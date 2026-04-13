@@ -1,0 +1,10 @@
+{
+  "id": "example-spec",
+  "title": "Example",
+  "status": "approved",
+  "owners": ["Tester"],
+  "linked_paths": ["CLAUDE.md", ".claude/commands/**"],
+  "acceptance_commands": ["echo ok"],
+  "depends_on_specs": [],
+  "active_prs": []
+}

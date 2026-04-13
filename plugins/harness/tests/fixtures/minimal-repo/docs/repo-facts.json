@@ -1,0 +1,8 @@
+{
+  "team_count": 2,
+  "protected_paths": [
+    "CLAUDE.md",
+    ".github/workflows/**",
+    ".claude/commands/**"
+  ]
+}
