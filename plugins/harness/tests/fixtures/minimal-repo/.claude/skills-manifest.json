@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "generatedAt": "2026-04-13T00:00:00.000Z",
+  "skills": [
+    {
+      "name": "example",
+      "path": ".claude/commands/example.md",
+      "category": "documentation",
+      "automationLevel": "full-auto",
+      "humanOversightReasons": [],
+      "dependencies": [],
+      "externalApis": [],
+      "modifiesFiles": [],
+      "checksum": "sha256:d1ee8d38e6d62ad36de75dd4159696ac8a26905e7136686c8e4c35112e14f9c0",
+      "lastValidated": "2026-04-13"
+    }
+  ]
+}
