@@ -1,0 +1,28 @@
+# Always-on AI PR review via Claude-headless.
+#
+# Phase 5 of the SDD & Harness Hardening plan chose this path over Vercel Agent
+# because it works in any repo with an ANTHROPIC_API_KEY secret — no per-repo
+# Vercel project linking required. Swap to vercel:vercel-agent per-project if
+# the host project is Vercel-deployed and prefers that integration.
+#
+# Requires: ANTHROPIC_API_KEY set as a GitHub Actions secret.
+# Scope: runs only on same-repo PRs (not forks) to prevent secret exfiltration
+# via malicious PR (SEC-6 in the spec).
+name: AI PR review
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with: { fetch-depth: 0 }
+      - name: Run /review-prs headless
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npx @anthropic-ai/claude-code -p "Run /review-prs for PR #${{ github.event.pull_request.number }}" \
+            --settings .claude/settings.headless.json --max-turns 40

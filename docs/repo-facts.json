@@ -1,0 +1,20 @@
+{
+  "project_name": "@kaiohenricunha/harness",
+  "project_type": "node",
+  "team_count": 1,
+  "protected_paths": [
+    "CLAUDE.md",
+    "README.md",
+    ".github/workflows/**",
+    ".claude/**",
+    "docs/repo-facts.json",
+    "docs/specs/**/spec.json",
+    "plugins/harness/src/**",
+    "plugins/harness/bin/**",
+    "plugins/harness/templates/**"
+  ],
+  "instruction_files": [
+    "CLAUDE.md",
+    "README.md"
+  ]
+}

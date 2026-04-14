@@ -99,6 +99,25 @@ Scope `--allowedTools` tightly — prefer `Bash(gh:*)` over `Bash(*)`. Combine w
 - State results and decisions directly. Don't narrate internal deliberation.
 - Bias toward action. Write a brief plan (5 bullets max), then start implementing. Do not iterate on plans without producing code.
 
+## Protected paths (dogfood)
+
+This repository governs itself with `@kaiohenricunha/harness`. The authoritative
+list of protected paths lives in `docs/repo-facts.json` and every entry must
+be documented here — `harness-check-instruction-drift` enforces this invariant.
+
+- `CLAUDE.md` — this file.
+- `README.md` — top-level public README.
+- `.github/workflows/**` — CI pipelines.
+- `.claude/**` — skill manifest, settings, hooks.
+- `docs/repo-facts.json` — the facts source of truth.
+- `docs/specs/**/spec.json` — spec metadata governed by the spec-anchored workflow.
+- `plugins/harness/src/**` — the npm package's source of truth.
+- `plugins/harness/bin/**` — the shipped bin entrypoints.
+- `plugins/harness/templates/**` — scaffolding templates consumers install.
+
+Any PR touching one of these paths must carry either `Spec ID: harness-core`
+or a `## No-spec rationale` section in its body.
+
 ## Slash Commands Reference
 
 Quick-invoke disciplines for recurring friction:

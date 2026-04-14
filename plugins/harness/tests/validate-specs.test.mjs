@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { readFileSync, writeFileSync, mkdtempSync, cpSync } from "fs";
+import { readFileSync, writeFileSync, mkdtempSync, cpSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { validateSpecs } from "../src/validate-specs.mjs";
@@ -109,6 +109,39 @@ describe("validateSpecs", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_LINKED_PATH_MISSING)).toBe(true);
     expect(result.errors.some((e) => /linked_paths/.test(e))).toBe(true);
+  });
+
+  it("flags non-string entries inside linked_paths / acceptance_commands arrays and non-array active_prs", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const spec = readSpecJson(root);
+    spec.linked_paths = ["ok.md", 42];
+    spec.acceptance_commands = ["npm test", null];
+    spec.active_prs = "not-an-array";
+    writeSpecJson(root, spec);
+    const result = validateSpecs(ctx);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_LINKED_PATH_MISSING && e.pointer === "linked_paths[]")).toBe(true);
+    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_ACCEPTANCE_EMPTY && e.pointer === "acceptance_commands[]")).toBe(true);
+    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && e.pointer === "active_prs")).toBe(true);
+  });
+
+  it("emits SPEC_JSON_INVALID when spec.json fails to parse", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    writeFileSync(specJsonPath(root), "{ not valid json");
+    const result = validateSpecs(ctx);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_JSON_INVALID)).toBe(true);
+  });
+
+  it("emits SPEC_JSON_INVALID when spec.json is missing for a listed dir", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    unlinkSync(specJsonPath(root));
+    const result = validateSpecs(ctx);
+    expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_JSON_INVALID && /missing spec\.json/.test(e.message))).toBe(true);
   });
 
   it("emits SPEC_ACCEPTANCE_EMPTY when `acceptance_commands` is empty", () => {

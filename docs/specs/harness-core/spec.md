@@ -1,0 +1,49 @@
+# Spec — @kaiohenricunha/harness core
+
+Status: **done** (v0.2.0 productization landing across PRs 1–7)
+
+## Context
+
+`@kaiohenricunha/harness` is a portable npm package + Claude Code plugin that
+bootstraps spec-driven-development governance into consumer repos. It ships a
+CLI surface (`harness`, `harness-doctor`, `harness-validate-skills`, …), a
+programmatic Node API (`import { validateSpecs, createHarnessContext, … }`),
+a gold-standard shell settings validator, and a destructive-git PreToolUse
+guard hook.
+
+This repository — `kaiohenricunha/dotclaude` — is the canonical checkout. It
+dogfoods its own validators on every push (dogfood.yml in PR 7) and ships the
+public npm release via trusted publishing (release.yml in PR 7).
+
+## Invariants
+
+- The public Node-API barrel at `plugins/harness/src/index.mjs` exposes ≥24
+  named exports. Consumers never deep-import `src/*.mjs` directly.
+- Every validator emits `ValidationError` instances with stable `.code` values
+  from `ERROR_CODES`. Renames are breaking; additions are not.
+- Every bin honors the harness-wide flag set (`--help`, `--version`, `--json`,
+  `--verbose`, `--no-color`) and the named `EXIT_CODES` convention
+  (0 ok, 1 validation, 2 env, 64 usage).
+- The `guard-destructive-git.sh` hook exits **2** (Claude Code PreToolUse
+  protocol) to block a tool call — this is distinct from the validator
+  `EXIT_CODES.ENV = 2`.
+- All shipped shell scripts use `set -euo pipefail` and source the shared
+  `✓/✗/⚠` helpers from `plugins/harness/scripts/lib/output.sh`.
+
+## Linked surface
+
+See `linked_paths` in `spec.json` — every file whose content is governed by
+this spec. Any PR that modifies a linked path must either reference
+`Spec ID: harness-core` or provide a `## No-spec rationale` section.
+
+## Acceptance
+
+See `acceptance_commands` in `spec.json`. CI runs them on every push (see
+`dogfood.yml` in PR 7).
+
+## Non-goals (frozen to out-of-scope at v0.2.0)
+
+- TypeScript migration (see ADR-0002)
+- Docs site framework (plain markdown + GitHub rendering)
+- Windows shell support
+- A `harness upgrade` subcommand (manual for now; see `docs/upgrade-guide.md`)

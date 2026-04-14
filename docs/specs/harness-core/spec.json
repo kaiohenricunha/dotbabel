@@ -1,0 +1,32 @@
+{
+  "id": "harness-core",
+  "title": "@kaiohenricunha/harness — core library + plugin",
+  "status": "done",
+  "owners": ["Kaio Henrique Cunha"],
+  "linked_paths": [
+    "package.json",
+    "bootstrap.sh",
+    "sync.sh",
+    "CLAUDE.md",
+    "README.md",
+    ".claude/**",
+    "docs/repo-facts.json",
+    "docs/specs/**/spec.json",
+    "plugins/harness/src/**",
+    "plugins/harness/bin/**",
+    "plugins/harness/scripts/**",
+    "plugins/harness/hooks/**",
+    "plugins/harness/templates/**",
+    "plugins/harness/tests/**",
+    "plugins/harness/.claude-plugin/**"
+  ],
+  "acceptance_commands": [
+    "npm test",
+    "npx harness-validate-skills",
+    "npx harness-validate-specs",
+    "npx harness-check-instruction-drift",
+    "node -e \"import('@kaiohenricunha/harness').then(m => process.exit(Object.keys(m).length >= 24 ? 0 : 1))\""
+  ],
+  "depends_on_specs": [],
+  "active_prs": []
+}
