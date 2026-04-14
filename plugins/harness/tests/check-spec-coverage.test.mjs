@@ -5,6 +5,7 @@ import { mkdtempSync, cpSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkSpecCoverage } from "../src/check-spec-coverage.mjs";
+import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
@@ -24,10 +25,12 @@ describe("checkSpecCoverage", () => {
     expect(r.ok).toBe(true);
   });
 
-  it("fails when protected path changes with no covering spec and no rationale", () => {
+  it("emits COVERAGE_UNCOVERED when protected path changes with no covering spec and no rationale", () => {
     const ctx = createHarnessContext({ repoRoot: iso() });
     const r = checkSpecCoverage(ctx, { changedFiles: [".github/workflows/ci.yml"], isPullRequest: true, body: "", actor: "human" });
     expect(r.ok).toBe(false);
+    for (const err of r.errors) expect(err).toBeInstanceOf(ValidationError);
+    expect(r.errors.some((e) => e.code === ERROR_CODES.COVERAGE_UNCOVERED)).toBe(true);
     expect(r.errors.some((e) => /without an approved/.test(e))).toBe(true);
   });
 
@@ -43,10 +46,12 @@ describe("checkSpecCoverage", () => {
     expect(r.ok).toBe(true);
   });
 
-  it("fails when PR body references an unknown Spec ID", () => {
+  it("emits COVERAGE_UNKNOWN_SPEC_ID when PR body references an unknown Spec ID", () => {
     const ctx = createHarnessContext({ repoRoot: iso() });
     const r = checkSpecCoverage(ctx, { changedFiles: [], isPullRequest: true, body: "## Spec ID\nnonexistent-spec\n", actor: "human" });
     expect(r.ok).toBe(false);
-    expect(r.errors[0]).toMatch(/unknown Spec ID/);
+    expect(r.errors[0]).toBeInstanceOf(ValidationError);
+    expect(r.errors[0].code).toBe(ERROR_CODES.COVERAGE_UNKNOWN_SPEC_ID);
+    expect(r.errors[0].message).toMatch(/unknown Spec ID/);
   });
 });

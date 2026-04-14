@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 // Map template subtree prefixes to target prefixes
 const PREFIX_MAP = [
@@ -68,16 +69,26 @@ export function scaffoldHarness(
     const manifestPath = path.join(targetDir, ".claude", "skills-manifest.json");
     const specsPath = path.join(targetDir, "docs", "specs");
     if (fs.existsSync(manifestPath)) {
-      throw new Error(
-        `Repo already initialized: ${manifestPath} already exists. ` +
-          `Use --force to overwrite.`
-      );
+      throw new ValidationError({
+        code: ERROR_CODES.SCAFFOLD_CONFLICT,
+        category: "scaffold",
+        file: manifestPath,
+        message:
+          `Repo already initialized: ${manifestPath} already exists. ` +
+          `Use --force to overwrite.`,
+        hint: "pass `{ force: true }` or remove .claude/skills-manifest.json",
+      });
     }
     if (fs.existsSync(specsPath)) {
-      throw new Error(
-        `Repo already initialized: ${specsPath} already exists. ` +
-          `Use --force to overwrite.`
-      );
+      throw new ValidationError({
+        code: ERROR_CODES.SCAFFOLD_CONFLICT,
+        category: "scaffold",
+        file: specsPath,
+        message:
+          `Repo already initialized: ${specsPath} already exists. ` +
+          `Use --force to overwrite.`,
+        hint: "pass `{ force: true }` or remove docs/specs/",
+      });
     }
   }
 

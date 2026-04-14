@@ -5,6 +5,7 @@ import { readFileSync, writeFileSync, mkdtempSync, cpSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { validateManifest, refreshChecksums } from "../src/validate-skills-inventory.mjs";
+import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
@@ -24,7 +25,7 @@ describe("validateManifest", () => {
     expect(result.errors).toEqual([]);
   });
 
-  it("fails when a manifest entry references a missing file", () => {
+  it("emits MANIFEST_ENTRY_MISSING when a manifest entry references a missing file", () => {
     const root = isolateFixture();
     const ctx = createHarnessContext({ repoRoot: root });
     const manifestPath = path.join(root, ".claude", "skills-manifest.json");
@@ -33,24 +34,29 @@ describe("validateManifest", () => {
     writeFileSync(manifestPath, JSON.stringify(m, null, 2));
     const result = validateManifest(ctx);
     expect(result.ok).toBe(false);
-    expect(result.errors[0]).toMatch(/File not found/);
+    expect(result.errors[0]).toBeInstanceOf(ValidationError);
+    expect(result.errors[0].code).toBe(ERROR_CODES.MANIFEST_ENTRY_MISSING);
+    expect(result.errors[0].message).toMatch(/File not found/);
   });
 
-  it("fails when a checksum is stale", () => {
+  it("emits MANIFEST_CHECKSUM_MISMATCH when a checksum is stale", () => {
     const root = isolateFixture();
     const ctx = createHarnessContext({ repoRoot: root });
     writeFileSync(path.join(root, ".claude", "commands", "example.md"), "# modified\n");
     const result = validateManifest(ctx);
     expect(result.ok).toBe(false);
-    expect(result.errors[0]).toMatch(/Checksum mismatch/);
+    expect(result.errors[0]).toBeInstanceOf(ValidationError);
+    expect(result.errors[0].code).toBe(ERROR_CODES.MANIFEST_CHECKSUM_MISMATCH);
+    expect(result.errors[0].message).toMatch(/Checksum mismatch/);
   });
 
-  it("fails when a file on disk is not in the manifest (orphan)", () => {
+  it("emits MANIFEST_ORPHAN_FILE when a file on disk is not in the manifest", () => {
     const root = isolateFixture();
     const ctx = createHarnessContext({ repoRoot: root });
     writeFileSync(path.join(root, ".claude", "commands", "orphan.md"), "# orphan\n");
     const result = validateManifest(ctx);
     expect(result.ok).toBe(false);
+    expect(result.errors.some((e) => e.code === ERROR_CODES.MANIFEST_ORPHAN_FILE)).toBe(true);
     expect(result.errors.join("\n")).toMatch(/orphan/);
   });
 });

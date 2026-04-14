@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { scaffoldHarness } from "../src/init-harness-scaffold.mjs";
+import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.join(__dirname, "..", "templates");
@@ -76,29 +77,41 @@ describe("scaffoldHarness", () => {
     expect(manifest.generatedAt).toBe("2026-04-14");
   });
 
-  it("refuses if .claude/skills-manifest.json already exists", () => {
+  it("refuses if .claude/skills-manifest.json already exists — throws SCAFFOLD_CONFLICT", () => {
     fs.mkdirSync(path.join(targetDir, ".claude"), { recursive: true });
     fs.writeFileSync(path.join(targetDir, ".claude/skills-manifest.json"), "{}");
 
-    expect(() =>
+    let caught;
+    try {
       scaffoldHarness({
         templatesDir: TEMPLATES_DIR,
         targetDir,
         placeholders: DEFAULT_PLACEHOLDERS,
-      })
-    ).toThrow(/already|initialized/i);
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ValidationError);
+    expect(caught.code).toBe(ERROR_CODES.SCAFFOLD_CONFLICT);
+    expect(caught.message).toMatch(/already|initialized/i);
   });
 
-  it("refuses if docs/specs/ already exists", () => {
+  it("refuses if docs/specs/ already exists — throws SCAFFOLD_CONFLICT", () => {
     fs.mkdirSync(path.join(targetDir, "docs/specs"), { recursive: true });
 
-    expect(() =>
+    let caught;
+    try {
       scaffoldHarness({
         templatesDir: TEMPLATES_DIR,
         targetDir,
         placeholders: DEFAULT_PLACEHOLDERS,
-      })
-    ).toThrow(/already|initialized/i);
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ValidationError);
+    expect(caught.code).toBe(ERROR_CODES.SCAFFOLD_CONFLICT);
+    expect(caught.message).toMatch(/already|initialized/i);
   });
 
   it("makes guard-destructive-git.sh executable post-copy", () => {
