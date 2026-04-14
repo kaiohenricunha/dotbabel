@@ -1,0 +1,16 @@
+{
+  "_note": "Conservative deny-list for unattended runs. Extend per-repo as needed.",
+  "permissions": {
+    "allow": ["Read", "Grep", "Glob", "Bash(git status)", "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)"],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(git push)",
+      "Bash(git reset --hard:*)",
+      "Bash(git reset --hard)",
+      "Bash(git clean -f:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(npm publish:*)",
+      "Bash(npm publish)"
+    ]
+  }
+}

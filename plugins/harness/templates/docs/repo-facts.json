@@ -1,0 +1,17 @@
+{
+  "project_name": "{{project_name}}",
+  "project_type": "{{project_type}}",
+  "protected_paths": [
+    "CLAUDE.md",
+    "README.md",
+    ".github/workflows/**",
+    ".claude/commands/**",
+    ".claude/hooks/**",
+    ".claude/settings.json",
+    ".claude/settings.headless.json",
+    ".claude/skills-manifest.json",
+    "docs/repo-facts.json",
+    "docs/specs/**/spec.json"
+  ],
+  "verification_commands": []
+}
