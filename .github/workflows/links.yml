@@ -8,6 +8,9 @@ on:
     - cron: "0 9 * * 1" # weekly Monday 09:00 UTC
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   lychee:
     runs-on: ubuntu-latest
