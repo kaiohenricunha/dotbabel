@@ -4,8 +4,8 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 
 ## Local filesystem conventions
 
-- All projects live at `/mnt/storage/Projects/kaiohenricunha/`. Do not search the home directory or default locations.
-- Global Claude config lives at `/mnt/storage/Projects/kaiohenricunha/dotclaude/` and is symlinked into `~/.claude/`. Edit files under `dotclaude/`, not `~/.claude/` directly.
+- All projects live at `$HOME/Projects/kaiohenricunha/`. Do not search the home directory or default locations.
+- Global Claude config lives at `$HOME/Projects/kaiohenricunha/dotclaude/` and is symlinked into `~/.claude/`. Edit files under `dotclaude/`, not `~/.claude/` directly.
 
 ## Code Changes
 
