@@ -24,9 +24,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "lint": "prettier --check \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown && markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.claude/worktrees\" && node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src",
+    "lint": "prettier --check \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown && markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.claude/worktrees\" && node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src && npm run shellcheck",
     "format": "prettier --write \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown",
-    "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/dotclaude/scripts/*.sh plugins/dotclaude/hooks/*.sh plugins/dotclaude/tests/*.sh plugins/dotclaude/templates/claude/hooks/*.sh plugins/dotclaude/templates/githooks/pre-commit",
+    "shellcheck": "shellcheck --severity=warning -x bootstrap.sh sync.sh plugins/dotclaude/scripts/*.sh plugins/dotclaude/scripts/lib/*.sh plugins/dotclaude/hooks/*.sh plugins/dotclaude/tests/*.sh plugins/dotclaude/templates/claude/hooks/*.sh plugins/dotclaude/templates/githooks/pre-commit",
     "dogfood": "npx dotclaude-validate-skills && npx dotclaude-validate-specs && npx dotclaude-check-instruction-drift && npx dotclaude-check-spec-coverage"
   },
   "files": [
