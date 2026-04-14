@@ -48,7 +48,7 @@ templates/
 
 - **`claude/hooks/guard-destructive-git.sh`** — PreToolUse hook that blocks
   destructive git calls. Exit 2 per Claude Code hook protocol. See
-  [ADR-0014](../../../docs/adr/) for the ✓/✗/⚠ format inheritance.
+  [ADR-0014](./adr/0014-cli-tick-cross-warn-format.md) for the ✓/✗/⚠ format inheritance.
 - **`claude/skills-manifest.json`** — minimal `{version:1, skills:[]}`
   seed. Run `npx harness-validate-skills --update` after adding skills to
   populate checksums.
