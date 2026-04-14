@@ -33,7 +33,7 @@ jobs:
             exit 1
           fi
       - run: npm test
-      - run: bash plugins/harness/tests/test_validate_settings.sh
+      - run: bash plugins/dotclaude/tests/test_validate_settings.sh
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public

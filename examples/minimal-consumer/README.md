@@ -1,6 +1,6 @@
 # minimal-consumer
 
-Committed output of `npx harness-init --project-name minimal-consumer --project-type node`.
+Committed output of `npx dotclaude-init --project-name minimal-consumer --project-type node`.
 This example exists so `dogfood.yml` (PR 7) can run every validator against a
 post-scaffold tree and catch breakage before consumers ever npm-install the
 package.
@@ -12,7 +12,7 @@ rm -rf examples/minimal-consumer
 mkdir examples/minimal-consumer
 cd examples/minimal-consumer
 git init
-node ../../plugins/harness/bin/harness-init.mjs --project-name minimal-consumer --project-type node
+node ../../plugins/dotclaude/bin/dotclaude-init.mjs --project-name minimal-consumer --project-type node
 rm -rf .git
 ```
 

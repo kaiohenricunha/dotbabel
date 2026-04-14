@@ -12,7 +12,7 @@
   "ignores": [
     "node_modules/**",
     ".claude/worktrees/**",
-    "plugins/harness/tests/fixtures/**",
+    "plugins/dotclaude/tests/fixtures/**",
     "commands/**",
     "skills/**",
     ".claude/commands/**",

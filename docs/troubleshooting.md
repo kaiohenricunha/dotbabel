@@ -3,7 +3,7 @@
 Indexed by `ERROR_CODES`. When a validator fails, look up the `.code` value
 from its `ValidationError` here.
 
-Debug flag: set `HARNESS_DEBUG=1` to route previously-silent git-probe
+Debug flag: set `DOTCLAUDE_DEBUG=1` to route previously-silent git-probe
 catches (`resolveRepoRootFromGit`, `getChangedFiles`) to stderr tagged
 `[harness:git:*]`.
 
@@ -58,12 +58,12 @@ A `.claude/skills-manifest.json` entry points at a path that does not exist on d
 ### `MANIFEST_CHECKSUM_MISMATCH`
 
 A file's content drifted from the recorded sha256.
-**Fix**: `npx harness-validate-skills --update` to recompute and accept the new content, or restore the file to its original state.
+**Fix**: `npx dotclaude-validate-skills --update` to recompute and accept the new content, or restore the file to its original state.
 
 ### `MANIFEST_ORPHAN_FILE`
 
 A file under `.claude/commands/` or `.claude/skills/<name>/SKILL.md` is not indexed in the manifest.
-**Fix**: `npx harness-validate-skills --update` to pick it up (add a manifest entry), or delete the file.
+**Fix**: `npx dotclaude-validate-skills --update` to pick it up (add a manifest entry), or delete the file.
 
 ### `MANIFEST_DEPENDENCY_CYCLE`
 
@@ -119,12 +119,12 @@ An `instruction_files` entry points at a path that does not exist.
 
 ### `SCAFFOLD_CONFLICT`
 
-`harness-init` refuses to overwrite an already-initialized repo.
+`dotclaude-init` refuses to overwrite an already-initialized repo.
 **Fix**: pass `--force` to overwrite, or remove `.claude/skills-manifest.json` / `docs/specs/` first.
 
 ### `SCAFFOLD_USAGE`
 
-Bad CLI invocation of `harness-init` (e.g. flag without a value).
+Bad CLI invocation of `dotclaude-init` (e.g. flag without a value).
 **Fix**: see `--help`.
 
 ---
@@ -165,12 +165,12 @@ Settings JSON is malformed OR an MCP command / hook target / enabled plugin does
 ### `ENV_REPO_ROOT_UNKNOWN`
 
 `createHarnessContext()` could not resolve a repo root.
-**Fix**: pass `--repo-root <path>` or `HARNESS_REPO_ROOT=<path>`, or run inside a git worktree.
+**Fix**: pass `--repo-root <path>` or `DOTCLAUDE_REPO_ROOT=<path>`, or run inside a git worktree.
 
 ### `ENV_FACTS_MISSING`
 
 `docs/repo-facts.json` is missing or unreadable.
-**Fix**: scaffold with `harness-init` or author the file (see `plugins/harness/templates/docs/repo-facts.json`).
+**Fix**: scaffold with `dotclaude-init` or author the file (see `plugins/dotclaude/templates/docs/repo-facts.json`).
 
 ### `USAGE_UNKNOWN_FLAG`
 

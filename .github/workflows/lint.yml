@@ -16,12 +16,12 @@ jobs:
           shellcheck --severity=warning -x \
             bootstrap.sh \
             sync.sh \
-            plugins/harness/scripts/*.sh \
-            plugins/harness/scripts/lib/*.sh \
-            plugins/harness/hooks/*.sh \
-            plugins/harness/tests/*.sh \
-            plugins/harness/templates/claude/hooks/*.sh \
-            plugins/harness/templates/githooks/pre-commit
+            plugins/dotclaude/scripts/*.sh \
+            plugins/dotclaude/scripts/lib/*.sh \
+            plugins/dotclaude/hooks/*.sh \
+            plugins/dotclaude/tests/*.sh \
+            plugins/dotclaude/templates/claude/hooks/*.sh \
+            plugins/dotclaude/templates/githooks/pre-commit
 
   markdownlint:
     runs-on: ubuntu-latest
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: "22" }
-      - run: node scripts/check-jsdoc-coverage.mjs plugins/harness/src
+      - run: node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src
 
   prettier:
     runs-on: ubuntu-latest

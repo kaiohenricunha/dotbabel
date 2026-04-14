@@ -1,7 +1,7 @@
-# Contributing to `@kaiohenricunha/harness`
+# Contributing to `@dotclaude/dotclaude`
 
 Thanks for considering a contribution. This repo is a dual-purpose checkout
-— a portable npm package (`@kaiohenricunha/harness`) **and** Kaio's personal
+— a portable npm package (`@dotclaude/dotclaude`) **and** Kaio's personal
 global Claude Code config. Most contributions land in the former. See
 `docs/personas.md` for the distinction.
 
@@ -13,9 +13,9 @@ cd dotclaude
 npm ci
 ./bootstrap.sh             # only if you also want the dotfiles in ~/.claude/
 npm test                   # vitest: must be 90/90+ green
-bash plugins/harness/tests/test_validate_settings.sh
-npx bats plugins/harness/tests/bats/
-npx harness-doctor         # self-diagnostic
+bash plugins/dotclaude/tests/test_validate_settings.sh
+npx bats plugins/dotclaude/tests/bats/
+npx dotclaude-doctor         # self-diagnostic
 ```
 
 ## Development workflow
@@ -33,18 +33,18 @@ npx harness-doctor         # self-diagnostic
 3. **Run the local gate** before `gh pr create`:
    ```bash
    npm test -- --coverage   # thresholds: 85/85/80/85
-   npx bats plugins/harness/tests/bats/
-   bash plugins/harness/tests/test_validate_settings.sh
+   npx bats plugins/dotclaude/tests/bats/
+   bash plugins/dotclaude/tests/test_validate_settings.sh
    shellcheck --severity=warning -x bootstrap.sh sync.sh \
-     plugins/harness/scripts/*.sh plugins/harness/scripts/lib/*.sh \
-     plugins/harness/hooks/*.sh plugins/harness/tests/*.sh \
-     plugins/harness/templates/claude/hooks/*.sh \
-     plugins/harness/templates/githooks/pre-commit
-   node scripts/check-jsdoc-coverage.mjs plugins/harness/src
+     plugins/dotclaude/scripts/*.sh plugins/dotclaude/scripts/lib/*.sh \
+     plugins/dotclaude/hooks/*.sh plugins/dotclaude/tests/*.sh \
+     plugins/dotclaude/templates/claude/hooks/*.sh \
+     plugins/dotclaude/templates/githooks/pre-commit
+   node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src
    npm run dogfood
    ```
 4. **Follow spec discipline.** Every PR touching a protected path (see
-   `docs/repo-facts.json`) needs `Spec ID: harness-core` or a
+   `docs/repo-facts.json`) needs `Spec ID: dotclaude-core` or a
    `## No-spec rationale` section in its body. If you're adding a new
    subsystem, run `/spec` first to produce the design doc in `docs/specs/`.
 
@@ -63,7 +63,7 @@ npx harness-doctor         # self-diagnostic
 - **No runtime dependencies.** The `package.json` manifest is zero-dep by
   contract (ADR-0002). New code ships as plain Node 20+ ESM, no bundler.
 - **JSDoc every export.** `scripts/check-jsdoc-coverage.mjs` fails CI on
-  undocumented `export`s under `plugins/harness/src/`.
+  undocumented `export`s under `plugins/dotclaude/src/`.
 - **Structured errors.** Validators emit `ValidationError` from
   `src/lib/errors.mjs`, never raw strings. Add new codes to `ERROR_CODES`
   when the taxonomy doesn't cover your case.
@@ -71,7 +71,7 @@ npx harness-doctor         # self-diagnostic
   `--verbose`, `--no-color` and exits via the named `EXIT_CODES`
   (`{OK:0, VALIDATION:1, ENV:2, USAGE:64}`).
 - **Shell.** `set -euo pipefail` at the top of every script. Source
-  `plugins/harness/scripts/lib/output.sh` for `pass`/`fail`/`warn`. Run
+  `plugins/dotclaude/scripts/lib/output.sh` for `pass`/`fail`/`warn`. Run
   `shellcheck --severity=warning` locally.
 
 ## What not to send

@@ -2,8 +2,8 @@
 
 ## 0.1.x → 0.2.0
 
-`0.1.x` was never published to npm — it was the local skeleton on the
-author's machine. The first public release is `0.2.0`. If you're starting
+`0.1.x` was never published to npm — it was the local development skeleton.
+The first public release is `0.2.0`. If you're starting
 from a checked-out development copy of `0.1.x`, the migration surface is:
 
 ### Breaking
@@ -26,10 +26,10 @@ from a checked-out development copy of `0.1.x`, the migration surface is:
 
   ```js
   // before
-  import { validateSpecs } from "@kaiohenricunha/harness/plugins/harness/src/validate-specs.mjs";
+  import { validateSpecs } from "@dotclaude/dotclaude/plugins/dotclaude/src/validate-specs.mjs";
 
   // after
-  import { validateSpecs } from "@kaiohenricunha/harness";
+  import { validateSpecs } from "@dotclaude/dotclaude";
   ```
 
   The subpath exports `./errors` and `./exit-codes` are supported; any
@@ -43,7 +43,7 @@ from a checked-out development copy of `0.1.x`, the migration surface is:
 ### New capabilities
 
 - `--help`, `--version`, `--json`, `--verbose`, `--no-color` on every bin.
-- Umbrella `harness` CLI and `harness-doctor` self-diagnostic.
+- Umbrella `dotclaude` CLI and `dotclaude-doctor` self-diagnostic.
 - `validate-settings.sh --json` structured output.
 - Hardened `guard-destructive-git.sh` with `BYPASS_DESTRUCTIVE_GIT=1` bypass.
 - `bootstrap.sh --quiet`, `sync.sh` secret scan on push.
@@ -59,16 +59,16 @@ config, the key files to edit are:
 
 Run `./bootstrap.sh` after the fork to symlink them into `~/.claude/`.
 
-The plugin surface (`plugins/harness/**`) should remain a strict upstream
-of `kaiohenricunha/dotclaude` — pull changes from upstream rather than
+The plugin surface (`plugins/dotclaude/**`) should remain a strict upstream
+of the canonical `dotclaude` repo — pull changes from upstream rather than
 forking divergent plugin code.
 
 ## Migrating a hand-written `.claude/` tree
 
 If you already maintain a hand-written `.claude/` tree in a consumer repo
-and want to start using the harness:
+and want to start using dotclaude:
 
-1. **Inventory what you have.** `npx harness-validate-skills --update`
+1. **Inventory what you have.** `npx dotclaude-validate-skills --update`
    from an empty manifest will seed the checksums; you then have to choose
    between treating each existing file as indexed (keep the entry) or
    removed (delete it + rerun `--update`).
@@ -77,7 +77,7 @@ and want to start using the harness:
 3. **Draft at least one spec** (`docs/specs/<id>/spec.json`). It can be
    `status: draft` initially — gating only kicks in at
    `approved|implementing|done`.
-4. Run `npx harness-doctor` and iterate on every `✗` it reports.
+4. Run `npx dotclaude-doctor` and iterate on every `✗` it reports.
 5. Wire the three shipped workflows into `.github/workflows/`.
 
 ## Running `v0.2.0` in CI without a published npm
@@ -87,9 +87,9 @@ git commit:
 
 ```json
 "devDependencies": {
-  "@kaiohenricunha/harness": "github:kaiohenricunha/dotclaude#v0.2.0"
+  "@dotclaude/dotclaude": "github:kaiohenricunha/dotclaude#v0.2.0"
 }
 ```
 
-Swap to the published version once `npm view @kaiohenricunha/harness@0.2.0`
+Swap to the published version once `npm view @dotclaude/dotclaude@0.2.0`
 returns a hit.

@@ -1,4 +1,4 @@
-# `@kaiohenricunha/harness` — docs
+# `@dotclaude/dotclaude` — docs
 
 The harness is a portable npm package + Claude Code plugin that bootstraps
 spec-driven-development governance into consumer repos. It ships a
@@ -21,14 +21,14 @@ validator, and a destructive-git PreToolUse hook.
 - [architecture.md](./architecture.md) — layer diagram + PR-time coverage check sequence
 - [personas.md](./personas.md) — consumer vs dotfile user vs contributor entry-point matrix
 - [adr/](./adr/) — architectural decision records (one per load-bearing decision)
-- [specs/harness-core/](./specs/harness-core/) — the canonical spec this repo governs itself with
+- [specs/dotclaude-core/](./specs/dotclaude-core/) — the canonical spec this repo governs itself with
 
 ## What this package gives you
 
 - **Structured-error contract.** Every validator emits `ValidationError`
   instances with stable `.code` values (see [troubleshooting.md](./troubleshooting.md)).
 - **Umbrella CLI + standalone bins.** `harness validate-specs` or
-  `harness-validate-specs` — both exist, same behavior.
+  `dotclaude-validate-specs` — both exist, same behavior.
 - **Universal flags.** `--help`, `--version`, `--json`, `--verbose`,
   `--no-color` on every bin.
 - **Named exit codes.** `{OK:0, VALIDATION:1, ENV:2, USAGE:64}` — `64`
@@ -40,5 +40,5 @@ validator, and a destructive-git PreToolUse hook.
 
 This package is itself a consumer of its own validators — see
 [../CLAUDE.md](../CLAUDE.md) §Protected paths. Every PR touching a
-protected path either carries `Spec ID: harness-core` or a
+protected path either carries `Spec ID: dotclaude-core` or a
 `## No-spec rationale` section; `dogfood.yml` enforces this on every push.

@@ -1,41 +1,41 @@
 {
-  "name": "@kaiohenricunha/harness",
+  "name": "@dotclaude/dotclaude",
   "version": "0.2.0",
-  "description": "Portable harness + SDD validators for Claude Code projects.",
+  "description": "dotclaude — portable SDD validators and Claude Code governance for any project.",
   "type": "module",
-  "main": "plugins/harness/src/index.mjs",
+  "main": "plugins/dotclaude/src/index.mjs",
   "exports": {
-    ".": "./plugins/harness/src/index.mjs",
-    "./errors": "./plugins/harness/src/lib/errors.mjs",
-    "./exit-codes": "./plugins/harness/src/lib/exit-codes.mjs",
+    ".": "./plugins/dotclaude/src/index.mjs",
+    "./errors": "./plugins/dotclaude/src/lib/errors.mjs",
+    "./exit-codes": "./plugins/dotclaude/src/lib/exit-codes.mjs",
     "./package.json": "./package.json"
   },
   "bin": {
-    "harness": "./plugins/harness/bin/harness.mjs",
-    "harness-doctor": "./plugins/harness/bin/harness-doctor.mjs",
-    "harness-detect-drift": "./plugins/harness/bin/harness-detect-drift.mjs",
-    "harness-validate-skills": "./plugins/harness/bin/harness-validate-skills.mjs",
-    "harness-check-spec-coverage": "./plugins/harness/bin/harness-check-spec-coverage.mjs",
-    "harness-validate-specs": "./plugins/harness/bin/harness-validate-specs.mjs",
-    "harness-check-instruction-drift": "./plugins/harness/bin/harness-check-instruction-drift.mjs",
-    "harness-init": "./plugins/harness/bin/harness-init.mjs"
+    "dotclaude": "./plugins/dotclaude/bin/dotclaude.mjs",
+    "dotclaude-doctor": "./plugins/dotclaude/bin/dotclaude-doctor.mjs",
+    "dotclaude-detect-drift": "./plugins/dotclaude/bin/dotclaude-detect-drift.mjs",
+    "dotclaude-validate-skills": "./plugins/dotclaude/bin/dotclaude-validate-skills.mjs",
+    "dotclaude-check-spec-coverage": "./plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs",
+    "dotclaude-validate-specs": "./plugins/dotclaude/bin/dotclaude-validate-specs.mjs",
+    "dotclaude-check-instruction-drift": "./plugins/dotclaude/bin/dotclaude-check-instruction-drift.mjs",
+    "dotclaude-init": "./plugins/dotclaude/bin/dotclaude-init.mjs"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "lint": "echo 'lint target stubs — prettier + markdownlint wiring lands in PR 4/6' && exit 0",
-    "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/harness/scripts/*.sh plugins/harness/hooks/*.sh plugins/harness/tests/*.sh plugins/harness/templates/claude/hooks/*.sh plugins/harness/templates/githooks/pre-commit",
-    "dogfood": "npx harness-validate-skills && npx harness-validate-specs && npx harness-check-instruction-drift && npx harness-check-spec-coverage"
+    "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/dotclaude/scripts/*.sh plugins/dotclaude/hooks/*.sh plugins/dotclaude/tests/*.sh plugins/dotclaude/templates/claude/hooks/*.sh plugins/dotclaude/templates/githooks/pre-commit",
+    "dogfood": "npx dotclaude-validate-skills && npx dotclaude-validate-specs && npx dotclaude-check-instruction-drift && npx dotclaude-check-spec-coverage"
   },
   "files": [
-    "plugins/harness/src/",
-    "plugins/harness/bin/",
-    "plugins/harness/scripts/",
-    "plugins/harness/templates/",
-    "plugins/harness/hooks/",
-    "plugins/harness/README.md",
-    "plugins/harness/.claude-plugin/"
+    "plugins/dotclaude/src/",
+    "plugins/dotclaude/bin/",
+    "plugins/dotclaude/scripts/",
+    "plugins/dotclaude/templates/",
+    "plugins/dotclaude/hooks/",
+    "plugins/dotclaude/README.md",
+    "plugins/dotclaude/.claude-plugin/"
   ],
   "engines": {
     "node": ">=20"
@@ -56,7 +56,7 @@
   "keywords": [
     "claude-code",
     "claude",
-    "harness",
+    "dotclaude",
     "sdd",
     "spec-driven",
     "validator",

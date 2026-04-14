@@ -1,18 +1,18 @@
-# `@kaiohenricunha/harness`
+# `@dotclaude/dotclaude`
 
-[![npm](https://img.shields.io/npm/v/@kaiohenricunha/harness.svg)](https://www.npmjs.com/package/@kaiohenricunha/harness)
+[![npm](https://img.shields.io/npm/v/@dotclaude/dotclaude.svg)](https://www.npmjs.com/package/@dotclaude/dotclaude)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![changelog](https://img.shields.io/badge/changelog-keep--a--changelog-orange.svg)](./CHANGELOG.md)
 
 Portable Claude Code plugin + zero-dependency npm package that bootstraps
 spec-driven-development governance into consumer repos. Ships a structured-error
-CLI, an umbrella `harness` dispatcher, seven standalone bins, a destructive-git
+CLI, an umbrella `dotclaude` dispatcher, seven standalone bins, a destructive-git
 PreToolUse hook, and a gold-standard shell settings validator.
 
 **Two personas live in this repo** (by design — see [docs/personas.md](./docs/personas.md)):
 
-- The **npm package** under `plugins/harness/` (what consumers install).
-- Kaio's **personal dotfiles** at the top level (symlinked into `~/.claude/` via `bootstrap.sh`).
+- The **npm package** under `plugins/dotclaude/` (what consumers install).
+- **Personal dotfiles** at the top level (symlinked into `~/.claude/` via `bootstrap.sh` — fork this to use your own).
 
 If you're installing the package, ignore the top-level scripts —
 `package.json.files` excludes them from the tarball.
@@ -22,10 +22,10 @@ If you're installing the package, ignore the top-level scripts —
 ## Consumer quickstart
 
 ```bash
-npm i -D @kaiohenricunha/harness
-npx harness-init --project-name my-project --project-type node
-npx harness-doctor          # self-diagnostic
-npx harness-validate-specs  # every bin works standalone or via `npx harness <sub>`
+npm i -D @dotclaude/dotclaude
+npx dotclaude-init --project-name my-project --project-type node
+npx dotclaude-doctor          # self-diagnostic
+npx dotclaude-validate-specs  # every bin works standalone or via `npx dotclaude <sub>`
 ```
 
 Five minutes end-to-end: [docs/quickstart.md](./docs/quickstart.md).
@@ -43,7 +43,7 @@ import {
   ValidationError,
   ERROR_CODES,
   EXIT_CODES,
-} from "@kaiohenricunha/harness";
+} from "@dotclaude/dotclaude";
 
 const ctx = createHarnessContext(); // resolves repo root via git
 const { ok, errors } = validateSpecs(ctx); // errors are ValidationError instances
@@ -87,19 +87,19 @@ Each row links to its ADR (see [docs/adr/](./docs/adr/)):
 | CLI ✓/✗/⚠ output format                  | [0014](./docs/adr/0014-cli-tick-cross-warn-format.md)   |
 
 Shell-level hardening (SEC-1..4, OPS-1..2) is enforced today at
-`plugins/harness/scripts/validate-settings.sh`; its 12-case behavioral
-suite at `plugins/harness/tests/test_validate_settings.sh` pins every
+`plugins/dotclaude/scripts/validate-settings.sh`; its 12-case behavioral
+suite at `plugins/dotclaude/tests/test_validate_settings.sh` pins every
 contract.
 
 ---
 
 ## Personal dotfiles persona
 
-If you're Kaio (or forking for your own dotfiles), the entry-point is:
+Fork this repo and use it as your own Claude Code dotfiles:
 
 ```bash
-git clone https://github.com/kaiohenricunha/dotclaude.git ~/projects/kaiohenricunha/dotclaude
-cd ~/projects/kaiohenricunha/dotclaude
+git clone https://github.com/kaiohenricunha/dotclaude.git ~/projects/dotclaude
+cd ~/projects/dotclaude
 ./bootstrap.sh                  # symlinks commands/ + skills/ + CLAUDE.md into ~/.claude/
 ./sync.sh pull                  # pull + re-bootstrap
 ./sync.sh push                  # secret-scan + commit + push
