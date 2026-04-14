@@ -1,3 +1,10 @@
+---
+name: detect-flaky
+description: >
+  Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.
+argument-hint: "[test-command]"
+---
+
 # /detect-flaky — Flaky Test Detection and Diagnosis Agent
 
 This agent detects, diagnoses, and fixes flaky tests in **Python**, **Go**, and **JavaScript/TypeScript** codebases.

@@ -1,5 +1,14 @@
 # CLAUDE.md — Global Claude Code Rules
 
+> **Persona note.** This file is the global rule floor for Kaio's personal
+> Claude Code environment — it gets symlinked into `~/.claude/CLAUDE.md`
+> by `bootstrap.sh`. **Consumers of `@kaiohenricunha/harness` do NOT
+> inherit it.** The plugin's behavior is defined by its own docs under
+> `plugins/harness/` and [docs/](./docs/). Contributors to this repo
+> should read [CONTRIBUTING.md](./CONTRIBUTING.md) first; this file
+> covers the author's universal working agreements, not project-specific
+> development conventions.
+
 Universal behavior for every Claude Code session in every repo. Project-level `CLAUDE.md` files extend and may override these, but should not repeat them.
 
 ## Local filesystem conventions

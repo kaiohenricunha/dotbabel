@@ -1,3 +1,9 @@
+---
+name: dependabot-sweep
+description: >
+  Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.
+---
+
 Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produce a risk-annotated table and merge only safe bumps.
 
 Trigger: when the user asks to review/merge/rebase Dependabot PRs, or wants to sweep dependency updates. Also triggered directly via `/dependabot-sweep`.

@@ -1,88 +1,88 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-14T17:53:47.436Z",
+  "generatedAt": "2026-04-14T18:16:39.823Z",
   "skills": [
     {
       "name": "audit-and-fix",
       "path": ".claude/commands/audit-and-fix.md",
-      "checksum": "sha256:809afb441a26c8ecca5e22e4728ee45635fc7244493cb4d4875e0f54168f5b60",
+      "checksum": "sha256:5c994b1e8b571c960350e9f6d731a210df18513fb48e96f4afa3b3bd1600286b",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "changelog",
       "path": ".claude/commands/changelog.md",
-      "checksum": "sha256:a187952d790a3c851893dde1c6657bfe45332ab4f7427d6f38c83d2886c8640e",
+      "checksum": "sha256:9b5d6ef4c54ec9889a18369c337a3f60660175a1d8409ca0fe53d2b94a7592dd",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "create-assessment",
       "path": ".claude/commands/create-assessment.md",
-      "checksum": "sha256:aa9001809f91041bcf81827ef9c1d142ef6ffb21696fed7a541849d501a70f8f",
+      "checksum": "sha256:d5e0e885b3f33371050316d47b1cdff515c2a1160229ffdc54e69d9401ba3c28",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "create-audit",
       "path": ".claude/commands/create-audit.md",
-      "checksum": "sha256:a7250ea760a3e70e9d258fc9c0e8f662076b32a544786fa58af4cd95bb244c79",
+      "checksum": "sha256:dc5c88c767dba94c1edff2a1c8e2c7696293402999d282c16ceefa23a1fd229a",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "dependabot-sweep",
       "path": ".claude/commands/dependabot-sweep.md",
-      "checksum": "sha256:40af56abe8a70ef6e4fc8fc6148609a890ae1680e7954ffce1e292fd70fe8481",
+      "checksum": "sha256:4583cfb9110adf12f01a2b888eb532931731eabe31607d27b3f9e2792535c08c",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "detect-flaky",
       "path": ".claude/commands/detect-flaky.md",
-      "checksum": "sha256:f574ed8110c7b7b5897be1c52df044f935fdc23dafa85c84e02e704a956de7c9",
+      "checksum": "sha256:f09291cd75e49a8eeb1e715d4aebc600dc17ec3419bcaf6650dfb03930c35d94",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "fix-with-evidence",
       "path": ".claude/commands/fix-with-evidence.md",
-      "checksum": "sha256:5296b8b9747203c195cbbca311302f9c0a962f8a2cb49136daf3aa45f80dea3e",
+      "checksum": "sha256:2ce881f525c808c1d1b3731019b538d4126faa150819df04a142bf5ec1d2bd5d",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "git",
       "path": ".claude/commands/git.md",
-      "checksum": "sha256:38c677158a596c37fa117698195bcc9e5d2169c8f8b5c412eca933fc0edf68df",
+      "checksum": "sha256:c5af180ce541a20d2bc9d536e0e0ae5346794c20d664d88bd602cdfdccf94b21",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "ground-first",
       "path": ".claude/commands/ground-first.md",
-      "checksum": "sha256:109c4984bd31f21b3113c7ddb389b68b6ee8b7302cdba7727e64b97f8f7e3bd1",
+      "checksum": "sha256:57948660205b9916d0c0f796387c6a7afc0221e0e610bcce14c2f6da0a651fd3",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "markdown",
       "path": ".claude/commands/markdown.md",
-      "checksum": "sha256:258e68b87d46407e65eabee20edb8bb95f6f362eb379b4bb19367b9b527f07a5",
+      "checksum": "sha256:58b7a88382f16f273353bad4a74fa2b312d5a91d062fa7c3928a3e9459b77a1c",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:0be77918cd64f7b48e10ce5df1f66215fa0ecaddf9034ae207a0536396750fbf",
+      "checksum": "sha256:a8f2f8c230140590fd927c5deb67e926d760cec520378d4eb3df9c9147446f71",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },
     {
       "name": "security-review",
       "path": ".claude/commands/security-review.md",
-      "checksum": "sha256:bc8b61a15cc8443477e2937248e98fc91d064e532bf1e5d5988fd69cc6bd52e0",
+      "checksum": "sha256:5e6c66a55312c0d6f09338c59e9121f95b2cc3baa4a19670bab29114f882e5fb",
       "dependencies": [],
       "lastValidated": "2026-04-14"
     },

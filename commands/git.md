@@ -1,3 +1,10 @@
+---
+name: git
+description: >
+  Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.
+argument-hint: "[subcommand]"
+---
+
 # /git
 
 A project-aware git workflow command: craft conventional commits, create PRs, push with the right safety rails, merge into main, and suggest branch names.

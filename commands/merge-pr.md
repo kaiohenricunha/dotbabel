@@ -1,3 +1,10 @@
+---
+name: merge-pr
+description: >
+  Merge a pull request only after full local verification, with a data-regression gate for PRs touching data/calibration/rankings.
+argument-hint: "[PR#]"
+---
+
 Merge a pull request only after full local verification, with a data-regression gate for PRs touching data/calibration/rankings.
 
 Trigger: when the user asks to merge a PR, especially one that modifies data files, calibration logic, or ranking output. Also triggered directly via `/merge-pr <N>`.

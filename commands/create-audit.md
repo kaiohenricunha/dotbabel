@@ -1,3 +1,10 @@
+---
+name: create-audit
+description: >
+  Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.
+argument-hint: "[subject]"
+---
+
 Create a structured audit document and save it to the project's `docs/audits/` directory.
 
 Trigger: when the user asks for an audit, review, or assessment of any system, feature, data quality, process, or component. Also triggered directly via `/create-audit`.

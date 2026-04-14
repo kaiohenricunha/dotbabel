@@ -1,3 +1,10 @@
+---
+name: ground-first
+description: >
+  Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.
+argument-hint: "[subject]"
+---
+
 Produce a code-grounded analysis of a subject before any edits are proposed.
 
 Trigger: when the user asks for a fix, change, or investigation on non-trivial code and has not yet confirmed you understand current behavior. Also triggered directly via `/ground-first`.

@@ -1,3 +1,10 @@
+---
+name: fix-with-evidence
+description: >
+  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.
+argument-hint: "[issue]"
+---
+
 Fix a bug using a strict four-phase evidence loop: Reproduce → Fix → Verify → PR. Each phase gates on the previous.
 
 Trigger: when the user asks for a bug fix, wants to address an issue, or says "fix X". Also triggered directly via `/fix-with-evidence <issue>`.

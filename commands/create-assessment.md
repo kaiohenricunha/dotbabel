@@ -1,3 +1,10 @@
+---
+name: create-assessment
+description: >
+  Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.
+argument-hint: "[target]"
+---
+
 Create a structured assessment document that grades a target on a 0-10 scale using a weighted rubric and save it to the project's `docs/assessments/` directory.
 
 Trigger: when the user asks to grade, rate, score, evaluate, or assess a specific target — a package, a project/repo, a source file, an architecture decision, a pull request, or a document. Also triggered directly via `/create-assessment`. This skill is about **producing a numeric grade**, not listing issues — for issue-triage with severity levels use `/create-audit`.

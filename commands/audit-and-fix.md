@@ -1,3 +1,10 @@
+---
+name: audit-and-fix
+description: >
+  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to "audit and fix" or kicks off an overnight cleanup run.
+argument-hint: "[domain]"
+---
+
 Run a long-horizon audit-then-implement pipeline: produce a structured audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.
 
 Trigger: when the user asks for "audit and fix", wants to clean up a domain, or kicks off an overnight cleanup run. Also triggered directly via `/audit-and-fix <domain>`.

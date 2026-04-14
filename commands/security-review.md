@@ -1,3 +1,10 @@
+---
+name: security-review
+description: >
+  path|staged]"|Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.
+argument-hint: "[PR#
+---
+
 Analyze a diff or set of changed files for common security vulnerabilities.
 
 Arguments: `$ARGUMENTS` (optional: a PR number, file path, or `staged` for staged changes. Default: staged changes.)

@@ -1,0 +1,151 @@
+# Troubleshooting
+
+Indexed by `ERROR_CODES`. When a validator fails, look up the `.code` value
+from its `ValidationError` here.
+
+Debug flag: set `HARNESS_DEBUG=1` to route previously-silent git-probe
+catches (`resolveRepoRootFromGit`, `getChangedFiles`) to stderr tagged
+`[harness:git:*]`.
+
+---
+
+## Spec errors
+
+### `SPEC_JSON_INVALID`
+`docs/specs/<id>/spec.json` is missing or fails to parse.
+**Fix**: `node -e "JSON.parse(require('fs').readFileSync('docs/specs/<id>/spec.json','utf8'))"` to locate the parse error, or create the file.
+
+### `SPEC_STATUS_INVALID`
+`status` is not one of `draft | approved | implementing | done`.
+**Fix**: pick a valid status. Only `approved|implementing|done` gate PR coverage.
+
+### `SPEC_ID_MISMATCH`
+`spec.json.id` does not equal the directory name.
+**Fix**: rename the directory or update `id` — they must match.
+
+### `SPEC_MISSING_REQUIRED_FIELD`
+A required field (`title`, `owners`, `depends_on_specs`, `active_prs`, …) is missing or wrong type.
+**Fix**: the `pointer` on the error tells you which field.
+
+### `SPEC_LINKED_PATH_MISSING`
+`linked_paths` is missing, empty, or contains a non-string entry.
+**Fix**: every entry must be a non-empty string glob or path.
+
+### `SPEC_ACCEPTANCE_EMPTY`
+`acceptance_commands` is empty or contains a non-string entry.
+**Fix**: at least one command that CI can run.
+
+### `SPEC_DEPENDENCY_UNKNOWN`
+`depends_on_specs` references an id that does not exist under `docs/specs/`.
+**Fix**: create the dependency spec or remove the reference.
+
+---
+
+## Manifest errors
+
+### `MANIFEST_ENTRY_MISSING`
+A `.claude/skills-manifest.json` entry points at a path that does not exist on disk.
+**Fix**: remove the entry, or restore the file.
+
+### `MANIFEST_CHECKSUM_MISMATCH`
+A file's content drifted from the recorded sha256.
+**Fix**: `npx harness-validate-skills --update` to recompute and accept the new content, or restore the file to its original state.
+
+### `MANIFEST_ORPHAN_FILE`
+A file under `.claude/commands/` or `.claude/skills/<name>/SKILL.md` is not indexed in the manifest.
+**Fix**: `npx harness-validate-skills --update` to pick it up (add a manifest entry), or delete the file.
+
+### `MANIFEST_DEPENDENCY_CYCLE`
+The `dependencies[]` graph has a cycle.
+**Fix**: break the cycle. The error `.got` field shows the path `A -> B -> A`.
+
+---
+
+## Coverage errors
+
+### `COVERAGE_UNCOVERED`
+A protected path changed in the PR but no `approved|implementing|done` spec covers it, and the PR body has no `## No-spec rationale` section.
+**Fix**: draft a covering spec (status ≥ `approved`) or add a rationale to the PR body.
+
+### `COVERAGE_NO_SPEC_RATIONALE`
+The PR body has neither a `## Spec ID` nor a `## No-spec rationale` section, but protected files changed.
+**Fix**: add one of the two sections.
+
+### `COVERAGE_UNKNOWN_SPEC_ID`
+The PR body references a `Spec ID:` that does not exist under `docs/specs/`.
+**Fix**: check the spec directory, or create the spec first.
+
+---
+
+## Drift errors
+
+### `DRIFT_TEAM_COUNT`
+An instruction file (CLAUDE.md, README.md) mentions `N team(s)` with N ≠ `docs/repo-facts.json` `team_count`.
+**Fix**: update either the file prose or `repo-facts.json.team_count`.
+
+### `DRIFT_PROTECTED_PATH`
+A `docs/repo-facts.json` `protected_paths` entry is either non-string or absent from `CLAUDE.md`.
+**Fix**: add the entry to `CLAUDE.md` §Protected paths, or remove it from the facts file.
+
+### `DRIFT_INSTRUCTION_FILES`
+`instruction_files` is missing or non-array in `docs/repo-facts.json`.
+**Fix**: add it as a non-empty array, e.g. `["CLAUDE.md", "README.md"]`.
+
+### `DRIFT_INSTRUCTION_FILE_MISSING`
+An `instruction_files` entry points at a path that does not exist.
+**Fix**: create the file or drop the entry.
+
+---
+
+## Scaffold errors
+
+### `SCAFFOLD_CONFLICT`
+`harness-init` refuses to overwrite an already-initialized repo.
+**Fix**: pass `--force` to overwrite, or remove `.claude/skills-manifest.json` / `docs/specs/` first.
+
+### `SCAFFOLD_USAGE`
+Bad CLI invocation of `harness-init` (e.g. flag without a value).
+**Fix**: see `--help`.
+
+---
+
+## Settings-validator errors (`validate-settings.sh`)
+
+### `SETTINGS_SEC_1`
+A `*_KEY` / `*_TOKEN` / `*_SECRET` field in `~/.claude/settings.json` holds
+a literal 20+ character value. **Fix**: replace with `${ENV_VAR}` reference.
+
+### `SETTINGS_SEC_2`
+`skipDangerousModePermissionPrompt` is set. **Fix**: remove it.
+
+### `SETTINGS_SEC_3`
+An MCP server args include `@latest`. **Fix**: pin the version.
+
+### `SETTINGS_SEC_4`
+`~/.claude/.credentials.json` is not mode `600`. **Fix**: `chmod 600 ~/.claude/.credentials.json`.
+
+### `SETTINGS_OPS_1`
+Settings JSON is malformed OR an MCP command / hook target / enabled plugin does not resolve.
+**Fix**: read the specific message — it names the unresolved target.
+
+### `SETTINGS_OPS_2`
+`~/.claude/projects/` or `~/.claude/file-history/` exceeded its disk budget.
+**Fix**: the warn message includes a `find … -delete` command to prune.
+
+---
+
+## Env + usage
+
+### `ENV_REPO_ROOT_UNKNOWN`
+`createHarnessContext()` could not resolve a repo root.
+**Fix**: pass `--repo-root <path>` or `HARNESS_REPO_ROOT=<path>`, or run inside a git worktree.
+
+### `ENV_FACTS_MISSING`
+`docs/repo-facts.json` is missing or unreadable.
+**Fix**: scaffold with `harness-init` or author the file (see `plugins/harness/templates/docs/repo-facts.json`).
+
+### `USAGE_UNKNOWN_FLAG`
+An unknown flag was passed. Exit 64. **Fix**: see `--help`.
+
+### `USAGE_MISSING_POSITIONAL`
+A required positional argument is missing. Exit 64. **Fix**: see `--help`.
