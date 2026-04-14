@@ -109,6 +109,8 @@ export function pathExists(ctx, relativePath) {
   return existsSync(path.join(ctx.repoRoot, relativePath));
 }
 
+const FORBIDDEN_GIT_PREFIXES = ["--upload-pack", "--receive-pack", "--exec"];
+
 /**
  * Run `git <args>` with `cwd = ctx.repoRoot`, return trimmed stdout.
  * Lets the underlying error bubble on non-zero exit.
@@ -117,7 +119,6 @@ export function pathExists(ctx, relativePath) {
  * @param {string[]} args
  * @returns {string}
  */
-const FORBIDDEN_GIT_PREFIXES = ["--upload-pack", "--receive-pack", "--exec"];
 export function git(ctx, args) {
   for (const a of args) {
     if (typeof a !== "string") throw new TypeError("git args must be strings");
@@ -291,13 +292,6 @@ export function extractTemplateSection(body, heading) {
   return m ? m[1].trim() : "";
 }
 
-/**
- * A section is "meaningful" when it contains at least one non-comment, non-whitespace
- * character. Strips `<!-- ... -->` HTML comments before the length check.
- *
- * @param {string} section
- * @returns {boolean}
- */
 function stripHtmlComments(input) {
   let out = "";
   let i = 0;
@@ -312,6 +306,14 @@ function stripHtmlComments(input) {
   }
   return out;
 }
+
+/**
+ * A section is "meaningful" when it contains at least one non-comment, non-whitespace
+ * character. Strips `<!-- ... -->` HTML comments before the length check.
+ *
+ * @param {string} section
+ * @returns {boolean}
+ */
 export function isMeaningfulSection(section) {
   if (!section) return false;
   return stripHtmlComments(section).trim().length > 0;
