@@ -30,4 +30,5 @@ jobs:
             --no-progress \
             --max-retries 2 \
             --exclude '^https?://(www\.)?npmjs\.com/' \
+            --exclude '^https?://(www\.)?contributor-covenant\.org/' \
             'docs/**/*.md' '*.md' 'plugins/dotclaude/**/*.md'

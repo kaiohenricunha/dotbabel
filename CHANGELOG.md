@@ -9,9 +9,33 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 ### Planned
 
 - Marketplace submission for the Claude Code plugin listing.
-- `harness upgrade` subcommand to migrate consumer repos across harness versions.
+- `dotclaude upgrade` subcommand to migrate consumer repos across versions.
 - `.d.ts` shipping for stronger type inference (via hand-authored declarations
   — TypeScript migration is out of scope per ADR-0002).
+
+## [0.3.0] — 2026-04-14
+
+### Breaking
+
+- **Package renamed** from `@kaiohenricunha/harness` → `@dotclaude/dotclaude`.
+  Update your `package.json` dependency and all imports.
+- **All CLI bins renamed**: `harness-*` → `dotclaude-*` (e.g. `harness-doctor`
+  → `dotclaude-doctor`). Update CI workflows, pre-commit hooks, and any scripts
+  that invoke them directly.
+- **Three env vars renamed**: `HARNESS_DEBUG` → `DOTCLAUDE_DEBUG`,
+  `HARNESS_JSON` → `DOTCLAUDE_JSON`, `HARNESS_REPO_ROOT` → `DOTCLAUDE_REPO_ROOT`.
+  Note: `HARNESS_CHANGED_FILES` (CI diff input) and `HARNESS_SYNC_SKIP_SECRET_SCAN`
+  (sync.sh bypass) are **not** renamed — they remain `HARNESS_*`.
+- **Plugin directory** moved from `plugins/harness/` → `plugins/dotclaude/`
+  (affects deep imports — use the public barrel `@dotclaude/dotclaude` instead).
+- **Spec ID** `harness-core` → `dotclaude-core` (update `Spec ID:` lines in PR
+  bodies and any `depends_on_specs` references).
+
+### Changed
+
+- npm scope changed from `@kaiohenricunha` to `@dotclaude` — published under
+  the public `dotclaude` npm org.
+- Prose and docs de-personalized for a public audience.
 
 ## [0.2.0] — 2026-04-14
 
