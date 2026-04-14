@@ -35,9 +35,14 @@ All bins default to `git rev-parse --show-toplevel` when no `--repo-root` is pas
 ## API
 
 ```javascript
-import { createHarnessContext } from "@kaiohenricunha/harness";
-import { validateManifest } from "@kaiohenricunha/harness/src/validate-skills-inventory.mjs";
+import {
+  createHarnessContext,
+  validateManifest,
+  EXIT_CODES,
+} from "@kaiohenricunha/harness";
 
 const ctx = createHarnessContext({ repoRoot: "/path/to/repo" });
 const result = validateManifest(ctx);
 ```
+
+Every export comes from the single barrel. Deep imports are not a supported contract.

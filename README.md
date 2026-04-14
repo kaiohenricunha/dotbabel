@@ -64,12 +64,25 @@ The scaffolded `.github/workflows/validate-skills.yml` runs the chain on every P
 ### Node API
 
 ```javascript
-import { createHarnessContext } from "@kaiohenricunha/harness";
-import { validateManifest } from "@kaiohenricunha/harness/plugins/harness/src/validate-skills-inventory.mjs";
+import {
+  createHarnessContext,
+  validateManifest,
+  ValidationError,
+  EXIT_CODES,
+} from "@kaiohenricunha/harness";
 
 const ctx = createHarnessContext({ repoRoot: "/path/to/repo" });
 const { ok, errors } = validateManifest(ctx);
+if (!ok) {
+  for (const err of errors) {
+    // err is a ValidationError with .code / .file / .hint / .category
+    console.error(err.toString());
+  }
+  process.exit(EXIT_CODES.VALIDATION);
+}
 ```
+
+All exports (24+ symbols: validators, helpers, `ValidationError`, `ERROR_CODES`, `EXIT_CODES`, `version`) come from the single barrel `@kaiohenricunha/harness`. Deep imports like `@kaiohenricunha/harness/plugins/...` are not a supported contract.
 
 All validators accept an explicit `repoRoot` or fall back to `process.env.HARNESS_REPO_ROOT`, then to `git rev-parse --show-toplevel`.
 

@@ -1,10 +1,19 @@
 {
   "name": "@kaiohenricunha/harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Portable harness + SDD validators for Claude Code projects.",
   "type": "module",
   "main": "plugins/harness/src/index.mjs",
+  "exports": {
+    ".": "./plugins/harness/src/index.mjs",
+    "./errors": "./plugins/harness/src/lib/errors.mjs",
+    "./exit-codes": "./plugins/harness/src/lib/exit-codes.mjs",
+    "./package.json": "./package.json"
+  },
   "bin": {
+    "harness": "./plugins/harness/bin/harness.mjs",
+    "harness-doctor": "./plugins/harness/bin/harness-doctor.mjs",
+    "harness-detect-drift": "./plugins/harness/bin/harness-detect-drift.mjs",
     "harness-validate-skills": "./plugins/harness/bin/harness-validate-skills.mjs",
     "harness-check-spec-coverage": "./plugins/harness/bin/harness-check-spec-coverage.mjs",
     "harness-validate-specs": "./plugins/harness/bin/harness-validate-specs.mjs",
@@ -13,11 +22,16 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "lint": "echo 'lint target stubs — prettier + markdownlint wiring lands in PR 4/6' && exit 0",
+    "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/harness/scripts/*.sh plugins/harness/hooks/*.sh plugins/harness/tests/*.sh plugins/harness/templates/claude/hooks/*.sh plugins/harness/templates/githooks/pre-commit",
+    "dogfood": "npx harness-validate-skills && npx harness-validate-specs && npx harness-check-instruction-drift && npx harness-check-spec-coverage"
   },
   "files": [
     "plugins/harness/src/",
     "plugins/harness/bin/",
+    "plugins/harness/scripts/",
     "plugins/harness/templates/",
     "plugins/harness/hooks/",
     "plugins/harness/README.md",
@@ -34,5 +48,20 @@
     "type": "git",
     "url": "git+https://github.com/kaiohenricunha/dotclaude.git"
   },
+  "homepage": "https://github.com/kaiohenricunha/dotclaude#readme",
+  "bugs": {
+    "url": "https://github.com/kaiohenricunha/dotclaude/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "claude",
+    "harness",
+    "sdd",
+    "spec-driven",
+    "validator",
+    "linter",
+    "governance",
+    "cli"
+  ],
   "license": "MIT"
 }
