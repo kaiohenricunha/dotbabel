@@ -1,6 +1,7 @@
 import { execFileSync } from "child_process";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
+import { debug } from "./lib/debug.mjs";
 
 export function createHarnessContext({ repoRoot } = {}) {
   const root =
@@ -25,7 +26,8 @@ function resolveRepoRootFromGit() {
     return execFileSync("git", ["rev-parse", "--show-toplevel"], {
       encoding: "utf8",
     }).trim();
-  } catch {
+  } catch (err) {
+    debug("git:rev-parse", err.message);
     return null;
   }
 }
@@ -181,7 +183,8 @@ export function getChangedFiles() {
       { encoding: "utf8" },
     );
     return out.split("\n").filter(Boolean);
-  } catch {
+  } catch (err) {
+    debug("git:diff", err.message);
     return [];
   }
 }

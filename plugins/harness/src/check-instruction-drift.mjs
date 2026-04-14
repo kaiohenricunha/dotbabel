@@ -4,6 +4,7 @@ import {
   pathExists,
   readText,
 } from "./spec-harness-lib.mjs";
+import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 /**
  * Cross-reference docs/repo-facts.json against instruction files (CLAUDE.md, README.md, etc.).
@@ -20,7 +21,7 @@ import {
  * itself as the authoritative source and checks that instruction files stay in sync with it.
  *
  * @param {object} ctx  Harness context from createHarnessContext().
- * @returns {{ ok: boolean, errors: string[] }}
+ * @returns {{ ok: boolean, errors: ValidationError[] }}
  */
 export function checkInstructionDrift(ctx) {
   const errors = [];
@@ -28,9 +29,13 @@ export function checkInstructionDrift(ctx) {
 
   // instruction_files must be a non-empty array.
   if (!Array.isArray(facts.instruction_files) || facts.instruction_files.length === 0) {
-    errors.push(
-      "docs/repo-facts.json: instruction_files must be a non-empty array of file paths",
-    );
+    errors.push(new ValidationError({
+      code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
+      category: "drift",
+      file: "docs/repo-facts.json",
+      pointer: "instruction_files",
+      message: "instruction_files must be a non-empty array of file paths",
+    }));
     // Can't proceed without knowing which files to check.
     return { ok: false, errors };
   }
@@ -38,9 +43,14 @@ export function checkInstructionDrift(ctx) {
   // protected_paths entries must be non-empty strings.
   for (const protectedPath of facts.protected_paths ?? []) {
     if (typeof protectedPath !== "string" || !protectedPath.trim()) {
-      errors.push(
-        `docs/repo-facts.json: protected_paths entries must be non-empty strings (got ${JSON.stringify(protectedPath)})`,
-      );
+      errors.push(new ValidationError({
+        code: ERROR_CODES.DRIFT_PROTECTED_PATH,
+        category: "drift",
+        file: "docs/repo-facts.json",
+        pointer: "protected_paths[]",
+        got: JSON.stringify(protectedPath),
+        message: `protected_paths entries must be non-empty strings (got ${JSON.stringify(protectedPath)})`,
+      }));
     }
   }
 
@@ -49,16 +59,26 @@ export function checkInstructionDrift(ctx) {
   // Check each instruction file.
   for (const instructionFile of facts.instruction_files) {
     if (typeof instructionFile !== "string" || !instructionFile.trim()) {
-      errors.push(
-        `docs/repo-facts.json: instruction_files entries must be non-empty strings`,
-      );
+      errors.push(new ValidationError({
+        code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
+        category: "drift",
+        file: "docs/repo-facts.json",
+        pointer: "instruction_files[]",
+        message: "instruction_files entries must be non-empty strings",
+      }));
       continue;
     }
 
     if (!pathExists(ctx, instructionFile)) {
-      errors.push(
-        `docs/repo-facts.json: instruction file does not exist -> ${instructionFile}`,
-      );
+      errors.push(new ValidationError({
+        code: ERROR_CODES.DRIFT_INSTRUCTION_FILE_MISSING,
+        category: "drift",
+        file: "docs/repo-facts.json",
+        pointer: "instruction_files[]",
+        got: instructionFile,
+        message: `instruction file does not exist -> ${instructionFile}`,
+        hint: "create the file on disk or remove it from repo-facts.json",
+      }));
       continue;
     }
 
@@ -70,9 +90,14 @@ export function checkInstructionDrift(ctx) {
       for (const match of text.matchAll(teamPhrasePattern)) {
         const mentioned = parseInt(match[1], 10);
         if (mentioned !== teamCount) {
-          errors.push(
-            `${instructionFile}: stale team_count claim — file mentions "${match[0]}" but docs/repo-facts.json has team_count=${teamCount}`,
-          );
+          errors.push(new ValidationError({
+            code: ERROR_CODES.DRIFT_TEAM_COUNT,
+            category: "drift",
+            file: instructionFile,
+            expected: String(teamCount),
+            got: match[0],
+            message: `stale team_count claim — file mentions "${match[0]}" but docs/repo-facts.json has team_count=${teamCount}`,
+          }));
         }
       }
     }
@@ -86,9 +111,14 @@ export function checkInstructionDrift(ctx) {
     for (const protectedPath of facts.protected_paths) {
       if (typeof protectedPath !== "string" || !protectedPath.trim()) continue;
       if (!claudeText.includes(protectedPath)) {
-        errors.push(
-          `CLAUDE.md: protected path "${protectedPath}" from docs/repo-facts.json is not documented`,
-        );
+        errors.push(new ValidationError({
+          code: ERROR_CODES.DRIFT_PROTECTED_PATH,
+          category: "drift",
+          file: "CLAUDE.md",
+          expected: protectedPath,
+          message: `protected path "${protectedPath}" from docs/repo-facts.json is not documented`,
+          hint: "add the protected path entry to CLAUDE.md or remove it from repo-facts.json",
+        }));
       }
     }
   }

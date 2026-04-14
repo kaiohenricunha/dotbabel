@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from "fs";
 import { createHash } from "crypto";
 import path from "path";
+import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 function sha256(content) {
   return "sha256:" + createHash("sha256").update(content).digest("hex");
@@ -46,19 +47,39 @@ export function validateManifest(ctx) {
   for (const skill of manifest.skills) {
     const abs = path.join(ctx.repoRoot, skill.path);
     if (!existsSync(abs)) {
-      errors.push(`File not found: ${skill.path}`);
+      errors.push(new ValidationError({
+        code: ERROR_CODES.MANIFEST_ENTRY_MISSING,
+        category: "manifest",
+        file: skill.path,
+        message: `File not found: ${skill.path}`,
+        hint: "remove the manifest entry or restore the file on disk",
+      }));
       continue;
     }
     const actual = sha256(readFileSync(abs, "utf8"));
     if (actual !== skill.checksum) {
-      errors.push(`Checksum mismatch for ${skill.name}: expected ${skill.checksum}, got ${actual}`);
+      errors.push(new ValidationError({
+        code: ERROR_CODES.MANIFEST_CHECKSUM_MISMATCH,
+        category: "manifest",
+        file: skill.path,
+        expected: skill.checksum,
+        got: actual,
+        message: `Checksum mismatch for ${skill.name}: expected ${skill.checksum}, got ${actual}`,
+        hint: "run `node plugins/harness/scripts/auto-update-manifest.mjs` to refresh checksums",
+      }));
     }
   }
 
   const onDisk = [...listCommandFiles(ctx), ...listSkillFilesRecursive(ctx)];
   for (const p of onDisk) {
     if (!entryPaths.has(p)) {
-      errors.push(`Orphan on disk (not in manifest): ${p}`);
+      errors.push(new ValidationError({
+        code: ERROR_CODES.MANIFEST_ORPHAN_FILE,
+        category: "manifest",
+        file: p,
+        message: `Orphan on disk (not in manifest): ${p}`,
+        hint: "add the file to .claude/skills-manifest.json or delete it",
+      }));
     }
   }
 
@@ -69,7 +90,13 @@ export function validateManifest(ctx) {
   for (const name of graph.keys()) color.set(name, WHITE);
   function visit(name, stack) {
     if (color.get(name) === GRAY) {
-      errors.push(`Dependency cycle: ${stack.concat(name).join(" -> ")}`);
+      errors.push(new ValidationError({
+        code: ERROR_CODES.MANIFEST_DEPENDENCY_CYCLE,
+        category: "manifest",
+        file: ".claude/skills-manifest.json",
+        got: stack.concat(name).join(" -> "),
+        message: `Dependency cycle: ${stack.concat(name).join(" -> ")}`,
+      }));
       return;
     }
     if (color.get(name) === BLACK) return;
