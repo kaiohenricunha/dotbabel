@@ -3,12 +3,19 @@
     "default": true,
     "MD013": false,
     "MD024": { "siblings_only": true },
-    "MD033": { "allowed_elements": ["details", "summary", "kbd", "br", "sub", "sup"] },
+    "MD029": false,
+    "MD031": false,
+    "MD033": { "allowed_elements": ["details", "summary", "kbd", "br", "sub", "sup", "previous", "current_status", "value"] },
+    "MD040": false,
     "MD041": false
   },
   "ignores": [
     "node_modules/**",
     ".claude/worktrees/**",
-    "plugins/harness/tests/fixtures/**"
+    "plugins/harness/tests/fixtures/**",
+    "commands/**",
+    "skills/**",
+    ".claude/commands/**",
+    ".claude/skills/**"
   ]
 }

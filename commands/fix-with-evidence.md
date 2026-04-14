@@ -45,6 +45,7 @@ Arguments: `$ARGUMENTS` — an issue number, link, or symptom description. If em
 ## Phase 4 — PR
 
 1. Write the PR body to a temporary file (not heredoc, to avoid backtick escaping):
+
    ```
    ## Summary
    <1–3 bullets>
@@ -68,6 +69,7 @@ Arguments: `$ARGUMENTS` — an issue number, link, or symptom description. If em
 
    Spec ID: <id if applicable>
    ```
+
 2. Open the PR:
    ```bash
    gh pr create --title "<title>" --body-file /tmp/pr-body.md

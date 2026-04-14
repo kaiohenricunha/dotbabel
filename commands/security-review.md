@@ -100,7 +100,7 @@ Globs: any tracked data file (`data/**`, `content/**`, project-specific generate
 4. **Report as a table:**
 
 | Severity | File | Line | Finding | Recommendation |
-|----------|------|------|---------|----------------|
+| -------- | ---- | ---- | ------- | -------------- |
 
 5. If no issues found, report "Security review: clean."
 

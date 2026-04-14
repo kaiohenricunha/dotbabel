@@ -45,8 +45,8 @@ import {
   EXIT_CODES,
 } from "@kaiohenricunha/harness";
 
-const ctx = createHarnessContext();           // resolves repo root via git
-const { ok, errors } = validateSpecs(ctx);    // errors are ValidationError instances
+const ctx = createHarnessContext(); // resolves repo root via git
+const { ok, errors } = validateSpecs(ctx); // errors are ValidationError instances
 if (!ok) {
   for (const err of errors) {
     if (err.code === ERROR_CODES.SPEC_STATUS_INVALID) {
@@ -63,12 +63,12 @@ Full contract: [docs/api-reference.md](./docs/api-reference.md).
 
 Every bin honors `--help`, `--version`, `--json`, `--verbose`, `--no-color` and exits with the named enum:
 
-| Code | Name | Meaning |
-|---|---|---|
-| 0 | OK | Success |
-| 1 | VALIDATION | Rule failure (expected failure mode) |
-| 2 | ENV | Misconfigured environment |
-| 64 | USAGE | Bad CLI invocation (matches BSD `sysexits.h EX_USAGE`) |
+| Code | Name       | Meaning                                                |
+| ---- | ---------- | ------------------------------------------------------ |
+| 0    | OK         | Success                                                |
+| 1    | VALIDATION | Rule failure (expected failure mode)                   |
+| 2    | ENV        | Misconfigured environment                              |
+| 64   | USAGE      | Bad CLI invocation (matches BSD `sysexits.h EX_USAGE`) |
 
 Per-bin details: [docs/cli-reference.md](./docs/cli-reference.md).
 
@@ -78,13 +78,13 @@ Per-bin details: [docs/cli-reference.md](./docs/cli-reference.md).
 
 Each row links to its ADR (see [docs/adr/](./docs/adr/)):
 
-| Decision | ADR |
-|---|---|
-| Monorepo dual-persona layout | [0001](./docs/adr/0001-monorepo-dual-persona-layout.md) |
-| No TypeScript; JSDoc + zero runtime deps | [0002](./docs/adr/0002-no-typescript.md) |
-| Structured `ValidationError` contract | [0012](./docs/adr/0012-structured-error-contract.md) |
-| Exit-code convention `{0,1,2,64}` | [0013](./docs/adr/0013-exit-code-convention.md) |
-| CLI ✓/✗/⚠ output format | [0014](./docs/adr/0014-cli-tick-cross-warn-format.md) |
+| Decision                                 | ADR                                                     |
+| ---------------------------------------- | ------------------------------------------------------- |
+| Monorepo dual-persona layout             | [0001](./docs/adr/0001-monorepo-dual-persona-layout.md) |
+| No TypeScript; JSDoc + zero runtime deps | [0002](./docs/adr/0002-no-typescript.md)                |
+| Structured `ValidationError` contract    | [0012](./docs/adr/0012-structured-error-contract.md)    |
+| Exit-code convention `{0,1,2,64}`        | [0013](./docs/adr/0013-exit-code-convention.md)         |
+| CLI ✓/✗/⚠ output format                  | [0014](./docs/adr/0014-cli-tick-cross-warn-format.md)   |
 
 Shell-level hardening (SEC-1..4, OPS-1..2) is enforced today at
 `plugins/harness/scripts/validate-settings.sh`; its 12-case behavioral
@@ -111,19 +111,19 @@ See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
 
 ## Further reading
 
-| | |
-|---|---|
-| [docs/index.md](./docs/index.md) | Nav map with persona-tailored entry points |
-| [docs/quickstart.md](./docs/quickstart.md) | Install → scaffold → first green validator |
-| [docs/cli-reference.md](./docs/cli-reference.md) | Every bin, flag, exit code, `--json` schema |
-| [docs/api-reference.md](./docs/api-reference.md) | Node API surface |
-| [docs/architecture.md](./docs/architecture.md) | Layer diagram + PR-time sequence |
-| [docs/troubleshooting.md](./docs/troubleshooting.md) | Error-code → remediation index |
-| [docs/upgrade-guide.md](./docs/upgrade-guide.md) | 0.1 → 0.2 migration, forking |
-| [docs/personas.md](./docs/personas.md) | Who reads which file |
-| [CONTRIBUTING.md](./CONTRIBUTING.md) | Dev workflow + local gates |
-| [SECURITY.md](./SECURITY.md) | Private vulnerability disclosure |
-| [CHANGELOG.md](./CHANGELOG.md) | Keep-a-Changelog history |
+|                                                      |                                             |
+| ---------------------------------------------------- | ------------------------------------------- |
+| [docs/index.md](./docs/index.md)                     | Nav map with persona-tailored entry points  |
+| [docs/quickstart.md](./docs/quickstart.md)           | Install → scaffold → first green validator  |
+| [docs/cli-reference.md](./docs/cli-reference.md)     | Every bin, flag, exit code, `--json` schema |
+| [docs/api-reference.md](./docs/api-reference.md)     | Node API surface                            |
+| [docs/architecture.md](./docs/architecture.md)       | Layer diagram + PR-time sequence            |
+| [docs/troubleshooting.md](./docs/troubleshooting.md) | Error-code → remediation index              |
+| [docs/upgrade-guide.md](./docs/upgrade-guide.md)     | 0.1 → 0.2 migration, forking                |
+| [docs/personas.md](./docs/personas.md)               | Who reads which file                        |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                 | Dev workflow + local gates                  |
+| [SECURITY.md](./SECURITY.md)                         | Private vulnerability disclosure            |
+| [CHANGELOG.md](./CHANGELOG.md)                       | Keep-a-Changelog history                    |
 
 ## License
 

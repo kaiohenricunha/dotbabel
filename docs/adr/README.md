@@ -12,13 +12,13 @@ ADR that supersedes the old and link both directions.
 
 ## Index
 
-| # | Title | Status |
-|---|---|---|
+| #    | Title                                                                  | Status   |
+| ---- | ---------------------------------------------------------------------- | -------- |
 | 0001 | [Monorepo dual-persona layout](./0001-monorepo-dual-persona-layout.md) | Accepted |
-| 0002 | [No TypeScript](./0002-no-typescript.md) | Accepted |
-| 0012 | [Structured error contract](./0012-structured-error-contract.md) | Accepted |
-| 0013 | [Exit-code convention](./0013-exit-code-convention.md) | Accepted |
-| 0014 | [CLI ✓/✗/⚠ output format](./0014-cli-tick-cross-warn-format.md) | Accepted |
+| 0002 | [No TypeScript](./0002-no-typescript.md)                               | Accepted |
+| 0012 | [Structured error contract](./0012-structured-error-contract.md)       | Accepted |
+| 0013 | [Exit-code convention](./0013-exit-code-convention.md)                 | Accepted |
+| 0014 | [CLI ✓/✗/⚠ output format](./0014-cli-tick-cross-warn-format.md)        | Accepted |
 
 ### Planned (not yet written)
 
@@ -27,7 +27,7 @@ when a related change is proposed:
 
 - 0003..0006 SEC-1..4 hardening decisions (enforced today in
   `plugins/harness/scripts/validate-settings.sh`; the ADRs capture the
-  *why*).
+  _why_).
 - 0007..0008 OPS-1..2 hardening decisions (same).
 - 0009 LSP plugins owned by `claude-code-lsps`.
 - 0010 `context7` runs globally.

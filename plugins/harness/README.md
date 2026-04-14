@@ -28,13 +28,19 @@ npx harness-validate-specs   # or: npx harness validate-specs
 
 ```js
 import {
-  createHarnessContext, validateSpecs, validateManifest, checkSpecCoverage,
-  checkInstructionDrift, scaffoldHarness, ValidationError, ERROR_CODES,
+  createHarnessContext,
+  validateSpecs,
+  validateManifest,
+  checkSpecCoverage,
+  checkInstructionDrift,
+  scaffoldHarness,
+  ValidationError,
+  ERROR_CODES,
   EXIT_CODES,
 } from "@kaiohenricunha/harness";
 
 const ctx = createHarnessContext();
-const { ok, errors } = validateSpecs(ctx);  // errors are ValidationError instances
+const { ok, errors } = validateSpecs(ctx); // errors are ValidationError instances
 ```
 
 See [api-reference](https://github.com/kaiohenricunha/dotclaude/blob/main/docs/api-reference.md)

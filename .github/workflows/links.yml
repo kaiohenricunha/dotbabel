@@ -1,0 +1,34 @@
+name: links
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+  schedule:
+    - cron: "0 9 * * 1" # weekly Monday 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  lychee:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install lychee
+        run: |
+          curl -sSL -o /tmp/lychee.tgz \
+            https://github.com/lycheeverse/lychee/releases/latest/download/lychee-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf /tmp/lychee.tgz -C /tmp
+          sudo install -m 0755 /tmp/lychee /usr/local/bin/lychee
+          lychee --version
+      - name: Check links
+        env:
+          # GitHub API is rate-limited for unauthenticated requests; scope GITHUB_TOKEN
+          # to public reads so rate limits don't false-positive this job.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          lychee \
+            --no-progress \
+            --max-retries 2 \
+            --exclude-mail \
+            --exclude '^https?://(www\.)?npmjs\.com/' \
+            'docs/**/*.md' '*.md' 'plugins/harness/**/*.md'

@@ -21,7 +21,8 @@ individual is officially representing the project in public.
 
 ## Enforcement
 
-Please report violations privately to **kaiohenriquecunha@gmail.com**.
+Please report violations privately to the maintainer at
+<kaiohenriquecunha@gmail.com>.
 All reports are reviewed and investigated promptly and fairly. Reporters'
 privacy is respected.
 

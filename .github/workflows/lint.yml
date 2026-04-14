@@ -1,0 +1,50 @@
+name: lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: shellcheck (warning-severity gate)
+        run: |
+          shellcheck --severity=warning -x \
+            bootstrap.sh \
+            sync.sh \
+            plugins/harness/scripts/*.sh \
+            plugins/harness/scripts/lib/*.sh \
+            plugins/harness/hooks/*.sh \
+            plugins/harness/tests/*.sh \
+            plugins/harness/templates/claude/hooks/*.sh \
+            plugins/harness/templates/githooks/pre-commit
+
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with: { node-version: "22" }
+      - run: npx --yes markdownlint-cli2 "**/*.md" "#node_modules" "#.claude/worktrees"
+
+  jsdoc-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with: { node-version: "22" }
+      - run: node scripts/check-jsdoc-coverage.mjs plugins/harness/src
+
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with: { node-version: "22" }
+      # Check only JSON/YAML/MD — the .mjs source is deliberately lightly formatted
+      # (see .prettierrc.json); running on .mjs today would churn a lot.
+      - run: npx --yes prettier@3 --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-unknown

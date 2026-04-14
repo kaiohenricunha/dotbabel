@@ -11,15 +11,15 @@ A project-aware git workflow command: craft conventional commits, create PRs, pu
 
 ## Your Domain
 
-| Component | Responsibility |
-|-----------|----------------|
-| Commits | Craft precise, conventional commit messages |
-| Staging | Smart `git add` with awareness of what changed |
-| PRs | Generate PR descriptions with `/git pr` |
-| Branches | Branch suggestions with `/git suggest` |
-| Merging | Merge to main with `/git main` |
-| Pushing | Smart push with `/git push` |
-| History | Log analysis, blame, bisect |
+| Component | Responsibility                                 |
+| --------- | ---------------------------------------------- |
+| Commits   | Craft precise, conventional commit messages    |
+| Staging   | Smart `git add` with awareness of what changed |
+| PRs       | Generate PR descriptions with `/git pr`        |
+| Branches  | Branch suggestions with `/git suggest`         |
+| Merging   | Merge to main with `/git main`                 |
+| Pushing   | Smart push with `/git push`                    |
+| History   | Log analysis, blame, bisect                    |
 
 ## Primary Command: Auto-Commit
 
@@ -59,17 +59,17 @@ Use **Conventional Commits** format:
 
 #### Types
 
-| Type | When to Use |
-|------|-------------|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
-| `refactor` | Code change that neither fixes nor adds |
-| `docs` | Documentation only |
-| `test` | Adding or updating tests |
-| `chore` | Maintenance, deps, config |
-| `style` | Formatting, whitespace (no logic change) |
-| `perf` | Performance improvement |
-| `ci` | CI / workflow changes |
+| Type       | When to Use                              |
+| ---------- | ---------------------------------------- |
+| `feat`     | New feature or capability                |
+| `fix`      | Bug fix                                  |
+| `refactor` | Code change that neither fixes nor adds  |
+| `docs`     | Documentation only                       |
+| `test`     | Adding or updating tests                 |
+| `chore`    | Maintenance, deps, config                |
+| `style`    | Formatting, whitespace (no logic change) |
+| `perf`     | Performance improvement                  |
+| `ci`       | CI / workflow changes                    |
 
 #### Scopes
 
@@ -164,6 +164,7 @@ git merge "$PREVIOUS_BRANCH"
 ```
 
 **Error handling:**
+
 - If merge conflicts occur, report them and do NOT auto-resolve.
 - If the working directory is dirty, warn and abort.
 - If the repo has an explicit rule against committing on main directly (e.g., CLAUDE.md requiring worktrees or PRs), stop and escalate.
@@ -195,6 +196,7 @@ fi
 ```
 
 **Safety rules:**
+
 - **Never** `--force` without `--with-lease`.
 - **Never** force push `main` or `master` without explicit user confirmation.
 - Warn if pushing to a protected branch.
@@ -229,6 +231,7 @@ gh pr create --title "<generated-title>" --body "<generated-body>"
 ```
 
 **Title rules:**
+
 - Use conventional-commit style: `<type>(<scope>): <subject>`.
 - Derive from branch name or most significant commit.
 
@@ -274,15 +277,15 @@ Suggest a branch name for the next unit of work.
 <type>/<scope>-<short-description>
 ```
 
-| Type | Usage |
-|------|-------|
-| `feat/` | New features |
-| `fix/` | Bug fixes |
-| `refactor/` | Code restructuring |
-| `docs/` | Documentation updates |
-| `test/` | Test additions |
-| `chore/` | Maintenance tasks |
-| `ci/` | CI/workflow changes |
+| Type        | Usage                 |
+| ----------- | --------------------- |
+| `feat/`     | New features          |
+| `fix/`      | Bug fixes             |
+| `refactor/` | Code restructuring    |
+| `docs/`     | Documentation updates |
+| `test/`     | Test additions        |
+| `chore/`    | Maintenance tasks     |
+| `ci/`       | CI/workflow changes   |
 
 Scope should match the area conventions used in this repo (detect from recent branch names or CLAUDE.md).
 

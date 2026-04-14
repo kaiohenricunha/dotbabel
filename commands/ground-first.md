@@ -24,21 +24,26 @@ Arguments: `$ARGUMENTS` — a description of what to analyze (e.g. "calibration 
 
    ```markdown
    ## Subject
+
    <one-line restatement of the subject>
 
    ## Current behavior
+
    - <claim>. `path/to/file.go:42`
    - <claim>. `path/to/other.ts:120–140`
 
    ## Relevant entry points
+
    - `path/to/handler.go:15` — `HandleIngest()`
    - `path/to/config.yaml:8` — `retries: 3`
 
    ## What I do not yet know
+
    - <specific unknown, e.g. "whether the retry limit is overridden at runtime">
    - <specific unknown>
 
    ## Proposed next steps (not yet actioned)
+
    1. <step>
    2. <step>
    ```

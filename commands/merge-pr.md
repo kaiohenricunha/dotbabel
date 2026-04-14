@@ -14,23 +14,27 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 ## Steps
 
 1. **Fetch PR metadata.**
+
    ```bash
    gh pr view <N> --json number,title,author,headRefName,baseRefName,body,labels,files,mergeable,mergeStateStatus,statusCheckRollup
    ```
+
    Record: branch name, changed files, CI status, mergeable status.
 
 2. **Verify PR body has required sections.**
    - Must contain `## Summary`
    - Must contain `## Test plan`
    - If the repo uses spec IDs (check for `specs/` or `docs/specs/` dir), must contain `Spec ID:`
-   If any are missing, STOP and ask the user whether to auto-append them via `gh pr edit <N> --body-file`.
+     If any are missing, STOP and ask the user whether to auto-append them via `gh pr edit <N> --body-file`.
 
 3. **Checkout the branch in an isolated worktree.**
+
    ```bash
    git fetch origin
    git worktree add /tmp/merge-pr-<N> origin/<headRefName>
    cd /tmp/merge-pr-<N>
    ```
+
    Never mutate the user's active working directory.
 
 4. **Run the full project test suite.** Detect runner:
@@ -42,23 +46,29 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
    Paste the tail of output (last ~40 lines) regardless of pass/fail.
 
 5. **Data-regression gate.** If any changed file matches `data/**`, `**/calibration/**`, `**/rankings/**`, `**/fixtures/**`:
+
    ```bash
    git diff origin/<baseRefName>...HEAD -- <matched-paths>
    ```
+
    Summarize: rows added/removed, numeric deltas >1%, schema changes. If anything looks load-bearing, STOP and surface the diff before proceeding.
 
 6. **Interpret failures honestly.** If the test suite fails:
+
    ```bash
    git stash
    <test-command>
    git stash pop
    ```
+
    Report whether the failure is pre-existing on `origin/<baseRefName>` or introduced by this PR. **Do not assert "pre-existing" without running this proof.**
 
 7. **Verify CI is green.**
+
    ```bash
    gh pr checks <N>
    ```
+
    If any check is `failing` or `pending`, STOP and wait or ask the user.
 
 8. **Request merge confirmation from the user.** Show:
@@ -66,7 +76,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
    - Data-regression findings
    - CI status
    - The exact merge command you will run
-   Wait for the user to say "merge" (or equivalent).
+     Wait for the user to say "merge" (or equivalent).
 
 9. **Merge.**
    ```bash

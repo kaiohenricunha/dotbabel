@@ -8,18 +8,18 @@ Each bin originally exited `0` on success and `1` on any other outcome.
 Operators running these in CI couldn't distinguish "a validation rule
 failed" (an expected outcome; the pipeline should fail the PR check) from
 "the CLI was invoked with a bad flag" (a workflow-author bug; the pipeline
-should fail the *workflow* author's attention, not the PR author's).
+should fail the _workflow_ author's attention, not the PR author's).
 
 ## Decision
 
 A single named enum, exported as `EXIT_CODES`, consumed by every bin:
 
-| Name | Value | Meaning |
-|---|---|---|
-| `OK` | 0 | Success |
-| `VALIDATION` | 1 | One or more validation rules failed (expected failure mode) |
-| `ENV` | 2 | Misconfigured environment — missing file, bad git repo, unreadable facts |
-| `USAGE` | 64 | Bad CLI invocation — unknown flag, missing required positional |
+| Name         | Value | Meaning                                                                  |
+| ------------ | ----- | ------------------------------------------------------------------------ |
+| `OK`         | 0     | Success                                                                  |
+| `VALIDATION` | 1     | One or more validation rules failed (expected failure mode)              |
+| `ENV`        | 2     | Misconfigured environment — missing file, bad git repo, unreadable facts |
+| `USAGE`      | 64    | Bad CLI invocation — unknown flag, missing required positional           |
 
 `64` is chosen deliberately: it matches BSD `sysexits.h EX_USAGE`. Pipeline
 authors can then write:
@@ -59,5 +59,5 @@ authors can then write:
 ## Revisit triggers
 
 - A failure mode surfaces that doesn't fit any of `{OK, VALIDATION, ENV,
-  USAGE}`. Most likely a "blocked by policy" (hook) case, which would
+USAGE}`. Most likely a "blocked by policy" (hook) case, which would
   adopt 77.

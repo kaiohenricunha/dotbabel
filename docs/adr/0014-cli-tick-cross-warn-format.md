@@ -10,7 +10,7 @@ Readable, grep-friendly, widely copied across projects.
 
 When `0.2.0` added Node bins, the question was whether to keep this format
 or switch to a structured logger (pino, winston, bunyan). The bins had to
-work well interactively (humans reading terminal output) *and* in CI
+work well interactively (humans reading terminal output) _and_ in CI
 (machine consumers, usually `jq`).
 
 ## Decision

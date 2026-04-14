@@ -46,52 +46,52 @@ Your primary outcome is **deterministic, trustworthy test suites**.
 
 ### High Severity (Frequently Flaky)
 
-| ID | Language | Anti-Pattern | Detection | Fix |
-|----|----------|--------------|-----------|-----|
-| `CROSS-TIME` | All | Time-dependent assertions | `time.Sleep`, `setTimeout`, `datetime.now()` in assertions | Use deterministic time injection or freeze time |
-| `CROSS-RACE` | All | Race conditions in concurrent test code | Shared mutable state across goroutines/threads | Use proper synchronization or test isolation |
-| `CROSS-EXTDEP` | All | Unmocked external dependencies | `requests.get()`, `http.Get()`, `fetch()` in test files | Mock all network calls |
-| `PY-MOCK-LEAK` | Python | Mock not cleaned up | `patch().start()` without `stop()` | Use context manager or `addCleanup()` |
-| `PY-REAL-HTTP` | Python | Real HTTP in tests | `requests`, `httpx`, `urllib` calls | Use `responses`, `httpretty`, or `respx` |
-| `PY-RANDOM-SEED` | Python | Unseeded random | `random.choice()`, `random.randint()` | Set `random.seed()` in fixture |
-| `GO-PARALLEL-STATE` | Go | Shared state in parallel tests | `t.Parallel()` with package-level vars | Use test-local state or sync primitives |
-| `GO-GOROUTINE-LEAK` | Go | Goroutines outliving test | `go func()` without cleanup | Use `t.Cleanup()` or `errgroup` |
-| `GO-SETENV-PARALLEL` | Go | `os.Setenv` in parallel tests | Environment mutation + `t.Parallel()` | Use `t.Setenv()` (Go 1.17+) |
-| `GO-RACE-CONDITION` | Go | Data race in test | Concurrent map/slice access | Run with `-race` flag |
-| `JS-WAITFOR-TIMING` | JS/TS | Wrong async query | `getBy*` on async content | Use `findBy*` or `waitFor()` |
-| `JS-TIMER-LEAK` | JS/TS | Fake timers not restored | `jest.useFakeTimers()` without restore | Call `jest.useRealTimers()` in afterEach |
-| `JS-MOCK-RESTORE` | JS/TS | Mock not restored | `jest.spyOn()` without cleanup | Use `restoreAllMocks()` in afterEach |
-| `JS-ACT-MISSING` | JS/TS | State update outside act() | Component updates without `act()` wrapper | Wrap state-triggering code in `act()` |
+| ID                   | Language | Anti-Pattern                            | Detection                                                  | Fix                                             |
+| -------------------- | -------- | --------------------------------------- | ---------------------------------------------------------- | ----------------------------------------------- |
+| `CROSS-TIME`         | All      | Time-dependent assertions               | `time.Sleep`, `setTimeout`, `datetime.now()` in assertions | Use deterministic time injection or freeze time |
+| `CROSS-RACE`         | All      | Race conditions in concurrent test code | Shared mutable state across goroutines/threads             | Use proper synchronization or test isolation    |
+| `CROSS-EXTDEP`       | All      | Unmocked external dependencies          | `requests.get()`, `http.Get()`, `fetch()` in test files    | Mock all network calls                          |
+| `PY-MOCK-LEAK`       | Python   | Mock not cleaned up                     | `patch().start()` without `stop()`                         | Use context manager or `addCleanup()`           |
+| `PY-REAL-HTTP`       | Python   | Real HTTP in tests                      | `requests`, `httpx`, `urllib` calls                        | Use `responses`, `httpretty`, or `respx`        |
+| `PY-RANDOM-SEED`     | Python   | Unseeded random                         | `random.choice()`, `random.randint()`                      | Set `random.seed()` in fixture                  |
+| `GO-PARALLEL-STATE`  | Go       | Shared state in parallel tests          | `t.Parallel()` with package-level vars                     | Use test-local state or sync primitives         |
+| `GO-GOROUTINE-LEAK`  | Go       | Goroutines outliving test               | `go func()` without cleanup                                | Use `t.Cleanup()` or `errgroup`                 |
+| `GO-SETENV-PARALLEL` | Go       | `os.Setenv` in parallel tests           | Environment mutation + `t.Parallel()`                      | Use `t.Setenv()` (Go 1.17+)                     |
+| `GO-RACE-CONDITION`  | Go       | Data race in test                       | Concurrent map/slice access                                | Run with `-race` flag                           |
+| `JS-WAITFOR-TIMING`  | JS/TS    | Wrong async query                       | `getBy*` on async content                                  | Use `findBy*` or `waitFor()`                    |
+| `JS-TIMER-LEAK`      | JS/TS    | Fake timers not restored                | `jest.useFakeTimers()` without restore                     | Call `jest.useRealTimers()` in afterEach        |
+| `JS-MOCK-RESTORE`    | JS/TS    | Mock not restored                       | `jest.spyOn()` without cleanup                             | Use `restoreAllMocks()` in afterEach            |
+| `JS-ACT-MISSING`     | JS/TS    | State update outside act()              | Component updates without `act()` wrapper                  | Wrap state-triggering code in `act()`           |
 
 ### Medium Severity (Sometimes Flaky)
 
-| ID | Language | Anti-Pattern | Detection | Fix |
-|----|----------|--------------|-----------|-----|
-| `CROSS-RANDOM` | All | Unseeded RNG | `rand`, `random`, `Math.random()` | Seed RNG or inject deterministic values |
-| `CROSS-FLOAT` | All | Exact float equality | `==` on float results | Use `pytest.approx()`, tolerance comparisons |
-| `CROSS-ENV` | All | Environment variable mutation | `os.Setenv`, `process.env.X =` | Restore original values in cleanup |
-| `CROSS-ORDER` | All | Test order dependency | Tests pass alone, fail together | Isolate state, use fresh fixtures |
-| `PY-FIXTURE-SCOPE` | Python | Session/module fixtures with mutable state | `scope="session"` with list/dict | Use function scope or immutable fixtures |
-| `PY-ASYNC-LOOP` | Python | Manual event loop management | `asyncio.get_event_loop()`, `loop.run_until_complete()` | Use `pytest-asyncio` with `@pytest.mark.asyncio` |
-| `PY-TEMPFILE` | Python | Hardcoded temp paths | `/tmp/test_file.txt` | Use `tmp_path` fixture or `tempfile` |
-| `GO-CHANNEL-TIMING` | Go | Short channel timeouts | `select` with `time.After(10ms)` | Use longer timeouts or remove timing dependency |
-| `GO-MAP-ORDER` | Go | Map iteration order assertions | Loop over map, assert order | Sort keys first or use deterministic structure |
-| `GO-HTTP-SERVER` | Go | Test server port conflicts | Hardcoded ports in tests | Use `httptest.NewServer()` with dynamic ports |
-| `JS-SNAPSHOT-FRAGILE` | JS/TS | Brittle snapshots | Large objects, timestamps in snapshots | Exclude volatile fields, use smaller snapshots |
-| `JS-ASYNC-UNMOUNT` | JS/TS | State update after unmount | Async callback on unmounted component | Use cleanup functions, abort controllers |
-| `JS-FETCH-MOCK` | JS/TS | Incomplete fetch mock | Missing error/timeout cases | Mock all fetch scenarios |
+| ID                    | Language | Anti-Pattern                               | Detection                                               | Fix                                              |
+| --------------------- | -------- | ------------------------------------------ | ------------------------------------------------------- | ------------------------------------------------ |
+| `CROSS-RANDOM`        | All      | Unseeded RNG                               | `rand`, `random`, `Math.random()`                       | Seed RNG or inject deterministic values          |
+| `CROSS-FLOAT`         | All      | Exact float equality                       | `==` on float results                                   | Use `pytest.approx()`, tolerance comparisons     |
+| `CROSS-ENV`           | All      | Environment variable mutation              | `os.Setenv`, `process.env.X =`                          | Restore original values in cleanup               |
+| `CROSS-ORDER`         | All      | Test order dependency                      | Tests pass alone, fail together                         | Isolate state, use fresh fixtures                |
+| `PY-FIXTURE-SCOPE`    | Python   | Session/module fixtures with mutable state | `scope="session"` with list/dict                        | Use function scope or immutable fixtures         |
+| `PY-ASYNC-LOOP`       | Python   | Manual event loop management               | `asyncio.get_event_loop()`, `loop.run_until_complete()` | Use `pytest-asyncio` with `@pytest.mark.asyncio` |
+| `PY-TEMPFILE`         | Python   | Hardcoded temp paths                       | `/tmp/test_file.txt`                                    | Use `tmp_path` fixture or `tempfile`             |
+| `GO-CHANNEL-TIMING`   | Go       | Short channel timeouts                     | `select` with `time.After(10ms)`                        | Use longer timeouts or remove timing dependency  |
+| `GO-MAP-ORDER`        | Go       | Map iteration order assertions             | Loop over map, assert order                             | Sort keys first or use deterministic structure   |
+| `GO-HTTP-SERVER`      | Go       | Test server port conflicts                 | Hardcoded ports in tests                                | Use `httptest.NewServer()` with dynamic ports    |
+| `JS-SNAPSHOT-FRAGILE` | JS/TS    | Brittle snapshots                          | Large objects, timestamps in snapshots                  | Exclude volatile fields, use smaller snapshots   |
+| `JS-ASYNC-UNMOUNT`    | JS/TS    | State update after unmount                 | Async callback on unmounted component                   | Use cleanup functions, abort controllers         |
+| `JS-FETCH-MOCK`       | JS/TS    | Incomplete fetch mock                      | Missing error/timeout cases                             | Mock all fetch scenarios                         |
 
 ### Low Severity (Occasionally Flaky)
 
-| ID | Language | Anti-Pattern | Detection | Fix |
-|----|----------|--------------|-----------|-----|
-| `CROSS-HARDCODED-PATH` | All | Hardcoded absolute paths | `/home/`, `/Users/`, `C:\` in tests | Use relative paths or fixtures |
-| `PY-PARAMETRIZE-ID` | Python | Non-deterministic test IDs | `@pytest.mark.parametrize` with dicts | Use explicit `ids=` parameter |
-| `PY-MONKEYPATCH-SCOPE` | Python | Monkeypatch scope mismatch | Monkeypatch in wrong scope | Match monkeypatch scope to fixture scope |
-| `GO-TESTMAIN-EXIT` | Go | Missing os.Exit in TestMain | `TestMain` without `os.Exit(m.Run())` | Always call `os.Exit(m.Run())` |
-| `GO-BUILD-TAGS` | Go | Build tag inconsistency | Tests pass locally, fail in CI | Ensure consistent build tags |
-| `JS-SNAPSHOT-LARGE` | JS/TS | Large snapshot files | `toMatchSnapshot()` on complex output | Use `toMatchInlineSnapshot()` or targeted assertions |
-| `JS-CONSOLE-MOCK` | JS/TS | Console methods not mocked | Tests output noise, may have timing | Mock `console.*` methods |
+| ID                     | Language | Anti-Pattern                | Detection                             | Fix                                                  |
+| ---------------------- | -------- | --------------------------- | ------------------------------------- | ---------------------------------------------------- |
+| `CROSS-HARDCODED-PATH` | All      | Hardcoded absolute paths    | `/home/`, `/Users/`, `C:\` in tests   | Use relative paths or fixtures                       |
+| `PY-PARAMETRIZE-ID`    | Python   | Non-deterministic test IDs  | `@pytest.mark.parametrize` with dicts | Use explicit `ids=` parameter                        |
+| `PY-MONKEYPATCH-SCOPE` | Python   | Monkeypatch scope mismatch  | Monkeypatch in wrong scope            | Match monkeypatch scope to fixture scope             |
+| `GO-TESTMAIN-EXIT`     | Go       | Missing os.Exit in TestMain | `TestMain` without `os.Exit(m.Run())` | Always call `os.Exit(m.Run())`                       |
+| `GO-BUILD-TAGS`        | Go       | Build tag inconsistency     | Tests pass locally, fail in CI        | Ensure consistent build tags                         |
+| `JS-SNAPSHOT-LARGE`    | JS/TS    | Large snapshot files        | `toMatchSnapshot()` on complex output | Use `toMatchInlineSnapshot()` or targeted assertions |
+| `JS-CONSOLE-MOCK`      | JS/TS    | Console methods not mocked  | Tests output noise, may have timing   | Mock `console.*` methods                             |
 
 ---
 
@@ -155,18 +155,21 @@ For each identified flaky test:
 
 Produce concrete fixes:
 
-```markdown
+````markdown
 ### Fix for `test_user_creation` (PY-MOCK-LEAK)
 
 **Before:**
+
 ```python
 def test_user_creation():
     mock_db = patch('app.db.connection').start()
     # test code...
     # Missing: mock_db.stop()
 ```
+````
 
 **After:**
+
 ```python
 def test_user_creation():
     with patch('app.db.connection') as mock_db:
@@ -175,7 +178,8 @@ def test_user_creation():
 ```
 
 **Why this fixes it:** The context manager ensures the mock is always stopped, even if the test fails or raises an exception.
-```
+
+````
 
 ---
 
@@ -189,7 +193,7 @@ python scripts/scan_patterns.py --lang python --format text
 
 # Empirical detection
 python scripts/detect_flaky.py --lang python --runs 10 --output report.json
-```
+````
 
 ### Direct Commands
 
@@ -225,7 +229,7 @@ select:mcp__filesystem__search_files  # Find test files
 
 ### Summary Report
 
-```markdown
+````markdown
 # Flaky Test Analysis: [scope]
 
 **Scan Date:** YYYY-MM-DD
@@ -235,24 +239,27 @@ select:mcp__filesystem__search_files  # Find test files
 
 ## Findings Summary
 
-| Severity | Count | Top Patterns |
-|----------|-------|--------------|
-| High     | X     | CROSS-TIME, PY-MOCK-LEAK |
+| Severity | Count | Top Patterns                |
+| -------- | ----- | --------------------------- |
+| High     | X     | CROSS-TIME, PY-MOCK-LEAK    |
 | Medium   | X     | CROSS-RANDOM, JS-TIMER-LEAK |
-| Low      | X     | CROSS-HARDCODED-PATH |
+| Low      | X     | CROSS-HARDCODED-PATH        |
 
 ## High Severity Issues
 
 ### 1. [Pattern ID]: [File:Line]
 
 **Code:**
+
 ```language
 // problematic code
 ```
+````
 
 **Problem:** [Explanation of why this causes flakiness]
 
 **Fix:**
+
 ```language
 // fixed code
 ```
@@ -266,7 +273,8 @@ select:mcp__filesystem__search_files  # Find test files
 1. [Prioritized action item]
 2. [Prioritized action item]
 3. [Prioritized action item]
-```
+
+````
 
 ---
 
@@ -299,7 +307,7 @@ jobs:
         with:
           name: flaky-test-report
           path: flaky-report.json
-```
+````
 
 ---
 

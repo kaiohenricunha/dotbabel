@@ -16,6 +16,7 @@ Arguments: `$ARGUMENTS` (optional: a ref range like `v1.0..HEAD`, a count like `
 ```bash
 LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 ```
+
 - If a tag exists: range = `$LAST_TAG..HEAD`
 - If `since-deploy`: find last deploy commit (grep recent messages for `deploy`, `ship`, or `release`)
 - If a number was given: last N commits
@@ -30,6 +31,7 @@ git log <range> --oneline --no-merges
 ### 3. Categorize by conventional commit prefix
 
 Group commits into:
+
 - **Features** (`feat:`)
 - **Fixes** (`fix:`)
 - **Performance** (`perf:`)
@@ -48,18 +50,23 @@ Format:
 ## [Unreleased] — YYYY-MM-DD
 
 ### Added
+
 - Feature description (abc1234)
 
 ### Fixed
+
 - Fix description (abc1234)
 
 ### Changed
+
 - Refactor or behavior change (abc1234)
 
 ### Data
+
 - Content/data update description (abc1234)
 
 ### Infrastructure
+
 - Build/CI/deps description (abc1234)
 ```
 
@@ -70,6 +77,7 @@ Omit empty sections. Include short commit hashes for traceability. Use Keep-a-Ch
 Print the changelog entry to the conversation.
 
 Ask the user:
+
 1. "Prepend this to `CHANGELOG.md`?" (create the file if it doesn't exist — use a standard Keep-a-Changelog header).
 2. "Create a git tag for this release?" Suggest a SemVer bump based on the nature of the changes:
    - **patch** (x.y.Z) for fixes, docs, infra

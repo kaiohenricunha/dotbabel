@@ -33,18 +33,19 @@ Arguments: `$ARGUMENTS` — a description of what to audit (e.g. "data quality f
    ### <Finding Category 1>
 
    | Item | Status | Details |
-   |------|--------|---------|
+   | ---- | ------ | ------- |
    | ...  | ...    | ...     |
 
    <Narrative explanation of the findings with evidence (file paths, line numbers, metrics, command output).>
 
    ### <Finding Category 2>
+
    ...
 
    ## Issues
 
    | Severity | Issue | Location | Recommendation |
-   |----------|-------|----------|----------------|
+   | -------- | ----- | -------- | -------------- |
    | CRITICAL | ...   | ...      | ...            |
    | WARNING  | ...   | ...      | ...            |
    | INFO     | ...   | ...      | ...            |

@@ -22,20 +22,22 @@ Arguments: `$ARGUMENTS` — the audit domain (e.g. "hardcoded business logic", "
 
    Produce **4–8 clusters**, not 30 single-finding PRs. Each cluster is one PR. Print the clustering plan as a table before dispatching:
 
-   | Cluster | Findings | Blast Radius | Recommended Title |
-   |---------|----------|--------------|-------------------|
-   | 1 | 3 | low | "Remove unused exports in pkg/db" |
+   | Cluster | Findings | Blast Radius | Recommended Title                 |
+   | ------- | -------- | ------------ | --------------------------------- |
+   | 1       | 3        | low          | "Remove unused exports in pkg/db" |
 
 3. **Initialize the status file.**
+
    ```markdown
    # Audit-and-Fix Status — <topic> — <YYYY-MM-DD>
 
    Audit: docs/audits/<topic-slug>-<date>.md
 
-   | Cluster | PR | Branch | State | Last Update |
-   |---------|----|--------|-------|-------------|
-   | 1 | — | — | pending | <timestamp> |
+   | Cluster | PR  | Branch | State   | Last Update |
+   | ------- | --- | ------ | ------- | ----------- |
+   | 1       | —   | —      | pending | <timestamp> |
    ```
+
    Write to `docs/audits/<topic-slug>-<date>-status.md`.
 
 4. **Dispatch parallel cluster implementers.** Use the `Agent` tool with `subagent_type: "general-purpose"` in a **single message with multiple tool calls** — one agent per cluster, cap at 6 concurrent. Each subagent receives:
@@ -48,10 +50,10 @@ Arguments: `$ARGUMENTS` — the audit domain (e.g. "hardcoded business logic", "
 
 6. **Post the final summary table** when all clusters reach `ready` or `blocked`:
 
-   | Cluster | PR | State | Notes |
-   |---------|----|----|-------|
-   | 1 | #201 | ready | 0 Copilot comments |
-   | 2 | #202 | blocked | rebase conflict on pkg/foo.go |
+   | Cluster | PR   | State   | Notes                         |
+   | ------- | ---- | ------- | ----------------------------- |
+   | 1       | #201 | ready   | 0 Copilot comments            |
+   | 2       | #202 | blocked | rebase conflict on pkg/foo.go |
 
    Do not merge. The user decides which PRs to merge (use `/merge-pr` per PR).
 

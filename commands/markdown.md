@@ -40,7 +40,7 @@ Use one of:
 
 ```bash
 npx markdownlint-cli2 path/to/file.md
-````
+```
 
 #### Docs directory
 

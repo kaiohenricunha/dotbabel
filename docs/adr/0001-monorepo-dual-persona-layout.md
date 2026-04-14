@@ -39,8 +39,8 @@ Consumers installing the package see only `plugins/harness/`. The author's
   matrix to pick their entry-point — added cognitive cost.
 - `package.json.files` becomes a trust boundary: a missing entry there
   silently ships dotfile scripts into consumer installs. Covered by an
-  integration test that asserts `plugins/harness/scripts/*` *is* shipped
-  and `bootstrap.sh` *is not*.
+  integration test that asserts `plugins/harness/scripts/*` _is_ shipped
+  and `bootstrap.sh` _is not_.
 
 ## Alternatives considered
 

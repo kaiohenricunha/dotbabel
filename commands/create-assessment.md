@@ -33,77 +33,83 @@ Arguments: `$ARGUMENTS` — a description of what to assess (e.g. "the ingest pi
 
 ## Grade bands
 
-| Grade | Band | Meaning |
-|-------|------|---------|
-| 9.0-10.0 | Excellent | Ship/adopt without reservation |
-| 7.0-8.9 | Solid | Production-ready; minor polish |
-| 5.0-6.9 | Passable | Usable but has real gaps; fix before scaling |
-| 3.0-4.9 | Weak | Significant problems; rework advised |
-| 0.0-2.9 | Broken | Do not ship/adopt |
+| Grade    | Band      | Meaning                                      |
+| -------- | --------- | -------------------------------------------- |
+| 9.0-10.0 | Excellent | Ship/adopt without reservation               |
+| 7.0-8.9  | Solid     | Production-ready; minor polish               |
+| 5.0-6.9  | Passable  | Usable but has real gaps; fix before scaling |
+| 3.0-4.9  | Weak      | Significant problems; rework advised         |
+| 0.0-2.9  | Broken    | Do not ship/adopt                            |
 
 ## Rubrics by target type
 
 Weights within each rubric sum to 1.00.
 
 ### package
-| Dimension | Weight |
-|---|---:|
-| Correctness (tests pass, matches spec) | 0.25 |
-| API design & ergonomics | 0.15 |
-| Test coverage & quality | 0.20 |
-| Documentation (README, examples, API docs) | 0.10 |
-| Maintenance signals (release cadence, open issues, responsiveness) | 0.10 |
-| Security & dependency health | 0.20 |
+
+| Dimension                                                          | Weight |
+| ------------------------------------------------------------------ | -----: |
+| Correctness (tests pass, matches spec)                             |   0.25 |
+| API design & ergonomics                                            |   0.15 |
+| Test coverage & quality                                            |   0.20 |
+| Documentation (README, examples, API docs)                         |   0.10 |
+| Maintenance signals (release cadence, open issues, responsiveness) |   0.10 |
+| Security & dependency health                                       |   0.20 |
 
 ### project
-| Dimension | Weight |
-|---|---:|
-| Architecture clarity (boundaries, layering) | 0.20 |
-| Code quality & consistency | 0.15 |
-| Test coverage | 0.15 |
-| CI/CD & automation | 0.10 |
-| Documentation (CLAUDE.md, README, runbooks) | 0.10 |
-| Security posture | 0.15 |
-| Observability (logs, metrics, alerting) | 0.15 |
+
+| Dimension                                   | Weight |
+| ------------------------------------------- | -----: |
+| Architecture clarity (boundaries, layering) |   0.20 |
+| Code quality & consistency                  |   0.15 |
+| Test coverage                               |   0.15 |
+| CI/CD & automation                          |   0.10 |
+| Documentation (CLAUDE.md, README, runbooks) |   0.10 |
+| Security posture                            |   0.15 |
+| Observability (logs, metrics, alerting)     |   0.15 |
 
 ### source-file
-| Dimension | Weight |
-|---|---:|
-| Correctness | 0.30 |
-| Readability | 0.20 |
-| Testability | 0.15 |
-| Coupling & cohesion | 0.15 |
-| Performance considerations | 0.10 |
-| Security | 0.10 |
+
+| Dimension                  | Weight |
+| -------------------------- | -----: |
+| Correctness                |   0.30 |
+| Readability                |   0.20 |
+| Testability                |   0.15 |
+| Coupling & cohesion        |   0.15 |
+| Performance considerations |   0.10 |
+| Security                   |   0.10 |
 
 ### architecture-decision
-| Dimension | Weight |
-|---|---:|
-| Problem framing | 0.20 |
-| Solution fit | 0.25 |
-| Alternatives considered | 0.15 |
-| Trade-offs made explicit | 0.15 |
-| Reversibility / migration path | 0.15 |
-| Operational impact (cost, ops load) | 0.10 |
+
+| Dimension                           | Weight |
+| ----------------------------------- | -----: |
+| Problem framing                     |   0.20 |
+| Solution fit                        |   0.25 |
+| Alternatives considered             |   0.15 |
+| Trade-offs made explicit            |   0.15 |
+| Reversibility / migration path      |   0.15 |
+| Operational impact (cost, ops load) |   0.10 |
 
 ### pull-request
-| Dimension | Weight |
-|---|---:|
-| Scope focus (one thing, well-scoped) | 0.15 |
-| Diff clarity | 0.15 |
-| Test coverage of the change | 0.25 |
-| Risk & rollback plan | 0.20 |
-| PR body quality (context, test plan) | 0.10 |
-| CI signal | 0.15 |
+
+| Dimension                            | Weight |
+| ------------------------------------ | -----: |
+| Scope focus (one thing, well-scoped) |   0.15 |
+| Diff clarity                         |   0.15 |
+| Test coverage of the change          |   0.25 |
+| Risk & rollback plan                 |   0.20 |
+| PR body quality (context, test plan) |   0.10 |
+| CI signal                            |   0.15 |
 
 ### document
-| Dimension | Weight |
-|---|---:|
-| Clarity | 0.25 |
-| Completeness | 0.25 |
-| Evidence / citations | 0.15 |
-| Actionability | 0.20 |
-| Maintenance hooks (owner, dates, versioning) | 0.15 |
+
+| Dimension                                    | Weight |
+| -------------------------------------------- | -----: |
+| Clarity                                      |   0.25 |
+| Completeness                                 |   0.25 |
+| Evidence / citations                         |   0.15 |
+| Actionability                                |   0.20 |
+| Maintenance hooks (owner, dates, versioning) |   0.15 |
 
 ## Document structure
 
@@ -121,17 +127,19 @@ What was included and excluded from this assessment, and which rubric was applie
 
 ## Rubric & scores
 
-| Dimension | Weight | Score | Weighted | Evidence |
-|-----------|-------:|------:|---------:|----------|
-| ...       | 0.XX   | N/10  | N.NN     | <file:line, metric, …> |
-| **Overall** | **1.00** | — | **X.X** | — |
+| Dimension   |   Weight | Score | Weighted | Evidence               |
+| ----------- | -------: | ----: | -------: | ---------------------- |
+| ...         |     0.XX |  N/10 |     N.NN | <file:line, metric, …> |
+| **Overall** | **1.00** |     — |  **X.X** | —                      |
 
 ## Dimension detail
 
 ### <Dimension 1> — N/10
+
 Observations with evidence. End with a short "**To raise this score:**" line listing concrete changes that would move the score up.
 
 ### <Dimension 2> — N/10
+
 ...
 
 ## Highest-leverage improvements

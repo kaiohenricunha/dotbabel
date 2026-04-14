@@ -6,7 +6,7 @@ Templates for generating Claude Code prompts in Section 6 of the spec.
 
 Use when the user needs CC to analyze existing code before designing the new architecture.
 
-```
+````
 Read the files listed below and produce a single markdown report at
 {output_path}. Do NOT modify any source files. Read-only analysis.
 
@@ -39,7 +39,7 @@ cat {output_path} | head -20
 grep -c "^##" {output_path}
 # expect: {N} sections
 </verify>
-```
+````
 
 ## Implementation Prompt (Phase: Build)
 

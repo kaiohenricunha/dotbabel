@@ -3,24 +3,24 @@
 This repo is a dual-purpose checkout. Three distinct audiences consume
 parts of it. Pick yours, then follow the "Start here" column.
 
-| Persona | What you want | Start here |
-|---|---|---|
-| **Consumer** — installing the plugin to govern your own repo | Install, scaffold, run validators, wire CI | [quickstart.md](./quickstart.md) → [cli-reference.md](./cli-reference.md) |
-| **Library user** — importing the Node API into your own tooling | Import, typed signatures, error codes | [api-reference.md](./api-reference.md) |
-| **Dotfile user** — personal Claude Code config via `bootstrap.sh` | Symlink into `~/.claude/`, manage your own commands/skills | [../CLAUDE.md](../CLAUDE.md) + [../bootstrap.sh](../bootstrap.sh) |
-| **Contributor** — sending PRs to this repo | Dev workflow, local gates, spec discipline | [../CONTRIBUTING.md](../CONTRIBUTING.md) |
-| **Security researcher** | Private disclosure, threat model | [../SECURITY.md](../SECURITY.md) |
+| Persona                                                           | What you want                                              | Start here                                                                |
+| ----------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Consumer** — installing the plugin to govern your own repo      | Install, scaffold, run validators, wire CI                 | [quickstart.md](./quickstart.md) → [cli-reference.md](./cli-reference.md) |
+| **Library user** — importing the Node API into your own tooling   | Import, typed signatures, error codes                      | [api-reference.md](./api-reference.md)                                    |
+| **Dotfile user** — personal Claude Code config via `bootstrap.sh` | Symlink into `~/.claude/`, manage your own commands/skills | [../CLAUDE.md](../CLAUDE.md) + [../bootstrap.sh](../bootstrap.sh)         |
+| **Contributor** — sending PRs to this repo                        | Dev workflow, local gates, spec discipline                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                  |
+| **Security researcher**                                           | Private disclosure, threat model                           | [../SECURITY.md](../SECURITY.md)                                          |
 
 ## Where the split happens
 
-| Path | Who consumes it |
-|---|---|
-| `package.json`, `plugins/harness/src/**`, `plugins/harness/bin/**` | Consumer + library user |
-| `plugins/harness/templates/**` | Consumer (installed by `harness-init`) |
-| `plugins/harness/.claude-plugin/plugin.json` | Claude Code when the plugin is enabled |
-| `bootstrap.sh`, `sync.sh`, `commands/**`, `skills/**` | Dotfile user (Kaio) |
-| `CLAUDE.md`, `docs/specs/harness-core/**`, `.claude/**` at repo root | Contributors + the dogfood CI |
-| `docs/**` (excluding `specs/harness-core/`) | All of the above |
+| Path                                                                 | Who consumes it                        |
+| -------------------------------------------------------------------- | -------------------------------------- |
+| `package.json`, `plugins/harness/src/**`, `plugins/harness/bin/**`   | Consumer + library user                |
+| `plugins/harness/templates/**`                                       | Consumer (installed by `harness-init`) |
+| `plugins/harness/.claude-plugin/plugin.json`                         | Claude Code when the plugin is enabled |
+| `bootstrap.sh`, `sync.sh`, `commands/**`, `skills/**`                | Dotfile user (Kaio)                    |
+| `CLAUDE.md`, `docs/specs/harness-core/**`, `.claude/**` at repo root | Contributors + the dogfood CI          |
+| `docs/**` (excluding `specs/harness-core/`)                          | All of the above                       |
 
 ## Why the dual-purpose layout
 

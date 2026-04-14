@@ -18,11 +18,23 @@ import {
   EXIT_CODES,
   version,
   // spec-harness helpers
-  readJson, readText, pathExists, git,
-  loadFacts, listSpecDirs, listRepoPaths,
-  escapeRegex, globToRegExp, matchesGlob, anyPathMatches, toPosix,
-  extractTemplateSection, isMeaningfulSection,
-  getPullRequestContext, isBotActor, getChangedFiles,
+  readJson,
+  readText,
+  pathExists,
+  git,
+  loadFacts,
+  listSpecDirs,
+  listRepoPaths,
+  escapeRegex,
+  globToRegExp,
+  matchesGlob,
+  anyPathMatches,
+  toPosix,
+  extractTemplateSection,
+  isMeaningfulSection,
+  getPullRequestContext,
+  isBotActor,
+  getChangedFiles,
 } from "@kaiohenricunha/harness";
 ```
 

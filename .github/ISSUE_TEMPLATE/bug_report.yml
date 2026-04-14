@@ -1,0 +1,68 @@
+name: Bug report
+description: Something is broken or produces the wrong output.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing! Before opening a security-sensitive bug, please read
+        [SECURITY.md](../SECURITY.md) and consider a private disclosure.
+  - type: input
+    id: version
+    attributes:
+      label: Harness version
+      description: Run `npx harness --version` or check package.json.
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: v22.11.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options:
+        - Linux
+        - macOS
+        - Windows / WSL
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Minimal steps + the exact command you ran. A link to a tiny repo is gold.
+      placeholder: |
+        1. npm i -D @kaiohenricunha/harness
+        2. npx harness-init
+        3. npx harness-validate-specs
+      render: bash
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What you thought should happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead. Paste `--verbose --json` output when relevant.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: error_code
+    attributes:
+      label: ValidationError code
+      description: If a validator failed, which `ERROR_CODES` value did it emit?
+      placeholder: SPEC_STATUS_INVALID

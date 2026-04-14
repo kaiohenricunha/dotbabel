@@ -33,9 +33,9 @@ specification; `validate-spec` proves whether it actually got built.
 Five phases, each gated. Do not skip ahead. If a phase fails fatally (e.g. spec
 not found, wrong format), stop with a clear message — partial audits mislead.
 
-The reasoning behind the structure: a spec is a set of *claims* (constraints,
+The reasoning behind the structure: a spec is a set of _claims_ (constraints,
 acceptance criteria, key decisions). An audit checks each claim against
-*evidence* (code, tests, runtime behavior). If you skip phases, you're guessing,
+_evidence_ (code, tests, runtime behavior). If you skip phases, you're guessing,
 not auditing.
 
 ---
@@ -60,6 +60,7 @@ not auditing.
    - `research/sources.md`
 
    If any are missing, **abort** with:
+
    > This skill validates only the structured `/spec` format (8 sections + spec.json). The directory `<path>` is missing: `<list>`. For ad-hoc or single-file specs, run `/create-audit` with the spec file as input instead.
 
 4. **Read everything into context.** `spec.json`, `README.md`, all 8 section files, `research/sources.md`, and `current-state/analysis.md` if present (brownfield).
@@ -166,6 +167,7 @@ ground truth. Run them.
 4. **Do not modify the spec.** No edits to `spec.json`, `README.md`, or any section file. No staging, no committing of any file. Leave the audit as untracked. The user decides whether to commit it.
 
 5. **Report to the user**, in this exact tight form (no document dump in chat):
+
    ```
    Wrote: docs/audits/spec-<id>-validation-<date>.md
    Constraints: <implemented>/<partial>/<unverified>/<n/a> (total <N>)

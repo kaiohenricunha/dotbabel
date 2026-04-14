@@ -50,7 +50,7 @@ from a checked-out development copy of `0.1.x`, the migration surface is:
 
 ## Forking the dotfiles
 
-If you want to fork the repo to keep your *own* personal Claude Code
+If you want to fork the repo to keep your _own_ personal Claude Code
 config, the key files to edit are:
 
 - `commands/**/*.md` — your slash commands.

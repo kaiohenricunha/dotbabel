@@ -1,12 +1,5 @@
 {
   "team_count": 2,
-  "protected_paths": [
-    "CLAUDE.md",
-    ".github/workflows/**",
-    ".claude/commands/**"
-  ],
-  "instruction_files": [
-    "CLAUDE.md",
-    "README.md"
-  ]
+  "protected_paths": ["CLAUDE.md", ".github/workflows/**", ".claude/commands/**"],
+  "instruction_files": ["CLAUDE.md", "README.md"]
 }

@@ -57,7 +57,7 @@ docs/specs/<spec-name>/
 3. Each spec section file gets the scaffold template (see "Section Scaffolds" below).
 4. The README gets a status dashboard showing all sections as `[ ] empty`.
 5. Tell the user the scaffold is created.
-   - **If `$1` was provided:** "Scaffold created. Based on your description — *{$1}* — let's start with §1 Problem/Motivation. What specifically is broken or missing that this addresses?"
+   - **If `$1` was provided:** "Scaffold created. Based on your description — _{$1}_ — let's start with §1 Problem/Motivation. What specifically is broken or missing that this addresses?"
    - **If no description:** "Scaffold created. Let's fill it in — starting with §1 Problem/Motivation. What problem are we solving?"
 
 **Do not fill in any content during scaffolding.** The scaffold is purely structural (the description goes only in the README header, not into section bodies).
@@ -78,6 +78,7 @@ Walk through each section with the user. For each section:
 **Section order is suggested, not mandatory.** If the user wants to jump to §6 Implementation Plan, go there. If they want to revisit §2 Scope after filling §5, do that.
 
 **Rules:**
+
 - Only add content the user explicitly provides or approves.
 - Tag constraints with IDs (e.g., PERF-1, SEC-3, ARCH-1) for cross-referencing between sections.
 - Place constraints in the section they **shape**, not just where they're mentioned.
@@ -118,6 +119,7 @@ When all sections are filled (or the user says "done" / "finalize"):
 Use these templates when creating each section file in Phase 1.
 
 ### 1-problem-motivation.md
+
 ```markdown
 # §1 — Problem / Motivation
 
@@ -137,6 +139,7 @@ Use these templates when creating each section file in Phase 1.
 ```
 
 ### 2-scope.md
+
 ```markdown
 # §2 — Scope
 
@@ -155,8 +158,8 @@ Use these templates when creating each section file in Phase 1.
 <!-- What files/systems/services does this touch vs. not touch? -->
 
 | Touches | Does Not Touch |
-|---------|---------------|
-|         |               |
+| ------- | -------------- |
+|         |                |
 
 ## Urgency
 
@@ -164,6 +167,7 @@ Use these templates when creating each section file in Phase 1.
 ```
 
 ### 3-high-level-architecture.md
+
 ```markdown
 # §3 — High-Level Architecture
 
@@ -178,16 +182,16 @@ Use these templates when creating each section file in Phase 1.
 <!-- What databases, caches, queues, or storage systems are involved? -->
 
 | Store | Role | Access Pattern |
-|-------|------|---------------|
-|       |      |               |
+| ----- | ---- | -------------- |
+|       |      |                |
 
 ## External APIs / Dependencies
 
 <!-- What external services does this depend on? -->
 
 | Service | Purpose | Rate Limits / Constraints |
-|---------|---------|--------------------------|
-|         |         |                          |
+| ------- | ------- | ------------------------- |
+|         |         |                           |
 
 ## Deployment
 
@@ -195,6 +199,7 @@ Use these templates when creating each section file in Phase 1.
 ```
 
 ### 4-data-flow-components.md
+
 ```markdown
 # §4 — Data Flow / Components
 
@@ -222,6 +227,7 @@ Use these templates when creating each section file in Phase 1.
 ```
 
 ### 5-interfaces-apis.md
+
 ```markdown
 # §5 — Interfaces and APIs
 
@@ -241,6 +247,7 @@ Use these templates when creating each section file in Phase 1.
 ```
 
 ### 6-implementation-plan.md
+
 ```markdown
 # §6 — Implementation Plan
 
@@ -270,7 +277,7 @@ Each prompt should include:
 <!-- Per-unit matrix -->
 
 | Unit | UNIT | INTEGRATION | POST-DEPLOY |
-|------|------|-------------|-------------|
+| ---- | ---- | ----------- | ----------- |
 |      |      |             |             |
 
 ## 6.5 Migration Sequence
@@ -282,11 +289,12 @@ Each prompt should include:
 <!-- Scenario → action table, coexistence strategy for old/new -->
 
 | Scenario | Action | Notes |
-|----------|--------|-------|
+| -------- | ------ | ----- |
 |          |        |       |
 ```
 
 ### 7-non-functional-requirements.md
+
 ```markdown
 # §7 — Non-Functional Requirements
 
@@ -310,6 +318,7 @@ Each prompt should include:
 ```
 
 ### 8-risks-alternatives.md
+
 ```markdown
 # §8 — Risks and Alternatives
 
@@ -319,9 +328,9 @@ Each prompt should include:
 
 <!-- Tag each as R-N -->
 
-| ID | Risk | Likelihood | Impact | Mitigation |
-|----|------|-----------|--------|------------|
-|    |      |           |        |            |
+| ID  | Risk | Likelihood | Impact | Mitigation |
+| --- | ---- | ---------- | ------ | ---------- |
+|     |      |            |        |            |
 
 ## Rejected Alternatives
 
@@ -329,6 +338,7 @@ Each prompt should include:
 ```
 
 ### README.md
+
 ```markdown
 # {Spec Name} — Engineering Spec
 
@@ -338,16 +348,16 @@ Each prompt should include:
 
 ## Status
 
-| # | Section | Status |
-|---|---------|--------|
-| 1 | Problem / Motivation | [ ] empty |
-| 2 | Scope | [ ] empty |
-| 3 | High-Level Architecture | [ ] empty |
-| 4 | Data Flow / Components | [ ] empty |
-| 5 | Interfaces and APIs | [ ] empty |
-| 6 | Implementation Plan | [ ] empty |
-| 7 | Non-Functional Requirements | [ ] empty |
-| 8 | Risks and Alternatives | [ ] empty |
+| #   | Section                     | Status    |
+| --- | --------------------------- | --------- |
+| 1   | Problem / Motivation        | [ ] empty |
+| 2   | Scope                       | [ ] empty |
+| 3   | High-Level Architecture     | [ ] empty |
+| 4   | Data Flow / Components      | [ ] empty |
+| 5   | Interfaces and APIs         | [ ] empty |
+| 6   | Implementation Plan         | [ ] empty |
+| 7   | Non-Functional Requirements | [ ] empty |
+| 8   | Risks and Alternatives      | [ ] empty |
 
 ## Quick Start
 
@@ -359,6 +369,7 @@ See [research/sources.md](research/sources.md) for indexed source documents.
 ```
 
 ### research/sources.md
+
 ```markdown
 # Research Sources
 
@@ -370,6 +381,7 @@ See [research/sources.md](research/sources.md) for indexed source documents.
 ```
 
 ### current-state/analysis.md (brownfield only)
+
 ```markdown
 # Current State Analysis
 
@@ -392,19 +404,19 @@ See [research/sources.md](research/sources.md) for indexed source documents.
 
 ## Constraint ID Conventions
 
-| Prefix | Domain | Lives In |
-|--------|--------|----------|
-| ARCH-N | Architecture | §3, §4 |
-| IMPL-N | Implementation | §6 |
-| TEST-N | Testing | §6 |
-| PERF-N | Performance | §7 |
-| REL-N | Reliability | §7 |
-| OPS-N | Operational | §7 |
-| SEC-N | Security | §7 |
-| KD-N | Key Decisions | §4 target arch |
-| R-N | Risks | §8 |
-| A-N | Alternatives | §8 |
-| DOC-N | Research docs | research/sources.md |
+| Prefix | Domain         | Lives In            |
+| ------ | -------------- | ------------------- |
+| ARCH-N | Architecture   | §3, §4              |
+| IMPL-N | Implementation | §6                  |
+| TEST-N | Testing        | §6                  |
+| PERF-N | Performance    | §7                  |
+| REL-N  | Reliability    | §7                  |
+| OPS-N  | Operational    | §7                  |
+| SEC-N  | Security       | §7                  |
+| KD-N   | Key Decisions  | §4 target arch      |
+| R-N    | Risks          | §8                  |
+| A-N    | Alternatives   | §8                  |
+| DOC-N  | Research docs  | research/sources.md |
 
 ---
 

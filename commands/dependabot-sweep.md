@@ -13,10 +13,12 @@ Arguments: `$ARGUMENTS` — optional filters (e.g. `gomod`, `npm`, `--max 10`). 
 ## Steps
 
 1. **Enumerate open Dependabot PRs.**
+
    ```bash
    gh pr list --author "app/dependabot" --state open \
      --json number,title,headRefName,labels,mergeable,mergeStateStatus,files,statusCheckRollup
    ```
+
    Apply any `$ARGUMENTS` filters. Report count before proceeding.
 
 2. **Classify each PR by risk.** For every PR, determine:
@@ -33,20 +35,23 @@ Arguments: `$ARGUMENTS` — optional filters (e.g. `gomod`, `npm`, `--max 10`). 
 
 4. **Aggregate results** into a markdown table in your response:
 
-   | PR | Dep | Bump | Test Δ | Copilot | Risk | Recommendation |
-   |----|-----|------|--------|---------|------|----------------|
-   | #123 | foo | minor | 0/0 | 2 addressed | low | auto-merge |
-   | #125 | bar | major | 0/0 | — | high | needs user review |
+   | PR   | Dep | Bump  | Test Δ | Copilot     | Risk | Recommendation    |
+   | ---- | --- | ----- | ------ | ----------- | ---- | ----------------- |
+   | #123 | foo | minor | 0/0    | 2 addressed | low  | auto-merge        |
+   | #125 | bar | major | 0/0    | —           | high | needs user review |
 
 5. **Auto-close subsumed PRs.** If two PRs bump the same dep to different versions, close the older one:
+
    ```bash
    gh pr close <N> --comment "Subsumed by #<newer>: same dep, newer version."
    ```
 
 6. **Merge safe bumps.** For every PR classified `low` risk AND (patch or minor) AND tests green AND not lockfile-only:
+
    ```bash
    gh pr merge <N> --squash --delete-branch
    ```
+
    Report each merge inline as it happens.
 
 7. **Stop and ask the user** for any PR classified `major`, `lockfile-only`, or `high risk`. Present the table and wait for explicit user approval per-PR before merging these.

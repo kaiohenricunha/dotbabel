@@ -35,7 +35,7 @@ source of truth lives at `plugins/harness/src/lib/errors.mjs`:
 - **Backwards-compatible for stderr consumers** — regexing the human
   message still works.
 - **Forward-compatible for structured consumers** — `jq -r '.events[] |
-  select(.kind == "fail") | .details.code'` is the documented pipeline.
+select(.kind == "fail") | .details.code'` is the documented pipeline.
 - **Stability contract** — `ERROR_CODES` entries are load-bearing strings.
   Renames require a major bump; additions don't.
 - **Discoverability** — `ERROR_CODES` is the authoritative index; the

@@ -12,11 +12,11 @@ is at
 
 ## Placeholders
 
-| Token | Source | Default |
-|---|---|---|
-| `{{project_name}}` | `harness-init --project-name` | `basename(cwd)` |
-| `{{project_type}}` | `harness-init --project-type` | `"unknown"` |
-| `{{today}}` | `new Date().toISOString().slice(0,10)` (scaffold time) | — |
+| Token              | Source                                                 | Default         |
+| ------------------ | ------------------------------------------------------ | --------------- |
+| `{{project_name}}` | `harness-init --project-name`                          | `basename(cwd)` |
+| `{{project_type}}` | `harness-init --project-type`                          | `"unknown"`     |
+| `{{today}}`        | `new Date().toISOString().slice(0,10)` (scaffold time) | —               |
 
 Tokens not listed above pass through unchanged. That's intentional — a
 consumer template can reference e.g. `{{custom_marker}}` knowing the

@@ -23,24 +23,25 @@ Tables over prose where possible. No filler.
 
 ## Structural Findings
 
-| Check | Result | Notes |
-|-------|--------|-------|
-| `spec.json` schema | <pass / fail> | <e.g. "missing `owners` field" or "ok"> |
-| `linked_paths` resolve | <N>/<N> globs matched | <list unresolved globs, or "all matched"> |
-| `depends_on_specs` resolve | <N>/<N> | <list missing, or "all matched"> |
-| README ↔ section consistency | <N> drifts | <e.g. "§4 marked done but file is scaffold-only"> |
-| `DOC-N` round-trip | <N> orphans, <N> undefined | <list, or "clean"> |
+| Check                        | Result                     | Notes                                             |
+| ---------------------------- | -------------------------- | ------------------------------------------------- |
+| `spec.json` schema           | <pass / fail>              | <e.g. "missing `owners` field" or "ok">           |
+| `linked_paths` resolve       | <N>/<N> globs matched      | <list unresolved globs, or "all matched">         |
+| `depends_on_specs` resolve   | <N>/<N>                    | <list missing, or "all matched">                  |
+| README ↔ section consistency | <N> drifts                 | <e.g. "§4 marked done but file is scaffold-only"> |
+| `DOC-N` round-trip           | <N> orphans, <N> undefined | <list, or "clean">                                |
 
 ## Constraint Coverage
 
-| ID | Section | Verdict | Evidence | Notes |
-|----|---------|---------|----------|-------|
-| ARCH-1 | §3 | Implemented | `api/internal/config/loader.go:42` | <one-line summary of the citation> |
-| PERF-2 | §7 | Partial | `src/main.jsx:118` | "p95<200ms" measured for read; write path uncovered |
-| KD-3 | §4 | Unverified | — | No literal id mention; no behavioral evidence in `linked_paths` |
-| R-1 | §8 | N/A | — | Spec marks risk as accepted; no mitigation expected |
+| ID     | Section | Verdict     | Evidence                           | Notes                                                           |
+| ------ | ------- | ----------- | ---------------------------------- | --------------------------------------------------------------- |
+| ARCH-1 | §3      | Implemented | `api/internal/config/loader.go:42` | <one-line summary of the citation>                              |
+| PERF-2 | §7      | Partial     | `src/main.jsx:118`                 | "p95<200ms" measured for read; write path uncovered             |
+| KD-3   | §4      | Unverified  | —                                  | No literal id mention; no behavioral evidence in `linked_paths` |
+| R-1    | §8      | N/A         | —                                  | Spec marks risk as accepted; no mitigation expected             |
 
 **Coverage summary:**
+
 - Implemented: <N>
 - Partial: <N>
 - Unverified: <N>
@@ -49,11 +50,11 @@ Tables over prose where possible. No filler.
 
 ## Acceptance Command Results
 
-| # | Command | Exit | Duration | Pre-existing? | Output Tail |
-|---|---------|------|----------|---------------|-------------|
-| 1 | `npm run build` | 0 | 12.4s | — | `built in 11.8s` |
-| 2 | `npm run test:coverage` | 1 | 38.1s | **introduced** | `2 failing: should render trends tab` |
-| 3 | `cd api && go test ./... -race` | 0 | 67.0s | — | `ok api/internal/handler 14.2s` |
+| #   | Command                         | Exit | Duration | Pre-existing?  | Output Tail                           |
+| --- | ------------------------------- | ---- | -------- | -------------- | ------------------------------------- |
+| 1   | `npm run build`                 | 0    | 12.4s    | —              | `built in 11.8s`                      |
+| 2   | `npm run test:coverage`         | 1    | 38.1s    | **introduced** | `2 failing: should render trends tab` |
+| 3   | `cd api && go test ./... -race` | 0    | 67.0s    | —              | `ok api/internal/handler 14.2s`       |
 
 If `--no-run` was passed, replace this section with:
 
@@ -65,13 +66,13 @@ If `--no-run` was passed, replace this section with:
 
 ## Issues
 
-| Severity | Issue | Location | Recommendation |
-|----------|-------|----------|----------------|
-| CRITICAL | Acceptance command #2 fails (introduced by spec implementation) | `src/__tests__/TrendsView.test.jsx:88` | Investigate failing assertion; spec.json marks status `done` but tests fail |
-| WARNING  | KD-3 has no code evidence | spec §4 | Either implement, defer explicitly, or remove from spec |
-| WARNING  | `linked_paths` glob `api/internal/legacy/**` resolves to no files | `spec.json:18` | Remove or update glob |
-| INFO     | README marks §7 `[x] done` but file is scaffold-only | `README.md`, `spec/7-non-functional-requirements.md` | Update README marker or fill section |
-| INFO     | `DOC-4` defined in `sources.md` but never referenced | `research/sources.md:11` | Cite or remove |
+| Severity | Issue                                                             | Location                                             | Recommendation                                                              |
+| -------- | ----------------------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- |
+| CRITICAL | Acceptance command #2 fails (introduced by spec implementation)   | `src/__tests__/TrendsView.test.jsx:88`               | Investigate failing assertion; spec.json marks status `done` but tests fail |
+| WARNING  | KD-3 has no code evidence                                         | spec §4                                              | Either implement, defer explicitly, or remove from spec                     |
+| WARNING  | `linked_paths` glob `api/internal/legacy/**` resolves to no files | `spec.json:18`                                       | Remove or update glob                                                       |
+| INFO     | README marks §7 `[x] done` but file is scaffold-only              | `README.md`, `spec/7-non-functional-requirements.md` | Update README marker or fill section                                        |
+| INFO     | `DOC-4` defined in `sources.md` but never referenced              | `research/sources.md:11`                             | Cite or remove                                                              |
 
 If no issues at a severity, write a single row: "No CRITICAL issues." etc. If
 genuinely zero issues across all severities, write "No issues found." in place
@@ -84,6 +85,7 @@ implemented), what's healthy, what needs attention, and the recommended next
 action.>
 
 Example:
+
 > Spec is **partially implemented**. Structural and metadata checks pass; 12 of
 > 15 constraints have direct code evidence. The CRITICAL test failure on
 > `TrendsView.test.jsx` is the only blocker — fix that and rerun this audit
@@ -99,7 +101,7 @@ Example:
   Multi-line citations only when the evidence genuinely spans multiple lines —
   use `path/to/file.ext:42-58`. Never cite a whole file.
 
-- **"Output Tail"** in the acceptance table: the *last* meaningful line — usually
+- **"Output Tail"** in the acceptance table: the _last_ meaningful line — usually
   the pass/fail summary. Not the whole stderr dump. If a command produced no
   meaningful tail (e.g. silent success), write `—`.
 

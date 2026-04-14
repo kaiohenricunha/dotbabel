@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a new capability, flag, or validator.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Non-trivial features land only after a spec in `docs/specs/`. Feel free to
+        describe the problem first — the author will pair with you on a spec if
+        the idea is in scope.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do today that the harness makes hard?
+    validations:
+      required: true
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed solution
+      description: A shape. Doesn't need to be final — a spec draft may refine it.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Which surface would this touch?
+      multiple: true
+      options:
+        - CLI bin
+        - Node API (src/lib)
+        - Validator (src/*.mjs)
+        - Template (plugins/harness/templates)
+        - Shell (bootstrap/sync/hooks/scripts)
+        - Docs only
+        - CI workflow

@@ -1,0 +1,10 @@
+# CODEOWNERS — every PR gets a default reviewer.
+# Syntax: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+*                               @kaiohenricunha
+/plugins/harness/               @kaiohenricunha
+/docs/                          @kaiohenricunha
+/docs/adr/                      @kaiohenricunha
+/.github/workflows/             @kaiohenricunha
+/docs/specs/harness-core/       @kaiohenricunha
+/docs/repo-facts.json           @kaiohenricunha
