@@ -117,7 +117,14 @@ export function pathExists(ctx, relativePath) {
  * @param {string[]} args
  * @returns {string}
  */
+const FORBIDDEN_GIT_PREFIXES = ["--upload-pack", "--receive-pack", "--exec"];
 export function git(ctx, args) {
+  for (const a of args) {
+    if (typeof a !== "string") throw new TypeError("git args must be strings");
+    if (FORBIDDEN_GIT_PREFIXES.some((p) => a.startsWith(p))) {
+      throw new Error(`git: refusing forbidden arg: ${a}`);
+    }
+  }
   return execFileSync("git", args, { cwd: ctx.repoRoot, encoding: "utf8" }).trim();
 }
 
@@ -291,10 +298,23 @@ export function extractTemplateSection(body, heading) {
  * @param {string} section
  * @returns {boolean}
  */
+function stripHtmlComments(input) {
+  let out = "";
+  let i = 0;
+  while (i < input.length) {
+    if (input.startsWith("<!--", i)) {
+      const end = input.indexOf("-->", i + 4);
+      if (end === -1) break; // unterminated: drop remainder
+      i = end + 3;
+    } else {
+      out += input[i++];
+    }
+  }
+  return out;
+}
 export function isMeaningfulSection(section) {
   if (!section) return false;
-  const cleaned = section.replace(/<!--[\s\S]*?-->/g, "").trim();
-  return cleaned.length > 0;
+  return stripHtmlComments(section).trim().length > 0;
 }
 
 /**

@@ -11,6 +11,8 @@ import {
   anyPathMatches,
   listRepoPaths,
   getChangedFiles,
+  git,
+  isMeaningfulSection,
 } from "../src/spec-harness-lib.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -74,6 +76,36 @@ describe("listRepoPaths", () => {
     expect(paths).toContain("docs/specs/example-spec/spec.json");
     // Ignored top-level (example: node_modules) must not appear
     expect(paths.some((p) => p.startsWith("node_modules/"))).toBe(false);
+  });
+});
+
+describe("git arg validation", () => {
+  it("throws on --upload-pack arg", () => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, ["--upload-pack=evil"])).toThrow("refusing forbidden arg");
+  });
+  it("throws on --receive-pack arg", () => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, ["--receive-pack=evil"])).toThrow("refusing forbidden arg");
+  });
+  it("throws on non-string arg", () => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, [123])).toThrow(TypeError);
+  });
+});
+
+describe("isMeaningfulSection — HTML comment stripping", () => {
+  it("handles pathological input without hanging", () => {
+    const start = Date.now();
+    const result = isMeaningfulSection("<!--".repeat(1000));
+    expect(Date.now() - start).toBeLessThan(50);
+    expect(result).toBe(false);
+  });
+  it("preserves text after a comment", () => {
+    expect(isMeaningfulSection("<!-- a --> text")).toBe(true);
+  });
+  it("strips a single comment leaving nothing", () => {
+    expect(isMeaningfulSection("<!-- only -->")).toBe(false);
   });
 });
 
