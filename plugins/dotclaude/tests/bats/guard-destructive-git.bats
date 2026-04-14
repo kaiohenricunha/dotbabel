@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/harness/hooks/guard-destructive-git.sh
+# Behavior tests for plugins/dotclaude/hooks/guard-destructive-git.sh
 #
 # Every test exercises the hook via stdin JSON, not a real Bash tool call,
 # so the suite is hermetic and doesn't depend on Claude Code being installed.
 
 load helpers
 
-HOOK="$REPO_ROOT/plugins/harness/hooks/guard-destructive-git.sh"
+HOOK="$REPO_ROOT/plugins/dotclaude/hooks/guard-destructive-git.sh"
 
 setup() {
   [ -x "$HOOK" ] || chmod +x "$HOOK"

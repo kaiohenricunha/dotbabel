@@ -2,14 +2,14 @@
 
 Every bin honors the **harness-wide flag set** in addition to its own:
 
-| Flag                  | Shape | Behavior                                                                           |
-| --------------------- | ----- | ---------------------------------------------------------------------------------- |
-| `--help`, `-h`        | bool  | Print usage and exit 0                                                             |
-| `--version`, `-V`     | bool  | Print package version and exit 0                                                   |
-| `--json`              | bool  | Emit `{events:[…], counts:{pass,fail,warn}}` on stdout; suppress ANSI              |
-| `--verbose`, `-v`     | bool  | Print every `StructuredError` field (code, pointer, expected, got, hint, category) |
-| `--no-color`          | bool  | Suppress ANSI escapes regardless of TTY detection                                  |
-| `NO_COLOR=` env       | env   | Same as `--no-color`, honors the cross-tool convention                             |
+| Flag                    | Shape | Behavior                                                                           |
+| ----------------------- | ----- | ---------------------------------------------------------------------------------- |
+| `--help`, `-h`          | bool  | Print usage and exit 0                                                             |
+| `--version`, `-V`       | bool  | Print package version and exit 0                                                   |
+| `--json`                | bool  | Emit `{events:[…], counts:{pass,fail,warn}}` on stdout; suppress ANSI              |
+| `--verbose`, `-v`       | bool  | Print every `StructuredError` field (code, pointer, expected, got, hint, category) |
+| `--no-color`            | bool  | Suppress ANSI escapes regardless of TTY detection                                  |
+| `NO_COLOR=` env         | env   | Same as `--no-color`, honors the cross-tool convention                             |
 | `DOTCLAUDE_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
 
 **Exit codes** follow a single convention across every bin:

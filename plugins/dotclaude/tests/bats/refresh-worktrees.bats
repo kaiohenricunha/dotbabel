@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/harness/scripts/refresh-worktrees.sh.
+# Behavior tests for plugins/dotclaude/scripts/refresh-worktrees.sh.
 
 load helpers
 
-REFRESH="$REPO_ROOT/plugins/harness/scripts/refresh-worktrees.sh"
+REFRESH="$REPO_ROOT/plugins/dotclaude/scripts/refresh-worktrees.sh"
 
 setup() {
   [ -x "$REFRESH" ] || chmod +x "$REFRESH"

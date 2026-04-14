@@ -13,14 +13,14 @@ parts of it. Pick yours, then follow the "Start here" column.
 
 ## Where the split happens
 
-| Path                                                                 | Who consumes it                        |
-| -------------------------------------------------------------------- | -------------------------------------- |
-| `package.json`, `plugins/dotclaude/src/**`, `plugins/dotclaude/bin/**`   | Consumer + library user                |
+| Path                                                                   | Who consumes it                          |
+| ---------------------------------------------------------------------- | ---------------------------------------- |
+| `package.json`, `plugins/dotclaude/src/**`, `plugins/dotclaude/bin/**` | Consumer + library user                  |
 | `plugins/dotclaude/templates/**`                                       | Consumer (installed by `dotclaude-init`) |
-| `plugins/dotclaude/.claude-plugin/plugin.json`                         | Claude Code when the plugin is enabled |
-| `bootstrap.sh`, `sync.sh`, `commands/**`, `skills/**`                | Dotfile user                           |
-| `CLAUDE.md`, `docs/specs/dotclaude-core/**`, `.claude/**` at repo root | Contributors + the dogfood CI          |
-| `docs/**` (excluding `specs/dotclaude-core/`)                          | All of the above                       |
+| `plugins/dotclaude/.claude-plugin/plugin.json`                         | Claude Code when the plugin is enabled   |
+| `bootstrap.sh`, `sync.sh`, `commands/**`, `skills/**`                  | Dotfile user                             |
+| `CLAUDE.md`, `docs/specs/dotclaude-core/**`, `.claude/**` at repo root | Contributors + the dogfood CI            |
+| `docs/**` (excluding `specs/dotclaude-core/`)                          | All of the above                         |
 
 ## Why the dual-purpose layout
 
