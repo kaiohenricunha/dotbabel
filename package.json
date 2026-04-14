@@ -44,7 +44,7 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.4",
     "bats": "^1.11.1",
-    "markdownlint-cli2": "^0.17.0",
+    "markdownlint-cli2": "^0.21.0",
     "prettier": "^3.5.0",
     "vitest": "^4.1.4"
   },
