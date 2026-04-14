@@ -11,6 +11,7 @@ import {
   anyPathMatches,
   listRepoPaths,
   getChangedFiles,
+  getPullRequestContext,
   git,
   isMeaningfulSection,
 } from "../src/spec-harness-lib.mjs";
@@ -138,6 +139,33 @@ describe("silent-catch replacement (debug-gated)", () => {
       stdio: ["ignore", "pipe", "ignore"],
     });
     expect(out).toMatch(/THROWN:.*repoRoot not provided/);
+  });
+
+  it("getPullRequestContext reads PR_ACTOR over GITHUB_ACTOR when both are set", () => {
+    const saved = { PR_ACTOR: process.env.PR_ACTOR, GITHUB_ACTOR: process.env.GITHUB_ACTOR };
+    process.env.PR_ACTOR = "dependabot[bot]";
+    process.env.GITHUB_ACTOR = "kaiohenricunha";
+    try {
+      expect(getPullRequestContext().actor).toBe("dependabot[bot]");
+    } finally {
+      if (saved.PR_ACTOR === undefined) delete process.env.PR_ACTOR;
+      else process.env.PR_ACTOR = saved.PR_ACTOR;
+      if (saved.GITHUB_ACTOR === undefined) delete process.env.GITHUB_ACTOR;
+      else process.env.GITHUB_ACTOR = saved.GITHUB_ACTOR;
+    }
+  });
+
+  it("getPullRequestContext falls back to GITHUB_ACTOR when PR_ACTOR is unset", () => {
+    const saved = { PR_ACTOR: process.env.PR_ACTOR, GITHUB_ACTOR: process.env.GITHUB_ACTOR };
+    delete process.env.PR_ACTOR;
+    process.env.GITHUB_ACTOR = "kaiohenricunha";
+    try {
+      expect(getPullRequestContext().actor).toBe("kaiohenricunha");
+    } finally {
+      if (saved.PR_ACTOR !== undefined) process.env.PR_ACTOR = saved.PR_ACTOR;
+      if (saved.GITHUB_ACTOR === undefined) delete process.env.GITHUB_ACTOR;
+      else process.env.GITHUB_ACTOR = saved.GITHUB_ACTOR;
+    }
   });
 
   it("getChangedFiles returns [] when git diff fails (subprocess run in non-git dir)", () => {
