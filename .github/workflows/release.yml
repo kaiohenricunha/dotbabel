@@ -40,23 +40,18 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Extract CHANGELOG section for this tag
-        id: changelog
+      - name: Create GitHub Release via gh CLI
+        # Uses the gh CLI pre-installed on ubuntu-latest instead of a
+        # third-party action — the repo's Actions policy only allows
+        # github-owned and verified-creator actions, and this keeps the
+        # release step dependency-free.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VER="${GITHUB_REF_NAME#v}"
           # Extract the section between `## [VER]` and the next `## [` heading.
-          # sed pattern: print lines in range, excluding the bounds themselves.
-          body=$(awk "/^## \\[$VER\\]/{found=1;next} /^## \\[/{if(found)exit} found" CHANGELOG.md)
-          {
-            echo "body<<EOF"
-            echo "$body"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@72f2c25fcb47643c292f7107632f7a47c1df5cd8 # v2.3.2
-        with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
-          body: ${{ steps.changelog.outputs.body }}
-          draft: false
-          prerelease: false
+          awk "/^## \\[$VER\\]/{found=1;next} /^## \\[/{if(found)exit} found" CHANGELOG.md > /tmp/release-body.md
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file /tmp/release-body.md \
+            --verify-tag
