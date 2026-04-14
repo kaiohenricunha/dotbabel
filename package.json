@@ -24,7 +24,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "lint": "echo 'lint target stubs — prettier + markdownlint wiring lands in PR 4/6' && exit 0",
+    "lint": "prettier --check \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown && markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.claude/worktrees\" && node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src",
+    "format": "prettier --write \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown",
     "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/dotclaude/scripts/*.sh plugins/dotclaude/hooks/*.sh plugins/dotclaude/tests/*.sh plugins/dotclaude/templates/claude/hooks/*.sh plugins/dotclaude/templates/githooks/pre-commit",
     "dogfood": "npx dotclaude-validate-skills && npx dotclaude-validate-specs && npx dotclaude-check-instruction-drift && npx dotclaude-check-spec-coverage"
   },
@@ -43,6 +44,8 @@
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.4",
     "bats": "^1.11.1",
+    "markdownlint-cli2": "^0.17.0",
+    "prettier": "^3.5.0",
     "vitest": "^4.1.4"
   },
   "repository": {
