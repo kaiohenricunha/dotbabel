@@ -46,4 +46,4 @@ See `acceptance_commands` in `spec.json`. CI runs them on every push (see
 - TypeScript migration (see ADR-0002)
 - Docs site framework (plain markdown + GitHub rendering)
 - Windows shell support
-- A `harness upgrade` subcommand (manual for now; see `docs/upgrade-guide.md`)
+- A `dotclaude upgrade` subcommand (manual for now; see `docs/upgrade-guide.md`)

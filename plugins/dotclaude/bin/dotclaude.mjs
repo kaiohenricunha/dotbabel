@@ -2,9 +2,9 @@
 /**
  * Umbrella dispatcher. Usage:
  *
- *   harness --version
- *   harness --help
- *   harness <subcommand> [args...]      # delegates to harness-<subcommand>.mjs
+ *   dotclaude --version
+ *   dotclaude --help
+ *   dotclaude <subcommand> [args...]      # delegates to dotclaude-<subcommand>.mjs
  *
  * Known subcommands mirror the bin/* entries shipped by the package:
  *   validate-skills, validate-specs, check-spec-coverage,
@@ -33,15 +33,15 @@ const SUBCOMMANDS = [
 function printUsage() {
   process.stdout.write(
     [
-      "harness — structured-error-emitting CLI for @dotclaude/dotclaude",
+      "dotclaude — structured-error-emitting CLI for @dotclaude/dotclaude",
       "",
       "Usage:",
-      "  harness <subcommand> [options]",
-      "  harness --version",
-      "  harness --help",
+      "  dotclaude <subcommand> [options]",
+      "  dotclaude --version",
+      "  dotclaude --help",
       "",
       "Subcommands:",
-      ...SUBCOMMANDS.map((s) => `  ${s.padEnd(26)}runs harness-${s}`),
+      ...SUBCOMMANDS.map((s) => `  ${s.padEnd(26)}runs dotclaude-${s}`),
       "",
       "Every subcommand also exists as a standalone bin (e.g. `npx dotclaude-doctor`).",
       "Each subcommand supports --help / --version / --json / --verbose / --no-color.",
@@ -67,16 +67,16 @@ if (args[0] === "--version" || args[0] === "-V") {
 const sub = args[0];
 if (!SUBCOMMANDS.includes(sub)) {
   process.stderr.write(
-    `harness: unknown subcommand '${sub}'. Run 'harness --help' for the list.\n`
+    `dotclaude: unknown subcommand '${sub}'. Run 'dotclaude --help' for the list.\n`
   );
   process.exit(EXIT_CODES.USAGE);
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const binPath = resolve(__dirname, `harness-${sub}.mjs`);
+const binPath = resolve(__dirname, `dotclaude-${sub}.mjs`);
 if (!existsSync(binPath)) {
   process.stderr.write(
-    `harness: bin 'harness-${sub}' not found at ${binPath}. Did the package install correctly?\n`
+    `dotclaude: bin 'dotclaude-${sub}' not found at ${binPath}. Did the package install correctly?\n`
   );
   process.exit(EXIT_CODES.ENV);
 }

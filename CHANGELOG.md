@@ -22,8 +22,10 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 - **All CLI bins renamed**: `harness-*` → `dotclaude-*` (e.g. `harness-doctor`
   → `dotclaude-doctor`). Update CI workflows, pre-commit hooks, and any scripts
   that invoke them directly.
-- **Env vars renamed**: `HARNESS_DEBUG` → `DOTCLAUDE_DEBUG`, `HARNESS_JSON` →
-  `DOTCLAUDE_JSON`, `HARNESS_REPO_ROOT` → `DOTCLAUDE_REPO_ROOT`.
+- **Three env vars renamed**: `HARNESS_DEBUG` → `DOTCLAUDE_DEBUG`,
+  `HARNESS_JSON` → `DOTCLAUDE_JSON`, `HARNESS_REPO_ROOT` → `DOTCLAUDE_REPO_ROOT`.
+  Note: `HARNESS_CHANGED_FILES` (CI diff input) and `HARNESS_SYNC_SKIP_SECRET_SCAN`
+  (sync.sh bypass) are **not** renamed — they remain `HARNESS_*`.
 - **Plugin directory** moved from `plugins/harness/` → `plugins/dotclaude/`
   (affects deep imports — use the public barrel `@dotclaude/dotclaude` instead).
 - **Spec ID** `harness-core` → `dotclaude-core` (update `Spec ID:` lines in PR
