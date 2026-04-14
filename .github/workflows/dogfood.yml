@@ -26,7 +26,7 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_ACTOR: ${{ github.event.pull_request.user.login || github.actor }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
         run: node plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs
       - run: node plugins/dotclaude/bin/dotclaude-doctor.mjs
