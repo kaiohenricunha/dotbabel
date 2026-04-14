@@ -4,5 +4,9 @@
     "CLAUDE.md",
     ".github/workflows/**",
     ".claude/commands/**"
+  ],
+  "instruction_files": [
+    "CLAUDE.md",
+    "README.md"
   ]
 }
