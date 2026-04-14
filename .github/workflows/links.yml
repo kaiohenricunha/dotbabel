@@ -30,4 +30,4 @@ jobs:
             --no-progress \
             --max-retries 2 \
             --exclude '^https?://(www\.)?npmjs\.com/' \
-            'docs/**/*.md' '*.md' 'plugins/harness/**/*.md'
+            'docs/**/*.md' '*.md' 'plugins/dotclaude/**/*.md'

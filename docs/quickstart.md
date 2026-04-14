@@ -4,7 +4,7 @@
 
 ```bash
 cd your-project
-npm install --save-dev @kaiohenricunha/harness
+npm install --save-dev @kaiohenricunha/dotclaude
 ```
 
 The package has **zero runtime dependencies**. It registers seven bins under
@@ -12,19 +12,19 @@ The package has **zero runtime dependencies**. It registers seven bins under
 
 ```
 harness
-harness-doctor
-harness-detect-drift
-harness-init
-harness-validate-specs
-harness-validate-skills
-harness-check-spec-coverage
-harness-check-instruction-drift
+dotclaude-doctor
+dotclaude-detect-drift
+dotclaude-init
+dotclaude-validate-specs
+dotclaude-validate-skills
+dotclaude-check-spec-coverage
+dotclaude-check-instruction-drift
 ```
 
 ## 2. Scaffold the governance tree
 
 ```bash
-npx harness-init --project-name your-project --project-type node
+npx dotclaude-init --project-name your-project --project-type node
 ```
 
 This writes:
@@ -41,7 +41,7 @@ substituted at scaffold time.
 ## 3. Run the self-diagnostic
 
 ```bash
-npx harness-doctor
+npx dotclaude-doctor
 ```
 
 You should see `✓` rows for env, repo, facts, manifest, specs, drift, hook.
@@ -77,7 +77,7 @@ Minimum viable `spec.json`:
 Validate it:
 
 ```bash
-npx harness-validate-specs
+npx dotclaude-validate-specs
 ```
 
 Green. You're done.
@@ -91,7 +91,7 @@ In GitHub branch protection, require the three shipped workflows:
 - `ai-review` — PR review (optional)
 
 Any PR touching a protected path (see `docs/repo-facts.json`) must now carry
-a `Spec ID:` or `## No-spec rationale` section. `harness-check-spec-coverage`
+a `Spec ID:` or `## No-spec rationale` section. `dotclaude-check-spec-coverage`
 enforces it.
 
 ## Next

@@ -32,7 +32,7 @@ updates:
   - package-ecosystem: github-actions
     # Consumer templates pin their own action SHAs; sweep them too so
     # downstream scaffolds don't go stale.
-    directory: /plugins/harness/templates/workflows
+    directory: /plugins/dotclaude/templates/workflows
     schedule:
       interval: weekly
       day: monday

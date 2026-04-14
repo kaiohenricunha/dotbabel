@@ -10,7 +10,7 @@ Every bin honors the **harness-wide flag set** in addition to its own:
 | `--verbose`, `-v`     | bool  | Print every `StructuredError` field (code, pointer, expected, got, hint, category) |
 | `--no-color`          | bool  | Suppress ANSI escapes regardless of TTY detection                                  |
 | `NO_COLOR=` env       | env   | Same as `--no-color`, honors the cross-tool convention                             |
-| `HARNESS_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
+| `DOTCLAUDE_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
 
 **Exit codes** follow a single convention across every bin:
 
@@ -21,7 +21,7 @@ Every bin honors the **harness-wide flag set** in addition to its own:
 | 2    | `ENV`        | Misconfigured environment (missing file, bad git repo, unreadable facts)                      |
 | 64   | `USAGE`      | Bad CLI invocation (unknown flag, missing positional). `64` matches BSD `sysexits.h EX_USAGE` |
 
-**The umbrella `harness`** forwards to each `harness-<sub>` bin:
+**The umbrella `dotclaude`** forwards to each `harness-<sub>` bin:
 
 ```
 harness validate-specs [OPTIONS]
@@ -33,12 +33,12 @@ harness doctor [OPTIONS]
 harness init [OPTIONS]
 ```
 
-Each subcommand also exists standalone — `npx harness-doctor` and
-`npx harness doctor` are identical.
+Each subcommand also exists standalone — `npx dotclaude-doctor` and
+`npx dotclaude doctor` are identical.
 
 ---
 
-## `harness-validate-specs`
+## `dotclaude-validate-specs`
 
 Validate every `docs/specs/<id>/spec.json` against the `StructuredError`
 contract.
@@ -50,8 +50,8 @@ contract.
 **Typical invocations:**
 
 ```bash
-npx harness-validate-specs
-npx harness-validate-specs --json | jq -r '.events[] | select(.kind == "fail") | .details.code'
+npx dotclaude-validate-specs
+npx dotclaude-validate-specs --json | jq -r '.events[] | select(.kind == "fail") | .details.code'
 ```
 
 **Emitted codes**: `SPEC_JSON_INVALID`, `SPEC_STATUS_INVALID`,
@@ -61,7 +61,7 @@ npx harness-validate-specs --json | jq -r '.events[] | select(.kind == "fail") |
 
 ---
 
-## `harness-validate-skills`
+## `dotclaude-validate-skills`
 
 Validate `.claude/skills-manifest.json` — checksums, orphan files on disk,
 and the `dependencies[]` DAG.
@@ -76,7 +76,7 @@ and the `dependencies[]` DAG.
 
 ---
 
-## `harness-check-instruction-drift`
+## `dotclaude-check-instruction-drift`
 
 Cross-reference `docs/repo-facts.json` against instruction files (CLAUDE.md,
 README.md). Flags stale `team_count` claims, undocumented `protected_paths`,
@@ -91,7 +91,7 @@ and broken `instruction_files` references.
 
 ---
 
-## `harness-check-spec-coverage`
+## `dotclaude-check-spec-coverage`
 
 PR-time gate. Confirms every change to a protected path is covered by an
 `approved|implementing|done` spec, or the PR body carries a
@@ -113,7 +113,7 @@ Reads context from the environment — designed for GitHub Actions:
 
 ---
 
-## `harness-doctor`
+## `dotclaude-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
 hook. Prints `✓/✗/⚠` per check.
@@ -126,11 +126,11 @@ hook. Prints `✓/✗/⚠` per check.
 
 ---
 
-## `harness-detect-drift`
+## `dotclaude-detect-drift`
 
 Flags `.claude/commands/*.md` that have diverged from `origin/main` for
 longer than 14 days. Thin wrapper over
-`plugins/harness/scripts/detect-branch-drift.mjs`.
+`plugins/dotclaude/scripts/detect-branch-drift.mjs`.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
@@ -141,7 +141,7 @@ for more than 14 days.
 
 ---
 
-## `harness-init`
+## `dotclaude-init`
 
 Scaffold the template tree into a target repo.
 
@@ -173,8 +173,8 @@ contract:
   `~/.claude/file-history/`
 
 ```bash
-bash plugins/harness/scripts/validate-settings.sh
-bash plugins/harness/scripts/validate-settings.sh --json <path>
+bash plugins/dotclaude/scripts/validate-settings.sh
+bash plugins/dotclaude/scripts/validate-settings.sh --json <path>
 ```
 
 `--json` emits `{events:[{check,category,status,message}], counts:{fail,warn}}`.

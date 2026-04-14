@@ -8,8 +8,8 @@ The work Kaio needs this repo to do splits into two distinct audiences:
 
 1. **Personal dotfiles** — `commands/`, `skills/`, `CLAUDE.md`, bootstrapped
    into `~/.claude/` via `bootstrap.sh`.
-2. **`@kaiohenricunha/harness` npm package** — a reusable plugin other repos
-   install via `npm i -D`. Lives under `plugins/harness/`.
+2. **`@kaiohenricunha/dotclaude` npm package** — a reusable plugin other repos
+   install via `npm i -D`. Lives under `plugins/dotclaude/`.
 
 The overlap is large: both surfaces define slash commands, skills, hooks,
 and CI workflows. Keeping two repos in sync by copy-paste was the status
@@ -22,11 +22,11 @@ Single repo. Two top-level trees:
 ```
 dotclaude/
 ├─ commands/  skills/  CLAUDE.md  bootstrap.sh  sync.sh    ← dotfile persona
-└─ plugins/harness/                                         ← npm package
+└─ plugins/dotclaude/                                         ← npm package
 ```
 
 `package.json.files` excludes the dotfile-only paths from the npm tarball.
-Consumers installing the package see only `plugins/harness/`. The author's
+Consumers installing the package see only `plugins/dotclaude/`. The author's
 `bootstrap.sh` symlinks from `commands/` and `skills/` into `~/.claude/`.
 
 ## Consequences
@@ -39,7 +39,7 @@ Consumers installing the package see only `plugins/harness/`. The author's
   matrix to pick their entry-point — added cognitive cost.
 - `package.json.files` becomes a trust boundary: a missing entry there
   silently ships dotfile scripts into consumer installs. Covered by an
-  integration test that asserts `plugins/harness/scripts/*` _is_ shipped
+  integration test that asserts `plugins/dotclaude/scripts/*` _is_ shipped
   and `bootstrap.sh` _is not_.
 
 ## Alternatives considered
@@ -59,4 +59,4 @@ Consumers installing the package see only `plugins/harness/`. The author's
 - The first external contributor to the dotfile tree (implies a third
   audience, strengthens the split-repo case).
 - The first consumer requesting a tighter tarball that excludes
-  `plugins/harness/tests/`.
+  `plugins/dotclaude/tests/`.

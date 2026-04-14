@@ -16,17 +16,17 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with: { node-version: "22", cache: "npm" }
       - run: npm ci
-      - run: node plugins/harness/bin/harness-validate-skills.mjs
-      - run: node plugins/harness/bin/harness-validate-specs.mjs
-      - run: node plugins/harness/bin/harness-check-instruction-drift.mjs
+      - run: node plugins/dotclaude/bin/dotclaude-validate-skills.mjs
+      - run: node plugins/dotclaude/bin/dotclaude-validate-specs.mjs
+      - run: node plugins/dotclaude/bin/dotclaude-check-instruction-drift.mjs
       - name: check-spec-coverage (PR context)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
-        run: node plugins/harness/bin/harness-check-spec-coverage.mjs
-      - run: node plugins/harness/bin/harness-doctor.mjs
+        run: node plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs
+      - run: node plugins/dotclaude/bin/dotclaude-doctor.mjs
 
   example:
     name: example (examples/minimal-consumer)
@@ -38,9 +38,9 @@ jobs:
       - run: npm ci
       - name: validators against minimal-consumer scaffold
         env:
-          HARNESS_REPO_ROOT: ${{ github.workspace }}/examples/minimal-consumer
+          DOTCLAUDE_REPO_ROOT: ${{ github.workspace }}/examples/minimal-consumer
         run: |
-          node plugins/harness/bin/harness-validate-skills.mjs --repo-root "$HARNESS_REPO_ROOT"
+          node plugins/dotclaude/bin/dotclaude-validate-skills.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"
           # validate-specs requires docs/specs/ — the scaffold ships an empty
           # docs/specs/ (README only), so listSpecDirs returns [] and result is ok.
-          node plugins/harness/bin/harness-validate-specs.mjs --repo-root "$HARNESS_REPO_ROOT"
+          node plugins/dotclaude/bin/dotclaude-validate-specs.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"

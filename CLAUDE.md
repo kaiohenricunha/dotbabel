@@ -1,20 +1,20 @@
 # CLAUDE.md — Global Claude Code Rules
 
-> **Persona note.** This file is the global rule floor for Kaio's personal
-> Claude Code environment — it gets symlinked into `~/.claude/CLAUDE.md`
-> by `bootstrap.sh`. **Consumers of `@kaiohenricunha/harness` do NOT
+> **Persona note.** This file is the global rule floor for the dotfile
+> user's Claude Code environment — it gets symlinked into `~/.claude/CLAUDE.md`
+> by `bootstrap.sh`. **Consumers of `@kaiohenricunha/dotclaude` do NOT
 > inherit it.** The plugin's behavior is defined by its own docs under
-> `plugins/harness/` and [docs/](./docs/). Contributors to this repo
+> `plugins/dotclaude/` and [docs/](./docs/). Contributors to this repo
 > should read [CONTRIBUTING.md](./CONTRIBUTING.md) first; this file
-> covers the author's universal working agreements, not project-specific
-> development conventions.
+> covers universal working agreements for whoever adopts this dotfile setup,
+> not project-specific development conventions.
 
 Universal behavior for every Claude Code session in every repo. Project-level `CLAUDE.md` files extend and may override these, but should not repeat them.
 
 ## Local filesystem conventions
 
-- All projects live at `$HOME/Projects/kaiohenricunha/`. Do not search the home directory or default locations.
-- Global Claude config lives at `$HOME/Projects/kaiohenricunha/dotclaude/` and is symlinked into `~/.claude/`. Edit files under `dotclaude/`, not `~/.claude/` directly.
+- All projects live at `$HOME/projects/`. Do not search the home directory or default locations.
+- Global Claude config lives wherever you cloned `dotclaude` and is symlinked into `~/.claude/`. Edit files in the clone, not `~/.claude/` directly.
 
 ## Code Changes
 
@@ -110,9 +110,9 @@ Scope `--allowedTools` tightly — prefer `Bash(gh:*)` over `Bash(*)`. Combine w
 
 ## Protected paths (dogfood)
 
-This repository governs itself with `@kaiohenricunha/harness`. The authoritative
+This repository governs itself with `@kaiohenricunha/dotclaude`. The authoritative
 list of protected paths lives in `docs/repo-facts.json` and every entry must
-be documented here — `harness-check-instruction-drift` enforces this invariant.
+be documented here — `dotclaude-check-instruction-drift` enforces this invariant.
 
 - `CLAUDE.md` — this file.
 - `README.md` — top-level public README.
@@ -120,11 +120,11 @@ be documented here — `harness-check-instruction-drift` enforces this invariant
 - `.claude/**` — skill manifest, settings, hooks.
 - `docs/repo-facts.json` — the facts source of truth.
 - `docs/specs/**/spec.json` — spec metadata governed by the spec-anchored workflow.
-- `plugins/harness/src/**` — the npm package's source of truth.
-- `plugins/harness/bin/**` — the shipped bin entrypoints.
-- `plugins/harness/templates/**` — scaffolding templates consumers install.
+- `plugins/dotclaude/src/**` — the npm package's source of truth.
+- `plugins/dotclaude/bin/**` — the shipped bin entrypoints.
+- `plugins/dotclaude/templates/**` — scaffolding templates consumers install.
 
-Any PR touching one of these paths must carry either `Spec ID: harness-core`
+Any PR touching one of these paths must carry either `Spec ID: dotclaude-core`
 or a `## No-spec rationale` section in its body.
 
 ## Slash Commands Reference

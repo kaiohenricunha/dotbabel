@@ -87,9 +87,9 @@ else
   echo "target:    $TARGET"
 fi
 
-# Tail hint — only when harness-doctor is discoverable on PATH so first-time
+# Tail hint — only when dotclaude-doctor is discoverable on PATH so first-time
 # bootstrappers are not confused by a broken reference.
-if command -v harness-doctor >/dev/null 2>&1 && [ "$QUIET" != "1" ]; then
+if command -v dotclaude-doctor >/dev/null 2>&1 && [ "$QUIET" != "1" ]; then
   echo ""
-  echo "next: run 'harness-doctor' to verify install."
+  echo "next: run 'dotclaude-doctor' to verify install."
 fi

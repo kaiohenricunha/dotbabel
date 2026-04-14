@@ -16,7 +16,7 @@ different channel — had two bad options:
 ## Decision
 
 Every validator emits `ValidationError` instances, not strings. A single
-source of truth lives at `plugins/harness/src/lib/errors.mjs`:
+source of truth lives at `plugins/dotclaude/src/lib/errors.mjs`:
 
 - **`class ValidationError extends Error`** with stable fields: `code`,
   `message`, optional `file`, `pointer`, `line`, `expected`, `got`,
