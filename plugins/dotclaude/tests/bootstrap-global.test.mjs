@@ -1,14 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { fileURLToPath } from "url";
+import { describe, it, expect, afterEach } from "vitest";
 import path from "path";
 import fs from "fs";
 import os from "os";
 import { bootstrapGlobal, resolveSource } from "../src/bootstrap-global.mjs";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Path to the real dotclaude repo root (two levels up from plugins/dotclaude)
-const REAL_SOURCE = path.resolve(__dirname, "..", "..", "..");
 
 let tmpDirs = [];
 
