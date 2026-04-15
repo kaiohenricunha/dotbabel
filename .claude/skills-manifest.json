@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-15T01:58:08.298Z",
+  "generatedAt": "2026-04-15T02:13:03.074Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -89,7 +89,7 @@
     {
       "name": "review-pr",
       "path": ".claude/commands/review-pr.md",
-      "checksum": "sha256:318ec86a2b2fe493f40019087c82c0897e3c3a91a4624f598473b1e9c6f05722",
+      "checksum": "sha256:c142391ec09be2601b50f4ac9edfdf0e484e51e5bd7cba0bd657f7c1394b6556",
       "dependencies": [],
       "lastValidated": "2026-04-15"
     },

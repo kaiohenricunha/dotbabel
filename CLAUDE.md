@@ -1,13 +1,19 @@
 # CLAUDE.md — Global Claude Code Rules
 
-> **Persona note.** This file is the global rule floor for the dotfile
-> user's Claude Code environment — it gets symlinked into `~/.claude/CLAUDE.md`
-> by `bootstrap.sh`. **Consumers of `@dotclaude/dotclaude` do NOT
-> inherit it.** The plugin's behavior is defined by its own docs under
-> `plugins/dotclaude/` and [docs/](./docs/). Contributors to this repo
-> should read [CONTRIBUTING.md](./CONTRIBUTING.md) first; this file
-> covers universal working agreements for whoever adopts this dotfile setup,
-> not project-specific development conventions.
+> **Two ways to use dotclaude:**
+>
+> - **TL;DR — just want skills & commands:** Clone this repo and run `./bootstrap.sh`.
+>   That wires `commands/`, `skills/`, and this file into `~/.claude/` in one step.
+>   No npm required.
+> - **Want more flexibility:** Install `@dotclaude/dotclaude` for the full governance
+>   CLI — `dotclaude doctor`, `dotclaude validate-specs`, `dotclaude check-spec-coverage`,
+>   and more. See [README.md](./README.md) or [docs/quickstart.md](./docs/quickstart.md).
+>
+> **This file is for the bootstrap path.** It gets symlinked into `~/.claude/CLAUDE.md`
+> by `bootstrap.sh` and sets the global rule floor for every Claude Code session.
+> **Consumers of `@dotclaude/dotclaude` do NOT inherit it** — the plugin's behavior
+> lives in `plugins/dotclaude/` and [docs/](./docs/). Contributors should read
+> [CONTRIBUTING.md](./CONTRIBUTING.md) first.
 
 Universal behavior for every Claude Code session in every repo. Project-level `CLAUDE.md` files extend and may override these, but should not repeat them.
 

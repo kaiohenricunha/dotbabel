@@ -5,30 +5,81 @@
 [![changelog](https://img.shields.io/badge/changelog-keep--a--changelog-orange.svg)](./CHANGELOG.md)
 
 Portable Claude Code plugin + zero-dependency npm package that bootstraps
-spec-driven-development governance into consumer repos. Ships a structured-error
-CLI, an umbrella `dotclaude` dispatcher, seven standalone bins, a destructive-git
-PreToolUse hook, and a gold-standard shell settings validator.
-
-**Two personas live in this repo** (by design — see [docs/personas.md](./docs/personas.md)):
-
-- The **npm package** under `plugins/dotclaude/` (what consumers install).
-- **Personal dotfiles** at the top level (symlinked into `~/.claude/` via `bootstrap.sh` — fork this to use your own).
-
-If you're installing the package, ignore the top-level scripts —
-`package.json.files` excludes them from the tarball.
+spec-driven-development governance into consumer repos.
 
 ---
 
-## Consumer quickstart
+## TL;DR — pick your path
+
+| What you want                                     | How                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------- |
+| Skills & commands library wired into `~/.claude/` | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required  |
+| Spec-governance CLI for your own repos            | **[Install the CLI](#install-the-cli)** — `npm i -g @dotclaude/dotclaude` |
+
+Both paths are independent. You can use one or both.
+
+---
+
+## Clone & bootstrap
+
+Just want the skills library, commands, and a global CLAUDE.md? Three lines:
 
 ```bash
-npm i -D @dotclaude/dotclaude
-npx dotclaude-init --project-name my-project --project-type node
-npx dotclaude-doctor          # self-diagnostic
-npx dotclaude-validate-specs  # every bin works standalone or via `npx dotclaude <sub>`
+git clone https://github.com/kaiohenricunha/dotclaude.git ~/projects/dotclaude
+cd ~/projects/dotclaude
+./bootstrap.sh          # symlinks commands/ + skills/ + CLAUDE.md into ~/.claude/
 ```
 
-Five minutes end-to-end: [docs/quickstart.md](./docs/quickstart.md).
+That's it — the full skills and commands library is now available in every
+Claude Code session. To stay current:
+
+```bash
+./sync.sh pull          # pull + re-bootstrap
+./sync.sh push          # secret-scan + commit + push
+```
+
+See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
+
+---
+
+## Install the CLI
+
+Need spec-governance gates, CI integration, drift detection, or programmatic
+validation in your own projects? Install the CLI:
+
+```bash
+# Global — use dotclaude anywhere
+npm install -g @dotclaude/dotclaude
+
+# Per-project — pin it to a repo (useful for CI)
+npm install -D @dotclaude/dotclaude
+```
+
+Then use the umbrella dispatcher or standalone bins interchangeably:
+
+```bash
+dotclaude doctor                   # self-diagnostic: env, facts, manifest, specs
+dotclaude validate-skills          # verify skills manifest checksums + DAG
+dotclaude validate-specs           # audit spec contracts + dependency cycles
+dotclaude check-spec-coverage      # PR gate: protected paths must be spec-backed
+dotclaude check-instruction-drift  # detect stale CLAUDE.md / README entries
+dotclaude detect-drift             # flag commands diverged from origin/main 14+ days
+dotclaude init                     # scaffold specs, hooks, manifest into a repo
+```
+
+Every subcommand also works as a standalone bin — `npx dotclaude-doctor`,
+`npx dotclaude-validate-specs`, etc. All support `--help`, `--version`,
+`--json`, `--verbose`, `--no-color`.
+
+Five-minute walkthrough: [docs/quickstart.md](./docs/quickstart.md).
+
+### Scaffold a repo
+
+```bash
+npx dotclaude-init --project-name my-project --project-type node
+npx dotclaude-doctor          # verify everything wired up
+npx dotclaude-validate-specs  # run first governance check
+```
 
 ### Node API
 
@@ -59,9 +110,9 @@ if (!ok) {
 
 Full contract: [docs/api-reference.md](./docs/api-reference.md).
 
-### CLI contract
+### CLI exit codes
 
-Every bin honors `--help`, `--version`, `--json`, `--verbose`, `--no-color` and exits with the named enum:
+Every bin honors `--help`, `--version`, `--json`, `--verbose`, `--no-color` and exits with:
 
 | Code | Name       | Meaning                                                |
 | ---- | ---------- | ------------------------------------------------------ |
@@ -90,22 +141,6 @@ Shell-level hardening (SEC-1..4, OPS-1..2) is enforced today at
 `plugins/dotclaude/scripts/validate-settings.sh`; its 12-case behavioral
 suite at `plugins/dotclaude/tests/test_validate_settings.sh` pins every
 contract.
-
----
-
-## Personal dotfiles persona
-
-Fork this repo and use it as your own Claude Code dotfiles:
-
-```bash
-git clone https://github.com/kaiohenricunha/dotclaude.git ~/projects/dotclaude
-cd ~/projects/dotclaude
-./bootstrap.sh                  # symlinks commands/ + skills/ + CLAUDE.md into ~/.claude/
-./sync.sh pull                  # pull + re-bootstrap
-./sync.sh push                  # secret-scan + commit + push
-```
-
-See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
 
 ---
 

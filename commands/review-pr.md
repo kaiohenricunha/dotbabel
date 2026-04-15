@@ -17,11 +17,23 @@ Before any step, bind the PR number:
 NUMBER="$ARGUMENTS"
 ```
 
-### 1. Fetch PR details
+### 1. Fetch PR details and check branch health
 
 ```bash
 gh pr view "$NUMBER" --json number,title,headRefName,baseRefName,body,mergeable,mergeStateStatus,additions,deletions
 ```
+
+**Immediately inspect `mergeable` and `mergeStateStatus`:**
+
+| `mergeable`   | `mergeStateStatus` | Action                                                                |
+| ------------- | ------------------ | --------------------------------------------------------------------- |
+| `MERGEABLE`   | `CLEAN`            | Proceed normally                                                      |
+| `MERGEABLE`   | `UNSTABLE`         | Proceed — CI failing but no conflict; fix CI in step 10               |
+| `MERGEABLE`   | `BEHIND`           | Rebase onto base branch before collecting comments                    |
+| `CONFLICTING` | `DIRTY`            | **Rebase first** (step 9) before any other work                       |
+| `UNKNOWN`     | any                | Re-fetch after 30 s — GitHub is still computing, do not proceed blind |
+
+If the branch is conflicting or behind, resolve it **before** collecting comments or applying fixes. A stale or conflicting branch produces a misleading diff and stale Copilot comments.
 
 ### 2. Collect ALL review comments
 
@@ -109,18 +121,19 @@ gh api "repos/{owner}/{repo}/pulls/$NUMBER/comments/<comment_id>/replies" \
   -f body="Fixed in <commit-sha> — <one-line description of the fix>."
 ```
 
-### 9. Check for merge conflicts
+### 9. Check for merge conflicts and staleness
 
 ```bash
-gh pr view "$NUMBER" --json mergeable,mergeStateStatus
+gh pr view "$NUMBER" --json mergeable,mergeStateStatus,baseRefName
 ```
 
-If there are conflicts:
+If `mergeable` is `CONFLICTING` or `mergeStateStatus` is `BEHIND`:
 
-- Rebase onto the base branch: `git rebase <base>`
+- Rebase onto the base branch: `git rebase origin/<baseRefName>`
 - Resolve conflicts (prefer the PR branch's intent, integrate base branch updates)
-- Force-push the rebased branch only with explicit user confirmation
+- Force-push with `--force-with-lease` only with explicit user confirmation
 - Verify the build still passes after rebase
+- Do **not** proceed to step 10 until the branch is clean and up-to-date
 
 ### 10. Check failed CI pipelines
 
@@ -142,19 +155,42 @@ For any check with `bucket: "fail"`:
 
 ### 11. Verify the test plan
 
-If the PR body has a `## Test plan` section, run each listed command locally from inside `.claude/worktrees/pr-$NUMBER/`. Mark each as:
+**If the PR body has no `## Test plan` section:** leave a comment asking the author to add one and note `test-plan: missing` in the summary. Do not proceed to step 12.
 
-- `✓ local` — ran and passed
-- `✗ failed` — ran and failed (fix before proceeding)
-- `skipped` — requires infra/services not available locally
-
-If the PR body has no `## Test plan` section: leave a comment asking the author to add one and note `test-plan: missing` in the summary.
-
-After a passing run, post the evidence as a PR comment:
+**If a `## Test plan` section exists**, first check whether CI has already run and passed every item:
 
 ```bash
-gh pr comment "$NUMBER" --body "Test plan verified against HEAD <sha>:
-- \`<command>\` — local ✓ (<ms>ms)
+gh pr checks "$NUMBER" --json name,state,bucket
+```
+
+- If all test-plan items map to passing CI jobs: skip local re-run and proceed directly to ticking the boxes (below).
+- Otherwise: **run every item locally** from inside `.claude/worktrees/pr-$NUMBER/`, regardless of whether some items already pass. Classify each result as:
+  - `✓ local` — ran and passed
+  - `✗ failed` — ran and failed (fix before proceeding; do not tick the box)
+  - `skipped` — requires infra or secrets not available locally (note reason)
+
+**After a successful run, tick the checkboxes in the PR description** for each passing item by patching the PR body:
+
+```bash
+# Fetch the current body
+BODY=$(gh pr view "$NUMBER" --json body -q .body)
+
+# Replace [ ] with [x] for each verified item, then patch
+UPDATED_BODY=$(echo "$BODY" | sed 's/- \[ \] <item text>/- [x] <item text>/g')
+
+gh api "repos/{owner}/{repo}/pulls/$NUMBER" \
+  --method PATCH \
+  -f body="$UPDATED_BODY"
+```
+
+In practice, tick items programmatically — replace `- [ ]` with `- [x]` only for lines whose corresponding local run passed. Leave `- [ ]` for skipped or failed items.
+
+Then post the evidence as a PR comment:
+
+```bash
+gh pr comment "$NUMBER" --body "Test plan verified against HEAD $(git rev-parse HEAD):
+- \`<item>\` — ✓ local
+- \`<item>\` — skipped (requires live DB)
 ..."
 ```
 
@@ -184,7 +220,19 @@ gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<thre
 
 Do NOT use `minimizeComment` — that hides comments instead of resolving them. Always use `resolveReviewThread` with a thread ID starting with `PRRT_`.
 
-### 13. Summary report
+### 13. Final branch health gate
+
+Before writing the summary, re-verify:
+
+```bash
+gh pr view "$NUMBER" --json mergeable,mergeStateStatus
+```
+
+- `mergeable: CONFLICTING` → do not mark `reviewed`; fix conflicts and re-run CI
+- `mergeStateStatus: BEHIND` → rebase onto base and push before closing out
+- Only proceed when `mergeable` is `MERGEABLE` and status is `CLEAN` or `UNSTABLE` (with all CI failures already addressed)
+
+### 14. Summary report
 
 Output a table:
 
@@ -196,7 +244,8 @@ A PR may only be marked `reviewed` if:
 - The §7 push succeeded
 - All auto-runnable test plan commands passed (or test plan was missing — flagged)
 - No unresolved CI failures remain
+- `mergeable` is `MERGEABLE` and branch is not `BEHIND` (verified in step 13)
 
-Otherwise the row status is `blocked`, `push-failed`, or `test-plan-missing` and the blocker is called out.
+Otherwise the row status is `blocked`, `push-failed`, `test-plan-missing`, or `conflicts-unresolved` and the blocker is called out.
 
 End with the commit pushed, the worktree cleanup command, and any remaining action items.
