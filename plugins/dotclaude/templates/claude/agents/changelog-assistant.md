@@ -5,7 +5,7 @@ description: >
   git history for a release. Triggers on: "generate changelog", "release notes",
   "what changed", "CHANGELOG", "summarize commits", "release summary",
   "version bump notes".
-tools: Read, Bash, Glob, Grep
+tools: Read, Write, Edit, Bash, Glob, Grep
 model: haiku
 ---
 

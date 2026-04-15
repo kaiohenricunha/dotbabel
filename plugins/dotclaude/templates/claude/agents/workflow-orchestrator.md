@@ -5,7 +5,7 @@ description: >
   parallel workstreams, or planning and delegating complex implementation efforts.
   Triggers on: "orchestrate", "coordinate agents", "parallel tasks", "multi-step plan",
   "delegate work", "break down", "dispatch subagents".
-tools: Read, Write, Edit, Bash, Glob, Grep
+tools: Read, Bash, Glob, Grep
 model: opus
 ---
 
