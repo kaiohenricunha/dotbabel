@@ -11,10 +11,10 @@ spec-driven-development governance into consumer repos.
 
 ## TL;DR — pick your path
 
-| What you want | How |
-| --- | --- |
-| Skills & commands library wired into `~/.claude/` | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required |
-| Spec-governance CLI for your own repos | **[Install the CLI](#install-the-cli)** — `npm i -g @dotclaude/dotclaude` |
+| What you want                                     | How                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------- |
+| Skills & commands library wired into `~/.claude/` | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required  |
+| Spec-governance CLI for your own repos            | **[Install the CLI](#install-the-cli)** — `npm i -g @dotclaude/dotclaude` |
 
 Both paths are independent. You can use one or both.
 
