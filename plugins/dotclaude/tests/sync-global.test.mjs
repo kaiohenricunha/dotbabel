@@ -236,4 +236,46 @@ describe("syncGlobal", () => {
     const calls = spawnSync.mock.calls.map((c) => c.slice(0, 2));
     expect(calls).not.toContainEqual(["git", ["-C", source, "commit", expect.any(String), expect.any(String)]]);
   });
+
+  // -------------------------------------------------------------------------
+  // Test 11 — pull (npm mode) fails when npm view returns non-zero
+  // -------------------------------------------------------------------------
+
+  it("pull (npm mode) returns ok:false when npm view fails", async () => {
+    spawnSync.mockReturnValueOnce({ stdout: "", stderr: "network error", status: 1 });
+
+    const result = await syncGlobal("pull", {});
+
+    expect(result.ok).toBe(false);
+    expect(result.mode).toBe("npm");
+    expect(result.summary).toMatch(/npm view failed/i);
+    // npm update must NOT have been called
+    const updateCalls = spawnSync.mock.calls.filter(
+      (call) => call[0] === "npm" && call[1].includes("update")
+    );
+    expect(updateCalls).toHaveLength(0);
+    expect(bootstrapGlobal).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 12 — push (clone mode) aborts when git show fails during secret scan
+  // -------------------------------------------------------------------------
+
+  it("push (clone mode) aborts when git show fails during secret scan", async () => {
+    const source = "/home/user/dotclaude";
+    // git add -A
+    spawnSync.mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
+    // git diff --cached --quiet → staged changes
+    spawnSync.mockReturnValueOnce({ stdout: "", stderr: "", status: 1 });
+    // git diff --cached --name-only
+    spawnSync.mockReturnValueOnce({ stdout: "broken.md\n", stderr: "", status: 0 });
+    // git show :broken.md → fails
+    spawnSync.mockReturnValueOnce({ stdout: "", stderr: "fatal: path not found", status: 128 });
+
+    const result = await syncGlobal("push", { source });
+
+    expect(result.ok).toBe(false);
+    expect(result.mode).toBe("clone");
+    expect(result.summary).toMatch(/could not read staged file/i);
+  });
 });

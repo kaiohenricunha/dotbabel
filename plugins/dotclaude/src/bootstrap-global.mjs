@@ -17,9 +17,11 @@ import { createOutput } from "./lib/output.mjs";
 
 // ---------------------------------------------------------------------------
 // pkgRoot() — walk up from this file until we find a directory containing
-// bootstrap.sh. That is the dotclaude repo root. Works both:
-//   • in the git checkout (where bootstrap.sh lives at the repo root), and
-//   • in an npm install (the package ships with the same layout).
+// bootstrap.sh. That is the dotclaude repo root. Works in a git checkout
+// where bootstrap.sh lives at the repo root. In a published npm install
+// bootstrap.sh is not shipped, so the loop hits the filesystem root and
+// falls back to two levels up from this file (src/ → plugins/dotclaude/ →
+// repo root), which is correct for the npm package layout.
 // ---------------------------------------------------------------------------
 
 function pkgRoot() {
@@ -146,11 +148,13 @@ export async function bootstrapGlobal(opts = {}) {
   const out = createOutput({
     noColor: opts.noColor ?? false,
     json: opts.json ?? false,
+    quiet: opts.quiet ?? false,
   });
 
   // Validate source exists
   if (!fs.existsSync(source)) {
     out.fail(`source directory does not exist: ${source}`);
+    out.flush();
     return { ok: false, linked: 0, skipped: 0, backed_up: 0 };
   }
 

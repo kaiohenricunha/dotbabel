@@ -67,6 +67,10 @@ function trim(s) {
 
 async function pullNpm(out, opts) {
   const res = run("npm", ["view", "@dotclaude/dotclaude", "version"]);
+  if (res.status !== 0) {
+    out.fail(`npm view failed: ${trim(res.stderr || res.stdout)}`);
+    return { ok: false, mode: "npm", summary: "npm view failed" };
+  }
   const latest = trim(res.stdout);
 
   if (currentVersion === latest) {
@@ -80,7 +84,7 @@ async function pullNpm(out, opts) {
   }
 
   await bootstrapGlobal({ quiet: opts.quiet, json: opts.json, noColor: opts.noColor });
-  return { ok: true, mode: "npm", summary: `updated to v${latest ?? currentVersion}` };
+  return { ok: true, mode: "npm", summary: `updated to v${latest || currentVersion}` };
 }
 
 async function pullClone(out, source, opts) {
@@ -131,13 +135,21 @@ async function pushNpm(out) {
 
 async function pushClone(out, source) {
   // Stage all changes
-  run("git", ["-C", source, "add", "-A"]);
+  const addRes = run("git", ["-C", source, "add", "-A"]);
+  if (addRes.status !== 0) {
+    out.fail(`git add failed: ${trim(addRes.stderr)}`);
+    return { ok: false, mode: "clone", summary: "git add failed" };
+  }
 
-  // Check if anything is staged
+  // Check if anything is staged (exit 0 = nothing staged, exit 1 = changes staged, >1 = error)
   const diffRes = run("git", ["-C", source, "diff", "--cached", "--quiet"]);
   if (diffRes.status === 0) {
     out.info("no changes to push");
     return { ok: true, mode: "clone", summary: "nothing to push" };
+  }
+  if (diffRes.status > 1) {
+    out.fail(`git diff failed: ${trim(diffRes.stderr)}`);
+    return { ok: false, mode: "clone", summary: "git diff failed" };
   }
 
   // Secret scan: get list of staged files
@@ -149,12 +161,20 @@ async function pushClone(out, source) {
     "--name-only",
     "--diff-filter=ACMR",
   ]);
+  if (stagedRes.status !== 0) {
+    out.fail(`git diff --name-only failed: ${trim(stagedRes.stderr)}`);
+    return { ok: false, mode: "clone", summary: "git diff --name-only failed" };
+  }
   const stagedFiles = trim(stagedRes.stdout)
     .split("\n")
     .filter((f) => f.length > 0);
 
   for (const file of stagedFiles) {
     const showRes = run("git", ["-C", source, "show", `:${file}`]);
+    if (showRes.status !== 0) {
+      out.fail(`secret-scan: could not read staged file ${file}`);
+      return { ok: false, mode: "clone", summary: `could not read staged file ${file}` };
+    }
     if (SECRET_RX.test(showRes.stdout)) {
       out.fail(`secret-scan: POSSIBLE SECRET in ${file}`);
       out.fail(
@@ -212,20 +232,24 @@ export async function syncGlobal(subcommand, opts = {}) {
 
   const out = createOutput({ quiet, json, noColor });
 
-  if (subcommand === "pull") {
-    return mode === "clone"
-      ? pullClone(out, source, opts)
-      : pullNpm(out, opts);
-  }
+  try {
+    if (subcommand === "pull") {
+      return await (mode === "clone"
+        ? pullClone(out, source, opts)
+        : pullNpm(out, opts));
+    }
 
-  if (subcommand === "status") {
-    return mode === "clone" ? statusClone(out, source) : statusNpm(out);
-  }
+    if (subcommand === "status") {
+      return await (mode === "clone" ? statusClone(out, source) : statusNpm(out));
+    }
 
-  if (subcommand === "push") {
-    return mode === "clone" ? pushClone(out, source) : pushNpm(out);
-  }
+    if (subcommand === "push") {
+      return await (mode === "clone" ? pushClone(out, source) : pushNpm(out));
+    }
 
-  out.fail(`unknown subcommand: ${subcommand}`);
-  return { ok: false, mode, summary: `unknown subcommand: ${subcommand}` };
+    out.fail(`unknown subcommand: ${subcommand}`);
+    return { ok: false, mode, summary: `unknown subcommand: ${subcommand}` };
+  } finally {
+    out.flush();
+  }
 }

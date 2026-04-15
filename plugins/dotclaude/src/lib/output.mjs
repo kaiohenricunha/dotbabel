@@ -24,6 +24,7 @@
  * @typedef {object} OutputOptions
  * @property {boolean} [json]     When true, buffer events and emit a JSON array on flush().
  * @property {boolean} [noColor]  When true, suppress ANSI escapes regardless of TTY.
+ * @property {boolean} [quiet]    When true, suppress pass/info events; fail/warn still emit.
  * @property {NodeJS.WritableStream} [stream]  Defaults to process.stdout.
  * @property {NodeJS.ProcessEnv} [env]         Defaults to process.env.
  */
@@ -44,6 +45,7 @@ export function createOutput(opts = {}) {
   const stream = opts.stream ?? process.stdout;
   const json = Boolean(opts.json);
   const noColor = Boolean(opts.noColor) || 'NO_COLOR' in env;
+  const quiet = Boolean(opts.quiet);
   const useAnsi = !json && !noColor && Boolean(stream.isTTY);
 
   const counts = { pass: 0, fail: 0, warn: 0 };
@@ -61,6 +63,8 @@ export function createOutput(opts = {}) {
     if (kind === 'pass') counts.pass++;
     else if (kind === 'fail') counts.fail++;
     else if (kind === 'warn') counts.warn++;
+    // quiet mode: suppress per-file progress (pass/info); fail/warn always surface
+    if (quiet && (kind === 'pass' || kind === 'info')) return;
     if (json) {
       /** @type {OutputEvent} */
       const event = { kind, message };
