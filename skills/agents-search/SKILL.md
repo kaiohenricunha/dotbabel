@@ -5,6 +5,7 @@ description: >
   agents, list installed agents, or refresh the agent catalog.
   Triggers on: "search agents", "list agents", "find agent", "what agents", "agent catalog".
 argument-hint: "search <query> | list | fetch <name> | invalidate [--fetch]"
+tools: Glob, Read, Grep, Write, Bash, WebFetch
 effort: medium
 model: sonnet
 ---
@@ -56,6 +57,8 @@ Find installed agents whose name or description matches a query string.
    No agents found matching '<query>'
    ```
 
+6. If Glob returns no results (no agents installed), check `~/.claude/cache/agents-catalog.md` — if it exists and is less than 12 hours old (use `Bash(stat -c %Y ~/.claude/cache/agents-catalog.md 2>/dev/null || echo 0)` to check mtime), display results from the catalog instead and note they are from the cached remote catalog.
+
 ---
 
 ### `list`
@@ -86,6 +89,8 @@ List all installed agents grouped by model tier.
    ```
    No agents installed. Run `/agents:search fetch <name>` to install one.
    ```
+
+6. If Glob returns no results (no agents installed), check `~/.claude/cache/agents-catalog.md` — if it exists and is less than 12 hours old (use `Bash(stat -c %Y ~/.claude/cache/agents-catalog.md 2>/dev/null || echo 0)` to check mtime), display results from the catalog instead and note they are from the cached remote catalog.
 
 ---
 
@@ -123,26 +128,23 @@ Clear the local agent catalog cache, optionally refreshing it from GitHub.
 
 **Steps:**
 
-1. Check whether `~/.claude/cache/agents-catalog.md` exists via `Read`.
+1. **If `--fetch` flag is present:** Read the mtime of `~/.claude/cache/agents-catalog.md`
+   now (before deleting anything) using
+   `Bash(stat -c %Y ~/.claude/cache/agents-catalog.md 2>/dev/null || echo 0)`.
+   Store the result for informational use later.
+
+2. Check whether `~/.claude/cache/agents-catalog.md` exists via `Read`.
    - If it exists, delete it using `Bash`: `rm ~/.claude/cache/agents-catalog.md`.
    - If it does not exist, note "No cache file found."
 
-2. **Without `--fetch`** (cache clear only):
+3. **Without `--fetch`** (cache clear only):
    Output:
 
    ```
    Cache cleared.
    ```
 
-3. **With `--fetch`** (clear and refresh):
-   - Check cache staleness first: run
-     `Bash(stat -c %Y ~/.claude/cache/agents-catalog.md 2>/dev/null || echo 0)`
-     to get the mtime epoch. If `(now - mtime) < 43200` (12 hours in seconds), warn:
-
-     ```
-     Cache is less than 12 hours old (refreshed <N> minutes ago). Fetching anyway…
-     ```
-
+4. **With `--fetch`** (clear and refresh — user explicitly requested a fresh fetch):
    - Fetch the catalog using `WebFetch` from:
      `https://raw.githubusercontent.com/VoltAgent/awesome-claude-code-subagents/main/README.md`
      - Use HTTPS only (SEC-3).
