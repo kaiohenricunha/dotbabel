@@ -101,7 +101,6 @@ Before pushing, run the security review skill on the PR diff:
 ```
 
 If it flags real issues:
-
 - Fix them in the same branch
 - Add to the commit message (e.g., `fix: address PR review + security findings`)
 - Note them in the summary under a **Security** column
