@@ -138,6 +138,7 @@ Quick-invoke disciplines for recurring friction:
 | `/fix-with-evidence <issue>`  | For any bug fix — enforces Reproduce → Fix → Verify → PR loop                             |
 | `/dependabot-sweep`           | Batch-triage all open Dependabot PRs with parallel subagents                              |
 | `/audit-and-fix <domain>`     | Long-running audit-then-implement pipeline across many PRs                                |
-| `/create-audit <subject>`     | Evidence-based audit doc to `docs/audits/`                                                |
-| `/create-assessment <target>` | 0–10 graded assessment doc to `docs/assessments/`                                         |
-| `/spec <subject>`             | Only when a spec/design doc is explicitly requested                                       |
+| `/create-audit <subject>`        | Evidence-based audit doc to `docs/audits/`                                                |
+| `/create-assessment <target>`    | 0–10 graded assessment doc to `docs/assessments/`                                         |
+| `/create-inspection <problem>`   | Investigate a problem and surface viable fix options to `docs/inspections/`               |
+| `/spec <subject>`                | Only when a spec/design doc is explicitly requested                                       |
