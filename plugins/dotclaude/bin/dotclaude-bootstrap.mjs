@@ -17,15 +17,11 @@
  * Exits: 0 bootstrap complete, 1 validation error, 2 env error, 64 usage error.
  */
 
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 import { parse, helpText } from "../src/lib/argv.mjs";
 import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { version } from "../src/index.mjs";
 import { bootstrapGlobal } from "../src/bootstrap-global.mjs";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const META = {
   name: "dotclaude-bootstrap",
