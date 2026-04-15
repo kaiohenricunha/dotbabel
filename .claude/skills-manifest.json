@@ -101,6 +101,13 @@
       "lastValidated": "2026-04-15"
     },
     {
+      "name": "agents-search",
+      "path": ".claude/skills/agents-search/SKILL.md",
+      "checksum": "sha256:c93b9e0d6a56e89da2021063d9dfc4439c0319255aaa56a7ed79571fda331a7f",
+      "dependencies": [],
+      "lastValidated": "2026-04-15"
+    },
+    {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
       "checksum": "sha256:5a302eb3ec1168a8a316fb64711b8ace9f9ca8929e5ec7e9b713e42f6d563295",
