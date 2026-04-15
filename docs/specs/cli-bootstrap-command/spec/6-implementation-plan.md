@@ -18,12 +18,12 @@ Phases 2 and 3 are independent once Phase 1 is merged.
 
 ## 6.2 Workstream Breakdown
 
-| Track | Owner | Depends On | Deliverable |
-| ----- | ----- | ---------- | ----------- |
-| A — package.json | any | — | `files` + `bin` updated; `npm pack` includes commands/ skills/ CLAUDE.md |
-| B — bootstrap-global | any | Track A | `bootstrap-global.mjs` + `dotclaude-bootstrap.mjs` + tests |
-| C — sync-global | any | Track B (uses bootstrapGlobal) | `sync-global.mjs` + `dotclaude-sync.mjs` + tests |
-| D — wiring + docs | any | Tracks B + C | dispatcher, doctor, index.mjs exports, README, cli-reference |
+| Track                | Owner | Depends On                     | Deliverable                                                              |
+| -------------------- | ----- | ------------------------------ | ------------------------------------------------------------------------ |
+| A — package.json     | any   | —                              | `files` + `bin` updated; `npm pack` includes commands/ skills/ CLAUDE.md |
+| B — bootstrap-global | any   | Track A                        | `bootstrap-global.mjs` + `dotclaude-bootstrap.mjs` + tests               |
+| C — sync-global      | any   | Track B (uses bootstrapGlobal) | `sync-global.mjs` + `dotclaude-sync.mjs` + tests                         |
+| D — wiring + docs    | any   | Tracks B + C                   | dispatcher, doctor, index.mjs exports, README, cli-reference             |
 
 ## 6.3 Prompt Sequence
 
@@ -164,13 +164,13 @@ Four surgical edits:
 
 ## 6.4 Testing Strategy
 
-| Unit | UNIT | INTEGRATION | POST-DEPLOY |
-| ---- | ---- | ----------- | ----------- |
-| `bootstrap-global.mjs` | Symlink/backup/idempotency logic with temp dirs | `npm pack` then `npm install` in a temp prefix; run `dotclaude bootstrap` and verify `~/.claude/` state | `dotclaude doctor` shows all ✓ after bootstrap |
-| `sync-global.mjs` | resolveMode, secretScan regex, npm/git spawn stubs | Clone-mode pull against a local bare git repo | `dotclaude sync status` returns correct version string |
-| `dotclaude-bootstrap.mjs` | `--help`, `--version`, win32 guard, exit codes | Full bin invocation via `node bin/dotclaude-bootstrap.mjs` | — |
-| `dotclaude-sync.mjs` | Unknown subcommand → exit 64 | Full bin invocation | — |
-| Dispatcher | `bootstrap` + `sync` in SUBCOMMANDS | `dotclaude bootstrap --help` exits 0 | — |
+| Unit                      | UNIT                                               | INTEGRATION                                                                                             | POST-DEPLOY                                            |
+| ------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| `bootstrap-global.mjs`    | Symlink/backup/idempotency logic with temp dirs    | `npm pack` then `npm install` in a temp prefix; run `dotclaude bootstrap` and verify `~/.claude/` state | `dotclaude doctor` shows all ✓ after bootstrap         |
+| `sync-global.mjs`         | resolveMode, secretScan regex, npm/git spawn stubs | Clone-mode pull against a local bare git repo                                                           | `dotclaude sync status` returns correct version string |
+| `dotclaude-bootstrap.mjs` | `--help`, `--version`, win32 guard, exit codes     | Full bin invocation via `node bin/dotclaude-bootstrap.mjs`                                              | —                                                      |
+| `dotclaude-sync.mjs`      | Unknown subcommand → exit 64                       | Full bin invocation                                                                                     | —                                                      |
+| Dispatcher                | `bootstrap` + `sync` in SUBCOMMANDS                | `dotclaude bootstrap --help` exits 0                                                                    | —                                                      |
 
 ## 6.5 Migration Sequence
 
@@ -185,9 +185,9 @@ All steps are additive. Nothing is renamed or removed.
 
 ## 6.6 Rollback Plan
 
-| Scenario | Action | Notes |
-| -------- | ------ | ----- |
-| bootstrap-global.mjs corrupts `~/.claude/` | Restore from `.bak-<timestamp>` files written by the tool itself | ARCH-1 guarantees backups exist |
-| npm mode symlinks break after `npm update -g` | Re-run `dotclaude bootstrap`; links will be refreshed | Idempotent by design |
-| New bins cause regression in existing subcommands | Revert the `dotclaude.mjs` SUBCOMMANDS change; new bins still ship but are not reachable via umbrella dispatcher | Dispatcher change is one-line; easy to revert independently |
-| `package.json` `files` change causes unexpected tarball size | `npm pack --dry-run` to audit; revert the files entry | No code change required |
+| Scenario                                                     | Action                                                                                                           | Notes                                                       |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| bootstrap-global.mjs corrupts `~/.claude/`                   | Restore from `.bak-<timestamp>` files written by the tool itself                                                 | ARCH-1 guarantees backups exist                             |
+| npm mode symlinks break after `npm update -g`                | Re-run `dotclaude bootstrap`; links will be refreshed                                                            | Idempotent by design                                        |
+| New bins cause regression in existing subcommands            | Revert the `dotclaude.mjs` SUBCOMMANDS change; new bins still ship but are not reachable via umbrella dispatcher | Dispatcher change is one-line; easy to revert independently |
+| `package.json` `files` change causes unexpected tarball size | `npm pack --dry-run` to audit; revert the files entry                                                            | No code change required                                     |

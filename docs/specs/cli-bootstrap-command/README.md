@@ -6,16 +6,16 @@
 
 ## Status
 
-| #   | Section                     | Status     |
-| --- | --------------------------- | ---------- |
-| 1   | Problem / Motivation        | [x] done   |
-| 2   | Scope                       | [x] done   |
-| 3   | High-Level Architecture     | [x] done   |
-| 4   | Data Flow / Components      | [x] done   |
-| 5   | Interfaces and APIs         | [x] done   |
-| 6   | Implementation Plan         | [x] done   |
-| 7   | Non-Functional Requirements | [x] done   |
-| 8   | Risks and Alternatives      | [x] done   |
+| #   | Section                     | Status   |
+| --- | --------------------------- | -------- |
+| 1   | Problem / Motivation        | [x] done |
+| 2   | Scope                       | [x] done |
+| 3   | High-Level Architecture     | [x] done |
+| 4   | Data Flow / Components      | [x] done |
+| 5   | Interfaces and APIs         | [x] done |
+| 6   | Implementation Plan         | [x] done |
+| 7   | Non-Functional Requirements | [x] done |
+| 8   | Risks and Alternatives      | [x] done |
 
 ## Quick Start
 

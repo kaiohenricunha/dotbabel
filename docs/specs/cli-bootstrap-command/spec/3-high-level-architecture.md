@@ -52,19 +52,19 @@ identical.
 
 ## Data Stores
 
-| Store | Role | Access Pattern |
-| ----- | ---- | -------------- |
-| `~/.claude/` | Target directory for symlinks | Read on status checks; write on bootstrap |
+| Store                                      | Role                                               | Access Pattern                                   |
+| ------------------------------------------ | -------------------------------------------------- | ------------------------------------------------ |
+| `~/.claude/`                               | Target directory for symlinks                      | Read on status checks; write on bootstrap        |
 | npm global registry (`registry.npmjs.org`) | Version check + update for `sync pull` in npm mode | Read-only HTTP GET; only on explicit `sync pull` |
-| git remote (`origin`) | Source of truth for clone mode `sync pull` | Read-only fetch + rebase on explicit `sync pull` |
+| git remote (`origin`)                      | Source of truth for clone mode `sync pull`         | Read-only fetch + rebase on explicit `sync pull` |
 
 ## External APIs / Dependencies
 
-| Service | Purpose | Rate Limits / Constraints |
-| ------- | ------- | ------------------------- |
+| Service              | Purpose                                                                                     | Rate Limits / Constraints                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `registry.npmjs.org` | `npm view @dotclaude/dotclaude version` for `sync status` + `npm update -g` for `sync pull` | npm rate-limits unauthenticated fetches to ~1 req/sec; trivial for interactive CLI use |
-| `git` binary | Clone-mode `sync pull` / `push` / `status` | Must be present in PATH; absence is an ENV error (exit 2) |
-| `npm` binary | npm-mode `sync pull` | Must be present in PATH; absence is an ENV error (exit 2) |
+| `git` binary         | Clone-mode `sync pull` / `push` / `status`                                                  | Must be present in PATH; absence is an ENV error (exit 2)                              |
+| `npm` binary         | npm-mode `sync pull`                                                                        | Must be present in PATH; absence is an ENV error (exit 2)                              |
 
 ## Deployment
 

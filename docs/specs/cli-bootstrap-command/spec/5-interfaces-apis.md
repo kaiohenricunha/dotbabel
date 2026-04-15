@@ -66,8 +66,8 @@ Examples:
 
 ```js
 const SUBCOMMANDS = [
-  "bootstrap",   // ← new
-  "sync",        // ← new
+  "bootstrap", // ← new
+  "sync", // ← new
   "validate-skills",
   "validate-specs",
   "check-spec-coverage",
@@ -142,16 +142,16 @@ export { syncGlobal } from "./sync-global.mjs";
     "plugins/dotclaude/.claude-plugin/"
   ],
   "bin": {
-    "dotclaude":                     "./plugins/dotclaude/bin/dotclaude.mjs",
-    "dotclaude-bootstrap":           "./plugins/dotclaude/bin/dotclaude-bootstrap.mjs",
-    "dotclaude-sync":                "./plugins/dotclaude/bin/dotclaude-sync.mjs",
-    "dotclaude-doctor":              "./plugins/dotclaude/bin/dotclaude-doctor.mjs",
-    "dotclaude-detect-drift":        "./plugins/dotclaude/bin/dotclaude-detect-drift.mjs",
-    "dotclaude-validate-skills":     "./plugins/dotclaude/bin/dotclaude-validate-skills.mjs",
+    "dotclaude": "./plugins/dotclaude/bin/dotclaude.mjs",
+    "dotclaude-bootstrap": "./plugins/dotclaude/bin/dotclaude-bootstrap.mjs",
+    "dotclaude-sync": "./plugins/dotclaude/bin/dotclaude-sync.mjs",
+    "dotclaude-doctor": "./plugins/dotclaude/bin/dotclaude-doctor.mjs",
+    "dotclaude-detect-drift": "./plugins/dotclaude/bin/dotclaude-detect-drift.mjs",
+    "dotclaude-validate-skills": "./plugins/dotclaude/bin/dotclaude-validate-skills.mjs",
     "dotclaude-check-spec-coverage": "./plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs",
-    "dotclaude-validate-specs":      "./plugins/dotclaude/bin/dotclaude-validate-specs.mjs",
+    "dotclaude-validate-specs": "./plugins/dotclaude/bin/dotclaude-validate-specs.mjs",
     "dotclaude-check-instruction-drift": "./plugins/dotclaude/bin/dotclaude-check-instruction-drift.mjs",
-    "dotclaude-init":                "./plugins/dotclaude/bin/dotclaude-init.mjs"
+    "dotclaude-init": "./plugins/dotclaude/bin/dotclaude-init.mjs"
   }
 }
 ```

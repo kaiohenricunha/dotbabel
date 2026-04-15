@@ -29,14 +29,14 @@
 
 ## Boundaries
 
-| Touches | Does Not Touch |
-| ------- | -------------- |
-| `plugins/dotclaude/bin/` — two new bins | `bootstrap.sh`, `sync.sh` |
-| `plugins/dotclaude/src/` — two new modules | `validate-specs.mjs`, `check-spec-coverage.mjs` |
-| `plugins/dotclaude/src/index.mjs` — two new exports | `spec-harness-lib.mjs` |
-| `plugins/dotclaude/bin/dotclaude.mjs` — SUBCOMMANDS array | Per-repo `.claude/` scaffold logic |
-| `package.json` — `files`, `bin` | `docs/repo-facts.json` protected paths (no new paths) |
-| `plugins/dotclaude/bin/dotclaude-doctor.mjs` — bootstrap check | Any downstream consumer repos |
+| Touches                                                        | Does Not Touch                                        |
+| -------------------------------------------------------------- | ----------------------------------------------------- |
+| `plugins/dotclaude/bin/` — two new bins                        | `bootstrap.sh`, `sync.sh`                             |
+| `plugins/dotclaude/src/` — two new modules                     | `validate-specs.mjs`, `check-spec-coverage.mjs`       |
+| `plugins/dotclaude/src/index.mjs` — two new exports            | `spec-harness-lib.mjs`                                |
+| `plugins/dotclaude/bin/dotclaude.mjs` — SUBCOMMANDS array      | Per-repo `.claude/` scaffold logic                    |
+| `package.json` — `files`, `bin`                                | `docs/repo-facts.json` protected paths (no new paths) |
+| `plugins/dotclaude/bin/dotclaude-doctor.mjs` — bootstrap check | Any downstream consumer repos                         |
 
 ## Urgency
 

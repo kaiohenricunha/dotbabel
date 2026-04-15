@@ -30,10 +30,12 @@ exits non-zero. Report the npm error and exit 1.
 
 OPS-1: On `win32` platform, `dotclaude bootstrap` and `dotclaude sync` must
 exit with code 2 and emit a clear message:
+
 ```
 ✗ bootstrap is not supported on Windows (symlinks require elevated permissions).
   Use WSL or run bootstrap.sh from Git Bash.
 ```
+
 No silent failure; no partial execution.
 
 OPS-2: `DOTCLAUDE_DIR` environment variable must be documented in

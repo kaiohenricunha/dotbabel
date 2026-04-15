@@ -4,13 +4,13 @@
 
 ## Risks
 
-| ID  | Risk | Likelihood | Impact | Mitigation |
-| --- | ---- | ---------- | ------ | ----------- |
-| R-1 | npm global install directory varies by platform (nvm, volta, brew, system node) — `pkgRoot()` via `import.meta.url` may resolve to an unexpected path | Medium | Medium | Log the resolved source path on every bootstrap run so users can verify it. Document the resolution algorithm in `--help`. |
-| R-2 | `npm update -g` in `sync pull` updates ALL globally installed packages, not just `@dotclaude/dotclaude` | Low | Low | Use `npm update -g @dotclaude/dotclaude` (package-scoped) not `npm update -g` bare. |
-| R-3 | Adding `commands/` and `skills/` to the npm tarball significantly increases package size | Low | Low | `npm pack --dry-run` before publishing; current skills/commands total ~200 KB. Acceptable. |
-| R-4 | `bootstrap.sh` and `dotclaude bootstrap` diverge over time — someone updates one but not the other | Medium | Medium | Add a note in `bootstrap.sh` referencing the CLI equivalent. The integration test for bootstrap-global.mjs runs against the same expected outputs as the bootstrap.sh test. |
-| R-5 | Symlinking the npm package directory into `~/.claude/` means updating the package breaks the symlinks briefly during the npm update window | Low | Low | npm replaces package contents atomically (via rename); symlinks remain valid throughout. |
+| ID  | Risk                                                                                                                                                  | Likelihood | Impact | Mitigation                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R-1 | npm global install directory varies by platform (nvm, volta, brew, system node) — `pkgRoot()` via `import.meta.url` may resolve to an unexpected path | Medium     | Medium | Log the resolved source path on every bootstrap run so users can verify it. Document the resolution algorithm in `--help`.                                                  |
+| R-2 | `npm update -g` in `sync pull` updates ALL globally installed packages, not just `@dotclaude/dotclaude`                                               | Low        | Low    | Use `npm update -g @dotclaude/dotclaude` (package-scoped) not `npm update -g` bare.                                                                                         |
+| R-3 | Adding `commands/` and `skills/` to the npm tarball significantly increases package size                                                              | Low        | Low    | `npm pack --dry-run` before publishing; current skills/commands total ~200 KB. Acceptable.                                                                                  |
+| R-4 | `bootstrap.sh` and `dotclaude bootstrap` diverge over time — someone updates one but not the other                                                    | Medium     | Medium | Add a note in `bootstrap.sh` referencing the CLI equivalent. The integration test for bootstrap-global.mjs runs against the same expected outputs as the bootstrap.sh test. |
+| R-5 | Symlinking the npm package directory into `~/.claude/` means updating the package breaks the symlinks briefly during the npm update window            | Low        | Low    | npm replaces package contents atomically (via rename); symlinks remain valid throughout.                                                                                    |
 
 ## Rejected Alternatives
 
