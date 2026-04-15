@@ -21,7 +21,7 @@ Arguments: `$ARGUMENTS` — a description of the problem or subject to inspect (
 
 2. **Locate the problem in the codebase.** Use `Grep`, `Glob`, and `Read` to find the relevant files, functions, configs, and tests. Do not guess — verify every claim with a `file:line` citation.
 
-3. **Diagnose root cause.** Read enough code to understand *why* the problem occurs, not just *where*. If there are tests, run them to observe the failure. If the issue is behavioural (performance, flakiness), read logs or run diagnostic commands.
+3. **Diagnose root cause.** Read enough code to understand _why_ the problem occurs, not just _where_. If there are tests, run them to observe the failure. If the issue is behavioural (performance, flakiness), read logs or run diagnostic commands.
 
 4. **Generate at least 2 fix options.** For each option:
    - Describe the approach concisely
