@@ -4,5 +4,15 @@
   "author": {
     "name": "Kaio Cunha",
     "email": "kaiohenricunha@example.com"
-  }
+  },
+  "agents": [
+    "./templates/claude/agents/security-auditor.md",
+    "./templates/claude/agents/architect-reviewer.md",
+    "./templates/claude/agents/workflow-orchestrator.md",
+    "./templates/claude/agents/backend-developer.md",
+    "./templates/claude/agents/frontend-developer.md",
+    "./templates/claude/agents/test-engineer.md",
+    "./templates/claude/agents/documentation-writer.md",
+    "./templates/claude/agents/changelog-assistant.md"
+  ]
 }

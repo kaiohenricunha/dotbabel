@@ -78,6 +78,24 @@ for d in "$DOTCLAUDE/skills"/*/; do
   link_one "${d%/}" "$TARGET/skills/$name"
 done
 
+say "==> installing agents/"
+AGENTS_SRC="$DOTCLAUDE/plugins/dotclaude/templates/claude/agents"
+AGENTS_DST="$TARGET/agents"
+mkdir -p "$AGENTS_DST"
+if [ -d "$AGENTS_SRC" ]; then
+  for agent_file in "$AGENTS_SRC"/*.md; do
+    [ -e "$agent_file" ] || continue
+    agent_name=$(basename "$agent_file")
+    dst_file="$AGENTS_DST/$agent_name"
+    if [ -e "$dst_file" ]; then
+      say "  skipped (exists): $agent_name"
+    else
+      cp "$agent_file" "$dst_file"
+      say "  installed agent: $agent_name"
+    fi
+  done
+fi
+
 if [ "$QUIET" = "1" ]; then
   echo "bootstrap complete — target: $TARGET"
 else
