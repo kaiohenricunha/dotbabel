@@ -155,19 +155,42 @@ For any check with `bucket: "fail"`:
 
 ### 11. Verify the test plan
 
-If the PR body has a `## Test plan` section, run each listed command locally from inside `.claude/worktrees/pr-$NUMBER/`. Mark each as:
+**If the PR body has no `## Test plan` section:** leave a comment asking the author to add one and note `test-plan: missing` in the summary. Do not proceed to step 12.
 
-- `✓ local` — ran and passed
-- `✗ failed` — ran and failed (fix before proceeding)
-- `skipped` — requires infra/services not available locally
-
-If the PR body has no `## Test plan` section: leave a comment asking the author to add one and note `test-plan: missing` in the summary.
-
-After a passing run, post the evidence as a PR comment:
+**If a `## Test plan` section exists**, first check whether CI has already run and passed every item:
 
 ```bash
-gh pr comment "$NUMBER" --body "Test plan verified against HEAD <sha>:
-- \`<command>\` — local ✓ (<ms>ms)
+gh pr checks "$NUMBER" --json name,state,bucket
+```
+
+- If all test-plan items map to passing CI jobs: skip local re-run and proceed directly to ticking the boxes (below).
+- Otherwise: **run every item locally** from inside `.claude/worktrees/pr-$NUMBER/`, regardless of whether some items already pass. Classify each result as:
+  - `✓ local` — ran and passed
+  - `✗ failed` — ran and failed (fix before proceeding; do not tick the box)
+  - `skipped` — requires infra or secrets not available locally (note reason)
+
+**After a successful run, tick the checkboxes in the PR description** for each passing item by patching the PR body:
+
+```bash
+# Fetch the current body
+BODY=$(gh pr view "$NUMBER" --json body -q .body)
+
+# Replace [ ] with [x] for each verified item, then patch
+UPDATED_BODY=$(echo "$BODY" | sed 's/- \[ \] <item text>/- [x] <item text>/g')
+
+gh api "repos/{owner}/{repo}/pulls/$NUMBER" \
+  --method PATCH \
+  -f body="$UPDATED_BODY"
+```
+
+In practice, tick items programmatically — replace `- [ ]` with `- [x]` only for lines whose corresponding local run passed. Leave `- [ ]` for skipped or failed items.
+
+Then post the evidence as a PR comment:
+
+```bash
+gh pr comment "$NUMBER" --body "Test plan verified against HEAD $(git rev-parse HEAD):
+- \`<item>\` — ✓ local
+- \`<item>\` — skipped (requires live DB)
 ..."
 ```
 
