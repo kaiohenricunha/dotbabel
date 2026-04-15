@@ -28,6 +28,8 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 - Cite `file:line` references in every analysis. Claims without citations are not grounded.
 - Do not propose edits until the analysis is confirmed against real code. "The file is probably named X" is not grounding — open it.
 - When unsure, run `/ground-first <subject>` to enforce the read-first discipline.
+- **Surface assumptions before coding.** If a request has multiple valid interpretations, list them and ask rather than picking silently. "Make it faster" → clarify which dimension (latency, throughput, perceived UX) before writing code.
+- **Surgical orphan cleanup.** When your changes make an import, variable, or function unused, remove it. But don't remove pre-existing dead code that your changes didn't create — mention it instead.
 
 ## Testing
 
@@ -48,6 +50,7 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 
 - **Always follow TDD for new features:** write tests first (positive, negative, boundary), then implement until tests pass.
 - **For bug fixes:** write a failing test that reproduces the issue, fix, then verify.
+- **Transform vague tasks into verifiable goals before starting.** "Fix the bug" → "write a test that reproduces it, then make it pass." For multi-step tasks, emit a plan with explicit verification at each step: `Step → verify: [check]`.
 - **When editing Go files, run `gofmt -w <file>` immediately after editing.** Never leave Go files with formatting issues.
 - **When reporting status or roadmap progress, verify each item against actual code or config before marking it complete.** Do not assume completion — show the evidence.
 
