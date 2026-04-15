@@ -76,7 +76,7 @@ if [ ! -d ".claude/worktrees/pr-$NUMBER" ]; then
 fi
 ```
 
-Work exclusively inside `.claude/worktrees/pr-$NUMBER/`. Do **not** use `gh pr checkout`, `git checkout`, or `git stash` — these modify the caller's working tree.
+Work exclusively inside `.claude/worktrees/pr-$NUMBER/`. Do **not** use `gh pr checkout` or `git checkout` — those switch the caller's working tree — and do **not** use `git stash`, because stashes are repo-global and can interfere with the caller's stash list.
 
 - Apply all fixes for valid comments, TDD-first (failing test → fix → green).
 - Detect and run the project test suite:

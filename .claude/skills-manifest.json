@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-15T01:38:55.141Z",
+  "generatedAt": "2026-04-15T01:58:08.298Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -80,9 +80,16 @@
       "lastValidated": "2026-04-15"
     },
     {
+      "name": "create-inspection",
+      "path": ".claude/commands/create-inspection.md",
+      "checksum": "sha256:32fe686caad0543057daf5f8cf6e418a4ae36898d1fc175e354c75c00b25616a",
+      "dependencies": [],
+      "lastValidated": "2026-04-15"
+    },
+    {
       "name": "review-pr",
       "path": ".claude/commands/review-pr.md",
-      "checksum": "sha256:a48115edac6ceff5f1521360fcd71646b426ef09b3164e7ac58acbd86671d487",
+      "checksum": "sha256:318ec86a2b2fe493f40019087c82c0897e3c3a91a4624f598473b1e9c6f05722",
       "dependencies": [],
       "lastValidated": "2026-04-15"
     },
