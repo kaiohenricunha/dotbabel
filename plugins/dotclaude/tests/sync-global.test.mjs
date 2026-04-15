@@ -4,7 +4,7 @@
  * Uses vitest with vi.mock / vi.spyOn to intercept spawnSync and bootstrapGlobal.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Mock child_process spawnSync before importing the module under test
