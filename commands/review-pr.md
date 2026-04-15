@@ -129,7 +129,8 @@ gh pr view "$NUMBER" --json mergeable,mergeStateStatus,baseRefName
 
 If `mergeable` is `CONFLICTING` or `mergeStateStatus` is `BEHIND`:
 
-- Rebase onto the base branch: `git rebase origin/<baseRefName>`
+- Fetch the latest base ref: `git fetch origin <baseRefName>`
+- Rebase onto the updated base: `git rebase origin/<baseRefName>`
 - Resolve conflicts (prefer the PR branch's intent, integrate base branch updates)
 - Force-push with `--force-with-lease` only with explicit user confirmation
 - Verify the build still passes after rebase
@@ -155,35 +156,32 @@ For any check with `bucket: "fail"`:
 
 ### 11. Verify the test plan
 
-**If the PR body has no `## Test plan` section:** leave a comment asking the author to add one and note `test-plan: missing` in the summary. Do not proceed to step 12.
+**If the PR body has no `## Test plan` section:** leave a comment asking the author to add one, record `test-plan: missing` in the final summary, and skip steps 12 and 13. Jump directly to the summary with status `test-plan-missing`.
 
-**If a `## Test plan` section exists**, first check whether CI has already run and passed every item:
+**If a `## Test plan` section exists**, check whether the CI-skip exception applies:
 
 ```bash
 gh pr checks "$NUMBER" --json name,state,bucket
 ```
 
-- If all test-plan items map to passing CI jobs: skip local re-run and proceed directly to ticking the boxes (below).
-- Otherwise: **run every item locally** from inside `.claude/worktrees/pr-$NUMBER/`, regardless of whether some items already pass. Classify each result as:
-  - `✓ local` — ran and passed
-  - `✗ failed` — ran and failed (fix before proceeding; do not tick the box)
-  - `skipped` — requires infra or secrets not available locally (note reason)
+**CI-skip rule (narrow):** skip the local run only if _every_ test-plan item is a runnable command whose exact text matches a named, passing CI check label. If any item is manual, prose-only, or has no CI counterpart, run all items locally.
 
-**After a successful run, tick the checkboxes in the PR description** for each passing item by patching the PR body:
+Otherwise: **run every item locally** from inside `.claude/worktrees/pr-$NUMBER/`. Classify each result as:
+
+- `✓ local` — ran and passed
+- `✗ failed` — ran and failed (fix before proceeding; do not tick the box)
+- `skipped` — requires infra or secrets not available locally (note reason)
+
+**After running, tick the checkboxes in the PR description** for each passing item. Use `printf` (not `echo`) to avoid escape-sequence corruption, and substitute the real checklist line text — the sed pattern below is pseudocode illustrating the shape of the transform:
 
 ```bash
-# Fetch the current body
+# Pseudocode — substitute real checklist line text for <item text>
 BODY=$(gh pr view "$NUMBER" --json body -q .body)
-
-# Replace [ ] with [x] for each verified item, then patch
-UPDATED_BODY=$(echo "$BODY" | sed 's/- \[ \] <item text>/- [x] <item text>/g')
-
-gh api "repos/{owner}/{repo}/pulls/$NUMBER" \
-  --method PATCH \
-  -f body="$UPDATED_BODY"
+UPDATED=$(printf '%s' "$BODY" | sed 's/- \[ \] <item text>/- [x] <item text>/g')
+gh api "repos/{owner}/{repo}/pulls/$NUMBER" --method PATCH -f body="$UPDATED"
 ```
 
-In practice, tick items programmatically — replace `- [ ]` with `- [x]` only for lines whose corresponding local run passed. Leave `- [ ]` for skipped or failed items.
+Replace `- [ ]` with `- [x]` only for lines whose local run passed; leave `- [ ]` for skipped or failed items.
 
 Then post the evidence as a PR comment:
 
@@ -242,7 +240,7 @@ Output a table:
 A PR may only be marked `reviewed` if:
 
 - The §7 push succeeded
-- All auto-runnable test plan commands passed (or test plan was missing — flagged)
+- A test plan is present and all auto-runnable commands passed
 - No unresolved CI failures remain
 - `mergeable` is `MERGEABLE` and branch is not `BEHIND` (verified in step 13)
 
