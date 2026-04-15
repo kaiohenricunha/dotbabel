@@ -34,6 +34,14 @@ describe("scaffoldHarness", () => {
     });
 
     const expected = [
+      ".claude/agents/architect-reviewer.md",
+      ".claude/agents/backend-developer.md",
+      ".claude/agents/changelog-assistant.md",
+      ".claude/agents/documentation-writer.md",
+      ".claude/agents/frontend-developer.md",
+      ".claude/agents/security-auditor.md",
+      ".claude/agents/test-engineer.md",
+      ".claude/agents/workflow-orchestrator.md",
       ".claude/hooks/guard-destructive-git.sh",
       ".claude/settings.headless.json",
       ".claude/settings.json",
