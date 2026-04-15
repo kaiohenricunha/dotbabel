@@ -41,6 +41,9 @@
   "engines": {
     "node": ">=20"
   },
+  "overrides": {
+    "js-yaml": "^4.1.1"
+  },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.4",
     "bats": "^1.11.1",
