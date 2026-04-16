@@ -27,7 +27,7 @@ Use `maxUnavailable: 0` + `maxSurge: 1` for zero-downtime rolling updates.
 # StatefulSet — for ordered, identity-sensitive workloads
 kind: StatefulSet
 spec:
-  serviceName: "my-service" # required for DNS identity
+  serviceName: "my-service" # should reference a headless Service (clusterIP: None) for stable pod DNS identity
   podManagementPolicy: OrderedReady
 ```
 

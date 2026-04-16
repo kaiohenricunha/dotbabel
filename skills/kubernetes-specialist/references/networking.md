@@ -52,6 +52,6 @@ spec:
 
 - NetworkPolicy is additive — multiple policies selecting the same pod create a union, not an intersection. A allow-all policy defeats a default-deny.
 - NodePort range is cluster-wide and fixed at provision time; changing it requires cluster reconfiguration.
-- Ingress `pathType: Prefix` matches `/api` and `/api/v2` but also `/apistuff`; use `Exact` when strict matching is required.
+- Ingress `pathType: Prefix` matches `/api` and `/api/v2`, but not `/apistuff`; use `Exact` when strict matching is required.
 - CoreDNS caches by TTL; stale DNS after a Service update can persist for seconds. Reduce TTL in CoreDNS configmap if immediate propagation is needed.
 - Services with `sessionAffinity: ClientIP` route all requests from one client to one pod — this hides load imbalances.

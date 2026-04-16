@@ -45,7 +45,7 @@ spec:
           spec:
             containers:
               - securityContext:
-                  privileged: "false | null"
+                  privileged: false
 ```
 
 ## Checklist

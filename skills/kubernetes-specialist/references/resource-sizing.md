@@ -50,7 +50,7 @@ Target 60–70% CPU utilization to leave headroom before scale-out.
 
 ## Gotchas
 
-- CPU throttling is silent — the pod runs but slowly. Always check `cpu_throttle_percentage` in metrics before concluding a pod is memory-bound.
+- CPU throttling is silent — the pod runs but slowly. Always check CPU throttling metrics before concluding a pod is memory-bound; in Prometheus-based setups, derive a throttling ratio from `container_cpu_cfs_throttled_periods_total` and `container_cpu_cfs_periods_total`.
 - Setting memory limit == memory request (Guaranteed QoS) prevents bursting but also protects from eviction.
 - HPA and VPA conflict on the same workload — use one or the other, not both, unless using VPA in recommendation-only mode.
 - Namespace `LimitRange` objects set defaults for containers without explicit resource specs — always check for LimitRanges when sizing behaves unexpectedly.

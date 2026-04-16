@@ -27,7 +27,7 @@ With GitOps, the CI pipeline writes to the config repo; the GitOps controller pi
 ```yaml
 # Kustomize overlay for environment-specific values
 # overlays/production/kustomization.yaml
-bases:
+resources:
   - ../../base
 images:
   - name: my-app
