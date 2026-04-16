@@ -22,25 +22,28 @@ You are a senior workflow orchestrator responsible for decomposing complex tasks
 
 ## Available Specialists
 
-| Agent                   | Best For                                             |
-| ----------------------- | ---------------------------------------------------- |
-| `security-auditor`      | Vulnerability scanning, secrets review, compliance   |
-| `architect-reviewer`    | Design review, coupling analysis, ADRs               |
-| `backend-developer`     | APIs, services, databases, infrastructure code       |
-| `frontend-developer`    | UI components, accessibility, client-side logic      |
-| `test-engineer`         | Test suites, coverage gaps, CI integration           |
-| `documentation-writer`  | READMEs, API docs, changelogs, guides                |
-| `changelog-assistant`   | Release notes, CHANGELOG.md entries                  |
-| `kubernetes-specialist` | Cluster config, workload design, k8s troubleshooting |
-| `container-engineer`    | Dockerfiles, image optimization, OCI best practices  |
-| `devops-engineer`       | CI/CD pipelines, build automation, release workflows |
-| `platform-engineer`     | Developer platform tooling, golden paths             |
-| `deployment-engineer`   | Deployment strategies, rollback, traffic shifting    |
-| `iac-engineer`          | IaC modules (Terraform/Pulumi), state management     |
-| `security-engineer`     | Infrastructure hardening, network policies, secrets  |
-| `aws-engineer`          | AWS services, IAM, VPC, CloudFormation/CDK           |
-| `azure-engineer`        | Azure services, EntraID, Bicep/ARM, Managed Identity |
-| `gcp-engineer`          | GCP services, IAM, Workload Identity, Terraform      |
+| Agent                   | Best For                                              |
+| ----------------------- | ----------------------------------------------------- |
+| `security-auditor`      | Vulnerability scanning, secrets review, compliance    |
+| `architect-reviewer`    | Design review, coupling analysis, ADRs                |
+| `backend-developer`     | APIs, services, databases, infrastructure code        |
+| `frontend-developer`    | UI components, accessibility, client-side logic       |
+| `test-engineer`         | Test suites, coverage gaps, CI integration            |
+| `documentation-writer`  | READMEs, API docs, changelogs, guides                 |
+| `changelog-assistant`   | Release notes, CHANGELOG.md entries                   |
+| `kubernetes-specialist` | Cluster config, workload design, k8s troubleshooting  |
+| `container-engineer`    | Dockerfiles, image optimization, OCI best practices   |
+| `devops-engineer`       | CI/CD pipelines, build automation, release workflows  |
+| `platform-engineer`     | Developer platform tooling, golden paths              |
+| `deployment-engineer`   | Deployment strategies, rollback, traffic shifting     |
+| `iac-engineer`          | IaC modules (Terraform/Pulumi), state management      |
+| `security-engineer`     | Infrastructure hardening, network policies, secrets   |
+| `aws-engineer`          | AWS services, IAM, VPC, CloudFormation/CDK            |
+| `azure-engineer`        | Azure services, EntraID, Bicep/ARM, Managed Identity  |
+| `gcp-engineer`          | GCP services, IAM, Workload Identity, Terraform       |
+| `terragrunt-engineer`   | DRY Terraform hierarchies, run-all, dependency blocks |
+| `crossplane-engineer`   | XRDs, Compositions, Crossplane provider configs       |
+| `pulumi-engineer`       | Pulumi stacks, ComponentResource, Automation API      |
 
 ## Working Approach
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-16T13:02:59.879Z",
+  "generatedAt": "2026-04-16T13:44:27.758Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -146,6 +146,34 @@
       "name": "gcp-specialist",
       "path": ".claude/skills/gcp-specialist/SKILL.md",
       "checksum": "sha256:95e1392a2f7ba74576f8d4a721882b0d2d2fbfa06b8fd24dd4b0029c2688a83e",
+      "dependencies": [],
+      "lastValidated": "2026-04-16"
+    },
+    {
+      "name": "terraform-specialist",
+      "path": ".claude/skills/terraform-specialist/SKILL.md",
+      "checksum": "sha256:f710fb28e9a9f65ff578fe2d3e6adddc05ee7a704403ba6c187b466a8496a0b5",
+      "dependencies": [],
+      "lastValidated": "2026-04-16"
+    },
+    {
+      "name": "terragrunt-specialist",
+      "path": ".claude/skills/terragrunt-specialist/SKILL.md",
+      "checksum": "sha256:aafdb76ea8504ab23f398e0cad801671c32494dc90a5f658b3569b1de3455675",
+      "dependencies": [],
+      "lastValidated": "2026-04-16"
+    },
+    {
+      "name": "crossplane-specialist",
+      "path": ".claude/skills/crossplane-specialist/SKILL.md",
+      "checksum": "sha256:0ff301f6d972e6a8fc27f838c575d70ccf1e2e074d3b955183af8401d838acec",
+      "dependencies": [],
+      "lastValidated": "2026-04-16"
+    },
+    {
+      "name": "pulumi-specialist",
+      "path": ".claude/skills/pulumi-specialist/SKILL.md",
+      "checksum": "sha256:ffbede5fd46a3dac7f73021ec763de3bf9337c1ae87cc6291f836fbdb15dec5d",
       "dependencies": [],
       "lastValidated": "2026-04-16"
     }
