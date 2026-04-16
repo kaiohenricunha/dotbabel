@@ -6,8 +6,9 @@
 >   That wires `commands/`, `skills/`, and this file into `~/.claude/` in one step.
 >   No npm required.
 > - **Want more flexibility:** Install `@dotclaude/dotclaude` for the full governance
->   CLI — `dotclaude doctor`, `dotclaude validate-specs`, `dotclaude check-spec-coverage`,
->   and more. See [README.md](./README.md) or [docs/quickstart.md](./docs/quickstart.md).
+>   CLI — `dotclaude bootstrap`, `dotclaude sync`, `dotclaude doctor`,
+>   `dotclaude validate-specs`, and more. See [README.md](./README.md) or
+>   [docs/quickstart.md](./docs/quickstart.md).
 >
 > **This file is for the bootstrap path.** It gets symlinked into `~/.claude/CLAUDE.md`
 > by `bootstrap.sh` and sets the global rule floor for every Claude Code session.

@@ -38,6 +38,19 @@ Claude Code session. To stay current:
 ./sync.sh push          # secret-scan + commit + push
 ```
 
+If you have the CLI installed, you can use it instead of the shell scripts:
+
+```bash
+dotclaude bootstrap             # same as ./bootstrap.sh
+dotclaude sync pull             # same as ./sync.sh pull
+dotclaude sync push             # same as ./sync.sh push
+dotclaude sync status           # show installed vs latest version
+```
+
+Both `bootstrap` and `sync` support `--source <path>` (clone mode) or default
+to the npm package installation (npm mode). Run `dotclaude bootstrap --help`
+or `dotclaude sync --help` for full options.
+
 See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
 
 ---
@@ -58,7 +71,11 @@ npm install -D @dotclaude/dotclaude
 Then use the umbrella dispatcher or standalone bins interchangeably:
 
 ```bash
-dotclaude doctor                   # self-diagnostic: env, facts, manifest, specs
+dotclaude bootstrap                # set up (or refresh) ~/.claude/ — symlinks commands, skills, CLAUDE.md
+dotclaude sync pull                # pull latest dotclaude version and re-bootstrap
+dotclaude sync push                # secret-scan staged files, commit, and push (clone mode)
+dotclaude sync status              # show installed vs latest version / git status
+dotclaude doctor                   # self-diagnostic: env, facts, manifest, specs, bootstrap
 dotclaude validate-skills          # verify skills manifest checksums + DAG
 dotclaude validate-specs           # audit spec contracts + dependency cycles
 dotclaude check-spec-coverage      # PR gate: protected paths must be spec-backed
