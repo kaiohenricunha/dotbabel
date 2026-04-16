@@ -1,125 +1,132 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-15T13:05:51.300Z",
+  "generatedAt": "2026-04-16T12:52:16.625Z",
   "skills": [
     {
       "name": "audit-and-fix",
       "path": ".claude/commands/audit-and-fix.md",
       "checksum": "sha256:f64e8d0ac9dfbefc251dfde1dca2859a09fe901b7d1a0d1f00aaad991210e718",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "changelog",
       "path": ".claude/commands/changelog.md",
       "checksum": "sha256:ebec2daf65ed9ef2a4a61b9ad802071f9cc09a1c1c6cd2d9b84a830f3380ce4f",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "create-assessment",
       "path": ".claude/commands/create-assessment.md",
       "checksum": "sha256:d13a9bb1c38ea41423c0acc9e652230f159087856948c410f08bfc8f6c796ebf",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "create-audit",
       "path": ".claude/commands/create-audit.md",
       "checksum": "sha256:0239f460cd256eb62604081ea328326bf9ac30bd9fee11fb71c81eb0caa84f8b",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "dependabot-sweep",
       "path": ".claude/commands/dependabot-sweep.md",
       "checksum": "sha256:746327d481573ad0af394da591295b36d5c33368fb6aa1ad69f40f4947781ea8",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "detect-flaky",
       "path": ".claude/commands/detect-flaky.md",
       "checksum": "sha256:c7cc063e2b898912627b34f4c370b735e8a0c5cb54bdc66466156e2b21f4ff86",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "fix-with-evidence",
       "path": ".claude/commands/fix-with-evidence.md",
       "checksum": "sha256:f10bbacbb5287e6ebf346e6fdaf309dcce436a221af9c5adede03e9e315d14dd",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "git",
       "path": ".claude/commands/git.md",
       "checksum": "sha256:770578c2a8184e91fc099bca3a14f3dbce209400e6570a8b768093268ae208fe",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "ground-first",
       "path": ".claude/commands/ground-first.md",
       "checksum": "sha256:3c8e79d3727af315e54f4017d1e85d754cd8ae7c99e3d1b54afec0bebe589ce0",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "markdown",
       "path": ".claude/commands/markdown.md",
       "checksum": "sha256:914196385b12a0bf9db3234411c07203255afccf13daf45feb02aafd91d507dc",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
       "checksum": "sha256:b3940bb70a4fef517870fe1d5962fd396cba373859bde9fca4edbce252e308da",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "create-inspection",
       "path": ".claude/commands/create-inspection.md",
       "checksum": "sha256:716d7d5d72b1cb3aa1a9e29bfd1cda1da8d057c9839686d8f7c90def31896e8e",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "review-pr",
       "path": ".claude/commands/review-pr.md",
       "checksum": "sha256:ca0495f32502152c245615d99f4ff0e74dd513985b6be3255fc47592f3acd223",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "security-review",
       "path": ".claude/commands/security-review.md",
       "checksum": "sha256:007ea80c772015841e260af5f82cf993fbe339a2293373104ec4d4579ddef3fb",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "agents-search",
       "path": ".claude/skills/agents-search/SKILL.md",
       "checksum": "sha256:ca85f38c70fa88e1447e3ad335b0d111236e718d634d058a28cabf88e95a1d5a",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
       "checksum": "sha256:44d6fcfc7e01a054f89bdd912f922a8d8278f1fc74c612d8ec151c3a020b0e40",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
     },
     {
       "name": "validate-spec",
       "path": ".claude/skills/validate-spec/SKILL.md",
       "checksum": "sha256:8f4b365e168cd4769fb927def41e1a05c465b00475ef3f5efb2d582bcc604a85",
       "dependencies": [],
-      "lastValidated": "2026-04-15"
+      "lastValidated": "2026-04-16"
+    },
+    {
+      "name": "kubernetes-specialist",
+      "path": ".claude/skills/kubernetes-specialist/SKILL.md",
+      "checksum": "sha256:bfad56ceca2a109b8464828840ff5c4b36bd0109fa87d4c3c1058db15f58025a",
+      "dependencies": [],
+      "lastValidated": "2026-04-16"
     }
   ]
 }

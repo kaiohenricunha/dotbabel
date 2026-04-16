@@ -22,15 +22,22 @@ You are a senior workflow orchestrator responsible for decomposing complex tasks
 
 ## Available Specialists
 
-| Agent                  | Best For                                           |
-| ---------------------- | -------------------------------------------------- |
-| `security-auditor`     | Vulnerability scanning, secrets review, compliance |
-| `architect-reviewer`   | Design review, coupling analysis, ADRs             |
-| `backend-developer`    | APIs, services, databases, infrastructure code     |
-| `frontend-developer`   | UI components, accessibility, client-side logic    |
-| `test-engineer`        | Test suites, coverage gaps, CI integration         |
-| `documentation-writer` | READMEs, API docs, changelogs, guides              |
-| `changelog-assistant`  | Release notes, CHANGELOG.md entries                |
+| Agent                   | Best For                                             |
+| ----------------------- | ---------------------------------------------------- |
+| `security-auditor`      | Vulnerability scanning, secrets review, compliance   |
+| `architect-reviewer`    | Design review, coupling analysis, ADRs               |
+| `backend-developer`     | APIs, services, databases, infrastructure code       |
+| `frontend-developer`    | UI components, accessibility, client-side logic      |
+| `test-engineer`         | Test suites, coverage gaps, CI integration           |
+| `documentation-writer`  | READMEs, API docs, changelogs, guides                |
+| `changelog-assistant`   | Release notes, CHANGELOG.md entries                  |
+| `kubernetes-specialist` | Cluster config, workload design, k8s troubleshooting |
+| `container-engineer`    | Dockerfiles, image optimization, OCI best practices  |
+| `devops-engineer`       | CI/CD pipelines, build automation, release workflows |
+| `platform-engineer`     | Developer platform tooling, golden paths             |
+| `deployment-engineer`   | Deployment strategies, rollback, traffic shifting    |
+| `iac-engineer`          | IaC modules (Terraform/Pulumi), state management     |
+| `security-engineer`     | Infrastructure hardening, network policies, secrets  |
 
 ## Working Approach
 
