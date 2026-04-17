@@ -1,0 +1,34 @@
+{
+  "domain": {},
+  "platform": {},
+  "task": {},
+  "maturity": {
+    "draft": [
+      "agents-search",
+      "audit-and-fix",
+      "aws-specialist",
+      "azure-specialist",
+      "changelog",
+      "create-assessment",
+      "create-audit",
+      "create-inspection",
+      "crossplane-specialist",
+      "dependabot-sweep",
+      "detect-flaky",
+      "fix-with-evidence",
+      "gcp-specialist",
+      "git",
+      "ground-first",
+      "kubernetes-specialist",
+      "markdown",
+      "merge-pr",
+      "pulumi-specialist",
+      "review-pr",
+      "security-review",
+      "spec",
+      "terraform-specialist",
+      "terragrunt-specialist",
+      "validate-spec"
+    ]
+  }
+}
