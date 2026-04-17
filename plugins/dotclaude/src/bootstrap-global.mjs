@@ -221,6 +221,19 @@ export async function bootstrapGlobal(opts = {}) {
     }
   }
 
+  // --- hooks/*.sh ---
+  const hooksSrc = path.join(source, "plugins", "dotclaude", "hooks");
+  if (fs.existsSync(hooksSrc)) {
+    const hooksDst = path.join(target, "hooks");
+    fs.mkdirSync(hooksDst, { recursive: true });
+    for (const entry of fs.readdirSync(hooksSrc)) {
+      if (!entry.endsWith(".sh")) continue;
+      const src = path.join(hooksSrc, entry);
+      const dst = path.join(hooksDst, entry);
+      doLink(src, dst);
+    }
+  }
+
   // --- agents (copy, not symlink) ---
   const agentsSrc = path.join(source, "plugins", "dotclaude", "templates", "claude", "agents");
   const agentsDst = path.join(target, "agents");

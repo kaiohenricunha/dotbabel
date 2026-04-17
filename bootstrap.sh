@@ -78,6 +78,13 @@ for d in "$DOTCLAUDE/skills"/*/; do
   link_one "${d%/}" "$TARGET/skills/$name"
 done
 
+say "==> linking hooks/"
+mkdir -p "$TARGET/hooks"
+for f in "$DOTCLAUDE/plugins/dotclaude/hooks"/*.sh; do
+  [ -e "$f" ] || continue
+  link_one "$f" "$TARGET/hooks/$(basename "$f")"
+done
+
 say "==> installing agents/"
 AGENTS_SRC="$DOTCLAUDE/plugins/dotclaude/templates/claude/agents"
 AGENTS_DST="$TARGET/agents"

@@ -46,6 +46,10 @@ function buildFakeSource(dir) {
     "---\nname: my-agent\n---\n"
   );
 
+  // hooks/*.sh
+  fs.mkdirSync(path.join(dir, "plugins", "dotclaude", "hooks"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "plugins", "dotclaude", "hooks", "guard.sh"), "#!/usr/bin/env bash\n");
+
   // bootstrap.sh marker (needed for pkgRoot() detection)
   fs.writeFileSync(path.join(dir, "bootstrap.sh"), "#!/usr/bin/env bash\n");
 }
@@ -195,7 +199,27 @@ describe("bootstrapGlobal", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Test 6 — returns { ok: false } when source directory does not exist
+  // Test 6 — symlinks hooks/*.sh into target/hooks/
+  // -------------------------------------------------------------------------
+
+  it("creates symlinks for hooks/*.sh in target/hooks/", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+
+    const result = await bootstrapGlobal({ source: src, target: tgt });
+
+    expect(result.ok).toBe(true);
+
+    const hookDst = path.join(tgt, "hooks", "guard.sh");
+    expect(fs.lstatSync(hookDst).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(hookDst)).toBe(
+      path.join(src, "plugins", "dotclaude", "hooks", "guard.sh")
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 7 — returns { ok: false } when source directory does not exist
   // -------------------------------------------------------------------------
 
   it("returns { ok: false } when source directory does not exist", async () => {
