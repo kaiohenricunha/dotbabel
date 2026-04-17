@@ -87,7 +87,7 @@ Read both config files in full. Retain their content to inject as a preamble int
 
 ### Step 2 — Dispatch three agents in parallel
 
-**Agent: data-engineer**
+#### Agent: data-engineer
 
 ```
 Task: Audit source reliability across all pipeline steps.
@@ -103,7 +103,7 @@ Output: P0/P1/P2 findings table per source, file:line.
 Constraints: read-only
 ```
 
-**Agent: data-scientist**
+#### Agent: data-scientist
 
 ```
 Task: Validate scoring math integrity.
@@ -124,7 +124,7 @@ Output: math integrity table (Formula | Expected | Code Behavior | Verdict | Fil
 Constraints: read-only
 ```
 
-**Agent: compliance-auditor**
+#### Agent: compliance-auditor
 
 ```
 Task: Gate completeness — coverage matrix of --quality-config declarations vs. enforcement code.
@@ -186,7 +186,7 @@ If `--save`: write to `docs/audits/veracity-<YYYY-MM-DD>.md`.
 2. If `--since` is present:
    - Run: `git log --since="<value>" --oneline -- <--quality-config>`
    - Extract check names added in recent commits.
-   - Prepend to agent prompt: "Focus on these recently added checks: <list>. Verify each has enforcement AND a test."
+   - Prepend to agent prompt: "Focus on these recently added checks: `[check-names]`. Verify each has enforcement AND a test."
 3. Dispatch `compliance-auditor` with Agent C spec above.
 4. Output coverage matrix and gap list directly — no synthesis.
 

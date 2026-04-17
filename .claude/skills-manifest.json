@@ -180,7 +180,7 @@
     {
       "name": "veracity-audit",
       "path": ".claude/skills/veracity-audit/SKILL.md",
-      "checksum": "sha256:2fd42cb6dc96d8f4ce217d85874299653be65e90b4549e04690b584c8908917f",
+      "checksum": "sha256:2dc1c4213ab6650d685e7b2243ddda91fce2ceba224ca3da3951afeb37d12946",
       "dependencies": [],
       "lastValidated": "2026-04-17"
     }
