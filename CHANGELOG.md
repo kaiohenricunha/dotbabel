@@ -13,6 +13,63 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 - `.d.ts` shipping for stronger type inference (via hand-authored declarations
   — TypeScript migration is out of scope per ADR-0002).
 
+## [0.4.0] — 2026-04-17
+
+No breaking changes. This release adds the global-lifecycle CLI
+(`dotclaude bootstrap`, `dotclaude sync`), first-class agents, the
+taxonomy pipeline (schemas → backfill → search/list/show → build-plugin),
+and a broad set of provider and IaC agents.
+
+### Added
+
+- **Global lifecycle CLI** — `dotclaude bootstrap` (set up or refresh
+  `~/.claude/`) and `dotclaude sync <pull|status|push>` (update an
+  installation). Both are idempotent, support `--json` / `--quiet`
+  / `--no-color`, and are registered as subcommands of the umbrella
+  `dotclaude` dispatcher alongside the taxonomy commands (#29).
+- **First-class agent support** — agents directory, model routing,
+  and discovery wired into the plugin (#28). Ships with 21 agents
+  across generalist, specialist, and veracity tiers (#40):
+  - Kubernetes ecosystem agents + `kubernetes-specialist` skill (#31).
+  - AWS, Azure, GCP provider agents + `*-specialist` skills (#32).
+  - IaC tool agents (Terraform, Terragrunt, Pulumi, Crossplane) +
+    `*-specialist` skills (#33).
+  - Generic veracity harness: `data-scientist`, `compliance-auditor`,
+    and the `veracity-audit` skill (#41).
+- **Taxonomy pipeline** — a four-phase buildout that formalizes the
+  skill/agent metadata layer:
+  - Phase 1: schemas + index builder + non-breaking CLI (#34).
+  - Phase 2: frontmatter backfill + schema tightening (#36).
+  - Phase 3: `dotclaude search`, `dotclaude list`, `dotclaude show`
+    + governance docs + CI gate (#37).
+  - Phase 4: `build-plugin` script + generated plugin templates (#38).
+- **Slash commands** — generic `/review-pr` (#22) and `/create-inspection`
+  (#23), plus strengthened branch-health gates and mandatory test plans
+  in `/review-pr` (#25).
+- **Lint pipeline** — `npm run lint` now wires `prettier` and
+  `markdownlint-cli2` (#18).
+
+### Changed
+
+- README and CLAUDE.md document the two-path usage model
+  (bootstrap vs npm plugin) (#24) and the new `bootstrap` / `sync`
+  subcommands (#30).
+- CLAUDE.md absorbs the Karpathy behavioral guidelines (#26).
+- `dotclaude-agents` spec registered; `.gitignore` cleaned up (#39).
+- Agent spec text updated with tier rationale from audit findings (#42).
+- CI bumps `actions/upload-artifact` 4.6.2 → 7.0.1 (#13).
+
+### Fixed
+
+- `bootstrap` now links `hooks/` into `~/.claude/hooks/` so
+  guard-destructive-git and friends apply globally (#35).
+- Patched `js-yaml` prototype pollution (GHSA-mh29-5h37-fv8m) (#27).
+- Closed 12 open CodeQL alerts around workflow permissions and
+  security (#19).
+- Dogfood workflow now uses `PR_ACTOR` (derived from PR author)
+  instead of the `GITHUB_ACTOR` builtin, restoring correct bot
+  detection (#20, #21).
+
 ## [0.3.0] — 2026-04-14
 
 ### Breaking
