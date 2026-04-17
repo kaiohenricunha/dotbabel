@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/index.schema.json",
+  "title": "dotclaude index",
+  "description": "Envelope for index/artifacts.json — metadata wrapper around an array of IndexEntry objects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generatedAt", "version", "artifacts"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "generatedAt": { "type": "string" },
+    "version": { "$ref": "facets.schema.json#/$defs/semver" },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "index-entry.schema.json" }
+    }
+  }
+}

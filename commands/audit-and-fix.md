@@ -1,5 +1,15 @@
 ---
+id: audit-and-fix
 name: audit-and-fix
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review, debugging]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to "audit and fix" or kicks off an overnight cleanup run.
 argument-hint: "[domain]"

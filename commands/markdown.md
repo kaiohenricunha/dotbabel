@@ -1,5 +1,15 @@
 ---
+id: markdown
 name: markdown
+type: command
+version: 1.0.0
+domain: [devex, writing]
+platform: [none]
+task: [documentation]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.
 argument-hint: "[file | dir]"

@@ -1,5 +1,15 @@
 ---
+id: aws-specialist
 name: aws-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [aws]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive AWS architecture review, debugging, and service design. Use for
   structured investigations of AWS-specific issues, cost or IAM audits, and

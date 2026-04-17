@@ -1,5 +1,15 @@
 ---
+id: create-audit
 name: create-audit
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review, documentation]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.
 argument-hint: "[subject]"

@@ -1,5 +1,15 @@
 ---
+id: security-review
 name: security-review
+type: command
+version: 1.0.0
+domain: [devex, security]
+platform: [none]
+task: [review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.
 argument-hint: "[PR# | path | staged]"

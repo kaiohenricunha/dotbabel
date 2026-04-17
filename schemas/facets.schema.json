@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/facets.schema.json",
+  "title": "dotclaude taxonomy facets",
+  "description": "Shared enum definitions for faceted artifact metadata.",
+  "$defs": {
+    "domain": {
+      "type": "string",
+      "enum": [
+        "infra",
+        "backend",
+        "frontend",
+        "data",
+        "security",
+        "observability",
+        "devex",
+        "writing"
+      ]
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "aws",
+        "azure",
+        "gcp",
+        "kubernetes",
+        "docker",
+        "vercel",
+        "flyio",
+        "neon",
+        "github-actions",
+        "terraform",
+        "terragrunt",
+        "pulumi",
+        "crossplane",
+        "none"
+      ]
+    },
+    "task": {
+      "type": "string",
+      "enum": [
+        "debugging",
+        "migration",
+        "scaffolding",
+        "review",
+        "testing",
+        "documentation",
+        "incident-response"
+      ]
+    },
+    "maturity": {
+      "type": "string",
+      "enum": ["draft", "validated", "production", "deprecated"]
+    },
+    "artifactType": {
+      "type": "string",
+      "enum": ["agent", "skill", "command", "hook", "template"]
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$"
+    }
+  }
+}

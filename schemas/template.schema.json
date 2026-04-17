@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/template.schema.json",
+  "title": "dotclaude template artifact",
+  "description": "Shape for scaffold-template metadata (template.yaml). Phase 1: every field optional.",
+  "allOf": [{ "$ref": "common.schema.json" }],
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "template" },
+    "scaffolds": {
+      "type": "string",
+      "enum": ["project", "file", "directory"]
+    },
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "default": {}
+        },
+        "required": ["name"]
+      }
+    },
+    "post_install": { "type": "string" }
+  }
+}

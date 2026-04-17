@@ -1,5 +1,15 @@
 ---
+id: spec
 name: spec
+type: skill
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [documentation]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Create structured engineering specs through interactive pairing.
   Use when the user wants to create a spec, design doc, technical specification,

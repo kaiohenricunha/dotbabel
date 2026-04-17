@@ -1,5 +1,15 @@
 ---
+id: review-pr
 name: review-pr
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [github-actions]
+task: [review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.
 argument-hint: "[PR#]"

@@ -1,5 +1,15 @@
 ---
+id: terragrunt-specialist
 name: terragrunt-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [terraform, terragrunt]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all
   orchestration analysis. Use for structured investigations of multi-environment

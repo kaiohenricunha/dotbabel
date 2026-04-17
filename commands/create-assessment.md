@@ -1,5 +1,15 @@
 ---
+id: create-assessment
 name: create-assessment
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review, documentation]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.
 argument-hint: "[target]"

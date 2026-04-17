@@ -1,5 +1,15 @@
 ---
+id: validate-spec
 name: validate-spec
+type: skill
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review, testing]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Audit an already-implemented spec against the codebase. Walks each constraint
   (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in
