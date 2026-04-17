@@ -1,9 +1,113 @@
 {
-  "domain": {},
-  "platform": {},
-  "task": {},
+  "domain": {
+    "devex": [
+      "agents-search",
+      "audit-and-fix",
+      "changelog",
+      "create-assessment",
+      "create-audit",
+      "create-inspection",
+      "dependabot-sweep",
+      "detect-flaky",
+      "fix-with-evidence",
+      "git",
+      "ground-first",
+      "markdown",
+      "merge-pr",
+      "review-pr",
+      "security-review",
+      "spec",
+      "validate-spec"
+    ],
+    "infra": [
+      "aws-specialist",
+      "azure-specialist",
+      "crossplane-specialist",
+      "gcp-specialist",
+      "kubernetes-specialist",
+      "pulumi-specialist",
+      "terraform-specialist",
+      "terragrunt-specialist"
+    ],
+    "security": ["dependabot-sweep", "security-review"],
+    "writing": ["markdown"]
+  },
+  "platform": {
+    "none": [
+      "agents-search",
+      "audit-and-fix",
+      "changelog",
+      "create-assessment",
+      "create-audit",
+      "create-inspection",
+      "detect-flaky",
+      "fix-with-evidence",
+      "git",
+      "ground-first",
+      "markdown",
+      "security-review",
+      "spec",
+      "validate-spec"
+    ],
+    "aws": ["aws-specialist"],
+    "azure": ["azure-specialist"],
+    "crossplane": ["crossplane-specialist"],
+    "kubernetes": ["crossplane-specialist", "kubernetes-specialist"],
+    "github-actions": ["dependabot-sweep", "merge-pr", "review-pr"],
+    "gcp": ["gcp-specialist"],
+    "pulumi": ["pulumi-specialist"],
+    "terraform": ["terraform-specialist", "terragrunt-specialist"],
+    "terragrunt": ["terragrunt-specialist"]
+  },
+  "task": {
+    "debugging": [
+      "agents-search",
+      "audit-and-fix",
+      "aws-specialist",
+      "azure-specialist",
+      "create-inspection",
+      "crossplane-specialist",
+      "detect-flaky",
+      "fix-with-evidence",
+      "gcp-specialist",
+      "ground-first",
+      "kubernetes-specialist",
+      "pulumi-specialist",
+      "terraform-specialist",
+      "terragrunt-specialist"
+    ],
+    "review": [
+      "audit-and-fix",
+      "aws-specialist",
+      "azure-specialist",
+      "create-assessment",
+      "create-audit",
+      "crossplane-specialist",
+      "dependabot-sweep",
+      "gcp-specialist",
+      "git",
+      "ground-first",
+      "kubernetes-specialist",
+      "merge-pr",
+      "pulumi-specialist",
+      "review-pr",
+      "security-review",
+      "terraform-specialist",
+      "terragrunt-specialist",
+      "validate-spec"
+    ],
+    "documentation": [
+      "changelog",
+      "create-assessment",
+      "create-audit",
+      "create-inspection",
+      "markdown",
+      "spec"
+    ],
+    "testing": ["detect-flaky", "fix-with-evidence", "merge-pr", "validate-spec"]
+  },
   "maturity": {
-    "draft": [
+    "validated": [
       "agents-search",
       "audit-and-fix",
       "aws-specialist",

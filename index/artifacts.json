@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-04-17T01:16:26.634Z",
+  "generatedAt": "2026-04-17T11:13:21.196Z",
   "version": "0.4.0",
   "artifacts": [
     {
@@ -10,11 +10,13 @@
       "name": "agents-search",
       "description": "Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: \"search agents\", \"list agents\", \"find agent\", \"what agents\", \"agent catalog\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "audit-and-fix",
@@ -23,11 +25,13 @@
       "name": "audit-and-fix",
       "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to \"audit and fix\" or kicks off an overnight cleanup run.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "debugging"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "aws-specialist",
@@ -36,11 +40,13 @@
       "name": "aws-specialist",
       "description": "Deep-dive AWS architecture review, debugging, and service design. Use for structured investigations of AWS-specific issues, cost or IAM audits, and multi-service design reviews. Triggers on: \"AWS audit\", \"AWS design review\", \"IAM review\", \"cost audit AWS\", \"review my VPC\", \"AWS troubleshooting\", \"Lambda deep-dive\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["aws"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "azure-specialist",
@@ -49,24 +55,28 @@
       "name": "azure-specialist",
       "description": "Deep-dive Azure architecture review, debugging, and service design. Use for structured investigations of Azure-specific issues, identity or cost audits, and multi-service design reviews. Triggers on: \"Azure audit\", \"Azure design review\", \"EntraID review\", \"Managed Identity debug\", \"review my Azure\", \"Azure troubleshooting\", \"AKS deep-dive\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["azure"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "changelog",
       "type": "command",
       "path": "commands/changelog.md",
       "name": "changelog",
-      "description": "",
+      "description": "Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "create-assessment",
@@ -75,11 +85,13 @@
       "name": "create-assessment",
       "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "create-audit",
@@ -88,11 +100,13 @@
       "name": "create-audit",
       "description": "Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "create-inspection",
@@ -101,11 +115,13 @@
       "name": "create-inspection",
       "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Use when the user needs to understand *how* to fix something before committing to an approach. Sits between /create-audit (find problems) and /fix-with-evidence (implement the fix).\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "crossplane-specialist",
@@ -114,11 +130,13 @@
       "name": "crossplane-specialist",
       "description": "Deep-dive Crossplane platform review: XRD design, Composition correctness, provider config audit, managed resource health, and GitOps integration. Use for structured investigations of stuck Claims, composition pipeline bugs, and credential injection patterns. Triggers on: \"Crossplane audit\", \"XRD review\", \"Composition debug\", \"stuck Claim\", \"managed resource stuck\", \"provider config review\", \"Crossplane GitOps\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["crossplane", "kubernetes"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "dependabot-sweep",
@@ -127,11 +145,13 @@
       "name": "dependabot-sweep",
       "description": "Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex", "security"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "detect-flaky",
@@ -140,11 +160,13 @@
       "name": "detect-flaky",
       "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["testing", "debugging"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "fix-with-evidence",
@@ -153,11 +175,13 @@
       "name": "fix-with-evidence",
       "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "testing"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "gcp-specialist",
@@ -166,11 +190,13 @@
       "name": "gcp-specialist",
       "description": "Deep-dive Google Cloud architecture review, debugging, and service design. Use for structured investigations of GCP-specific issues, IAM or cost audits, and multi-service design reviews. Triggers on: \"GCP audit\", \"GCP design review\", \"Workload Identity debug\", \"IAM review GCP\", \"review my GKE\", \"GCP troubleshooting\", \"Cloud Run deep-dive\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["gcp"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "git",
@@ -179,11 +205,13 @@
       "name": "git",
       "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "ground-first",
@@ -192,11 +220,13 @@
       "name": "ground-first",
       "description": "Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "kubernetes-specialist",
@@ -205,11 +235,13 @@
       "name": "kubernetes-specialist",
       "description": "Deep-dive Kubernetes troubleshooting, workload design, and cluster health review. Use when you need a structured investigation of a cluster issue, a design review of Kubernetes manifests, or a health audit of a namespace or workload. Triggers on: \"debug kubernetes\", \"why is my pod\", \"review my manifests\", \"cluster health\", \"kubernetes design review\", \"k8s audit\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["kubernetes"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "markdown",
@@ -218,11 +250,13 @@
       "name": "markdown",
       "description": "Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "merge-pr",
@@ -231,11 +265,13 @@
       "name": "merge-pr",
       "description": "Merge a pull request only after full local verification, with a data-regression gate for PRs touching data/calibration/rankings.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "testing"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "pulumi-specialist",
@@ -244,11 +280,13 @@
       "name": "pulumi-specialist",
       "description": "Deep-dive Pulumi stack review, component design, Automation API audit, and secrets management. Use for structured investigations of Pulumi stack drift, ComponentResource coupling, ESC configuration, and Automation API workflows. Triggers on: \"Pulumi audit\", \"stack review\", \"Automation API review\", \"ComponentResource design\", \"ESC audit\", \"Pulumi secrets\", \"Pulumi testing\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["pulumi"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "review-pr",
@@ -257,11 +295,13 @@
       "name": "review-pr",
       "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "security-review",
@@ -270,11 +310,13 @@
       "name": "security-review",
       "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex", "security"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "spec",
@@ -283,11 +325,13 @@
       "name": "spec",
       "description": "Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on \"let's spec this out\", \"create a spec\", \"design doc\", \"write a technical plan\", \"plan the architecture\". Works for greenfield and brownfield projects. Outputs to docs/specs/.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "terraform-specialist",
@@ -296,11 +340,13 @@
       "name": "terraform-specialist",
       "description": "Deep-dive Terraform architecture review, module design, state management, and migration. Use for structured investigations of Terraform workspaces, provider configuration, module coupling, import workflows, and test coverage. Triggers on: \"Terraform audit\", \"module review\", \"state management\", \"Terraform import\", \"workspace design\", \"provider config review\", \"Terraform testing\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["terraform"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "terragrunt-specialist",
@@ -309,11 +355,13 @@
       "name": "terragrunt-specialist",
       "description": "Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all orchestration analysis. Use for structured investigations of multi-environment Terragrunt layouts, dependency graphs, remote state config, and hook correctness. Triggers on: \"Terragrunt audit\", \"run-all review\", \"dependency block\", \"DRY pattern review\", \"env hierarchy audit\", \"mock_outputs\", \"terragrunt hooks\".\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["infra"],
+        "platform": ["terraform", "terragrunt"],
+        "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     },
     {
       "id": "validate-spec",
@@ -322,11 +370,13 @@
       "name": "validate-spec",
       "description": "Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to \"validate a spec\", \"audit a spec\", \"check if spec is implemented\", \"verify the spec is done\", \"is this spec really done\", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.\n",
       "facets": {
-        "domain": [],
-        "platform": [],
-        "task": [],
-        "maturity": "draft"
-      }
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
     }
   ]
 }

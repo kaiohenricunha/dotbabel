@@ -25,6 +25,6 @@
         "required": ["name"]
       }
     },
-    "post_install": { "$ref": "facets.schema.json#/$defs/slug" }
+    "post_install": { "type": "string" }
   }
 }

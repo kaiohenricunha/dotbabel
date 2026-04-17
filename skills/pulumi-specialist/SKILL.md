@@ -1,5 +1,15 @@
 ---
+id: pulumi-specialist
 name: pulumi-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [pulumi]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Pulumi stack review, component design, Automation API audit, and
   secrets management. Use for structured investigations of Pulumi stack drift,

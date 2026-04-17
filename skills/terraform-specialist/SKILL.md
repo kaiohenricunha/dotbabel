@@ -1,5 +1,15 @@
 ---
+id: terraform-specialist
 name: terraform-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [terraform]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Terraform architecture review, module design, state management, and
   migration. Use for structured investigations of Terraform workspaces, provider

@@ -1,5 +1,15 @@
 ---
+id: kubernetes-specialist
 name: kubernetes-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [kubernetes]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Kubernetes troubleshooting, workload design, and cluster health review.
   Use when you need a structured investigation of a cluster issue, a design review

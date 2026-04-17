@@ -1,5 +1,15 @@
 ---
+id: detect-flaky
 name: detect-flaky
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [testing, debugging]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.
 argument-hint: "[test-command]"

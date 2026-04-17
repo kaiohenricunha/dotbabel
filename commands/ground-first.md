@@ -1,5 +1,15 @@
 ---
+id: ground-first
 name: ground-first
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.
 argument-hint: "[subject]"

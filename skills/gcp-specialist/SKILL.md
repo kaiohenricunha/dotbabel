@@ -1,5 +1,15 @@
 ---
+id: gcp-specialist
 name: gcp-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [gcp]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Google Cloud architecture review, debugging, and service design.
   Use for structured investigations of GCP-specific issues, IAM or cost audits,

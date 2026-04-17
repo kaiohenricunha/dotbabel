@@ -19,7 +19,22 @@
     },
     "platform": {
       "type": "string",
-      "enum": ["aws", "kubernetes", "docker", "vercel", "flyio", "neon", "github-actions", "none"]
+      "enum": [
+        "aws",
+        "azure",
+        "gcp",
+        "kubernetes",
+        "docker",
+        "vercel",
+        "flyio",
+        "neon",
+        "github-actions",
+        "terraform",
+        "terragrunt",
+        "pulumi",
+        "crossplane",
+        "none"
+      ]
     },
     "task": {
       "type": "string",

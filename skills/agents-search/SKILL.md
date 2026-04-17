@@ -1,5 +1,15 @@
 ---
+id: agents-search
 name: agents-search
+type: skill
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [debugging]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Discover, search, and manage Claude Code agents. Use when you want to find available
   agents, list installed agents, or refresh the agent catalog.

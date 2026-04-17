@@ -1,5 +1,15 @@
 ---
+id: crossplane-specialist
 name: crossplane-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [crossplane, kubernetes]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Crossplane platform review: XRD design, Composition correctness,
   provider config audit, managed resource health, and GitOps integration.

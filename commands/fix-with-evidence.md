@@ -1,5 +1,15 @@
 ---
+id: fix-with-evidence
 name: fix-with-evidence
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [debugging, testing]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.
 argument-hint: "[issue]"

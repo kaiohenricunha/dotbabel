@@ -1,5 +1,15 @@
 ---
+id: create-inspection
 name: create-inspection
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [debugging, documentation]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Use when the user needs to understand *how* to fix something before committing to an approach. Sits between /create-audit (find problems) and /fix-with-evidence (implement the fix).
 argument-hint: "[problem or subject]"

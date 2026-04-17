@@ -5,13 +5,13 @@
   "description": "Shape of one row in index/artifacts.json. Facet arrays default to [] when absent.",
   "type": "object",
   "additionalProperties": true,
-  "required": ["id", "type", "path", "name", "facets"],
+  "required": ["id", "type", "path", "name", "description", "facets"],
   "properties": {
     "id": { "$ref": "facets.schema.json#/$defs/slug" },
     "type": { "$ref": "facets.schema.json#/$defs/artifactType" },
     "path": { "type": "string", "minLength": 1 },
     "name": { "type": "string", "minLength": 1 },
-    "description": { "type": "string" },
+    "description": { "type": "string", "minLength": 1 },
     "version": { "$ref": "facets.schema.json#/$defs/semver" },
     "facets": {
       "type": "object",

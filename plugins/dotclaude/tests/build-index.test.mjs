@@ -294,13 +294,14 @@ describe("validateArtifacts", () => {
     expect(warnings).toEqual([]);
   });
 
-  it("emits warnings for legacy artifacts' parse-time quirks but not for missing fields", () => {
+  it("emits schema warnings for legacy artifacts missing required taxonomy fields", () => {
     const root = mkRepo();
     writeFile(root, "skills/legacy/SKILL.md", LEGACY_SKILL);
-    // Phase 1: no required fields, so the schema is silent; only artifact
-    // parse warnings (if any) surface. Legacy has valid frontmatter, so:
+    // Phase 2: common schema requires id, type, version, domain, platform, task,
+    // maturity, owner, created, updated — LEGACY_SKILL has none of these.
     const { warnings } = validateArtifacts(walkArtifacts(root), SCHEMAS_DIR);
-    expect(warnings).toEqual([]);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.some((w) => /required property 'id'/.test(w))).toBe(true);
   });
 });
 
@@ -455,8 +456,14 @@ describe("schema round-trip", () => {
         type: "skill",
         name: "ok",
         description: "ok",
+        version: "1.0.0",
         domain: ["infra"],
+        platform: ["none"],
+        task: ["review"],
         maturity: "production",
+        owner: "@test",
+        created: "2025-01-01",
+        updated: "2026-04-17",
       }),
     ).toBe(true);
     expect(

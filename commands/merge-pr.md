@@ -1,5 +1,15 @@
 ---
+id: merge-pr
 name: merge-pr
+type: command
+version: 1.0.0
+domain: [devex]
+platform: [github-actions]
+task: [review, testing]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Merge a pull request only after full local verification, with a data-regression gate for PRs touching data/calibration/rankings.
 argument-hint: "[PR#]"

@@ -1,5 +1,15 @@
 ---
+id: azure-specialist
 name: azure-specialist
+type: skill
+version: 1.0.0
+domain: [infra]
+platform: [azure]
+task: [debugging, review]
+maturity: validated
+owner: "@kaiohenricunha"
+created: 2025-01-01
+updated: 2026-04-17
 description: >
   Deep-dive Azure architecture review, debugging, and service design. Use for
   structured investigations of Azure-specific issues, identity or cost audits,

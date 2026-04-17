@@ -143,12 +143,26 @@ export function walkArtifacts(repoRoot) {
   /** @type {Artifact[]} */
   const artifacts = [];
 
+  const safeLoad = (loader, absPath) => {
+    try {
+      artifacts.push(loader(absPath));
+    } catch (err) {
+      artifacts.push({
+        type: "command",
+        path: toRelPosix(repoRoot, absPath),
+        content: "",
+        frontmatter: {},
+        warnings: [`read error: ${err.message}`],
+      });
+    }
+  };
+
   const addMarkdownFiles = (dir, type) => {
     if (!existsSync(dir)) return;
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       if (entry.isFile() && entry.name.endsWith(".md")) {
         const abs = join(dir, entry.name);
-        artifacts.push(loadArtifact(repoRoot, abs, type));
+        safeLoad((p) => loadArtifact(repoRoot, p, type), abs);
       }
     }
   };
@@ -162,11 +176,11 @@ export function walkArtifacts(repoRoot) {
     for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
       const top = join(skillsDir, entry.name);
       if (entry.isFile() && entry.name.endsWith(".md")) {
-        artifacts.push(loadArtifact(repoRoot, top, "skill"));
+        safeLoad((p) => loadArtifact(repoRoot, p, "skill"), top);
       } else if (entry.isDirectory()) {
         const inner = join(top, "SKILL.md");
         if (existsSync(inner)) {
-          artifacts.push(loadArtifact(repoRoot, inner, "skill"));
+          safeLoad((p) => loadArtifact(repoRoot, p, "skill"), inner);
         }
       }
     }
@@ -185,7 +199,7 @@ export function walkArtifacts(repoRoot) {
       if (!entry.isDirectory()) continue;
       const yamlPath = join(templatesDir, entry.name, "template.yaml");
       if (existsSync(yamlPath)) {
-        artifacts.push(loadTemplateArtifact(repoRoot, yamlPath));
+        safeLoad((p) => loadTemplateArtifact(repoRoot, p), yamlPath);
       }
     }
   }
