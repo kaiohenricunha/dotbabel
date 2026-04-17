@@ -18,5 +18,5 @@
   ],
   "acceptance_commands": ["npm test", "node plugins/dotclaude/bin/dotclaude-validate-skills.mjs ."],
   "depends_on_specs": ["dotclaude-core"],
-  "active_prs": [28]
+  "active_prs": []
 }

@@ -7,6 +7,9 @@ settings.local.json
 **/logs/
 **/.DS_Store
 
+# Local working plans — transient, not for distribution.
+docs/plans/
+
 # Node (for the plugin workspace)
 node_modules/
 *.log
