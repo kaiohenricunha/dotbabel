@@ -17,6 +17,7 @@ import {
   buildIndex,
   validateArtifacts,
   isIndexStale,
+  isDirectory,
   SCHEMAS_DIR,
 } from "../src/build-index.mjs";
 
@@ -500,5 +501,99 @@ describe("schema round-trip", () => {
       }),
     ).toBe(true);
     expect(validate({ id: "x" })).toBe(false);
+  });
+});
+
+describe("small helpers", () => {
+  it("isDirectory returns true for a directory and false for missing paths", () => {
+    const root = mkRepo();
+    expect(isDirectory(root)).toBe(true);
+    expect(isDirectory(join(root, "definitely-not-here"))).toBe(false);
+    expect(isDirectory("/dev/null")).toBe(false);
+  });
+
+  it("isIndexStale returns true when by-type.json is corrupt JSON", () => {
+    const root = mkRepo();
+    writeFile(root, "skills/test-skill/SKILL.md", NEW_STYLE_SKILL);
+    const bundle = buildIndex(walkArtifacts(root));
+    mkdirSync(join(root, "index"));
+    writeFileSync(
+      join(root, "index", "artifacts.json"),
+      JSON.stringify(bundle.artifactsJson, null, 2) + "\n",
+    );
+    writeFileSync(
+      join(root, "index", "by-type.json"),
+      "{ not valid json",
+    );
+    writeFileSync(
+      join(root, "index", "by-facet.json"),
+      JSON.stringify(bundle.byFacet, null, 2) + "\n",
+    );
+    expect(isIndexStale(root)).toBe(true);
+  });
+
+  it("isIndexStale returns true when artifacts.json is corrupt JSON", () => {
+    const root = mkRepo();
+    writeFile(root, "skills/test-skill/SKILL.md", NEW_STYLE_SKILL);
+    mkdirSync(join(root, "index"));
+    writeFileSync(join(root, "index", "artifacts.json"), "not json at all");
+    writeFileSync(join(root, "index", "by-type.json"), "{}");
+    writeFileSync(join(root, "index", "by-facet.json"), "{}");
+    expect(isIndexStale(root)).toBe(true);
+  });
+
+  it("validateArtifacts surfaces parse-time warnings from walkArtifacts", () => {
+    const root = mkRepo();
+    // A skill file without opening ---, generating a parse warning.
+    writeFile(root, "skills/bad/SKILL.md", "no frontmatter here\njust body");
+    const arts = walkArtifacts(root);
+    const { warnings } = validateArtifacts(arts, SCHEMAS_DIR);
+    expect(warnings.some((w) => w.includes("no YAML frontmatter"))).toBe(true);
+  });
+
+  it("validateArtifacts throws when the schemas directory is missing", () => {
+    const root = mkRepo();
+    writeFile(root, "skills/ok/SKILL.md", NEW_STYLE_SKILL);
+    expect(() =>
+      validateArtifacts(walkArtifacts(root), join(root, "no-such-dir")),
+    ).toThrow(/schema not found/);
+  });
+
+  it("toIndexEntry falls back when name/description/maturity are missing and preserves related", () => {
+    const root = mkRepo();
+    // Bare frontmatter — name, description, maturity all absent.
+    writeFile(
+      root,
+      "skills/bare/SKILL.md",
+      "---\nrelated: [foo, bar]\n---\nbody",
+    );
+    const bundle = buildIndex(walkArtifacts(root));
+    const entry = bundle.artifactsJson.artifacts.find((e) => e.id === "bare");
+    expect(entry).toBeDefined();
+    expect(entry.name).toBe("bare");           // fell back to id
+    expect(entry.description).toBe("");        // empty default
+    expect(entry.facets.maturity).toBe("draft"); // default maturity
+    expect(entry.related).toEqual(["foo", "bar"]);
+  });
+
+  it("isIndexStale returns true when by-facet.json differs from fresh build", () => {
+    const root = mkRepo();
+    writeFile(root, "skills/test-skill/SKILL.md", NEW_STYLE_SKILL);
+    const bundle = buildIndex(walkArtifacts(root));
+    mkdirSync(join(root, "index"));
+    writeFileSync(
+      join(root, "index", "artifacts.json"),
+      JSON.stringify(bundle.artifactsJson, null, 2) + "\n",
+    );
+    writeFileSync(
+      join(root, "index", "by-type.json"),
+      JSON.stringify(bundle.byType, null, 2) + "\n",
+    );
+    // Write a facet map that won't match a fresh build.
+    writeFileSync(
+      join(root, "index", "by-facet.json"),
+      JSON.stringify({ domain: {}, platform: {}, task: {}, maturity: {} }, null, 2) + "\n",
+    );
+    expect(isIndexStale(root)).toBe(true);
   });
 });
