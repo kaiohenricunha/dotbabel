@@ -23,7 +23,3 @@
 2. **What to build:** [`spec/5-interfaces-apis.md`](spec/5-interfaces-apis.md) — exact CLI flags, Node API, and `package.json` changes
 3. **How to build it:** [`spec/6-implementation-plan.md`](spec/6-implementation-plan.md) — 4 phased prompts with TDD test names
 4. **Key decisions:** [`spec/4-data-flow-components.md`](spec/4-data-flow-components.md#key-decisions) — KD-1 (agents copy), KD-2 (secret-scan), KD-3 (symlink-to-npm-dir)
-
-## Research Sources
-
-See [research/sources.md](research/sources.md) for indexed source documents (DOC-1 through DOC-8).

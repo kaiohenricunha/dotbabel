@@ -11,12 +11,12 @@ spec-driven-development governance into consumer repos.
 
 **Who is this for?**
 
-| I am… | I want… | Start here |
-| --- | --- | --- |
-| **Dotfile user** | Skills & commands in every Claude Code session | [Clone & bootstrap](#clone--bootstrap) |
-| **Consumer** | Spec-governance CLI for my own repos | [Install the CLI](#install-the-cli) |
-| **Library user** | Node API in my own tooling | [docs/api-reference.md](./docs/api-reference.md) |
-| **Contributor** | Dev workflow, local gates | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| I am…            | I want…                                        | Start here                                       |
+| ---------------- | ---------------------------------------------- | ------------------------------------------------ |
+| **Dotfile user** | Skills & commands in every Claude Code session | [Clone & bootstrap](#clone--bootstrap)           |
+| **Consumer**     | Spec-governance CLI for my own repos           | [Install the CLI](#install-the-cli)              |
+| **Library user** | Node API in my own tooling                     | [docs/api-reference.md](./docs/api-reference.md) |
+| **Contributor**  | Dev workflow, local gates                      | [CONTRIBUTING.md](./CONTRIBUTING.md)             |
 
 ---
 
@@ -68,54 +68,54 @@ or `dotclaude sync --help` for full options.
 
 **Cloud & IaC specialists** — activate automatically when you mention the relevant technology:
 
-| Skill | Triggers on | What it does |
-| --- | --- | --- |
-| `aws-specialist` | "AWS", "IAM role", "Lambda", "ECS", "S3"… | Deep-dive AWS architecture review, IAM audits, multi-service debugging |
-| `azure-specialist` | "Azure", "AKS", "Managed Identity", "Bicep"… | Azure workload review, identity audits, ARM/Bicep guidance |
-| `gcp-specialist` | "GCP", "GKE", "Cloud Run", "Workload Identity"… | GCP architecture review, IAM hierarchy, serverless guidance |
-| `kubernetes-specialist` | "kubernetes", "k8s", "pod", "helm chart"… | Cluster troubleshooting, workload design, network policy review |
-| `crossplane-specialist` | "Crossplane", "XRD", "Composition", "Claim"… | XRD design, Composition correctness, provider config audit |
-| `terraform-specialist` | "Terraform", "state file", "IaC module"… | Module design, state management, workspace review |
-| `terragrunt-specialist` | "Terragrunt", "run-all", "DRY Terraform"… | DRY hierarchy review, dependency graph, env layout |
-| `pulumi-specialist` | "Pulumi", "ComponentResource", "stack"… | Stack review, Automation API audit, secrets management |
+| Skill                   | Triggers on                                     | What it does                                                           |
+| ----------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| `aws-specialist`        | "AWS", "IAM role", "Lambda", "ECS", "S3"…       | Deep-dive AWS architecture review, IAM audits, multi-service debugging |
+| `azure-specialist`      | "Azure", "AKS", "Managed Identity", "Bicep"…    | Azure workload review, identity audits, ARM/Bicep guidance             |
+| `gcp-specialist`        | "GCP", "GKE", "Cloud Run", "Workload Identity"… | GCP architecture review, IAM hierarchy, serverless guidance            |
+| `kubernetes-specialist` | "kubernetes", "k8s", "pod", "helm chart"…       | Cluster troubleshooting, workload design, network policy review        |
+| `crossplane-specialist` | "Crossplane", "XRD", "Composition", "Claim"…    | XRD design, Composition correctness, provider config audit             |
+| `terraform-specialist`  | "Terraform", "state file", "IaC module"…        | Module design, state management, workspace review                      |
+| `terragrunt-specialist` | "Terragrunt", "run-all", "DRY Terraform"…       | DRY hierarchy review, dependency graph, env layout                     |
+| `pulumi-specialist`     | "Pulumi", "ComponentResource", "stack"…         | Stack review, Automation API audit, secrets management                 |
 
 **Engineering workflow** — slash commands:
 
-| Command | Invoke | What it does |
-| --- | --- | --- |
-| `git` | `/git` | Conventional commits, PR creation, branch naming |
-| `changelog` | `/changelog` | Generate changelog entry from git history |
-| `merge-pr` | `/merge-pr <N>` | Full local verification gate before merge |
-| `review-pr` | `/review-pr <N>` | Fetch comments, apply fixes, resolve threads |
-| `audit-and-fix` | `/audit-and-fix <domain>` | Audit → cluster findings → spawn parallel fix PRs |
-| `dependabot-sweep` | `/dependabot-sweep` | Batch-triage all open Dependabot PRs |
+| Command            | Invoke                    | What it does                                      |
+| ------------------ | ------------------------- | ------------------------------------------------- |
+| `git`              | `/git`                    | Conventional commits, PR creation, branch naming  |
+| `changelog`        | `/changelog`              | Generate changelog entry from git history         |
+| `merge-pr`         | `/merge-pr <N>`           | Full local verification gate before merge         |
+| `review-pr`        | `/review-pr <N>`          | Fetch comments, apply fixes, resolve threads      |
+| `audit-and-fix`    | `/audit-and-fix <domain>` | Audit → cluster findings → spawn parallel fix PRs |
+| `dependabot-sweep` | `/dependabot-sweep`       | Batch-triage all open Dependabot PRs              |
 
 **Debugging & quality:**
 
-| Command | Invoke | What it does |
-| --- | --- | --- |
-| `ground-first` | `/ground-first <subject>` | Code-grounded analysis before any edit |
-| `fix-with-evidence` | `/fix-with-evidence <issue>` | Reproduce → Fix → Verify → PR loop |
-| `detect-flaky` | `/detect-flaky <test-cmd>` | Find and fix flaky tests by repeated execution |
-| `security-review` | `/security-review` | Scan changed files for OWASP vulnerabilities |
+| Command             | Invoke                       | What it does                                   |
+| ------------------- | ---------------------------- | ---------------------------------------------- |
+| `ground-first`      | `/ground-first <subject>`    | Code-grounded analysis before any edit         |
+| `fix-with-evidence` | `/fix-with-evidence <issue>` | Reproduce → Fix → Verify → PR loop             |
+| `detect-flaky`      | `/detect-flaky <test-cmd>`   | Find and fix flaky tests by repeated execution |
+| `security-review`   | `/security-review`           | Scan changed files for OWASP vulnerabilities   |
 
 **Analysis & documentation:**
 
-| Command | Invoke | What it does |
-| --- | --- | --- |
-| `create-audit` | `/create-audit <subject>` | Evidence-based audit doc → `docs/audits/` |
+| Command             | Invoke                         | What it does                                              |
+| ------------------- | ------------------------------ | --------------------------------------------------------- |
+| `create-audit`      | `/create-audit <subject>`      | Evidence-based audit doc → `docs/audits/`                 |
 | `create-inspection` | `/create-inspection <problem>` | Investigate and surface fix options → `docs/inspections/` |
-| `create-assessment` | `/create-assessment <target>` | 0–10 graded assessment doc → `docs/assessments/` |
-| `markdown` | `/markdown <path>` | Fix markdown formatting and structure |
+| `create-assessment` | `/create-assessment <target>`  | 0–10 graded assessment doc → `docs/assessments/`          |
+| `markdown`          | `/markdown <path>`             | Fix markdown formatting and structure                     |
 
 **Spec & governance:**
 
-| Command / Skill | Invoke | What it does |
-| --- | --- | --- |
-| `spec` | `/spec <id> "<title>"` | Interactive spec authoring → `docs/specs/` |
-| `validate-spec` | `/validate-spec <id>` | Audit an implemented spec against the codebase |
-| `agents-search` | `/agents-search list` | Discover, search, and manage Claude Code agents |
-| `veracity-audit` | `/veracity-audit audit` | Audit a data pipeline for veracity and value |
+| Command / Skill  | Invoke                                                                                                                                | What it does                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `spec`           | `/spec <id> "<title>"`                                                                                                                | Interactive spec authoring → `docs/specs/`      |
+| `validate-spec`  | `/validate-spec <id>`                                                                                                                 | Audit an implemented spec against the codebase  |
+| `agents-search`  | `/agents-search list`                                                                                                                 | Discover, search, and manage Claude Code agents |
+| `veracity-audit` | `/veracity-audit audit --config <config> --quality-config <quality-config> --pipeline-dir <pipeline-dir> --scoring-dir <scoring-dir>` | Audit a data pipeline for veracity and value    |
 
 See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
 
@@ -132,7 +132,7 @@ After `./bootstrap.sh`, open any repo in Claude Code and try:
 
 # Fix a reported bug with a full evidence loop
 /fix-with-evidence 140
-# → reproduces the issue, fixes it, verifies, opens a draft PR
+# → reproduces the issue, fixes it, verifies, opens a PR
 
 # Get a deep AWS IAM review of this repo
 /aws-specialist review IAM policies in the production account
@@ -246,7 +246,7 @@ Each row links to its ADR (see [docs/adr/](./docs/adr/)):
 | Exit-code convention `{0,1,2,64}`        | [0013](./docs/adr/0013-exit-code-convention.md)         |
 | CLI ✓/✗/⚠ output format                  | [0014](./docs/adr/0014-cli-tick-cross-warn-format.md)   |
 
-Shell-level hardening ([SEC-1..4, OPS-1..2](./docs/cli-reference.md#hardening)) is enforced at
+Shell-level hardening ([SEC-1..4, OPS-1..2](./docs/cli-reference.md#hardening-contract)) is enforced at
 [`plugins/dotclaude/scripts/validate-settings.sh`](./plugins/dotclaude/scripts/validate-settings.sh);
 its 12-case behavioral suite at
 [`plugins/dotclaude/tests/test_validate_settings.sh`](./plugins/dotclaude/tests/test_validate_settings.sh)

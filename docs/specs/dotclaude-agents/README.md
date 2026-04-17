@@ -23,7 +23,3 @@
 - **Agent file format + model routing** → [§5 Interfaces](spec/5-interfaces-apis.md)
 - **How to implement it** → [§6 Implementation Plan](spec/6-implementation-plan.md) (5 prompts, parallelizable)
 - **Risks** → [§8 Risks & Alternatives](spec/8-risks-alternatives.md)
-
-## Research Sources
-
-See [research/sources.md](research/sources.md) for indexed source documents.
