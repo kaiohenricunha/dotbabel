@@ -1,7 +1,7 @@
 {
   "id": "dotclaude-agents",
   "title": "First-class agent support in dotclaude",
-  "status": "shipped",
+  "status": "done",
   "owners": ["dotclaude maintainers"],
   "linked_paths": [
     "bootstrap.sh",
