@@ -5,6 +5,7 @@ description: >
   API. Triggers on: "Pulumi", "pulumi up", "pulumi stack", "ComponentResource",
   "Pulumi ESC", "Automation API", "pulumi.Config", "pulumi new", "stack
   reference", "StackReference".
+  Uses sonnet — Pulumi stack work is code-first and structured; sonnet matches the task depth.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

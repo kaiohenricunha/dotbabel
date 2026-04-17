@@ -5,6 +5,7 @@ description: >
   shifting, or rollback procedures. Triggers on: "deployment strategy", "blue/green",
   "canary release", "rolling update", "traffic shifting", "rollback", "release
   coordination", "feature flag", "progressive delivery", "deploy to production".
+  Uses sonnet — deployment strategy execution is structured; sonnet handles the reasoning without over-provisioning cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

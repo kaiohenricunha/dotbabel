@@ -6,6 +6,7 @@ description: >
   "GCE", "Cloud Functions", "Pub/Sub", "GCS", "BigQuery", "Cloud Build",
   "Workload Identity", "Service Account", "VPC", "Cloud Armor", "Cloud CDN",
   "Deployment Manager", "Config Connector".
+  Uses opus — GCP architecture across Workload Identity, VPC networks, and IAM hierarchies requires deep reasoning to avoid security gaps.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: opus
 ---

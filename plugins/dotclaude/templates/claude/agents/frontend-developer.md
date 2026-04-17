@@ -5,6 +5,7 @@ description: >
   state management, or client-side data fetching. Triggers on: "build UI",
   "React component", "frontend", "CSS", "accessibility", "form validation",
   "client-side", "Next.js page", "Tailwind".
+  Uses sonnet — everyday frontend implementation benefits from balanced capability and response speed.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---

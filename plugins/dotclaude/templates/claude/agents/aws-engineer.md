@@ -5,6 +5,7 @@ description: >
   integrations. Triggers on: "AWS", "EC2", "ECS", "EKS", "Lambda", "S3",
   "IAM role", "VPC", "RDS", "DynamoDB", "CloudFront", "ALB", "Route53",
   "CloudFormation", "CDK", "API Gateway", "EventBridge", "SQS", "SNS".
+  Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: opus
 ---

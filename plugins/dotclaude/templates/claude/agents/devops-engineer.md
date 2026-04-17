@@ -5,6 +5,7 @@ description: >
   or developer tooling. Triggers on: "CI pipeline", "CD workflow", "GitHub Actions",
   "build automation", "artifact", "release workflow", "environment promotion",
   "pipeline stage", "deploy pipeline", "lint CI".
+  Uses sonnet — CI/CD pipeline work is structured and iterative; sonnet matches the workload.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

@@ -5,6 +5,7 @@ description: >
   Kubernetes-native IaC. Triggers on: "Crossplane", "XRD", "Composition",
   "CompositeResource", "Claim", "managed resource", "provider config",
   "ProviderConfig", "composite resource definition", "Crossplane package".
+  Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

@@ -5,6 +5,7 @@ description: >
   state, or handling drift detection. Triggers on: "Terraform", "Pulumi", "OpenTofu",
   "infrastructure as code", "IaC module", "state file", "drift detection", "resource
   graph", "provider", "workspace", "remote state".
+  Uses sonnet — IaC authoring is structured and pattern-driven; sonnet covers the depth needed without excess cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

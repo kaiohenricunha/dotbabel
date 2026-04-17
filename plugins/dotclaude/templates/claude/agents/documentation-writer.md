@@ -5,6 +5,7 @@ description: >
   onboarding materials, docstrings, or inline docs. Triggers on: "write docs",
   "update README", "API documentation", "document this", "user guide",
   "onboarding guide", "add examples", "explain how".
+  Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.
 tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
 model: haiku
 ---

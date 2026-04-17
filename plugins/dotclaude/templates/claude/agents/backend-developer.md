@@ -5,6 +5,7 @@ description: >
   background jobs, or infrastructure logic. Triggers on: "build API", "add endpoint",
   "database schema", "backend service", "server-side", "REST", "GraphQL",
   "background job", "migration".
+  Uses sonnet — everyday backend implementation benefits from balanced capability and throughput.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---

@@ -6,6 +6,7 @@ description: >
   Functions", "Blob Storage", "VNet", "App Gateway", "Front Door", "EntraID",
   "Managed Identity", "ARM template", "Bicep", "Azure DevOps", "ACR",
   "Service Bus", "Logic Apps", "Cosmos DB".
+  Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: opus
 ---

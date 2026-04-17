@@ -5,6 +5,7 @@ description: >
   assessing secrets exposure, or evaluating compliance posture. Triggers on:
   "audit security", "find vulnerabilities", "check secrets", "OWASP review",
   "security scan", "CVE", "threat model".
+  Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.
 tools: Read, Grep, Glob
 model: opus
 ---

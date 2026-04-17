@@ -5,6 +5,7 @@ description: >
   technology choices, or identifying structural anti-patterns. Triggers on:
   "review architecture", "design review", "architecture concerns", "tech stack",
   "coupling", "scalability review", "ADR review".
+  Uses opus — cross-cutting architectural analysis requires deep reasoning across large codebases.
 tools: Read, Grep, Glob
 model: opus
 ---

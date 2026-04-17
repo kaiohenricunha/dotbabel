@@ -5,6 +5,7 @@ description: >
   multi-environment root-module hierarchies. Triggers on: "Terragrunt",
   "terragrunt.hcl", "run-all", "DRY Terraform", "dependency block",
   "env hierarchy", "root module", "terragrunt hooks", "generate block".
+  Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

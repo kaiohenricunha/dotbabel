@@ -4,6 +4,7 @@ description: >
   Use when designing, debugging, or reviewing Kubernetes workloads and cluster
   configuration. Triggers on: "kubernetes", "k8s", "pod", "deployment", "cluster",
   "kubectl", "namespace", "ingress", "helm chart", "workload", "node not ready".
+  Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

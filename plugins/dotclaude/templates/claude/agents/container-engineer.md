@@ -4,6 +4,7 @@ description: >
   Use when authoring, optimizing, or reviewing container images and build pipelines.
   Triggers on: "Dockerfile", "container image", "multi-stage build", "image size",
   "OCI", "Docker Compose", "container registry", "base image", "layer cache".
+  Uses sonnet — container image optimization is structured and pattern-driven; sonnet provides the right depth without excess cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

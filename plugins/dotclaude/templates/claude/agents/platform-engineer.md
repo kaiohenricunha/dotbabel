@@ -5,6 +5,7 @@ description: >
   tooling, or environment parity. Triggers on: "developer platform", "internal tooling",
   "golden path", "paved road", "developer experience", "self-service", "environment parity",
   "platform team", "scaffolding", "service catalog".
+  Uses opus — platform design decisions compound over time; deep reasoning prevents golden-path choices that become maintenance burdens.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: opus
 ---

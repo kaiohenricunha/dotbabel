@@ -5,6 +5,7 @@ description: >
   managing secrets, or assessing supply-chain risks. Triggers on: "infrastructure
   hardening", "network policy", "secrets management", "RBAC", "admission controller",
   "mTLS", "supply chain", "image signing", "privilege escalation", "security posture".
+  Uses opus — infrastructure hardening and privilege analysis require deep reasoning; a missed vector has high downstream cost.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

@@ -5,6 +5,7 @@ description: >
   parallel workstreams, or planning and delegating complex implementation efforts.
   Triggers on: "orchestrate", "coordinate agents", "parallel tasks", "multi-step plan",
   "delegate work", "break down", "dispatch subagents".
+  Uses opus — orchestration quality compounds across delegated agents; poor decomposition cascades into downstream failures.
 tools: Read, Bash, Glob, Grep
 model: opus
 ---

@@ -5,6 +5,7 @@ description: >
   up test infrastructure. Triggers on: "write tests", "add test coverage",
   "fix flaky test", "integration test", "test suite", "coverage report",
   "missing tests", "test CI".
+  Uses sonnet — test design benefits from reasoning about edge cases and failure modes; sonnet balances depth and speed.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---

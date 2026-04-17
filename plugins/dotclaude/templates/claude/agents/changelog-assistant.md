@@ -5,6 +5,7 @@ description: >
   git history for a release. Triggers on: "generate changelog", "release notes",
   "what changed", "CHANGELOG", "summarize commits", "release summary",
   "version bump notes".
+  Uses haiku — changelog generation from git history is formulaic and lightweight; fast output benefits release flow.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: haiku
 ---
