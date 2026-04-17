@@ -1,6 +1,181 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "version": "1.0.0",
+  "version": 1,
   "generatedAt": "{{today}}",
-  "skills": []
+  "skills": [
+    {
+      "name": "agents-search",
+      "path": ".claude/skills/agents-search/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "audit-and-fix",
+      "path": ".claude/commands/audit-and-fix.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "aws-specialist",
+      "path": ".claude/skills/aws-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "azure-specialist",
+      "path": ".claude/skills/azure-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "changelog",
+      "path": ".claude/commands/changelog.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "create-assessment",
+      "path": ".claude/commands/create-assessment.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "create-audit",
+      "path": ".claude/commands/create-audit.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "create-inspection",
+      "path": ".claude/commands/create-inspection.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "crossplane-specialist",
+      "path": ".claude/skills/crossplane-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "dependabot-sweep",
+      "path": ".claude/commands/dependabot-sweep.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "detect-flaky",
+      "path": ".claude/commands/detect-flaky.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "fix-with-evidence",
+      "path": ".claude/commands/fix-with-evidence.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "gcp-specialist",
+      "path": ".claude/skills/gcp-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "git",
+      "path": ".claude/commands/git.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "ground-first",
+      "path": ".claude/commands/ground-first.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "kubernetes-specialist",
+      "path": ".claude/skills/kubernetes-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "markdown",
+      "path": ".claude/commands/markdown.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "merge-pr",
+      "path": ".claude/commands/merge-pr.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "pulumi-specialist",
+      "path": ".claude/skills/pulumi-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "review-pr",
+      "path": ".claude/commands/review-pr.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "security-review",
+      "path": ".claude/commands/security-review.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "spec",
+      "path": ".claude/skills/spec/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "terraform-specialist",
+      "path": ".claude/skills/terraform-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "terragrunt-specialist",
+      "path": ".claude/skills/terragrunt-specialist/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "validate-spec",
+      "path": ".claude/skills/validate-spec/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    }
+  ]
 }

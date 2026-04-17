@@ -31,6 +31,7 @@ jobs:
         run: node plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs
       - run: node plugins/dotclaude/bin/dotclaude-doctor.mjs
       - run: node plugins/dotclaude/bin/dotclaude-index.mjs --check
+      - run: node scripts/build-plugin.mjs --check
 
   example:
     name: example (examples/minimal-consumer)

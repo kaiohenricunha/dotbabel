@@ -27,6 +27,7 @@
     "dotclaude-show": "./plugins/dotclaude/bin/dotclaude-show.mjs"
   },
   "scripts": {
+    "build-plugin": "node scripts/build-plugin.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",

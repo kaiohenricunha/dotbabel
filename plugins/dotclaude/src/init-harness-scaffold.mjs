@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { createHash } from "crypto";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 // Map template subtree prefixes to target prefixes
@@ -115,6 +116,22 @@ export function scaffoldHarness(
     }
 
     filesWritten.push(targetRel);
+  }
+
+  // Populate real checksums so validate-skills passes immediately after init.
+  const manifestDest = path.join(targetDir, ".claude", "skills-manifest.json");
+  if (fs.existsSync(manifestDest)) {
+    const manifestObj = JSON.parse(fs.readFileSync(manifestDest, "utf8"));
+    const todayStr = new Date().toISOString().slice(0, 10);
+    for (const skill of manifestObj.skills ?? []) {
+      const skillAbs = path.join(targetDir, skill.path);
+      if (fs.existsSync(skillAbs)) {
+        const content = fs.readFileSync(skillAbs, "utf8");
+        skill.checksum = "sha256:" + createHash("sha256").update(content).digest("hex");
+        skill.lastValidated = todayStr;
+      }
+    }
+    fs.writeFileSync(manifestDest, JSON.stringify(manifestObj, null, 2) + "\n", "utf8");
   }
 
   return { filesWritten: filesWritten.sort() };
