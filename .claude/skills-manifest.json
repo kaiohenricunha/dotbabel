@@ -176,6 +176,13 @@
       "checksum": "sha256:83ce60f0a0d524515fc423ded7d6917b3242d252f92f2a03fa1064696afe5e5b",
       "dependencies": [],
       "lastValidated": "2026-04-17"
+    },
+    {
+      "name": "squadranks-veracity",
+      "path": ".claude/skills/squadranks-veracity/SKILL.md",
+      "checksum": "sha256:b2d0571ae6ef7cecb6986feca4db44d0cd3ec1683b3bb38b71cc69211bf09386",
+      "dependencies": [],
+      "lastValidated": "2026-04-17"
     }
   ]
 }

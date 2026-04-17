@@ -24,6 +24,8 @@
     "./templates/claude/agents/pulumi-engineer.md",
     "./templates/claude/agents/security-auditor.md",
     "./templates/claude/agents/security-engineer.md",
+    "./templates/claude/agents/squadranks-compliance-auditor.md",
+    "./templates/claude/agents/squadranks-data-scientist.md",
     "./templates/claude/agents/terragrunt-engineer.md",
     "./templates/claude/agents/test-engineer.md",
     "./templates/claude/agents/workflow-orchestrator.md"
