@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/common.schema.json",
+  "title": "dotclaude common artifact fields",
+  "description": "Shared fields every taxonomy artifact may carry. Phase 1: every field is optional; Phase 2 will tighten requirements after backfill.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "id": { "$ref": "facets.schema.json#/$defs/slug" },
+    "name": { "type": "string", "minLength": 1 },
+    "type": { "$ref": "facets.schema.json#/$defs/artifactType" },
+    "description": { "type": "string", "minLength": 1 },
+    "version": { "$ref": "facets.schema.json#/$defs/semver" },
+    "domain": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "facets.schema.json#/$defs/domain" }
+    },
+    "platform": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "facets.schema.json#/$defs/platform" }
+    },
+    "task": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "facets.schema.json#/$defs/task" }
+    },
+    "maturity": { "$ref": "facets.schema.json#/$defs/maturity" },
+    "owner": { "type": "string" },
+    "created": { "type": "string", "format": "date" },
+    "updated": { "type": "string", "format": "date" },
+    "deprecated_by": { "$ref": "facets.schema.json#/$defs/slug" },
+    "related": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "facets.schema.json#/$defs/slug" }
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/agent.schema.json",
+  "title": "dotclaude agent artifact",
+  "description": "Shape for agent YAML frontmatter. Phase 1: every field optional.",
+  "allOf": [{ "$ref": "common.schema.json" }],
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "agent" },
+    "tools": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
+    "model": {
+      "type": "string",
+      "enum": ["opus", "sonnet", "haiku", "inherit"]
+    },
+    "invocation": {
+      "type": "string",
+      "enum": ["passive", "explicit"]
+    }
+  }
+}

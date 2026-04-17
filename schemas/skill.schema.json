@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/skill.schema.json",
+  "title": "dotclaude skill artifact",
+  "description": "Shape for skill YAML frontmatter. Phase 1: every field optional.",
+  "allOf": [{ "$ref": "common.schema.json" }],
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "skill" },
+    "tools": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
+    "model": {
+      "type": "string",
+      "enum": ["opus", "sonnet", "haiku", "inherit"]
+    },
+    "effort": {
+      "type": "string",
+      "enum": ["low", "medium", "max"]
+    },
+    "inputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "prerequisites": {
+      "type": "array",
+      "items": { "$ref": "facets.schema.json#/$defs/slug" }
+    }
+  }
+}

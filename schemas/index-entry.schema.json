@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/index-entry.schema.json",
+  "title": "dotclaude index entry",
+  "description": "Shape of one row in index/artifacts.json. Facet arrays default to [] when absent.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["id", "type", "path", "name", "facets"],
+  "properties": {
+    "id": { "$ref": "facets.schema.json#/$defs/slug" },
+    "type": { "$ref": "facets.schema.json#/$defs/artifactType" },
+    "path": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "version": { "$ref": "facets.schema.json#/$defs/semver" },
+    "facets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maturity"],
+      "properties": {
+        "domain": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "facets.schema.json#/$defs/domain" }
+        },
+        "platform": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "facets.schema.json#/$defs/platform" }
+        },
+        "task": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "facets.schema.json#/$defs/task" }
+        },
+        "maturity": { "$ref": "facets.schema.json#/$defs/maturity" }
+      }
+    },
+    "owner": { "type": "string" },
+    "related": {
+      "type": "array",
+      "items": { "$ref": "facets.schema.json#/$defs/slug" }
+    }
+  }
+}

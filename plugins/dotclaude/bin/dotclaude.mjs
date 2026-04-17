@@ -31,6 +31,7 @@ const SUBCOMMANDS = [
   "init",
   "bootstrap",
   "sync",
+  "index",
 ];
 
 function printUsage() {

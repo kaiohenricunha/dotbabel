@@ -50,6 +50,17 @@ export { scaffoldHarness } from "./init-harness-scaffold.mjs";
 export { bootstrapGlobal, resolveSource } from "./bootstrap-global.mjs";
 export { syncGlobal, resolveMode } from "./sync-global.mjs";
 
+// --- taxonomy index (Phase 1: non-breaking) ---
+export {
+  walkArtifacts,
+  parseFrontmatter,
+  buildIndex,
+  validateArtifacts,
+  isIndexStale,
+  SCHEMAS_DIR,
+  isDirectory,
+} from "./build-index.mjs";
+
 // --- error taxonomy + exit codes ---
 export { ValidationError, ERROR_CODES, formatError } from "./lib/errors.mjs";
 export { EXIT_CODES } from "./lib/exit-codes.mjs";

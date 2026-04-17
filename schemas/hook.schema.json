@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/hook.schema.json",
+  "title": "dotclaude hook artifact",
+  "description": "Shape for hook YAML frontmatter. Phase 1: every field optional.",
+  "allOf": [{ "$ref": "common.schema.json" }],
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "hook" },
+    "event": {
+      "type": "string",
+      "enum": [
+        "SessionStart",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "SubagentStop",
+        "Notification",
+        "PreCompact"
+      ]
+    },
+    "matcher": { "type": "string" },
+    "blocking": { "type": "boolean" }
+  }
+}
