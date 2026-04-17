@@ -89,7 +89,7 @@
     {
       "name": "review-pr",
       "path": ".claude/commands/review-pr.md",
-      "checksum": "sha256:8472f04eafafe81915e4e1dd8756a115747381464cf1c0bb8c5dd00a95dd4ecc",
+      "checksum": "sha256:d0bc84f956c0ee8c176cf76a79374e8defb0bd2487c8340a2e2a1d9e04d8a1cc",
       "dependencies": [],
       "lastValidated": "2026-04-17"
     },
@@ -180,7 +180,7 @@
     {
       "name": "veracity-audit",
       "path": ".claude/skills/veracity-audit/SKILL.md",
-      "checksum": "sha256:c48eeceedbda78a5cf204458f60c057d4c30d1d6a754e7141da62d0ee2272896",
+      "checksum": "sha256:2fd42cb6dc96d8f4ce217d85874299653be65e90b4549e04690b584c8908917f",
       "dependencies": [],
       "lastValidated": "2026-04-17"
     }

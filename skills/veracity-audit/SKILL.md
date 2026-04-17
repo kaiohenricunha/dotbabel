@@ -1,5 +1,15 @@
 ---
+id: veracity-audit
 name: veracity-audit
+type: skill
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review, testing]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-17
+updated: 2026-04-17
 description: >
   Audit a data pipeline for Veracity and Value. Dispatches data-scientist,
   compliance-auditor, and data-engineer agents with project context injected
@@ -22,6 +32,7 @@ Orchestrating audit skill for data pipelines. Dispatches specialized sub-agents
 injected at dispatch time. Produces inline findings; `--save` writes to `docs/audits/`.
 
 **Covers:**
+
 - **Veracity** — source reliability, scoring math integrity, quality gate completeness
 - **Value** — primary score vs. legacy output correctness, blend-config wiring
 
@@ -31,14 +42,14 @@ injected at dispatch time. Produces inline findings; `--save` writes to `docs/au
 
 All paths must be provided explicitly. The skill has no built-in defaults.
 
-| Flag | Required | Description |
-|---|---|---|
-| `--config <path>` | yes (score-check, audit) | Scoring/rating config file (YAML or JSON) |
-| `--quality-config <path>` | yes (gate-check, audit) | Data quality gate declarations file |
-| `--pipeline-dir <path>` | yes (audit, source-trace) | Directory containing pipeline step source files |
-| `--scoring-dir <path>` | yes (score-check, audit) | Directory containing scoring/math source files |
-| `--save` | no | Write findings to `docs/audits/veracity-<YYYY-MM-DD>.md` |
-| `--since <spec>` | no, gate-check only | Focus on checks added within this window (e.g. `"30 days ago"`) |
+| Flag                      | Required                  | Description                                                     |
+| ------------------------- | ------------------------- | --------------------------------------------------------------- |
+| `--config <path>`         | yes (score-check, audit)  | Scoring/rating config file (YAML or JSON)                       |
+| `--quality-config <path>` | yes (gate-check, audit)   | Data quality gate declarations file                             |
+| `--pipeline-dir <path>`   | yes (audit, source-trace) | Directory containing pipeline step source files                 |
+| `--scoring-dir <path>`    | yes (score-check, audit)  | Directory containing scoring/math source files                  |
+| `--save`                  | no                        | Write findings to `docs/audits/veracity-<YYYY-MM-DD>.md`        |
+| `--since <spec>`          | no, gate-check only       | Focus on checks added within this window (e.g. `"30 days ago"`) |
 
 If a required flag is missing, print which flags are needed and halt.
 
@@ -47,12 +58,15 @@ If a required flag is missing, print which flags are needed and halt.
 ## Pre-flight (always runs first)
 
 Confirm the three required agents are installed:
+
 ```
 ~/.claude/agents/data-engineer.md
 ~/.claude/agents/data-scientist.md
 ~/.claude/agents/compliance-auditor.md
 ```
+
 If any are missing, halt:
+
 ```
 Missing agent(s): <list>
 Run: dotclaude bootstrap

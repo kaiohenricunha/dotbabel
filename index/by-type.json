@@ -11,7 +11,8 @@
     "spec",
     "terraform-specialist",
     "terragrunt-specialist",
-    "validate-spec"
+    "validate-spec",
+    "veracity-audit"
   ],
   "command": [
     "audit-and-fix",

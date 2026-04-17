@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-04-17T11:13:21.196Z",
+  "generatedAt": "2026-04-17T14:17:29.874Z",
   "version": "0.4.0",
   "artifacts": [
     {
@@ -374,6 +374,21 @@
         "platform": ["none"],
         "task": ["review", "testing"],
         "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "veracity-audit",
+      "type": "skill",
+      "path": "skills/veracity-audit/SKILL.md",
+      "name": "veracity-audit",
+      "description": "Audit a data pipeline for Veracity and Value. Dispatches data-scientist, compliance-auditor, and data-engineer agents with project context injected at dispatch time. All source paths are supplied via flags — no defaults, no project assumptions. Subcommands: audit (full pipeline walk), score-check (scoring math only), gate-check (gate coverage only), source-trace <label> (single source end-to-end). Invoke when: \"audit pipeline\", \"veracity check\", \"scoring math correct?\", \"check gates\", \"trace source\", \"verify quality gates\", \"formula correct?\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"

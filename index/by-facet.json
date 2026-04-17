@@ -17,7 +17,8 @@
       "review-pr",
       "security-review",
       "spec",
-      "validate-spec"
+      "validate-spec",
+      "veracity-audit"
     ],
     "infra": [
       "aws-specialist",
@@ -47,7 +48,8 @@
       "markdown",
       "security-review",
       "spec",
-      "validate-spec"
+      "validate-spec",
+      "veracity-audit"
     ],
     "aws": ["aws-specialist"],
     "azure": ["azure-specialist"],
@@ -94,7 +96,8 @@
       "security-review",
       "terraform-specialist",
       "terragrunt-specialist",
-      "validate-spec"
+      "validate-spec",
+      "veracity-audit"
     ],
     "documentation": [
       "changelog",
@@ -104,7 +107,7 @@
       "markdown",
       "spec"
     ],
-    "testing": ["detect-flaky", "fix-with-evidence", "merge-pr", "validate-spec"]
+    "testing": ["detect-flaky", "fix-with-evidence", "merge-pr", "validate-spec", "veracity-audit"]
   },
   "maturity": {
     "validated": [
@@ -133,6 +136,7 @@
       "terraform-specialist",
       "terragrunt-specialist",
       "validate-spec"
-    ]
+    ],
+    "draft": ["veracity-audit"]
   }
 }
