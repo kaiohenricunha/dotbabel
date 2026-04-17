@@ -20,7 +20,8 @@
     "dotclaude-validate-specs": "./plugins/dotclaude/bin/dotclaude-validate-specs.mjs",
     "dotclaude-check-instruction-drift": "./plugins/dotclaude/bin/dotclaude-check-instruction-drift.mjs",
     "dotclaude-init": "./plugins/dotclaude/bin/dotclaude-init.mjs",
-    "dotclaude-sync": "./plugins/dotclaude/bin/dotclaude-sync.mjs"
+    "dotclaude-sync": "./plugins/dotclaude/bin/dotclaude-sync.mjs",
+    "dotclaude-index": "./plugins/dotclaude/bin/dotclaude-index.mjs"
   },
   "scripts": {
     "test": "vitest run",
@@ -34,6 +35,7 @@
   "files": [
     "commands/",
     "skills/",
+    "schemas/",
     "CLAUDE.md",
     "plugins/dotclaude/src/",
     "plugins/dotclaude/bin/",
@@ -75,5 +77,10 @@
     "governance",
     "cli"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
+    "js-yaml": "^4.1.1"
+  }
 }
