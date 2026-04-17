@@ -176,6 +176,13 @@
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
+    },
+    {
+      "name": "veracity-audit",
+      "path": ".claude/skills/veracity-audit/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
     }
   ]
 }
