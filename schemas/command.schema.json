@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotclaude.dev/schemas/command.schema.json",
+  "title": "dotclaude command artifact",
+  "description": "Shape for command YAML frontmatter. Phase 1: every field optional.",
+  "allOf": [{ "$ref": "common.schema.json" }],
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "type": { "const": "command" },
+    "argument-hint": { "type": "string" },
+    "model": {
+      "type": "string",
+      "enum": ["opus", "sonnet", "haiku", "inherit"]
+    },
+    "allowed_tools": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "headless_safe": { "type": "boolean" }
+  }
+}
