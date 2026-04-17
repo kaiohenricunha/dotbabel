@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-17T11:13:53.144Z",
+  "generatedAt": "2026-04-17T12:38:08.896Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -103,7 +103,7 @@
     {
       "name": "agents-search",
       "path": ".claude/skills/agents-search/SKILL.md",
-      "checksum": "sha256:4407dbdea7d0ad7cb39efae6ac4ebf6efc5adbdd727ea802d917093080dfd279",
+      "checksum": "sha256:ed2f98dc0344f7c57f19b92c0f08a1bf02e517435175bc690b51fee2a78136b3",
       "dependencies": [],
       "lastValidated": "2026-04-17"
     },
