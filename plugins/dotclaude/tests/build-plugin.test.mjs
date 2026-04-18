@@ -24,12 +24,40 @@ function mkRepo() {
   const root = mkdtempSync(join(tmpdir(), "dc-phase4-"));
   mkdirSync(join(root, "commands"), { recursive: true });
   mkdirSync(join(root, "skills"), { recursive: true });
+  mkdirSync(join(root, "agents"), { recursive: true });
   mkdirSync(join(root, "plugins", "dotclaude", "templates", "claude"), { recursive: true });
   writeFileSync(
     join(root, "plugins", "dotclaude", "templates", "claude", "skills-manifest.json"),
     JSON.stringify({ version: 1, generatedAt: "{{today}}", skills: [] }, null, 2) + "\n",
   );
   return root;
+}
+
+function writeAgent(root, slug) {
+  writeFileSync(
+    join(root, "agents", `${slug}.md`),
+    [
+      "---",
+      `id: "${slug}"`,
+      `name: "${slug}"`,
+      'type: "agent"',
+      `description: "${slug} agent description."`,
+      'version: "1.0.0"',
+      "domain: [infra]",
+      "platform: [none]",
+      "task: [review]",
+      'maturity: "validated"',
+      'owner: "@test"',
+      'created: "2025-01-01"',
+      'updated: "2026-04-17"',
+      "tools: Read, Grep",
+      'model: "sonnet"',
+      "---",
+      "",
+      "Agent body.",
+      "",
+    ].join("\n"),
+  );
 }
 
 function writeSkill(root, slug, extra = "") {
@@ -259,5 +287,61 @@ describe("build-plugin", () => {
     const r = runBuild(root);
     expect(r.status).toBe(2);
     expect(r.stderr).toContain("index not found");
+  });
+
+  it("copies agent file to templates/claude/agents/<slug>.md", () => {
+    const root = mkRepo();
+    writeAgent(root, "my-agent");
+    buildIndex(root);
+    const r = runBuild(root);
+    expect(r.status).toBe(0);
+    const agentPath = join(
+      root,
+      "plugins",
+      "dotclaude",
+      "templates",
+      "claude",
+      "agents",
+      "my-agent.md",
+    );
+    const content = readFileSync(agentPath, "utf8");
+    expect(content).toContain("name: \"my-agent\"");
+    expect(content).toContain("Agent body.");
+  });
+
+  it("strips owner/created/updated from agent frontmatter in plugin templates", () => {
+    const root = mkRepo();
+    writeAgent(root, "my-agent");
+    buildIndex(root);
+    runBuild(root);
+    const agentPath = join(
+      root,
+      "plugins",
+      "dotclaude",
+      "templates",
+      "claude",
+      "agents",
+      "my-agent.md",
+    );
+    const content = readFileSync(agentPath, "utf8");
+    expect(content).not.toMatch(/^owner:/m);
+    expect(content).not.toMatch(/^created:/m);
+    expect(content).not.toMatch(/^updated:/m);
+    // but the operational fields remain
+    expect(content).toMatch(/^name:/m);
+    expect(content).toMatch(/^model:/m);
+    expect(content).toMatch(/^tools:/m);
+  });
+
+  it("does NOT add agent entries to skills-manifest.json (agents track separately)", () => {
+    const root = mkRepo();
+    writeAgent(root, "my-agent");
+    writeSkill(root, "my-skill");
+    buildIndex(root);
+    runBuild(root);
+    const manifest = readManifest(root);
+    const ids = manifest.skills.map((s) => s.name);
+    expect(ids).toContain("my-skill");
+    expect(ids).not.toContain("my-agent");
   });
 });

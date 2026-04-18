@@ -356,3 +356,80 @@ export function validateAgents(agentsDir) {
 
   return { ok: errors.length === 0, errors, warnings };
 }
+
+/**
+ * Detect trigger keyword overlap between agents. Each agent's `description`
+ * frontmatter contains a "Triggers on:" sentence with quoted phrases; if the
+ * same phrase appears in two or more agents' trigger lists without an explicit
+ * cross-reference in the agents' `## Collaboration` section, that's a routing
+ * ambiguity — Claude's dispatcher will pick non-deterministically.
+ *
+ * Advisory by default. Use `--strict` in the CLI to promote warnings to errors.
+ *
+ * @param {string} agentsDir  Absolute path to the directory that contains an
+ *                            `agents/` sub-folder.
+ * @returns {{ ok: boolean, errors: ValidationError[], warnings: ValidationError[] }}
+ */
+export function validateAgentTriggerOverlap(agentsDir) {
+  const errors = [];
+  const warnings = [];
+
+  const agentFiles = listAgentFiles(agentsDir);
+
+  // keyword (lowercased) → array of { agentName, file }
+  const triggerIndex = new Map();
+  // agentName → { collaborationText: string, file: string }
+  const collaborationByAgent = new Map();
+
+  for (const absPath of agentFiles) {
+    const relPath = path.relative(agentsDir, absPath);
+    const content = readFileSync(absPath, "utf8");
+    const fm = parseFrontmatter(content);
+    if (!fm) continue;
+
+    const name = (fm.fields.get("name") ?? "").trim();
+    const description = fm.fields.get("description") ?? "";
+    if (!name || !description) continue;
+
+    // Extract quoted trigger phrases. Match all "..." inside the description.
+    const quoted = description.match(/"([^"]+)"/g) ?? [];
+    for (const raw of quoted) {
+      const keyword = raw.slice(1, -1).trim().toLowerCase();
+      if (!keyword) continue;
+      if (!triggerIndex.has(keyword)) triggerIndex.set(keyword, []);
+      triggerIndex.get(keyword).push({ agentName: name, file: relPath });
+    }
+
+    // Capture the body text after `## Collaboration` so we can check whether
+    // an overlapping agent is explicitly cross-referenced there.
+    const collabMatch = content.match(/##\s+Collaboration[\s\S]*$/i);
+    collaborationByAgent.set(name, {
+      collaborationText: collabMatch ? collabMatch[0] : "",
+      file: relPath,
+    });
+  }
+
+  for (const [keyword, claimants] of triggerIndex) {
+    if (claimants.length < 2) continue;
+    const names = claimants.map((c) => c.agentName);
+
+    // Check whether each claimant's collaboration section mentions at least
+    // one of the other claimants by name.
+    for (const claimant of claimants) {
+      const otherNames = names.filter((n) => n !== claimant.agentName);
+      const collab = collaborationByAgent.get(claimant.agentName)?.collaborationText ?? "";
+      const referencesAny = otherNames.some((other) => collab.includes(other));
+      if (!referencesAny) {
+        warnings.push(new ValidationError({
+          code: ERROR_CODES.AGENT_TRIGGER_OVERLAP,
+          category: "agent",
+          file: claimant.file,
+          message: `trigger "${keyword}" also claimed by: ${otherNames.join(", ")} — but ## Collaboration does not reference them`,
+          hint: `add a handoff line in ## Collaboration naming one of: ${otherNames.join(", ")}, or narrow the trigger keyword to disambiguate`,
+        }));
+      }
+    }
+  }
+
+  return { ok: errors.length === 0, errors, warnings };
+}

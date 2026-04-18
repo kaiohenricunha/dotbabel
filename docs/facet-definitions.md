@@ -48,15 +48,18 @@ field — use `[none]` explicitly.
 
 ## task
 
-| Value               | Meaning                                         | Example artifact    |
-| ------------------- | ----------------------------------------------- | ------------------- |
-| `debugging`         | Diagnosing and fixing runtime or build failures | `fix-with-evidence` |
-| `migration`         | Moving systems, schemas, or data between states | —                   |
-| `scaffolding`       | Generating new projects, files, or boilerplate  | —                   |
-| `review`            | Code review, audit, assessment, PR review       | `review-pr`         |
-| `testing`           | Writing, running, or diagnosing tests           | `detect-flaky`      |
-| `documentation`     | Writing, updating, or generating docs           | `changelog`         |
-| `incident-response` | On-call triage, runbooks, postmortems           | —                   |
+| Value               | Meaning                                                                                         | Example artifact        |
+| ------------------- | ----------------------------------------------------------------------------------------------- | ----------------------- |
+| `debugging`         | Diagnosing and fixing runtime or build failures                                                 | `fix-with-evidence`     |
+| `migration`         | Moving systems, schemas, or data between states                                                 | —                       |
+| `scaffolding`       | Generating new projects, files, or boilerplate                                                  | —                       |
+| `review`            | Code review, audit, assessment, PR review                                                       | `review-pr`             |
+| `testing`           | Writing, running, or diagnosing tests                                                           | `detect-flaky`          |
+| `documentation`     | Writing, updating, or generating docs                                                           | `changelog`             |
+| `incident-response` | On-call triage, runbooks, postmortems                                                           | —                       |
+| `runtime-ops`       | Operating live systems: container exec, log inspection, service restart, traffic shifts         | `docker-engineer`       |
+| `diagnostics`       | Inspecting state to understand behavior: kubectl describe, network tracing, query analysis      | `kubernetes-specialist` |
+| `provisioning`      | Standing up new infrastructure or accounts: cluster bootstrap, IAM role creation, database init | `aws-engineer`          |
 
 ---
 

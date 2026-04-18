@@ -17,9 +17,11 @@ import { spawnSync } from "node:child_process";
 const META = {
   name: "dotclaude-show",
   synopsis: "dotclaude-show <id> [OPTIONS]",
-  description: "Display a single artifact by its id from the taxonomy index.",
+  description:
+    "Display a single artifact by its id from the taxonomy index. When an agent and a skill share the same id, use --type agent|skill|command to disambiguate.",
   flags: {
     "repo-root": { type: "string" },
+    type: { type: "string" },
   },
 };
 
@@ -72,11 +74,25 @@ try {
 }
 
 const id = argv.positional[0];
-const artifact = (envelope.artifacts ?? []).find((a) => a.id === id);
+const typeFilter = argv.flags.type;
+const matches = (envelope.artifacts ?? []).filter((a) => a.id === id);
+const artifact = typeFilter ? matches.find((a) => a.type === typeFilter) : matches[0];
 
 if (!artifact) {
-  process.stderr.write(`not found: ${id}\n`);
+  if (typeFilter && matches.length > 0) {
+    const types = matches.map((a) => a.type).join(", ");
+    process.stderr.write(`not found as ${typeFilter}: "${id}" exists as: ${types}\n`);
+  } else {
+    process.stderr.write(`not found: ${id}\n`);
+  }
   process.exit(EXIT_CODES.VALIDATION);
+}
+
+if (!typeFilter && matches.length > 1) {
+  const types = matches.map((a) => a.type).join(", ");
+  process.stderr.write(
+    `note: multiple artifacts share id "${id}" (${types}); showing ${artifact.type} — use --type to select a specific one\n`,
+  );
 }
 
 if (argv.json) {

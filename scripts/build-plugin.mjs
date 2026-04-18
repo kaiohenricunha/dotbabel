@@ -11,6 +11,10 @@
  *   → plugins/dotclaude/templates/claude/commands/<slug>.md
  *     (frontmatter stripped of owner, created, updated)
  *
+ * For each agent in agents/<slug>.md:
+ *   → plugins/dotclaude/templates/claude/agents/<slug>.md
+ *     (frontmatter stripped of owner, created, updated)
+ *
  * The generated skills-manifest.json uses {{today}} as the generatedAt
  * placeholder so init-harness-scaffold.mjs substitutes the real date at
  * install time.
@@ -97,7 +101,7 @@ try {
 }
 
 const artifacts = (envelope.artifacts ?? []).filter(
-  (a) => a.type === "skill" || a.type === "command",
+  (a) => a.type === "skill" || a.type === "command" || a.type === "agent",
 );
 
 /**
@@ -177,6 +181,13 @@ function buildExpected() {
         dependencies: [],
         lastValidated: null,
       });
+    } else if (artifact.type === "agent") {
+      const srcPath = join(repoRoot, "agents", `${artifact.id}.md`);
+      if (!existsSync(srcPath)) continue;
+      const raw = readFileSync(srcPath, "utf8");
+      const stripped = stripAuthoringFields(raw);
+      const destPath = join(templateRoot, "agents", `${artifact.id}.md`);
+      files.set(destPath, stripped);
     }
   }
 

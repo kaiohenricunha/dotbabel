@@ -99,3 +99,19 @@ dotclaude show <id>
 Create a **new artifact** when the platform, task, or required tools differ substantially. **Extend the existing artifact** (bump `version`) for flags, optional inputs, wording improvements, or expanding coverage within the same domain.
 
 See `docs/governance.md` for the full promotion ladder and CI gates.
+
+## Pairing agents with skills
+
+Agents and skills are complementary, not redundant. For any domain deep enough to justify both, keep each artifact in its lane and link them via `related:`.
+
+- **Agent** = thin persona + routing. Trigger keywords, tool list, and the four-section dotclaude pattern (`## Expertise`, `## Working Approach`, `## Standards` or `## Constraints`, `## Collaboration`). Target ~50 lines.
+- **Skill** = procedural runbook. Multi-phase workflow, command catalogs, and supporting `references/` docs. As deep as the domain warrants.
+
+**When to split vs. fatten an agent:** if a domain needs more than ~3 reference documents, a multi-phase procedure, or step-by-step command examples, author the depth as a skill and keep the agent thin. A 200-line agent is a smell — the content probably belongs in a skill.
+
+**Linking:** the agent's frontmatter declares `related: [<skill-id>]` so Claude can read the skill on invocation. Both artifacts share the same base `id` (e.g. `kubernetes-specialist` agent, `kubernetes-specialist` skill). Use `dotclaude show <id> --type agent|skill` to disambiguate when both exist.
+
+Canonical examples in this repo:
+
+- `agents/kubernetes-specialist.md` (persona, triggers) ↔ `skills/kubernetes-specialist/SKILL.md` (investigation runbook + references)
+- `agents/aws-engineer.md` (persona, triggers) ↔ `skills/aws-specialist/SKILL.md` (audit procedure + references)

@@ -19,15 +19,17 @@ import {
   validateManifest,
   refreshChecksums,
   validateAgents,
+  validateAgentTriggerOverlap,
 } from "../src/index.mjs";
 
 const META = {
   name: "dotclaude-validate-skills",
   synopsis: "dotclaude-validate-skills [OPTIONS]",
-  description: "Validate .claude/skills-manifest.json checksums, orphans, and DAG. Use --update to rewrite checksums in place.",
+  description: "Validate .claude/skills-manifest.json checksums, orphans, and DAG. Also runs agent frontmatter validation and trigger-overlap detection. Use --update to rewrite checksums in place. Use --strict to promote agent overlap warnings to errors.",
   flags: {
     "repo-root": { type: "string" },
     update: { type: "boolean" },
+    strict: { type: "boolean" },
   },
 };
 
@@ -114,6 +116,29 @@ for (const warn of agentsResult.warnings) {
   out.warn(formatError(warn, { verbose: argv.verbose }), warn.toJSON ? warn.toJSON() : undefined);
 }
 
+// --- agent trigger-overlap detection (advisory by default) ---
+let overlapResult;
+try {
+  overlapResult = validateAgentTriggerOverlap(agentsDir);
+} catch (err) {
+  out.fail(`agent trigger-overlap check failed: ${err.message}`);
+  out.flush();
+  process.exit(EXIT_CODES.ENV);
+}
+
+if (overlapResult.warnings.length === 0) {
+  out.pass(`agent triggers: no overlap detected`);
+} else {
+  for (const warn of overlapResult.warnings) {
+    if (argv.flags.strict) {
+      out.fail(formatError(warn, { verbose: argv.verbose }), warn.toJSON ? warn.toJSON() : undefined);
+    } else {
+      out.warn(formatError(warn, { verbose: argv.verbose }), warn.toJSON ? warn.toJSON() : undefined);
+    }
+  }
+}
+
 out.flush();
-const hasErrors = !result.ok || !agentsResult.ok;
+const overlapFailed = argv.flags.strict && overlapResult.warnings.length > 0;
+const hasErrors = !result.ok || !agentsResult.ok || overlapFailed;
 process.exit(hasErrors ? EXIT_CODES.VALIDATION : EXIT_CODES.OK);

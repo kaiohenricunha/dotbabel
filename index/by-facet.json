@@ -141,6 +141,33 @@
       "terragrunt-specialist",
       "validate-spec"
     ],
-    "draft": ["handoff", "veracity-audit"]
+    "draft": [
+      "architect-reviewer",
+      "aws-engineer",
+      "azure-engineer",
+      "backend-developer",
+      "changelog-assistant",
+      "compliance-auditor",
+      "container-engineer",
+      "crossplane-engineer",
+      "data-scientist",
+      "deployment-engineer",
+      "devops-engineer",
+      "docker-engineer",
+      "documentation-writer",
+      "frontend-developer",
+      "gcp-engineer",
+      "handoff",
+      "iac-engineer",
+      "kubernetes-specialist",
+      "platform-engineer",
+      "pulumi-engineer",
+      "security-auditor",
+      "security-engineer",
+      "terragrunt-engineer",
+      "test-engineer",
+      "veracity-audit",
+      "workflow-orchestrator"
+    ]
   }
 }

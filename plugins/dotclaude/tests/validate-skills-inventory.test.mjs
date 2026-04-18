@@ -4,7 +4,12 @@ import path, { resolve } from "path";
 import { readFileSync, writeFileSync, mkdtempSync, cpSync, unlinkSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
-import { validateManifest, refreshChecksums, validateAgents } from "../src/validate-skills-inventory.mjs";
+import {
+  validateManifest,
+  refreshChecksums,
+  validateAgents,
+  validateAgentTriggerOverlap,
+} from "../src/validate-skills-inventory.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -368,12 +373,148 @@ key = sk-abcdef123456
 // ---------------------------------------------------------------------------
 
 describe("validateAgents — shipped template agents", () => {
-  it("returns 0 errors for all 8 agents in templates/claude/agents/", () => {
+  it("returns 0 errors for all agents in templates/claude/agents/", () => {
     const repoRoot = resolve(__dirname, "..", "..", "..");
     const agentsDir = resolve(repoRoot, "plugins", "dotclaude", "templates", "claude");
     const result = validateAgents(agentsDir);
     expect(result.errors).toEqual([]);
     expect(result.ok).toBe(true);
     expect(result.warnings).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateAgentTriggerOverlap
+// ---------------------------------------------------------------------------
+
+const AGENT_A_NO_OVERLAP = `---
+name: agent-a
+description: >
+  Triggers on: "alpha-keyword", "agent-a-only".
+tools: Read
+model: sonnet
+---
+
+## Collaboration
+
+- Hand off frontend concerns to agent-b.
+`;
+
+const AGENT_B_DISJOINT = `---
+name: agent-b
+description: >
+  Triggers on: "beta-keyword", "agent-b-only".
+tools: Read
+model: sonnet
+---
+
+## Collaboration
+
+- Hand off frontend concerns to agent-a.
+`;
+
+const AGENT_OVERLAPPING_LEFT = `---
+name: agent-left
+description: >
+  Triggers on: "shared-keyword", "left-only".
+tools: Read
+model: sonnet
+---
+
+## Collaboration
+
+- Hand off cluster concerns to agent-right.
+`;
+
+const AGENT_OVERLAPPING_RIGHT_NO_HANDOFF = `---
+name: agent-right
+description: >
+  Triggers on: "shared-keyword", "right-only".
+tools: Read
+model: sonnet
+---
+
+## Collaboration
+
+- Coordinate with the platform team for production rollouts.
+`;
+
+describe("validateAgentTriggerOverlap", () => {
+  it("emits no warnings when agents have disjoint trigger keywords", () => {
+    const dir = makeAgentDir();
+    writeAgent(dir, "agent-a.md", AGENT_A_NO_OVERLAP);
+    writeAgent(dir, "agent-b.md", AGENT_B_DISJOINT);
+    const result = validateAgentTriggerOverlap(dir);
+    expect(result.warnings).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("emits no warnings when overlapping agents reference each other in ## Collaboration", () => {
+    const dir = makeAgentDir();
+    // Both agents share "shared-keyword" but each names the other in collaboration.
+    writeAgent(dir, "agent-left.md", AGENT_OVERLAPPING_LEFT);
+    writeAgent(dir, "agent-right.md", `---
+name: agent-right
+description: >
+  Triggers on: "shared-keyword", "right-only".
+tools: Read
+model: sonnet
+---
+
+## Collaboration
+
+- Hand off platform concerns to agent-left.
+`);
+    const result = validateAgentTriggerOverlap(dir);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("emits AGENT_TRIGGER_OVERLAP warning when an overlapping agent does not reference the other", () => {
+    const dir = makeAgentDir();
+    writeAgent(dir, "agent-left.md", AGENT_OVERLAPPING_LEFT);
+    writeAgent(dir, "agent-right.md", AGENT_OVERLAPPING_RIGHT_NO_HANDOFF);
+    const result = validateAgentTriggerOverlap(dir);
+    // agent-right does not reference agent-left in its collaboration → warning expected
+    const warn = result.warnings.find(
+      (w) => w.code === ERROR_CODES.AGENT_TRIGGER_OVERLAP && w.file.includes("agent-right"),
+    );
+    expect(warn).toBeDefined();
+    expect(warn.message).toMatch(/shared-keyword/);
+    expect(warn.message).toMatch(/agent-left/);
+  });
+
+  it("is case-insensitive on trigger keywords", () => {
+    const dir = makeAgentDir();
+    writeAgent(dir, "uppercase.md", `---
+name: uppercase
+description: >
+  Triggers on: "SHARED".
+tools: Read
+model: sonnet
+---
+
+Body.
+`);
+    writeAgent(dir, "lowercase.md", `---
+name: lowercase
+description: >
+  Triggers on: "shared".
+tools: Read
+model: sonnet
+---
+
+Body.
+`);
+    const result = validateAgentTriggerOverlap(dir);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it("ok=true even when warnings exist (advisory only)", () => {
+    const dir = makeAgentDir();
+    writeAgent(dir, "agent-left.md", AGENT_OVERLAPPING_LEFT);
+    writeAgent(dir, "agent-right.md", AGENT_OVERLAPPING_RIGHT_NO_HANDOFF);
+    const result = validateAgentTriggerOverlap(dir);
+    expect(result.ok).toBe(true); // warnings don't fail validation
+    expect(result.errors).toEqual([]);
   });
 });

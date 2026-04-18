@@ -45,7 +45,10 @@
         "review",
         "testing",
         "documentation",
-        "incident-response"
+        "incident-response",
+        "runtime-ops",
+        "diagnostics",
+        "provisioning"
       ]
     },
     "maturity": {

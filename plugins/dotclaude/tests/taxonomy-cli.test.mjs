@@ -25,7 +25,23 @@ function mkRepo() {
   const root = mkdtempSync(join(tmpdir(), "dc-phase3-"));
   mkdirSync(join(root, "skills", "infra-tool"), { recursive: true });
   mkdirSync(join(root, "commands"), { recursive: true });
+  mkdirSync(join(root, "agents"), { recursive: true });
   return root;
+}
+
+function writeAgent(root, slug, overrides = {}) {
+  const fm = {
+    name: slug,
+    type: "agent",
+    description: `${slug} agent description.`,
+    tools: "Read, Grep",
+    model: "sonnet",
+    ...overrides,
+  };
+  const yaml = Object.entries(fm)
+    .map(([k, v]) => `${k}: "${v}"`)
+    .join("\n");
+  writeFileSync(join(root, "agents", `${slug}.md`), `---\n${yaml}\n---\n\nAgent body.\n`);
 }
 
 function writeSkill(root, slug, overrides = {}) {
@@ -350,6 +366,59 @@ describe("dotclaude-show", () => {
     });
     expect(r.status).toBe(64);
     expect(r.stderr).toContain("usage:");
+  });
+
+  it("--type selects the correct artifact when agent and skill share an id", () => {
+    const root = mkRepo();
+    writeSkill(root, "domain-tool");
+    writeAgent(root, "domain-tool");
+    buildIndex(root);
+
+    const rSkill = spawnSync(
+      process.execPath,
+      [SHOW_BIN, "domain-tool", "--type", "skill", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
+    expect(rSkill.status).toBe(0);
+    expect(rSkill.stdout).toContain("type:        skill");
+
+    const rAgent = spawnSync(
+      process.execPath,
+      [SHOW_BIN, "domain-tool", "--type", "agent", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
+    expect(rAgent.status).toBe(0);
+    expect(rAgent.stdout).toContain("type:        agent");
+  });
+
+  it("warns to stderr but exits 0 when multiple artifacts share an id and --type is omitted", () => {
+    const root = mkRepo();
+    writeSkill(root, "shared-id");
+    writeAgent(root, "shared-id");
+    buildIndex(root);
+
+    const r = spawnSync(
+      process.execPath,
+      [SHOW_BIN, "shared-id", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/multiple artifacts share id "shared-id"/);
+    expect(r.stderr).toMatch(/--type/);
+  });
+
+  it("exits 1 with ambiguous message when --type doesn't match any artifact with that id", () => {
+    const root = mkRepo();
+    writeSkill(root, "skill-only");
+    buildIndex(root);
+
+    const r = spawnSync(
+      process.execPath,
+      [SHOW_BIN, "skill-only", "--type", "agent", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/not found as agent/);
   });
 });
 

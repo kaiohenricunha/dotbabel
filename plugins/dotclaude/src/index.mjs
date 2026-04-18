@@ -41,6 +41,7 @@ export {
   validateManifest,
   refreshChecksums,
   validateAgents,
+  validateAgentTriggerOverlap,
 } from "./validate-skills-inventory.mjs";
 export { checkInstructionDrift } from "./check-instruction-drift.mjs";
 export { checkSpecCoverage } from "./check-spec-coverage.mjs";
