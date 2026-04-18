@@ -22,6 +22,7 @@ Trigger: when the user is done with a feature and is about to open a PR, or says
 Arguments: `$ARGUMENTS` — optional base branch. Defaults to `origin/main`.
 
 **Lifecycle:**
+
 ```
 /git (commit) → /pre-pr → /git pr (open PR) → /review-pr → /merge-pr
 ```
@@ -82,10 +83,22 @@ Record in summary: "Simplified N files, M changes staged." If no changes: "simpl
 
 ### 3. Security review
 
-`/security-review` defaults to `git diff` (staged + unstaged) when invoked with no PR number — which is the correct mode here.
+In pre-PR context all branch changes are committed and the working tree is clean, so `git diff --cached` (the security-review default) would see nothing. Stage the diff vs base explicitly before invoking:
+
+```bash
+git diff "$MERGE_BASE" | git apply --cached --allow-empty
+```
+
+Then run:
 
 ```
-/security-review
+/security-review staged
+```
+
+Then unstage:
+
+```bash
+git restore --staged .
 ```
 
 If the skill is not available in this session (not bootstrapped, non-dotclaude environment):
@@ -107,12 +120,12 @@ Classify findings:
 
 Detect runner from the project:
 
-| Signal | Command |
-| ------ | ------- |
-| `Makefile` with `test` target | `make test` |
-| `package.json` | `npm test` (or `pnpm test` / `yarn test` per lockfile) |
-| `go.mod` | `go test ./...` |
-| `pyproject.toml` | `pytest` or `uv run pytest` |
+| Signal                        | Command                                                |
+| ----------------------------- | ------------------------------------------------------ |
+| `Makefile` with `test` target | `make test`                                            |
+| `package.json`                | `npm test` (or `pnpm test` / `yarn test` per lockfile) |
+| `go.mod`                      | `go test ./...`                                        |
+| `pyproject.toml`              | `pytest` or `uv run pytest`                            |
 
 Run and paste the **last 40 lines** of output regardless of pass/fail.
 
@@ -151,7 +164,7 @@ Pre-PR gate: branch → $BRANCH (base: $BASE)
   Step 1 — Scope:     N files changed
   Step 2 — Simplify:  N files, M changes committed as style: pre-pr simplification pass
                    |  simplify: clean (no changes)
-  Step 3 — Security:  clean
+  Step 3 — Security:  clean (diff vs $MERGE_BASE)
                    |  N warnings (see above)
                    |  ⚠ skill unavailable — skipped
   Step 4 — Tests:     ✓ pass

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-18T17:33:21.471Z",
+  "generatedAt": "2026-04-18T17:43:29.585Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -89,7 +89,7 @@
     {
       "name": "review-pr",
       "path": ".claude/commands/review-pr.md",
-      "checksum": "sha256:8472f04eafafe81915e4e1dd8756a115747381464cf1c0bb8c5dd00a95dd4ecc",
+      "checksum": "sha256:d0bc84f956c0ee8c176cf76a79374e8defb0bd2487c8340a2e2a1d9e04d8a1cc",
       "dependencies": [],
       "lastValidated": "2026-04-18"
     },
@@ -194,14 +194,14 @@
     {
       "name": "review-prs",
       "path": ".claude/commands/review-prs.md",
-      "checksum": "sha256:b806d547ecd0d2d6034ea4abf9358b11ffcd6f88d2570d15eca46f794decb2ea",
+      "checksum": "sha256:c8290649f21daabab1e07cc64262106e3d0504948913a75b26ea88fb04a44aeb",
       "dependencies": [],
       "lastValidated": "2026-04-18"
     },
     {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
-      "checksum": "sha256:19e9e2c58ad7c04f5f4e1a71e17e3efb561b12de07a20ecb25df232e5bdbc38c",
+      "checksum": "sha256:d818d5fa44cd84112e6a87b6c5d9b2173a65c9298c2a0ea9064107e25a747348",
       "dependencies": [],
       "lastValidated": "2026-04-18"
     }

@@ -43,19 +43,19 @@ Run all three checks **before creating any worktree**.
 gh pr view "$N" --json number,title,headRefName,baseRefName,mergeable,mergeStateStatus,state
 ```
 
-- Non-zero exit (PR not found, no access) → mark `preflight-failed: not-found`; remove from list.
-- `state != "OPEN"` → mark `preflight-failed: not-open`; remove from list.
+- Non-zero exit (PR not found, no access) → mark `preflight-failed: not-found`; add a synthetic result row for that PR and exclude it from worktree/sub-agent execution.
+- `state != "OPEN"` → mark `preflight-failed: not-open`; add a synthetic result row for that PR and exclude it from worktree/sub-agent execution.
 
-Report any removals. If zero PRs survive, stop.
+Report any exclusions. Never silently skip a PR: every requested PR must appear in the final aggregate table, including `preflight-failed` rows created here. If zero PRs survive for execution, stop after emitting the aggregate table.
 
 **2b — Merge state classification** (advisory; from the same JSON above):
 
-| `mergeable`   | `mergeStateStatus` | Tag                              |
-| ------------- | ------------------ | -------------------------------- |
-| `CONFLICTING` | `DIRTY`            | `preflight-warn: conflicts`      |
-| `MERGEABLE`   | `BEHIND`           | `preflight-warn: behind`         |
-| `UNKNOWN`     | any                | `preflight-warn: unknown-state`  |
-| `MERGEABLE`   | `CLEAN/UNSTABLE`   | (no tag — proceed normally)      |
+| `mergeable`   | `mergeStateStatus`      | Tag                             |
+| ------------- | ----------------------- | ------------------------------- |
+| `CONFLICTING` | `DIRTY`                 | `preflight-warn: conflicts`     |
+| `MERGEABLE`   | `BEHIND`                | `preflight-warn: behind`        |
+| `UNKNOWN`     | any                     | `preflight-warn: unknown-state` |
+| `MERGEABLE`   | `CLEAN` or `UNSTABLE`   | (no tag — proceed normally)     |
 
 Record the tag and pass `mergeStateStatus` into the sub-agent brief; the sub-agent handles rebase (step 9 of review-pr) and CI (step 10) autonomously.
 
@@ -69,9 +69,9 @@ For each PR N, check if `.claude/worktrees/pr-N` appears. If yes: `preflight-war
 
 **Print the pre-flight summary table before dispatch:**
 
-| PR  | Title | Merge State | Worktree | Pre-flight |
-| --- | ----- | ----------- | -------- | ---------- |
-| #42 | ...   | CLEAN       | new      | ok         |
+| PR  | Title | Merge State | Worktree | Pre-flight                       |
+| --- | ----- | ----------- | -------- | -------------------------------- |
+| #42 | ...   | CLEAN       | new      | ok                               |
 | #43 | ...   | DIRTY       | exists   | warn: conflicts, worktree-exists |
 
 Only surviving (non-`preflight-failed`) PRs proceed.
@@ -129,13 +129,20 @@ After completing step 14, emit exactly ONE JSON object to stdout (no other text 
   "ci": "green|fixed|blocked|flaky|skipped",
   "test_plan": "verified|missing|partial|skipped",
   "conflicts": "none|resolved|unresolved",
-  "status": "reviewed|blocked|push-failed|test-plan-missing|conflicts-unresolved",
+  "status": "reviewed|blocked|push-failed|test-plan-missing|conflicts-unresolved|sub-agent-failed|preflight-failed",
   "evidence_url": "<CI run URL or test output reference>",
   "blocker": null
 }
 
 FAILURE MODES
 - Push failure (step 7): set status "push-failed", stop — do not post replies or resolve threads.
+- Test plan missing: set status "test-plan-missing"; include evidence_url if available.
+- Merge conflicts left unresolved: set status "conflicts-unresolved"; set blocker to a one-line explanation.
+- Preflight/setup failure before the review can run: set status "preflight-failed", set blocker to a
+  one-line explanation, still emit the JSON. Use zero counts for fields that were never collected.
+- Sub-agent execution failure after start but before a normal result is produced: set status
+  "sub-agent-failed", set blocker to a one-line explanation, still emit the JSON. Populate
+  completed counts best-effort from work finished before the failure.
 - Sandbox blocks file writes: emit JSON to stdout regardless.
 - Any other unrecoverable error: set status "blocked", set blocker to a one-line explanation,
   still emit the JSON.
@@ -147,11 +154,11 @@ FAILURE MODES
 
 After each round, parse each sub-agent's stdout for the result JSON.
 
-| Outcome | Action |
-| ------- | ------ |
-| Valid JSON | Store for aggregate table |
-| No output / crash | `status: sub-agent-failed`, `blocker: "no output from sub-agent"` |
-| Malformed JSON | `status: sub-agent-failed`, `blocker: "parse error: <first 100 chars of output>"` |
+| Outcome               | Action                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------- |
+| Valid JSON            | Store for aggregate table                                                           |
+| No output / crash     | `status: sub-agent-failed`, `blocker: "no output from sub-agent"`                   |
+| Malformed JSON        | `status: sub-agent-failed`, `blocker: "parse error: <first 100 chars of output>"`   |
 | `status: push-failed` | Record as-is; add note: "commits staged locally — run `/review-pr N` to retry push" |
 
 Never silently skip a PR. Every PR gets a row in the aggregate table.
