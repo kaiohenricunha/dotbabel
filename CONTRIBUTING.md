@@ -42,11 +42,36 @@ npx dotclaude-doctor         # self-diagnostic
      plugins/dotclaude/templates/githooks/pre-commit
    node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src
    npm run dogfood
+   npm run docs:stamp-check   # verify docs/*.md version stamps match package.json
    ```
 4. **Follow spec discipline.** Every PR touching a protected path (see
    `docs/repo-facts.json`) needs `Spec ID: dotclaude-core` or a
    `## No-spec rationale` section in its body. If you're adding a new
    subsystem, run `/spec` first to produce the design doc in `docs/specs/`.
+
+## Releasing a new version
+
+1. Bump `version` in `package.json` (semver — patch/minor/major as appropriate).
+2. Run `npm run docs:stamp` to rewrite `_Last updated: vX.Y.Z_` stamps across all
+   `docs/*.md` files to the new version. Never edit stamps by hand.
+3. Add a `## [X.Y.Z] — YYYY-MM-DD` block to `CHANGELOG.md`.
+4. Run the full local gate above to confirm everything is green.
+5. Open a PR with title `chore(release): vX.Y.Z` and body:
+
+   ```
+   ## Summary
+   - Bumps package version to X.Y.Z
+   - Updates doc version stamps via `npm run docs:stamp`
+   - Updates CHANGELOG.md
+
+   ## Test plan
+   - [ ] Full test suite green (`npm test`)
+   - [ ] `npm run docs:stamp-check` exits 0
+   - [ ] `npm run dogfood` exits 0
+
+   ## No-spec rationale
+   Release mechanics — no new protected paths or subsystem changes.
+   ```
 
 ## Commit + PR conventions
 

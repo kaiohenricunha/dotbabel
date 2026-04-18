@@ -34,7 +34,9 @@
     "lint": "prettier --check \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown && markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.claude/worktrees\" && node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src",
     "format": "prettier --write \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown",
     "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/dotclaude/scripts/*.sh plugins/dotclaude/hooks/*.sh plugins/dotclaude/tests/*.sh plugins/dotclaude/templates/claude/hooks/*.sh plugins/dotclaude/templates/githooks/pre-commit",
-    "dogfood": "npx dotclaude-validate-skills && npx dotclaude-validate-specs && npx dotclaude-check-instruction-drift && npx dotclaude-check-spec-coverage"
+    "dogfood": "npx dotclaude-validate-skills && npx dotclaude-validate-specs && npx dotclaude-check-instruction-drift && npx dotclaude-check-spec-coverage",
+    "docs:stamp": "node scripts/stamp-doc-versions.mjs",
+    "docs:stamp-check": "node scripts/stamp-doc-versions.mjs --check"
   },
   "files": [
     "commands/",

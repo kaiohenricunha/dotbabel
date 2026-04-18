@@ -32,6 +32,8 @@ jobs:
       - run: node plugins/dotclaude/bin/dotclaude-doctor.mjs
       - run: node plugins/dotclaude/bin/dotclaude-index.mjs --check
       - run: node scripts/build-plugin.mjs --check
+      - name: docs version stamps match package.json
+        run: node scripts/stamp-doc-versions.mjs --check
 
   example:
     name: example (examples/minimal-consumer)

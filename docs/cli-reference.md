@@ -1,6 +1,8 @@
 # CLI reference
 
-Every bin honors the **harness-wide flag set** in addition to its own:
+_Last updated: v0.5.0_
+
+Every bin honors the **dotclaude-wide flag set** in addition to its own:
 
 | Flag                    | Shape | Behavior                                                                           |
 | ----------------------- | ----- | ---------------------------------------------------------------------------------- |
@@ -24,6 +26,7 @@ Every bin honors the **harness-wide flag set** in addition to its own:
 **The umbrella `dotclaude`** forwards to each `dotclaude-<sub>` bin:
 
 ```
+# Governance validators
 dotclaude validate-specs [OPTIONS]
 dotclaude validate-skills [OPTIONS]
 dotclaude check-spec-coverage [OPTIONS]
@@ -31,6 +34,16 @@ dotclaude check-instruction-drift [OPTIONS]
 dotclaude detect-drift [OPTIONS]
 dotclaude doctor [OPTIONS]
 dotclaude init [OPTIONS]
+
+# Installation lifecycle (added v0.4.0)
+dotclaude bootstrap [OPTIONS]
+dotclaude sync <pull|push|status> [OPTIONS]
+
+# Taxonomy discovery (added v0.4.0)
+dotclaude index [OPTIONS]
+dotclaude search <query> [OPTIONS]
+dotclaude list [OPTIONS]
+dotclaude show <id> [OPTIONS]
 ```
 
 Each subcommand also exists standalone — `npx dotclaude-doctor` and
@@ -180,3 +193,157 @@ bash plugins/dotclaude/scripts/validate-settings.sh --json <path>
 ```
 
 `--json` emits `{events:[{check,category,status,message}], counts:{fail,warn}}`.
+
+---
+
+## `dotclaude-bootstrap` _(added v0.4.0)_
+
+Set up or refresh `~/.claude/` by symlinking `commands/`, `skills/`, and
+`CLAUDE.md` from the dotclaude source, and copying agent templates into
+`~/.claude/agents/`. Idempotent — safe to re-run after pulling new commits.
+Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`.
+
+> **Platform note:** Windows is not supported (symlinks require elevated
+> permissions). Use WSL or run `bootstrap.sh` from Git Bash instead.
+
+| Flag              | Default     |                                                  |
+| ----------------- | ----------- | ------------------------------------------------ |
+| `--source <path>` | npm install | Path to a local dotclaude git clone (clone mode) |
+| `--target <dir>`  | `~/.claude` | Override destination directory                   |
+| `--quiet`         | false       | Suppress per-file progress; print summary only   |
+
+**Typical invocations:**
+
+```bash
+dotclaude bootstrap
+dotclaude bootstrap --source ~/projects/dotclaude   # clone mode
+dotclaude bootstrap --quiet
+```
+
+**Returns** a summary with counts: `{linked, skipped, backed_up}`.
+
+---
+
+## `dotclaude-sync` _(added v0.4.0)_
+
+Pull, push, or check status for a dotclaude installation. Works in two modes:
+**npm mode** (default — installed globally via npm) or **clone mode** (local
+git checkout, activated with `--source`).
+
+| Flag              | Default     |                                     |
+| ----------------- | ----------- | ----------------------------------- |
+| `--source <path>` | npm install | Path to a local dotclaude git clone |
+| `--quiet`         | false       | Suppress per-file progress          |
+
+**Subcommands:**
+
+| Subcommand | Description                                                                                                                      |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `pull`     | npm mode: fetch latest from registry and re-bootstrap. Clone mode: `git fetch` + `git rebase origin/main` + re-bootstrap.        |
+| `push`     | Clone mode only: secret-scan staged files, commit, and push to origin. Set `HARNESS_SYNC_SKIP_SECRET_SCAN=1` to bypass the scan. |
+| `status`   | npm mode: print current version. Clone mode: `git status --short`.                                                               |
+
+**Typical invocations:**
+
+```bash
+dotclaude sync pull            # update to latest
+dotclaude sync status          # check installed version
+dotclaude sync push            # commit + push local changes (clone mode)
+```
+
+---
+
+## `dotclaude-index` _(added v0.4.0)_
+
+Rebuild the taxonomy index (`index/artifacts.json`, `index/by-type.json`,
+`index/by-facet.json`) from authored artifacts in `agents/`, `skills/`,
+`commands/`, `hooks/`, and `templates/`. Required before `search`, `list`,
+and `show` can operate.
+
+| Flag                 | Default          |                                            |
+| -------------------- | ---------------- | ------------------------------------------ |
+| `--repo-root <path>` | resolved via git | Override repo root                         |
+| `--check`            | false            | Verify index is fresh without writing (CI) |
+| `--strict`           | false            | Fail on schema validation warnings         |
+
+**Typical invocations:**
+
+```bash
+dotclaude index                    # rebuild
+dotclaude index --check            # CI freshness gate — exit 1 if stale
+dotclaude index --strict           # fail on any warning
+```
+
+**Emitted codes** (when `--check` fails): `INDEX_STALE`.
+
+---
+
+## `dotclaude-search` _(added v0.4.0)_
+
+Full-text search over the taxonomy index by name, id, and description.
+Requires `dotclaude index` to have been run at least once.
+
+| Flag                 | Default          |                                                        |
+| -------------------- | ---------------- | ------------------------------------------------------ |
+| `--repo-root <path>` | resolved via git | Override repo root                                     |
+| `--type <type>`      | —                | Filter to one artifact type (agent, skill, command, …) |
+
+**Typical invocations:**
+
+```bash
+dotclaude search kubernetes
+dotclaude search "IaC module" --type skill
+dotclaude search aws --json | jq -r '.[] | .id'
+```
+
+Searches are case-insensitive. Exit 2 if the index is missing.
+
+---
+
+## `dotclaude-list` _(added v0.4.0)_
+
+List all artifacts from the taxonomy index with optional facet filters.
+Requires `dotclaude index` to have been run at least once.
+
+| Flag                    | Default          |                          |
+| ----------------------- | ---------------- | ------------------------ |
+| `--repo-root <path>`    | resolved via git | Override repo root       |
+| `--type <type>`         | —                | Filter by artifact type  |
+| `--domain <domain>`     | —                | Filter by domain facet   |
+| `--platform <platform>` | —                | Filter by platform facet |
+| `--task <task>`         | —                | Filter by task facet     |
+| `--maturity <maturity>` | —                | Filter by maturity level |
+
+All filters are optional; omitting them lists everything. Multiple filters
+combine with AND logic.
+
+**Typical invocations:**
+
+```bash
+dotclaude list
+dotclaude list --type command
+dotclaude list --domain devex --maturity validated
+dotclaude list --json | jq -r '.[].id'
+```
+
+---
+
+## `dotclaude-show` _(added v0.4.0)_
+
+Display detailed metadata for a single artifact by its id. When a skill and
+agent share an id, use `--type` to disambiguate.
+
+| Flag                 | Default          |                                                |
+| -------------------- | ---------------- | ---------------------------------------------- |
+| `--repo-root <path>` | resolved via git | Override repo root                             |
+| `--type <type>`      | —                | Force type when multiple artifacts share an id |
+
+**Typical invocations:**
+
+```bash
+dotclaude show aws-specialist
+dotclaude show review-pr --type command
+dotclaude show pre-pr --json
+```
+
+Exit 1 if the artifact is not found. Exit 2 if the index is missing.

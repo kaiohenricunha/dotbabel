@@ -10,6 +10,12 @@ settings.local.json
 # Local working plans — transient, not for distribution.
 docs/plans/
 
+# Articles — written locally, published elsewhere, not versioned here.
+docs/articles/
+
+# Assessment docs — graded locally, not for distribution.
+docs/assessments/
+
 # Node (for the plugin workspace)
 node_modules/
 *.log

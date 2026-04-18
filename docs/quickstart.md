@@ -1,6 +1,19 @@
-# Quickstart — install to first green validator in under 10 minutes
+# Quickstart
 
-## 1. Install
+_Last updated: v0.5.0_
+
+**Two paths — pick yours:**
+
+| I want…                                          | Path                                                                           |
+| ------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Skills & commands in every Claude Code session   | **[Dotfile bootstrap](./dotfile-quickstart.md)** — 30 seconds, no npm required |
+| Spec-governance CLI and CI gates for my own repo | **This page** — 10 minutes, Node ≥ 20 required                                 |
+
+---
+
+## CLI consumer — install to first green validator in under 10 minutes
+
+### 1. Install
 
 ```bash
 cd your-project
@@ -21,7 +34,7 @@ dotclaude-check-spec-coverage
 dotclaude-check-instruction-drift
 ```
 
-## 2. Scaffold the governance tree
+### 2. Scaffold the governance tree
 
 ```bash
 npx dotclaude-init --project-name your-project --project-type node
@@ -38,7 +51,7 @@ This writes:
 Every placeholder (`{{project_name}}`, `{{project_type}}`, `{{today}}`) is
 substituted at scaffold time.
 
-## 3. Run the self-diagnostic
+### 3. Run the self-diagnostic
 
 ```bash
 npx dotclaude-doctor
@@ -48,7 +61,7 @@ You should see `✓` rows for env, repo, facts, manifest, specs, drift, hook.
 The first run may warn about missing artifacts (e.g. `docs/specs/` empty) —
 that's expected until you draft your first spec.
 
-## 4. Your first spec
+### 4. Your first spec
 
 Use the `/spec` skill (if you're in a Claude Code session) or scaffold
 manually:
@@ -82,7 +95,7 @@ npx dotclaude-validate-specs
 
 Green. You're done.
 
-## 5. Wire the PR gate
+### 5. Wire the PR gate
 
 In GitHub branch protection, require the three shipped workflows:
 
@@ -94,7 +107,7 @@ Any PR touching a protected path (see `docs/repo-facts.json`) must now carry
 a `Spec ID:` or `## No-spec rationale` section. `dotclaude-check-spec-coverage`
 enforces it.
 
-## Next
+### Next
 
 - [cli-reference.md](./cli-reference.md) — every flag, exit code, `--json` schema.
 - [troubleshooting.md](./troubleshooting.md) — look up any failing `ERROR_CODE`.

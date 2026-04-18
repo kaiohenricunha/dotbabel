@@ -1,25 +1,29 @@
 # `@dotclaude/dotclaude` — docs
 
-The harness is a portable npm package + Claude Code plugin that bootstraps
+_Last updated: v0.5.0_
+
+dotclaude is a portable npm package + Claude Code plugin that bootstraps
 spec-driven-development governance into consumer repos. It ships a
 zero-dependency Node API, an umbrella CLI, a gold-standard shell settings
 validator, and a destructive-git PreToolUse hook.
 
 ## Start here
 
-| If you are…                      | Read                                                                               |
-| -------------------------------- | ---------------------------------------------------------------------------------- |
-| A consumer evaluating the plugin | [quickstart.md](./quickstart.md) — 5 minutes from install to first green validator |
-| Integrating the library in CI    | [cli-reference.md](./cli-reference.md) and the `--json` payload examples           |
-| Importing the Node API           | [api-reference.md](./api-reference.md)                                             |
-| Debugging a validator failure    | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
-| Upgrading or forking             | [upgrade-guide.md](./upgrade-guide.md)                                             |
-| Contributing                     | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
+| If you are…                                  | Read                                                                               |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Setting up skills & commands in `~/.claude/` | [dotfile-quickstart.md](./dotfile-quickstart.md) — 30 seconds, no npm required     |
+| A consumer evaluating the plugin             | [quickstart.md](./quickstart.md) — 5 minutes from install to first green validator |
+| Integrating the library in CI                | [cli-reference.md](./cli-reference.md) and the `--json` payload examples           |
+| Importing the Node API                       | [api-reference.md](./api-reference.md)                                             |
+| Debugging a validator failure                | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
+| Upgrading or forking                         | [upgrade-guide.md](./upgrade-guide.md)                                             |
+| Contributing                                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
 
 ## Deeper references
 
 - [architecture.md](./architecture.md) — layer diagram + PR-time coverage check sequence
 - [personas.md](./personas.md) — consumer vs dotfile user vs contributor entry-point matrix
+- [handoff-guide.md](./handoff-guide.md) — cross-CLI, cross-machine session transfer (v0.5.0+)
 - [adr/](./adr/) — architectural decision records (one per load-bearing decision)
 - [specs/dotclaude-core/](./specs/dotclaude-core/) — the canonical spec this repo governs itself with
 
@@ -27,7 +31,7 @@ validator, and a destructive-git PreToolUse hook.
 
 - **Structured-error contract.** Every validator emits `ValidationError`
   instances with stable `.code` values (see [troubleshooting.md](./troubleshooting.md)).
-- **Umbrella CLI + standalone bins.** `harness validate-specs` or
+- **Umbrella CLI + standalone bins.** `dotclaude validate-specs` or
   `dotclaude-validate-specs` — both exist, same behavior.
 - **Universal flags.** `--help`, `--version`, `--json`, `--verbose`,
   `--no-color` on every bin.

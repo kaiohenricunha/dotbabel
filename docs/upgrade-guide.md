@@ -1,5 +1,7 @@
 # Upgrade guide
 
+_Last updated: v0.5.0_
+
 ## 0.1.x → 0.2.0
 
 `0.1.x` was never published to npm — it was the local development skeleton.

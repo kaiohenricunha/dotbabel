@@ -1,5 +1,7 @@
 # Troubleshooting
 
+_Last updated: v0.5.0_
+
 Indexed by `ERROR_CODES`. When a validator fails, look up the `.code` value
 from its `ValidationError` here.
 
@@ -179,3 +181,64 @@ An unknown flag was passed. Exit 64. **Fix**: see `--help`.
 ### `USAGE_MISSING_POSITIONAL`
 
 A required positional argument is missing. Exit 64. **Fix**: see `--help`.
+
+---
+
+## Skills & commands (dotfile users)
+
+These issues apply when using the bootstrap path (`./bootstrap.sh`) rather than
+the npm CLI. They are not `ERROR_CODES` — they are runtime observations.
+
+### A skill or command isn't available in Claude Code
+
+**Check the symlink exists:**
+
+```bash
+ls -la ~/.claude/commands/pre-pr.md
+ls -la ~/.claude/skills/aws-specialist/SKILL.md
+```
+
+If missing: re-run `./bootstrap.sh`. If present: restart the Claude Code session
+(`/clear` or quit and reopen) — the session may have cached the pre-bootstrap state.
+
+### A skill runs but uses outdated behavior
+
+The session cached an older version. Run `./sync.sh pull` (or `dotclaude sync pull`)
+to fetch the latest, then restart the session.
+
+### A specialist skill doesn't auto-activate
+
+Specialist skills (e.g. `aws-specialist`) activate when their trigger phrases appear
+in your message. Ensure the phrase matches — e.g. write "AWS Lambda" not just
+"lambda". If still not triggering, check that the skill's `SKILL.md` is present:
+
+```bash
+ls ~/.claude/skills/aws-specialist/SKILL.md
+```
+
+### `bootstrap.sh` backed up files I didn't expect
+
+Bootstrap backs up any real file (not a symlink) at a target path before replacing
+it. Backups are named `<name>.bak-<timestamp>`. Review them before deleting. This
+is intentional — bootstrap never silently overwrites your existing work.
+
+### `sync push` refuses with "secret scan failed"
+
+The push-side scan detected a likely secret (`*_KEY`/`*_TOKEN`/`*_SECRET` pattern
+or AWS key format). Review the flagged file and remove the secret. To bypass for
+a known-safe file (e.g. a test fixture with a fake key):
+
+```bash
+HARNESS_SYNC_SKIP_SECRET_SCAN=1 ./sync.sh push
+```
+
+### Taxonomy commands (`search`, `list`, `show`) return "index missing"
+
+Run `dotclaude index` first to build the artifact index. The index is generated
+from `agents/`, `skills/`, `commands/`, etc. and must be rebuilt after adding or
+renaming artifacts.
+
+```bash
+dotclaude index
+dotclaude search kubernetes
+```

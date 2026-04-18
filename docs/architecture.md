@@ -1,5 +1,7 @@
 # Architecture
 
+_Last updated: v0.5.0_
+
 ## Layers
 
 ```

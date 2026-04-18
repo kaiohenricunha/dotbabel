@@ -1,5 +1,7 @@
 # dotclaude Taxonomy Governance
 
+_Last updated: v0.5.0_
+
 ## Ownership
 
 `schemas/`, `docs/taxonomy.md`, `docs/facet-definitions.md`, and `docs/governance.md` are owned by the core maintainer group (see `.github/CODEOWNERS`). All other artifacts are community-editable.
