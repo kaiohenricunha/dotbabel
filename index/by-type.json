@@ -6,6 +6,7 @@
     "azure-specialist",
     "crossplane-specialist",
     "gcp-specialist",
+    "handoff",
     "kubernetes-specialist",
     "pulumi-specialist",
     "spec",

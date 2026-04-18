@@ -6,7 +6,7 @@ version: 1.0.0
 domain: [devex]
 platform: [none]
 task: [documentation, debugging]
-maturity: experimental
+maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-04-17
 updated: 2026-04-17
