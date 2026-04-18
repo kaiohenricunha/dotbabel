@@ -16,7 +16,8 @@ of patterns. The reusable implementation lives at
 
 ## Patterns (v1)
 
-Each row: the regex (ERE — POSIX extended, `-E` flag to `grep`/`sed`),
+Each row: the regex (Perl-compatible, PCRE — the implementation uses
+`perl -e` to support inline flags like `(?i)` and `\S+`),
 the pattern name used in the replacement marker, and a one-line
 rationale.
 
@@ -53,10 +54,11 @@ rationale.
 
 ## Extending
 
-Add a new row to the table AND to `handoff-scrub.sh`'s sed cascade in
-the same commit. Update `redact.bats` with one positive case and one
-false-friend case. The reference doc and the script must agree — the
-unit test cross-checks by parsing this table and grepping the script.
+Add a new row to the table AND to `handoff-scrub.sh`'s Perl `s///g`
+substitutions in the same commit. Update `handoff-scrub.bats` with one
+positive case and one false-friend case. The reference doc and the script
+must agree — the unit test cross-checks by parsing this table and
+grepping the script.
 
 ## User responsibility
 

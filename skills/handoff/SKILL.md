@@ -89,7 +89,7 @@ the session files on disk.
   with `gist` scope.
 - `push` / `pull` / `remote-list` with `--via git-fallback` → `git`
   on PATH, a pre-existing user-owned private repo whose URL lives in
-  `DOTCLAUDE_HANDOFF_REPO` (default
+  `DOTCLAUDE_HANDOFF_REPO` (no default — must be set; example:
   `git@github.com:<user>/handoff-store.git`), and working SSH or
   credential-helper auth to that repo.
 

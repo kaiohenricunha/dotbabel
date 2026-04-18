@@ -24,7 +24,7 @@ die() { printf 'handoff-description: %s\n' "$1" >&2; exit 2; }
 # Lower-cases input and replaces non-[a-z0-9-] with '-', trims to 40 chars.
 slugify() {
   local raw="$1"
-  raw="${raw,,}"
+  raw="$(printf '%s' "$raw" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
   raw="$(printf '%s' "$raw" | LC_ALL=C tr -c 'a-z0-9-' '-')"
   # Trim leading/trailing dashes and collapse runs.
   raw="$(printf '%s' "$raw" | sed -E 's/-+/-/g; s/^-+//; s/-+$//')"

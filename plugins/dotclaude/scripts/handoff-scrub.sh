@@ -5,7 +5,7 @@
 # Exits 0 on success, non-zero only on I/O error.
 #
 # Patterns are authoritatively documented in
-# skills/handoff/references/redaction.md. The unit test redact.bats
+# skills/handoff/references/redaction.md. The unit test handoff-scrub.bats
 # cross-checks the script against that table — if you add a pattern
 # here, update the table and the test in the same commit.
 

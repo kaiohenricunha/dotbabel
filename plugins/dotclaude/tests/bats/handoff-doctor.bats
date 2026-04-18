@@ -98,6 +98,24 @@ exit 0
   [[ "$output" == *"gh auth login -h github.com -s gist"* ]]
 }
 
+@test "doctor github: network-unreachable when gh api / fails" {
+  shim gh '
+case "$1" in
+  auth)
+    [[ "$2" == "status" ]] && exit 0
+    ;;
+  api)
+    [[ "$2" == "/" ]] && exit 1
+    ;;
+esac
+exit 0
+'
+  hermetic_path
+  run "$DOCTOR" github
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Preflight failed: network-unreachable"* ]]
+}
+
 @test "doctor github: gist-scope-missing when token lacks gist scope" {
   shim gh '
 case "$1" in
@@ -162,6 +180,24 @@ exit 0
   [ "$status" -eq 1 ]
   [[ "$output" == *"Preflight failed: token-missing"* ]]
   [[ "$output" == *"DOTCLAUDE_GH_TOKEN"* ]]
+}
+
+@test "doctor gist-token: network-unreachable when curl returns HTTP 000" {
+  shim curl '
+for arg in "$@"; do
+  if [[ "$arg" == "%{http_code}" ]]; then
+    printf "000"
+    exit 0
+  fi
+done
+exit 0
+'
+  hermetic_path
+  DOTCLAUDE_GH_TOKEN=faketoken
+  export DOTCLAUDE_GH_TOKEN
+  run "$DOCTOR" gist-token
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Preflight failed: network-unreachable"* ]]
 }
 
 @test "doctor gist-token: token-invalid when /user returns 401" {

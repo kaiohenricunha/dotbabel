@@ -85,6 +85,14 @@ doctor_github() {
       "--via gist-token with DOTCLAUDE_GH_TOKEN=<PAT>"
   fi
 
+  if ! gh api / >/dev/null 2>&1; then
+    fail "network-unreachable" \
+      "gh api / failed — no connectivity to api.github.com" \
+      "check: curl -sS https://api.github.com/ -o /dev/null -w '%{http_code}\\n'" \
+      "if corporate proxy: export HTTPS_PROXY and retry" \
+      "/handoff file <cli> <uuid> writes a local markdown; pull with /handoff pull --from-file <path>"
+  fi
+
   # The gist scope is required; without it, push/remote-list fail with a misleading 404.
   # Parse X-Oauth-Scopes header value (the value itself contains colons like "admin:public_key",
   # so we strip the header name prefix rather than splitting on ": ").
@@ -99,14 +107,6 @@ doctor_github() {
       "gh auth refresh -h github.com -s gist" \
       "" \
       "--via gist-token with a PAT that has the gist scope"
-  fi
-
-  if ! gh api / >/dev/null 2>&1; then
-    fail "network-unreachable" \
-      "gh api / failed — no connectivity to api.github.com" \
-      "check: curl -sS https://api.github.com/ -o /dev/null -w '%{http_code}\\n'" \
-      "if corporate proxy: export HTTPS_PROXY and retry" \
-      "/handoff file <cli> <uuid> writes a local markdown; pull with /handoff pull --from-file <path>"
   fi
 
   check_clock
@@ -135,6 +135,13 @@ doctor_gist_token() {
   code="$(curl -sS -o /dev/null -w '%{http_code}' \
     -H "Authorization: token $DOTCLAUDE_GH_TOKEN" \
     https://api.github.com/user 2>/dev/null || printf '000')"
+  if [[ "$code" == "000" ]]; then
+    fail "network-unreachable" \
+      "curl could not connect to api.github.com (HTTP 000)" \
+      "check: curl -sS https://api.github.com/ -o /dev/null -w '%{http_code}\\n'" \
+      "if corporate proxy: export HTTPS_PROXY and retry" \
+      "--via git-fallback if the API is temporarily unreachable"
+  fi
   if [[ "$code" != "200" ]]; then
     fail "token-invalid" \
       "GET /user returned HTTP $code — token is invalid or revoked" \

@@ -2,7 +2,7 @@
 # Behavior tests for plugins/dotclaude/scripts/handoff-scrub.sh.
 # The script's pattern table is authoritatively documented in
 # skills/handoff/references/redaction.md — this suite cross-checks
-# that each documented pattern has a positive test AND a false-friend.
+# each documented pattern with at least one positive test case.
 
 load helpers
 

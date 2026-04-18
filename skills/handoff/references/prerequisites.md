@@ -39,8 +39,8 @@ the workaround come from the tables below.
 | --- | ------------------- | ---------------------------------------------------------- | ------------------------ |
 | 1   | `gh` on PATH        | `command -v gh`                                            | `gh-missing`             |
 | 2   | `gh` authenticated  | `gh auth status -h github.com`                             | `gh-unauthenticated`     |
-| 3   | `gist` OAuth scope  | `gh api user -i` and grep `X-Oauth-Scopes:` for `gist`     | `gist-scope-missing`     |
-| 4   | Network reach       | `gh api /` (expect HTTP 200)                               | `network-unreachable`    |
+| 3   | Network reach       | `gh api /` (expect HTTP 200)                               | `network-unreachable`    |
+| 4   | `gist` OAuth scope  | `gh api user -i` and grep `X-Oauth-Scopes:` for `gist`     | `gist-scope-missing`     |
 | 5   | Clock sanity (soft) | `[[ $(date -u +%Y) -ge 2024 && $(date -u +%Y) -le 2100 ]]` | `clock-skew` (warn only) |
 
 ### Remediation
@@ -96,21 +96,20 @@ artifact; transport it by any out-of-band means and pull with
 **`clock-skew`** — warn only, never blocks. Message:
 
 ```text
-Warning: system clock reports year <YYYY>; gist auth may fail with
-signature errors. Fix with your OS's time sync (e.g. timedatectl
-set-ntp true on Linux).
+warn: system clock reports year <YYYY>; gist auth may fail with signature errors (timedatectl set-ntp true)
 ```
 
 ## Transport: `gist-token`
 
 ### Checks
 
-| #   | Check                            | Command                                          | Failure reason        |
-| --- | -------------------------------- | ------------------------------------------------ | --------------------- |
-| 1   | `curl` on PATH                   | `command -v curl`                                | `curl-missing`        |
-| 2   | `DOTCLAUDE_GH_TOKEN` env var set | `[[ -n "$DOTCLAUDE_GH_TOKEN" ]]`                 | `token-missing`       |
-| 3   | Token valid + `gist` scope       | `GET /user` with token; inspect `X-Oauth-Scopes` | `token-invalid`       |
-| 4   | Network reach                    | same `GET /` HTTP 200                            | `network-unreachable` |
+| #   | Check                            | Command                          | Failure reason        |
+| --- | -------------------------------- | -------------------------------- | --------------------- |
+| 1   | `curl` on PATH                   | `command -v curl`                | `curl-missing`        |
+| 2   | `DOTCLAUDE_GH_TOKEN` env var set | `[[ -n "$DOTCLAUDE_GH_TOKEN" ]]` | `token-missing`       |
+| 3   | Network reachable                | `GET /user` HTTP ≠ 000           | `network-unreachable` |
+| 4   | Token valid                      | `GET /user` HTTP 200             | `token-invalid`       |
+| 5   | `gist` scope present             | inspect `X-Oauth-Scopes` header  | `token-scope-missing` |
 
 Remediation follows the same shape. For `token-missing`:
 
@@ -122,11 +121,11 @@ Remediation follows the same shape. For `token-missing`:
 
 ### Checks
 
-| #   | Check                       | Command                                             | Failure reason             |
-| --- | --------------------------- | --------------------------------------------------- | -------------------------- |
-| 1   | `git` on PATH               | `command -v git`                                    | `git-missing`              |
-| 2   | Handoff repo URL configured | `[[ -n "$DOTCLAUDE_HANDOFF_REPO" ]]` (else default) | `handoff-repo-unset`       |
-| 3   | Repo reachable              | `git ls-remote "$DOTCLAUDE_HANDOFF_REPO" HEAD`      | `handoff-repo-unreachable` |
+| #   | Check                       | Command                                        | Failure reason             |
+| --- | --------------------------- | ---------------------------------------------- | -------------------------- |
+| 1   | `git` on PATH               | `command -v git`                               | `git-missing`              |
+| 2   | Handoff repo URL configured | `[[ -n "$DOTCLAUDE_HANDOFF_REPO" ]]`           | `handoff-repo-unset`       |
+| 3   | Repo reachable              | `git ls-remote "$DOTCLAUDE_HANDOFF_REPO" HEAD` | `handoff-repo-unreachable` |
 
 Remediation for `handoff-repo-unset`:
 
