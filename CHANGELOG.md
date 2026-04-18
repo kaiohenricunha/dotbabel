@@ -34,7 +34,7 @@ agent build pipeline.
   multi-service health, volume binding, network bridge configuration, and
   registry operations (#47).
 - **curl-pipe-bash installer** — `curl -sSL .../install.sh | bash` path for
-  users who prefer not to use npm. Idempotent, supports `--quiet` (#44).
+  users who prefer not to use npm. Idempotent; respects `NO_COLOR` (#44).
 
 ### Changed
 
