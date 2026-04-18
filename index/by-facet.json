@@ -31,13 +31,8 @@
       "terraform-specialist",
       "terragrunt-specialist"
     ],
-    "security": [
-      "dependabot-sweep",
-      "security-review"
-    ],
-    "writing": [
-      "markdown"
-    ]
+    "security": ["dependabot-sweep", "security-review"],
+    "writing": ["markdown"]
   },
   "platform": {
     "none": [
@@ -58,37 +53,15 @@
       "validate-spec",
       "veracity-audit"
     ],
-    "aws": [
-      "aws-specialist"
-    ],
-    "azure": [
-      "azure-specialist"
-    ],
-    "crossplane": [
-      "crossplane-specialist"
-    ],
-    "kubernetes": [
-      "crossplane-specialist",
-      "kubernetes-specialist"
-    ],
-    "github-actions": [
-      "dependabot-sweep",
-      "merge-pr",
-      "review-pr"
-    ],
-    "gcp": [
-      "gcp-specialist"
-    ],
-    "pulumi": [
-      "pulumi-specialist"
-    ],
-    "terraform": [
-      "terraform-specialist",
-      "terragrunt-specialist"
-    ],
-    "terragrunt": [
-      "terragrunt-specialist"
-    ]
+    "aws": ["aws-specialist"],
+    "azure": ["azure-specialist"],
+    "crossplane": ["crossplane-specialist"],
+    "kubernetes": ["crossplane-specialist", "kubernetes-specialist"],
+    "github-actions": ["dependabot-sweep", "merge-pr", "review-pr"],
+    "gcp": ["gcp-specialist"],
+    "pulumi": ["pulumi-specialist"],
+    "terraform": ["terraform-specialist", "terragrunt-specialist"],
+    "terragrunt": ["terragrunt-specialist"]
   },
   "task": {
     "debugging": [
@@ -138,13 +111,7 @@
       "markdown",
       "spec"
     ],
-    "testing": [
-      "detect-flaky",
-      "fix-with-evidence",
-      "merge-pr",
-      "validate-spec",
-      "veracity-audit"
-    ]
+    "testing": ["detect-flaky", "fix-with-evidence", "merge-pr", "validate-spec", "veracity-audit"]
   },
   "maturity": {
     "validated": [
@@ -174,9 +141,6 @@
       "terragrunt-specialist",
       "validate-spec"
     ],
-    "draft": [
-      "handoff",
-      "veracity-audit"
-    ]
+    "draft": ["handoff", "veracity-audit"]
   }
 }

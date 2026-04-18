@@ -108,6 +108,13 @@
       "lastValidated": null
     },
     {
+      "name": "handoff",
+      "path": ".claude/skills/handoff/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "kubernetes-specialist",
       "path": ".claude/skills/kubernetes-specialist/SKILL.md",
       "checksum": "",
