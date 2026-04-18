@@ -34,4 +34,5 @@ jobs:
             --max-retries 2 \
             --exclude '^https?://(www\.)?npmjs\.com/' \
             --exclude '^https?://(www\.)?contributor-covenant\.org/' \
+            --exclude '^https?://github\.com/.*/compare/' \
             'docs/**/*.md' '*.md' 'plugins/dotclaude/**/*.md'
