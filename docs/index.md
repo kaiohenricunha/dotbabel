@@ -9,15 +9,15 @@ validator, and a destructive-git PreToolUse hook.
 
 ## Start here
 
-| If you are…                                       | Read                                                                               |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Setting up skills & commands in `~/.claude/`      | [dotfile-quickstart.md](./dotfile-quickstart.md) — 30 seconds, no npm required    |
-| A consumer evaluating the plugin                  | [quickstart.md](./quickstart.md) — 5 minutes from install to first green validator |
-| Integrating the library in CI                     | [cli-reference.md](./cli-reference.md) and the `--json` payload examples           |
-| Importing the Node API                            | [api-reference.md](./api-reference.md)                                             |
-| Debugging a validator failure                     | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
-| Upgrading or forking                              | [upgrade-guide.md](./upgrade-guide.md)                                             |
-| Contributing                                      | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
+| If you are…                                  | Read                                                                               |
+| -------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Setting up skills & commands in `~/.claude/` | [dotfile-quickstart.md](./dotfile-quickstart.md) — 30 seconds, no npm required     |
+| A consumer evaluating the plugin             | [quickstart.md](./quickstart.md) — 5 minutes from install to first green validator |
+| Integrating the library in CI                | [cli-reference.md](./cli-reference.md) and the `--json` payload examples           |
+| Importing the Node API                       | [api-reference.md](./api-reference.md)                                             |
+| Debugging a validator failure                | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
+| Upgrading or forking                         | [upgrade-guide.md](./upgrade-guide.md)                                             |
+| Contributing                                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
 
 ## Deeper references
 

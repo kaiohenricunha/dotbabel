@@ -9,6 +9,7 @@
     "MD031": false,
     "MD033": { "allowed_elements": ["details", "summary", "kbd", "br", "sub", "sup", "previous", "current_status", "value"] },
     "MD036": false,
+    "MD060": false,
     "MD040": false,
     "MD041": false
   },

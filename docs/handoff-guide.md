@@ -12,16 +12,16 @@ machines. Nine sub-commands, three transports, one scrubbed digest.
 
 ## When to use it
 
-| Situation                                                | Sub-command                    |
-| -------------------------------------------------------- | ------------------------------ |
-| Continue a Claude Code session in Codex                  | `digest` → paste-in            |
-| Pick up the same work on a different laptop              | `push` (machine A) → `pull` (machine B) |
-| Persist the handoff to a markdown file for later         | `file`                         |
-| Inspect a session's purpose without loading it           | `describe`                     |
-| Find an old session by topic                             | `search "k8s networking"`      |
-| List recent sessions                                     | `list claude`                  |
-| Check what's waiting for you on the transport            | `remote-list`                  |
-| Diagnose why `push`/`pull` isn't working                 | `doctor`                       |
+| Situation                                        | Sub-command                             |
+| ------------------------------------------------ | --------------------------------------- |
+| Continue a Claude Code session in Codex          | `digest` → paste-in                     |
+| Pick up the same work on a different laptop      | `push` (machine A) → `pull` (machine B) |
+| Persist the handoff to a markdown file for later | `file`                                  |
+| Inspect a session's purpose without loading it   | `describe`                              |
+| Find an old session by topic                     | `search "k8s networking"`               |
+| List recent sessions                             | `list claude`                           |
+| Check what's waiting for you on the transport    | `remote-list`                           |
+| Diagnose why `push`/`pull` isn't working         | `doctor`                                |
 
 ---
 
@@ -34,6 +34,7 @@ machines. Nine sub-commands, three transports, one scrubbed digest.
 ```
 
 This:
+
 1. Loads the most recent Claude Code session transcript.
 2. Runs a secret-scrubbing pass (eight token patterns — bearer, AWS key, etc.).
 3. Voices the digest for the target agent (Codex in this case).
@@ -54,11 +55,11 @@ digest, and lists any follow-up prompts.
 
 Three transports, picked with `--via`:
 
-| Transport       | Flag                   | Requirements                                                      | When to use                         |
-| --------------- | ---------------------- | ----------------------------------------------------------------- | ----------------------------------- |
-| GitHub (default)| `--via github`         | `gh` CLI on PATH, authenticated with `gist` scope                 | Default — works on most hosts       |
-| Token-based     | `--via gist-token`     | `curl` + `DOTCLAUDE_GH_TOKEN` PAT with `gist` scope                | Hosts where `gh` isn't installable  |
-| Raw git         | `--via git-fallback`   | `git` + `DOTCLAUDE_HANDOFF_REPO` pointing at a private repo       | Corporate hosts where GitHub API is blocked |
+| Transport        | Flag                 | Requirements                                                | When to use                                 |
+| ---------------- | -------------------- | ----------------------------------------------------------- | ------------------------------------------- |
+| GitHub (default) | `--via github`       | `gh` CLI on PATH, authenticated with `gist` scope           | Default — works on most hosts               |
+| Token-based      | `--via gist-token`   | `curl` + `DOTCLAUDE_GH_TOKEN` PAT with `gist` scope         | Hosts where `gh` isn't installable          |
+| Raw git          | `--via git-fallback` | `git` + `DOTCLAUDE_HANDOFF_REPO` pointing at a private repo | Corporate hosts where GitHub API is blocked |
 
 Run `/handoff doctor --via <transport>` to verify prerequisites and get a
 platform-specific remediation block.
@@ -67,17 +68,17 @@ platform-specific remediation block.
 
 ## Sub-commands at a glance
 
-| Sub-command       | Positional args         | Flags                                           |
-| ----------------- | ----------------------- | ----------------------------------------------- |
-| `describe`        | `<cli> <uuid\|latest>`  | `--to`                                          |
-| `digest`          | `<cli> <uuid\|latest>`  | `--to`                                          |
-| `file`            | `<cli> <uuid\|latest>`  | `--to`                                          |
-| `list`            | `<cli>`                 | `--limit`, `--since`                            |
-| `search`          | `<query>`               | `--cli`, `--limit`, `--since`                   |
-| `push`            | `<cli> <uuid\|latest>`  | `--to`, `--via`, `--include-transcript`, `--tag`|
-| `pull`            | `<handle\|latest>`      | `--to`, `--via`, `--from-file`                  |
-| `remote-list`     | —                       | `--via`, `--limit`, `--since`                   |
-| `doctor`          | —                       | `--via`                                         |
+| Sub-command   | Positional args        | Flags                                            |
+| ------------- | ---------------------- | ------------------------------------------------ |
+| `describe`    | `<cli> <uuid\|latest>` | `--to`                                           |
+| `digest`      | `<cli> <uuid\|latest>` | `--to`                                           |
+| `file`        | `<cli> <uuid\|latest>` | `--to`                                           |
+| `list`        | `<cli>`                | `--limit`, `--since`                             |
+| `search`      | `<query>`              | `--cli`, `--limit`, `--since`                    |
+| `push`        | `<cli> <uuid\|latest>` | `--to`, `--via`, `--include-transcript`, `--tag` |
+| `pull`        | `<handle\|latest>`     | `--to`, `--via`, `--from-file`                   |
+| `remote-list` | —                      | `--via`, `--limit`, `--since`                    |
+| `doctor`      | —                      | `--via`                                          |
 
 Full argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
 

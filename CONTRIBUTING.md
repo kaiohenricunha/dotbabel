@@ -57,6 +57,7 @@ npx dotclaude-doctor         # self-diagnostic
 3. Add a `## [X.Y.Z] — YYYY-MM-DD` block to `CHANGELOG.md`.
 4. Run the full local gate above to confirm everything is green.
 5. Open a PR with title `chore(release): vX.Y.Z` and body:
+
    ```
    ## Summary
    - Bumps package version to X.Y.Z

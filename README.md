@@ -68,60 +68,60 @@ or `dotclaude sync --help` for full options.
 
 **Cloud, IaC & Container specialists** — activate automatically when you mention the relevant technology:
 
-| Skill / Agent                                                          | Triggers on                                     | What it does                                                           |
-| ---------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
-| [`aws-specialist`](skills/aws-specialist/SKILL.md)                     | "AWS", "IAM role", "Lambda", "ECS", "S3"…       | Deep-dive AWS architecture review, IAM audits, multi-service debugging |
-| [`azure-specialist`](skills/azure-specialist/SKILL.md)                 | "Azure", "AKS", "Managed Identity", "Bicep"…    | Azure workload review, identity audits, ARM/Bicep guidance             |
-| [`gcp-specialist`](skills/gcp-specialist/SKILL.md)                     | "GCP", "GKE", "Cloud Run", "Workload Identity"… | GCP architecture review, IAM hierarchy, serverless guidance            |
-| [`kubernetes-specialist`](skills/kubernetes-specialist/SKILL.md)       | "kubernetes", "k8s", "pod", "helm chart"…       | Cluster troubleshooting, workload design, network policy review        |
-| [`crossplane-specialist`](skills/crossplane-specialist/SKILL.md)       | "Crossplane", "XRD", "Composition", "Claim"…    | XRD design, Composition correctness, provider config audit             |
-| [`terraform-specialist`](skills/terraform-specialist/SKILL.md)         | "Terraform", "state file", "IaC module"…        | Module design, state management, workspace review                      |
-| [`terragrunt-specialist`](skills/terragrunt-specialist/SKILL.md)       | "Terragrunt", "run-all", "DRY Terraform"…       | DRY hierarchy review, dependency graph, env layout                     |
-| [`pulumi-specialist`](skills/pulumi-specialist/SKILL.md)               | "Pulumi", "ComponentResource", "stack"…         | Stack review, Automation API audit, secrets management                 |
-| [`docker-engineer`](agents/docker-engineer.md)                         | "docker compose", "docker exec", "container logs", "docker stats"… | Multi-service Compose orchestration, runtime container ops, supply chain analysis |
+| Skill / Agent                                                    | Triggers on                                                        | What it does                                                                      |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| [`aws-specialist`](skills/aws-specialist/SKILL.md)               | "AWS", "IAM role", "Lambda", "ECS", "S3"…                          | Deep-dive AWS architecture review, IAM audits, multi-service debugging            |
+| [`azure-specialist`](skills/azure-specialist/SKILL.md)           | "Azure", "AKS", "Managed Identity", "Bicep"…                       | Azure workload review, identity audits, ARM/Bicep guidance                        |
+| [`gcp-specialist`](skills/gcp-specialist/SKILL.md)               | "GCP", "GKE", "Cloud Run", "Workload Identity"…                    | GCP architecture review, IAM hierarchy, serverless guidance                       |
+| [`kubernetes-specialist`](skills/kubernetes-specialist/SKILL.md) | "kubernetes", "k8s", "pod", "helm chart"…                          | Cluster troubleshooting, workload design, network policy review                   |
+| [`crossplane-specialist`](skills/crossplane-specialist/SKILL.md) | "Crossplane", "XRD", "Composition", "Claim"…                       | XRD design, Composition correctness, provider config audit                        |
+| [`terraform-specialist`](skills/terraform-specialist/SKILL.md)   | "Terraform", "state file", "IaC module"…                           | Module design, state management, workspace review                                 |
+| [`terragrunt-specialist`](skills/terragrunt-specialist/SKILL.md) | "Terragrunt", "run-all", "DRY Terraform"…                          | DRY hierarchy review, dependency graph, env layout                                |
+| [`pulumi-specialist`](skills/pulumi-specialist/SKILL.md)         | "Pulumi", "ComponentResource", "stack"…                            | Stack review, Automation API audit, secrets management                            |
+| [`docker-engineer`](agents/docker-engineer.md)                   | "docker compose", "docker exec", "container logs", "docker stats"… | Multi-service Compose orchestration, runtime container ops, supply chain analysis |
 
 **Engineering workflow** — slash commands:
 
-| Command                                              | Invoke                         | What it does                                                                                                      |
-| ---------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [`git`](commands/git.md)                             | `/git`                         | Conventional commits, PR creation, branch naming                                                                  |
-| [`changelog`](commands/changelog.md)                 | `/changelog`                   | Generate changelog entry from git history                                                                         |
-| [`merge-pr`](commands/merge-pr.md)                   | `/merge-pr <N>`                | Full local verification gate before merge                                                                         |
-| [`pre-pr`](commands/pre-pr.md) ¹                     | `/pre-pr [base-branch]`        | Quality gate before opening a PR: simplify, security-review, test suite                                           |
-| [`review-pr`](commands/review-pr.md)                 | `/review-pr <N>`               | Fetch comments, apply fixes, resolve threads                                                                      |
-| [`review-prs`](commands/review-prs.md) ¹             | `/review-prs <N1> [N2 N3 ...]` | Batch-review multiple PRs in parallel with one sub-agent per PR                                                   |
-| [`audit-and-fix`](commands/audit-and-fix.md)         | `/audit-and-fix <domain>`      | Audit → cluster findings → spawn parallel fix PRs                                                                 |
-| [`dependabot-sweep`](commands/dependabot-sweep.md)   | `/dependabot-sweep`            | Batch-triage all open Dependabot PRs                                                                              |
-| [`handoff`](skills/handoff/SKILL.md)                 | `/handoff <sub-command>`       | Transfer session context between AI agents (Claude Code, Copilot CLI, Codex) and across machines via GitHub Gists |
+| Command                                            | Invoke                         | What it does                                                                                                      |
+| -------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| [`git`](commands/git.md)                           | `/git`                         | Conventional commits, PR creation, branch naming                                                                  |
+| [`changelog`](commands/changelog.md)               | `/changelog`                   | Generate changelog entry from git history                                                                         |
+| [`merge-pr`](commands/merge-pr.md)                 | `/merge-pr <N>`                | Full local verification gate before merge                                                                         |
+| [`pre-pr`](commands/pre-pr.md) ¹                   | `/pre-pr [base-branch]`        | Quality gate before opening a PR: simplify, security-review, test suite                                           |
+| [`review-pr`](commands/review-pr.md)               | `/review-pr <N>`               | Fetch comments, apply fixes, resolve threads                                                                      |
+| [`review-prs`](commands/review-prs.md) ¹           | `/review-prs <N1> [N2 N3 ...]` | Batch-review multiple PRs in parallel with one sub-agent per PR                                                   |
+| [`audit-and-fix`](commands/audit-and-fix.md)       | `/audit-and-fix <domain>`      | Audit → cluster findings → spawn parallel fix PRs                                                                 |
+| [`dependabot-sweep`](commands/dependabot-sweep.md) | `/dependabot-sweep`            | Batch-triage all open Dependabot PRs                                                                              |
+| [`handoff`](skills/handoff/SKILL.md)               | `/handoff <sub-command>`       | Transfer session context between AI agents (Claude Code, Copilot CLI, Codex) and across machines via GitHub Gists |
 
 > ¹ `maturity: draft` — functional but not yet tested across all project types.
 
 **Debugging & quality:**
 
-| Command                                                  | Invoke                       | What it does                                   |
-| -------------------------------------------------------- | ---------------------------- | ---------------------------------------------- |
-| [`ground-first`](commands/ground-first.md)               | `/ground-first <subject>`    | Code-grounded analysis before any edit         |
-| [`fix-with-evidence`](commands/fix-with-evidence.md)     | `/fix-with-evidence <issue>` | Reproduce → Fix → Verify → PR loop             |
-| [`detect-flaky`](commands/detect-flaky.md)               | `/detect-flaky <test-cmd>`   | Find and fix flaky tests by repeated execution |
-| [`security-review`](commands/security-review.md)         | `/security-review`           | Scan changed files for OWASP vulnerabilities   |
+| Command                                              | Invoke                       | What it does                                   |
+| ---------------------------------------------------- | ---------------------------- | ---------------------------------------------- |
+| [`ground-first`](commands/ground-first.md)           | `/ground-first <subject>`    | Code-grounded analysis before any edit         |
+| [`fix-with-evidence`](commands/fix-with-evidence.md) | `/fix-with-evidence <issue>` | Reproduce → Fix → Verify → PR loop             |
+| [`detect-flaky`](commands/detect-flaky.md)           | `/detect-flaky <test-cmd>`   | Find and fix flaky tests by repeated execution |
+| [`security-review`](commands/security-review.md)     | `/security-review`           | Scan changed files for OWASP vulnerabilities   |
 
 **Analysis & documentation:**
 
-| Command                                                    | Invoke                         | What it does                                              |
-| ---------------------------------------------------------- | ------------------------------ | --------------------------------------------------------- |
-| [`create-audit`](commands/create-audit.md)                 | `/create-audit <subject>`      | Evidence-based audit doc → `docs/audits/`                 |
-| [`create-inspection`](commands/create-inspection.md)       | `/create-inspection <problem>` | Investigate and surface fix options → `docs/inspections/` |
-| [`create-assessment`](commands/create-assessment.md)       | `/create-assessment <target>`  | 0–10 graded assessment doc → `docs/assessments/`          |
-| [`markdown`](commands/markdown.md)                         | `/markdown <path>`             | Fix markdown formatting and structure                     |
+| Command                                              | Invoke                         | What it does                                              |
+| ---------------------------------------------------- | ------------------------------ | --------------------------------------------------------- |
+| [`create-audit`](commands/create-audit.md)           | `/create-audit <subject>`      | Evidence-based audit doc → `docs/audits/`                 |
+| [`create-inspection`](commands/create-inspection.md) | `/create-inspection <problem>` | Investigate and surface fix options → `docs/inspections/` |
+| [`create-assessment`](commands/create-assessment.md) | `/create-assessment <target>`  | 0–10 graded assessment doc → `docs/assessments/`          |
+| [`markdown`](commands/markdown.md)                   | `/markdown <path>`             | Fix markdown formatting and structure                     |
 
 **Spec & governance:**
 
-| Command / Skill                                          | Invoke                                                                                                                                | What it does                                    |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| [`spec`](skills/spec/SKILL.md)                           | `/spec <id> "<title>"`                                                                                                                | Interactive spec authoring → `docs/specs/`      |
-| [`validate-spec`](skills/validate-spec/SKILL.md)         | `/validate-spec <id>`                                                                                                                 | Audit an implemented spec against the codebase  |
-| [`agents-search`](skills/agents-search/SKILL.md)         | `/agents-search list`                                                                                                                 | Discover, search, and manage Claude Code agents |
-| [`veracity-audit`](skills/veracity-audit/SKILL.md)       | `/veracity-audit audit --config <config> --quality-config <quality-config> --pipeline-dir <pipeline-dir> --scoring-dir <scoring-dir>` | Audit a data pipeline for veracity and value    |
+| Command / Skill                                    | Invoke                                                                                                                                | What it does                                    |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| [`spec`](skills/spec/SKILL.md)                     | `/spec <id> "<title>"`                                                                                                                | Interactive spec authoring → `docs/specs/`      |
+| [`validate-spec`](skills/validate-spec/SKILL.md)   | `/validate-spec <id>`                                                                                                                 | Audit an implemented spec against the codebase  |
+| [`agents-search`](skills/agents-search/SKILL.md)   | `/agents-search list`                                                                                                                 | Discover, search, and manage Claude Code agents |
+| [`veracity-audit`](skills/veracity-audit/SKILL.md) | `/veracity-audit audit --config <config> --quality-config <quality-config> --pipeline-dir <pipeline-dir> --scoring-dir <scoring-dir>` | Audit a data pipeline for veracity and value    |
 
 See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
 
