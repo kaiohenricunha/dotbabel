@@ -50,4 +50,4 @@ jobs:
         with: { node-version: "22" }
       # Check only JSON/YAML/MD — the .mjs source is deliberately lightly formatted
       # (see .prettierrc.json); running on .mjs today would churn a lot.
-      - run: npx --yes prettier@3 --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-unknown
+      - run: npx --yes prettier@3 --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown
