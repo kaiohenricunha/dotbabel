@@ -12,6 +12,7 @@
       "fix-with-evidence",
       "git",
       "ground-first",
+      "handoff",
       "markdown",
       "merge-pr",
       "review-pr",
@@ -45,6 +46,7 @@
       "fix-with-evidence",
       "git",
       "ground-first",
+      "handoff",
       "markdown",
       "security-review",
       "spec",
@@ -73,6 +75,7 @@
       "fix-with-evidence",
       "gcp-specialist",
       "ground-first",
+      "handoff",
       "kubernetes-specialist",
       "pulumi-specialist",
       "terraform-specialist",
@@ -104,6 +107,7 @@
       "create-assessment",
       "create-audit",
       "create-inspection",
+      "handoff",
       "markdown",
       "spec"
     ],
@@ -137,6 +141,6 @@
       "terragrunt-specialist",
       "validate-spec"
     ],
-    "draft": ["veracity-audit"]
+    "draft": ["handoff", "veracity-audit"]
   }
 }

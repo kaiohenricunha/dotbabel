@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-04-17T14:17:29.874Z",
+  "generatedAt": "2026-04-18T00:36:26.760Z",
   "version": "0.4.0",
   "artifacts": [
     {
@@ -224,6 +224,21 @@
         "platform": ["none"],
         "task": ["debugging", "review"],
         "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "handoff",
+      "type": "skill",
+      "path": "skills/handoff/SKILL.md",
+      "name": "handoff",
+      "description": "Transfer conversation context between agentic CLIs (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI). Reads a source session transcript by UUID and produces either an inline summary or a paste-ready handoff digest for another agent. Use when switching agents mid-task or recovering context. Triggers on: \"handoff\", \"transfer context\", \"continue in codex\", \"continue in claude\", \"continue in copilot\", \"switch to codex\", \"switch to claude\", \"what was that session about\", \"claude --resume\", \"copilot --resume\", \"codex resume\", \"find the session where\", \"search sessions\", \"which session did I\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation", "debugging"],
+        "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"
