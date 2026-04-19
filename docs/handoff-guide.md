@@ -1,6 +1,6 @@
 # Handoff guide — cross-CLI, cross-machine session transfer
 
-_Last updated: v0.7.0_
+_Last updated: v0.8.0_
 
 > **Added in v0.5.0.** Full skill reference: [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
 

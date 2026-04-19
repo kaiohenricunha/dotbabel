@@ -1,6 +1,6 @@
 # Dotfile quickstart — skills & commands in every Claude Code session
 
-_Last updated: v0.7.0_
+_Last updated: v0.8.0_
 
 Bootstrap dotclaude into `~/.claude/` in under 30 seconds. No npm, no Node required.
 
