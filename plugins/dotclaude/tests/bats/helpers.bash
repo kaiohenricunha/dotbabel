@@ -8,6 +8,9 @@
 #   make_tmp_home         mktemp a hermetic $HOME for bootstrap tests.
 #   make_tmp_git_repo     mktemp an initialized git repo with an origin remote.
 #   with_fake_git_bin     prepend a shim dir to PATH providing a fake `git`.
+#   with_fake_tool_bin    prepend a shim dir to PATH providing a fake <tool>.
+#   make_many_codex_sessions     bulk-seed N codex sessions, no sleep.
+#   make_many_transport_branches bulk-create N handoff/claude/<short> branches.
 #   feed_hook_json        send a PreToolUse JSON payload to a hook script.
 #   pass_assert / fail_assert  internal helpers (not for consumer use).
 
@@ -48,14 +51,23 @@ make_tmp_git_repo() {
 # Usage: with_fake_git_bin <shim-body>
 # Inside shim, $1.. are the args `git` was called with.
 with_fake_git_bin() {
-  local body="$1"
+  with_fake_tool_bin git "$1"
+}
+
+# Generalised shim builder. Usage: with_fake_tool_bin <tool-name> <shim-body>
+# Inside shim, $1.. are the args <tool-name> was called with. PATH is
+# prepended so the shim shadows the real binary. Echoes the shim dir so
+# callers can clean up or inspect.
+with_fake_tool_bin() {
+  local tool="$1"
+  local body="$2"
   local dir
   dir=$(mktemp -d)
-  cat > "$dir/git" <<EOF
+  cat > "$dir/$tool" <<EOF
 #!/usr/bin/env bash
 $body
 EOF
-  chmod +x "$dir/git"
+  chmod +x "$dir/$tool"
   PATH="$dir:$PATH"
   export PATH
   echo "$dir"
@@ -127,6 +139,84 @@ make_codex_session_tree() {
   done
   CODEX_SESSION_UUIDS="${uuids[*]}"
   export CODEX_SESSION_UUIDS
+}
+
+# make_many_codex_sessions <home> <count>
+# Bulk-seed <count> codex sessions under ~/.codex/sessions/2026/04/18/.
+# Avoids the per-iteration `sleep 0.01` of `make_codex_session_tree` so 10k
+# sessions is fast. Deterministic ordering is achieved with explicit
+# `touch -d` stamps at 1ms steps — the resolver's `pick_newest` uses mtime.
+# UUIDs are derived from the index so callers can recompute them if needed.
+make_many_codex_sessions() {
+  local home="$1" count="$2"
+  local dir="$home/.codex/sessions/2026/04/18"
+  mkdir -p "$dir"
+  local i=0
+  while (( i < count )); do
+    local hex; printf -v hex '%08x' "$i"
+    local uuid="${hex}-0000-0000-0000-000000000000"
+    local ms; printf -v ms '%03d' $(( i % 1000 ))
+    local ss; printf -v ss '%02d' $(( (i / 1000) % 60 ))
+    local mm; printf -v mm '%02d' $(( (i / 60000) % 60 ))
+    local path="$dir/rollout-2026-04-18T10-${mm}-${ss}-${uuid}.jsonl"
+    printf '{"type":"session_meta","payload":{"id":"%s","cwd":"/work"}}\n' \
+      "$uuid" > "$path"
+    touch -d "2026-04-18 10:${mm}:${ss}.${ms}000000" "$path" 2>/dev/null || true
+    i=$((i + 1))
+  done
+}
+
+# make_many_transport_branches <bare-repo> <count>
+# Create <count> branches of shape `handoff/claude/<short-uuid>` on the bare
+# repo. All refs point at a single shared commit that carries a valid
+# `handoff.md` + `description.txt` — so `pull` works against any of the
+# generated short-ids. Uses `git update-ref --stdin` to set all refs in
+# one pass; cost is O(N) on the server side, not N round-trips.
+make_many_transport_branches() {
+  local bare="$1" count="$2"
+  local work
+  work=$(mktemp -d)
+  (
+    cd "$work"
+    git init -q -b main
+    git config user.email "bats@example.test"
+    git config user.name "bats"
+    cat > handoff.md <<'HEREDOC'
+<handoff origin="claude" session="deadbeef" cwd="/bulk" target="claude">
+
+**Summary.** Bulk-seeded handoff.
+
+**User prompts (last 10, in order).**
+
+1. bulk prompt
+
+**Last assistant turns (tail).**
+
+> bulk reply
+
+**Next step.** Continue.
+
+</handoff>
+HEREDOC
+    echo "handoff:v1:claude:deadbeef:bulk:bats" > description.txt
+    git add handoff.md description.txt
+    git commit -q -m "bulk seed"
+    local sha
+    sha=$(git rev-parse HEAD)
+    git remote add origin "$bare"
+    git push -q origin HEAD:refs/heads/main
+    # Build a stdin script for `update-ref` on the bare repo: one
+    # `create refs/heads/handoff/claude/<hex> <sha>` line per branch.
+    local i=0
+    {
+      while (( i < count )); do
+        local hex; printf -v hex '%08x' "$i"
+        printf 'create refs/heads/handoff/claude/%s %s\n' "$hex" "$sha"
+        i=$((i + 1))
+      done
+    } | git --git-dir="$bare" update-ref --stdin
+  )
+  rm -rf "$work"
 }
 
 # make_transport_repo <dir>
