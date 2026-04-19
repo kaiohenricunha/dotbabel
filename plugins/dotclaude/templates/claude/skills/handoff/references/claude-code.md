@@ -72,6 +72,24 @@ jq -r 'select(.type == "user") | .message.content
   | if type == "string" then . else (map(select(.type == "text") | .text) | join("\n")) end' <file>
 ```
 
+**Noise exclusions.** Claude JSONL carries many synthetic "user" records
+that are not real human prompts: hook outputs, system reminders,
+slash-command echoes, task-notification polling, and tool results.
+Drop any prompt whose first non-whitespace content starts with:
+
+- `<local-command-caveat>` — caveat wrapper for local-command input
+- `<command-name>`, `<command-message>`, `<command-args>` — slash-command echoes
+- `<stdin>` — interactive input wrapper
+- `<system-reminder>` — injected reminders
+- `<user-prompt-submit-hook>` — hook payloads
+- `<task-notification>`, `</task-notification>`, `<task-id>` — task-monitor polling
+- `<summary>Monitor event` — monitor-event summary
+- `<event>` — raw monitor events
+- `If this event is something the user` — monitor heuristic preamble
+
+Reference implementation: `plugins/dotclaude/scripts/handoff-extract.sh
+prompts claude <file>`.
+
 ### Assistant turns (text only)
 
 ```bash

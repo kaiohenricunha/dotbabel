@@ -64,3 +64,17 @@ DENYLIST_OPTS=(
     "$REPO_ROOT/plugins/dotclaude/src/"
   [ "$status" -eq 1 ]
 }
+
+@test "plugin bin files contain no project-specific vocabulary" {
+  run grep -rni "${DENYLIST_OPTS[@]}" \
+    --include="*.mjs" --include="*.sh" \
+    "$REPO_ROOT/plugins/dotclaude/bin/"
+  [ "$status" -eq 1 ]
+}
+
+@test "plugin scripts contain no project-specific vocabulary" {
+  run grep -rni "${DENYLIST_OPTS[@]}" \
+    --include="*.sh" --include="*.mjs" \
+    "$REPO_ROOT/plugins/dotclaude/scripts/"
+  [ "$status" -eq 1 ]
+}

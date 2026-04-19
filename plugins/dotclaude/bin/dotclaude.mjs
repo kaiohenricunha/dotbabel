@@ -35,6 +35,7 @@ const SUBCOMMANDS = [
   "search",
   "list",
   "show",
+  "handoff",
 ];
 
 function printUsage() {

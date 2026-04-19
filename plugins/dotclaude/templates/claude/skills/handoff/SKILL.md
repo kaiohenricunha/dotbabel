@@ -114,20 +114,36 @@ ask a single clarifying question before proceeding.
 
 ## Sub-Commands
 
-### `describe <cli> <uuid|latest>`
+### `describe <cli> <uuid|latest|alias>`
 
 Print an inline 2–4 sentence summary of the session plus the verbatim
 user prompts. Use when the user asks "what was that about" and nothing
 more.
 
-**Steps:**
+For the deterministic path (resolve + extract), prefer the bundled
+shell scripts:
+
+- `plugins/dotclaude/scripts/handoff-resolve.sh <cli> <id>` — returns
+  the absolute JSONL path, supports UUID, short-UUID, `latest`, and
+  (codex only) thread-name aliases.
+- `plugins/dotclaude/scripts/handoff-extract.sh meta <cli> <file>` —
+  emits a JSON metadata object.
+- `plugins/dotclaude/scripts/handoff-extract.sh prompts <cli> <file>` —
+  emits clean user prompts with CLI-specific noise filtered out.
+
+For a fully-packaged CLI interface, invoke
+`dotclaude-handoff describe <cli> <id>` (same pattern, no skill load
+required — useful from Codex).
+
+**Steps (skill-interpreted fallback if the scripts are unavailable):**
 
 1. Resolve the session file. Load the per-CLI reference:
    - `claude` → `references/claude-code.md`
    - `copilot` → `references/copilot.md`
    - `codex` → `references/codex.md`
-2. Apply the `latest` resolver if the identifier is `latest`, otherwise
-   locate the file by UUID using the path pattern in that reference.
+2. Apply the `latest` resolver if the identifier is `latest`; for codex
+   an alias (non-hex identifier) triggers a `thread_name` scan; otherwise
+   locate the file by UUID using the path pattern in the reference.
 3. If no file is found, output exactly:
 
    ```
@@ -137,8 +153,10 @@ more.
    and stop.
 
 4. Run the per-CLI `jq` filters from the reference to extract:
-   - session meta (cwd, model, timestamp)
-   - all user turns, verbatim, in order
+   - session meta (cwd, model, timestamp); for copilot, fall back to
+     `workspace.yaml` when `session.start.cwd` is null
+   - all user turns, verbatim, in order, with CLI-specific noise filtered
+     (see the reference for the exclusion list)
    - all assistant turns (kept in memory for summary only; do not print)
 5. Render the output as:
 

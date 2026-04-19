@@ -65,9 +65,18 @@ Relevant `type` values:
 jq -r 'select(.type == "session.start") | .data | {cwd, model, sessionId}' <file> | head -1
 ```
 
-If `session.start` lacks `cwd`, fall back to the sibling
-`workspace.yaml` in the session dir — it carries `cwd:` as a top-level
-key.
+**Mandatory `workspace.yaml` fallback.** Real Copilot sessions commonly
+emit `"cwd": null` on `session.start`; the authoritative value lives in
+the sibling `workspace.yaml` (same session dir). If the `jq` filter
+above returns a null or empty `cwd`, grep `workspace.yaml`:
+
+```bash
+awk -F': ' '$1 == "cwd" { sub(/^[^:]*: */, ""); print; exit }' \
+  "$(dirname <file>)/workspace.yaml"
+```
+
+Same pattern for `model`. Reference implementation:
+`plugins/dotclaude/scripts/handoff-extract.sh meta copilot <file>`.
 
 ### User prompts
 

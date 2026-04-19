@@ -24,7 +24,8 @@
     "dotclaude-index": "./plugins/dotclaude/bin/dotclaude-index.mjs",
     "dotclaude-search": "./plugins/dotclaude/bin/dotclaude-search.mjs",
     "dotclaude-list": "./plugins/dotclaude/bin/dotclaude-list.mjs",
-    "dotclaude-show": "./plugins/dotclaude/bin/dotclaude-show.mjs"
+    "dotclaude-show": "./plugins/dotclaude/bin/dotclaude-show.mjs",
+    "dotclaude-handoff": "./plugins/dotclaude/bin/dotclaude-handoff.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",
