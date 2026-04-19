@@ -1,6 +1,6 @@
 {
   "name": "@dotclaude/dotclaude",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "dotclaude — portable SDD validators and Claude Code governance for any project.",
   "type": "module",
   "main": "plugins/dotclaude/src/index.mjs",

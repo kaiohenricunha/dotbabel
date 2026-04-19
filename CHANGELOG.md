@@ -4,6 +4,27 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.7.0...v0.8.0) (2026-04-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **handoff:** push <cli> <query> and pull <cli> <handle> now exit 64 with a migration message pointing at --from. Power-user subs (resolve/describe/digest/file) keep their explicit <cli> <id>.
+
+### Added
+
+* **handoff:** drop &lt;cli&gt; positional from push/pull ([#66](https://github.com/kaiohenricunha/dotclaude/issues/66)) ([a172e0e](https://github.com/kaiohenricunha/dotclaude/commit/a172e0e3b736094c43b80047ed2e217ed30a8301))
+
+
+### Fixed
+
+* **test:** avoid bats $output capture for 10k-session stress test ([#63](https://github.com/kaiohenricunha/dotclaude/issues/63)) ([e1145b0](https://github.com/kaiohenricunha/dotclaude/commit/e1145b016e7a7266f133178084d13d04126d86b0))
+
+
+### Documentation
+
+* add Copilot instructions, review config, and AGENTS.md ([#65](https://github.com/kaiohenricunha/dotclaude/issues/65)) ([eb1aca4](https://github.com/kaiohenricunha/dotclaude/commit/eb1aca425b46467b64162c3b5c8ab1d4dcb9280c))
+
 ## [0.7.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.6.0...v0.7.0) (2026-04-19)
 
 ### Added
