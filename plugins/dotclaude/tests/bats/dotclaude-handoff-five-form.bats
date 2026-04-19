@@ -12,6 +12,8 @@
 
 load helpers
 
+bats_require_minimum_version 1.5.0
+
 BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
 
 setup() {
@@ -55,10 +57,11 @@ teardown() {
 
 # -- zero-arg and <query> (local, no network) ----------------------------
 
-@test "zero args prints helpful usage of the five forms" {
-  run node "$BIN"
-  # Either exit 0 with usage, or exit 64 — either way, output must mention
-  # the five forms so the user can recover.
+@test "--help prints the five-form surface" {
+  # Bare invocation no longer prints usage — it executes `push`. Help
+  # lives behind --help, which is the conventional opt-in.
+  run node "$BIN" --help
+  [ "$status" -eq 0 ]
   [[ "$output" == *"push"* ]]
   [[ "$output" == *"pull"* ]]
   [[ "$output" == *"list"* ]]
@@ -191,4 +194,100 @@ teardown() {
   # "claude" is not a valid subcommand and not a query (no such alias),
   # so it must exit 2 (no session matches) — NOT 0.
   [ "$status" -ne 0 ]
+}
+
+@test "push <cli> <query> exits 64 with the breaking-change message" {
+  # The shim catches the removed form and points the user at --from
+  # or dropping the positional entirely.
+  run node "$BIN" push claude aaaa1111
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"no longer takes a <cli> positional"* ]]
+  [[ "$output" == *"--from claude"* ]]
+}
+
+@test "pull <cli> <query> exits 64 with the breaking-change message" {
+  # Mirror of the push shim — the parallel surface keeps parallel errors.
+  run node "$BIN" pull claude aaaa1111
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"no longer takes a <cli> positional"* ]]
+  [[ "$output" == *"--from claude"* ]]
+}
+
+# -- --from flag ----------------------------------------------------------
+
+@test "push --from codex (no query) narrows the fallback to the codex root" {
+  # With env cleared (no host detected), --from steers the fallback away
+  # from `resolveAny("latest")` (union) to the codex-only "latest".
+  # setup() seeds codex with bbbb2222 as the newest of its root.
+  run env -i HOME="$TEST_HOME" PATH="$PATH" DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
+    node "$BIN" push --from codex --via git-fallback
+  [ "$status" -eq 0 ]
+  run git --git-dir="$TRANSPORT_REPO" branch -a
+  [[ "$output" == *"handoff/codex/bbbb2222"* ]]
+}
+
+@test "push --from with an unknown CLI exits 64" {
+  run node "$BIN" push --from bogus --via git-fallback
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--from must be one of"* ]]
+}
+
+@test "pull --from codex narrows the transport candidate pool" {
+  # Push one handoff per CLI, then pull with --from codex and confirm
+  # the returned block names the codex session (bbbb2222), not the
+  # claude one (aaaa1111). Proves --from is wired through pullGitFallback.
+  run node "$BIN" push my-feature --via git-fallback
+  [ "$status" -eq 0 ]
+  run node "$BIN" push my-codex-task --via git-fallback
+  [ "$status" -eq 0 ]
+  run node "$BIN" pull --from codex --via git-fallback
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bbbb2222"* ]]
+  [[ "$output" != *"aaaa1111"* ]]
+}
+
+@test "pull --from with an unknown CLI exits 64" {
+  run node "$BIN" pull --from bogus --via git-fallback
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--from must be one of"* ]]
+}
+
+@test "push --from codex beats CLAUDECODE=1 (override precedence)" {
+  # --from is an explicit user intent and must outrank the env-var
+  # probe. Without this assertion, a regression swapping the precedence
+  # of `fromCli ?? detectedHost` would silently mis-route a user who
+  # explicitly asked for codex from inside a Claude Code session.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
+    DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
+    node "$BIN" push --from codex --via git-fallback
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"using --from codex override"* ]]
+  run git --git-dir="$TRANSPORT_REPO" branch -a
+  [[ "$output" == *"handoff/codex/bbbb2222"* ]]
+}
+
+# -- honest stderr fallback notes ----------------------------------------
+
+@test "push (no args, no host signal) emits stderr note about unknown host" {
+  # env -i clears CLAUDECODE / CODEX_* / COPILOT_* leaking from the
+  # parent shell, so detectHost() returns "unknown" and the bare-push
+  # path uses the union resolver with the matching stderr note.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
+    DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
+    node "$BIN" push --via git-fallback
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"host not detected"* ]]
+  [[ "$stderr" == *"latest across all clis"* ]]
+}
+
+@test "push (no args, CLAUDECODE=1) emits stderr note about claude" {
+  # The claude probe fires, so the fallback narrows to the claude root.
+  # The seeded claude session (aaaa1111) is the only one under that
+  # root, so its short-UUID must surface in the stderr note.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
+    DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
+    node "$BIN" push --via git-fallback
+  [ "$status" -eq 0 ]
+  [[ "$stderr" == *"latest claude session"* ]]
+  [[ "$stderr" == *"aaaa1111"* ]]
 }

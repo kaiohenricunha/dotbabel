@@ -80,7 +80,7 @@ Open any repo in Claude Code. The full library is now available:
 /dependabot-sweep
 
 # Transfer your session to another machine or AI
-/handoff push claude latest
+/handoff push
 ```
 
 Cloud/IaC specialists activate automatically — just mention the technology:

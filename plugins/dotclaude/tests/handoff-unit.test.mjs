@@ -1,12 +1,13 @@
 // Pure-function unit tests for dotclaude-handoff internals.
 // Covers: UUID_HEAD_RE, cliFromPath, projectSlugFromCwd, matchesQuery,
-// nextStepFor, mechanicalSummary, CLI_LAYOUTS.
+// nextStepFor, mechanicalSummary, CLI_LAYOUTS, detectHost.
 
 import { describe, it, expect } from "vitest";
 import {
   UUID_HEAD_RE,
   CLI_LAYOUTS,
   cliFromPath,
+  detectHost,
   projectSlugFromCwd,
   matchesQuery,
   nextStepFor,
@@ -185,5 +186,61 @@ describe("CLI_LAYOUTS", () => {
     expect(CLI_LAYOUTS.codex.match("rollout-2026-04-18-abc.jsonl")).toBe(true);
     expect(CLI_LAYOUTS.codex.match("events.jsonl")).toBe(false);
     expect(CLI_LAYOUTS.codex.match("rollout.json")).toBe(false);
+  });
+});
+
+describe("detectHost", () => {
+  it("returns 'unknown' on empty env", () => {
+    expect(detectHost({})).toBe("unknown");
+  });
+
+  it("returns 'claude' when CLAUDECODE=1", () => {
+    expect(detectHost({ CLAUDECODE: "1" })).toBe("claude");
+  });
+
+  it("treats CLAUDECODE values other than '1' as unset", () => {
+    // Locks in the strict-equals check: a future loosening that lets
+    // CLAUDECODE=0 or empty-string return "claude" would silently
+    // mislabel hosts that explicitly opt out.
+    expect(detectHost({ CLAUDECODE: "0" })).toBe("unknown");
+    expect(detectHost({ CLAUDECODE: "" })).toBe("unknown");
+  });
+
+  it("returns 'claude' on CLAUDE_CODE_SSE_PORT fallback when CLAUDECODE is unset", () => {
+    expect(detectHost({ CLAUDE_CODE_SSE_PORT: "12345" })).toBe("claude");
+  });
+
+  it("returns 'codex' on any CODEX_* prefix", () => {
+    expect(detectHost({ CODEX_HOME: "/tmp/codex" })).toBe("codex");
+    expect(detectHost({ CODEX_SESSION_ID: "abc" })).toBe("codex");
+  });
+
+  it("returns 'copilot' on GITHUB_COPILOT_* or COPILOT_* prefix", () => {
+    expect(detectHost({ GITHUB_COPILOT_CLI: "1" })).toBe("copilot");
+    expect(detectHost({ COPILOT_SESSION: "1" })).toBe("copilot");
+  });
+
+  it("prioritises claude > codex > copilot when multiple signals fire", () => {
+    // Probe order is load-bearing: it determines which host "wins"
+    // when an operator has env vars for multiple CLIs exported.
+    expect(
+      detectHost({ CLAUDECODE: "1", CODEX_HOME: "/x", COPILOT_SESSION: "1" })
+    ).toBe("claude");
+    expect(detectHost({ CODEX_HOME: "/x", COPILOT_SESSION: "1" })).toBe("codex");
+  });
+
+  it("does not match unrelated env vars starting with CLAUDE", () => {
+    // Guards against a future refactor that replaces the strict probes
+    // with a prefix scan — only CLAUDECODE / CLAUDE_CODE_SSE_PORT count.
+    expect(detectHost({ CLAUDE_TEST_FOO: "1" })).toBe("unknown");
+  });
+
+  it("requires the trailing underscore on CODEX_ and COPILOT_ probes", () => {
+    // The prefix scans are `startsWith("CODEX_")` / `startsWith("COPILOT_")`
+    // on purpose: a future loosening to bare "CODEX" would match e.g.
+    // CODEX (no underscore) or CODEXHOME and mis-label unrelated tooling.
+    expect(detectHost({ CODEX: "1" })).toBe("unknown");
+    expect(detectHost({ CODEXHOME: "/tmp" })).toBe("unknown");
+    expect(detectHost({ COPILOT: "1" })).toBe("unknown");
   });
 });

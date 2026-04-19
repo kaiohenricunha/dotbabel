@@ -83,6 +83,17 @@ platform-specific remediation block.
 Every `<query>` can be a full UUID, short UUID (first 8 hex), `latest`,
 a Claude `customTitle`, or a Codex `thread_name`.
 
+**Narrowing with `--from <cli>`.** `push`, `pull`, and bare `<query>`
+auto-detect the source CLI across all three roots. Short-UUID
+prefixes can collide; add `--from claude` (or `copilot` / `codex`)
+to force resolution into one root. Scripts that know which CLI a
+handoff lives in should always pass `--from`. With no `<query>` and
+no `--from`, bare `push` picks the latest session in the detected
+host's root (based on `CLAUDECODE` / `CODEX_*` / `COPILOT_*` env
+signals) and prints one stderr line naming the fallback; when no
+host is detected, it falls back to the newest session across all
+three roots.
+
 Power-user sub-commands (`resolve`, `describe`, `digest`, `file`) stay
 reachable for scripting — each takes an explicit `<cli>` `<id>`. Full
 argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
