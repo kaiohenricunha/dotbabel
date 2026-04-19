@@ -1,17 +1,8 @@
 #!/usr/bin/env bats
-# Portability tests. The shell scripts are deliberately written to run
-# on both GNU and BSD toolchains. Production picks whichever works;
-# these tests shim PATH to force each fallback branch and prove the
-# chain holds.
-#
-# Covered fallbacks:
-#   handoff-resolve.sh:pick_newest
-#     - find -printf %T@        (GNU primary)
-#     - stat -f %Fm              (BSD)
-#     - stat -c %Y               (GNU fallback, whole-second only)
-#   handoff-extract.sh:file_iso_mtime
-#     - date -u -r               (BSD + GNU coreutils)
-#     - date -u -d @$(stat ...)  (older coreutils without -r)
+# Force each branch of the GNU/BSD fallback chains in handoff-resolve
+# (pick_newest: find -printf %T@ → stat -f %Fm → stat -c %Y) and
+# handoff-extract (file_iso_mtime: date -r → date -d @stat) by shimming
+# PATH so the higher-precedence tool exits non-zero.
 
 load helpers
 
@@ -34,9 +25,8 @@ teardown() {
   rm -rf "$TEST_HOME"
 }
 
-# Seed two claude sessions with fractional-second mtime delta. pick_newest's
-# primary branch resolves this via `find -printf %T@`; fallbacks that rely
-# on whole-second mtime can't distinguish them.
+# Fractional-second mtime delta: distinguishable only by `find -printf %T@`
+# or `stat -f %Fm`; the whole-second fallback can't resolve the order.
 seed_fractional_pair() {
   local older="$1" newer="$2"
   local dir="$TEST_HOME/.claude/projects/-demo"
@@ -49,34 +39,24 @@ seed_fractional_pair() {
   touch -d '2026-04-18 10:00:00.900000000' "$dir/$newer.jsonl"
 }
 
-# -- pick_newest primary (GNU find -printf) ------------------------------
-
 @test "pick_newest picks newest via find -printf %T@ (GNU primary)" {
-  # Baseline: no shim. Resolver should see the fractional-ms delta and
-  # pick the newer file. If this fails, the fallback tests below have no
-  # meaningful baseline.
+  # Baseline for the fallback tests: without a shim, the resolver should
+  # resolve the fractional-ms delta via find -printf.
   local older="aaaa1111-1111-1111-1111-111111111111"
   local newer="bbbb2222-2222-2222-2222-222222222222"
   seed_fractional_pair "$older" "$newer"
-  # Short-UUID prefix is intentionally non-matching so `find` enumerates
-  # the whole dir; `latest` would bypass the fractional logic on some
-  # code paths. Use `claude latest` which exercises pick_newest directly.
   run "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"$newer.jsonl" ]]
 }
-
-# -- pick_newest BSD stat fallback --------------------------------------
 
 @test "pick_newest falls back to BSD stat -f %Fm when find -printf fails" {
   local older="cccc3333-3333-3333-3333-333333333333"
   local newer="dddd4444-4444-4444-4444-444444444444"
   seed_fractional_pair "$older" "$newer"
 
-  # Shim `find`: for `-maxdepth 0 -printf '%T@'` (pick_newest's probe),
-  # exit non-zero to force the fallback. For any other invocation,
-  # delegate to the real `find`. The shim must appear on PATH before
-  # `/usr/bin/find`.
+  # Shim: exit 1 on pick_newest's `-printf '%T@'` probe, delegate
+  # everything else to the real `find`.
   local shim
   shim=$(with_fake_tool_bin find '
 for arg in "$@"; do
@@ -93,12 +73,9 @@ exec /usr/bin/find "$@"
   [[ "$output" == *"$newer.jsonl" ]]
 }
 
-# -- pick_newest GNU stat -c %Y fallback --------------------------------
-
 @test "pick_newest falls back to stat -c %Y when find -printf and stat -f fail" {
-  # With both fractional-precision paths disabled, pick_newest falls
-  # back to whole-second mtime. Use 2-second-apart stamps so the
-  # fallback can resolve ordering.
+  # With both fractional-precision paths disabled, pick_newest falls back
+  # to whole-second mtime — so stamps must be ≥1s apart to resolve order.
   local older="eeee5555-5555-5555-5555-555555555555"
   local newer="ffff6666-6666-6666-6666-666666666666"
   local dir="$TEST_HOME/.claude/projects/-demo"
@@ -117,7 +94,6 @@ done
 exec /usr/bin/find "$@"
 ')
   stat_shim=$(with_fake_tool_bin stat '
-# Reject BSD-style -f %Fm; delegate everything else to real stat.
 prev=""
 for arg in "$@"; do
   if [[ "$prev" == "-f" && "$arg" == "%Fm" ]]; then
@@ -134,13 +110,9 @@ exec /usr/bin/stat "$@"
   [[ "$output" == *"$newer.jsonl" ]]
 }
 
-# -- file_iso_mtime fallback --------------------------------------------
-
 @test "extract meta returns valid started_at when date -r is unavailable" {
-  # file_iso_mtime's primary is `date -u -r <file>`; fallback is
-  # `date -u -d "@$(stat ...)"`. Shim `date` to reject -r (emulating
-  # environments without GNU coreutils date), then assert extract still
-  # emits a well-formed ISO-8601 timestamp.
+  # Shim date to reject -r, forcing the `date -u -d "@$(stat ...)"`
+  # fallback. Extract must still emit a well-formed ISO-8601 timestamp.
   local uuid="aaaa0000-0000-0000-0000-000000000000"
   local file="$TEST_HOME/.claude/projects/-demo/$uuid.jsonl"
   mkdir -p "$(dirname "$file")"
@@ -148,7 +120,6 @@ exec /usr/bin/stat "$@"
 
   local shim
   shim=$(with_fake_tool_bin date '
-# Reject any invocation that uses -r <file>; delegate everything else.
 for arg in "$@"; do
   [[ "$arg" == "-r" ]] && exit 1
 done
@@ -158,6 +129,5 @@ exec /usr/bin/date "$@"
 
   run "$EXTRACT" meta claude "$file"
   [ "$status" -eq 0 ]
-  # Match the ISO-8601 UTC shape: YYYY-MM-DDTHH:MM:SSZ
   [[ "$output" =~ \"started_at\":\"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\" ]]
 }
