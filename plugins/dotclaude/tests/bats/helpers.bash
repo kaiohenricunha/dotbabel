@@ -144,8 +144,9 @@ make_codex_session_tree() {
 # make_many_codex_sessions <home> <count>
 # Bulk-seed <count> codex sessions under ~/.codex/sessions/2026/04/18/.
 # Avoids the per-iteration `sleep 0.01` of `make_codex_session_tree` so 10k
-# sessions is fast. Deterministic ordering is achieved with explicit
-# `touch -d` stamps at 1ms steps — the resolver's `pick_newest` uses mtime.
+# sessions is fast. Attempts `touch -d` stamps at 1ms steps to produce
+# deterministic mtime ordering where supported; silently falls back to
+# filesystem-assigned mtimes on platforms without sub-second touch.
 # UUIDs are derived from the index so callers can recompute them if needed.
 make_many_codex_sessions() {
   local home="$1" count="$2"

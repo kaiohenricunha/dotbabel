@@ -60,7 +60,7 @@ teardown() {
   wait "$appender"
 }
 
-@test "extract meta on a file with a truncated final record fails cleanly" {
+@test "extract meta on a file with a truncated final record succeeds by short-circuiting before the tail" {
   # jq's streaming first() short-circuits before reaching the truncated
   # tail, so the first valid record is still extractable. The contract
   # here is "does not hang, does not leak partial JSON".

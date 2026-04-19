@@ -13,9 +13,10 @@ import {
 
 describe("collectSessionFiles (symlink safety)", () => {
   it("does not recurse into a symlink that points back up the walk", () => {
-    // A self-referential symlink is harmless under the walker's depth cap
-    // only if it doesn't enumerate the same real file twice. Pin that the
-    // walk terminates and the leaf appears exactly once.
+    // `readdirSync(..., { withFileTypes:true })` returns Dirents where
+    // symlinks report isDirectory()=false, so the walker skips them
+    // entirely rather than following or loop-detecting them. Pin that
+    // the walk terminates and the leaf file appears exactly once.
     const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
     try {
       const leaf = join(root, "leaf");
