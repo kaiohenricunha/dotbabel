@@ -9,7 +9,7 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ### ⚠ BREAKING CHANGES
 
-* **handoff:** push <cli> <query> and pull <cli> <handle> now exit 64 with a migration message pointing at --from. Power-user subs (resolve/describe/digest/file) keep their explicit <cli> <id>.
+* **handoff:** `push <cli> <query>` and `pull <cli> <handle>` now exit 64 with a migration message pointing at `--from`. Power-user subs (resolve/describe/digest/file) keep their explicit `<cli> <id>`.
 
 ### Added
 

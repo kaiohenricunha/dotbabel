@@ -1,7 +1,7 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-04-19T18:11:33.421Z",
-  "version": "0.7.0",
+  "generatedAt": "2026-04-19T22:19:19.718Z",
+  "version": "0.8.0",
   "artifacts": [
     {
       "id": "agents-search",
@@ -10,9 +10,15 @@
       "name": "agents-search",
       "description": "Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: \"search agents\", \"list agents\", \"find agent\", \"what agents\", \"agent catalog\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -38,9 +44,16 @@
       "name": "audit-and-fix",
       "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to \"audit and fix\" or kicks off an overnight cleanup run.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "debugging"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -58,7 +71,9 @@
         "task": [],
         "maturity": "draft"
       },
-      "related": ["aws-specialist"]
+      "related": [
+        "aws-specialist"
+      ]
     },
     {
       "id": "aws-specialist",
@@ -67,9 +82,16 @@
       "name": "aws-specialist",
       "description": "Deep-dive AWS architecture review, debugging, and service design. Use for structured investigations of AWS-specific issues, cost or IAM audits, and multi-service design reviews. Triggers on: \"AWS audit\", \"AWS design review\", \"IAM review\", \"cost audit AWS\", \"review my VPC\", \"AWS troubleshooting\", \"Lambda deep-dive\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["aws"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "aws"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -95,9 +117,16 @@
       "name": "azure-specialist",
       "description": "Deep-dive Azure architecture review, debugging, and service design. Use for structured investigations of Azure-specific issues, identity or cost audits, and multi-service design reviews. Triggers on: \"Azure audit\", \"Azure design review\", \"EntraID review\", \"Managed Identity debug\", \"review my Azure\", \"Azure troubleshooting\", \"AKS deep-dive\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["azure"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "azure"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -123,9 +152,15 @@
       "name": "changelog",
       "description": "Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -177,9 +212,16 @@
       "name": "create-assessment",
       "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -192,9 +234,16 @@
       "name": "create-audit",
       "description": "Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -207,9 +256,16 @@
       "name": "create-inspection",
       "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Use when the user needs to understand *how* to fix something before committing to an approach. Sits between /create-audit (find problems) and /fix-with-evidence (implement the fix).\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -235,9 +291,17 @@
       "name": "crossplane-specialist",
       "description": "Deep-dive Crossplane platform review: XRD design, Composition correctness, provider config audit, managed resource health, and GitOps integration. Use for structured investigations of stuck Claims, composition pipeline bugs, and credential injection patterns. Triggers on: \"Crossplane audit\", \"XRD review\", \"Composition debug\", \"stuck Claim\", \"managed resource stuck\", \"provider config review\", \"Crossplane GitOps\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["crossplane", "kubernetes"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "crossplane",
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -263,9 +327,16 @@
       "name": "dependabot-sweep",
       "description": "Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.\n",
       "facets": {
-        "domain": ["devex", "security"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex",
+          "security"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -291,9 +362,16 @@
       "name": "detect-flaky",
       "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["testing", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "testing",
+          "debugging"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -345,9 +423,16 @@
       "name": "fix-with-evidence",
       "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "testing"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -386,9 +471,16 @@
       "name": "gcp-specialist",
       "description": "Deep-dive Google Cloud architecture review, debugging, and service design. Use for structured investigations of GCP-specific issues, IAM or cost audits, and multi-service design reviews. Triggers on: \"GCP audit\", \"GCP design review\", \"Workload Identity debug\", \"IAM review GCP\", \"review my GKE\", \"GCP troubleshooting\", \"Cloud Run deep-dive\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["gcp"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "gcp"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -401,9 +493,15 @@
       "name": "git",
       "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -416,9 +514,16 @@
       "name": "ground-first",
       "description": "Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -431,9 +536,16 @@
       "name": "handoff",
       "description": "Transfer conversation context between agentic CLIs (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a source session transcript by UUID and produces either an inline summary, a paste-ready handoff digest, a written markdown file, or a private GitHub gist that another machine can pull. Use when switching agents mid-task, recovering context, or moving between Windows/Linux/macOS setups. Triggers on: \"handoff\", \"transfer context\", \"continue in codex\", \"continue in claude\", \"continue in copilot\", \"switch to codex\", \"switch to claude\", \"what was that session about\", \"claude --resume\", \"copilot --resume\", \"codex resume\", \"find the session where\", \"search sessions\", \"which session did I\", \"push handoff\", \"pull handoff\", \"handoff to other machine\", \"resume on my other laptop\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -464,7 +576,9 @@
         "task": [],
         "maturity": "draft"
       },
-      "related": ["kubernetes-specialist"]
+      "related": [
+        "kubernetes-specialist"
+      ]
     },
     {
       "id": "kubernetes-specialist",
@@ -473,9 +587,16 @@
       "name": "kubernetes-specialist",
       "description": "Deep-dive Kubernetes troubleshooting, workload design, and cluster health review. Use when you need a structured investigation of a cluster issue, a design review of Kubernetes manifests, or a health audit of a namespace or workload. Triggers on: \"debug kubernetes\", \"why is my pod\", \"review my manifests\", \"cluster health\", \"kubernetes design review\", \"k8s audit\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["kubernetes"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -488,9 +609,16 @@
       "name": "markdown",
       "description": "Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.\n",
       "facets": {
-        "domain": ["devex", "writing"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex",
+          "writing"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -503,9 +631,16 @@
       "name": "merge-pr",
       "description": "Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in docs/repo-facts.json.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -531,9 +666,16 @@
       "name": "pre-pr",
       "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the full test suite, and surface a go/no-go summary before opening a pull request.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.1",
@@ -559,9 +701,16 @@
       "name": "pulumi-specialist",
       "description": "Deep-dive Pulumi stack review, component design, Automation API audit, and secrets management. Use for structured investigations of Pulumi stack drift, ComponentResource coupling, ESC configuration, and Automation API workflows. Triggers on: \"Pulumi audit\", \"stack review\", \"Automation API review\", \"ComponentResource design\", \"ESC audit\", \"Pulumi secrets\", \"Pulumi testing\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["pulumi"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "pulumi"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -574,9 +723,15 @@
       "name": "review-pr",
       "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -589,9 +744,15 @@
       "name": "review-prs",
       "description": "Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.1",
@@ -630,9 +791,16 @@
       "name": "security-review",
       "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.\n",
       "facets": {
-        "domain": ["devex", "security"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex",
+          "security"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -645,9 +813,15 @@
       "name": "spec",
       "description": "Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on \"let's spec this out\", \"create a spec\", \"design doc\", \"write a technical plan\", \"plan the architecture\". Works for greenfield and brownfield projects. Outputs to docs/specs/.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -660,9 +834,16 @@
       "name": "terraform-specialist",
       "description": "Deep-dive Terraform architecture review, module design, state management, and migration. Use for structured investigations of Terraform workspaces, provider configuration, module coupling, import workflows, and test coverage. Triggers on: \"Terraform audit\", \"module review\", \"state management\", \"Terraform import\", \"workspace design\", \"provider config review\", \"Terraform testing\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["terraform"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -688,9 +869,17 @@
       "name": "terragrunt-specialist",
       "description": "Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all orchestration analysis. Use for structured investigations of multi-environment Terragrunt layouts, dependency graphs, remote state config, and hook correctness. Triggers on: \"Terragrunt audit\", \"run-all review\", \"dependency block\", \"DRY pattern review\", \"env hierarchy audit\", \"mock_outputs\", \"terragrunt hooks\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["terraform", "terragrunt"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform",
+          "terragrunt"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -716,9 +905,16 @@
       "name": "validate-spec",
       "description": "Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to \"validate a spec\", \"audit a spec\", \"check if spec is implemented\", \"verify the spec is done\", \"is this spec really done\", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -731,9 +927,16 @@
       "name": "veracity-audit",
       "description": "Audit a data pipeline for Veracity and Value. Dispatches data-scientist, compliance-auditor, and data-engineer agents with project context injected at dispatch time. All source paths are supplied via flags — no defaults, no project assumptions. Subcommands: audit (full pipeline walk), score-check (scoring math only), gate-check (gate coverage only), source-trace <label> (single source end-to-end). Invoke when: \"audit pipeline\", \"veracity check\", \"scoring math correct?\", \"check gates\", \"trace source\", \"verify quality gates\", \"formula correct?\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
