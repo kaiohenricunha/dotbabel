@@ -7,16 +7,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { requireTransportRepo } from "../bin/dotclaude-handoff.mjs";
 
 describe("requireTransportRepo", () => {
-  const savedEnv = process.env.DOTCLAUDE_HANDOFF_REPO;
   let exitSpy;
   let stderrSpy;
+  let savedEnv;
 
   beforeEach(() => {
+    savedEnv = process.env.DOTCLAUDE_HANDOFF_REPO;
     // Stub process.exit so fail() throws instead of ending the test runner.
     exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`__exit__${code}`);
     });
-    stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
   });
 
   afterEach(() => {

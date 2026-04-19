@@ -11,14 +11,13 @@ import { spawnSync } from "node:child_process";
  * @returns {{path: string, cleanup: () => void}}
  */
 export function makeTransportRepo() {
-  const root = mkdtempSync(join(tmpdir(), "handoff-transport-"));
-  const bare = join(root, "bare.git");
+  const bare = mkdtempSync(join(tmpdir(), "handoff-bare-"));
   const result = spawnSync("git", ["init", "-q", "--bare", bare], { stdio: "ignore" });
   if (result.status !== 0) {
     throw new Error(`git init --bare failed (exit ${result.status})`);
   }
   return {
     path: bare,
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
+    cleanup: () => rmSync(bare, { recursive: true, force: true }),
   };
 }

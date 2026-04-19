@@ -44,10 +44,7 @@ EOF
 {"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"codex prompt"}]}}
 EOF
 
-  # Bare git repo as the git-fallback transport.
-  TRANSPORT_REPO=$(mktemp -d)
-  rm -rf "$TRANSPORT_REPO"
-  git init -q --bare "$TRANSPORT_REPO"
+  TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
   export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
 
   export CLAUDE_UUID CLAUDE_FILE CODEX_UUID CODEX_FILE TRANSPORT_REPO

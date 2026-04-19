@@ -64,7 +64,6 @@ describe("encodeDescription", () => {
       project: "",
       host: "laptop",
     });
-    // Handled in JS: `project || "adhoc"` before shelling out.
     expect(parse(s).project).toBe("adhoc");
   });
 

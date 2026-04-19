@@ -101,7 +101,6 @@ make_copilot_session_tree() {
     mkdir -p "$dir"
     printf '{"type":"session.start","data":{"cwd":"/tmp","model":"gpt","sessionId":"%s"}}\n' \
       "$uuid" > "$dir/events.jsonl"
-    sleep 0.01
   done
   COPILOT_SESSION_UUIDS="${uuids[*]}"
   export COPILOT_SESSION_UUIDS
@@ -127,8 +126,7 @@ make_codex_session_tree() {
     i=$((i + 1))
   done
   CODEX_SESSION_UUIDS="${uuids[*]}"
-  CODEX_SESSION_PATHS="${paths[*]}"
-  export CODEX_SESSION_UUIDS CODEX_SESSION_PATHS
+  export CODEX_SESSION_UUIDS
 }
 
 # make_transport_repo <dir>
