@@ -1,6 +1,6 @@
 # Template catalog
 
-_Last updated: v0.7.0_
+_Last updated: v0.8.0_
 
 Every file under `plugins/dotclaude/templates/` is written verbatim into a
 consumer repo by `dotclaude-init`, with `{{placeholder}}` tokens substituted

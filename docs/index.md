@@ -1,6 +1,6 @@
 # `@dotclaude/dotclaude` — docs
 
-_Last updated: v0.7.0_
+_Last updated: v0.8.0_
 
 dotclaude is a portable npm package + Claude Code plugin that bootstraps
 spec-driven-development governance into consumer repos. It ships a

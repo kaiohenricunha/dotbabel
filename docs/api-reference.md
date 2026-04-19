@@ -1,6 +1,6 @@
 # Node API reference
 
-_Last updated: v0.7.0_
+_Last updated: v0.8.0_
 
 The public contract lives at `plugins/dotclaude/src/index.mjs` — import from
 the package root, not deep paths:
