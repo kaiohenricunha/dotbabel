@@ -41,15 +41,13 @@ require_file() {
   [[ -f "$1" ]] || die_runtime "file not found: $1"
 }
 
-# jq boolean helper: does this string look like a non-empty, non-null?
-json_str_or_null() {
-  local raw="$1"
-  if [[ -z "$raw" || "$raw" == "null" ]]; then
-    printf 'null'
-  else
-    # Escape embedded double-quotes and backslashes for safe JSON embedding.
-    printf '"%s"' "$(printf '%s' "$raw" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-  fi
+UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+
+# ISO-8601 UTC mtime of a file (portable: GNU date first, BSD fallback).
+file_iso_mtime() {
+  local file="$1"
+  date -u -r "$file" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+    || date -u -d "@$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file")" +%Y-%m-%dT%H:%M:%SZ
 }
 
 # -- claude ---------------------------------------------------------------
@@ -58,45 +56,33 @@ meta_claude() {
   local file="$1"
   # Prefer a record with a cwd (the common case). Slurp-and-first via
   # `jq -n '[inputs]|.[0]'` to avoid SIGPIPE on long transcripts.
-  local raw
-  raw=$(jq -n -c '[inputs | select(.cwd != null and .cwd != "") | {cwd, sessionId, version}] | .[0] // empty' "$file" 2>/dev/null)
-
-  local cwd="" session_id="" version=""
-  if [[ -n "$raw" ]]; then
-    cwd=$(printf '%s' "$raw" | jq -r '.cwd // ""')
-    session_id=$(printf '%s' "$raw" | jq -r '.sessionId // ""')
-    version=$(printf '%s' "$raw" | jq -r '.version // ""')
+  # Fallback chain: any record with sessionId → UUID parsed from filename.
+  local base started_at fallback_id=""
+  base=$(basename "$file" .jsonl)
+  if [[ "$base" =~ $UUID_RE ]]; then
+    fallback_id="$base"
   fi
+  started_at=$(file_iso_mtime "$file")
 
-  # Edge case: brand-new aliased session with no activity yet (only
-  # custom-title / agent-name records, no cwd). Fall back to whatever
-  # identity records exist, then to the filename.
-  if [[ -z "$session_id" ]]; then
-    session_id=$(jq -n -r '[inputs | select(.sessionId != null) | .sessionId] | .[0] // empty' "$file" 2>/dev/null)
-  fi
-  if [[ -z "$session_id" ]]; then
-    # Parse the UUID out of the filename as a last resort.
-    local base
-    base=$(basename "$file" .jsonl)
-    if [[ "$base" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
-      session_id="$base"
-    fi
-  fi
-
-  local short_id="${session_id:0:8}"
-
-  # started_at: use file mtime as a stable proxy.
-  local started_at
-  started_at=$(date -u -r "$file" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
-    || date -u -d "@$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file")" +%Y-%m-%dT%H:%M:%SZ)
-
-  printf '{"cli":"claude","session_id":%s,"short_id":%s,"cwd":%s,"model":%s,"version":%s,"started_at":%s}\n' \
-    "$(json_str_or_null "$session_id")" \
-    "$(json_str_or_null "$short_id")" \
-    "$(json_str_or_null "$cwd")" \
-    "null" \
-    "$(json_str_or_null "$version")" \
-    "$(json_str_or_null "$started_at")"
+  jq -n -c \
+    --arg cli "claude" \
+    --arg fallback_id "$fallback_id" \
+    --arg started_at "$started_at" \
+    '
+    def nonempty: select(. != null and . != "");
+    [inputs] as $r
+    | (($r | map(select(.cwd | (. // "") != "")) | .[0]) // {}) as $with_cwd
+    | (($r | map(select(.sessionId != null)) | .[0].sessionId) // $fallback_id) as $sid
+    | {
+        cli: $cli,
+        session_id: ($sid | nonempty // null),
+        short_id: ($sid | (.[:8] | nonempty) // null),
+        cwd: ($with_cwd.cwd | (. // "") | nonempty // null),
+        model: null,
+        version: ($with_cwd.version | (. // "") | nonempty // null),
+        started_at: ($started_at | nonempty // null)
+      }
+    ' "$file" 2>/dev/null
 }
 
 # Claude user prompts, scrubbed of system/command/tool noise.
@@ -166,34 +152,37 @@ meta_copilot() {
   session_meta=$(jq -n -c '[inputs | select(.type == "session.start") | .data] | .[0] // empty' "$file" 2>/dev/null)
   [[ -n "$session_meta" ]] || die_runtime "no session.start record in $file"
 
-  local cwd model session_id
-  cwd=$(printf '%s' "$session_meta" | jq -r '.cwd // ""')
-  model=$(printf '%s' "$session_meta" | jq -r '.model // ""')
-  session_id=$(printf '%s' "$session_meta" | jq -r '.sessionId // ""')
-
-  # Fallback: if session.start's cwd is null/empty, try the sibling
+  # Fallback: if session.start's cwd/model is null/empty, read the sibling
   # workspace.yaml. (Real Copilot sessions emit null cwd at start in practice.)
-  local session_dir
+  local session_dir wy wy_cwd="" wy_model=""
   session_dir=$(dirname "$file")
-  local wy="$session_dir/workspace.yaml"
-  if [[ -z "$cwd" && -f "$wy" ]]; then
-    cwd=$(workspace_yaml_get "$wy" "cwd")
-  fi
-  if [[ -z "$model" && -f "$wy" ]]; then
-    model=$(workspace_yaml_get "$wy" "model")
+  wy="$session_dir/workspace.yaml"
+  if [[ -f "$wy" ]]; then
+    wy_cwd=$(workspace_yaml_get "$wy" "cwd")
+    wy_model=$(workspace_yaml_get "$wy" "model")
   fi
 
-  local short_id="${session_id:0:8}"
   local started_at
-  started_at=$(date -u -r "$file" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
-    || date -u -d "@$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file")" +%Y-%m-%dT%H:%M:%SZ)
+  started_at=$(file_iso_mtime "$file")
 
-  printf '{"cli":"copilot","session_id":%s,"short_id":%s,"cwd":%s,"model":%s,"started_at":%s}\n' \
-    "$(json_str_or_null "$session_id")" \
-    "$(json_str_or_null "$short_id")" \
-    "$(json_str_or_null "$cwd")" \
-    "$(json_str_or_null "$model")" \
-    "$(json_str_or_null "$started_at")"
+  printf '%s' "$session_meta" | jq -c \
+    --arg cli "copilot" \
+    --arg wy_cwd "$wy_cwd" \
+    --arg wy_model "$wy_model" \
+    --arg started_at "$started_at" \
+    '
+    def nn(x): (x // "") | select(. != "") // null;
+    . as $d
+    | ($d.sessionId // "") as $sid
+    | {
+        cli: $cli,
+        session_id: nn($sid),
+        short_id: nn($sid[:8]),
+        cwd: nn($d.cwd // $wy_cwd),
+        model: nn($d.model // $wy_model),
+        started_at: nn($started_at)
+      }
+    '
 }
 
 # Always prefer .data.content (the raw user text) over .data.transformedContent
@@ -225,19 +214,18 @@ meta_codex() {
   sm=$(jq -n -c '[inputs | select(.type == "session_meta") | .payload] | .[0] // empty' "$file" 2>/dev/null)
   [[ -n "$sm" ]] || die_runtime "no session_meta record in $file"
 
-  local session_id cwd model started_at
-  session_id=$(printf '%s' "$sm" | jq -r '.id // ""')
-  cwd=$(printf '%s' "$sm" | jq -r '.cwd // ""')
-  model=$(printf '%s' "$sm" | jq -r '.model_provider // ""')
-  started_at=$(printf '%s' "$sm" | jq -r '.timestamp // ""')
-
-  local short_id="${session_id:0:8}"
-  printf '{"cli":"codex","session_id":%s,"short_id":%s,"cwd":%s,"model":%s,"started_at":%s}\n' \
-    "$(json_str_or_null "$session_id")" \
-    "$(json_str_or_null "$short_id")" \
-    "$(json_str_or_null "$cwd")" \
-    "$(json_str_or_null "$model")" \
-    "$(json_str_or_null "$started_at")"
+  printf '%s' "$sm" | jq -c '
+    def nn(x): (x // "") | select(. != "") // null;
+    ((.id // "")) as $sid
+    | {
+        cli: "codex",
+        session_id: nn($sid),
+        short_id: nn($sid[:8]),
+        cwd: nn(.cwd),
+        model: nn(.model_provider),
+        started_at: nn(.timestamp)
+      }
+  '
 }
 
 prompts_codex() {

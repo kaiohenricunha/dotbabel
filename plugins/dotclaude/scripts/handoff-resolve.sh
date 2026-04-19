@@ -26,11 +26,8 @@ EOF
   exit 64
 }
 
-# Portable mtime+path printer (GNU or BSD stat).
-stat_mtime() {
-  local file="$1"
-  stat -c "%Y %n" "$file" 2>/dev/null || stat -f "%m %N" "$file" 2>/dev/null
-}
+UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+SHORT_UUID_RE='^[0-9a-f]{8}$'
 
 # Pick newest by mtime from stdin-separated file list. Prints path only.
 pick_newest() {
@@ -47,25 +44,25 @@ resolve_claude() {
     local hit
     hit="$(find "$root" -maxdepth 2 -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no claude sessions found under $root"
-    printf '%s' "$hit"
+    printf '%s\n' "$hit"
     return 0
   fi
 
   # Full UUID (36 chars, 5 hyphen-separated groups).
-  if [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  if [[ "$id" =~ $UUID_RE ]]; then
     local hit
     hit="$(find "$root" -maxdepth 2 -type f -name "${id}.jsonl" 2>/dev/null | head -1)"
     [[ -n "$hit" ]] || die_runtime "claude session not found for uuid: $id"
-    printf '%s' "$hit"
+    printf '%s\n' "$hit"
     return 0
   fi
 
   # Short UUID (first 8 hex).
-  if [[ "$id" =~ ^[0-9a-f]{8}$ ]]; then
+  if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
     hit="$(find "$root" -maxdepth 2 -type f -name "${id}*.jsonl" 2>/dev/null | head -1)"
     if [[ -n "$hit" ]]; then
-      printf '%s' "$hit"
+      printf '%s\n' "$hit"
       return 0
     fi
     # Fall through to customTitle scan if short-UUID lookup missed.
@@ -73,6 +70,7 @@ resolve_claude() {
 
   # Claude `custom-title` alias scan: `claude --resume "<name>"` stores
   # the alias as a JSONL record `{"type":"custom-title","customTitle":"<name>","sessionId":"<uuid>"}`.
+  # Prefilter with grep so we only jq-verify files that contain the alias.
   if command -v jq >/dev/null 2>&1; then
     local f session_id
     while IFS= read -r f; do
@@ -83,11 +81,11 @@ resolve_claude() {
         local hit
         hit="$(find "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" 2>/dev/null | head -1)"
         if [[ -n "$hit" ]]; then
-          printf '%s' "$hit"
+          printf '%s\n' "$hit"
           return 0
         fi
       fi
-    done < <(find "$root" -maxdepth 2 -type f -name '*.jsonl' 2>/dev/null)
+    done < <(grep -rl --include='*.jsonl' -F "\"customTitle\":\"${id}\"" "$root" 2>/dev/null)
   fi
 
   die_runtime "claude session not found for identifier: $id"
@@ -102,25 +100,25 @@ resolve_copilot() {
     local hit
     hit="$(find "$root" -maxdepth 2 -type f -name 'events.jsonl' 2>/dev/null | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no copilot sessions found under $root"
-    printf '%s' "$hit"
+    printf '%s\n' "$hit"
     return 0
   fi
 
   # Full UUID — direct path.
-  if [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  if [[ "$id" =~ $UUID_RE ]]; then
     local candidate="${root}/${id}/events.jsonl"
     [[ -f "$candidate" ]] || die_runtime "copilot session not found for uuid: $id"
-    printf '%s' "$candidate"
+    printf '%s\n' "$candidate"
     return 0
   fi
 
   # Short UUID — glob match on dir prefix.
-  if [[ "$id" =~ ^[0-9a-f]{8}$ ]]; then
+  if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
     hit="$(find "$root" -maxdepth 1 -type d -name "${id}*" 2>/dev/null | head -1)"
     [[ -n "$hit" && -f "$hit/events.jsonl" ]] \
       || die_runtime "copilot session not found for short-uuid: $id"
-    printf '%s' "$hit/events.jsonl"
+    printf '%s\n' "$hit/events.jsonl"
     return 0
   fi
 
@@ -136,16 +134,16 @@ resolve_codex() {
     local hit
     hit="$(find "$root" -type f -name 'rollout-*.jsonl' 2>/dev/null | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no codex sessions found under $root"
-    printf '%s' "$hit"
+    printf '%s\n' "$hit"
     return 0
   fi
 
   # Full UUID.
-  if [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+  if [[ "$id" =~ $UUID_RE ]]; then
     local hit
     hit="$(find "$root" -type f -name "rollout-*-${id}.jsonl" 2>/dev/null | head -1)"
     if [[ -n "$hit" ]]; then
-      printf '%s' "$hit"
+      printf '%s\n' "$hit"
       return 0
     fi
     # UUID-shaped but not on disk: fall through to alias scan in case someone
@@ -153,41 +151,32 @@ resolve_codex() {
   fi
 
   # Short UUID.
-  if [[ "$id" =~ ^[0-9a-f]{8}$ ]]; then
+  if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
     hit="$(find "$root" -type f -name "rollout-*-${id}-*.jsonl" 2>/dev/null | head -1)"
     if [[ -n "$hit" ]]; then
-      printf '%s' "$hit"
+      printf '%s\n' "$hit"
       return 0
     fi
     # Fall through to alias scan.
   fi
 
   # Alias scan: look for event_msg records with thread_name == "$id".
-  # jq is required here; on older systems fall back to a plain grep for the
-  # quoted string. jq is the happy path.
-  if command -v jq >/dev/null 2>&1; then
-    local f
-    while IFS= read -r f; do
+  # Prefilter with grep — rollout dirs can hold hundreds of files, jq-parsing
+  # each one is quadratic. Then jq-verify only candidates if jq is present.
+  local f
+  while IFS= read -r f; do
+    if command -v jq >/dev/null 2>&1; then
       local match
       match=$(jq -r --arg name "$id" '
         select(.type == "event_msg"
                and .payload.thread_name == $name)
         | input_filename' "$f" 2>/dev/null | head -1)
-      if [[ -n "$match" ]]; then
-        printf '%s' "$f"
-        return 0
-      fi
-    done < <(find "$root" -type f -name 'rollout-*.jsonl' 2>/dev/null)
-  else
-    local f
-    while IFS= read -r f; do
-      if grep -q "\"thread_name\":\"${id}\"" "$f" 2>/dev/null; then
-        printf '%s' "$f"
-        return 0
-      fi
-    done < <(find "$root" -type f -name 'rollout-*.jsonl' 2>/dev/null)
-  fi
+      [[ -n "$match" ]] || continue
+    fi
+    printf '%s\n' "$f"
+    return 0
+  done < <(grep -rl --include='rollout-*.jsonl' -F "\"thread_name\":\"${id}\"" "$root" 2>/dev/null)
 
   die_runtime "codex session not found for identifier: $id"
 }

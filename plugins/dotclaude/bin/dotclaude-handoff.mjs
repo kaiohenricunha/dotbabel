@@ -26,7 +26,7 @@ import { version } from "../src/index.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve as resolvePath } from "node:path";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 
 const SUBCOMMANDS = new Set(["resolve", "describe", "digest", "list", "file"]);
 const CLIS = new Set(["claude", "copilot", "codex"]);
@@ -77,29 +77,26 @@ function extractMeta(cli, file) {
   }
 }
 
-function extractPrompts(cli, file) {
-  const r = runScript(EXTRACT_SH, ["prompts", cli, file]);
-  if (r.status !== 0) return [];
+function extractLines(sub, cli, file, extra = []) {
+  const r = runScript(EXTRACT_SH, [sub, cli, file, ...extra]);
+  if (r.status !== 0) {
+    if (r.stderr.trim()) process.stderr.write(`dotclaude-handoff: ${sub}: ${r.stderr.trim()}\n`);
+    return [];
+  }
   return r.stdout.split("\n").filter((line) => line.trim().length > 0);
 }
 
-function extractTurns(cli, file, limit) {
-  const args = ["turns", cli, file];
-  if (limit) args.push(String(limit));
-  const r = runScript(EXTRACT_SH, args);
-  if (r.status !== 0) return [];
-  return r.stdout.split("\n").filter((line) => line.trim().length > 0);
-}
+const extractPrompts = (cli, file) => extractLines("prompts", cli, file);
+const extractTurns = (cli, file, limit) =>
+  extractLines("turns", cli, file, limit ? [String(limit)] : []);
 
 function nextStepFor(toCli) {
-  // The LLM on the target side will re-summarize; this is a mechanical cue.
   if (toCli === "codex") {
     return "Read the prompts and assistant turns above, then continue the task using the file paths mentioned. Treat this as a task specification.";
   }
   if (toCli === "copilot") {
     return "Help me pick up where this session left off; reference the prompts and findings above.";
   }
-  // claude (default)
   return "Continue from the last assistant turn using the same file scope and goals summarized above.";
 }
 
@@ -176,51 +173,72 @@ function renderHandoffBlock(meta, prompts, turns, toCli) {
   return lines.join("\n");
 }
 
+const UUID_HEAD_RE = /([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+
+const CLI_LAYOUTS = {
+  claude: {
+    root: (home) => join(home, ".claude", "projects"),
+    // ~/.claude/projects/<slug>/<uuid>.jsonl — one level deep.
+    walk: 1,
+    match: (name) => name.endsWith(".jsonl"),
+  },
+  copilot: {
+    root: (home) => join(home, ".copilot", "session-state"),
+    // ~/.copilot/session-state/<uuid>/events.jsonl — one level deep.
+    walk: 1,
+    match: (name) => name === "events.jsonl",
+  },
+  codex: {
+    root: (home) => join(home, ".codex", "sessions"),
+    // ~/.codex/sessions/YYYY/MM/DD/rollout-…-<uuid>.jsonl — three levels deep.
+    walk: 3,
+    match: (name) => name.startsWith("rollout-") && name.endsWith(".jsonl"),
+  },
+};
+
+function collectSessionFiles(root, walk, match) {
+  const files = [];
+  const recur = (dir, depth) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of entries) {
+      const full = join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (depth < walk) recur(full, depth + 1);
+      } else if (ent.isFile() && match(ent.name)) {
+        files.push(full);
+      }
+    }
+  };
+  recur(root, 0);
+  return files;
+}
+
 function listSessions(cli) {
-  // Delegate to handoff-resolve.sh's `latest` logic by shelling out to find.
-  // Newest-first per CLI.
-  const home = process.env.HOME ?? "";
-  let roots, pattern;
-  switch (cli) {
-    case "claude":
-      roots = [join(home, ".claude", "projects")];
-      pattern = "*.jsonl";
-      break;
-    case "copilot":
-      roots = [join(home, ".copilot", "session-state")];
-      pattern = "events.jsonl";
-      break;
-    case "codex":
-      roots = [join(home, ".codex", "sessions")];
-      pattern = "rollout-*.jsonl";
-      break;
-    default:
-      fail(EXIT_CODES.USAGE, `unknown cli: ${cli}`);
-  }
-  const root = roots[0];
+  const layout = CLI_LAYOUTS[cli];
+  if (!layout) fail(EXIT_CODES.USAGE, `unknown cli: ${cli}`);
+  const root = layout.root(process.env.HOME ?? "");
   if (!existsSync(root)) return [];
-  const res = spawnSync("sh", [
-    "-c",
-    `find "${root}" ${cli === "claude" ? "-maxdepth 2" : ""} -type f -name '${pattern}' 2>/dev/null | xargs -I{} sh -c 'stat -c "%Y %n" "{}" 2>/dev/null || stat -f "%m %N" "{}" 2>/dev/null' | sort -rn | head -50`,
-  ], { encoding: "utf8" });
+
   const rows = [];
-  for (const line of (res.stdout ?? "").split("\n")) {
-    if (!line.trim()) continue;
-    const spaceIdx = line.indexOf(" ");
-    if (spaceIdx < 0) continue;
-    const mtime = parseInt(line.slice(0, spaceIdx), 10);
-    const file = line.slice(spaceIdx + 1);
-    // Derive short_id from path.
-    let shortId = "?";
-    const m =
-      cli === "claude" ? file.match(/\/([0-9a-f]{8})-[0-9a-f]{4}-/) :
-      cli === "copilot" ? file.match(/\/([0-9a-f]{8})-[0-9a-f]{4}-/) :
-      /* codex */         file.match(/-([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jsonl$/);
-    if (m) shortId = m[1];
+  for (const file of collectSessionFiles(root, layout.walk, layout.match)) {
+    let mtime;
+    try {
+      mtime = statSync(file).mtimeMs / 1000;
+    } catch {
+      continue;
+    }
+    const m = file.match(UUID_HEAD_RE);
+    const shortId = m ? m[1] : "?";
     const when = new Date(mtime * 1000).toISOString().replace("T", " ").slice(0, 16);
     rows.push({ cli, short_id: shortId, file, mtime, when });
   }
-  return rows;
+  rows.sort((a, b) => b.mtime - a.mtime);
+  return rows.slice(0, 50);
 }
 
 // ---- main ---------------------------------------------------------------
@@ -241,10 +259,7 @@ if (argv.version) {
   process.exit(EXIT_CODES.OK);
 }
 
-// Bare form: `dotclaude-handoff <cli> <id>` is implicit `digest`.
-// If positional[0] is a known CLI name, shift it into the sub-command
-// slot and default sub-command to "digest". Otherwise the existing
-// sub-command dispatch runs.
+// Bare form `dotclaude-handoff <cli> <id>` is implicit `digest`.
 let sub, cli, id;
 if (argv.positional.length >= 1 && CLIS.has(argv.positional[0])) {
   sub = "digest";
@@ -261,6 +276,9 @@ if (argv.positional.length >= 1 && CLIS.has(argv.positional[0])) {
 
 const toCli = argv.flags.to ?? "claude";
 if (!CLIS.has(toCli)) fail(EXIT_CODES.USAGE, `--to must be one of: claude, copilot, codex`);
+
+const limit = argv.flags.limit ?? "20";
+if (!/^\d+$/.test(limit)) fail(EXIT_CODES.USAGE, `--limit must be a non-negative integer, got: ${limit}`);
 
 if (sub === "list") {
   const rows = listSessions(cli);
@@ -303,7 +321,7 @@ if (sub === "describe") {
   process.exit(EXIT_CODES.OK);
 }
 
-const turns = extractTurns(cli, file, argv.flags.limit ?? "20");
+const turns = extractTurns(cli, file, limit);
 
 if (sub === "digest") {
   process.stdout.write(renderHandoffBlock(meta, prompts, turns, toCli) + "\n");
