@@ -48,7 +48,7 @@ teardown() {
   make_many_transport_branches "$TRANSPORT_REPO" 10000
 
   # index 5000 → 00001388 (seeded by make_many_transport_branches as %08x).
-  run timeout 30s node "$BIN" pull 00001388 --via git-fallback
+  run timeout 30s node "$BIN" pull 00001388
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }

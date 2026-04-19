@@ -11,17 +11,17 @@ description: >
   Transfer conversation context between agentic CLIs (Claude Code, GitHub
   Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a
   source session transcript by UUID and produces either an inline summary,
-  a paste-ready handoff digest, a written markdown file, or a private
-  GitHub gist that another machine can pull. Use when switching agents
-  mid-task, recovering context, or moving between Windows/Linux/macOS
-  setups. Triggers on: "handoff", "transfer context",
+  a paste-ready handoff digest, a written markdown file, or a branch in a
+  user-owned private git repo that another machine can pull. Use when
+  switching agents mid-task, recovering context, or moving between
+  Windows/Linux/macOS setups. Triggers on: "handoff", "transfer context",
   "continue in codex", "continue in claude", "continue in copilot",
   "switch to codex", "switch to claude", "what was that session about",
   "claude --resume", "copilot --resume", "codex resume",
   "find the session where", "search sessions", "which session did I",
   "push handoff", "pull handoff", "handoff to other machine",
   "resume on my other laptop".
-argument-hint: "[<query>|push|pull|list] [<query>] [--tag <label>] [--via <transport>]"
+argument-hint: "[<query>|push|pull|list] [<query>] [--tag <label>]"
 tools: Glob, Read, Grep, Bash, Write
 effort: medium
 model: sonnet
@@ -63,7 +63,7 @@ It accepts:
   an `event_msg` record)
 
 **Collision model.** When a `<query>` matches in two or more roots (or
-matches two gists on `pull`), behavior depends on stdin:
+matches two remote handoffs on `pull`), behavior depends on stdin:
 
 - TTY → skill prompts interactively for a pick.
 - Non-TTY → exits 2 with a TSV candidate list on stderr (one line per
@@ -95,16 +95,11 @@ identifier. These remain reachable for scripting.
   than this date. Default: 30 days ago.
 - `--limit <N>` — `search` and `remote-list` only; max rows in the
   output table. Default: 20.
-- `--via <transport>` — `push`, `pull`, `remote-list`, `doctor` only.
-  Values: `github` (default, uses `gh gist`), `gist-token` (uses a
-  `DOTCLAUDE_GH_TOKEN` PAT directly), `git-fallback` (uses raw `git`
-  against a user-owned private repo). See
-  `references/transport-github.md` for transport details.
 - `--include-transcript` — `push` only; also uploads the last 50 turns
   of the raw session transcript. Off by default to minimise secret
   leakage blast radius.
 - `--tag <label>` — `push` only; human-readable label appended to the
-  gist description and stored in `metadata.json.tag`. Useful to
+  branch description and stored in `metadata.json.tag`. Useful to
   distinguish parallel handoffs from the same session.
 - `--from-file <path>` — `pull` only; skip the transport and load a
   local markdown file previously written by `file` (or any file
@@ -116,21 +111,18 @@ Only the remote sub-commands (`push`, `pull`, `remote-list`) require
 external tooling; local sub-commands continue to need only `jq` and
 the session files on disk.
 
-- `push` / `pull` / `remote-list` with `--via github` → `gh` CLI on
-  PATH, authenticated (`gh auth status`) with the `gist` scope.
-- `push` / `pull` / `remote-list` with `--via gist-token` → `curl` on
-  PATH and `DOTCLAUDE_GH_TOKEN` environment variable set to a PAT
-  with `gist` scope.
-- `push` / `pull` / `remote-list` with `--via git-fallback` → `git`
-  on PATH, a pre-existing user-owned private repo whose URL lives in
-  `DOTCLAUDE_HANDOFF_REPO` (no default — must be set; example:
-  `git@github.com:<user>/handoff-store.git`), and working SSH or
-  credential-helper auth to that repo.
+The remote transport is a user-owned private git repository (any
+provider — GitHub, GitLab, Gitea, self-hosted). Prerequisites:
 
-Run `/handoff doctor --via <transport>` at any time to verify
-prerequisites and get a platform-specific remediation block. Full
-install matrix and workarounds live in
-`references/prerequisites.md`.
+- `git` on PATH.
+- A pre-existing private repo whose URL lives in
+  `DOTCLAUDE_HANDOFF_REPO` (no default — must be set; example:
+  `git@github.com:<user>/handoff-store.git`).
+- Working SSH or credential-helper auth to that repo.
+
+Run `/handoff doctor` at any time to verify prerequisites and get a
+platform-specific remediation block. Full install matrix and
+workarounds live in `references/prerequisites.md`.
 
 ---
 
@@ -327,27 +319,21 @@ on the chosen row.
 
 ---
 
-### `push [<query>] [--from <cli>] [--to <target-cli>] [--via <transport>] [--include-transcript] [--tag <label>]`
+### `push [<query>] [--from <cli>] [--to <target-cli>] [--include-transcript] [--tag <label>]`
 
-Upload a handoff digest to a remote transport so the context can be
-resumed on a different machine. Use when switching laptops/distros
-and you need the next agent on the other side to pick up the thread.
+Upload a handoff digest to the remote git transport so the context
+can be resumed on a different machine. Use when switching
+laptops/distros and you need the next agent on the other side to
+pick up the thread.
 
-The `<cli>` positional was removed (see CHANGELOG `[Unreleased]`).
-Resolution now auto-detects across all three roots; narrow with
-`--from <cli>` when scripting or when short-UUID collisions demand
-a specific root.
-
-**Runtime split.** The `dotclaude-handoff` binary only implements
-`--via git-fallback` today; `--via github` and `--via gist-token`
-require the `/handoff` skill runtime inside Claude Code or Copilot.
-Invoking the binary with `--via github` exits 64 and points at this
-split. The step list below describes the skill-runtime behaviour.
+The `<cli>` positional was removed in v0.8.0. Resolution now
+auto-detects across all three roots; narrow with `--from <cli>` when
+scripting or when short-UUID collisions demand a specific root.
 
 **Steps:**
 
-1. Run `/handoff doctor --via <transport>` preflight. On failure,
-   print the remediation block and stop — do not touch the transport.
+1. Run `/handoff doctor` preflight. On failure, print the
+   remediation block and stop — do not touch the transport.
 2. Resolve the session file. With no `<query>`, fall back to the
    host-detected CLI's "latest" session (or the union across all
    roots when no host signal is present); emit a single stderr line
@@ -371,102 +357,76 @@ split. The step list below describes the skill-runtime behaviour.
 6. If `--include-transcript` is set, build `transcript.jsonl` from
    the last 50 turns of the raw session JSONL, then run the same
    scrubbing pass over it.
-7. Encode the gist description by calling
+7. Encode the description by calling
    `plugins/dotclaude/scripts/handoff-description.sh encode
 --cli <cli> --short-id <short_id> --project <project-slug>
 --hostname <hostname> [--tag <tag>]`. The script prints the
    `handoff:v1:...` string on stdout. Description schema:
    `handoff:v1:<cli>:<short-uuid>:<project-slug>:<hostname>[:<tag>]`.
-8. Upload via the chosen transport (see
-   `references/transport-github.md` for the exact commands per
-   `--via` value):
-   - `--via github` → `gh gist create --desc "<description>" ...`
-     with `handoff.yaml`, `metadata.json`, and optional
-     `transcript.jsonl`.
-   - `--via gist-token` → `curl -H "Authorization: token
-$DOTCLAUDE_GH_TOKEN" https://api.github.com/gists` with the
-     same payload.
-   - `--via git-fallback` → branch + commit + push to
-     `$DOTCLAUDE_HANDOFF_REPO`, branch name
-     `handoff/<cli>/<short-uuid>`.
+8. Push to `$DOTCLAUDE_HANDOFF_REPO` on a branch named
+   `handoff/<cli>/<short-uuid>`. Commit message is the encoded
+   description; commit contents are `handoff.md`, `metadata.json`,
+   and `description.txt` (and `transcript.jsonl` when
+   `--include-transcript` is set).
 9. Print to stdout, one field per line:
 
    ```text
-   <gist-id-or-branch-name>
-   <gist-url-or-repo-ref>
+   <branch-name>
+   <repo-url>
    Scrubbed <N> secrets
    ```
 
-   No other commentary. If the transport failed, print the exact
-   error plus the `--via <alt>` fallback suggestion from
-   `references/transport-github.md`, then exit non-zero.
+   No other commentary. If the push failed, print the exact error
+   and exit non-zero.
 
-### `pull [<handle>] [--to <target-cli>] [--via <transport>] [--from-file <path>]`
+### `pull [<handle>] [--to <target-cli>] [--from-file <path>]`
 
 Fetch a previously pushed handoff and render the `<handoff>` block
 for the target agent. Use when you sat down at the other machine
 and want to continue.
 
-The `<cli>` positional was removed (see CHANGELOG `[Unreleased]`).
-Bare `pull` (no `<handle>`) fetches the newest handoff on the
-transport; provide a `<handle>` (gist id, URL, or fuzzy substring
-over tag/short-UUID/project/hostname) to pick a specific one. Use
-`--from <cli>` to restrict the candidate pool to one source-CLI's
-branches when the `git-fallback` transport holds handoffs from
+The `<cli>` positional was removed in v0.8.0. Bare `pull` (no
+`<handle>`) fetches the newest handoff on the transport; provide a
+`<handle>` (fuzzy substring over tag/short-UUID/project/hostname or
+the explicit `handoff/<cli>/<short>` branch name) to pick a specific
+one. Use `--from <cli>` to restrict the candidate pool to one
+source-CLI's branches when the transport holds handoffs from
 multiple hosts.
-
-**Runtime split.** The `dotclaude-handoff` binary only implements
-`--via git-fallback` today; `--via github` and `--via gist-token`
-require the `/handoff` skill runtime inside Claude Code or Copilot.
-Invoking the binary with `--via github` exits 64 and points at this
-split.
 
 **Steps:**
 
 1. If `--from-file` is set, read the file, extract the
    `<handoff>...</handoff>` block, tune `next_step_suggestion` for
-   `--to`, print, and stop. This is the offline / gh-less path.
-2. Otherwise run `/handoff doctor --via <transport>` preflight. On
-   failure, print the remediation block plus the `--from-file`
-   suggestion and stop.
+   `--to`, print, and stop. This is the offline path.
+2. Otherwise run `/handoff doctor` preflight. On failure, print the
+   remediation block plus the `--from-file` suggestion and stop.
 3. Resolve the handle:
-   - Literal gist ID (hex) → use as-is.
-   - URL like `https://gist.github.com/<user>/<id>` → extract the
-     id with a simple regex.
-   - `latest` → call `remote-list --limit 1 --via <transport>`
-     (optionally filtered by `--cli`) and take the first row's id.
-4. Fetch the gist contents:
-   - `--via github` → `gh gist view <id> --filename handoff.yaml --raw`.
-   - `--via gist-token` → `curl -s -H "Authorization: token
-$DOTCLAUDE_GH_TOKEN"
-https://api.github.com/gists/<id>` and read
-     `.files["handoff.yaml"].content`.
-   - `--via git-fallback` → shallow-clone the repo, `git show
-handoff/<cli>/<short-uuid>:handoff.yaml`.
+   - Explicit branch name `handoff/<cli>/<short>` → use as-is.
+   - Fuzzy substring → match against branch names and decoded
+     descriptions; on collision, prompt (TTY) or exit 2 with the
+     candidate list (non-TTY).
+   - `latest` → call `remote-list --limit 1` (optionally filtered by
+     `--from <cli>`) and take the first row's branch.
+4. Shallow-clone the repo and `git show
+handoff/<cli>/<short-uuid>:handoff.md` (the file written by
+   `push`).
 5. Tune `next_step_suggestion` for `--to` per
    `references/digest-schema.md`.
 6. Print the `<handoff>...</handoff>` block, unchanged otherwise,
    with no commentary before or after.
 
-### `remote-list [--via <transport>] [--cli <cli>] [--since <ISO>] [--limit <N>]`
+### `remote-list [--cli <cli>] [--since <ISO>] [--limit <N>]`
 
 List recent handoffs on the transport, newest first. Useful when
 you forgot which one to pull or want a scrollback.
 
 **Steps:**
 
-1. Run `/handoff doctor --via <transport>` preflight. On failure,
-   print the remediation block and stop.
-2. Enumerate remote entries:
-   - `--via github` → `gh api '/gists?per_page=100'` (the `gist list`
-     subcommand lacks `--json`, so we use the REST API directly;
-     filter `.public == false` to exclude public gists).
-   - `--via gist-token` → `curl -s -H "Authorization: token
-$DOTCLAUDE_GH_TOKEN"
-https://api.github.com/gists?per_page=100`.
-   - `--via git-fallback` → `git ls-remote
-$DOTCLAUDE_HANDOFF_REPO 'handoff/*'` with a sort pass by
-     committer-date (shallow fetch of refs meta only).
+1. Run `/handoff doctor` preflight. On failure, print the
+   remediation block and stop.
+2. Enumerate remote entries: `git ls-remote $DOTCLAUDE_HANDOFF_REPO
+'handoff/*'` followed by a sort pass by committer-date (shallow
+   fetch of refs meta only).
 3. Filter to descriptions starting with `handoff:v1:`. If `--cli` is
    set, additionally require the third colon-segment to match.
 4. Decode each row with
@@ -477,17 +437,17 @@ $DOTCLAUDE_HANDOFF_REPO 'handoff/*'` with a sort pass by
 6. Render a table:
 
    ```markdown
-   | Gist ID | CLI | Short UUID | Project | Hostname | Tag | Updated |
-   | ------- | --- | ---------- | ------- | -------- | --- | ------- |
+   | Branch | CLI | Short UUID | Project | Hostname | Tag | Updated |
+   | ------ | --- | ---------- | ------- | -------- | --- | ------- |
    ```
 
 7. If zero rows survive, print exactly:
 
    ```text
-   No handoffs found on <transport>
+   No handoffs found
    ```
 
-### `doctor [--via <transport>]`
+### `doctor`
 
 Run the preflight prerequisite checks without touching the
 transport. Prints an exact remediation block on failure. Use to
@@ -495,24 +455,18 @@ verify setup before the first `push` or on a fresh machine.
 
 **Steps:**
 
-1. Select the transport (`--via`, default `github`).
-2. Invoke `plugins/dotclaude/scripts/handoff-doctor.sh <transport>`.
-   The script returns:
-   - exit 0 on success, printing a single-line `ok: <transport>`
-     summary.
+1. Invoke `plugins/dotclaude/scripts/handoff-doctor.sh`. The script
+   takes no arguments and returns:
+   - exit 0 on success, printing `ok` on stdout.
    - exit non-zero on failure, printing a structured remediation
      block of the form documented in
      `references/prerequisites.md`.
-3. Do not emit any additional commentary. The script output is the
+2. Do not emit any additional commentary. The script output is the
    contract.
 
-The script enumerates: `gh` on PATH, `gh auth status -h
-github.com`, the `gist` OAuth scope (via `gh api user -i`), network
-reach (`gh api /`), and clock sanity (warn only). For
-`gist-token`, it checks `DOTCLAUDE_GH_TOKEN` presence and calls
-`GET /user` to confirm the token is valid. For `git-fallback`, it
-checks `git` on PATH and `git ls-remote $DOTCLAUDE_HANDOFF_REPO`
-reachability.
+The script enumerates: `git` on PATH, `DOTCLAUDE_HANDOFF_REPO`
+present and pointing at a reachable repo (`git ls-remote $repo
+HEAD`), and clock sanity (warn only).
 
 ---
 
@@ -536,9 +490,11 @@ reachability.
   `file`, `list`, `search`). The caller is responsible for not passing
   sensitive transcripts through those outputs. Redaction IS applied
   on `push` because the payload leaves the machine.
-- End-to-end encryption. Scrubbing is best-effort pattern matching;
-  private gists are URL-visible and not encrypted at rest. Do not push
-  transcripts that contain secrets you rely on scrubbing to catch.
+- End-to-end encryption. Scrubbing is best-effort pattern matching.
+  The git transport is access-controlled by the host (private repo on
+  GitHub/GitLab/Gitea/etc.), but content is stored in plaintext on the
+  remote — do not push transcripts that contain secrets you rely on
+  scrubbing to catch.
 - Fuzzy or semantic search. `search` is substring/regex only. If a user
   wants semantic retrieval, direct them to the raw transcripts.
 - Persistent indexing. Grep-at-query-time is fast enough for local

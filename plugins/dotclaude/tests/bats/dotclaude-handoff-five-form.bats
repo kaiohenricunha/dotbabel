@@ -7,8 +7,9 @@
 #   dotclaude handoff pull  [<query>]          # pull by fuzzy match; bare = latest
 #   dotclaude handoff list                     # unified local + remote table
 #
-# Transport for push/pull tests: `--via git-fallback` against a local
-# bare repo (DOTCLAUDE_HANDOFF_REPO). No GitHub auth required.
+# Transport for push/pull tests: a local bare repo named by
+# DOTCLAUDE_HANDOFF_REPO. The git transport is the only remote
+# transport since v0.9.0; no GitHub auth required.
 
 load helpers
 
@@ -41,8 +42,8 @@ EOF
 {"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"running"}]}}
 EOF
 
-  # Set up a bare git repo as the git-fallback transport endpoint.
-  # Push/pull tests use `--via git-fallback` which doesn't need GitHub auth.
+  # Set up a bare git repo as the remote transport endpoint.
+  # Push/pull tests run against this local repo — no GitHub auth needed.
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
@@ -126,7 +127,7 @@ teardown() {
 # -- push (git-fallback transport) ---------------------------------------
 
 @test "push <query> uploads to transport (git-fallback bare repo)" {
-  run node "$BIN" push my-feature --via git-fallback
+  run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
   # Confirm the transport repo has the new branch.
   run bash -c "git --git-dir='$TRANSPORT_REPO' branch -a"
@@ -135,7 +136,7 @@ teardown() {
 }
 
 @test "push --tag label embeds tag in the transport description" {
-  run node "$BIN" push my-feature --via git-fallback --tag finishing-auth
+  run node "$BIN" push my-feature --tag finishing-auth
   [ "$status" -eq 0 ]
   # The description line includes the tag (commit message carries it).
   run bash -c "git --git-dir='$TRANSPORT_REPO' log --format=%s handoff/claude/aaaa1111"
@@ -144,7 +145,7 @@ teardown() {
 }
 
 @test "push (zero-arg) pushes host's latest session" {
-  run node "$BIN" push --via git-fallback
+  run node "$BIN" push
   [ "$status" -eq 0 ]
   run bash -c "git --git-dir='$TRANSPORT_REPO' branch -a"
   [[ "$output" == *"handoff/"* ]]
@@ -154,35 +155,35 @@ teardown() {
 
 @test "pull <tag-substring> fetches by tag match" {
   # First push with a tag, then try to pull by that tag.
-  run node "$BIN" push my-feature --via git-fallback --tag finishing-auth
+  run node "$BIN" push my-feature --tag finishing-auth
   [ "$status" -eq 0 ]
-  run node "$BIN" pull finishing-auth --via git-fallback
+  run node "$BIN" pull finishing-auth
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
 
 @test "pull <short-uuid> fetches by short UUID match" {
-  run node "$BIN" push my-feature --via git-fallback
+  run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
-  run node "$BIN" pull aaaa1111 --via git-fallback
+  run node "$BIN" pull aaaa1111
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
 
 @test "pull (zero-arg) fetches the latest" {
-  run node "$BIN" push my-feature --via git-fallback --tag keepme
+  run node "$BIN" push my-feature --tag keepme
   [ "$status" -eq 0 ]
-  run node "$BIN" pull --via git-fallback
+  run node "$BIN" pull
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
 
 @test "pull collision on non-TTY exits 2 with candidate list" {
-  run node "$BIN" push my-feature --via git-fallback --tag alpha
+  run node "$BIN" push my-feature --tag alpha
   [ "$status" -eq 0 ]
-  run node "$BIN" push my-codex-task --via git-fallback --tag alpha-beta
+  run node "$BIN" push my-codex-task --tag alpha-beta
   [ "$status" -eq 0 ]
-  run node "$BIN" pull alpha --via git-fallback </dev/null
+  run node "$BIN" pull alpha </dev/null
   [ "$status" -eq 2 ]
   [[ "$output" == *"handoff/claude/aaaa1111"* ]] || [[ "$output" == *"handoff/codex/bbbb2222"* ]]
 }
@@ -220,14 +221,14 @@ teardown() {
   # from `resolveAny("latest")` (union) to the codex-only "latest".
   # setup() seeds codex with bbbb2222 as the newest of its root.
   run env -i HOME="$TEST_HOME" PATH="$PATH" DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
-    node "$BIN" push --from codex --via git-fallback
+    node "$BIN" push --from codex
   [ "$status" -eq 0 ]
   run git --git-dir="$TRANSPORT_REPO" branch -a
   [[ "$output" == *"handoff/codex/bbbb2222"* ]]
 }
 
 @test "push --from with an unknown CLI exits 64" {
-  run node "$BIN" push --from bogus --via git-fallback
+  run node "$BIN" push --from bogus
   [ "$status" -eq 64 ]
   [[ "$output" == *"--from must be one of"* ]]
 }
@@ -236,18 +237,18 @@ teardown() {
   # Push one handoff per CLI, then pull with --from codex and confirm
   # the returned block names the codex session (bbbb2222), not the
   # claude one (aaaa1111). Proves --from is wired through pullGitFallback.
-  run node "$BIN" push my-feature --via git-fallback
+  run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
-  run node "$BIN" push my-codex-task --via git-fallback
+  run node "$BIN" push my-codex-task
   [ "$status" -eq 0 ]
-  run node "$BIN" pull --from codex --via git-fallback
+  run node "$BIN" pull --from codex
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
   [[ "$output" != *"aaaa1111"* ]]
 }
 
 @test "pull --from with an unknown CLI exits 64" {
-  run node "$BIN" pull --from bogus --via git-fallback
+  run node "$BIN" pull --from bogus
   [ "$status" -eq 64 ]
   [[ "$output" == *"--from must be one of"* ]]
 }
@@ -259,7 +260,7 @@ teardown() {
   # explicitly asked for codex from inside a Claude Code session.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
-    node "$BIN" push --from codex --via git-fallback
+    node "$BIN" push --from codex
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"using --from codex override"* ]]
   run git --git-dir="$TRANSPORT_REPO" branch -a
@@ -274,7 +275,7 @@ teardown() {
   # path uses the union resolver with the matching stderr note.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
-    node "$BIN" push --via git-fallback
+    node "$BIN" push
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"host not detected"* ]]
   [[ "$stderr" == *"latest across all clis"* ]]
@@ -286,8 +287,28 @@ teardown() {
   # root, so its short-UUID must surface in the stderr note.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
-    node "$BIN" push --via git-fallback
+    node "$BIN" push
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"latest claude session"* ]]
   [[ "$stderr" == *"aaaa1111"* ]]
+}
+
+# -- --via flag removal (v0.9.0 breaking change) -------------------------
+
+@test "--via with any value exits 64 (gist transport removed)" {
+  # The flag was deleted along with the gist transports. The argv
+  # parser is the first line of defence — it rejects --via as an
+  # unknown option, so legacy scripts surface the migration via the
+  # usage error rather than silently accepting a no-op flag.
+  run node "$BIN" push --via github
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--via"* ]]
+
+  run node "$BIN" push --via git-fallback
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--via"* ]]
+
+  run node "$BIN" pull --via github
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--via"* ]]
 }

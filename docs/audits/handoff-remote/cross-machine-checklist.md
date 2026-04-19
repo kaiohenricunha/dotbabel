@@ -1,5 +1,13 @@
 # Handoff remote — cross-machine sign-off
 
+> **STATUS: SUPERSEDED (v0.9.0).** This audit was performed against the
+> v0.7.0 gist transports (`--via github`, `--via gist-token`, `--via
+git-fallback`). v0.9.0 deleted the gist paths entirely; the only
+> remote transport now is the user-owned private git repo named by
+> `DOTCLAUDE_HANDOFF_REPO`. This file is preserved as historical
+> evidence — do **not** treat it as a live runbook. A fresh sign-off
+> for the git-only transport lives in a future audit.
+
 Fill in once per OS pair (e.g. Windows ↔ PopOS). Re-sign only if the
 description schema or payload shape changes in a backwards-
 incompatible way.

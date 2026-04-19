@@ -51,16 +51,16 @@ Same works with a full UUID or a Claude `customTitle`:
 On machine A (before closing):
 
 ```
-!dotclaude handoff push my-feature --tag end-of-day --via git-fallback
+!dotclaude handoff push my-feature --tag end-of-day
 ```
 
 On machine B:
 
 ```
-!dotclaude handoff pull end-of-day --via git-fallback
+!dotclaude handoff pull end-of-day
 ```
 
-or bare `!dotclaude handoff pull --via git-fallback` to pick up the latest handoff.
+or bare `!dotclaude handoff pull` to pick up the latest handoff.
 
 ## Prerequisite
 

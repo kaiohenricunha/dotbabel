@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # Behavior tests for plugins/dotclaude/scripts/handoff-description.sh.
-# Encodes/decodes the gist description schema:
+# Encodes/decodes the transport-neutral description schema:
 #   handoff:v1:<cli>:<short-uuid>:<project-slug>:<hostname>[:<tag>]
 
 load helpers

@@ -39,9 +39,9 @@ teardown() {
   # non-zero. Contention is not corruption — we only require that at
   # least one succeeds, the ref tip is a real commit, and fsck is clean.
   run timeout 15s bash -c "
-    node '$BIN' push integration-demo --via git-fallback >/dev/null 2>&1 &
+    node '$BIN' push integration-demo >/dev/null 2>&1 &
     pid1=\$!
-    node '$BIN' push integration-demo --via git-fallback >/dev/null 2>&1 &
+    node '$BIN' push integration-demo >/dev/null 2>&1 &
     pid2=\$!
     wait \$pid1
     rc1=\$?
@@ -59,16 +59,16 @@ teardown() {
 }
 
 @test "two concurrent pulls of same branch both emit valid <handoff> blocks" {
-  run node "$BIN" push integration-demo --via git-fallback
+  run node "$BIN" push integration-demo
   [ "$status" -eq 0 ]
 
   local out1_file out2_file
   out1_file=$(mktemp)
   out2_file=$(mktemp)
   run timeout 15s bash -c "
-    node '$BIN' pull aaaa1111 --via git-fallback > '$out1_file' 2>/dev/null &
+    node '$BIN' pull aaaa1111 > '$out1_file' 2>/dev/null &
     pid1=\$!
-    node '$BIN' pull aaaa1111 --via git-fallback > '$out2_file' 2>/dev/null &
+    node '$BIN' pull aaaa1111 > '$out2_file' 2>/dev/null &
     pid2=\$!
     wait \$pid1
     rc1=\$?
@@ -125,7 +125,7 @@ teardown() {
 }
 
 @test "pull during concurrent push returns a consistent <handoff> block" {
-  run node "$BIN" push integration-demo --via git-fallback
+  run node "$BIN" push integration-demo
   [ "$status" -eq 0 ]
 
   # `git clone --depth 1 --branch <b>` is atomic at the ref level on the
@@ -133,9 +133,9 @@ teardown() {
   local pull_out
   pull_out=$(mktemp)
   run timeout 15s bash -c "
-    node '$BIN' push integration-demo --via git-fallback >/dev/null 2>&1 &
+    node '$BIN' push integration-demo >/dev/null 2>&1 &
     push_pid=\$!
-    node '$BIN' pull aaaa1111 --via git-fallback > '$pull_out' 2>/dev/null
+    node '$BIN' pull aaaa1111 > '$pull_out' 2>/dev/null
     rc_pull=\$?
     wait \$push_pid
     rc_push=\$?

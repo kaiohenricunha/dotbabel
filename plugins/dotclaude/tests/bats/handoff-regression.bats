@@ -89,7 +89,7 @@ teardown() {
   # Seed a session so push has something to extract.
   make_claude_session_tree "$TEST_HOME" "eeee5555-5555-5555-5555-555555555555"
   DOTCLAUDE_HANDOFF_REPO="$bare" \
-    run node "$HANDOFF_BIN" push eeee5555 --via git-fallback
+    run node "$HANDOFF_BIN" push eeee5555
   # The push path may fail later for unrelated reasons in a hermetic env
   # (no git user config etc.) — what we care about is that the URL
   # validator did NOT reject up-front. Accept exit 0 OR a non-URL-related

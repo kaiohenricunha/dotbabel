@@ -2,11 +2,13 @@
 
 _Last updated: v0.8.0_
 
-> **Added in v0.5.0.** Full skill reference: [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
+> **Added in v0.5.0; reworked in v0.9.0** to drop the gist transports.
+> Full skill reference: [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
 
 The `/handoff` skill moves live session context from one agentic CLI to another —
 Claude Code, GitHub Copilot CLI, OpenAI Codex CLI — on the same machine or across
-machines. Nine sub-commands, three transports, one scrubbed digest.
+machines. Nine sub-commands, one transport (a user-owned private git repo), one
+scrubbed digest.
 
 ---
 
@@ -25,6 +27,24 @@ machines. Nine sub-commands, three transports, one scrubbed digest.
 
 ---
 
+## One-time setup
+
+The remote transport is a user-owned private git repository (any provider —
+GitHub, GitLab, Gitea, self-hosted). Create one once, then point
+`DOTCLAUDE_HANDOFF_REPO` at it:
+
+```bash
+gh repo create handoff-store --private
+echo 'export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git' >> ~/.zshrc
+source ~/.zshrc
+/handoff doctor                  # verify
+```
+
+You can also use HTTPS (`https://github.com/<user>/handoff-store.git`), self-hosted
+URLs, or local paths. The only requirement is that your account can push.
+
+---
+
 ## Quick start — machine-to-machine handoff
 
 **On machine A** (inside any session on Claude, Copilot, or Codex):
@@ -40,8 +60,8 @@ This:
 
 1. Loads the relevant session transcript.
 2. Runs a secret-scrubbing pass (eight token patterns — bearer, AWS key, etc.).
-3. Uploads as a private GitHub Gist via `gh gist` (default), or via
-   `--via git-fallback` / `--via gist-token` for restricted environments.
+3. Pushes a `handoff/<cli>/<short-uuid>` branch into
+   `$DOTCLAUDE_HANDOFF_REPO`.
 
 **On machine B** (inside any CLI):
 
@@ -55,21 +75,6 @@ CLI name.
 
 ---
 
-## Transports
-
-Three transports, picked with `--via`:
-
-| Transport        | Flag                 | Requirements                                                | When to use                                 |
-| ---------------- | -------------------- | ----------------------------------------------------------- | ------------------------------------------- |
-| GitHub (default) | `--via github`       | `gh` CLI on PATH, authenticated with `gist` scope           | Default — works on most hosts               |
-| Token-based      | `--via gist-token`   | `curl` + `DOTCLAUDE_GH_TOKEN` PAT with `gist` scope         | Hosts where `gh` isn't installable          |
-| Raw git          | `--via git-fallback` | `git` + `DOTCLAUDE_HANDOFF_REPO` pointing at a private repo | Corporate hosts where GitHub API is blocked |
-
-Run `/handoff doctor --via <transport>` to verify prerequisites and get a
-platform-specific remediation block.
-
----
-
 ## The five forms
 
 | Form                  | Behavior                                              |
@@ -77,7 +82,7 @@ platform-specific remediation block.
 | `/handoff`            | Push the host's latest session                        |
 | `/handoff <query>`    | Local cross-agent: emit `<handoff>` block in place    |
 | `/handoff push [<q>]` | Upload to transport; zero-arg = host latest           |
-| `/handoff pull [<q>]` | Fetch from transport; zero-arg = newest gist          |
+| `/handoff pull [<q>]` | Fetch from transport; zero-arg = newest handoff       |
 | `/handoff list`       | Unified local + remote table (`--local` / `--remote`) |
 
 Every `<query>` can be a full UUID, short UUID (first 8 hex), `latest`,
@@ -119,7 +124,7 @@ argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.m
 **Scheduled remote handoff** (e.g. running as a /loop or cron):
 
 ```
-/handoff push --via github --tag "nightly checkpoint"
+/handoff push --tag "nightly checkpoint"
 ```
 
 ---
@@ -129,8 +134,10 @@ argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.m
 - **Push-side scrubbing**: eight secret patterns (AWS access keys, bearer tokens,
   `*_KEY`/`*_TOKEN`/`*_SECRET` with 20+ char values, PAT prefixes) are stripped
   before upload.
-- **Gists are private by default** (`gh gist create` without `--public`). Do not
-  add `--public`.
+- **Transport is access-controlled**: `DOTCLAUDE_HANDOFF_REPO` points at a
+  private repo. Push access is enforced by your provider's auth (SSH keys,
+  PATs, credential helper). Content is stored in plaintext on the remote — do
+  not push transcripts containing secrets you rely on scrubbing to catch.
 - **`--include-transcript` is opt-in** — uploading raw turns increases secret
   leakage blast radius. Off by default.
 - The skill never invokes another CLI itself — it produces the digest and hands
@@ -142,13 +149,12 @@ argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.m
 ## Troubleshooting
 
 See [troubleshooting.md — skills & commands](./troubleshooting.md#skills--commands-dotfile-users).
-For transport-specific failures, start with:
+For transport failures, start with:
 
 ```
-/handoff doctor --via github
-/handoff doctor --via gist-token
-/handoff doctor --via git-fallback
+/handoff doctor
 ```
 
-Each prints a platform-specific remediation block with the exact commands to fix
-the failure mode it detected.
+It prints a platform-specific remediation block with the exact commands to fix
+the failure mode it detected (missing `git`, unset `DOTCLAUDE_HANDOFF_REPO`,
+unreachable repo).

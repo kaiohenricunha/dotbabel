@@ -5,9 +5,12 @@
  * Usage:
  *   dotclaude handoff                              push host's latest session
  *   dotclaude handoff <query>                      local cross-agent: emit <handoff> block
- *   dotclaude handoff push [<query>] [--tag <label>] [--via <transport>]
- *   dotclaude handoff pull [<query>] [--via <transport>]
- *   dotclaude handoff list [--local|--remote] [--via <transport>]
+ *   dotclaude handoff push [<query>] [--tag <label>]
+ *   dotclaude handoff pull [<query>]
+ *   dotclaude handoff list [--local|--remote]
+ *
+ * Remote transport is always git: push/pull commit a `handoff/<cli>/<short>`
+ * branch into the user-owned private repo named by `DOTCLAUDE_HANDOFF_REPO`.
  *
  * Power-user sub-commands (still work):
  *   resolve   <cli> <id>         print resolved session file path
@@ -43,17 +46,15 @@ import { createInterface } from "node:readline";
 
 const POWER_SUBS = new Set(["resolve", "describe", "digest", "file"]);
 const CLIS = new Set(["claude", "copilot", "codex"]);
-const TRANSPORTS = new Set(["git-fallback", "github"]);
 
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [<query>|push|pull|list] [<query>] [--from <cli>] [--to <cli>] [--tag <label>] [--via <transport>]",
+    "dotclaude handoff [<query>|push|pull|list] [<query>] [--from <cli>] [--to <cli>] [--tag <label>]",
   description:
-    "Cross-agent and cross-machine session handoff. Bare <query> emits a <handoff> block for local cross-agent. push/pull/list handle the remote transport.",
+    "Cross-agent and cross-machine session handoff. Bare <query> emits a <handoff> block for local cross-agent. push/pull/list handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO).",
   flags: {
     tag: { type: "string" },
-    via: { type: "string" },
     from: { type: "string" },
     to: { type: "string" },
     limit: { type: "string" },
@@ -349,7 +350,7 @@ function listAllLocalSessions() {
 
 function requireTransportRepo() {
   const url = process.env.DOTCLAUDE_HANDOFF_REPO;
-  if (!url) fail(2, "DOTCLAUDE_HANDOFF_REPO env var must be set for --via git-fallback");
+  if (!url) fail(2, "DOTCLAUDE_HANDOFF_REPO env var must be set for the remote git transport");
   // Reject ext:: and other exec-triggering Git URL schemes (CVE-2017-1000117-class).
   // Allow: https://, http://, git@, ssh://, file://, and absolute paths (bare repos).
   if (!/^(https?:\/\/|git@|ssh:\/\/|file:\/\/|\/)/.test(url))
@@ -618,8 +619,10 @@ if (argv.version) {
   process.exit(EXIT_CODES.OK);
 }
 
-const via = (argv.flags.via ?? "github").toString();
-if (!TRANSPORTS.has(via)) fail(EXIT_CODES.USAGE, `--via must be one of: ${[...TRANSPORTS].join(", ")}`);
+// Note: `--via` was removed in v0.9.0 along with the gist transports.
+// The argv parser rejects it as an unknown option; no explicit guard
+// needed here. Bats coverage for the rejection lives in
+// dotclaude-handoff-five-form.bats.
 
 const limit = argv.flags.limit ?? "20";
 if (!/^\d+$/.test(limit.toString())) fail(EXIT_CODES.USAGE, `--limit must be a non-negative integer, got: ${limit}`);
@@ -638,14 +641,6 @@ const [first, second, third] = argv.positional;
 function shortIdFromPath(path) {
   const m = path?.match(UUID_HEAD_RE);
   return m ? m[1] : "?";
-}
-
-function requireGitFallbackTransport(transport) {
-  if (transport === "git-fallback") return;
-  fail(
-    EXIT_CODES.USAGE,
-    `transport '${transport}' not yet implemented in the binary; use --via git-fallback (or invoke the /handoff skill inside Claude/Copilot for --via github)`
-  );
 }
 
 async function main() {
@@ -670,7 +665,7 @@ async function main() {
         rows.push({ ...r, location: "local" });
       }
     }
-    if (showRemote && via === "git-fallback" && process.env.DOTCLAUDE_HANDOFF_REPO) {
+    if (showRemote && process.env.DOTCLAUDE_HANDOFF_REPO) {
       try {
         for (const c of listGitFallbackCandidates()) {
           rows.push({ location: "remote", branch: c.branch, commit: c.commit });
@@ -736,7 +731,6 @@ async function main() {
     }
     if (fallbackNote) process.stderr.write(fallbackNote + "\n");
 
-    requireGitFallbackTransport(via);
     const tag = argv.flags.tag ? String(argv.flags.tag) : null;
     try {
       const result = pushGitFallback({ cli: sessionHit.cli, path: sessionHit.path, tag });
@@ -748,7 +742,6 @@ async function main() {
   }
 
   if (first === "pull") {
-    requireGitFallbackTransport(via);
     try {
       const hit = await pullGitFallback(second, fromCli);
       const { content } = fetchGitFallbackBranch(hit.branch);

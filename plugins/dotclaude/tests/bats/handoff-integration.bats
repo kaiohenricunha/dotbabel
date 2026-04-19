@@ -97,9 +97,9 @@ teardown() {
 @test "push → pull <short-uuid> round-trip returns equivalent <handoff> content" {
   # Stronger than existing "pull emits <handoff>" tests: we capture the
   # pulled block and assert it carries the session markers from the seed.
-  run node "$BIN" push integration-demo --via git-fallback
+  run node "$BIN" push integration-demo
   [ "$status" -eq 0 ]
-  run node "$BIN" pull aaaa1111 --via git-fallback
+  run node "$BIN" pull aaaa1111
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
   # Short UUID must survive the transport round-trip.
@@ -113,7 +113,7 @@ teardown() {
   # the <handoff> content — that's by design (the block is the payload, the
   # tag is routing metadata). Lock in the metadata location here; the
   # routing behavior is covered by the separate pull-by-tag test.
-  run node "$BIN" push integration-demo --via git-fallback --tag shipping-the-thing
+  run node "$BIN" push integration-demo --tag shipping-the-thing
   [ "$status" -eq 0 ]
   # Transport description appears on stdout as the final line of the push.
   [[ "$output" == *"shipping-the-thing"* ]]
@@ -123,7 +123,7 @@ teardown() {
   [[ "$output" == *"shipping-the-thing"* ]]
   # Pull-by-tag resolves and returns a valid block (content-equivalence
   # already asserted above; here we just prove routing works).
-  run node "$BIN" pull shipping-the-thing --via git-fallback
+  run node "$BIN" pull shipping-the-thing
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
@@ -170,11 +170,11 @@ teardown() {
 
 @test "list after multiple pushes shows all sessions (remote column populated)" {
   # Two distinct pushes should both surface in the unified list output.
-  run node "$BIN" push integration-demo --via git-fallback --tag first
+  run node "$BIN" push integration-demo --tag first
   [ "$status" -eq 0 ]
-  run node "$BIN" push codex-thread --via git-fallback --tag second
+  run node "$BIN" push codex-thread --tag second
   [ "$status" -eq 0 ]
-  run node "$BIN" list --via git-fallback </dev/null
+  run node "$BIN" list </dev/null
   [ "$status" -eq 0 ]
   # Both short UUIDs should be visible somewhere in the unified list.
   [[ "$output" == *"aaaa1111"* ]]

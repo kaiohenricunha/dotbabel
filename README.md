@@ -82,17 +82,17 @@ or `dotclaude sync --help` for full options.
 
 **Engineering workflow** — slash commands:
 
-| Command                                            | Invoke                         | What it does                                                                                                      |
-| -------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| [`git`](commands/git.md)                           | `/git`                         | Conventional commits, PR creation, branch naming                                                                  |
-| [`changelog`](commands/changelog.md)               | `/changelog`                   | Generate changelog entry from git history                                                                         |
-| [`merge-pr`](commands/merge-pr.md)                 | `/merge-pr <N>`                | Full local verification gate before merge                                                                         |
-| [`pre-pr`](commands/pre-pr.md) ¹                   | `/pre-pr [base-branch]`        | Quality gate before opening a PR: simplify, security-review, test suite                                           |
-| [`review-pr`](commands/review-pr.md)               | `/review-pr <N>`               | Fetch comments, apply fixes, resolve threads                                                                      |
-| [`review-prs`](commands/review-prs.md) ¹           | `/review-prs <N1> [N2 N3 ...]` | Batch-review multiple PRs in parallel with one sub-agent per PR                                                   |
-| [`audit-and-fix`](commands/audit-and-fix.md)       | `/audit-and-fix <domain>`      | Audit → cluster findings → spawn parallel fix PRs                                                                 |
-| [`dependabot-sweep`](commands/dependabot-sweep.md) | `/dependabot-sweep`            | Batch-triage all open Dependabot PRs                                                                              |
-| [`handoff`](skills/handoff/SKILL.md)               | `/handoff <sub-command>`       | Transfer session context between AI agents (Claude Code, Copilot CLI, Codex) and across machines via GitHub Gists |
+| Command                                            | Invoke                         | What it does                                                                                                                       |
+| -------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| [`git`](commands/git.md)                           | `/git`                         | Conventional commits, PR creation, branch naming                                                                                   |
+| [`changelog`](commands/changelog.md)               | `/changelog`                   | Generate changelog entry from git history                                                                                          |
+| [`merge-pr`](commands/merge-pr.md)                 | `/merge-pr <N>`                | Full local verification gate before merge                                                                                          |
+| [`pre-pr`](commands/pre-pr.md) ¹                   | `/pre-pr [base-branch]`        | Quality gate before opening a PR: simplify, security-review, test suite                                                            |
+| [`review-pr`](commands/review-pr.md)               | `/review-pr <N>`               | Fetch comments, apply fixes, resolve threads                                                                                       |
+| [`review-prs`](commands/review-prs.md) ¹           | `/review-prs <N1> [N2 N3 ...]` | Batch-review multiple PRs in parallel with one sub-agent per PR                                                                    |
+| [`audit-and-fix`](commands/audit-and-fix.md)       | `/audit-and-fix <domain>`      | Audit → cluster findings → spawn parallel fix PRs                                                                                  |
+| [`dependabot-sweep`](commands/dependabot-sweep.md) | `/dependabot-sweep`            | Batch-triage all open Dependabot PRs                                                                                               |
+| [`handoff`](skills/handoff/SKILL.md)               | `/handoff <sub-command>`       | Transfer session context between AI agents (Claude Code, Copilot CLI, Codex) and across machines via a user-owned private git repo |
 
 > ¹ `maturity: draft` — functional but not yet tested across all project types.
 

@@ -83,7 +83,7 @@ teardown() {
 
 @test "push rejects ext:: transport URL" {
   DOTCLAUDE_HANDOFF_REPO='ext::sh -c evil' \
-    run node "$HANDOFF_BIN" push latest --via git-fallback
+    run node "$HANDOFF_BIN" push latest
   [ "$status" -eq 2 ]
   [[ "$output" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
   [[ "$output" == *"ext::"* ]]
@@ -91,7 +91,7 @@ teardown() {
 
 @test "push rejects data: transport URL" {
   DOTCLAUDE_HANDOFF_REPO='data:text/plain,x' \
-    run node "$HANDOFF_BIN" push latest --via git-fallback
+    run node "$HANDOFF_BIN" push latest
   [ "$status" -eq 2 ]
   [[ "$output" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
 }
