@@ -6,32 +6,70 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ## [0.7.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.6.0...v0.7.0) (2026-04-19)
 
-
 ### Added
 
-* **handoff:** shell-scripts-first refactor + dotclaude-handoff binary ([#58](https://github.com/kaiohenricunha/dotclaude/issues/58)) ([176cb9d](https://github.com/kaiohenricunha/dotclaude/commit/176cb9dd9a0c1ba5362bd783604343aaa4815b19))
+- **handoff:** shell-scripts-first refactor + dotclaude-handoff binary ([#58](https://github.com/kaiohenricunha/dotclaude/issues/58)) ([176cb9d](https://github.com/kaiohenricunha/dotclaude/commit/176cb9dd9a0c1ba5362bd783604343aaa4815b19))
 
 ## [0.6.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.5.0...v0.6.0) (2026-04-18)
 
-
 ### Added
 
-* /pre-pr and /review-prs commands + CLAUDE.md rule refinements ([#51](https://github.com/kaiohenricunha/dotclaude/issues/51)) ([4e300ca](https://github.com/kaiohenricunha/dotclaude/commit/4e300ca399555d9b2fc8f018d30fe55fcbe977f4))
-* **ci:** automate semantic versioning with release-please ([#52](https://github.com/kaiohenricunha/dotclaude/issues/52)) ([67e7949](https://github.com/kaiohenricunha/dotclaude/commit/67e79491a190c6dfa51188de55daf80169be7436))
-
+- /pre-pr and /review-prs commands + CLAUDE.md rule refinements ([#51](https://github.com/kaiohenricunha/dotclaude/issues/51)) ([4e300ca](https://github.com/kaiohenricunha/dotclaude/commit/4e300ca399555d9b2fc8f018d30fe55fcbe977f4))
+- **ci:** automate semantic versioning with release-please ([#52](https://github.com/kaiohenricunha/dotclaude/issues/52)) ([67e7949](https://github.com/kaiohenricunha/dotclaude/commit/67e79491a190c6dfa51188de55daf80169be7436))
 
 ### Fixed
 
-* **ci:** allow release-please CHANGELOG formatting in lint checks ([#55](https://github.com/kaiohenricunha/dotclaude/issues/55)) ([7b0c048](https://github.com/kaiohenricunha/dotclaude/commit/7b0c0484425b508d0e15373725f3710963adadca))
-* **ci:** fix release-please config — drop ### prefix, add include-component-in-tag: false ([#54](https://github.com/kaiohenricunha/dotclaude/issues/54)) ([e7ae3e3](https://github.com/kaiohenricunha/dotclaude/commit/e7ae3e3495f8fd76dedd47213d46458bc6211d28))
-* remove squadranks vocabulary from project-agnostic surface ([#57](https://github.com/kaiohenricunha/dotclaude/issues/57)) ([59b5c63](https://github.com/kaiohenricunha/dotclaude/commit/59b5c6314861ad45150f5fa1c9087c057fc39175))
-
+- **ci:** allow release-please CHANGELOG formatting in lint checks ([#55](https://github.com/kaiohenricunha/dotclaude/issues/55)) ([7b0c048](https://github.com/kaiohenricunha/dotclaude/commit/7b0c0484425b508d0e15373725f3710963adadca))
+- **ci:** fix release-please config — drop ### prefix, add include-component-in-tag: false ([#54](https://github.com/kaiohenricunha/dotclaude/issues/54)) ([e7ae3e3](https://github.com/kaiohenricunha/dotclaude/commit/e7ae3e3495f8fd76dedd47213d46458bc6211d28))
+- remove squadranks vocabulary from project-agnostic surface ([#57](https://github.com/kaiohenricunha/dotclaude/issues/57)) ([59b5c63](https://github.com/kaiohenricunha/dotclaude/commit/59b5c6314861ad45150f5fa1c9087c057fc39175))
 
 ### Documentation
 
-* close v0.4-v0.5 coverage gaps + automate version stamps ([#56](https://github.com/kaiohenricunha/dotclaude/issues/56)) ([6e121c7](https://github.com/kaiohenricunha/dotclaude/commit/6e121c7721b5a504fe84cf65ea0539c2cf0f3f4e))
+- close v0.4-v0.5 coverage gaps + automate version stamps ([#56](https://github.com/kaiohenricunha/dotclaude/issues/56)) ([6e121c7](https://github.com/kaiohenricunha/dotclaude/commit/6e121c7721b5a504fe84cf65ea0539c2cf0f3f4e))
 
 ## [Unreleased]
+
+### BREAKING
+
+- **`handoff push`/`pull`**: the `<cli>` positional is removed. The
+  resolver already auto-detects across all three roots (claude,
+  copilot, codex); forcing the user to state the source CLI was
+  busywork. Migration:
+  - `dotclaude-handoff push claude <q>` → `dotclaude-handoff push <q>`
+    (or `... push <q> --from claude` to force a root).
+  - `dotclaude-handoff pull claude <h>` → `dotclaude-handoff pull <h>`
+    (or `... pull <h> --from claude`).
+  - Power-user subs (`resolve`, `describe`, `digest`, `file`) keep
+    their explicit `<cli> <id>` — scripting entry points unchanged.
+
+  The binary now exits 64 on the removed form with an actionable
+  message pointing at `--from` and this CHANGELOG. Bare
+  `dotclaude-handoff` (no positionals) now executes `push` (host's
+  latest session), aligning the binary with SKILL.md's five-form
+  surface. Help still lives behind `--help`.
+
+### Added
+
+- **`--from <cli>` flag** on `push` / `pull` / bare `<query>`.
+  Narrows auto-detection to a single root. Useful for scripting and
+  for resolving short-UUID collisions across roots.
+- **`detectHost()` env-probe routing.** The binary best-effort
+  identifies the agentic CLI it is running inside via `CLAUDECODE`,
+  `CLAUDE_CODE_SSE_PORT`, and `CODEX_*` / `COPILOT_*` / `GITHUB_COPILOT_*`
+  prefix scans. All signals are labelled UNCONFIRMED in the source —
+  false positives are cheap (a narrower resolve) and false negatives
+  fall back to the union resolver.
+- **Honest stderr fallback notes.** Bare `push` (no query) now prints
+  one stderr line naming which fallback fired:
+  - `no current-signal in claude, using latest claude session: <short>`
+    — host was detected, narrowed to its root.
+  - `using --from <cli> override, latest session: <short>` — `--from`
+    was explicit, host was not detected or differed.
+  - `host not detected, using latest across all clis: <short>` —
+    union-resolver fallback.
+- **`--to` default is the detected host.** Previously hardcoded to
+  `claude`; now matches whichever CLI the binary is running inside
+  (falling back to `claude` when undetected).
 
 ## [0.5.0] — 2026-04-18
 

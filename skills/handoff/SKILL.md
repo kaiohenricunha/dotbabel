@@ -83,8 +83,15 @@ Each takes an explicit `<cli>` (`claude`, `copilot`, `codex`) and an
 identifier. These remain reachable for scripting.
 
 - `--to <target-cli>` — optional; tunes the `<handoff>` block's
-  next-step wording for a specific target agent. Defaults to `claude`.
-  Mostly redundant for in-place use and can be omitted.
+  next-step wording for a specific target agent. Defaults to the
+  auto-detected host CLI (`CLAUDECODE=1` → `claude`, any `CODEX_*` →
+  `codex`, any `COPILOT_*` → `copilot`), falling back to `claude`
+  when no host signal is present. Mostly redundant for in-place use.
+- `--from <cli>` — `push`, `pull`, and bare `<query>` paths; narrows
+  auto-detection to one root (`claude`, `copilot`, or `codex`). Use
+  when short-UUID prefixes collide across roots, or when scripting
+  and the source CLI is known. Without `--from`, the resolver probes
+  all three roots; with `--from`, only the named root is consulted.
 - `--cli <cli>` — `search` and `remote-list` only; restrict the scan
   to one CLI.
 - `--since <ISO>` — `search` and `remote-list` only; skip entries older
@@ -323,18 +330,33 @@ on the chosen row.
 
 ---
 
-### `push <cli> <uuid|latest> [--to <target-cli>] [--via <transport>] [--include-transcript] [--tag <label>]`
+### `push [<query>] [--from <cli>] [--to <target-cli>] [--via <transport>] [--include-transcript] [--tag <label>]`
 
 Upload a handoff digest to a remote transport so the context can be
 resumed on a different machine. Use when switching laptops/distros
 and you need the next agent on the other side to pick up the thread.
 
+The `<cli>` positional was removed (see CHANGELOG `[Unreleased]`).
+Resolution now auto-detects across all three roots; narrow with
+`--from <cli>` when scripting or when short-UUID collisions demand
+a specific root.
+
+**Runtime split.** The `dotclaude-handoff` binary only implements
+`--via git-fallback` today; `--via github` and `--via gist-token`
+require the `/handoff` skill runtime inside Claude Code or Copilot.
+Invoking the binary with `--via github` exits 64 and points at this
+split. The step list below describes the skill-runtime behaviour.
+
 **Steps:**
 
 1. Run `/handoff doctor --via <transport>` preflight. On failure,
    print the remediation block and stop — do not touch the transport.
-2. Run steps 1–4 of `describe` to resolve the session file, load
-   the per-CLI reference, and run the `jq` filters.
+2. Resolve the session file. With no `<query>`, fall back to the
+   host-detected CLI's "latest" session (or the union across all
+   roots when no host signal is present); emit a single stderr line
+   naming the fallback that fired. With `<query>`, use the `any`
+   entry point unless `--from <cli>` narrows the scan. Then run the
+   per-CLI reference's `jq` filters (steps 1–4 of `describe`).
 3. Build the normalized digest per `references/digest-schema.md`,
    tuned by `--to`.
 4. Build `metadata.json` with these keys:
@@ -382,11 +404,25 @@ $DOTCLAUDE_GH_TOKEN" https://api.github.com/gists` with the
    error plus the `--via <alt>` fallback suggestion from
    `references/transport-github.md`, then exit non-zero.
 
-### `pull <handle|latest> [--to <target-cli>] [--via <transport>] [--from-file <path>]`
+### `pull [<handle>] [--to <target-cli>] [--via <transport>] [--from-file <path>]`
 
 Fetch a previously pushed handoff and render the `<handoff>` block
 for the target agent. Use when you sat down at the other machine
 and want to continue.
+
+The `<cli>` positional was removed (see CHANGELOG `[Unreleased]`).
+Bare `pull` (no `<handle>`) fetches the newest handoff on the
+transport; provide a `<handle>` (gist id, URL, or fuzzy substring
+over tag/short-UUID/project/hostname) to pick a specific one. Use
+`--from <cli>` to restrict the candidate pool to one source-CLI's
+branches when the `git-fallback` transport holds handoffs from
+multiple hosts.
+
+**Runtime split.** The `dotclaude-handoff` binary only implements
+`--via git-fallback` today; `--via github` and `--via gist-token`
+require the `/handoff` skill runtime inside Claude Code or Copilot.
+Invoking the binary with `--via github` exits 64 and points at this
+split.
 
 **Steps:**
 

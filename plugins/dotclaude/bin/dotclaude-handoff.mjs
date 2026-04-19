@@ -48,12 +48,13 @@ const TRANSPORTS = new Set(["git-fallback", "github"]);
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [<query>|push|pull|list] [<query>] [--tag <label>] [--via <transport>]",
+    "dotclaude handoff [<query>|push|pull|list] [<query>] [--from <cli>] [--to <cli>] [--tag <label>] [--via <transport>]",
   description:
     "Cross-agent and cross-machine session handoff. Bare <query> emits a <handoff> block for local cross-agent. push/pull/list handle the remote transport.",
   flags: {
     tag: { type: "string" },
     via: { type: "string" },
+    from: { type: "string" },
     to: { type: "string" },
     limit: { type: "string" },
     "out-dir": { type: "string" },
@@ -133,6 +134,23 @@ async function resolveAny(query) {
   // Non-TTY: pass through the script's stderr and exit 2.
   process.stderr.write(stderr);
   process.exit(2);
+}
+
+/**
+ * Resolve `<id>` against a single CLI's root. Thin wrapper over the
+ * per-CLI entry point of handoff-resolve.sh — no collision handling
+ * because the per-CLI resolvers return at most one hit.
+ *
+ * @param {string} cli    one of CLIS
+ * @param {string} id     uuid | short-uuid | "latest" | alias
+ * @returns {{cli: string, path: string}}
+ */
+function resolveNarrowed(cli, id) {
+  const r = runScript(RESOLVE_SH, [cli, id]);
+  if (r.status !== 0) {
+    fail(r.status === 64 ? EXIT_CODES.USAGE : 2, r.stderr.trim() || `no ${cli} session matches: ${id}`);
+  }
+  return { cli, path: r.stdout.trim() };
 }
 
 async function promptCollisionChoice(query, candidates) {
@@ -480,9 +498,18 @@ function matchesQuery(candidate, query) {
   return false;
 }
 
-async function pullGitFallback(query) {
-  const candidates = listGitFallbackCandidates();
+async function pullGitFallback(query, fromCli = null) {
+  let candidates = listGitFallbackCandidates();
   if (candidates.length === 0) fail(2, "no handoffs found on transport");
+
+  // `--from <cli>` narrows the candidate set to one source-CLI. Branch
+  // names are shaped `handoff/<cli>/<short-uuid>`, so the prefix match
+  // is exact. Applied BEFORE any query match so short-UUID collisions
+  // across CLIs can be resolved with --from.
+  if (fromCli) {
+    candidates = candidates.filter((c) => c.branch.startsWith(`handoff/${fromCli}/`));
+    if (candidates.length === 0) fail(2, `no ${fromCli} handoffs found on transport`);
+  }
 
   // Bare: pick the newest (for git-fallback we don't have a reliable remote
   // mtime; fall back to enriching and picking the lexically last, which is
@@ -503,7 +530,9 @@ async function pullGitFallback(query) {
     hits = enrichWithDescriptions(hits);
   }
 
-  if (hits.length === 0) fail(2, `no handoffs match: ${query}`);
+  if (hits.length === 0) {
+    fail(2, fromCli ? `no ${fromCli} handoffs match: ${query}` : `no handoffs match: ${query}`);
+  }
   if (hits.length === 1) return hits[0];
 
   // Collision.
@@ -528,9 +557,59 @@ async function pullGitFallback(query) {
 
 // ---- host session detection --------------------------------------------
 
+/**
+ * Best-effort identification of the agentic CLI the binary is running
+ * inside. Returns "claude" | "copilot" | "codex" | "unknown".
+ *
+ * All four signals below are UNCONFIRMED in the dotclaude codebase:
+ * neither the repo nor the upstream CLIs document stable env-var
+ * contracts. The probes are intentionally cheap — a false positive
+ * only steers `bare push` into a narrower root than `resolveAny`,
+ * which still succeeds when sessions exist there. A false negative
+ * falls back to "unknown" and the union resolver.
+ *
+ * Probe order matters when multiple probes fire: claude probes run
+ * first, then codex, then copilot. The realistic multi-signal case
+ * is env inheritance — e.g. `dotclaude-handoff` invoked inside a
+ * Codex session that was launched from a Claude Code bash shell
+ * inherits `CLAUDECODE=1`. In that case "claude wins", which is a
+ * sensible default because the outer shell is typically the source
+ * of truth; callers who want the inner CLI should pass `--from`.
+ *
+ * @param {NodeJS.ProcessEnv} [env]
+ * @returns {"claude" | "copilot" | "codex" | "unknown"}
+ */
+function detectHost(env = process.env) {
+  // UNCONFIRMED: Claude Code is widely believed to set CLAUDECODE=1
+  // in its bash tool. Treated as the primary signal.
+  if (env.CLAUDECODE === "1") return "claude";
+  // UNCONFIRMED: anecdotal fallback for Claude Code; the SSE port is
+  // set in some launch paths but not others.
+  if (env.CLAUDE_CODE_SSE_PORT) return "claude";
+  // UNCONFIRMED: Codex CLI env-var contract is undocumented. Probe
+  // the CODEX_ prefix as a cheap heuristic.
+  for (const k of Object.keys(env)) {
+    if (k.startsWith("CODEX_")) return "codex";
+  }
+  // UNCONFIRMED: Copilot CLI markers. Both prefixes are checked to
+  // avoid guessing which GitHub tooling variant is in use.
+  for (const k of Object.keys(env)) {
+    if (k.startsWith("GITHUB_COPILOT_") || k.startsWith("COPILOT_")) return "copilot";
+  }
+  return "unknown";
+}
+
+/**
+ * Resolve the current-session JSONL file for the detected host, when
+ * possible. Returns null if no stable env-var pointer is known for
+ * any of the three CLIs today — the bare-push fallback chain in
+ * main() handles the "unknown current session" case by narrowing to
+ * the detected host's "latest" session instead.
+ *
+ * Kept as a hook for a future signal (e.g. a Claude Code transcript
+ * path env var) without rewiring call sites.
+ */
 function detectHostSession() {
-  // Claude Code exposes no stable env-var pointer to the current session
-  // file. Fall back to `latest` across all three roots.
   return null;
 }
 
@@ -558,34 +637,34 @@ if (!TRANSPORTS.has(via)) fail(EXIT_CODES.USAGE, `--via must be one of: ${[...TR
 const limit = argv.flags.limit ?? "20";
 if (!/^\d+$/.test(limit.toString())) fail(EXIT_CODES.USAGE, `--limit must be a non-negative integer, got: ${limit}`);
 
-const toCli = (argv.flags.to ?? "claude").toString();
+const detectedHost = detectHost();
+const toCli = (argv.flags.to ?? (detectedHost === "unknown" ? "claude" : detectedHost)).toString();
 if (!CLIS.has(toCli)) fail(EXIT_CODES.USAGE, `--to must be one of: ${[...CLIS].join(", ")}`);
+
+const fromCli = argv.flags.from ? String(argv.flags.from) : null;
+if (fromCli !== null && !CLIS.has(fromCli)) {
+  fail(EXIT_CODES.USAGE, `--from must be one of: ${[...CLIS].join(", ")}`);
+}
 
 const [first, second, third] = argv.positional;
 
-function printUsage() {
-  process.stdout.write(
-    [
-      "Usage:",
-      "  dotclaude handoff                              push host's latest session",
-      "  dotclaude handoff <query>                      emit <handoff> block for local paste",
-      "  dotclaude handoff push [<query>] [--tag LBL]   upload to transport",
-      "  dotclaude handoff pull [<query>]               fetch from transport",
-      "  dotclaude handoff list [--local|--remote]      sessions + gists",
-      "",
-      "Power-user sub-commands: resolve, describe, digest, file (all take <cli> <id>).",
-      "",
-      "Exit codes: 0 ok, 2 not found / runtime error, 64 usage error.",
-      "",
-    ].join("\n")
-  );
+function shortIdFromPath(path) {
+  const m = path?.match(UUID_HEAD_RE);
+  return m ? m[1] : "?";
 }
 
 async function main() {
-  // ---- zero-arg: print usage --------------------------------------------
-  if (argv.positional.length === 0) {
-    printUsage();
-    process.exit(EXIT_CODES.OK);
+  // ---- breaking-change shim ---------------------------------------------
+  // v<next>: `push/pull <cli> <query>` and the bare `push <cli>` form
+  // (no query) were removed. Auto-detect via `--from` or leave the
+  // positional off entirely. A lone CLI name is never a valid query
+  // under the new surface, so the shim fires whether or not a third
+  // positional is present.
+  if ((first === "push" || first === "pull") && CLIS.has(second)) {
+    fail(
+      EXIT_CODES.USAGE,
+      `${first} no longer takes a <cli> positional; use --from ${second} or drop it entirely (see CHANGELOG [Unreleased] for the breaking change)`
+    );
   }
 
   // ---- top-level subs: push / pull / list --------------------------------
@@ -628,15 +707,42 @@ async function main() {
     process.exit(EXIT_CODES.OK);
   }
 
-  if (first === "push") {
-    // `push` | `push <query>` | `push <query> --tag <label>`
+  // Bare `dotclaude-handoff` (no positionals) is an alias for `push`.
+  // Aligns the binary with SKILL.md's "zero-arg = push host's latest
+  // session" contract.
+  const isPush = first === "push" || argv.positional.length === 0;
+  if (isPush) {
+    const explicitQuery = first === "push" ? second : null;
     let sessionHit;
-    if (second) {
-      sessionHit = await resolveAny(second);
+    let fallbackNote;
+    if (explicitQuery) {
+      // Explicit query: only narrow when the user explicitly asked
+      // via --from. A detected-host probe must NOT override an
+      // explicit query — it would silently mis-route a user who
+      // typed `push <codex-alias>` from inside a Claude Code session.
+      sessionHit = fromCli
+        ? resolveNarrowed(fromCli, explicitQuery)
+        : await resolveAny(explicitQuery);
     } else {
-      const host = detectHostSession();
-      sessionHit = host ?? (await resolveAny("latest"));
+      // No query: pick a default session. Prefer --from, then the
+      // detected host, then the union resolver. Each fallback emits
+      // a one-line stderr note so the user can diff two runs and
+      // see why the pick changed.
+      const narrowTo = fromCli ?? (detectedHost !== "unknown" ? detectedHost : null);
+      if (narrowTo) {
+        sessionHit = resolveNarrowed(narrowTo, "latest");
+        const shortId = shortIdFromPath(sessionHit.path);
+        fallbackNote = fromCli
+          ? `using --from ${narrowTo} override, latest session: ${shortId}`
+          : `no current-session signal in ${narrowTo}, using latest ${narrowTo} session: ${shortId}`;
+      } else {
+        sessionHit = await resolveAny("latest");
+        const shortId = shortIdFromPath(sessionHit.path);
+        fallbackNote = `host not detected, using latest across all clis: ${shortId}`;
+      }
     }
+    if (fallbackNote) process.stderr.write(fallbackNote + "\n");
+
     if (via !== "git-fallback") {
       fail(
         EXIT_CODES.USAGE,
@@ -661,7 +767,7 @@ async function main() {
       );
     }
     try {
-      const hit = await pullGitFallback(second);
+      const hit = await pullGitFallback(second, fromCli);
       const { content } = fetchGitFallbackBranch(hit.branch);
       process.stdout.write(content.endsWith("\n") ? content : content + "\n");
       process.exit(EXIT_CODES.OK);
@@ -759,6 +865,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 export {
   cliFromPath,
   collectSessionFiles,
+  detectHost,
   encodeDescription,
   mechanicalSummary,
   matchesQuery,
