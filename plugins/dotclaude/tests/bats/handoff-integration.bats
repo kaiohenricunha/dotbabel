@@ -151,8 +151,10 @@ teardown() {
 # -- file subcommand: digest rendered to a markdown file ----------------
 
 @test "file <cli> <id> with --out-dir writes markdown containing <handoff> block" {
-  local outdir
-  outdir=$(mktemp -d)
+  # Nest outdir under TEST_HOME so teardown's rm -rf cleans it even if an
+  # assertion fails before the end of this test (no separate mktemp needed).
+  local outdir="$TEST_HOME/file-out"
+  mkdir -p "$outdir"
   run node "$BIN" file claude aaaa1111 --out-dir "$outdir"
   [ "$status" -eq 0 ]
   # The command prints the absolute path of the file written.
@@ -162,7 +164,6 @@ teardown() {
   [[ "$output" == *"<handoff"* ]]
   [[ "$output" == *"first prompt"* ]]
   [[ "$output" == *"Source transcript"* ]]
-  rm -rf "$outdir"
 }
 
 # -- multi-push ordering in list -----------------------------------------
