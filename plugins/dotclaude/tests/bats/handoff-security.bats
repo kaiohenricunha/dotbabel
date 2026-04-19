@@ -73,7 +73,8 @@ teardown() {
   mkdir -p "$(dirname "$path")"
   printf '{"type":"session_meta","payload":{"id":"%s","cwd":"/work"}}\n{"type":"event_msg","payload":{"thread_id":"%s","thread_name":"safe","type":"thread_renamed"}}\n' \
     "$uuid" "$uuid" > "$path"
-  run "$RESOLVE" codex $'multi\nline'
+  local alias=$'multi\nline'
+  run "$RESOLVE" codex "$alias"
   [ "$status" -eq 2 ]
   [[ "$output" == *"not found"* ]]
 }

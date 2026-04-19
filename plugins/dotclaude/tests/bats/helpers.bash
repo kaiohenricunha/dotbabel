@@ -125,7 +125,6 @@ make_codex_session_tree() {
       "$uuid" > "$path"
     paths+=("$path")
     i=$((i + 1))
-    sleep 0.01
   done
   CODEX_SESSION_UUIDS="${uuids[*]}"
   CODEX_SESSION_PATHS="${paths[*]}"
@@ -141,11 +140,11 @@ make_transport_repo() {
   echo "$dir"
 }
 
-# make_session_with_content <cli> <path> <content>
+# make_session_with_content <path> <content>
 # Overwrite the session JSONL at <path> with <content>. Useful for
 # boundary tests (empty files, unicode, malformed records).
 make_session_with_content() {
-  local cli="$1" path="$2" content="$3"
+  local path="$1" content="$2"
   mkdir -p "$(dirname "$path")"
   printf '%s' "$content" > "$path"
 }

@@ -756,7 +756,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   main().catch((err) => fail(2, err.message));
 }
 
-// Internals exposed for unit testing.
 export {
   cliFromPath,
   encodeDescription,
