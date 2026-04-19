@@ -38,7 +38,7 @@ the full diagram; the short version:
 
 - `plugins/dotclaude/bin/*.mjs` — CLI entry points. Every bin follows the
   same pipeline: `parse(lib/argv) → validator → createOutput(lib/output) →
-  formatError(lib/errors) → exit(lib/exit-codes)`. Each is also exposed as a
+formatError(lib/errors) → exit(lib/exit-codes)`. Each is also exposed as a
   standalone `npx dotclaude-<thing>` bin **and** as a subcommand of the
   umbrella `dotclaude` dispatcher.
 - `plugins/dotclaude/src/lib/` — shared primitives (`argv`, `output`,

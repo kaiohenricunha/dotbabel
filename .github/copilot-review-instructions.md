@@ -31,7 +31,7 @@ unless they prevent a bug.
   this is what `dotclaude-check-spec-coverage` enforces and a missing
   block fails CI.
 - **`spec.json status`** must be one of `draft | approved | implementing
-  | done`. Coverage only counts `approved | implementing | done`.
+| done`. Coverage only counts `approved | implementing | done`.
 - **Drift between `CLAUDE.md` "Protected paths" and `docs/repo-facts.json`.**
   Every protected path in the JSON must appear in `CLAUDE.md`'s list and
   vice versa — `dotclaude-check-instruction-drift` enforces this.
@@ -49,7 +49,7 @@ unless they prevent a bug.
   (ADR-0002). Block.
 - **Bin without the standard pipeline.** Every `plugins/dotclaude/bin/*.mjs`
   must `parse(lib/argv) → validator → createOutput(lib/output) →
-  formatError(lib/errors) → exit(lib/exit-codes)`. Flag raw
+formatError(lib/errors) → exit(lib/exit-codes)`. Flag raw
   `console.log` / `process.exit(N)` / `throw new Error("string")` in bin
   or validator code.
 - **Wrong exit code.** Bins must exit with the named `EXIT_CODES`:
