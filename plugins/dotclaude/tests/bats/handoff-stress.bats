@@ -24,13 +24,21 @@ teardown() {
   local file_count
   file_count=$(find "$TEST_HOME/.codex/sessions" -name "rollout-*.jsonl" 2>/dev/null | wc -l)
   file_count=$(( file_count + 0 ))  # strip whitespace
-  run timeout 30s node "$BIN" list --local
-  [ "$status" -eq 0 ]
-  local line_count
-  line_count=$(printf '%s\n' "$output" | wc -l)
-  # The list must enumerate substantially all created sessions (≥ 90%).
-  # If file_count < 100 the fixture seeder itself failed; fail the gate.
+  # Gate on fixture health before the timed run.
   [ "$file_count" -ge 100 ]
+
+  # Write directly to a temp file instead of capturing in $output — bats
+  # serialises the entire stdout into a shell variable, which can miscount
+  # newlines when output exceeds ~800 KB (10k sessions × 80 chars/row).
+  local outfile exit_status line_count
+  outfile=$(mktemp)
+  exit_status=0
+  timeout 30s node "$BIN" list --local > "$outfile" 2>/dev/null || exit_status=$?
+  line_count=$(wc -l < "$outfile")
+  rm -f "$outfile"
+
+  [ "$exit_status" -eq 0 ]
+  # The list must enumerate substantially all created sessions (≥ 90%).
   [ "$line_count" -ge $(( file_count * 9 / 10 )) ]
 }
 
