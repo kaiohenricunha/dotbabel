@@ -51,21 +51,29 @@ Same works with a full UUID or a Claude `customTitle`:
 On machine A (before closing):
 
 ```
-!dotclaude handoff push my-feature --tag end-of-day
+!dotclaude handoff push my-feature --tag end-of-day --via git-fallback
 ```
 
 On machine B:
 
 ```
-!dotclaude handoff pull end-of-day
+!dotclaude handoff pull end-of-day --via git-fallback
 ```
 
-or bare `!dotclaude handoff pull` to pick up the latest gist.
+or bare `!dotclaude handoff pull --via git-fallback` to pick up the latest handoff.
 
 ## Prerequisite
 
 `npm install -g @dotclaude/dotclaude` (installs the `dotclaude` CLI on
 PATH). Or `npx dotclaude handoff …` for ad-hoc use.
+
+For cross-machine transport, set `DOTCLAUDE_HANDOFF_REPO` to a bare git
+repo URL (HTTPS, SSH, `file://`, or absolute path) before running
+`push`/`pull`. Example:
+
+```bash
+export DOTCLAUDE_HANDOFF_REPO=git@github.com:you/handoffs.git
+```
 
 ## Collision handling
 

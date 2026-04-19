@@ -41,17 +41,17 @@ setup() {
   printf '{"type":"session_meta","payload":{"id":"eeee5555-5555-5555-5555-555555555555","cwd":"/work"}}\n{"type":"event_msg","payload":{"thread_id":"eeee5555-5555-5555-5555-555555555555","thread_name":"refactor","type":"thread_renamed"}}\n' \
     > "$CODEX_ALIAS_FILE"
 
-  # Newer codex rollout — explicit mtime ordering via `touch -d`, since
-  # `sleep` fractions are unreliable across filesystems (tmpfs mtime
-  # resolution is often 1s).
+  # Newer codex rollout — explicit mtime ordering via `touch -t` (POSIX,
+  # portable across GNU and BSD/macOS), since `sleep` fractions are
+  # unreliable across filesystems (tmpfs mtime resolution is often 1s).
   CODEX_NEWEST_FILE="$TEST_HOME/.codex/sessions/2026/04/18/rollout-2026-04-18T11-00-00-ffff6666-6666-6666-6666-666666666666.jsonl"
   printf '{"type":"session_meta","payload":{"id":"ffff6666-6666-6666-6666-666666666666","cwd":"/work"}}\n' \
     > "$CODEX_NEWEST_FILE"
-  touch -d '2026-04-18T09:00:00Z' "$CLAUDE_ALIAS_FILE"
-  touch -d '2026-04-18T10:00:00Z' "$CLAUDE_PLAIN_FILE"
-  touch -d '2026-04-18T11:00:00Z' "$COPILOT_FILE"
-  touch -d '2026-04-18T12:00:00Z' "$CODEX_ALIAS_FILE"
-  touch -d '2026-04-18T13:00:00Z' "$CODEX_NEWEST_FILE"
+  touch -t 202604180900.00 "$CLAUDE_ALIAS_FILE"
+  touch -t 202604181000.00 "$CLAUDE_PLAIN_FILE"
+  touch -t 202604181100.00 "$COPILOT_FILE"
+  touch -t 202604181200.00 "$CODEX_ALIAS_FILE"
+  touch -t 202604181300.00 "$CODEX_NEWEST_FILE"
 
   export CLAUDE_ALIAS_FILE CLAUDE_PLAIN_FILE COPILOT_FILE CODEX_ALIAS_FILE CODEX_NEWEST_FILE
 }
