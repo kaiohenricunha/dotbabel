@@ -26,7 +26,7 @@ import { parse, helpText } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { version } from "../src/index.mjs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import {
   existsSync,
@@ -751,4 +751,20 @@ async function main() {
   process.exit(EXIT_CODES.OK);
 }
 
-main().catch((err) => fail(2, err.message));
+// Only execute the CLI when invoked directly; stay import-safe for unit tests.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => fail(2, err.message));
+}
+
+export {
+  cliFromPath,
+  collectSessionFiles,
+  encodeDescription,
+  mechanicalSummary,
+  matchesQuery,
+  nextStepFor,
+  projectSlugFromCwd,
+  requireTransportRepo,
+  CLI_LAYOUTS,
+  UUID_HEAD_RE,
+};
