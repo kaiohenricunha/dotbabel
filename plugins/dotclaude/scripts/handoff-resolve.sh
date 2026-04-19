@@ -34,10 +34,31 @@ EOF
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 SHORT_UUID_RE='^[0-9a-f]{8}$'
 
-# Pick newest by mtime from stdin-separated file list. Prints path only.
+# Pick newest by mtime from a newline-separated list on stdin. Prints path only.
+# Pure-bash loop: no word-splitting on paths with spaces, no subshell per file.
 pick_newest() {
-  xargs -I{} sh -c 'stat -c "%Y %n" "{}" 2>/dev/null || stat -f "%m %N" "{}" 2>/dev/null' \
-    | sort -rn | head -1 | awk '{for (i=2; i<=NF; i++) printf "%s%s", $i, (i<NF ? OFS : ORS)}'
+  local best_ms=0 best_path="" file frac secs frac_ms
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    # GNU find -printf gives fractional epoch seconds (e.g. 1700000000.123456789).
+    # BSD stat -f %Fm gives the same. Whole-second fallbacks for minimal platforms.
+    frac=$(find "$file" -maxdepth 0 -printf '%T@' 2>/dev/null \
+           || stat -f '%Fm' "$file" 2>/dev/null \
+           || stat -c '%Y' "$file" 2>/dev/null \
+           || echo 0)
+    if [[ "$frac" == *.* ]]; then
+      secs="${frac%%.*}"
+      local frac_part="${frac#*.}000"          # pad to ≥3 digits
+      frac_ms=$(( ${secs:-0} * 1000 + 10#${frac_part:0:3} ))
+    else
+      frac_ms=$(( ${frac:-0} * 1000 ))
+    fi
+    if (( frac_ms > best_ms )); then
+      best_ms=$frac_ms
+      best_path="$file"
+    fi
+  done
+  [[ -n "$best_path" ]] && printf '%s\n' "$best_path"
 }
 
 resolve_claude() {
@@ -62,10 +83,10 @@ resolve_claude() {
     return 0
   fi
 
-  # Short UUID (first 8 hex).
+  # Short UUID (first 8 hex) — pick newest by mtime; deterministic across prefix collisions.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name "${id}*.jsonl" 2>/dev/null | head -1)"
+    hit="$(find "$root" -maxdepth 2 -type f -name "${id}*.jsonl" 2>/dev/null | pick_newest)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       return 0
@@ -117,13 +138,13 @@ resolve_copilot() {
     return 0
   fi
 
-  # Short UUID — glob match on dir prefix.
+  # Short UUID — pick newest matching session dir by mtime of its events.jsonl.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 1 -type d -name "${id}*" 2>/dev/null | head -1)"
-    [[ -n "$hit" && -f "$hit/events.jsonl" ]] \
+    hit="$(find "$root" -maxdepth 2 -type f -path "*/${id}*/events.jsonl" 2>/dev/null | pick_newest)"
+    [[ -n "$hit" ]] \
       || die_runtime "copilot session not found for short-uuid: $id"
-    printf '%s\n' "$hit/events.jsonl"
+    printf '%s\n' "$hit"
     return 0
   fi
 
@@ -155,10 +176,10 @@ resolve_codex() {
     # named a thread with UUID-like shape. Very unlikely, but cheap.
   fi
 
-  # Short UUID.
+  # Short UUID — pick newest by mtime; deterministic across prefix collisions.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -type f -name "rollout-*-${id}-*.jsonl" 2>/dev/null | head -1)"
+    hit="$(find "$root" -type f -name "rollout-*-${id}-*.jsonl" 2>/dev/null | pick_newest)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       return 0

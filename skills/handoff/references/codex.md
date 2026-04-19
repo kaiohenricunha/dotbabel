@@ -29,11 +29,12 @@ thread, Codex records an `event_msg` with
 `payload.thread_name = "<name>"`. Scan rollouts for the match:
 
 ```bash
-for f in $(find ~/.codex/sessions -type f -name 'rollout-*.jsonl'); do
-  jq -r --arg name "<name>" '
-    select(.type == "event_msg" and .payload.thread_name == $name)
-    | input_filename' "$f" 2>/dev/null | head -1
-done | head -1
+find ~/.codex/sessions -type f -name 'rollout-*.jsonl' 2>/dev/null \
+  | while IFS= read -r f; do
+      jq -r --arg name "<name>" '
+        select(.type == "event_msg" and .payload.thread_name == $name)
+        | input_filename' "$f" 2>/dev/null | head -1
+    done | head -1
 ```
 
 Reference implementation:

@@ -68,7 +68,7 @@ jq -r 'select(.type == "session.start") | .data | {cwd, model, sessionId}' <file
 **Mandatory `workspace.yaml` fallback.** Real Copilot sessions commonly
 emit `"cwd": null` on `session.start`; the authoritative value lives in
 the sibling `workspace.yaml` (same session dir). If the `jq` filter
-above returns a null or empty `cwd`, grep `workspace.yaml`:
+above returns a null or empty `cwd`, parse `workspace.yaml`:
 
 ```bash
 awk -F': ' '$1 == "cwd" { sub(/^[^:]*: */, ""); print; exit }' \

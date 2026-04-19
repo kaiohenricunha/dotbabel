@@ -64,22 +64,25 @@ meta_claude() {
   fi
   started_at=$(file_iso_mtime "$file")
 
+  # Use first(inputs | select(...)) so jq stops at the first cwd-bearing record
+  # rather than slurping the entire file — keeps memory bounded on large transcripts.
+  # Session ID comes from the matched record if available, else $fallback_id (the
+  # filename UUID), so the second slurp-pass for sessionId is eliminated.
   jq -n -c \
     --arg cli "claude" \
     --arg fallback_id "$fallback_id" \
     --arg started_at "$started_at" \
     '
     def nonempty: select(. != null and . != "");
-    [inputs] as $r
-    | (($r | map(select(.cwd | (. // "") != "")) | .[0]) // {}) as $with_cwd
-    | (($r | map(select(.sessionId != null)) | .[0].sessionId) // $fallback_id) as $sid
+    (first(inputs | select((.cwd // "") != "")) // {}) as $r
+    | (($r.sessionId // "") | select(. != "") // $fallback_id) as $sid
     | {
         cli: $cli,
         session_id: ($sid | nonempty // null),
         short_id: ($sid | (.[:8] | nonempty) // null),
-        cwd: ($with_cwd.cwd | (. // "") | nonempty // null),
+        cwd: ($r.cwd | (. // "") | nonempty // null),
         model: null,
-        version: ($with_cwd.version | (. // "") | nonempty // null),
+        version: ($r.version | (. // "") | nonempty // null),
         started_at: ($started_at | nonempty // null)
       }
     ' "$file" 2>/dev/null
@@ -87,43 +90,37 @@ meta_claude() {
 
 # Claude user prompts, scrubbed of system/command/tool noise.
 # Content may be string OR array of content blocks.
+# Noise filtering is done in jq on the full prompt text (not line-by-line)
+# so multi-line synthetic records are correctly dropped at the record level.
 prompts_claude() {
   local file="$1"
   jq -r '
+    def text_of:
+      if type == "string" then .
+      else (map(select(.type == "text") | .text) | join("\n"))
+      end;
+    def is_noise:
+      ltrimstr(" ") | ltrimstr("\t") | ltrimstr("\n") |
+      ( startswith("<local-command-caveat>")
+        or startswith("<command-name>")
+        or startswith("<command-message>")
+        or startswith("<command-args>")
+        or startswith("<stdin>")
+        or startswith("<system-reminder>")
+        or startswith("<user-prompt-submit-hook>")
+        or startswith("<task-notification>")
+        or startswith("<task-id>")
+        or startswith("<summary>Monitor event")
+        or startswith("</task-notification>")
+        or startswith("<event>")
+        or startswith("If this event is something the user")
+      );
     select(.type == "user")
     | .message.content
-    | if type == "string" then
-        .
-      else
-        (map(select(.type == "text") | .text) | join("\n"))
-      end
+    | text_of
     | select(length > 0)
-  ' "$file" 2>/dev/null \
-    | awk '
-        # Claude JSONL carries many synthetic "user" records that are not
-        # actual human prompts: hook outputs, system reminders, slash-command
-        # echoes, task-notification polling, etc. Drop any record whose
-        # first non-whitespace content starts with one of these markers.
-        {
-          trimmed = $0
-          sub(/^[[:space:]]+/, "", trimmed)
-          if (trimmed == "") next
-          if (trimmed ~ /^<local-command-caveat>/) next
-          if (trimmed ~ /^<command-name>/) next
-          if (trimmed ~ /^<command-message>/) next
-          if (trimmed ~ /^<command-args>/) next
-          if (trimmed ~ /^<stdin>/) next
-          if (trimmed ~ /^<system-reminder>/) next
-          if (trimmed ~ /^<user-prompt-submit-hook>/) next
-          if (trimmed ~ /^<task-notification>/) next
-          if (trimmed ~ /^<task-id>/) next
-          if (trimmed ~ /^<summary>Monitor event/) next
-          if (trimmed ~ /^<\/task-notification>/) next
-          if (trimmed ~ /^<event>/) next
-          if (trimmed ~ /^If this event is something the user/) next
-          print
-        }
-      '
+    | select(is_noise | not)
+  ' "$file" 2>/dev/null
 }
 
 turns_claude() {

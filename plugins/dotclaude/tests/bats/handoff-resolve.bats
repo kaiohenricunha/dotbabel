@@ -77,7 +77,8 @@ teardown() {
 @test "resolve claude latest picks newest mtime" {
   run "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
-  [[ "$output" == *"bbbb2222-2222-2222-2222-222222222222.jsonl" ]]
+  # cccc1111 is created last (sleep 0.01 after bbbb2222) so it is the newest.
+  [[ "$output" == *"cccc1111-1111-1111-1111-111111111111.jsonl" ]]
 }
 
 @test "resolve claude miss exits 2 with structured error" {

@@ -332,6 +332,9 @@ function listAllLocalSessions() {
 function requireTransportRepo() {
   const url = process.env.DOTCLAUDE_HANDOFF_REPO;
   if (!url) fail(2, "DOTCLAUDE_HANDOFF_REPO env var must be set for --via git-fallback");
+  // Reject ext:: and other exec-triggering Git URL schemes (CVE-2017-1000117-class).
+  if (!/^(https?:\/\/|git@|ssh:\/\/)/.test(url))
+    fail(2, `DOTCLAUDE_HANDOFF_REPO must start with https://, git@, or ssh:// (got: ${url})`);
   return url;
 }
 
