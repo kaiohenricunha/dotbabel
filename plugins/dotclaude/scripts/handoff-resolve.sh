@@ -21,7 +21,12 @@ die_runtime() { printf 'handoff-resolve: %s\n' "$1" >&2; exit 2; }
 
 usage() {
   cat <<'EOF' >&2
-usage: handoff-resolve.sh <claude|copilot|codex> <uuid|short-uuid|latest|alias>
+usage: handoff-resolve.sh <any|claude|copilot|codex> <uuid|short-uuid|latest|alias>
+
+  any       probe all three CLIs; on collision, exit 2 with TSV candidates on stderr
+  claude    resolve in ~/.claude/projects only
+  copilot   resolve in ~/.copilot/session-state only
+  codex     resolve in ~/.codex/sessions only
 EOF
   exit 64
 }
@@ -181,6 +186,79 @@ resolve_codex() {
   die_runtime "codex session not found for identifier: $id"
 }
 
+# Extract a session id from a resolved path, per-CLI convention.
+session_id_from_path() {
+  local cli="$1" path="$2"
+  case "$cli" in
+    claude)
+      basename "$path" .jsonl
+      ;;
+    copilot)
+      basename "$(dirname "$path")"
+      ;;
+    codex)
+      local base; base=$(basename "$path" .jsonl)
+      printf '%s' "$base" \
+        | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+        | tail -1
+      ;;
+  esac
+}
+
+# `any` mode: probe all three CLIs. Emit single path on exactly-one match;
+# TSV candidate list on stderr + exit 2 on collision; exit 2 on no match.
+resolve_any() {
+  local id="$1"
+
+  # Special case: `any latest` picks the newest jsonl across all three roots.
+  if [[ "$id" == "latest" ]]; then
+    local roots=()
+    [[ -d "${HOME}/.claude/projects" ]]       && roots+=("${HOME}/.claude/projects")
+    [[ -d "${HOME}/.copilot/session-state" ]] && roots+=("${HOME}/.copilot/session-state")
+    [[ -d "${HOME}/.codex/sessions" ]]        && roots+=("${HOME}/.codex/sessions")
+    [[ ${#roots[@]} -gt 0 ]] || die_runtime "no session roots found under \$HOME"
+    local hit
+    hit="$(find "${roots[@]}" -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
+    [[ -n "$hit" ]] || die_runtime "no sessions found across any root"
+    printf '%s\n' "$hit"
+    return 0
+  fi
+
+  # Collect hits from each per-CLI resolver (each may die_runtime on miss;
+  # subshell captures the non-zero exit and we skip).
+  local hits=()
+  local tsv=()
+  local cli path sid
+  for cli in claude copilot codex; do
+    if path=$("resolve_$cli" "$id" 2>/dev/null); then
+      [[ -n "$path" ]] || continue
+      sid=$(session_id_from_path "$cli" "$path")
+      hits+=("$path")
+      tsv+=("$(printf '%s\t%s\t%s\t%s' "$cli" "$sid" "$path" "$id")")
+    fi
+  done
+
+  case ${#hits[@]} in
+    0)
+      die_runtime "no session matches: $id"
+      ;;
+    1)
+      printf '%s\n' "${hits[0]}"
+      return 0
+      ;;
+    *)
+      {
+        printf 'handoff-resolve: multiple sessions match "%s":\n' "$id"
+        local line
+        for line in "${tsv[@]}"; do
+          printf '%s\n' "$line"
+        done
+      } >&2
+      exit 2
+      ;;
+  esac
+}
+
 main() {
   [[ $# -ge 1 ]] || usage
   local cli="$1"
@@ -188,10 +266,11 @@ main() {
   local id="$2"
 
   case "$cli" in
+    any)     resolve_any "$id" ;;
     claude)  resolve_claude "$id" ;;
     copilot) resolve_copilot "$id" ;;
     codex)   resolve_codex "$id" ;;
-    *)       die_usage "cli must be one of: claude, copilot, codex (got: $cli)" ;;
+    *)       die_usage "cli must be one of: any, claude, copilot, codex (got: $cli)" ;;
   esac
 }
 

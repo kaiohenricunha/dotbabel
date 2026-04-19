@@ -24,14 +24,11 @@ setup() {
   CLAUDE_ALIAS_FILE="$TEST_HOME/.claude/projects/-home-u-demo/cccc1111-1111-1111-1111-111111111111.jsonl"
   printf '{"cwd":"/home/u/demo","sessionId":"cccc1111-1111-1111-1111-111111111111","version":"2.1"}\n{"type":"custom-title","customTitle":"refactor","sessionId":"cccc1111-1111-1111-1111-111111111111"}\n' \
     > "$CLAUDE_ALIAS_FILE"
-
-  sleep 0.01
   CLAUDE_PLAIN_FILE="$TEST_HOME/.claude/projects/-home-u-demo/aaaa2222-2222-2222-2222-222222222222.jsonl"
   printf '{"cwd":"/home/u/demo","sessionId":"aaaa2222-2222-2222-2222-222222222222","version":"2.1"}\n' \
     > "$CLAUDE_PLAIN_FILE"
 
   # Copilot fixture
-  sleep 0.01
   COPILOT_DIR="$TEST_HOME/.copilot/session-state/dddd3333-3333-3333-3333-333333333333"
   mkdir -p "$COPILOT_DIR"
   COPILOT_FILE="$COPILOT_DIR/events.jsonl"
@@ -39,18 +36,22 @@ setup() {
     > "$COPILOT_FILE"
 
   # Codex fixture: a rollout WITH thread_name "refactor" (collision with claude)
-  sleep 0.01
   mkdir -p "$TEST_HOME/.codex/sessions/2026/04/18"
   CODEX_ALIAS_FILE="$TEST_HOME/.codex/sessions/2026/04/18/rollout-2026-04-18T10-00-00-eeee5555-5555-5555-5555-555555555555.jsonl"
   printf '{"type":"session_meta","payload":{"id":"eeee5555-5555-5555-5555-555555555555","cwd":"/work"}}\n{"type":"event_msg","payload":{"thread_id":"eeee5555-5555-5555-5555-555555555555","thread_name":"refactor","type":"thread_renamed"}}\n' \
     > "$CODEX_ALIAS_FILE"
 
-  # Newer codex rollout (no alias) — will be the "latest" winner because
-  # it has the most recent mtime across all three roots.
-  sleep 0.01
+  # Newer codex rollout — explicit mtime ordering via `touch -d`, since
+  # `sleep` fractions are unreliable across filesystems (tmpfs mtime
+  # resolution is often 1s).
   CODEX_NEWEST_FILE="$TEST_HOME/.codex/sessions/2026/04/18/rollout-2026-04-18T11-00-00-ffff6666-6666-6666-6666-666666666666.jsonl"
   printf '{"type":"session_meta","payload":{"id":"ffff6666-6666-6666-6666-666666666666","cwd":"/work"}}\n' \
     > "$CODEX_NEWEST_FILE"
+  touch -d '2026-04-18T09:00:00Z' "$CLAUDE_ALIAS_FILE"
+  touch -d '2026-04-18T10:00:00Z' "$CLAUDE_PLAIN_FILE"
+  touch -d '2026-04-18T11:00:00Z' "$COPILOT_FILE"
+  touch -d '2026-04-18T12:00:00Z' "$CODEX_ALIAS_FILE"
+  touch -d '2026-04-18T13:00:00Z' "$CODEX_NEWEST_FILE"
 
   export CLAUDE_ALIAS_FILE CLAUDE_PLAIN_FILE COPILOT_FILE CODEX_ALIAS_FILE CODEX_NEWEST_FILE
 }
