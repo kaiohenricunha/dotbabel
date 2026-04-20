@@ -79,11 +79,13 @@ fi
 
 repo="${DOTCLAUDE_HANDOFF_REPO:-}"
 if [[ -z "$repo" ]]; then
-  fail "handoff-repo-unset" \
-    "DOTCLAUDE_HANDOFF_REPO is not set" \
-    "create a private repo once: gh repo create handoff-store --private" \
-    "export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git" \
-    "any private git repo works (GitLab, Gitea, self-hosted) — the URL just needs to be ssh://, git@, https://, or a local path"
+  # Not a hard failure: the binary auto-bootstraps on `push` when stdin is
+  # a TTY and `gh` is authenticated. Surface that so running `doctor`
+  # before the first push doesn't read as alarming.
+  printf 'info: DOTCLAUDE_HANDOFF_REPO is not set — first `dotclaude handoff push` will offer to create a private repo interactively.\n'
+  check_clock
+  printf 'ok (unconfigured)\n'
+  exit 0
 fi
 
 if ! git ls-remote "$repo" HEAD >/dev/null 2>&1; then

@@ -50,14 +50,22 @@ import { createInterface } from "node:readline";
 const POWER_SUBS = new Set(["resolve", "describe", "digest", "file"]);
 const CLIS = new Set(["claude", "copilot", "codex"]);
 
-// Mirrors `schema_version` in .dotclaude-handoff.json; bump only on a
-// breaking store-layout change, because every writer on the network
-// must agree before the next `push`.
-const SCHEMA_VERSION = "2";
-
+// Branch shape written by `push`. The store is unceremonial — there is
+// no schema pin on `main`, no `init` step, no server-side enforcement;
+// the binary is the only writer and reader, so consistency comes from
+// shipping a single version of this regex everywhere.
 const V2_BRANCH_RE =
   /^handoff\/[a-z0-9-]+\/(claude|copilot|codex)\/\d{4}-\d{2}\/[0-9a-f]{8}$/;
 const V1_BRANCH_RE = /^handoff\/(claude|copilot|codex)\/[0-9a-f]{8}$/;
+
+// Persisted config lives under $XDG_CONFIG_HOME (~/.config by default).
+// Shell-sourceable `.env`-style; one KEY=VALUE per line. Created by
+// the first successful bootstrap so subsequent pushes don't re-prompt.
+const CONFIG_DIR = join(
+  process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"),
+  "dotclaude"
+);
+const CONFIG_FILE = join(CONFIG_DIR, "handoff.env");
 
 const META = {
   name: "dotclaude-handoff",
@@ -363,14 +371,230 @@ function listAllLocalSessions() {
 
 // ---- remote transport (git, the only transport since v0.9.0) ----------
 
-function requireTransportRepo() {
-  const url = process.env.DOTCLAUDE_HANDOFF_REPO;
-  if (!url) fail(2, "DOTCLAUDE_HANDOFF_REPO env var must be set for the remote git transport");
-  // Reject ext:: and other exec-triggering Git URL schemes (CVE-2017-1000117-class).
-  // Allow: https://, http://, git@, ssh://, file://, and absolute paths (bare repos).
+// Reject ext:: and other exec-triggering Git URL schemes (CVE-2017-1000117-class).
+// Allow: https://, http://, git@, ssh://, file://, and absolute paths (bare repos).
+function validateTransportUrl(url) {
   if (!/^(https?:\/\/|git@|ssh:\/\/|file:\/\/|\/)/.test(url))
     fail(2, `DOTCLAUDE_HANDOFF_REPO must be an https://, git@, ssh://, file://, or absolute path (got: ${url})`);
   return url;
+}
+
+// Source ~/.config/dotclaude/handoff.env if present, seeding any missing
+// env var. Shell rc users can `source` the same file; bypass is trivial
+// via an explicit `DOTCLAUDE_HANDOFF_REPO=...` on the command line.
+function loadPersistedEnv() {
+  if (!existsSync(CONFIG_FILE)) return;
+  let contents;
+  try {
+    contents = readFileSync(CONFIG_FILE, "utf8");
+  } catch {
+    return;
+  }
+  for (const raw of contents.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!m) continue;
+    const key = m[1];
+    let val = m[2];
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined || process.env[key] === "") {
+      process.env[key] = val;
+    }
+  }
+}
+
+// Best-effort slugify matching what `gh repo create` will accept. Stricter
+// than handoff-description.sh's slugify because GitHub repo names reject
+// leading/trailing dashes and double-dashes.
+function slugifyRepoName(input) {
+  const s = (input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s.slice(0, 100);
+}
+
+function isTty() {
+  return Boolean(process.stdin.isTTY && process.stderr.isTTY);
+}
+
+// Three-line manual-setup block. Printed when we can't (or shouldn't)
+// auto-create — non-TTY, no `gh`, or user declines the prompt.
+function printManualSetupBlock(reason) {
+  const msg = [
+    "",
+    `Can't auto-bootstrap the handoff store: ${reason}`,
+    "",
+    "Set it up manually:",
+    "  1. gh repo create <you>/dotclaude-handoff-store --private",
+    "  2. export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotclaude-handoff-store.git",
+    "  3. dotclaude handoff push   # retries",
+    "",
+    "Alternative providers (GitLab, Gitea, self-hosted) work too — set",
+    "DOTCLAUDE_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.",
+    "",
+  ];
+  process.stderr.write(msg.join("\n"));
+}
+
+function ghAvailable() {
+  const r = spawnSync("gh", ["--version"], { encoding: "utf8" });
+  return r.status === 0;
+}
+
+function ghAuthenticated() {
+  const r = spawnSync("gh", ["auth", "status", "-h", "github.com"], { encoding: "utf8" });
+  return r.status === 0;
+}
+
+function ghLogin() {
+  const r = spawnSync("gh", ["api", "user", "-q", ".login"], { encoding: "utf8" });
+  if (r.status !== 0) return null;
+  return r.stdout.trim() || null;
+}
+
+// Synchronous readline prompt that mirrors the existing collision-prompt
+// pattern (createInterface + rl.question + close). Returns the trimmed
+// answer, or "" for empty input.
+async function promptLine(message) {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    return await new Promise((resolve) => {
+      rl.question(message, (answer) => resolve(answer.trim()));
+    });
+  } finally {
+    rl.close();
+  }
+}
+
+// Interactive repo creation. Prompts for a name (default
+// `dotclaude-handoff-store`), confirms, runs `gh repo create --private`,
+// writes the URL to ~/.config/dotclaude/handoff.env, and exports it
+// in-process so the current run continues without re-reading.
+//
+// Exits 2 with a manual-setup block when we can't proceed:
+//   - no TTY (cron/CI)
+//   - `gh` missing or unauthenticated
+//   - the user aborts
+async function bootstrapTransportRepo() {
+  if (!isTty()) {
+    printManualSetupBlock("not running in an interactive terminal");
+    process.exit(2);
+  }
+  if (!ghAvailable()) {
+    printManualSetupBlock("`gh` CLI is not on PATH — install it from https://cli.github.com/");
+    process.exit(2);
+  }
+  if (!ghAuthenticated()) {
+    printManualSetupBlock("`gh` is not authenticated — run `gh auth login` (scopes: repo)");
+    process.exit(2);
+  }
+  const login = ghLogin();
+  if (!login) {
+    printManualSetupBlock("could not read GitHub username via `gh api user`");
+    process.exit(2);
+  }
+
+  process.stderr.write(
+    [
+      "",
+      "DOTCLAUDE_HANDOFF_REPO is not set — dotclaude can set this up for you.",
+      "",
+      `  Detected: gh CLI authenticated as @${login}.`,
+      `  Plan: create private repo  ${login}/<name>`,
+      `        persist URL to       ${CONFIG_FILE}`,
+      "",
+    ].join("\n")
+  );
+
+  let name = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const input = await promptLine("  Repo name? [dotclaude-handoff-store] ");
+    const candidate = input === "" ? "dotclaude-handoff-store" : slugifyRepoName(input);
+    if (/^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$|^[a-z0-9]$/.test(candidate)) {
+      name = candidate;
+      break;
+    }
+    process.stderr.write(
+      "  Name must be 1-100 chars of [a-z0-9-], no leading/trailing dash. Try again.\n"
+    );
+  }
+  if (!name) {
+    process.stderr.write("  Gave up after 3 invalid names. Aborting.\n");
+    process.exit(2);
+  }
+
+  const confirm = await promptLine(`  Create ${login}/${name} and proceed? [y/N] `);
+  if (!/^y(es)?$/i.test(confirm)) {
+    process.stderr.write("  Aborted.\n");
+    process.exit(1);
+  }
+
+  const create = spawnSync(
+    "gh",
+    ["repo", "create", `${login}/${name}`, "--private", "--description", "dotclaude handoff store"],
+    { encoding: "utf8" }
+  );
+  if (create.status !== 0) {
+    const stderr = (create.stderr || "").toLowerCase();
+    // Idempotent: an existing repo is not a failure — we'll push to it.
+    if (!stderr.includes("already exists") && !stderr.includes("name already exists on this account")) {
+      process.stderr.write(`  gh repo create failed:\n${create.stderr}\n`);
+      process.exit(2);
+    }
+    process.stderr.write(`  ✓ repo ${login}/${name} already exists — reusing\n`);
+  } else {
+    process.stderr.write(`  ✓ created ${login}/${name}\n`);
+  }
+
+  const view = spawnSync(
+    "gh",
+    ["repo", "view", `${login}/${name}`, "--json", "sshUrl,url", "-q", ".sshUrl"],
+    { encoding: "utf8" }
+  );
+  const url = view.status === 0 && view.stdout.trim()
+    ? view.stdout.trim()
+    : `git@github.com:${login}/${name}.git`;
+
+  mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
+  writeFileSync(
+    CONFIG_FILE,
+    `# Written by dotclaude handoff on ${new Date().toISOString()}\n` +
+      `# Sourceable from your shell rc:  source ${CONFIG_FILE}\n` +
+      `export DOTCLAUDE_HANDOFF_REPO=${url}\n`,
+    { mode: 0o600 }
+  );
+  process.stderr.write(`  ✓ wrote ${CONFIG_FILE}\n`);
+  process.stderr.write(
+    `    (add \`source ${CONFIG_FILE}\` to ~/.bashrc or ~/.zshrc to persist across shells)\n`
+  );
+
+  process.env.DOTCLAUDE_HANDOFF_REPO = url;
+  return url;
+}
+
+// Public entry point: return a validated transport URL, bootstrapping
+// interactively if the env var is missing. Called by push/pull/list/
+// doctor, i.e. anywhere the remote is required.
+async function requireTransportRepo() {
+  const existing = process.env.DOTCLAUDE_HANDOFF_REPO;
+  if (existing) return validateTransportUrl(existing);
+  const fresh = await bootstrapTransportRepo();
+  return validateTransportUrl(fresh);
+}
+
+// Synchronous variant for read-only paths (list, remote-list, doctor
+// shell script) that can't meaningfully trigger an interactive bootstrap
+// mid-command. Fails hard instead.
+function requireTransportRepoStrict() {
+  const url = process.env.DOTCLAUDE_HANDOFF_REPO;
+  if (!url) fail(2, "DOTCLAUDE_HANDOFF_REPO is not set — run `dotclaude handoff push` to auto-bootstrap, or set it manually");
+  return validateTransportUrl(url);
 }
 
 function encodeDescription({ cli, shortId, project, host, month, tag }) {
@@ -429,65 +653,23 @@ function v2BranchName({ project, cli, month, shortId }) {
   return `handoff/${slugify(project)}/${cli}/${month}/${shortId}`;
 }
 
-// Shallow-clone the remote's `main` branch into a temp dir and read
-// `.dotclaude-handoff.json`. Returns the parsed object, or null when
-// the file is missing (uninitialised store). Throws when `main`
-// itself is missing (truly empty repo) — caller decides how to
-// handle that vs the unwritten-pin case.
-function readRemoteSchema() {
-  const repoUrl = requireTransportRepo();
-  const tmp = mkdtempSync(join(tmpdir(), "handoff-schema-"));
-  try {
-    const r = runGit(["clone", "-q", "--depth", "1", "--branch", "main", repoUrl, "."], tmp);
-    if (r.status !== 0) {
-      // Empty repo (no `main`) is a distinct state from "main exists
-      // but lacks the pin"; surface it as null so callers can decide.
-      const stderr = (r.stderr || "").toLowerCase();
-      if (stderr.includes("not found") || stderr.includes("does not appear") || stderr.includes("empty repository")) {
-        return null;
-      }
-      throw new Error(`clone failed: ${(r.stderr || r.stdout).trim()}`);
-    }
-    const pinPath = join(tmp, ".dotclaude-handoff.json");
-    if (!existsSync(pinPath)) return null;
-    try {
-      return JSON.parse(readFileSync(pinPath, "utf8"));
-    } catch (err) {
-      throw new Error(`.dotclaude-handoff.json is not valid JSON: ${err.message}`);
-    }
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
+// Detect the "remote repo doesn't exist / auth failed" class of errors
+// from `git push` stderr. GitHub, GitLab, Gitea and plain SSH all phrase
+// it slightly differently, so match on the union.
+function isRepoMissingError(stderr) {
+  const s = (stderr || "").toLowerCase();
+  return (
+    s.includes("repository not found") ||
+    s.includes("could not read from remote") ||
+    s.includes("remote: not found") ||
+    s.includes("project you were looking for could not be found") ||
+    s.includes("permission denied") ||
+    s.includes("does not appear to be a git repository")
+  );
 }
 
-// Wrap requireTransportRepo with a schema check. Push paths must call
-// this before writing — it's the "enforced" half of the v2 contract.
-// On schema mismatch / missing pin, fails with a pointer at `init`.
-function requireInitializedRepo() {
-  const url = requireTransportRepo();
-  let pin;
-  try {
-    pin = readRemoteSchema();
-  } catch (err) {
-    fail(2, `cannot read remote schema: ${err.message}`);
-  }
-  if (pin === null) {
-    fail(
-      2,
-      "remote handoff store is not initialised — run `dotclaude handoff init` first (writes README.md + .dotclaude-handoff.json to `main`)"
-    );
-  }
-  if (pin.schema_version !== SCHEMA_VERSION) {
-    fail(
-      2,
-      `remote handoff store schema_version=${pin.schema_version}, this binary supports ${SCHEMA_VERSION}; upgrade @dotclaude/dotclaude or reinitialise the store`
-    );
-  }
-  return url;
-}
-
-function pushRemote({ cli, path: sessionFile, tag }) {
-  const repoUrl = requireInitializedRepo();
+async function pushRemote({ cli, path: sessionFile, tag }) {
+  let repoUrl = await requireTransportRepo();
   const meta = extractMeta(cli, sessionFile);
   const prompts = extractPrompts(cli, sessionFile);
   const turns = extractTurns(cli, sessionFile);
@@ -517,27 +699,52 @@ function pushRemote({ cli, path: sessionFile, tag }) {
     hostname: host,
     created_at: new Date().toISOString(),
     scrubbed_count: 0,
-    schema_version: SCHEMA_VERSION,
     tag: tag || null,
   };
 
-  const tmp = mkdtempSync(join(tmpdir(), "handoff-push-"));
+  const doPush = (url) => {
+    const tmp = mkdtempSync(join(tmpdir(), "handoff-push-"));
+    try {
+      runGitOrThrow(["init", "-q"], tmp);
+      runGitOrThrow(["remote", "add", "origin", url], tmp);
+      runGitOrThrow(["config", "user.email", "handoff@dotclaude.local"], tmp);
+      runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
+      const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
+      runGitOrThrow(["checkout", "-q", "-b", branch], tmp);
+      writeFileSync(join(tmp, "handoff.md"), handoffBlock + "\n");
+      writeFileSync(join(tmp, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
+      writeFileSync(join(tmp, "description.txt"), description + "\n");
+      runGitOrThrow(["add", "."], tmp);
+      runGitOrThrow(["commit", "-q", "-m", description], tmp);
+      runGitOrThrow(["push", "-q", "-f", "origin", branch], tmp);
+      return { branch, url, description };
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  };
+
   try {
-    runGitOrThrow(["init", "-q"], tmp);
-    runGitOrThrow(["remote", "add", "origin", repoUrl], tmp);
-    runGitOrThrow(["config", "user.email", "handoff@dotclaude.local"], tmp);
-    runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
-    const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
-    runGitOrThrow(["checkout", "-q", "-b", branch], tmp);
-    writeFileSync(join(tmp, "handoff.md"), handoffBlock + "\n");
-    writeFileSync(join(tmp, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
-    writeFileSync(join(tmp, "description.txt"), description + "\n");
-    runGitOrThrow(["add", "."], tmp);
-    runGitOrThrow(["commit", "-q", "-m", description], tmp);
-    runGitOrThrow(["push", "-q", "-f", "origin", branch], tmp);
-    return { branch, url: repoUrl, description };
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
+    return doPush(repoUrl);
+  } catch (err) {
+    // Retry once after bootstrap if the remote is gone or unauthorized
+    // — handles stale config (repo deleted) and first-run with a pre-set
+    // env var that points at a non-existent repo. Second failure is fatal.
+    if (!isRepoMissingError(err.message)) throw err;
+    if (!isTty()) {
+      printManualSetupBlock(
+        `configured repo is unreachable (${process.env.DOTCLAUDE_HANDOFF_REPO}) and we can't prompt in non-interactive mode`
+      );
+      throw err;
+    }
+    process.stderr.write(
+      `\n  The configured repo (${process.env.DOTCLAUDE_HANDOFF_REPO}) is unreachable.\n`
+    );
+    const again = await promptLine("  Re-bootstrap (create a new one)? [y/N] ");
+    if (!/^y(es)?$/i.test(again)) throw err;
+    // Clear the stale URL so bootstrapTransportRepo() doesn't short-circuit.
+    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    const fresh = await bootstrapTransportRepo();
+    return doPush(validateTransportUrl(fresh));
   }
 }
 
@@ -546,7 +753,7 @@ function pushRemote({ cli, path: sessionFile, tag }) {
  * Returns [{branch, description, commit}] — no content fetched.
  */
 function listRemoteCandidates() {
-  const repoUrl = requireTransportRepo();
+  const repoUrl = requireTransportRepoStrict();
   const r = runGit(["ls-remote", repoUrl, "refs/heads/handoff/*"]);
   if (r.status !== 0) fail(2, `ls-remote failed: ${r.stderr.trim()}`);
   const rows = [];
@@ -565,7 +772,7 @@ function listRemoteCandidates() {
  * Fetch a specific handoff branch and return its `handoff.md` content.
  */
 function fetchRemoteBranch(branch) {
-  const repoUrl = requireTransportRepo();
+  const repoUrl = requireTransportRepoStrict();
   const tmp = mkdtempSync(join(tmpdir(), "handoff-pull-"));
   try {
     const r = runGit(["clone", "-q", "--depth", "1", "--branch", branch, repoUrl, "."], tmp);
@@ -796,6 +1003,10 @@ function searchSessions({ query, cli, since, limit }) {
 
 // ---- main --------------------------------------------------------------
 
+// Seed env vars from the persisted config before anything else reads
+// process.env. Idempotent; skipped when the file is absent.
+loadPersistedEnv();
+
 let argv;
 try {
   argv = parse(process.argv.slice(2), META.flags);
@@ -857,139 +1068,24 @@ async function main() {
     const r = runScript(DOCTOR_SH, []);
     process.stdout.write(r.stdout);
     process.stderr.write(r.stderr);
-    if (r.status !== 0) process.exit(r.status);
-    // Surface the v2 schema pin status as a soft check on top of the
-    // shell script's git/env validation. Missing pin is a warning,
-    // not a failure — the script's contract stays "git transport
-    // reachable", and `init` is the documented next step.
-    try {
-      const pin = readRemoteSchema();
-      if (pin === null) {
-        process.stderr.write(
-          "warn: remote handoff store is not initialised — run `dotclaude handoff init` before the first push\n"
-        );
-      } else if (pin.schema_version !== SCHEMA_VERSION) {
-        process.stderr.write(
-          `warn: remote schema_version=${pin.schema_version}, this binary supports ${SCHEMA_VERSION}\n`
-        );
-      } else {
-        process.stdout.write(`ok: schema_version=${pin.schema_version}\n`);
-      }
-    } catch (err) {
-      process.stderr.write(`warn: schema check skipped: ${err.message}\n`);
-    }
-    process.exit(EXIT_CODES.OK);
-  }
-
-  if (first === "init") {
-    const repoUrl = requireTransportRepo();
-    let existing;
-    try {
-      existing = readRemoteSchema();
-    } catch (err) {
-      fail(2, `cannot read remote schema: ${err.message}`);
-    }
-    if (existing !== null) {
-      if (existing.schema_version === SCHEMA_VERSION) {
-        process.stdout.write(`ok: already initialised (schema_version=${existing.schema_version})\n`);
-        process.exit(EXIT_CODES.OK);
-      }
-      fail(
-        2,
-        `remote already pinned at schema_version=${existing.schema_version}; this binary supports ${SCHEMA_VERSION}. Upgrade @dotclaude/dotclaude on every machine before reinitialising.`
-      );
-    }
-
-    const tmp = mkdtempSync(join(tmpdir(), "handoff-init-"));
-    try {
-      // Try to clone main first; falls back to a fresh init when the
-      // remote is genuinely empty (no main branch yet).
-      const cloneR = runGit(["clone", "-q", "--depth", "1", "--branch", "main", repoUrl, "."], tmp);
-      const isEmpty = cloneR.status !== 0;
-      if (isEmpty) {
-        runGitOrThrow(["init", "-q", "-b", "main"], tmp);
-        runGitOrThrow(["remote", "add", "origin", repoUrl], tmp);
-      }
-      runGitOrThrow(["config", "user.email", "handoff@dotclaude.local"], tmp);
-      runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
-
-      const pin = {
-        schema_version: SCHEMA_VERSION,
-        created_at: new Date().toISOString(),
-        layout: "branch-per-handoff",
-        branch_format: "handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>",
-        description_format: "handoff:v2:<project>:<cli>:<YYYY-MM>:<short-uuid>:<hostname>[:<tag>]",
-        created_by: `@dotclaude/dotclaude@${version}`,
-      };
-      writeFileSync(join(tmp, ".dotclaude-handoff.json"), JSON.stringify(pin, null, 2) + "\n");
-
-      // README.md is best-effort: only write it when the repo doesn't
-      // already have one. This keeps `init` safe to run against a
-      // private repo the user is also using for unrelated content.
-      const readmePath = join(tmp, "README.md");
-      let readmeWritten = false;
-      if (!existsSync(readmePath)) {
-        writeFileSync(
-          readmePath,
-          [
-            "# Handoff store",
-            "",
-            "Managed by [`@dotclaude/dotclaude`](https://github.com/kaiohenricunha/dotclaude). Holds session handoffs",
-            "produced by `dotclaude handoff push`.",
-            "",
-            "## Layout",
-            "",
-            "Each handoff is a branch:",
-            "",
-            "```",
-            "handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>",
-            "```",
-            "",
-            "Each branch carries three files at the root: `handoff.md` (the rendered",
-            "`<handoff>` block), `metadata.json` (cli, session, project, hostname,",
-            "scrubbed_count, schema_version), and `description.txt` (the encoded",
-            "`handoff:v2:...` string, also used as the commit message).",
-            "",
-            "The `main` branch is reserved for `.dotclaude-handoff.json` (the schema",
-            "pin) and this README. Operational sub-commands (push / pull /",
-            "remote-list / prune / migrate) only touch `handoff/...` branches.",
-            "",
-            "## Lifecycle",
-            "",
-            "- `dotclaude handoff init` — scaffolds this repo (idempotent).",
-            "- `dotclaude handoff push` — appends a handoff branch.",
-            "- `dotclaude handoff pull` — fetches one back.",
-            "- `dotclaude handoff remote-list` — lists what's here.",
-            "- `dotclaude handoff prune --older-than <Nd>` — deletes stale branches.",
-            "",
-            "Do not edit files on `main` by hand unless you know what you're doing.",
-            "",
-          ].join("\n")
-        );
-        readmeWritten = true;
-      } else {
-        process.stderr.write(
-          "note: README.md already exists on `main`; leaving it untouched\n"
-        );
-      }
-
-      runGitOrThrow(["add", ".dotclaude-handoff.json", ...(readmeWritten ? ["README.md"] : [])], tmp);
-      runGitOrThrow(
-        ["commit", "-q", "-m", `chore: initialise handoff store (schema_version=${SCHEMA_VERSION})`],
-        tmp
-      );
-      runGitOrThrow(["push", "-q", "origin", "main"], tmp);
-      process.stdout.write(`ok: initialised handoff store at ${repoUrl} (schema_version=${SCHEMA_VERSION})\n`);
-      process.exit(EXIT_CODES.OK);
-    } catch (err) {
-      fail(2, `init failed: ${err.message}`);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
+    // Enrich the shell script's output with one line each for: persisted
+    // config, gh usable as bootstrap fallback, and the current repo URL.
+    // These are diagnostics, not gates — no exit-code change.
+    const configLoaded = existsSync(CONFIG_FILE);
+    process.stdout.write(
+      `config: ${configLoaded ? CONFIG_FILE : "(not written yet — first push will create it)"}\n`
+    );
+    process.stdout.write(
+      `gh: ${ghAvailable() ? (ghAuthenticated() ? "authenticated" : "installed, not authenticated") : "not installed"}\n`
+    );
+    process.stdout.write(
+      `DOTCLAUDE_HANDOFF_REPO: ${process.env.DOTCLAUDE_HANDOFF_REPO || "(unset — will bootstrap on first push)"}\n`
+    );
+    process.exit(r.status !== 0 ? r.status : EXIT_CODES.OK);
   }
 
   if (first === "remote-list") {
-    requireTransportRepo();
+    requireTransportRepoStrict();
     let candidates;
     try {
       candidates = listRemoteCandidates();
@@ -1152,7 +1248,7 @@ async function main() {
 
     const tag = argv.flags.tag ? String(argv.flags.tag) : null;
     try {
-      const result = pushRemote({ cli: sessionHit.cli, path: sessionHit.path, tag });
+      const result = await pushRemote({ cli: sessionHit.cli, path: sessionHit.path, tag });
       process.stdout.write(`${result.branch}\n${result.url}\n${result.description}\n`);
       process.exit(EXIT_CODES.OK);
     } catch (err) {
@@ -1266,16 +1362,19 @@ export {
   monthBucket,
   nextStepFor,
   projectSlugFromCwd,
-  readRemoteSchema,
-  requireInitializedRepo,
   requireTransportRepo,
+  requireTransportRepoStrict,
+  validateTransportUrl,
   searchSessions,
   slugify,
   truncate,
   v2BranchName,
+  loadPersistedEnv,
+  bootstrapTransportRepo,
+  isRepoMissingError,
   CLI_LAYOUTS,
-  SCHEMA_VERSION,
   UUID_HEAD_RE,
   V1_BRANCH_RE,
   V2_BRANCH_RE,
+  CONFIG_FILE,
 };

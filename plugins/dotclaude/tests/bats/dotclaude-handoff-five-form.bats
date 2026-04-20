@@ -45,13 +45,12 @@ EOF
   # Set up a bare git repo as the remote transport endpoint and
   # pre-initialise it with the v2 schema pin so push/pull work without
   # each test having to run `init` first. v0.10.0 pushRemote() refuses
-  # uninitialised stores by design — the init-coverage tests live in
-  # handoff-binary-subs.bats and don't use this fixture.
+  # Set up a bare git repo for the transport. The binary writes directly
+  # to `handoff/...` branches with no init / schema-pin ceremony.
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
   export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
-  node "$BIN" init >/dev/null
 
   export CLAUDE_FILE CODEX_FILE TRANSPORT_REPO
 }
