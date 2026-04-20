@@ -50,16 +50,11 @@ import { createInterface } from "node:readline";
 const POWER_SUBS = new Set(["resolve", "describe", "digest", "file"]);
 const CLIS = new Set(["claude", "copilot", "codex"]);
 
-// Schema pin for the remote handoff store. v0.10.0 introduced the v2
-// branch namespace (handoff/<project>/<cli>/<YYYY-MM>/<short>) and the
-// .dotclaude-handoff.json file on `main`. The binary refuses to write
-// (exit 2) against a store whose pin doesn't match, pointing the user
-// at `dotclaude handoff init`.
+// Mirrors `schema_version` in .dotclaude-handoff.json; bump only on a
+// breaking store-layout change, because every writer on the network
+// must agree before the next `push`.
 const SCHEMA_VERSION = "2";
 
-// V2 branch shape — used both as the regex the writer must match AND
-// the filter `listRemoteCandidates` applies on read to skip legacy v1
-// branches. Keep in sync with handoff-description.sh's v2 schema.
 const V2_BRANCH_RE =
   /^handoff\/[a-z0-9-]+\/(claude|copilot|codex)\/\d{4}-\d{2}\/[0-9a-f]{8}$/;
 const V1_BRANCH_RE = /^handoff\/(claude|copilot|codex)\/[0-9a-f]{8}$/;
@@ -398,34 +393,30 @@ function encodeDescription({ cli, shortId, project, host, month, tag }) {
   return r.stdout.trim();
 }
 
-// Slugify any string for safe use as a branch / description segment:
-// lowercase, [a-z0-9-] only, capped at 40 chars. Collapses runs of
-// dashes and strips leading/trailing dashes so whitespace-only input
-// falls back to "adhoc" instead of "-" — matches the shell-side
-// contract in handoff-description.sh's slugify().
+// Mirror of the shell `slugify` in handoff-description.sh so JS-side
+// encoders and the shell decoder agree on the edge cases (dash-run
+// collapse, trimmed edges, "" → "adhoc" fallback).
 function slugify(s) {
   if (!s) return "adhoc";
-  let out = s.toLowerCase().replace(/[^a-z0-9-]+/g, "-");
-  out = out.replace(/-+/g, "-").replace(/^-+/, "").replace(/-+$/, "");
+  const out = s
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
   return out.slice(0, 40) || "adhoc";
 }
 
-// Resolve a cwd to a project slug. Walks up to the nearest git-repo
-// root via `git rev-parse --show-toplevel` so a session running deep
-// inside `~/projects/foo/services/api` is grouped under `foo`, not
-// `api`. Falls back to the cwd basename when not inside a git repo —
-// matching the v0.9.0 behaviour for non-git scratch dirs.
+// Walk up to the git-repo root so a session deep in `~/foo/services/api`
+// groups under `foo`, not `api`. Falls back to the cwd basename outside
+// a git repo.
 function projectSlugFromCwd(cwd) {
   if (!cwd) return "adhoc";
-  const r = spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8" });
+  const r = runGit(["-C", cwd, "rev-parse", "--show-toplevel"]);
   const root = r.status === 0 ? r.stdout.trim() : "";
   const last = (root || cwd).split("/").filter(Boolean).pop() || "adhoc";
   return slugify(last);
 }
 
-// Two-digit UTC month bucket for the v2 branch namespace. Accepts any
-// ISO-8601 string (or null/undefined → falls back to "now"); returns
-// "YYYY-MM". Pure function so the unit tests can drive it directly.
 function monthBucket(isoOrNull) {
   const d = isoOrNull ? new Date(isoOrNull) : new Date();
   if (Number.isNaN(d.getTime())) return monthBucket(null);
@@ -434,8 +425,6 @@ function monthBucket(isoOrNull) {
   return `${yyyy}-${mm}`;
 }
 
-// Build a v2 branch name. Centralised so the regex, the writer, and
-// the migrate sub all agree on the format.
 function v2BranchName({ project, cli, month, shortId }) {
   return `handoff/${slugify(project)}/${cli}/${month}/${shortId}`;
 }
@@ -508,7 +497,7 @@ function pushRemote({ cli, path: sessionFile, tag }) {
   const shortId = meta.short_id ?? "unknown";
   const host = slugify(hostname());
   const project = projectSlugFromCwd(meta.cwd);
-  const month = monthBucket(new Date().toISOString());
+  const month = monthBucket();
   const description = encodeDescription({
     cli: meta.cli,
     shortId,
@@ -622,12 +611,8 @@ async function pullRemote(query, fromCli = null) {
   let candidates = listRemoteCandidates();
   if (candidates.length === 0) fail(2, "no handoffs found on transport");
 
-  // `--from <cli>` narrows the candidate set to one source-CLI. Two
-  // branch shapes may coexist in the store: v2 (`handoff/<project>/
-  // <cli>/<YYYY-MM>/<short>`) carries the CLI in segment 2, v1 legacy
-  // (`handoff/<cli>/<short>`) carries it in segment 1. Applied BEFORE
-  // any query match so short-UUID collisions across CLIs can be
-  // resolved with --from.
+  // v2 carries the CLI in segment 2 (handoff/<project>/<cli>/...);
+  // v1 legacy carries it in segment 1 (handoff/<cli>/<short>).
   if (fromCli) {
     candidates = candidates.filter((c) => {
       const segs = c.branch.split("/");

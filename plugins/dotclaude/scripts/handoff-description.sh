@@ -4,13 +4,10 @@
 # branch commit message + the description.txt file, and by
 # `remote-list` to render the table.
 #
-# v0.10.0 introduces v2; v1 is still parsed for back-compat with
-# v0.9.0-era stores so `remote-list` and (PR-C) `migrate` can read
-# legacy branches.
-#
 # Schemas:
 #   v2 (current): handoff:v2:<project>:<cli>:<YYYY-MM>:<short>:<host>[:<tag>]
 #   v1 (legacy ): handoff:v1:<cli>:<short>:<project>:<host>[:<tag>]
+# decode accepts both; encode only emits v2.
 #
 # Usage:
 #   handoff-description.sh encode \
