@@ -346,7 +346,7 @@ function listAllLocalSessions() {
   );
 }
 
-// ---- transport: git-fallback -------------------------------------------
+// ---- remote transport (git, the only transport since v0.9.0) ----------
 
 function requireTransportRepo() {
   const url = process.env.DOTCLAUDE_HANDOFF_REPO;
@@ -382,7 +382,7 @@ function projectSlugFromCwd(cwd) {
   return last.toLowerCase().replace(/[^a-z0-9-]+/g, "-").slice(0, 40) || "adhoc";
 }
 
-function pushGitFallback({ cli, path: sessionFile, tag }) {
+function pushRemote({ cli, path: sessionFile, tag }) {
   const repoUrl = requireTransportRepo();
   const meta = extractMeta(cli, sessionFile);
   const prompts = extractPrompts(cli, sessionFile);
@@ -434,10 +434,10 @@ function pushGitFallback({ cli, path: sessionFile, tag }) {
 }
 
 /**
- * List remote handoffs from git-fallback as candidate objects.
+ * List handoff branches on the remote as candidate objects.
  * Returns [{branch, description, commit}] — no content fetched.
  */
-function listGitFallbackCandidates() {
+function listRemoteCandidates() {
   const repoUrl = requireTransportRepo();
   const r = runGit(["ls-remote", repoUrl, "refs/heads/handoff/*"]);
   if (r.status !== 0) fail(2, `ls-remote failed: ${r.stderr.trim()}`);
@@ -456,7 +456,7 @@ function listGitFallbackCandidates() {
 /**
  * Fetch a specific handoff branch and return its `handoff.md` content.
  */
-function fetchGitFallbackBranch(branch) {
+function fetchRemoteBranch(branch) {
   const repoUrl = requireTransportRepo();
   const tmp = mkdtempSync(join(tmpdir(), "handoff-pull-"));
   try {
@@ -483,7 +483,7 @@ function fetchGitFallbackBranch(branch) {
 function enrichWithDescriptions(candidates) {
   return candidates.map((c) => {
     try {
-      const { description } = fetchGitFallbackBranch(c.branch);
+      const { description } = fetchRemoteBranch(c.branch);
       return { ...c, description };
     } catch {
       return c;
@@ -499,8 +499,8 @@ function matchesQuery(candidate, query) {
   return false;
 }
 
-async function pullGitFallback(query, fromCli = null) {
-  let candidates = listGitFallbackCandidates();
+async function pullRemote(query, fromCli = null) {
+  let candidates = listRemoteCandidates();
   if (candidates.length === 0) fail(2, "no handoffs found on transport");
 
   // `--from <cli>` narrows the candidate set to one source-CLI. Branch
@@ -512,10 +512,10 @@ async function pullGitFallback(query, fromCli = null) {
     if (candidates.length === 0) fail(2, `no ${fromCli} handoffs found on transport`);
   }
 
-  // Bare: pick the newest (for git-fallback we don't have a reliable remote
-  // mtime; fall back to the lexically last branch, which is typically the
-  // most recent since short IDs hash-distribute). The caller re-fetches
-  // the branch contents via fetchGitFallbackBranch, so skipping the
+  // Bare: pick the newest. We don't have a reliable remote mtime, so
+  // fall back to the lexically last branch, which is typically the
+  // most recent since short IDs hash-distribute. The caller re-fetches
+  // the branch contents via fetchRemoteBranch, so skipping the
   // enrichment pass saves N shallow clones.
   if (!query) {
     return candidates[candidates.length - 1];
@@ -667,7 +667,7 @@ async function main() {
     }
     if (showRemote && process.env.DOTCLAUDE_HANDOFF_REPO) {
       try {
-        for (const c of listGitFallbackCandidates()) {
+        for (const c of listRemoteCandidates()) {
           rows.push({ location: "remote", branch: c.branch, commit: c.commit });
         }
       } catch (err) {
@@ -733,7 +733,7 @@ async function main() {
 
     const tag = argv.flags.tag ? String(argv.flags.tag) : null;
     try {
-      const result = pushGitFallback({ cli: sessionHit.cli, path: sessionHit.path, tag });
+      const result = pushRemote({ cli: sessionHit.cli, path: sessionHit.path, tag });
       process.stdout.write(`${result.branch}\n${result.url}\n${result.description}\n`);
       process.exit(EXIT_CODES.OK);
     } catch (err) {
@@ -743,8 +743,8 @@ async function main() {
 
   if (first === "pull") {
     try {
-      const hit = await pullGitFallback(second, fromCli);
-      const { content } = fetchGitFallbackBranch(hit.branch);
+      const hit = await pullRemote(second, fromCli);
+      const { content } = fetchRemoteBranch(hit.branch);
       process.stdout.write(content.endsWith("\n") ? content : content + "\n");
       process.exit(EXIT_CODES.OK);
     } catch (err) {

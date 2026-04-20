@@ -124,9 +124,9 @@ teardown() {
   [[ "$output" != *"gist.github"* ]]
 }
 
-# -- push (git-fallback transport) ---------------------------------------
+# -- push (remote git transport) -----------------------------------------
 
-@test "push <query> uploads to transport (git-fallback bare repo)" {
+@test "push <query> uploads to remote (bare repo transport)" {
   run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
   # Confirm the transport repo has the new branch.
@@ -236,7 +236,7 @@ teardown() {
 @test "pull --from codex narrows the transport candidate pool" {
   # Push one handoff per CLI, then pull with --from codex and confirm
   # the returned block names the codex session (bbbb2222), not the
-  # claude one (aaaa1111). Proves --from is wired through pullGitFallback.
+  # claude one (aaaa1111). Proves --from is wired through pullRemote.
   run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
   run node "$BIN" push my-codex-task
