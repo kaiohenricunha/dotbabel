@@ -1,6 +1,6 @@
 # Handoff store schema (v2 — v0.10.0+)
 
-_Last updated: v0.9.0_
+_Last updated: v0.10.0_
 
 Authoritative reference for the layout of the private git repository
 that `dotclaude handoff` uses as its remote transport. Consumed by the
