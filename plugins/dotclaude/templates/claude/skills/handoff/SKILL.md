@@ -119,7 +119,7 @@ handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>
 e.g. `handoff/dotclaude/claude/2026-04/aaaa1111`. `main` holds
 `.dotclaude-handoff.json` (the schema pin) and a README — `push`/
 `pull`/`remote-list`/`prune` only touch `handoff/...` branches. Full
-schema + rationale in [`docs/handoff-store-schema.md`](https://github.com/kaiohenricunha/dotclaude/blob/main/docs/handoff-store-schema.md).
+schema + rationale in [`docs/handoff-store-schema.md`](../../docs/handoff-store-schema.md).
 
 ## Auto-trigger contract
 
