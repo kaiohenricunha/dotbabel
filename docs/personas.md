@@ -1,6 +1,6 @@
 # Personas — who reads which file
 
-_Last updated: v0.10.0_
+_Last updated: v0.11.0_
 
 This repo is a dual-purpose checkout. Three distinct audiences consume
 parts of it. Pick yours, then follow the "Start here" column.
