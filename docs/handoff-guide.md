@@ -2,7 +2,8 @@
 
 _Last updated: v0.10.0_
 
-> **Added in v0.5.0; later reworked** to drop the gist transports.
+> **Added in v0.5.0; reworked** in v0.11.0 to drop the `init` ceremony —
+> `push` now auto-bootstraps the remote store on first run.
 > Full skill reference: [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
 
 The `/handoff` skill moves live session context from one agentic CLI to another —
@@ -21,57 +22,45 @@ scrubbed digest.
 | Persist the handoff to a markdown file for later | `file`                                  |
 | Inspect a session's purpose without loading it   | `describe`                              |
 | Find an old session by topic                     | `search "k8s networking"`               |
-| List recent sessions                             | `list claude`                           |
+| List recent sessions                             | `list`                                  |
 | Check what's waiting for you on the transport    | `remote-list`                           |
 | Diagnose why `push`/`pull` isn't working         | `doctor`                                |
 
 ---
 
-## One-time setup
-
-The remote transport is a user-owned private git repository (any provider —
-GitHub, GitLab, Gitea, self-hosted). Create one once, then point
-`DOTCLAUDE_HANDOFF_REPO` at it:
-
-```bash
-gh repo create handoff-store --private
-echo 'export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git' >> ~/.zshrc
-source ~/.zshrc
-dotclaude handoff init           # writes .dotclaude-handoff.json + README to main
-dotclaude handoff doctor         # verify
-```
-
-`init` is required from v0.10.0 onward — `push` refuses to write into
-an unstamped store so mismatched versions across machines surface
-immediately. Running it against an already-initialised store is a
-no-op (exits 0 with "already initialised"). Schema details live in
-[`docs/handoff-store-schema.md`](./handoff-store-schema.md).
-
-You can also use HTTPS (`https://github.com/<user>/handoff-store.git`), self-hosted
-URLs, or a local repository via an absolute path or `file://` URL. The only
-requirement is that your account can push.
-
----
-
 ## Quick start — machine-to-machine handoff
 
-**On machine A** (inside any session on Claude, Copilot, or Codex):
+**On machine A**, from any Claude / Copilot / Codex session:
 
 ```
 /handoff push --tag "finishing auth refactor"
 ```
 
-(Zero-arg: pushes the host's latest session. Explicit variant:
-`/handoff push <query> --tag <label>` picks a specific session.)
+On the **first** push the binary walks you through a one-time setup:
 
-This:
+```
+DOTCLAUDE_HANDOFF_REPO is not set — dotclaude can set this up for you.
 
-1. Loads the relevant session transcript.
-2. Runs a secret-scrubbing pass (eight token patterns — bearer, AWS key, etc.).
-3. Pushes a `handoff/<cli>/<short-uuid>` branch into
-   `$DOTCLAUDE_HANDOFF_REPO`.
+  Detected: gh CLI authenticated as @kaiohenricunha.
+  Plan: create private repo  kaiohenricunha/<name>
+        persist URL to       ~/.config/dotclaude/handoff.env
 
-**On machine B** (inside any CLI):
+  Repo name? [dotclaude-handoff-store]
+  Create kaiohenricunha/dotclaude-handoff-store and proceed? [y/N] y
+  ✓ created kaiohenricunha/dotclaude-handoff-store
+  ✓ wrote ~/.config/dotclaude/handoff.env
+```
+
+Subsequent pushes read the persisted URL silently. To make the URL
+available in regular shells too, add:
+
+```bash
+source ~/.config/dotclaude/handoff.env
+```
+
+to your `~/.bashrc` or `~/.zshrc`.
+
+**On machine B** (any CLI):
 
 ```
 /handoff pull finishing-auth-refactor
@@ -83,6 +72,48 @@ CLI name.
 
 ---
 
+## The transport
+
+One transport, always: a user-owned private git repo named by
+`$DOTCLAUDE_HANDOFF_REPO`. Any provider works (GitHub, GitLab, Gitea,
+self-hosted, bare local path). Each handoff lands as a branch:
+
+```
+handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>
+```
+
+e.g. `handoff/dotclaude/claude/2026-04/aaaa1111`. `main` is untouched —
+the binary only reads and writes `handoff/...` branches, so you can
+reuse an existing repo without disturbing its content.
+
+**Auto-bootstrap requirements.** For the interactive setup on first push:
+
+- `gh` CLI on PATH, authenticated against GitHub (`gh auth status`).
+- An interactive terminal (TTY on stdin + stderr).
+
+If either is missing, `push` prints a three-line manual-setup block
+(create the repo, export the env var, retry) and exits 2. Set
+`$DOTCLAUDE_HANDOFF_REPO` manually for GitLab, Gitea, or headless
+workflows.
+
+## Config file
+
+The auto-bootstrap writes this file on success:
+
+```
+~/.config/dotclaude/handoff.env
+  # Written by dotclaude handoff on 2026-04-20T…
+  # Sourceable from your shell rc:  source ~/.config/dotclaude/handoff.env
+  export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotclaude-handoff-store.git
+```
+
+Mode 0600. Edit by hand to switch stores, or delete to force a
+re-bootstrap on the next push. The binary sources this file at start-up
+only when `$DOTCLAUDE_HANDOFF_REPO` is unset — an explicit env var always
+wins.
+
+---
+
 ## The five forms
 
 | Form                  | Behavior                                              |
@@ -90,22 +121,11 @@ CLI name.
 | `/handoff`            | Push the host's latest session                        |
 | `/handoff <query>`    | Local cross-agent: emit `<handoff>` block in place    |
 | `/handoff push [<q>]` | Upload to transport; zero-arg = host latest           |
-| `/handoff pull [<q>]` | Fetch from transport; zero-arg = newest handoff       |
+| `/handoff pull [<q>]` | Fetch from transport; zero-arg = newest branch        |
 | `/handoff list`       | Unified local + remote table (`--local` / `--remote`) |
 
 Every `<query>` can be a full UUID, short UUID (first 8 hex), `latest`,
 a Claude `customTitle`, or a Codex `thread_name`.
-
-**Narrowing with `--from <cli>`.** `push`, `pull`, and bare `<query>`
-auto-detect the source CLI across all three roots. Short-UUID
-prefixes can collide; add `--from claude` (or `copilot` / `codex`)
-to force resolution into one root. Scripts that know which CLI a
-handoff lives in should always pass `--from`. With no `<query>` and
-no `--from`, bare `push` picks the latest session in the detected
-host's root (based on `CLAUDECODE` / `CODEX_*` / `COPILOT_*` env
-signals) and prints one stderr line naming the fallback; when no
-host is detected, it falls back to the newest session across all
-three roots.
 
 Power-user sub-commands (`resolve`, `describe`, `digest`, `file`) stay
 reachable for scripting — each takes an explicit `<cli>` `<id>`. Full
@@ -135,6 +155,9 @@ argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.m
 /handoff push --tag "nightly checkpoint"
 ```
 
+Headless runs skip the interactive bootstrap — set
+`$DOTCLAUDE_HANDOFF_REPO` in the scheduler's environment.
+
 ---
 
 ## Secrets & privacy
@@ -142,10 +165,8 @@ argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.m
 - **Push-side scrubbing**: eight secret patterns (AWS access keys, bearer tokens,
   `*_KEY`/`*_TOKEN`/`*_SECRET` with 20+ char values, PAT prefixes) are stripped
   before upload.
-- **Transport is access-controlled**: `DOTCLAUDE_HANDOFF_REPO` points at a
-  private repo. Push access is enforced by your provider's auth (SSH keys,
-  PATs, credential helper). Content is stored in plaintext on the remote — do
-  not push transcripts containing secrets you rely on scrubbing to catch.
+- **The handoff store is private by default** — the auto-bootstrap runs
+  `gh repo create --private`. Don't flip it to public.
 - **`--include-transcript` is opt-in** — uploading raw turns increases secret
   leakage blast radius. Off by default.
 - The skill never invokes another CLI itself — it produces the digest and hands
@@ -157,12 +178,12 @@ argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.m
 ## Troubleshooting
 
 See [troubleshooting.md — skills & commands](./troubleshooting.md#skills--commands-dotfile-users).
-For transport failures, start with:
+Quick diagnostic:
 
 ```
-/handoff doctor
+dotclaude handoff doctor
 ```
 
-It prints a platform-specific remediation block with the exact commands to fix
-the failure mode it detected (missing `git`, unset `DOTCLAUDE_HANDOFF_REPO`,
-unreachable repo).
+It prints a one-line status for `git`, the transport URL, the persisted
+config file, and `gh` fallback availability. A failure is always
+accompanied by an exact remediation command.

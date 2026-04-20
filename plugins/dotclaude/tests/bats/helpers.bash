@@ -205,11 +205,9 @@ HEREDOC
     local sha
     sha=$(git rev-parse HEAD)
     git remote add origin "$bare"
-    # Force-push because make_transport_repo now stamps the store with
-    # the v0.10.0 schema pin via `dotclaude handoff init`; this bulk
-    # seed path overwrites main with a minimal commit so the stress
-    # test's pull (which reads handoff/... branches, not main) stays
-    # cheap. Pull paths don't consult `.dotclaude-handoff.json`.
+    # Seed a minimal main so ls-remote and refs list cleanly; the
+    # binary never reads main itself, but having one is cheaper than
+    # branching to handle the empty-repo case in every caller.
     git push -qf origin HEAD:refs/heads/main
     # Build a stdin script for `update-ref` on the bare repo: one
     # `create refs/heads/handoff/claude/<hex> <sha>` line per branch.
@@ -226,17 +224,14 @@ HEREDOC
 }
 
 # make_transport_repo <dir>
-# Initialise a bare git repo at <dir> AND stamp it with the v0.10.0+
-# schema pin (`.dotclaude-handoff.json` on `main`) so callers can push
-# immediately. Pushes to uninitialised stores refuse by design; having
-# a shared helper avoids per-file boilerplate.
-# Use the returned path as DOTCLAUDE_HANDOFF_REPO. Caller is responsible
-# for cleanup.
+# Initialise a bare git repo at <dir>. The handoff binary no longer
+# requires any schema pin or init step — push writes directly to
+# `handoff/...` branches — so this helper is just a thin wrapper
+# around `git init --bare`. Use the returned path as
+# DOTCLAUDE_HANDOFF_REPO. Caller is responsible for cleanup.
 make_transport_repo() {
   local dir="$1"
   git init -q --bare "$dir"
-  DOTCLAUDE_HANDOFF_REPO="$dir" node \
-    "${REPO_ROOT}/plugins/dotclaude/bin/dotclaude-handoff.mjs" init >/dev/null
   echo "$dir"
 }
 

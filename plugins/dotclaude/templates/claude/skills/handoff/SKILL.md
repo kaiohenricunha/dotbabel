@@ -62,7 +62,6 @@ semantics. Brief summary:
 
 | Sub                   | Purpose                                                             |
 | --------------------- | ------------------------------------------------------------------- |
-| `init`                | Scaffold the remote schema pin on `main` (idempotent, one-time)     |
 | `resolve <cli> <id>`  | Print the absolute JSONL path                                       |
 | `describe <cli> <id>` | Inline 2–4 sentence summary + verbatim user prompts                 |
 | `digest <cli> <id>`   | Print a paste-ready `<handoff>` block (no transport)                |
@@ -72,7 +71,7 @@ semantics. Brief summary:
 | `push [<query>]`      | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag` / `--include-transcript` |
 | `pull [<handle>]`     | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline     |
 | `remote-list`         | List handoffs on the transport; `--cli` / `--since` / `--limit`     |
-| `doctor`              | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + schema pin               |
+| `doctor`              | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback            |
 
 Cross-cutting flags (consult `--help` for the canonical list):
 
@@ -99,16 +98,17 @@ user-owned private git repo (any provider — GitHub, GitLab, Gitea,
 self-hosted). Required:
 
 - `git` on PATH.
-- `$DOTCLAUDE_HANDOFF_REPO` set to the repo URL (no default; example:
-  `git@github.com:<user>/handoff-store.git`).
-- Working SSH or credential-helper auth for that repo.
-- The repo initialised once via `dotclaude handoff init` — writes the
-  schema pin on `main` so the binary can refuse mismatched stores.
+- Either `$DOTCLAUDE_HANDOFF_REPO` set to a repo URL, **or** the binary
+  will auto-bootstrap on first `push` when stdin is a TTY and `gh` is
+  authenticated — it offers to `gh repo create` a private store and
+  persists the URL to `~/.config/dotclaude/handoff.env` for future runs.
+- Working SSH or credential-helper auth for the resulting repo.
 
-Run `dotclaude handoff doctor` to verify. Full install matrix and
-remediation lives in `references/prerequisites.md`.
+That's it. No `init` step, no schema pin, no ceremony. Run
+`dotclaude handoff doctor` for a sanity check; see
+`references/prerequisites.md` for the full install matrix.
 
-## Repo layout (v0.10.0+)
+## Repo layout
 
 Each handoff is a branch:
 
@@ -116,10 +116,10 @@ Each handoff is a branch:
 handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>
 ```
 
-e.g. `handoff/dotclaude/claude/2026-04/aaaa1111`. `main` holds
-`.dotclaude-handoff.json` (the schema pin) and a README — `push`/
-`pull`/`remote-list`/`prune` only touch `handoff/...` branches. Full
-schema + rationale in [`docs/handoff-store-schema.md`](https://github.com/kaiohenricunha/dotclaude/blob/main/docs/handoff-store-schema.md).
+e.g. `handoff/dotclaude/claude/2026-04/aaaa1111`. The store needs no
+setup beyond "be a reachable git repo"; `main` is never touched by
+`push` / `pull` / `remote-list`. GitHub UI + `git ls-remote` render
+the branches directly.
 
 ## Auto-trigger contract
 

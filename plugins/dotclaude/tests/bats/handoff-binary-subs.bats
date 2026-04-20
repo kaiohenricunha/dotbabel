@@ -34,15 +34,13 @@ EOF
 {"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"running"}]}}
 EOF
 
-  # Set up a bare git repo as the remote transport endpoint and
-  # pre-initialise it with the v2 schema pin so push succeeds.
-  # The dedicated `init` tests further down reinitialise their own
-  # fresh stores so they can assert against the bare-repo starting state.
+  # Set up a bare git repo as the remote transport endpoint. The binary
+  # no longer requires any schema pin or init step — pushes land
+  # straight onto `handoff/...` branches.
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
   export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
-  node "$BIN" init >/dev/null
 
   export CLAUDE_FILE CODEX_FILE TRANSPORT_REPO
 }
@@ -59,11 +57,11 @@ teardown() {
   [[ "$output" == *"ok"* ]]
 }
 
-@test "doctor: exit 1 with a remediation block when DOTCLAUDE_HANDOFF_REPO is unset" {
+@test "doctor: exit 0 with an info line when DOTCLAUDE_HANDOFF_REPO is unset (auto-bootstrap is the recovery path)" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" node "$BIN" doctor
-  [ "$status" -eq 1 ]
-  [[ "$stderr" == *"Preflight failed: handoff-repo-unset"* ]]
-  [[ "$stderr" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"info: DOTCLAUDE_HANDOFF_REPO is not set"* ]]
+  [[ "$output" == *"auto-bootstrap"* ]] || [[ "$output" == *"will offer to create"* ]]
 }
 
 # ---- remote-list -------------------------------------------------------
@@ -159,42 +157,43 @@ teardown() {
   [[ "$output" == *'"snippet":'* ]]
 }
 
-# ---- init (v0.10.0: scaffold the remote schema pin) --------------------
-# These tests build a second, FRESH bare repo so they can assert the
-# pre-init / post-init transitions without tripping the shared setup's
-# already-initialised fixture repo.
+# ---- self-bootstrap ----------------------------------------------------
+# Replaces the old `init` sub-command: `push` auto-resolves a missing
+# transport interactively, persists the URL to ~/.config/dotclaude, and
+# falls back to a clear manual-setup block when non-interactive.
 
-@test "init: idempotent — re-running against an already-initialised store exits 0" {
-  run node "$BIN" init
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"already initialised"* ]]
-}
-
-@test "init: a fresh empty bare repo gets main + .dotclaude-handoff.json" {
-  local fresh
-  fresh=$(mktemp -d); rm -rf "$fresh"; git init -q --bare "$fresh"
-  DOTCLAUDE_HANDOFF_REPO="$fresh" run node "$BIN" init
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"ok: initialised"* ]]
-  # Schema pin landed on main.
-  run git --git-dir="$fresh" show main:.dotclaude-handoff.json
-  [ "$status" -eq 0 ]
-  [[ "$output" == *'"schema_version": "2"'* ]]
-  rm -rf "$fresh"
-}
-
-@test "push against an uninitialised store exits 2 with an init pointer" {
+@test "push against an empty bare repo succeeds — no init required" {
   local fresh
   fresh=$(mktemp -d); rm -rf "$fresh"; git init -q --bare "$fresh"
   DOTCLAUDE_HANDOFF_REPO="$fresh" run node "$BIN" push aaaa1111
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"not initialised"* ]]
-  [[ "$output" == *"dotclaude handoff init"* ]]
+  [ "$status" -eq 0 ]
+  # Branch landed; no schema-pin complaints on stdout/stderr.
+  run git --git-dir="$fresh" ls-remote --heads "$fresh"
+  [[ "$output" =~ handoff/demo/claude/[0-9]{4}-[0-9]{2}/aaaa1111 ]]
   rm -rf "$fresh"
 }
 
-@test "doctor surfaces schema status after a successful transport check" {
-  run node "$BIN" doctor
+@test "push with env unset + no TTY prints manual-setup block and exits 2" {
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" node "$BIN" push aaaa1111 </dev/null
+  [ "$status" -eq 2 ]
+  [[ "$stderr" == *"Can't auto-bootstrap"* ]]
+  [[ "$stderr" == *"gh repo create"* ]]
+  [[ "$stderr" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+}
+
+@test "push with env unset + config file present auto-sources the URL" {
+  local fresh configdir
+  fresh=$(mktemp -d); rm -rf "$fresh"; git init -q --bare "$fresh"
+  # Pin CONFIG_DIR via XDG_CONFIG_HOME so the test works regardless of the
+  # developer's real XDG_CONFIG_HOME value (defaulting HOME-derivation
+  # isn't enough when a caller has XDG_CONFIG_HOME exported).
+  configdir="$TEST_HOME/xdg/dotclaude"
+  mkdir -p "$configdir"
+  printf 'export DOTCLAUDE_HANDOFF_REPO=%s\n' "$fresh" > "$configdir/handoff.env"
+  run env HOME="$TEST_HOME" XDG_CONFIG_HOME="$TEST_HOME/xdg" DOTCLAUDE_HANDOFF_REPO= \
+    node "$BIN" push aaaa1111
   [ "$status" -eq 0 ]
-  [[ "$output" == *"schema_version=2"* ]]
+  run git --git-dir="$fresh" ls-remote --heads "$fresh"
+  [[ "$output" =~ handoff/demo/claude/[0-9]{4}-[0-9]{2}/aaaa1111 ]]
+  rm -rf "$fresh"
 }

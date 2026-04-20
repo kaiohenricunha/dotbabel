@@ -91,14 +91,14 @@ hermetic_path_without() {
   [[ "$output" == *"Preflight failed: git-missing"* ]]
 }
 
-@test "doctor: handoff-repo-unset when env var is empty" {
+@test "doctor: prints an info line (exit 0) when env var is empty — auto-bootstrap is the recovery path" {
   shim git 'exit 0'
   hermetic_path
   unset DOTCLAUDE_HANDOFF_REPO
   run "$DOCTOR"
-  [ "$status" -eq 1 ]
-  [[ "$output" == *"Preflight failed: handoff-repo-unset"* ]]
-  [[ "$output" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"info: DOTCLAUDE_HANDOFF_REPO is not set"* ]]
+  [[ "$output" == *"will offer to create"* ]]
 }
 
 @test "doctor: handoff-repo-unreachable when ls-remote fails" {
