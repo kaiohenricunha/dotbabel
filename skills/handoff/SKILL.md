@@ -104,7 +104,8 @@ self-hosted). Required:
 - Either `$DOTCLAUDE_HANDOFF_REPO` set to a repo URL, **or** the binary
   will auto-bootstrap on first `push` when stdin is a TTY and `gh` is
   authenticated — it offers to `gh repo create` a private store and
-  persists the URL to `~/.config/dotclaude/handoff.env` for future runs.
+  persists the URL to `$XDG_CONFIG_HOME/dotclaude/handoff.env` (default:
+  `~/.config/dotclaude/handoff.env`) for future runs.
 - Working SSH or credential-helper auth for the resulting repo.
 
 That's it. No `init` step, no schema pin, no ceremony. Run

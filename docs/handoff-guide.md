@@ -2,7 +2,7 @@
 
 _Last updated: v0.10.0_
 
-> **Added in v0.5.0; reworked** in v0.11.0 to drop the `init` ceremony —
+> **Added in v0.5.0; later reworked** to drop the `init` ceremony —
 > `push` now auto-bootstraps the remote store on first run.
 > Full skill reference: [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
 
@@ -109,7 +109,8 @@ The auto-bootstrap writes this file on success:
 
 Mode 0600. Edit by hand to switch stores, or delete to force a
 re-bootstrap on the next push. The binary sources this file at start-up
-only when `$DOTCLAUDE_HANDOFF_REPO` is unset — an explicit env var always
+only when `$DOTCLAUDE_HANDOFF_REPO` is unset or empty — an explicit
+non-empty env var always
 wins.
 
 ---
