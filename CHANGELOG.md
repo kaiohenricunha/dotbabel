@@ -4,6 +4,28 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.8.0...v0.9.0) (2026-04-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **handoff:** `--via github`, `--via gist-token`, `--via git-fallback`, `DOTCLAUDE_GH_TOKEN`, and the `references/transport-github.md` file are removed. Migration is `s/ --via git-fallback//g` across any script that called `dotclaude handoff push|pull --via git-fallback`; gist users move to a private git repo (`gh repo create handoff-store --private` + `export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git`) and delete leftover gists with `gh gist list` + `gh gist delete <id>`.
+
+### Added
+
+* **handoff:** promote doctor, remote-list, search into the binary ([#71](https://github.com/kaiohenricunha/dotclaude/issues/71)) ([7ea0883](https://github.com/kaiohenricunha/dotclaude/commit/7ea08833104ebe89292e4b280468670fbb08bff0))
+* **handoff:** remove gist transports, drop --via flag ([#68](https://github.com/kaiohenricunha/dotclaude/issues/68)) ([9aec0dc](https://github.com/kaiohenricunha/dotclaude/commit/9aec0dc0902a58831898ad34ccda97be06250b3f))
+
+
+### Changed
+
+* **handoff:** rename git-fallback internals to remote ([#70](https://github.com/kaiohenricunha/dotclaude/issues/70)) ([fc8fbf7](https://github.com/kaiohenricunha/dotclaude/commit/fc8fbf773d2e2380d4b9e7097d41a47c53f86b9f))
+
+
+### Documentation
+
+* **handoff:** slim SKILL.md to a thin wrapper around the binary ([#72](https://github.com/kaiohenricunha/dotclaude/issues/72)) ([fee18d7](https://github.com/kaiohenricunha/dotclaude/commit/fee18d7d3ed86e3ced9c6257ff38791c4a74c135))
+
 ## [0.8.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.7.0...v0.8.0) (2026-04-19)
 
 
