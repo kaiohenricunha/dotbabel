@@ -4,6 +4,17 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.9.0...v0.10.0) (2026-04-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* **handoff:** every `dotclaude handoff push` now requires a one-time `dotclaude handoff init` against $DOTCLAUDE_HANDOFF_REPO. Existing v1 branches remain readable; writes always emit the new v2 shape. Migrate script lands as a follow-up (plan PR C). Migration is one command: `dotclaude handoff init`.
+
+### Added
+
+* **handoff:** v2 store taxonomy + schema enforcement + init ([#73](https://github.com/kaiohenricunha/dotclaude/issues/73)) ([6da64bb](https://github.com/kaiohenricunha/dotclaude/commit/6da64bb80f7e25d489d1ee92bef2416d3a1674a2))
+
 ## [0.9.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.8.0...v0.9.0) (2026-04-20)
 
 
