@@ -5,13 +5,13 @@ _Last updated: v0.11.0_
 This repo is a dual-purpose checkout. Three distinct audiences consume
 parts of it. Pick yours, then follow the "Start here" column.
 
-| Persona                                                                                     | What you want                                              | Start here                                                                                                          |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **Dotfile user** — personal Claude Code config via `bootstrap.sh`                           | Symlink into `~/.claude/`, manage your own commands/skills | [dotfile-quickstart.md](./dotfile-quickstart.md) — start here, then [../CLAUDE.md](../CLAUDE.md) for the full rules |
-| **Consumer** — installing the CLI for bootstrap, doctor, drift, and optional spec-gov gates | Install, scaffold, run validators, wire CI                 | [quickstart.md](./quickstart.md) → [cli-reference.md](./cli-reference.md)                                           |
-| **Library user** — importing the Node API into your own tooling                             | Import, typed signatures, error codes                      | [api-reference.md](./api-reference.md)                                                                              |
-| **Contributor** — sending PRs to this repo                                                  | Dev workflow, local gates, spec discipline                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                                                            |
-| **Security researcher**                                                                     | Private disclosure, threat model                           | [../SECURITY.md](../SECURITY.md)                                                                                    |
+| Persona                                                                                               | What you want                                              | Start here                                                                                                          |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| **Dotfile user** — personal Claude Code config via `bootstrap.sh`                                     | Symlink into `~/.claude/`, manage your own commands/skills | [dotfile-quickstart.md](./dotfile-quickstart.md) — start here, then [../CLAUDE.md](../CLAUDE.md) for the full rules |
+| **Consumer** — installing the CLI for bootstrap, doctor, drift detection, and optional spec-gov gates | Install, scaffold, run validators, wire CI                 | [quickstart.md](./quickstart.md) → [cli-reference.md](./cli-reference.md)                                           |
+| **Library user** — importing the Node API into your own tooling                                       | Import, typed signatures, error codes                      | [api-reference.md](./api-reference.md)                                                                              |
+| **Contributor** — sending PRs to this repo                                                            | Dev workflow, local gates, spec discipline                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                                                            |
+| **Security researcher**                                                                               | Private disclosure, threat model                           | [../SECURITY.md](../SECURITY.md)                                                                                    |
 
 ## Where the split happens
 

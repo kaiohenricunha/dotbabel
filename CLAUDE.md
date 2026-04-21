@@ -6,7 +6,8 @@
 >   That wires `commands/`, `skills/`, and this file into `~/.claude/` in one step.
 >   No npm required.
 > - **Want more:** Install `@dotclaude/dotclaude` for the full CLI — `dotclaude bootstrap`,
->   `sync`, `doctor`, `init`, drift detection, and the spec-governance validators.
+>   `dotclaude sync`, `dotclaude doctor`, `dotclaude init`, `dotclaude detect-drift`,
+>   and the spec-governance validators.
 >   See [README.md](./README.md) or [docs/quickstart.md](./docs/quickstart.md).
 >
 > **This file is for the bootstrap path.** It gets symlinked into `~/.claude/CLAUDE.md`

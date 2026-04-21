@@ -13,12 +13,12 @@ governance CLI on top, for repos that want PR-time gates.
 
 **Who is this for?**
 
-| I am…            | I want…                                                                | Start here                                       |
-| ---------------- | ---------------------------------------------------------------------- | ------------------------------------------------ |
-| **Dotfile user** | The toolkit — skills, commands, and CLAUDE.md in every Claude session  | [Clone & bootstrap](#clone--bootstrap)           |
-| **Consumer**     | The CLI in my repo — bootstrap, doctor, drift, optional spec-gov gates | [Install the CLI](#install-the-cli)              |
-| **Library user** | Node API in my own tooling                                             | [docs/api-reference.md](./docs/api-reference.md) |
-| **Contributor**  | Dev workflow, local gates                                              | [CONTRIBUTING.md](./CONTRIBUTING.md)             |
+| I am…            | I want…                                                                          | Start here                                       |
+| ---------------- | -------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **Dotfile user** | The toolkit — skills, commands, and CLAUDE.md in every Claude session            | [Clone & bootstrap](#clone--bootstrap)           |
+| **Consumer**     | The CLI in my repo — bootstrap, doctor, drift detection, optional spec-gov gates | [Install the CLI](#install-the-cli)              |
+| **Library user** | Node API in my own tooling                                                       | [docs/api-reference.md](./docs/api-reference.md) |
+| **Contributor**  | Dev workflow, local gates                                                        | [CONTRIBUTING.md](./CONTRIBUTING.md)             |
 
 ---
 

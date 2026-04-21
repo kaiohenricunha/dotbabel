@@ -3,7 +3,7 @@
 _Last updated: v0.11.0_
 
 dotclaude is an opinionated Claude Code toolkit shipped as a portable
-plugin + zero-dependency npm package. It curates a library of skills,
+npm package + Claude Code plugin. It curates a library of skills,
 slash commands, and cloud/IaC specialists, hardens every Claude Code
 session via a global rule floor, and adds an optional spec-driven-development
 governance CLI on top — Node API, umbrella CLI, gold-standard shell
@@ -39,8 +39,8 @@ settings validator, and a destructive-git PreToolUse hook.
   `--no-color` on every bin.
 - **Named exit codes.** `{OK:0, VALIDATION:1, ENV:2, USAGE:64}` — `64`
   mirrors BSD `sysexits.h`.
-- **Zero runtime dependencies.** Plain Node 20+, no bundler, no type system
-  runtime cost.
+- **Minimal runtime footprint.** Plain Node 20+, no bundler, no TypeScript
+  runtime — three small JSON/YAML utility dependencies (ajv, ajv-formats, js-yaml).
 
 ## Governance
 
