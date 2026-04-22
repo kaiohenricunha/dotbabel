@@ -3,7 +3,7 @@
  * dotclaude-handoff — five-form cross-agent / cross-machine handoff.
  *
  * Usage:
- *   dotclaude handoff                              push host's latest session
+ *   dotclaude handoff                              print usage and exit 0 (#86)
  *   dotclaude handoff <query>                      local cross-agent: emit <handoff> block
  *   dotclaude handoff push [<query>] [--tag <label>]
  *   dotclaude handoff pull [<query>]
@@ -458,6 +458,11 @@ function shortIdFromPath(path) {
 }
 
 async function main() {
+  if (argv.positional.length === 0) {
+    process.stdout.write(helpText(META) + "\n");
+    process.exit(EXIT_CODES.OK);
+  }
+
   // ---- breaking-change shim ---------------------------------------------
   // A lone CLI name is never a valid query under the new surface, so
   // catch `push/pull claude|copilot|codex` (with or without a trailing
@@ -620,12 +625,8 @@ async function main() {
     process.exit(EXIT_CODES.OK);
   }
 
-  // Bare `dotclaude-handoff` (no positionals) is an alias for `push`.
-  // Aligns the binary with SKILL.md's "zero-arg = push host's latest
-  // session" contract.
-  const isPush = first === "push" || argv.positional.length === 0;
-  if (isPush) {
-    const explicitQuery = first === "push" ? second : null;
+  if (first === "push") {
+    const explicitQuery = second ?? null;
     let sessionHit;
     let fallbackNote;
     if (explicitQuery) {

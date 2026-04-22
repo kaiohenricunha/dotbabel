@@ -39,15 +39,17 @@ document the public surface in one place. Every form below also works
 verbatim as `!dotclaude handoff …` from any shell — including Codex's
 bash tool.
 
-## The five forms
+## The four forms
 
 ```
-/handoff                              push host's latest session
-/handoff <query>                      local cross-agent: emit <handoff>
-/handoff push [<query>] [--tag <l>]   upload to transport
-/handoff pull [<query>]               fetch from transport
-/handoff list [--local|--remote]      unified table
+/handoff <query>                          local cross-agent: emit <handoff>
+/handoff push [<query>] [--tag <label>]   upload to transport
+/handoff pull [<query>]                   fetch from transport
+/handoff list [--local|--remote]          unified table
 ```
+
+A bare `/handoff` with no arguments prints usage and exits 0. Every
+remote verb is explicit.
 
 `<query>` auto-detects across `~/.claude/projects`,
 `~/.copilot/session-state`, and `~/.codex/sessions`. Accepted forms:

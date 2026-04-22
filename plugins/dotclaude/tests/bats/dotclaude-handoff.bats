@@ -48,6 +48,18 @@ teardown() {
   [[ "$output" == *"list"* ]]
 }
 
+@test "bare dotclaude-handoff prints usage and exits 0 (no push)" {
+  run node "$BIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"push"* ]]
+  [[ "$output" == *"pull"* ]]
+  [[ "$output" == *"list"* ]]
+  # Guardrail: a successful push would emit `[scrubbed N secrets]` and
+  # a `handoff/<cli>/...` branch name. Neither may appear.
+  [[ "$output" != *"scrubbed"* ]]
+  [[ "$output" != *"handoff/dotclaude/"* ]]
+}
+
 @test "resolve missing args exits 64" {
   run node "$BIN" resolve
   [ "$status" -eq 64 ]
