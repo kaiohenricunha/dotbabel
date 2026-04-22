@@ -1,8 +1,9 @@
 // Unit tests for the scrubDigest helper that wraps handoff-scrub.sh.
-// The sibling bats suite (tests/bats/handoff-scrub.bats) exercises the shell
-// script itself; this file pins the Node-side contract: stdin→stdout streaming,
-// the `scrubbed:N` stderr-count parse, and the fail-closed behavior that
-// pushRemote() relies on to avoid uploading unscrubbed content.
+// The sibling bats suite
+// (plugins/dotclaude/tests/bats/handoff-scrub.bats) exercises the shell
+// script itself; this file pins the Node-side contract: full-input scrubbed
+// output, the `scrubbed:N` stderr-count parse, and the fail-closed behavior
+// that pushRemote() relies on to avoid uploading unscrubbed content.
 
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
