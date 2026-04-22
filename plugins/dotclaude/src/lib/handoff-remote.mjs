@@ -1,0 +1,764 @@
+/**
+ * Shared remote handoff library — the transport-side surface used by both
+ * `bin/dotclaude-handoff.mjs` and future callers (skill/agent dispatchers,
+ * other CLIs). Owns session-data extraction (via the shell scripts),
+ * digest rendering, scrubbing, bootstrap / doctor orchestration, branch
+ * naming, metadata encoding, and the git transport operations themselves.
+ *
+ * The bin imports from here and re-exports the symbols that existing
+ * vitest suites depend on, preserving the public-import surface without
+ * copy-pasting implementation across the boundary.
+ */
+
+import { spawnSync } from "node:child_process";
+import { createInterface } from "node:readline";
+import { dirname, join, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+import { hostname, tmpdir } from "node:os";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+
+import { scrubDigest } from "./handoff-scrub.mjs";
+
+// ---- constants ---------------------------------------------------------
+
+/** Matches v2 handoff branch names: handoff/<project>/<cli>/<YYYY-MM>/<shortId>. */
+export const V2_BRANCH_RE =
+  /^handoff\/[a-z0-9-]+\/(claude|copilot|codex)\/\d{4}-\d{2}\/[0-9a-f]{8}$/;
+/** Matches legacy v1 handoff branch names: handoff/<cli>/<shortId>. */
+export const V1_BRANCH_RE = /^handoff\/(claude|copilot|codex)\/[0-9a-f]{8}$/;
+
+// Callers that read state at run time (loadPersistedEnv,
+// bootstrapTransportRepo) go through these helpers so an updated
+// process.env.HOME / XDG_CONFIG_HOME takes effect without a module
+// reload. The exported CONFIG_FILE constant below captures the path
+// at library-init time and is kept only for the diagnostic display
+// in `doctor` + the test-contract `typeof mod.CONFIG_FILE === "string"`.
+function currentConfigDir() {
+  return join(
+    process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"),
+    "dotclaude",
+  );
+}
+function currentConfigFile() {
+  return join(currentConfigDir(), "handoff.env");
+}
+/** Path to the persisted handoff env file; evaluated at library-init time. */
+export const CONFIG_FILE = currentConfigFile();
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const SCRIPTS = resolvePath(__dirname, "..", "..", "scripts");
+const EXTRACT_SH = join(SCRIPTS, "handoff-extract.sh");
+const DESCRIPTION_SH = join(SCRIPTS, "handoff-description.sh");
+
+// ---- local fail helper ---------------------------------------------------
+// Duplicate of the bin's `fail` — kept local so the library never reaches
+// back into the bin (which would create a circular import).
+
+function fail(code, msg) {
+  if (msg) process.stderr.write(`dotclaude-handoff: ${msg}\n`);
+  process.exit(code);
+}
+
+// ---- subprocess primitives ---------------------------------------------
+
+/** Spawn a shell script via spawnSync, returning {status, stdout, stderr}. */
+export function runScript(script, args, opts = {}) {
+  const res = spawnSync(script, args, { encoding: "utf8", ...opts });
+  return {
+    status: res.status ?? 2,
+    stdout: res.stdout ?? "",
+    stderr: res.stderr ?? "",
+  };
+}
+
+/** Run git with spawnSync, returning the raw SpawnSyncReturns result. */
+export function runGit(args, cwd) {
+  return spawnSync("git", args, { encoding: "utf8", cwd });
+}
+
+/** Run git and throw a descriptive Error on non-zero exit. */
+export function runGitOrThrow(args, cwd) {
+  const r = runGit(args, cwd);
+  if (r.status !== 0) {
+    throw new Error(
+      `git ${args.join(" ")} failed: ${(r.stderr || r.stdout).trim()}`,
+    );
+  }
+  return r;
+}
+
+// ---- session extraction ------------------------------------------------
+
+/** Extract JSON session metadata via handoff-extract.sh meta. */
+export function extractMeta(cli, file) {
+  const r = runScript(EXTRACT_SH, ["meta", cli, file]);
+  if (r.status !== 0) fail(2, r.stderr.trim() || `meta extraction failed for ${cli}`);
+  try {
+    return JSON.parse(r.stdout.trim());
+  } catch (err) {
+    fail(2, `meta returned non-JSON: ${err.message}`);
+  }
+}
+
+/** Extract newline-delimited output via handoff-extract.sh <sub>. */
+export function extractLines(sub, cli, file, extra = []) {
+  const r = runScript(EXTRACT_SH, [sub, cli, file, ...extra]);
+  if (r.status !== 0) {
+    if (r.stderr.trim())
+      process.stderr.write(`dotclaude-handoff: ${sub}: ${r.stderr.trim()}\n`);
+    return [];
+  }
+  return r.stdout.split("\n").filter((line) => line.trim().length > 0);
+}
+
+/** Extract user prompt lines from a session file. */
+export const extractPrompts = (cli, file) => extractLines("prompts", cli, file);
+/** Extract assistant turn lines from a session file (optionally capped). */
+export const extractTurns = (cli, file, limit) =>
+  extractLines("turns", cli, file, limit ? [String(limit)] : []);
+
+// ---- rendering ---------------------------------------------------------
+
+/** Return a target-CLI-specific continuation hint for the next-step text. */
+export function nextStepFor(toCli) {
+  if (toCli === "codex") {
+    return "Read the prompts and assistant turns above, then continue the task using the file paths mentioned. Treat this as a task specification.";
+  }
+  if (toCli === "copilot") {
+    return "Help me pick up where this session left off; reference the prompts and findings above.";
+  }
+  return "Continue from the last assistant turn using the same file scope and goals summarized above.";
+}
+
+/** Produce a one-sentence summary: first prompt + last assistant turn (clipped). */
+export function mechanicalSummary(prompts, turns) {
+  const first = prompts[0] ?? "(no user prompts captured)";
+  const last = turns[turns.length - 1] ?? "(no assistant turns captured)";
+  const clip = (s, n) => (s.length > n ? `${s.slice(0, n).trim()}…` : s);
+  return `Session opened with: "${clip(first, 160)}". Last assistant output (truncated): "${clip(last, 160)}". Full prompt log and assistant tail follow for context.`;
+}
+
+/** Render the full <handoff> block for push or standalone describe. */
+export function renderHandoffBlock(meta, prompts, turns, toCli) {
+  const summary = mechanicalSummary(prompts, turns);
+  const promptsCapped = prompts.slice(-10);
+  const turnsTail = turns.slice(-3);
+  const next = nextStepFor(toCli);
+  const lines = [];
+  lines.push(
+    `<handoff origin="${meta.cli}" session="${meta.short_id ?? ""}" cwd="${meta.cwd ?? ""}" target="${toCli}">`,
+  );
+  lines.push("");
+  lines.push(`**Summary.** ${summary}`);
+  lines.push("");
+  lines.push("**User prompts (last 10, in order).**");
+  lines.push("");
+  if (promptsCapped.length === 0) lines.push("1. (no user prompts captured)");
+  else
+    promptsCapped.forEach((p, i) => {
+      const trimmed = p.length > 300 ? `${p.slice(0, 300).trim()}…` : p;
+      lines.push(`${i + 1}. ${trimmed}`);
+    });
+  lines.push("");
+  lines.push("**Last assistant turns (tail).**");
+  lines.push("");
+  if (turnsTail.length === 0) lines.push("_(no assistant output captured)_");
+  else
+    for (const t of turnsTail) {
+      const trimmed = t.length > 400 ? `${t.slice(0, 400).trim()}…` : t;
+      lines.push(`> ${trimmed.replace(/\n/g, "\n> ")}`);
+      lines.push("");
+    }
+  lines.push("**Next step.** " + next);
+  lines.push("");
+  lines.push("</handoff>");
+  return lines.join("\n");
+}
+
+// ---- URL / path primitives ---------------------------------------------
+
+/**
+ * Reject ext:: and other exec-triggering Git URL schemes (CVE-2017-1000117-class).
+ * Allows: https://, http://, git@, ssh://, file://, and absolute paths.
+ */
+export function validateTransportUrl(url) {
+  if (!/^(https?:\/\/|git@|ssh:\/\/|file:\/\/|\/)/.test(url))
+    fail(
+      2,
+      `DOTCLAUDE_HANDOFF_REPO must be an https://, git@, ssh://, file://, or absolute path (got: ${url})`,
+    );
+  return url;
+}
+
+/**
+ * Return true if stderr matches the union of "repo missing / auth failed"
+ * messages from GitHub, GitLab, Gitea, and plain SSH.
+ */
+export function isRepoMissingError(stderr) {
+  const s = (stderr || "").toLowerCase();
+  return (
+    s.includes("repository not found") ||
+    s.includes("could not read from remote") ||
+    s.includes("remote: not found") ||
+    s.includes("project you were looking for could not be found") ||
+    s.includes("permission denied") ||
+    s.includes("does not appear to be a git repository")
+  );
+}
+
+/**
+ * Lowercase, replace non-alphanumeric runs with dashes, trim edges, cap at 40 chars.
+ * Mirrors handoff-description.sh slugify so JS and shell agree on edge cases.
+ */
+export function slugify(s) {
+  if (!s) return "adhoc";
+  const out = s
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return out.slice(0, 40) || "adhoc";
+}
+
+/**
+ * Slugify to GitHub-acceptable repo name: [a-z0-9-], no leading/trailing dashes,
+ * max 100 chars.
+ */
+export function slugifyRepoName(input) {
+  const s = (input || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s.slice(0, 100);
+}
+
+/**
+ * Return the slugified top-level git repo name for `cwd`, or the basename.
+ * A session inside ~/foo/services/api groups under "foo", not "api".
+ */
+export function projectSlugFromCwd(cwd) {
+  if (!cwd) return "adhoc";
+  const r = runGit(["-C", cwd, "rev-parse", "--show-toplevel"]);
+  const root = r.status === 0 ? r.stdout.trim() : "";
+  const last = (root || cwd).split("/").filter(Boolean).pop() || "adhoc";
+  return slugify(last);
+}
+
+/** Return YYYY-MM for an ISO timestamp, or for the current UTC month if null/invalid. */
+export function monthBucket(isoOrNull) {
+  const d = isoOrNull ? new Date(isoOrNull) : new Date();
+  if (Number.isNaN(d.getTime())) return monthBucket(null);
+  const yyyy = d.getUTCFullYear().toString();
+  const mm = (d.getUTCMonth() + 1).toString().padStart(2, "0");
+  return `${yyyy}-${mm}`;
+}
+
+/** Assemble the canonical v2 branch name from {project, cli, month, shortId}. */
+export function v2BranchName({ project, cli, month, shortId }) {
+  return `handoff/${slugify(project)}/${cli}/${month}/${shortId}`;
+}
+
+/** Return true when both stdin and stderr are interactive TTYs. */
+export function isTty() {
+  return Boolean(process.stdin.isTTY && process.stderr.isTTY);
+}
+
+// ---- metadata encoding / decoding --------------------------------------
+
+/** Encode handoff metadata into an opaque description string via handoff-description.sh. */
+export function encodeDescription({ cli, shortId, project, host, month, tag }) {
+  const args = [
+    "encode",
+    "--cli",
+    cli,
+    "--short-id",
+    shortId,
+    "--project",
+    project || "adhoc",
+    "--hostname",
+    host || "unknown",
+    "--month",
+    month,
+  ];
+  if (tag) args.push("--tag", tag);
+  const r = runScript(DESCRIPTION_SH, args);
+  if (r.status !== 0) fail(2, `description encode failed: ${r.stderr.trim()}`);
+  return r.stdout.trim();
+}
+
+/** Decode a handoff description string back into a metadata object, or null on failure. */
+export function decodeDescription(desc) {
+  if (!desc) return null;
+  if (!desc.startsWith("handoff:v1:") && !desc.startsWith("handoff:v2:")) return null;
+  const r = runScript(DESCRIPTION_SH, ["decode", desc]);
+  if (r.status !== 0) return null;
+  try {
+    return JSON.parse(r.stdout);
+  } catch {
+    return null;
+  }
+}
+
+// ---- persisted env / bootstrap helpers --------------------------------
+
+/**
+ * Source ~/.config/dotclaude/handoff.env if present, seeding any missing env var.
+ * Shell rc users can `source` the same file; bypass via an explicit env var.
+ */
+export function loadPersistedEnv() {
+  const configFile = currentConfigFile();
+  if (!existsSync(configFile)) return;
+  let contents;
+  try {
+    contents = readFileSync(configFile, "utf8");
+  } catch {
+    return;
+  }
+  for (const raw of contents.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const m = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
+    if (!m) continue;
+    const key = m[1];
+    let val = m[2];
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined || process.env[key] === "") {
+      process.env[key] = val;
+    }
+  }
+}
+
+/** Return true if `gh` is on PATH and exits 0. */
+export function ghAvailable() {
+  const r = spawnSync("gh", ["--version"], { encoding: "utf8" });
+  return r.status === 0;
+}
+
+/** Return true if `gh auth status` exits 0 (authenticated to github.com). */
+export function ghAuthenticated() {
+  const r = spawnSync("gh", ["auth", "status", "-h", "github.com"], {
+    encoding: "utf8",
+  });
+  return r.status === 0;
+}
+
+/** Return the authenticated GitHub username, or null on failure. */
+export function ghLogin() {
+  const r = spawnSync("gh", ["api", "user", "-q", ".login"], {
+    encoding: "utf8",
+  });
+  if (r.status !== 0) return null;
+  return r.stdout.trim() || null;
+}
+
+/**
+ * Print a manual-setup hint block to stderr when auto-bootstrap can't proceed.
+ * Triggered for non-TTY, missing gh, or user abort.
+ */
+export function printManualSetupBlock(reason) {
+  const msg = [
+    "",
+    `Can't auto-bootstrap the handoff store: ${reason}`,
+    "",
+    "Set it up manually:",
+    "  1. gh repo create <you>/dotclaude-handoff-store --private",
+    "  2. export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotclaude-handoff-store.git",
+    "  3. dotclaude handoff push   # retries",
+    "",
+    "Alternative providers (GitLab, Gitea, self-hosted) work too — set",
+    "DOTCLAUDE_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.",
+    "",
+  ];
+  process.stderr.write(msg.join("\n"));
+}
+
+/**
+ * Async readline prompt via createInterface; returns the trimmed answer.
+ * Returns "" for empty input.
+ */
+export async function promptLine(message) {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    return await new Promise((resolve) => {
+      rl.question(message, (answer) => resolve(answer.trim()));
+    });
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * Interactively create a private GitHub repo for handoff storage via `gh`.
+ * Writes the URL to the persisted env file and sets DOTCLAUDE_HANDOFF_REPO.
+ * Exits 2 with a manual-setup block when non-TTY, gh missing, or user aborts.
+ */
+export async function bootstrapTransportRepo() {
+  if (!isTty()) {
+    printManualSetupBlock("not running in an interactive terminal");
+    process.exit(2);
+  }
+  if (!ghAvailable()) {
+    printManualSetupBlock(
+      "`gh` CLI is not on PATH — install it from https://cli.github.com/",
+    );
+    process.exit(2);
+  }
+  if (!ghAuthenticated()) {
+    printManualSetupBlock(
+      "`gh` is not authenticated — run `gh auth login` (scopes: repo)",
+    );
+    process.exit(2);
+  }
+  const login = ghLogin();
+  if (!login) {
+    printManualSetupBlock("could not read GitHub username via `gh api user`");
+    process.exit(2);
+  }
+
+  const configFile = currentConfigFile();
+  process.stderr.write(
+    [
+      "",
+      "DOTCLAUDE_HANDOFF_REPO is not set — dotclaude can set this up for you.",
+      "",
+      `  Detected: gh CLI authenticated as @${login}.`,
+      `  Plan: create private repo  ${login}/<name>`,
+      `        persist URL to       ${configFile}`,
+      "",
+    ].join("\n"),
+  );
+
+  let name = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const input = await promptLine("  Repo name? [dotclaude-handoff-store] ");
+    const candidate = input === "" ? "dotclaude-handoff-store" : slugifyRepoName(input);
+    if (/^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$|^[a-z0-9]$/.test(candidate)) {
+      name = candidate;
+      break;
+    }
+    process.stderr.write(
+      "  Name must be 1-100 chars of [a-z0-9-], no leading/trailing dash. Try again.\n",
+    );
+  }
+  if (!name) {
+    process.stderr.write("  Gave up after 3 invalid names. Aborting.\n");
+    process.exit(2);
+  }
+
+  const confirm = await promptLine(`  Create ${login}/${name} and proceed? [y/N] `);
+  if (!/^y(es)?$/i.test(confirm)) {
+    process.stderr.write("  Aborted.\n");
+    process.exit(1);
+  }
+
+  const create = spawnSync(
+    "gh",
+    [
+      "repo",
+      "create",
+      `${login}/${name}`,
+      "--private",
+      "--description",
+      "dotclaude handoff store",
+    ],
+    { encoding: "utf8" },
+  );
+  if (create.status !== 0) {
+    const stderr = (create.stderr || "").toLowerCase();
+    // Idempotent: an existing repo is not a failure — we'll push to it.
+    if (
+      !stderr.includes("already exists") &&
+      !stderr.includes("name already exists on this account")
+    ) {
+      process.stderr.write(`  gh repo create failed:\n${create.stderr}\n`);
+      process.exit(2);
+    }
+    process.stderr.write(`  ✓ repo ${login}/${name} already exists — reusing\n`);
+  } else {
+    process.stderr.write(`  ✓ created ${login}/${name}\n`);
+  }
+
+  const view = spawnSync(
+    "gh",
+    ["repo", "view", `${login}/${name}`, "--json", "sshUrl,url", "-q", ".sshUrl"],
+    { encoding: "utf8" },
+  );
+  const url =
+    view.status === 0 && view.stdout.trim()
+      ? view.stdout.trim()
+      : `git@github.com:${login}/${name}.git`;
+
+  mkdirSync(currentConfigDir(), { recursive: true, mode: 0o700 });
+  writeFileSync(
+    configFile,
+    `# Written by dotclaude handoff on ${new Date().toISOString()}\n` +
+      `# Sourceable from your shell rc:  source ${configFile}\n` +
+      `export DOTCLAUDE_HANDOFF_REPO=${url}\n`,
+    { mode: 0o600 },
+  );
+  process.stderr.write(`  ✓ wrote ${configFile}\n`);
+  process.stderr.write(
+    `    (add \`source ${configFile}\` to ~/.bashrc or ~/.zshrc to persist across shells)\n`,
+  );
+
+  process.env.DOTCLAUDE_HANDOFF_REPO = url;
+  return url;
+}
+
+/**
+ * Return a validated transport URL, bootstrapping interactively if the env var
+ * is missing. Call site for push/pull/list/doctor.
+ */
+export async function requireTransportRepo() {
+  const existing = process.env.DOTCLAUDE_HANDOFF_REPO;
+  if (existing) return validateTransportUrl(existing);
+  const fresh = await bootstrapTransportRepo();
+  return validateTransportUrl(fresh);
+}
+
+/**
+ * Synchronous variant: return a validated transport URL or fail hard.
+ * Use for read-only paths (list, doctor) that cannot trigger interactive bootstrap.
+ */
+export function requireTransportRepoStrict() {
+  const url = process.env.DOTCLAUDE_HANDOFF_REPO;
+  if (!url)
+    fail(
+      2,
+      "DOTCLAUDE_HANDOFF_REPO is not set — run `dotclaude handoff push` to auto-bootstrap, or set it manually",
+    );
+  return validateTransportUrl(url);
+}
+
+// ---- remote I/O --------------------------------------------------------
+
+/** Push a local session to the transport repo as a handoff branch. */
+export async function pushRemote({ cli, path: sessionFile, tag }) {
+  let repoUrl = await requireTransportRepo();
+  const meta = extractMeta(cli, sessionFile);
+  const prompts = extractPrompts(cli, sessionFile);
+  const turns = extractTurns(cli, sessionFile);
+  const toCli = meta.cli;
+  const handoffBlock = renderHandoffBlock(meta, prompts, turns, toCli);
+
+  // Scrub before the digest ever leaves the machine. Thrown errors
+  // propagate out of pushRemote — the outer try/catch in main() maps
+  // them to `push failed: <message>` with exit 2, so an unscrubbed
+  // digest can never reach the remote.
+  const { scrubbed, count: scrubbedCount } = scrubDigest(handoffBlock);
+
+  const shortId = meta.short_id ?? "unknown";
+  const host = slugify(hostname());
+  const project = projectSlugFromCwd(meta.cwd);
+  const month = monthBucket();
+  const description = encodeDescription({
+    cli: meta.cli,
+    shortId,
+    project,
+    host,
+    month,
+    tag: tag || null,
+  });
+
+  const metadata = {
+    cli: meta.cli,
+    session_id: meta.session_id,
+    short_id: shortId,
+    cwd: meta.cwd ?? null,
+    project,
+    month,
+    hostname: host,
+    created_at: new Date().toISOString(),
+    scrubbed_count: scrubbedCount,
+    tag: tag || null,
+  };
+
+  const doPush = (url) => {
+    const tmp = mkdtempSync(join(tmpdir(), "handoff-push-"));
+    try {
+      runGitOrThrow(["init", "-q"], tmp);
+      runGitOrThrow(["remote", "add", "origin", url], tmp);
+      runGitOrThrow(["config", "user.email", "handoff@dotclaude.local"], tmp);
+      runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
+      const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
+      runGitOrThrow(["checkout", "-q", "-b", branch], tmp);
+      writeFileSync(join(tmp, "handoff.md"), scrubbed + "\n");
+      writeFileSync(join(tmp, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
+      writeFileSync(join(tmp, "description.txt"), description + "\n");
+      runGitOrThrow(["add", "."], tmp);
+      runGitOrThrow(["commit", "-q", "-m", description], tmp);
+      runGitOrThrow(["push", "-q", "-f", "origin", branch], tmp);
+      return { branch, url, description, scrubbedCount };
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  };
+
+  try {
+    return doPush(repoUrl);
+  } catch (err) {
+    // Retry once after bootstrap if the remote is gone or unauthorized
+    // — handles stale config (repo deleted) and first-run with a pre-set
+    // env var that points at a non-existent repo. Second failure is fatal.
+    if (!isRepoMissingError(err.message)) throw err;
+    if (!isTty()) {
+      printManualSetupBlock(
+        `configured repo is unreachable (${process.env.DOTCLAUDE_HANDOFF_REPO}) and we can't prompt in non-interactive mode`,
+      );
+      throw err;
+    }
+    process.stderr.write(
+      `\n  The configured repo (${process.env.DOTCLAUDE_HANDOFF_REPO}) is unreachable.\n`,
+    );
+    const again = await promptLine("  Re-bootstrap (create a new one)? [y/N] ");
+    if (!/^y(es)?$/i.test(again)) throw err;
+    // Clear the stale URL so bootstrapTransportRepo() doesn't short-circuit.
+    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    const fresh = await bootstrapTransportRepo();
+    return doPush(validateTransportUrl(fresh));
+  }
+}
+
+/**
+ * List handoff branches on the remote as candidate objects.
+ * Returns [{branch, description, commit}] — no content fetched.
+ */
+export function listRemoteCandidates() {
+  const repoUrl = requireTransportRepoStrict();
+  const r = runGit(["ls-remote", repoUrl, "refs/heads/handoff/*"]);
+  if (r.status !== 0) fail(2, `ls-remote failed: ${r.stderr.trim()}`);
+  const rows = [];
+  for (const line of r.stdout.split("\n")) {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length !== 2) continue;
+    const commit = parts[0];
+    const ref = parts[1];
+    const branch = ref.replace(/^refs\/heads\//, "");
+    rows.push({ commit, branch, description: "" });
+  }
+  return rows;
+}
+
+/**
+ * Fetch a specific handoff branch and return its `handoff.md` content.
+ */
+export function fetchRemoteBranch(branch) {
+  const repoUrl = requireTransportRepoStrict();
+  const tmp = mkdtempSync(join(tmpdir(), "handoff-pull-"));
+  try {
+    const r = runGit(["clone", "-q", "--depth", "1", "--branch", branch, repoUrl, "."], tmp);
+    if (r.status !== 0) {
+      throw new Error(`clone --branch ${branch} failed: ${r.stderr.trim()}`);
+    }
+    const handoffPath = join(tmp, "handoff.md");
+    if (!existsSync(handoffPath)) {
+      throw new Error(`handoff.md missing in branch ${branch}`);
+    }
+    const content = readFileSync(handoffPath, "utf8");
+    const descPath = join(tmp, "description.txt");
+    const description = existsSync(descPath) ? readFileSync(descPath, "utf8").trim() : "";
+    return { content, description };
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Enrich candidates with their description (requires per-branch fetch).
+ */
+export function enrichWithDescriptions(candidates) {
+  return candidates.map((c) => {
+    try {
+      const { description } = fetchRemoteBranch(c.branch);
+      return { ...c, description };
+    } catch {
+      return c;
+    }
+  });
+}
+
+/** Return true if a candidate {branch, description, commit} matches the query string. */
+export function matchesQuery(candidate, query) {
+  const q = query.toLowerCase();
+  if (candidate.branch.toLowerCase().includes(q)) return true;
+  if (candidate.description && candidate.description.toLowerCase().includes(q))
+    return true;
+  if (candidate.commit && candidate.commit.toLowerCase().startsWith(q)) return true;
+  return false;
+}
+
+/** Resolve a remote handoff branch by query, pick interactively on collision. */
+export async function pullRemote(query, fromCli = null) {
+  let candidates = listRemoteCandidates();
+  if (candidates.length === 0) fail(2, "no handoffs found on transport");
+
+  // v2 carries the CLI in segment 2 (handoff/<project>/<cli>/...);
+  // v1 legacy carries it in segment 1 (handoff/<cli>/<short>).
+  if (fromCli) {
+    candidates = candidates.filter((c) => {
+      const segs = c.branch.split("/");
+      return segs[2] === fromCli || segs[1] === fromCli;
+    });
+    if (candidates.length === 0) fail(2, `no ${fromCli} handoffs found on transport`);
+  }
+
+  // Bare: pick the newest. We don't have a reliable remote mtime, so
+  // fall back to the lexically last branch, which is typically the
+  // most recent since short IDs hash-distribute. The caller re-fetches
+  // the branch contents via fetchRemoteBranch, so skipping the
+  // enrichment pass saves N shallow clones.
+  if (!query) {
+    return candidates[candidates.length - 1];
+  }
+
+  // Cheap pass: filter by branch name.
+  let hits = candidates.filter((c) => matchesQuery(c, query));
+  if (hits.length === 0) {
+    // Expensive pass: enrich with descriptions and re-match.
+    const enriched = enrichWithDescriptions(candidates);
+    hits = enriched.filter((c) => matchesQuery(c, query));
+  } else {
+    hits = enrichWithDescriptions(hits);
+  }
+
+  if (hits.length === 0) {
+    fail(
+      2,
+      fromCli ? `no ${fromCli} handoffs match: ${query}` : `no handoffs match: ${query}`,
+    );
+  }
+  if (hits.length === 1) return hits[0];
+
+  // Collision.
+  if (process.stdin.isTTY) {
+    process.stderr.write(`dotclaude-handoff: multiple handoffs match "${query}":\n`);
+    hits.forEach((h, i) => {
+      process.stderr.write(`  [${i + 1}] ${h.branch}  ${h.description}\n`);
+    });
+    const rl = createInterface({ input: process.stdin, output: process.stderr });
+    const ans = await new Promise((resolve) => {
+      rl.question("Pick [1..N], or any other input to abort: ", resolve);
+    });
+    rl.close();
+    const n = Number.parseInt(ans.trim(), 10);
+    if (!Number.isInteger(n) || n < 1 || n > hits.length) process.exit(2);
+    return hits[n - 1];
+  }
+  process.stderr.write(`dotclaude-handoff: multiple handoffs match "${query}":\n`);
+  for (const h of hits) process.stderr.write(`  ${h.branch}\t${h.description}\n`);
+  process.exit(2);
+}

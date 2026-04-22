@@ -61,6 +61,16 @@ describe("helpText", () => {
     expect(text).toContain("--json");
     expect(text).toContain("Exit codes:");
   });
+
+  it("works without the optional flags property", () => {
+    const text = helpText({
+      name: "harness-foo",
+      synopsis: "harness-foo",
+      description: "Test.",
+    });
+    expect(text).toContain("--help");
+    expect(text).toContain("Exit codes:");
+  });
 });
 
 describe("HARNESS_FLAGS", () => {
