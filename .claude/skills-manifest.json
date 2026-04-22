@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-04-22T19:23:00.873Z",
+  "generatedAt": "2026-04-22T21:09:04.509Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -187,7 +187,7 @@
     {
       "name": "handoff",
       "path": ".claude/skills/handoff/SKILL.md",
-      "checksum": "sha256:4fdf77f0a676ff0750e4a7f1488cb18cf04db6070b2cf8350f42477f7cfba9c9",
+      "checksum": "sha256:ca2e4bbb2a00f696ed4eb679de7aed097aefd37bf8b274c16f57550976c803db",
       "dependencies": [],
       "lastValidated": "2026-04-22"
     },

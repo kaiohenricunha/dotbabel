@@ -7,7 +7,7 @@
  *   dotclaude handoff <query>                      local cross-agent: emit <handoff> block
  *   dotclaude handoff push [<query>] [--tag <label>]
  *   dotclaude handoff pull [<query>]
- *   dotclaude handoff list [--local|--remote]
+ *   dotclaude handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit <N>|--all]
  *   dotclaude handoff doctor
  *   dotclaude handoff remote-list [--cli <cli>] [--since <ISO>] [--limit <N>]
  *   dotclaude handoff search <query> [--cli <cli>] [--since <ISO>] [--limit <N>]
@@ -70,6 +70,7 @@ import {
   CONFIG_FILE,
   V1_BRANCH_RE,
   V2_BRANCH_RE,
+  parseHandoffBranch,
 } from "../src/lib/handoff-remote.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -105,6 +106,7 @@ const META = {
     remote: { type: "boolean" },
     verify: { type: "boolean" },
     "force-collision": { type: "boolean" },
+    all: { type: "boolean" },
   },
 };
 
@@ -118,6 +120,20 @@ const DOCTOR_SH = join(SCRIPTS, "handoff-doctor.sh");
 function fail(code, msg) {
   if (msg) process.stderr.write(`dotclaude-handoff: ${msg}\n`);
   process.exit(code);
+}
+
+// --since <ISO> → epoch ms, or the default-N-days fallback when raw is
+// absent. Pass `defaultDays: null` for "no filter" (used by `list`).
+// Exits USAGE on non-ISO input.
+function parseSinceOrFail(raw, { defaultDays = null } = {}) {
+  if (!raw) {
+    return defaultDays === null
+      ? null
+      : Date.now() - defaultDays * 24 * 60 * 60 * 1000;
+  }
+  const ms = Date.parse(String(raw));
+  if (Number.isNaN(ms)) fail(EXIT_CODES.USAGE, `--since must be ISO-8601, got: ${raw}`);
+  return ms;
 }
 
 // ---- resolver / extractor bridge ---------------------------------------
@@ -367,10 +383,7 @@ function truncate(s, max) {
  */
 function searchSessions({ query, cli, since, limit }) {
   const re = new RegExp(query, "i");
-  const sinceMs = since
-    ? Date.parse(since)
-    : Date.now() - 30 * 24 * 60 * 60 * 1000;
-  if (Number.isNaN(sinceMs)) fail(EXIT_CODES.USAGE, `--since must be ISO-8601, got: ${since}`);
+  const sinceMs = parseSinceOrFail(since, { defaultDays: 30 });
   const clis = cli ? [cli] : Object.keys(CLI_LAYOUTS);
   const out = [];
   for (const c of clis) {
@@ -524,12 +537,7 @@ async function main() {
       fail(2, `remote-list failed: ${err.message}`);
     }
     const enriched = enrichWithDescriptions(candidates);
-    const sinceMs = argv.flags.since
-      ? Date.parse(String(argv.flags.since))
-      : Date.now() - 30 * 24 * 60 * 60 * 1000;
-    if (Number.isNaN(sinceMs)) {
-      fail(EXIT_CODES.USAGE, `--since must be ISO-8601, got: ${argv.flags.since}`);
-    }
+    const sinceMs = parseSinceOrFail(argv.flags.since, { defaultDays: 30 });
     const filterCli = argv.flags.cli ? String(argv.flags.cli) : null;
     if (filterCli !== null && !CLIS.has(filterCli)) {
       fail(EXIT_CODES.USAGE, `--cli must be one of: ${[...CLIS].join(", ")}`);
@@ -603,40 +611,67 @@ async function main() {
 
   // ---- top-level subs: push / pull / list --------------------------------
   if (first === "list") {
+    const sinceMs = parseSinceOrFail(argv.flags.since);
+    const listCap = argv.flags.all ? Infinity : Number(limit);
     const showLocal = !argv.flags.remote;
     const showRemote = !argv.flags.local;
     const rows = [];
+
     if (showLocal) {
       for (const r of listAllLocalSessions()) {
+        if (fromCli && r.cli !== fromCli) continue;
+        if (sinceMs !== null && r.mtime * 1000 < sinceMs) continue;
         rows.push({ ...r, location: "local" });
       }
     }
-    if (showRemote && process.env.DOTCLAUDE_HANDOFF_REPO) {
-      try {
-        for (const c of listRemoteCandidates()) {
-          rows.push({ location: "remote", branch: c.branch, commit: c.commit });
+
+    let remoteSkipped = false;
+    if (showRemote) {
+      if (!process.env.DOTCLAUDE_HANDOFF_REPO) {
+        remoteSkipped = true;
+        process.stderr.write(
+          "dotclaude-handoff: list --remote: DOTCLAUDE_HANDOFF_REPO not set; skipping remote enumeration\n",
+        );
+      } else {
+        try {
+          for (const c of listRemoteCandidates()) {
+            const parsed = parseHandoffBranch(c.branch);
+            if (fromCli && parsed.cli !== fromCli) continue;
+            rows.push({
+              location: "remote",
+              cli: parsed.cli,
+              short_id: parsed.shortId,
+              branch: c.branch,
+              commit: c.commit,
+              when: parsed.yearMonth,
+            });
+          }
+        } catch (err) {
+          process.stderr.write(`dotclaude-handoff: list --remote: ${err.message}\n`);
         }
-      } catch (err) {
-        process.stderr.write(`dotclaude-handoff: list --remote: ${err.message}\n`);
       }
     }
+
+    rows.sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0));
+    const capped = Number.isFinite(listCap) ? rows.slice(0, listCap) : rows;
+
     if (argv.json) {
-      process.stdout.write(JSON.stringify(rows, null, 2) + "\n");
+      process.stdout.write(JSON.stringify(capped, null, 2) + "\n");
       process.exit(EXIT_CODES.OK);
     }
-    if (rows.length === 0) {
+    if (capped.length === 0) {
+      // --remote + no transport env + no local rows = hard failure so
+      // piped callers don't silently treat an empty list as success.
+      if (argv.flags.remote && !argv.flags.local && remoteSkipped) process.exit(2);
       process.stdout.write("No sessions found\n");
       process.exit(EXIT_CODES.OK);
     }
-    process.stdout.write("| Location | CLI / Branch                         | Short UUID | When / Commit    |\n");
-    process.stdout.write("| -------- | ------------------------------------ | ---------- | ---------------- |\n");
-    for (const r of rows) {
-      if (r.location === "local") {
-        process.stdout.write(`| local    | ${r.cli.padEnd(36)} | ${r.short_id.padEnd(10)} | ${r.when.padEnd(16)} |\n`);
-      } else {
-        const shortCommit = (r.commit ?? "").slice(0, 10);
-        process.stdout.write(`| remote   | ${r.branch.padEnd(36)} | ${"".padEnd(10)} | ${shortCommit.padEnd(16)} |\n`);
-      }
+    process.stdout.write("| Location | CLI     | Short UUID | When             |\n");
+    process.stdout.write("| -------- | ------- | ---------- | ---------------- |\n");
+    for (const r of capped) {
+      process.stdout.write(
+        `| ${r.location.padEnd(8)} | ${(r.cli ?? "").padEnd(7)} | ${(r.short_id ?? "").padEnd(10)} | ${(r.when ?? "").padEnd(16)} |\n`,
+      );
     }
     process.exit(EXIT_CODES.OK);
   }

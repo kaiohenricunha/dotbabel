@@ -35,6 +35,25 @@ export const V2_BRANCH_RE =
 /** Matches legacy v1 handoff branch names: handoff/<cli>/<shortId>. */
 export const V1_BRANCH_RE = /^handoff\/(claude|copilot|codex)\/[0-9a-f]{8}$/;
 
+/**
+ * Decompose a handoff branch into `{version, cli, shortId, yearMonth}`.
+ * Unrecognised shapes return `{version: null, cli: "?", shortId: "", yearMonth: ""}`
+ * so list renderers degrade gracefully on branches that predate both schemes.
+ * v1 branches have no `yearMonth`.
+ */
+export function parseHandoffBranch(branch) {
+  const s = branch ?? "";
+  if (V2_BRANCH_RE.test(s)) {
+    const [, , cli, yearMonth, shortId] = s.split("/");
+    return { version: 2, cli, shortId, yearMonth };
+  }
+  if (V1_BRANCH_RE.test(s)) {
+    const [, cli, shortId] = s.split("/");
+    return { version: 1, cli, shortId, yearMonth: "" };
+  }
+  return { version: null, cli: "?", shortId: "", yearMonth: "" };
+}
+
 // Callers that read state at run time (loadPersistedEnv,
 // bootstrapTransportRepo) go through these helpers so an updated
 // process.env.HOME / XDG_CONFIG_HOME takes effect without a module

@@ -11,7 +11,7 @@ Codex's bash tool instead. Same binary, same five-form shape.
 !dotclaude handoff <query>                      local cross-agent: emit <handoff>
 !dotclaude handoff push [<query>] [--tag LBL]   upload to transport
 !dotclaude handoff pull [<query>]               fetch from transport
-!dotclaude handoff list [--local|--remote]      unified table
+!dotclaude handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit N|--all]
 ```
 
 `<query>` auto-detects the source CLI across all three roots. It

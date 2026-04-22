@@ -42,7 +42,7 @@ bash tool.
 /handoff <query>                          local cross-agent: emit <handoff>
 /handoff push [<query>] [--tag <label>]   upload to transport
 /handoff pull [<query>]                   fetch from transport
-/handoff list [--local|--remote]          unified table
+/handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit N|--all]
 ```
 
 A bare `/handoff` with no arguments prints usage and exits 0. Every
@@ -72,28 +72,31 @@ with a TSV candidate list on stderr.
 The binary's `--help` lists the full surface and authoritative flag
 semantics. Brief summary:
 
-| Sub                   | Purpose                                                             |
-| --------------------- | ------------------------------------------------------------------- |
-| `resolve <cli> <id>`  | Print the absolute JSONL path                                       |
-| `describe <cli> <id>` | Inline 2–4 sentence summary + verbatim user prompts                 |
-| `digest <cli> <id>`   | Print a paste-ready `<handoff>` block (no transport)                |
-| `file <cli> <id>`     | Write the digest to `docs/handoffs/<date>-<cli>-<short>.md`         |
-| `list`                | Unified local + remote table (`--local` / `--remote` to filter)     |
-| `search <query>`      | Substring/regex match across local sessions; `--cli` / `--since`    |
-| `push [<query>]`      | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag` / `--include-transcript` |
-| `pull [<handle>]`     | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline     |
-| `remote-list`         | List handoffs on the transport; `--cli` / `--since` / `--limit`     |
-| `doctor`              | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback            |
+| Sub                   | Purpose                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------- |
+| `resolve <cli> <id>`  | Print the absolute JSONL path                                                               |
+| `describe <cli> <id>` | Inline 2–4 sentence summary + verbatim user prompts                                         |
+| `digest <cli> <id>`   | Print a paste-ready `<handoff>` block (no transport)                                        |
+| `file <cli> <id>`     | Write the digest to `docs/handoffs/<date>-<cli>-<short>.md`                                 |
+| `list`                | Unified local + remote table (`--local`/`--remote`, `--from`, `--since`, `--limit`/`--all`) |
+| `search <query>`      | Substring/regex match across local sessions; `--cli` / `--since`                            |
+| `push [<query>]`      | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag` / `--include-transcript`                         |
+| `pull [<handle>]`     | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline                             |
+| `remote-list`         | List handoffs on the transport; `--cli` / `--since` / `--limit`                             |
+| `doctor`              | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback                                    |
 
 Cross-cutting flags (consult `--help` for the canonical list):
 
 - `--from <cli>` narrows source-CLI auto-detection on `push`, `pull`,
-  bare `<query>`. Without it, the resolver probes all three roots.
+  bare `<query>`, and filters `list` to one root. Without it, the
+  resolver probes all three roots.
 - `--to <cli>` tunes the `<handoff>` block's next-step wording for a
   target agent. Defaults to the auto-detected host.
 - `--cli <cli>` filters `search` and `remote-list` to one CLI.
-- `--since <ISO>` cuts off `search` and `remote-list` (default 30 days).
-- `--limit <N>` caps the row count (default 20).
+- `--since <ISO>` cuts off `list` when explicitly provided, and
+  cuts off `search` and `remote-list` (default 30 days).
+- `--limit <N>` caps the row count (default 20). `--all` (on `list`)
+  disables the cap.
 - `--tag <label>` annotates a `push` for fuzzy `pull` later.
 - `--include-transcript` adds the last 50 raw turns to a `push`
   (off by default to minimise leakage).

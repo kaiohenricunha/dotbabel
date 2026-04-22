@@ -35,6 +35,7 @@ describe("export shape", () => {
     "mechanicalSummary",
     "monthBucket",
     "nextStepFor",
+    "parseHandoffBranch",
     "printManualSetupBlock",
     "probeCollision",
     "projectSlugFromCwd",

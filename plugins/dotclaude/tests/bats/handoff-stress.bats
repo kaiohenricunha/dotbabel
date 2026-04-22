@@ -33,7 +33,7 @@ teardown() {
   local outfile exit_status line_count
   outfile=$(mktemp)
   exit_status=0
-  timeout 30s node "$BIN" list --local > "$outfile" 2>/dev/null || exit_status=$?
+  timeout 30s node "$BIN" list --local --all > "$outfile" 2>/dev/null || exit_status=$?
   line_count=$(wc -l < "$outfile")
   rm -f "$outfile"
 
