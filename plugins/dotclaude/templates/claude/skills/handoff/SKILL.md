@@ -54,7 +54,8 @@ full UUID, short UUID (first 8 hex), `latest`, Claude `customTitle`
 alias, Codex `thread_name` alias.
 
 **`latest` is host-scoped.** When the binary identifies the invoking
-CLI (via `CLAUDECODE=1`, `CODEX_*` / `COPILOT_*` env-vars, or `--from`),
+CLI (via `--from` or host-specific env-var probes such as `CLAUDECODE=1`,
+`CLAUDE_CODE_SSE_PORT`, `CODEX_*`, `COPILOT_*`, and `GITHUB_COPILOT_*`),
 `latest` resolves within that CLI's root only — so inside Claude Code
 it picks the newest `~/.claude/projects` session even when a newer
 Codex JSONL exists on disk. Explicit UUIDs and aliases are never
