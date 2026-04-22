@@ -760,10 +760,83 @@ describe("pullRemote", () => {
     delete process.env.DOTCLAUDE_HANDOFF_REPO;
   });
 
-  it("returns the last candidate when query is null (no enrichment)", async () => {
+  it("returns the single candidate when query is null (sort short-circuits on N=1)", async () => {
     mockLsRemote("handoff/proj/claude/2026-04/abc12345");
     const result = await lib.pullRemote(null);
     expect(result.branch).toBe("handoff/proj/claude/2026-04/abc12345");
+  });
+
+  // ---- sortByCommitterDate via bare pullRemote ----
+  //
+  // Each test below mocks an ls-remote with 2–3 candidates, then queues
+  // spawnSync returns for `git init` / `git fetch` / `git for-each-ref`
+  // in that exact order. On fallback, sortByCommitterDate returns null
+  // and pullRemote falls back to candidates[candidates.length - 1] —
+  // the last ls-remote entry, preserving pre-fix selection semantics.
+  // The stderr warning signals the user that the pick is best-effort.
+
+  function mockLsRemoteMulti(...shortIds) {
+    const lines = shortIds
+      .map((s, i) => `c${i}  refs/heads/handoff/proj/claude/2026-04/${s}`)
+      .join("\n") + "\n";
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: lines, stderr: "" });
+  }
+
+  it("sorts bare pull candidates by committer date (newest first)", async () => {
+    mockLsRemoteMulti("aaaaaaaa", "bbbbbbbb", "cccccccc");
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // fetch
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout:
+        [
+          "handoff/proj/claude/2026-04/bbbbbbbb",
+          "handoff/proj/claude/2026-04/aaaaaaaa",
+          "handoff/proj/claude/2026-04/cccccccc",
+        ].join("\n") + "\n",
+      stderr: "",
+    }); // for-each-ref: bbb is newest
+    const result = await lib.pullRemote(null);
+    // Pre-fix would return 'cccccccc' (lex-last); the fix returns the
+    // first entry of for-each-ref --sort=-committerdate output.
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
+  });
+
+  it("falls back to ls-remote order when `git init` fails during sort", async () => {
+    mockLsRemoteMulti("aaaaaaaa", "bbbbbbbb");
+    spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "init denied" });
+    const result = await lib.pullRemote(null);
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
+  });
+
+  it("falls back to ls-remote order when the shallow fetch fails during sort", async () => {
+    mockLsRemoteMulti("aaaaaaaa", "bbbbbbbb");
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    spawnSync.mockReturnValueOnce({ status: 128, stdout: "", stderr: "remote hung up" });
+    const result = await lib.pullRemote(null);
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
+  });
+
+  it("falls back to ls-remote order when `for-each-ref` fails during sort", async () => {
+    mockLsRemoteMulti("aaaaaaaa", "bbbbbbbb");
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // fetch
+    spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "bad ref" });
+    const result = await lib.pullRemote(null);
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
+  });
+
+  it("falls back when for-each-ref returns fewer refs than candidates (partial)", async () => {
+    mockLsRemoteMulti("aaaaaaaa", "bbbbbbbb");
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // fetch
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "handoff/proj/claude/2026-04/aaaaaaaa\n", // only one of two
+      stderr: "",
+    });
+    const result = await lib.pullRemote(null);
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
   });
 
   it("exits 2 when no candidates exist", async () => {

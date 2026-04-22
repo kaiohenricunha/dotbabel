@@ -636,6 +636,82 @@ export async function pushRemote({ cli, path: sessionFile, tag, verify = false, 
 }
 
 /**
+ * Sort remote handoff candidates newest-first by commit date.
+ *
+ * `git ls-remote --sort=committerdate` is documented to fail with
+ * "missing object" for refs whose objects have not yet been fetched
+ * (see git-ls-remote(1)), so we can't sort server-side. Instead, do
+ * one bulk shallow fetch into a throwaway bare repo and run
+ * `for-each-ref --sort=-committerdate` locally.
+ *
+ * Cost: one `fetch --depth=1` round-trip; O(N) commit-tip objects.
+ *
+ * If the sort fetch fails (network blip, auth hiccup between the
+ * ls-remote that built `candidates` and this call), emit a stderr
+ * warning and return null. The caller falls back to the pre-fix
+ * selection (last ls-remote entry) so the degraded path is stable.
+ *
+ * @param {Array<{branch: string, commit: string, description: string}>} candidates
+ * @param {string} repoUrl
+ * @returns {Array<{branch: string, commit: string, description: string}>|null}
+ */
+function sortByCommitterDate(candidates, repoUrl) {
+  if (candidates.length <= 1) return candidates;
+  const tmp = mkdtempSync(join(tmpdir(), "handoff-sort-"));
+  const warnAndFallback = (reason) => {
+    const msg = String(reason).trim().replace(/\s+/gu, " ") || "unknown error";
+    process.stderr.write(
+      `dotclaude-handoff: committer-date sort skipped (${msg}); using ls-remote order\n`,
+    );
+    return null;
+  };
+  try {
+    const init = runGit(["init", "-q", "--bare"], tmp);
+    if (init.status !== 0) {
+      return warnAndFallback(`git init failed: ${init.stderr.trim()}`);
+    }
+    const refspecs = candidates.map(
+      (c) => `+refs/heads/${c.branch}:refs/heads/${c.branch}`,
+    );
+    const fetched = runGit(
+      ["fetch", "--depth=1", "--no-tags", "-q", repoUrl, ...refspecs],
+      tmp,
+    );
+    if (fetched.status !== 0) {
+      return warnAndFallback(`fetch failed: ${fetched.stderr.trim()}`);
+    }
+    const fer = runGit(
+      [
+        "for-each-ref",
+        "--sort=-committerdate",
+        "--format=%(refname:short)",
+        "refs/heads/handoff/",
+      ],
+      tmp,
+    );
+    if (fer.status !== 0) {
+      return warnAndFallback(`for-each-ref failed: ${fer.stderr.trim()}`);
+    }
+    const byBranch = new Map(candidates.map((c) => [c.branch, c]));
+    const sorted = [];
+    for (const line of fer.stdout.split("\n")) {
+      const ref = line.trim();
+      if (!ref) continue;
+      const c = byBranch.get(ref);
+      if (c) sorted.push(c);
+    }
+    if (sorted.length !== candidates.length) {
+      return warnAndFallback(
+        `partial sort (${sorted.length}/${candidates.length} refs resolved)`,
+      );
+    }
+    return sorted;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/**
  * List handoff branches on the remote as candidate objects.
  * Returns [{branch, description, commit}] — no content fetched.
  */
@@ -720,13 +796,15 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
     if (candidates.length === 0) fail(2, `no ${fromCli} handoffs found on transport`);
   }
 
-  // Bare: pick the newest. We don't have a reliable remote mtime, so
-  // fall back to the lexically last branch, which is typically the
-  // most recent since short IDs hash-distribute. The caller re-fetches
-  // the branch contents via fetchRemoteBranch, so skipping the
-  // enrichment pass saves N shallow clones.
+  // Bare: pick the newest by commit date. Short UUIDs are 8 hex chars
+  // of a v4 random UUID, so lexical order is random with respect to
+  // push time — the previous implementation could return a stale
+  // branch silently. sortByCommitterDate pays one shallow fetch to
+  // get a correct answer, and falls back to ls-remote order on
+  // transient failure with a stderr warning.
   if (!query) {
-    return candidates[candidates.length - 1];
+    const sorted = sortByCommitterDate(candidates, repoUrl);
+    return sorted ? sorted[0] : candidates[candidates.length - 1];
   }
 
   // Cheap pass: filter by branch name.
