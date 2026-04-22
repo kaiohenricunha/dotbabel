@@ -141,11 +141,11 @@ teardown() {
 
 # -- extract turns: limit normalization ---------------------------------
 
-@test "extract turns with limit=0 yields no lines (SIGPIPE tolerated)" {
-  # Seed a session with 5 assistant turns. Behavior: `tail -n 0` closes
-  # its stdin immediately, sending SIGPIPE to jq. The pipeline exits 141
-  # (128 + 13) with empty stdout. Locked in — if a future change routes
-  # this through a head/awk filter with exit-0 semantics, update here.
+@test "extract turns with limit=0 is unbounded (returns every turn)" {
+  # `0` is the documented unbounded sentinel — search uses it to scan every
+  # assistant turn, not just the last 20. `handoff-extract.sh` translates
+  # it to `tail -n +1`. Previous behavior (SIGPIPE from `tail -n 0`) was
+  # a contract bug: search dropped matches in long sessions.
   local uuid="ffff6666-6666-6666-6666-666666666666"
   local file="$TEST_HOME/.claude/projects/-demo/$uuid.jsonl"
   mkdir -p "$(dirname "$file")"
@@ -156,10 +156,9 @@ teardown() {
     done
   } > "$file"
   run "$EXTRACT" turns claude "$file" 0
-  # Exit 141 is acceptable here (SIGPIPE from tail -n 0). The important
-  # invariant is that no turn content leaks through.
-  [[ "$status" -eq 0 || "$status" -eq 141 ]]
-  [ -z "$output" ]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"turn 1"* ]]
+  [[ "$output" == *"turn 5"* ]]
 }
 
 @test "extract turns with absurdly large limit returns all turns" {

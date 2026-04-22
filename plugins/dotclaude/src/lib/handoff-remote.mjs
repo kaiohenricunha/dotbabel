@@ -158,9 +158,9 @@ export function extractLines(sub, cli, file, extra = []) {
 
 /** Extract user prompt lines from a session file. */
 export const extractPrompts = (cli, file) => extractLines("prompts", cli, file);
-/** Extract assistant turn lines from a session file (optionally capped). */
+/** Extract assistant turn lines from a session file (optionally capped; 0 = unbounded). */
 export const extractTurns = (cli, file, limit) =>
-  extractLines("turns", cli, file, limit ? [String(limit)] : []);
+  extractLines("turns", cli, file, limit == null ? [] : [String(limit)]);
 
 // ---- rendering ---------------------------------------------------------
 
