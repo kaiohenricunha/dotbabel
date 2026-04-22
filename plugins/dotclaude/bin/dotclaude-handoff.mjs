@@ -104,6 +104,7 @@ const META = {
     local: { type: "boolean" },
     remote: { type: "boolean" },
     verify: { type: "boolean" },
+    "force-collision": { type: "boolean" },
   },
 };
 
@@ -658,6 +659,7 @@ async function main() {
     const tag = argv.flags.tag ? String(argv.flags.tag) : null;
     const verify = Boolean(argv.flags.verify);
     const verbose = Boolean(argv.verbose);
+    const force = Boolean(argv.flags["force-collision"]);
     try {
       const result = await pushRemote({
         cli: sessionHit.cli,
@@ -665,6 +667,7 @@ async function main() {
         tag,
         verify,
         verbose,
+        force,
       });
       process.stdout.write(
         `${result.branch}\n${result.url}\n${result.description}\n[scrubbed ${result.scrubbedCount} secrets]\n`,

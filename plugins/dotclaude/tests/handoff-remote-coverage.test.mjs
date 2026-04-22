@@ -1013,3 +1013,242 @@ describe("bootstrapTransportRepo — TTY early-exit paths", () => {
     await expect(lib.bootstrapTransportRepo()).rejects.toThrow(/__exit__2/);
   });
 });
+
+// ---- fetchRemoteMetadata ----------------------------------------------
+
+describe("fetchRemoteMetadata", () => {
+  beforeEach(() => {
+    spawnSync.mockReset();
+    mkdtempSync.mockReset().mockReturnValue("/tmp/mock-probe");
+  });
+
+  it("parses metadata.json from a fetched branch", () => {
+    // init, fetch, show — all succeed
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // fetch
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: JSON.stringify({ session_id: "abc123", short_id: "abc12345" }),
+      stderr: "",
+    });
+    const result = lib.fetchRemoteMetadata(
+      "handoff/proj/claude/2026-04/aaaaaaaa",
+      "https://example.test/repo.git",
+    );
+    expect(result.session_id).toBe("abc123");
+  });
+
+  it("throws when git init fails", () => {
+    spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "disk full" });
+    expect(() =>
+      lib.fetchRemoteMetadata("handoff/a/claude/2026-04/aaaaaaaa", "url"),
+    ).toThrow(/git init failed/);
+  });
+
+  it("throws when fetch fails", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "network error" });
+    expect(() =>
+      lib.fetchRemoteMetadata("handoff/a/claude/2026-04/aaaaaaaa", "url"),
+    ).toThrow(/fetch failed/);
+  });
+
+  it("throws when metadata.json is missing (legacy branch)", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 128,
+      stdout: "",
+      stderr: "fatal: path 'metadata.json' does not exist",
+    });
+    expect(() =>
+      lib.fetchRemoteMetadata("handoff/a/claude/2026-04/aaaaaaaa", "url"),
+    ).toThrow(/metadata.json missing/);
+  });
+
+  it("throws when metadata.json is malformed", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "not { valid json", stderr: "" });
+    expect(() =>
+      lib.fetchRemoteMetadata("handoff/a/claude/2026-04/aaaaaaaa", "url"),
+    ).toThrow(/parse failed/);
+  });
+});
+
+// ---- probeCollision ----------------------------------------------------
+
+describe("probeCollision", () => {
+  let exitSpy;
+  let stderrSpy;
+  beforeEach(() => {
+    spawnSync.mockReset();
+    mkdtempSync.mockReset().mockReturnValue("/tmp/mock-probe");
+    exitSpy = mockExit();
+    stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  });
+  afterEach(() => {
+    exitSpy.mockRestore();
+    stderrSpy.mockRestore();
+  });
+
+  it("returns create when ls-remote stdout is empty", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    const r = lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", "sess-A");
+    expect(r).toEqual({ mode: "create" });
+  });
+
+  it("returns update when remote session_id matches local", () => {
+    // ls-remote → branch present
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abc refs/heads/handoff/a/claude/2026-04/aaaaaaaa",
+      stderr: "",
+    });
+    // fetchRemoteMetadata: init, fetch, show
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: JSON.stringify({ session_id: "sess-A" }),
+      stderr: "",
+    });
+    const r = lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", "sess-A");
+    expect(r).toEqual({ mode: "update" });
+  });
+
+  it("fails closed on session mismatch without force", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abc refs/heads/handoff/a/claude/2026-04/aaaaaaaa",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: JSON.stringify({ session_id: "sess-OTHER" }),
+      stderr: "",
+    });
+    expect(() =>
+      lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", "sess-A"),
+    ).toThrow(/__exit__2/);
+  });
+
+  it("returns force on session mismatch with force=true and warns to stderr", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abc refs/heads/handoff/a/claude/2026-04/aaaaaaaa",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: JSON.stringify({ session_id: "sess-OTHER" }),
+      stderr: "",
+    });
+    const r = lib.probeCollision(
+      "url",
+      "handoff/a/claude/2026-04/aaaaaaaa",
+      "sess-A",
+      { force: true },
+    );
+    expect(r).toEqual({ mode: "force" });
+    expect(stderrSpy).toHaveBeenCalled();
+  });
+
+  it("fails closed when ls-remote itself errors", () => {
+    spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "auth denied" });
+    expect(() =>
+      lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", "sess-A"),
+    ).toThrow(/__exit__2/);
+  });
+
+  it("returns force when ls-remote errors and force=true", () => {
+    spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "auth denied" });
+    const r = lib.probeCollision(
+      "url",
+      "handoff/a/claude/2026-04/aaaaaaaa",
+      "sess-A",
+      { force: true },
+    );
+    expect(r).toEqual({ mode: "force" });
+  });
+
+  it("fails closed when remote metadata is missing (legacy branch)", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abc refs/heads/handoff/a/claude/2026-04/aaaaaaaa",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 128,
+      stdout: "",
+      stderr: "fatal: path 'metadata.json' does not exist",
+    });
+    expect(() =>
+      lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", "sess-A"),
+    ).toThrow(/__exit__2/);
+  });
+
+  it("returns force when remote metadata is missing and force=true", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abc refs/heads/handoff/a/claude/2026-04/aaaaaaaa",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 128,
+      stdout: "",
+      stderr: "fatal: path 'metadata.json' does not exist",
+    });
+    const r = lib.probeCollision(
+      "url",
+      "handoff/a/claude/2026-04/aaaaaaaa",
+      "sess-A",
+      { force: true },
+    );
+    expect(r).toEqual({ mode: "force" });
+  });
+
+  it("fails closed when localSessionId is null without force", () => {
+    expect(() =>
+      lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", null),
+    ).toThrow(/__exit__2/);
+  });
+
+  it("skips the null-session guard when force=true and proceeds to ls-remote", () => {
+    // With force=true and no local session, ls-remote empty → create.
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    const r = lib.probeCollision(
+      "url",
+      "handoff/a/claude/2026-04/aaaaaaaa",
+      null,
+      { force: true },
+    );
+    expect(r).toEqual({ mode: "create" });
+  });
+
+  it("treats non-string session_id in remote metadata as mismatch", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abc refs/heads/handoff/a/claude/2026-04/aaaaaaaa",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: JSON.stringify({ session_id: null }),
+      stderr: "",
+    });
+    expect(() =>
+      lib.probeCollision("url", "handoff/a/claude/2026-04/aaaaaaaa", "sess-A"),
+    ).toThrow(/__exit__2/);
+  });
+});

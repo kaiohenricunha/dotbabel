@@ -547,8 +547,139 @@ export function requireTransportRepoStrict() {
 
 // ---- remote I/O --------------------------------------------------------
 
+/**
+ * Read `metadata.json` from the tip of a remote handoff branch.
+ *
+ * Does one bulk shallow fetch of the single branch into a throwaway bare
+ * repo, then `git show refs/heads/<branch>:metadata.json`. Returns the
+ * parsed object.
+ *
+ * Throws on:
+ *   - transport / fetch failure
+ *   - missing metadata.json on the branch (legacy branch)
+ *   - malformed JSON
+ * The caller (probeCollision) distinguishes those cases via error
+ * message inspection and decides fail-closed vs --force-collision.
+ *
+ * @param {string} branch
+ * @param {string} repoUrl
+ * @returns {{ session_id: string|null, [k: string]: any }}
+ */
+export function fetchRemoteMetadata(branch, repoUrl) {
+  const tmp = mkdtempSync(join(tmpdir(), "handoff-probe-"));
+  try {
+    const init = runGit(["init", "-q", "--bare"], tmp);
+    if (init.status !== 0) {
+      throw new Error(`git init failed: ${init.stderr.trim()}`);
+    }
+    const fetched = runGit(
+      [
+        "fetch",
+        "--depth=1",
+        "--no-tags",
+        "-q",
+        repoUrl,
+        `+refs/heads/${branch}:refs/heads/${branch}`,
+      ],
+      tmp,
+    );
+    if (fetched.status !== 0) {
+      throw new Error(`fetch failed: ${fetched.stderr.trim()}`);
+    }
+    const shown = runGit(["show", `refs/heads/${branch}:metadata.json`], tmp);
+    if (shown.status !== 0) {
+      // Most common path here is "path 'metadata.json' does not exist" —
+      // that's a legacy branch predating the session_id invariant. Surface
+      // the underlying git message so the caller can match on it.
+      throw new Error(`metadata.json missing: ${shown.stderr.trim()}`);
+    }
+    try {
+      return JSON.parse(shown.stdout);
+    } catch (err) {
+      throw new Error(`metadata.json parse failed: ${err.message}`);
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Pre-push collision probe. Decides whether a push can safely proceed
+ * and in which mode (create vs update vs forced override).
+ *
+ * Returns `{ mode: "create" | "update" | "force" }`.
+ *
+ * Fails closed (exit 2 via fail()) on:
+ *   - ls-remote transport errors (can't prove branch absence)
+ *   - metadata fetch/parse errors on an existing branch (can't prove
+ *     ownership), UNLESS `force` is true
+ *   - remote session_id mismatch, UNLESS `force` is true
+ *
+ * Under `force`, the same failures emit a stderr warning and return
+ * `{ mode: "force" }`. `force` is a per-invocation override from the
+ * user's `--force-collision` flag; it is never persisted.
+ *
+ * @param {string} repoUrl
+ * @param {string} branch
+ * @param {string|null|undefined} localSessionId
+ * @param {{ force?: boolean }} [opts]
+ * @returns {{ mode: "create" | "update" | "force" }}
+ */
+export function probeCollision(repoUrl, branch, localSessionId, { force = false } = {}) {
+  // Without a local session_id we cannot prove ownership of any existing
+  // branch. This is a defensive check — session_id should always be
+  // populated via extractMeta, but the schema allows null, so refuse
+  // rather than silently match-on-null.
+  if (!localSessionId && !force) {
+    fail(
+      2,
+      "collision probe refused: local session_id is missing; rerun with --force-collision to override",
+    );
+  }
+  const ls = runGit(["ls-remote", repoUrl, `refs/heads/${branch}`]);
+  if (ls.status !== 0) {
+    const msg = `collision probe failed: ls-remote: ${ls.stderr.trim()}`;
+    if (!force) fail(2, msg);
+    process.stderr.write(`dotclaude-handoff: ${msg}; forcing\n`);
+    return { mode: "force" };
+  }
+  if (ls.stdout.trim() === "") {
+    return { mode: "create" };
+  }
+  let remote;
+  try {
+    remote = fetchRemoteMetadata(branch, repoUrl);
+  } catch (err) {
+    const msg = `collision probe failed: ${err.message}`;
+    if (!force) {
+      fail(
+        2,
+        `short-id collision on ${branch}: existing branch has no provable owner (${err.message}); rerun with --force-collision to override`,
+      );
+    }
+    process.stderr.write(`dotclaude-handoff: ${msg}; forcing\n`);
+    return { mode: "force" };
+  }
+  const remoteSessionId = remote && typeof remote.session_id === "string" ? remote.session_id : null;
+  if (remoteSessionId && remoteSessionId === localSessionId) {
+    return { mode: "update" };
+  }
+  const ownerHint = remoteSessionId ? `remote-session=${remoteSessionId}` : "remote-session=unknown";
+  const detail = `short-id collision on ${branch}: local-session=${localSessionId ?? "unknown"} ${ownerHint}; rerun with --force-collision to override`;
+  if (!force) fail(2, detail);
+  process.stderr.write(`dotclaude-handoff: ${detail}; forcing\n`);
+  return { mode: "force" };
+}
+
 /** Push a local session to the transport repo as a handoff branch. */
-export async function pushRemote({ cli, path: sessionFile, tag, verify = false, verbose = false }) {
+export async function pushRemote({
+  cli,
+  path: sessionFile,
+  tag,
+  verify = false,
+  verbose = false,
+  force = false,
+}) {
   let repoUrl = await requireTransportRepo();
   autoPreflight({ repo: repoUrl, verify, verbose });
   const meta = extractMeta(cli, sessionFile);
@@ -589,24 +720,67 @@ export async function pushRemote({ cli, path: sessionFile, tag, verify = false, 
     tag: tag || null,
   };
 
-  const doPush = (url) => {
+  const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
+
+  // Pre-push collision probe: compare the remote branch's
+  // metadata.session_id (if any) against the local session_id. Without
+  // this, two sessions with the same 8-hex-char short_id prefix would
+  // silently force-push over each other (issue #90 Gap 3).
+  const attemptPush = (url, mode) => {
     const tmp = mkdtempSync(join(tmpdir(), "handoff-push-"));
     try {
       runGitOrThrow(["init", "-q"], tmp);
       runGitOrThrow(["remote", "add", "origin", url], tmp);
       runGitOrThrow(["config", "user.email", "handoff@dotclaude.local"], tmp);
       runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
-      const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
       runGitOrThrow(["checkout", "-q", "-b", branch], tmp);
       writeFileSync(join(tmp, "handoff.md"), scrubbed + "\n");
       writeFileSync(join(tmp, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
       writeFileSync(join(tmp, "description.txt"), description + "\n");
       runGitOrThrow(["add", "."], tmp);
       runGitOrThrow(["commit", "-q", "-m", description], tmp);
-      runGitOrThrow(["push", "-q", "-f", "origin", branch], tmp);
+      // `create` pushes without -f so a racing session that claimed the
+      // short-id between our probe and our push produces a non-fast-forward
+      // error rather than a silent clobber. `update`/`force` keep -f because
+      // every push writes an orphan commit (no shared history with the
+      // existing ref), so a fast-forward is structurally impossible — but
+      // the probe has already proven either same-session ownership or an
+      // explicit user override.
+      const pushArgs =
+        mode === "create"
+          ? ["push", "-q", "origin", branch]
+          : ["push", "-q", "-f", "origin", branch];
+      const pushed = runGit(pushArgs, tmp);
+      if (pushed.status !== 0) {
+        const err = new Error(pushed.stderr.trim() || "push failed");
+        /** @type {any} */ (err).pushStderr = pushed.stderr;
+        throw err;
+      }
       return { branch, url, description, scrubbedCount };
     } finally {
       rmSync(tmp, { recursive: true, force: true });
+    }
+  };
+
+  const doPush = (url) => {
+    const mode = probeCollision(url, branch, meta.session_id, { force }).mode;
+    try {
+      return attemptPush(url, mode);
+    } catch (err) {
+      // TOCTOU: in create mode, someone may have claimed the branch
+      // between the probe (ls-remote) and our push. Git reports that as
+      // a non-fast-forward rejection. Re-probe once and retry with the
+      // fresh decision — this closes the race without ever force-pushing
+      // over a verifiably-different session.
+      if (mode !== "create") throw err;
+      const stderr = String(/** @type {any} */ (err).pushStderr ?? err.message ?? "");
+      const looksLikeRace =
+        /non-fast-forward|fetch first|\(fetch first\)|rejected.*non-fast|already exists/i.test(
+          stderr,
+        );
+      if (!looksLikeRace) throw err;
+      const retryMode = probeCollision(url, branch, meta.session_id, { force }).mode;
+      return attemptPush(url, retryMode);
     }
   };
 
