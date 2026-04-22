@@ -30,6 +30,7 @@
 
 import { parse, helpText } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
+import { scrubDigest } from "../src/lib/handoff-scrub.mjs";
 import { version } from "../src/index.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -676,6 +677,12 @@ async function pushRemote({ cli, path: sessionFile, tag }) {
   const toCli = meta.cli;
   const handoffBlock = renderHandoffBlock(meta, prompts, turns, toCli);
 
+  // Scrub before the digest ever leaves the machine. Thrown errors
+  // propagate out of pushRemote — the outer try/catch in main() maps
+  // them to `push failed: <message>` with exit 2, so an unscrubbed
+  // digest can never reach the remote.
+  const { scrubbed, count: scrubbedCount } = scrubDigest(handoffBlock);
+
   const shortId = meta.short_id ?? "unknown";
   const host = slugify(hostname());
   const project = projectSlugFromCwd(meta.cwd);
@@ -698,7 +705,7 @@ async function pushRemote({ cli, path: sessionFile, tag }) {
     month,
     hostname: host,
     created_at: new Date().toISOString(),
-    scrubbed_count: 0,
+    scrubbed_count: scrubbedCount,
     tag: tag || null,
   };
 
@@ -711,13 +718,13 @@ async function pushRemote({ cli, path: sessionFile, tag }) {
       runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
       const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
       runGitOrThrow(["checkout", "-q", "-b", branch], tmp);
-      writeFileSync(join(tmp, "handoff.md"), handoffBlock + "\n");
+      writeFileSync(join(tmp, "handoff.md"), scrubbed + "\n");
       writeFileSync(join(tmp, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
       writeFileSync(join(tmp, "description.txt"), description + "\n");
       runGitOrThrow(["add", "."], tmp);
       runGitOrThrow(["commit", "-q", "-m", description], tmp);
       runGitOrThrow(["push", "-q", "-f", "origin", branch], tmp);
-      return { branch, url, description };
+      return { branch, url, description, scrubbedCount };
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }
@@ -1249,7 +1256,9 @@ async function main() {
     const tag = argv.flags.tag ? String(argv.flags.tag) : null;
     try {
       const result = await pushRemote({ cli: sessionHit.cli, path: sessionHit.path, tag });
-      process.stdout.write(`${result.branch}\n${result.url}\n${result.description}\n`);
+      process.stdout.write(
+        `${result.branch}\n${result.url}\n${result.description}\n[scrubbed ${result.scrubbedCount} secrets]\n`,
+      );
       process.exit(EXIT_CODES.OK);
     } catch (err) {
       fail(2, `push failed: ${err.message}`);

@@ -148,9 +148,12 @@ question before proceeding.
   prevents unintended cross-session execution.
 - **End-to-end encryption.** The git transport is access-controlled
   by the host (private repo + push-side auth), but content is stored
-  in plaintext on the remote. Do not push transcripts containing
-  secrets you rely on scrubbing to catch. Scrubbing is a best-effort
-  pattern pass (see `references/redaction.md`).
+  in plaintext on the remote. Every `push` runs the scrubber before
+  uploading and reports `[scrubbed N secrets]` as the final stdout
+  line; the push fails closed (exit 2, no commit written) if the
+  scrubber cannot run. Scrubbing is a best-effort pattern pass (see
+  `references/redaction.md`) — do not rely on it to catch bespoke
+  or obfuscated secrets.
 - **Fuzzy or semantic search.** `search` is substring/regex only.
 - **Persistent indexing.** Grep-at-query-time is fast enough for
   local session volumes; revisit only if p95 exceeds ~2s.
