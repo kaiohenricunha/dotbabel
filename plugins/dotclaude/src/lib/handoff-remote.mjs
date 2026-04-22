@@ -648,22 +648,22 @@ export async function pushRemote({ cli, path: sessionFile, tag, verify = false, 
  *
  * If the sort fetch fails (network blip, auth hiccup between the
  * ls-remote that built `candidates` and this call), emit a stderr
- * warning and return the input unchanged. Preserving availability
- * beats picking a deterministic-but-wrong answer — the caller can
- * still pull by id.
+ * warning and return null. The caller falls back to the pre-fix
+ * selection (last ls-remote entry) so the degraded path is stable.
  *
  * @param {Array<{branch: string, commit: string, description: string}>} candidates
  * @param {string} repoUrl
- * @returns {Array<{branch: string, commit: string, description: string}>}
+ * @returns {Array<{branch: string, commit: string, description: string}>|null}
  */
 function sortByCommitterDate(candidates, repoUrl) {
   if (candidates.length <= 1) return candidates;
   const tmp = mkdtempSync(join(tmpdir(), "handoff-sort-"));
   const warnAndFallback = (reason) => {
+    const msg = String(reason).trim().replace(/\s+/gu, " ") || "unknown error";
     process.stderr.write(
-      `dotclaude-handoff: committer-date sort skipped (${reason}); using ls-remote order\n`,
+      `dotclaude-handoff: committer-date sort skipped (${msg}); using ls-remote order\n`,
     );
-    return candidates;
+    return null;
   };
   try {
     const init = runGit(["init", "-q", "--bare"], tmp);
@@ -804,7 +804,7 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
   // transient failure with a stderr warning.
   if (!query) {
     const sorted = sortByCommitterDate(candidates, repoUrl);
-    return sorted[0];
+    return sorted ? sorted[0] : candidates[candidates.length - 1];
   }
 
   // Cheap pass: filter by branch name.

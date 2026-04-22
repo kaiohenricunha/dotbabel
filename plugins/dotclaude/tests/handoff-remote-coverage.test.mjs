@@ -770,10 +770,10 @@ describe("pullRemote", () => {
   //
   // Each test below mocks an ls-remote with 2–3 candidates, then queues
   // spawnSync returns for `git init` / `git fetch` / `git for-each-ref`
-  // in that exact order. On fallback, sortByCommitterDate returns the
-  // candidates unchanged (ls-remote order) and pullRemote returns
-  // sorted[0] — i.e. the first ls-remote candidate. The stderr warning
-  // is what signals the user that the pick is best-effort.
+  // in that exact order. On fallback, sortByCommitterDate returns null
+  // and pullRemote falls back to candidates[candidates.length - 1] —
+  // the last ls-remote entry, preserving pre-fix selection semantics.
+  // The stderr warning signals the user that the pick is best-effort.
 
   function mockLsRemoteMulti(...shortIds) {
     const lines = shortIds
@@ -806,7 +806,7 @@ describe("pullRemote", () => {
     mockLsRemoteMulti("aaaaaaaa", "bbbbbbbb");
     spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "init denied" });
     const result = await lib.pullRemote(null);
-    expect(result.branch).toBe("handoff/proj/claude/2026-04/aaaaaaaa");
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
   });
 
   it("falls back to ls-remote order when the shallow fetch fails during sort", async () => {
@@ -814,7 +814,7 @@ describe("pullRemote", () => {
     spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
     spawnSync.mockReturnValueOnce({ status: 128, stdout: "", stderr: "remote hung up" });
     const result = await lib.pullRemote(null);
-    expect(result.branch).toBe("handoff/proj/claude/2026-04/aaaaaaaa");
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
   });
 
   it("falls back to ls-remote order when `for-each-ref` fails during sort", async () => {
@@ -823,7 +823,7 @@ describe("pullRemote", () => {
     spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // fetch
     spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "bad ref" });
     const result = await lib.pullRemote(null);
-    expect(result.branch).toBe("handoff/proj/claude/2026-04/aaaaaaaa");
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
   });
 
   it("falls back when for-each-ref returns fewer refs than candidates (partial)", async () => {
@@ -836,7 +836,7 @@ describe("pullRemote", () => {
       stderr: "",
     });
     const result = await lib.pullRemote(null);
-    expect(result.branch).toBe("handoff/proj/claude/2026-04/aaaaaaaa");
+    expect(result.branch).toBe("handoff/proj/claude/2026-04/bbbbbbbb");
   });
 
   it("exits 2 when no candidates exist", async () => {
