@@ -11,6 +11,21 @@ BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
 SCRUB="$REPO_ROOT/plugins/dotclaude/scripts/handoff-scrub.sh"
 BAIT_GH_TOKEN="ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456"
 
+# Emits the short-ref name of the session's pushed branch, or empty if none.
+# Call against $TRANSPORT_REPO. Scoped by short-UUID suffix.
+handoff_branch_for() {
+  local short_uuid="$1"
+  git --git-dir="$TRANSPORT_REPO" for-each-ref \
+    --format='%(refname:short)' \
+    "refs/heads/handoff/*/claude/*/$short_uuid"
+}
+
+# Parses the `[scrubbed N secrets]` line from `$output` into a bare integer.
+# Assumes the state line is the fourth line of `push` stdout.
+scrub_count_from_output() {
+  printf '%s\n' "$output" | sed -n '4p' | sed -E 's/^\[scrubbed ([0-9]+) secrets\]$/\1/'
+}
+
 setup() {
   [ -x "$SCRUB" ] || chmod +x "$SCRUB"
   TEST_HOME=$(mktemp -d)
@@ -41,27 +56,23 @@ teardown() {
 @test "push: stdout emits [scrubbed N secrets] as a fourth line" {
   run node "$BIN" push aaaa1111
   [ "$status" -eq 0 ]
-  # Fourth line is the scrub-state line.
   local fourth
   fourth="$(printf '%s\n' "$output" | sed -n '4p')"
   [[ "$fourth" =~ ^\[scrubbed\ [0-9]+\ secrets\]$ ]]
   # Seeded one bait token → count must be at least 1.
   local count
-  count="$(printf '%s\n' "$fourth" | sed -E 's/^\[scrubbed ([0-9]+) secrets\]$/\1/')"
+  count="$(scrub_count_from_output)"
   [ "$count" -ge 1 ]
 }
 
 @test "push: pushed handoff.md does not contain the bait token" {
   run node "$BIN" push aaaa1111
   [ "$status" -eq 0 ]
-  # Look up the branch written by push (handoff/<project>/claude/<month>/aaaa1111).
-  run bash -c "git --git-dir='$TRANSPORT_REPO' for-each-ref --format='%(refname:short)' 'refs/heads/handoff/*/claude/*/aaaa1111'"
-  [ "$status" -eq 0 ]
-  local branch="$output"
+  local branch
+  branch="$(handoff_branch_for aaaa1111)"
   [ -n "$branch" ]
-  run bash -c "git --git-dir='$TRANSPORT_REPO' show '$branch:handoff.md'"
+  run git --git-dir="$TRANSPORT_REPO" show "$branch:handoff.md"
   [ "$status" -eq 0 ]
-  # Bait must be gone; replacement marker must be present.
   [[ "$output" != *"$BAIT_GH_TOKEN"* ]]
   [[ "$output" == *"<redacted:github-token>"* ]]
 }
@@ -69,13 +80,10 @@ teardown() {
 @test "push: metadata.json.scrubbed_count matches the stdout count" {
   run node "$BIN" push aaaa1111
   [ "$status" -eq 0 ]
-  local fourth count_stdout
-  fourth="$(printf '%s\n' "$output" | sed -n '4p')"
-  count_stdout="$(printf '%s\n' "$fourth" | sed -E 's/^\[scrubbed ([0-9]+) secrets\]$/\1/')"
+  local count_stdout branch
+  count_stdout="$(scrub_count_from_output)"
+  branch="$(handoff_branch_for aaaa1111)"
 
-  run bash -c "git --git-dir='$TRANSPORT_REPO' for-each-ref --format='%(refname:short)' 'refs/heads/handoff/*/claude/*/aaaa1111'"
-  [ "$status" -eq 0 ]
-  local branch="$output"
   run bash -c "git --git-dir='$TRANSPORT_REPO' show '$branch:metadata.json' | jq -r .scrubbed_count"
   [ "$status" -eq 0 ]
   [ "$output" = "$count_stdout" ]
@@ -112,7 +120,7 @@ EOF
   [[ "$push_output" == *"scrub not applied"* ]]
 
   # Remote must carry no branch for this session.
-  run bash -c "git --git-dir='$TRANSPORT_REPO' for-each-ref --format='%(refname:short)' 'refs/heads/handoff/*/claude/*/aaaa1111'"
-  [ "$status" -eq 0 ]
-  [ -z "$output" ]
+  local branch
+  branch="$(handoff_branch_for aaaa1111)"
+  [ -z "$branch" ]
 }

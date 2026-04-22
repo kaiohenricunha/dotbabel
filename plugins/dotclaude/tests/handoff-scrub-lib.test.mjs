@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scrubDigest } from "../src/lib/handoff-scrub.mjs";
+import { scrubDigest, SCRUB_ERROR_PREFIX } from "../src/lib/handoff-scrub.mjs";
 
 /**
  * Build a temporary stub script that mimics handoff-scrub.sh's contract
@@ -50,14 +50,14 @@ describe("scrubDigest", () => {
   it("throws when the scrubber script is missing", () => {
     expect(() =>
       scrubDigest("any input", { scriptPath: "/nonexistent/handoff-scrub.sh" }),
-    ).toThrow(/scrub not applied/);
+    ).toThrow(SCRUB_ERROR_PREFIX);
   });
 
   it("throws when the scrubber exits non-zero (fail-closed contract)", () => {
     const { dir, path } = stubScript("exit 3");
     try {
       expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(
-        /scrub not applied/,
+        SCRUB_ERROR_PREFIX,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -69,7 +69,7 @@ describe("scrubDigest", () => {
     const { dir, path } = stubScript("cat");
     try {
       expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(
-        /scrub not applied/,
+        SCRUB_ERROR_PREFIX,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -82,7 +82,7 @@ describe("scrubDigest", () => {
     );
     try {
       expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(
-        /scrub not applied/,
+        SCRUB_ERROR_PREFIX,
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });

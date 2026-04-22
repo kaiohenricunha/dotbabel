@@ -1,19 +1,4 @@
-/**
- * Node-side wrapper around `plugins/dotclaude/scripts/handoff-scrub.sh`.
- *
- * The shell script is a stdin→stdout filter that prints `scrubbed:N` to
- * stderr and exits 0 on success. This wrapper feeds a digest string to it,
- * captures the redacted output, parses the count, and fails closed on any
- * deviation from that contract. Callers on a push path must propagate the
- * throw so the remote upload does not proceed with unscrubbed content.
- *
- * The three-state signal the remote binary emits (`[scrubbed N secrets]`,
- * `[scrubbed 0 secrets]`, `[scrub not applied]`) lives in the caller —
- * this module only distinguishes "scrubbed with count N" from "throw".
- */
-
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,6 +12,12 @@ export const DEFAULT_SCRUB_SCRIPT = resolvePath(
   "scripts",
   "handoff-scrub.sh",
 );
+
+/**
+ * Message prefix on every throw from this module. Callers (and tests) match
+ * on it to recognise fail-closed failures before surfacing them to the user.
+ */
+export const SCRUB_ERROR_PREFIX = "scrub not applied";
 
 const COUNT_LINE_RE = /^scrubbed:(\d+)$/m;
 
@@ -48,12 +39,6 @@ const COUNT_LINE_RE = /^scrubbed:(\d+)$/m;
 export function scrubDigest(text, opts = {}) {
   const scriptPath = opts.scriptPath ?? DEFAULT_SCRUB_SCRIPT;
 
-  if (!existsSync(scriptPath)) {
-    throw new Error(
-      `scrub not applied: handoff-scrub.sh missing at ${scriptPath}`,
-    );
-  }
-
   const res = spawnSync(scriptPath, [], {
     input: text,
     encoding: "utf8",
@@ -62,26 +47,26 @@ export function scrubDigest(text, opts = {}) {
   });
 
   if (res.error) {
-    throw new Error(`scrub not applied: ${res.error.message}`);
+    throw new Error(`${SCRUB_ERROR_PREFIX}: ${res.error.message}`);
   }
   if (typeof res.status !== "number" || res.status !== 0) {
     const stderr = (res.stderr ?? "").trim();
     throw new Error(
-      `scrub not applied: handoff-scrub.sh exited ${res.status}${stderr ? `: ${stderr}` : ""}`,
+      `${SCRUB_ERROR_PREFIX}: handoff-scrub.sh exited ${res.status}${stderr ? `: ${stderr}` : ""}`,
     );
   }
 
   const match = (res.stderr ?? "").match(COUNT_LINE_RE);
   if (!match) {
     throw new Error(
-      "scrub not applied: handoff-scrub.sh did not report a `scrubbed:N` count on stderr",
+      `${SCRUB_ERROR_PREFIX}: handoff-scrub.sh did not report a \`scrubbed:N\` count on stderr`,
     );
   }
 
   const count = Number(match[1]);
   if (!Number.isInteger(count) || count < 0) {
     throw new Error(
-      `scrub not applied: unparseable scrubbed count ${JSON.stringify(match[1])}`,
+      `${SCRUB_ERROR_PREFIX}: unparseable scrubbed count ${JSON.stringify(match[1])}`,
     );
   }
 
