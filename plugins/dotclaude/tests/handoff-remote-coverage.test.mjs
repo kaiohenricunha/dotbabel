@@ -462,12 +462,27 @@ describe("loadPersistedEnv", () => {
     expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("good-val");
   });
 
+  it("uses XDG_CONFIG_HOME when set", () => {
+    const origXDG = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = "/tmp/test-xdg-config";
+    existsSync.mockReturnValueOnce(false);
+    try {
+      expect(() => lib.loadPersistedEnv()).not.toThrow();
+    } finally {
+      if (origXDG !== undefined) {
+        process.env.XDG_CONFIG_HOME = origXDG;
+      } else {
+        delete process.env.XDG_CONFIG_HOME;
+      }
+    }
+  });
+
   it("falls back to HOME when XDG_CONFIG_HOME is unset", () => {
     const origXDG = process.env.XDG_CONFIG_HOME;
     delete process.env.XDG_CONFIG_HOME;
     existsSync.mockReturnValueOnce(false);
     expect(() => lib.loadPersistedEnv()).not.toThrow();
-    process.env.XDG_CONFIG_HOME = origXDG;
+    if (origXDG !== undefined) process.env.XDG_CONFIG_HOME = origXDG;
   });
 
   it("falls back to empty string when both XDG_CONFIG_HOME and HOME are unset", () => {
