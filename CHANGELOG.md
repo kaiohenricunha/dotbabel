@@ -4,6 +4,12 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- **handoff:** push/pull now auto-run preflight on first use within a 5-minute window; `--verify` forces re-run. `doctor` verb unchanged.
+
 ## [0.11.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.10.0...v0.11.0) (2026-04-20)
 
 

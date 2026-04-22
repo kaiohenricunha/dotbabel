@@ -90,9 +90,9 @@ const CLIS = new Set(["claude", "copilot", "codex"]);
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [<query>|push|pull|list|doctor|remote-list|search] [args...] [--from <cli>] [--to <cli>] [--tag <label>] [--cli <cli>] [--since <ISO>] [--limit <N>]",
+    "dotclaude handoff [<query>|push|pull|list|doctor|remote-list|search] [args...] [--from <cli>] [--to <cli>] [--tag <label>] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify]",
   description:
-    "Cross-agent and cross-machine session handoff. Bare <query> emits a <handoff> block for local cross-agent. push/pull/list handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO).",
+    "Cross-agent and cross-machine session handoff. Bare <query> emits a <handoff> block for local cross-agent. push/pull/list handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/pull auto-run a preflight check (cached 5 min); --verify forces re-run.",
   flags: {
     tag: { type: "string" },
     from: { type: "string" },
@@ -103,6 +103,7 @@ const META = {
     "out-dir": { type: "string" },
     local: { type: "boolean" },
     remote: { type: "boolean" },
+    verify: { type: "boolean" },
   },
 };
 
@@ -655,8 +656,16 @@ async function main() {
     if (fallbackNote) process.stderr.write(fallbackNote + "\n");
 
     const tag = argv.flags.tag ? String(argv.flags.tag) : null;
+    const verify = Boolean(argv.flags.verify);
+    const verbose = Boolean(argv.verbose);
     try {
-      const result = await pushRemote({ cli: sessionHit.cli, path: sessionHit.path, tag });
+      const result = await pushRemote({
+        cli: sessionHit.cli,
+        path: sessionHit.path,
+        tag,
+        verify,
+        verbose,
+      });
       process.stdout.write(
         `${result.branch}\n${result.url}\n${result.description}\n[scrubbed ${result.scrubbedCount} secrets]\n`,
       );
@@ -667,8 +676,10 @@ async function main() {
   }
 
   if (first === "pull") {
+    const verify = Boolean(argv.flags.verify);
+    const verbose = Boolean(argv.verbose);
     try {
-      const hit = await pullRemote(second, fromCli);
+      const hit = await pullRemote(second, fromCli, { verify, verbose });
       const { content } = fetchRemoteBranch(hit.branch);
       process.stdout.write(content.endsWith("\n") ? content : content + "\n");
       process.exit(EXIT_CODES.OK);

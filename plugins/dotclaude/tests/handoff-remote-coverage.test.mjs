@@ -12,7 +12,9 @@ vi.mock("node:fs", () => ({
   mkdirSync: vi.fn(),
   mkdtempSync: vi.fn().mockReturnValue("/tmp/mock-dir"),
   readFileSync: vi.fn().mockReturnValue(""),
+  renameSync: vi.fn(),
   rmSync: vi.fn(),
+  unlinkSync: vi.fn(),
   writeFileSync: vi.fn(),
 }));
 vi.mock("node:readline", () => ({
@@ -730,11 +732,27 @@ describe("pullRemote", () => {
     readFileSync.mockReturnValueOnce(description);
   }
 
+  // Preflight runs first on pullRemote and reads the doctor cache via
+  // existsSync + readFileSync. Prime a cache-hit so preflight returns silently
+  // and does not consume any spawnSync mock that was queued for ls-remote.
+  function primePreflightCacheHit() {
+    existsSync.mockReturnValueOnce(true);
+    readFileSync.mockReturnValueOnce(
+      JSON.stringify({
+        version: 1,
+        timestamp: new Date().toISOString(),
+        repo: "https://github.com/x/y.git",
+        status: "ok",
+      }),
+    );
+  }
+
   beforeEach(() => {
     resetMockQueues();
     process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
     exitSpy = mockExit();
     stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    primePreflightCacheHit();
   });
   afterEach(() => {
     exitSpy.mockRestore();

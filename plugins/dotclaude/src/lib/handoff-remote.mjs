@@ -25,6 +25,7 @@ import {
 } from "node:fs";
 
 import { scrubDigest } from "./handoff-scrub.mjs";
+import { autoPreflight } from "./handoff-preflight.mjs";
 
 // ---- constants ---------------------------------------------------------
 
@@ -547,8 +548,9 @@ export function requireTransportRepoStrict() {
 // ---- remote I/O --------------------------------------------------------
 
 /** Push a local session to the transport repo as a handoff branch. */
-export async function pushRemote({ cli, path: sessionFile, tag }) {
+export async function pushRemote({ cli, path: sessionFile, tag, verify = false, verbose = false }) {
   let repoUrl = await requireTransportRepo();
+  autoPreflight({ repo: repoUrl, verify, verbose });
   const meta = extractMeta(cli, sessionFile);
   const prompts = extractPrompts(cli, sessionFile);
   const turns = extractTurns(cli, sessionFile);
@@ -702,7 +704,9 @@ export function matchesQuery(candidate, query) {
 }
 
 /** Resolve a remote handoff branch by query, pick interactively on collision. */
-export async function pullRemote(query, fromCli = null) {
+export async function pullRemote(query, fromCli = null, { verify = false, verbose = false } = {}) {
+  const repoUrl = requireTransportRepoStrict();
+  autoPreflight({ repo: repoUrl, verify, verbose });
   let candidates = listRemoteCandidates();
   if (candidates.length === 0) fail(2, "no handoffs found on transport");
 
