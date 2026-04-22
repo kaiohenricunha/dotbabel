@@ -56,6 +56,16 @@ remote verb is explicit.
 full UUID, short UUID (first 8 hex), `latest`, Claude `customTitle`
 alias, Codex `thread_name` alias.
 
+**`latest` is host-scoped.** When the binary identifies the invoking
+CLI (via `--from` or host-specific env-var probes such as `CLAUDECODE=1`,
+`CLAUDE_CODE_SSE_PORT`, `CODEX_*`, `COPILOT_*`, and `GITHUB_COPILOT_*`),
+`latest` resolves within that CLI's root only — so inside Claude Code
+it picks the newest `~/.claude/projects` session even when a newer
+Codex JSONL exists on disk. Explicit UUIDs and aliases are never
+narrowed. Without a host signal `latest` falls back to the union
+resolver (globally newest across all roots) and stderr names the
+picked session. Pass `--from <cli>` to force a specific root.
+
 **Collision model.** When `<query>` matches multiple roots (or two
 remote handoffs on `pull`): TTY → interactive prompt; non-TTY → exit 2
 with a TSV candidate list on stderr.

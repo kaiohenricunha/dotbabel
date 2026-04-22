@@ -97,6 +97,55 @@ teardown() {
   [ "$status" -eq 2 ]
 }
 
+# -- `latest` host-scoping (#85) -----------------------------------------
+
+@test "<query> latest without host signal picks globally newest (across roots)" {
+  # setup() sleeps between fixtures so the codex file is newer. No host
+  # signal → cross-root winner = codex/bbbb2222.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
+    node "$BIN" latest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bbbb2222"* ]]
+  [[ "$stderr" == *"host not detected"* ]]
+}
+
+@test "<query> latest with CLAUDECODE=1 narrows to claude root" {
+  # The outer-shell probe fires; `latest` must resolve within ~/.claude
+  # only, so aaaa1111 wins even though the codex fixture is newer on disk.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
+    node "$BIN" latest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"aaaa1111"* ]]
+  [[ "$output" != *"bbbb2222"* ]]
+  [[ "$stderr" == *"latest claude session"* ]]
+  [[ "$stderr" == *"aaaa1111"* ]]
+}
+
+@test "<query> latest --from codex overrides host detection" {
+  # --from must outrank detectedHost, mirroring push's precedence.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
+    node "$BIN" latest --from codex
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bbbb2222"* ]]
+  [[ "$output" != *"aaaa1111"* ]]
+  [[ "$stderr" == *"--from codex"* ]]
+}
+
+@test "<query> latest --from with unknown cli exits 64" {
+  run node "$BIN" latest --from bogus
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--from must be one of"* ]]
+}
+
+@test "<query> non-latest: host detection does NOT narrow (UUID lookup stays global)" {
+  # A short-UUID is unambiguous — narrowing by host would hide a valid
+  # cross-agent match. CLAUDECODE=1 must not prevent bbbb2222 lookup.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
+    node "$BIN" bbbb2222
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bbbb2222"* ]]
+}
+
 @test "<query>: collision across CLIs on non-TTY stdin exits 2 with candidate list" {
   # Introduce collision: claude customTitle "both" + codex thread_name "both"
   printf '{"type":"custom-title","customTitle":"both","sessionId":"aaaa1111-1111-1111-1111-111111111111"}\n' \

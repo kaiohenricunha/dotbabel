@@ -457,6 +457,22 @@ function shortIdFromPath(path) {
   return m ? m[1] : "?";
 }
 
+// Centralizes the "latest" precedence (--from > detectedHost > union)
+// so push and bare <query> can't drift. Returns {hit, note}; note is
+// always populated because every branch emits a stderr diff-aid.
+async function resolveLatestWithHostScope({ fromCli, detectedHost }) {
+  const narrowTo = fromCli ?? (detectedHost !== "unknown" ? detectedHost : null);
+  if (narrowTo) {
+    const hit = resolveNarrowed(narrowTo, "latest");
+    const shortId = shortIdFromPath(hit.path);
+    const prefix = fromCli ? `using --from ${narrowTo} override, ` : "";
+    return { hit, note: `${prefix}latest ${narrowTo} session: ${shortId}` };
+  }
+  const hit = await resolveAny("latest");
+  const shortId = shortIdFromPath(hit.path);
+  return { hit, note: `host not detected, using latest across all clis: ${shortId}` };
+}
+
 async function main() {
   if (argv.positional.length === 0) {
     process.stdout.write(helpText(META) + "\n");
@@ -638,22 +654,10 @@ async function main() {
         ? resolveNarrowed(fromCli, explicitQuery)
         : await resolveAny(explicitQuery);
     } else {
-      // No query: pick a default session. Prefer --from, then the
-      // detected host, then the union resolver. Each fallback emits
-      // a one-line stderr note so the user can diff two runs and
-      // see why the pick changed.
-      const narrowTo = fromCli ?? (detectedHost !== "unknown" ? detectedHost : null);
-      if (narrowTo) {
-        sessionHit = resolveNarrowed(narrowTo, "latest");
-        const shortId = shortIdFromPath(sessionHit.path);
-        fallbackNote = fromCli
-          ? `using --from ${narrowTo} override, latest session: ${shortId}`
-          : `no current-session signal in ${narrowTo}, using latest ${narrowTo} session: ${shortId}`;
-      } else {
-        sessionHit = await resolveAny("latest");
-        const shortId = shortIdFromPath(sessionHit.path);
-        fallbackNote = `host not detected, using latest across all clis: ${shortId}`;
-      }
+      ({ hit: sessionHit, note: fallbackNote } = await resolveLatestWithHostScope({
+        fromCli,
+        detectedHost,
+      }));
     }
     if (fallbackNote) process.stderr.write(fallbackNote + "\n");
 
@@ -762,8 +766,16 @@ async function main() {
   }
 
   // ---- bare <query>: local cross-agent (implicit digest) -----------------
+  // `latest` is host-scoped (explicit UUIDs/aliases pass through — narrowing
+  // them could hide a legitimate cross-agent match).
   const query = first;
-  const hit = await resolveAny(query);
+  let hit, fallbackNote;
+  if (query === "latest") {
+    ({ hit, note: fallbackNote } = await resolveLatestWithHostScope({ fromCli, detectedHost }));
+  } else {
+    hit = await resolveAny(query);
+  }
+  if (fallbackNote) process.stderr.write(fallbackNote + "\n");
   const meta = extractMeta(hit.cli, hit.path);
   const prompts = extractPrompts(hit.cli, hit.path);
   const turns = extractTurns(hit.cli, hit.path, limit);
