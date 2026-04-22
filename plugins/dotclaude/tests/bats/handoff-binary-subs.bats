@@ -178,7 +178,6 @@ teardown() {
 }
 
 @test "search --fixed makes regex metacharacters literal (no regex parse error, only literal match)" {
-  # Seed a claude session whose prompt contains literal parens.
   local fixed_home
   fixed_home=$(mktemp -d)
   mkdir -p "$fixed_home/.claude/projects/-home-u-demo"
@@ -226,7 +225,6 @@ EOF
 }
 
 @test "search matches terms that only appear in assistant turns" {
-  # Word appears only in an assistant text block, never in user prompts.
   local asst_home
   asst_home=$(mktemp -d)
   mkdir -p "$asst_home/.claude/projects/-home-u-demo"
@@ -239,6 +237,28 @@ EOF
   [[ "$output" == *"ffff6666"* ]]
   [[ "$output" == *"assistant:"* ]]
   rm -rf "$asst_home"
+}
+
+@test "search finds a match in an early assistant turn past extractTurns' default 20-turn window" {
+  # Regression: earlier impl asked extractTurns for the default (last 20
+  # turns) while calling .find() to locate the first match. A session with
+  # >20 assistant turns and the target term only in turn #1 silently
+  # returned no results. Seed such a session and confirm the hit comes
+  # through with the unbounded-turns fix.
+  local deep_home
+  deep_home=$(mktemp -d)
+  mkdir -p "$deep_home/.claude/projects/-home-u-demo"
+  local jsonl="$deep_home/.claude/projects/-home-u-demo/deadbeef-beef-beef-beef-deadbeefbeef.jsonl"
+  printf '%s\n' '{"type":"user","cwd":"/home/u/demo","sessionId":"deadbeef-beef-beef-beef-deadbeefbeef","version":"2.1","message":{"content":"driving prompt"}}' > "$jsonl"
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"Glimfarble is the unique word we are looking for"}]}}' >> "$jsonl"
+  for i in $(seq 1 40); do
+    printf '{"type":"assistant","message":{"content":[{"type":"text","text":"filler turn %s"}]}}\n' "$i" >> "$jsonl"
+  done
+  run env HOME="$deep_home" node "$BIN" search Glimfarble
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"deadbeef"* ]]
+  [[ "$output" == *"assistant:"* ]]
+  rm -rf "$deep_home"
 }
 
 # ---- self-bootstrap ----------------------------------------------------

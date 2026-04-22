@@ -157,12 +157,14 @@ prompts_claude() {
 turns_claude() {
   local file="$1"
   local limit="${2:-20}"
+  local tail_arg="$limit"
+  [[ "$limit" == "0" ]] && tail_arg="+1"
   jq -c '
     select(.type == "assistant")
     | .message.content
     | (map(select(.type == "text") | .text) | join("\n"))
     | select(length > 0)
-  ' "$file" 2>/dev/null | tail -n "$limit"
+  ' "$file" 2>/dev/null | tail -n "$tail_arg"
 }
 
 # -- copilot --------------------------------------------------------------
@@ -228,11 +230,13 @@ prompts_copilot() {
 turns_copilot() {
   local file="$1"
   local limit="${2:-20}"
+  local tail_arg="$limit"
+  [[ "$limit" == "0" ]] && tail_arg="+1"
   jq -c '
     select(.type == "assistant.message")
     | (.data.content // .data.text // "")
     | select(length > 0)
-  ' "$file" 2>/dev/null | tail -n "$limit"
+  ' "$file" 2>/dev/null | tail -n "$tail_arg"
 }
 
 # -- codex ----------------------------------------------------------------
@@ -275,13 +279,15 @@ prompts_codex() {
 turns_codex() {
   local file="$1"
   local limit="${2:-20}"
+  local tail_arg="$limit"
+  [[ "$limit" == "0" ]] && tail_arg="+1"
   jq -c '
     select(.type == "response_item"
            and .payload.type == "message"
            and .payload.role == "assistant")
     | .payload.content[0].text // ""
     | select(length > 0)
-  ' "$file" 2>/dev/null | tail -n "$limit"
+  ' "$file" 2>/dev/null | tail -n "$tail_arg"
 }
 
 # -- dispatch -------------------------------------------------------------

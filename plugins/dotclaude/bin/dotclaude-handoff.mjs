@@ -30,7 +30,7 @@
 
 import { parse, helpText } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
-import { version } from "../src/index.mjs";
+import { version, escapeRegex } from "../src/index.mjs";
 import {
   // subprocess primitives
   runScript,
@@ -372,19 +372,17 @@ function truncate(s, max) {
 }
 
 /**
- * Port of SKILL.md's `search` algorithm (L258-324 in v0.8.0). Two-pass
- * design: fast raw-regex pass over JSONL to narrow candidates, then a
- * clean pass over extractPrompts + extractTurns output (tool-use and
- * env-context noise already stripped by handoff-extract.sh) to confirm
- * the hit. `fixed` escapes regex metachars for literal-string queries.
+ * Two-pass search: fast raw-regex pass over JSONL to narrow candidates,
+ * then a clean pass over extractPrompts + extractTurns output (tool-use
+ * and env-context noise already stripped by handoff-extract.sh) to
+ * confirm the hit. `fixed` escapes regex metachars for literal queries.
  *
  * Returns a newest-first array of {cli, short_id, session_id, path,
  * cwd, mtime, match_snippet} objects capped at `limit`. The binary
  * caller handles table rendering vs `--json` serialization.
  */
 function searchSessions({ query, cli, since, limit, fixed }) {
-  const pattern = fixed ? query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") : query;
-  const re = new RegExp(pattern, "i");
+  const re = new RegExp(fixed ? escapeRegex(query) : query, "i");
   const sinceMs = parseSinceOrFail(since, { defaultDays: 30 });
   const clis = cli ? [cli] : Object.keys(CLI_LAYOUTS);
   const out = [];
@@ -409,7 +407,7 @@ function searchSessions({ query, cli, since, limit, fixed }) {
       }
       if (!re.test(raw)) continue;
       const promptHit = extractPrompts(c, file).find((p) => re.test(p));
-      const turnHit = promptHit ? null : extractTurns(c, file).find((t) => re.test(t));
+      const turnHit = promptHit ? null : extractTurns(c, file, 0).find((t) => re.test(t));
       if (!promptHit && !turnHit) continue;
       const snippet = promptHit
         ? truncate(`user: ${promptHit}`, 80)
@@ -493,6 +491,17 @@ async function resolveLatestWithHostScope({ fromCli, detectedHost }) {
   return { hit, note: `host not detected, using latest across all clis: ${shortId}` };
 }
 
+// Resolve the CLI filter for sub-commands that accept `--from` with a
+// `--cli` legacy alias (search, remote-list). Fails USAGE on an unknown
+// value. Returns null when neither flag was passed.
+function resolveFilterCli() {
+  const v = fromCli ?? (argv.flags.cli ? String(argv.flags.cli) : null);
+  if (v !== null && !CLIS.has(v)) {
+    fail(EXIT_CODES.USAGE, `--from must be one of: ${[...CLIS].join(", ")}`);
+  }
+  return v;
+}
+
 async function main() {
   if (argv.positional.length === 0) {
     process.stdout.write(helpText(META) + "\n");
@@ -545,11 +554,7 @@ async function main() {
     }
     const enriched = enrichWithDescriptions(candidates);
     const sinceMs = parseSinceOrFail(argv.flags.since, { defaultDays: 30 });
-    const filterCli =
-      fromCli ?? (argv.flags.cli ? String(argv.flags.cli) : null);
-    if (filterCli !== null && !CLIS.has(filterCli)) {
-      fail(EXIT_CODES.USAGE, `--from must be one of: ${[...CLIS].join(", ")}`);
-    }
+    const filterCli = resolveFilterCli();
     const rows = [];
     for (const c of enriched) {
       const decoded = decodeDescription(c.description);
@@ -587,11 +592,7 @@ async function main() {
   if (first === "search") {
     const query = second;
     if (!query) fail(EXIT_CODES.USAGE, "search requires a <query> argument");
-    const filterCli =
-      fromCli ?? (argv.flags.cli ? String(argv.flags.cli) : null);
-    if (filterCli !== null && !CLIS.has(filterCli)) {
-      fail(EXIT_CODES.USAGE, `--from must be one of: ${[...CLIS].join(", ")}`);
-    }
+    const filterCli = resolveFilterCli();
     const hits = searchSessions({
       query,
       cli: filterCli,
