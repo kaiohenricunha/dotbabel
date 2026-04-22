@@ -126,9 +126,22 @@ describe("extractMeta", () => {
 // ---- extractLines / extractPrompts / extractTurns ----------------------
 
 describe("extractLines", () => {
-  it("returns non-empty lines on success", () => {
-    spawnSync.mockReturnValueOnce({ status: 0, stdout: "line1\nline2\n\n", stderr: "" });
-    expect(lib.extractLines("prompts", "claude", "/f")).toEqual(["line1", "line2"]);
+  it("parses JSON-encoded strings, one per line, preserving embedded newlines", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: '"line1"\n"multi\\nline"\n\n',
+      stderr: "",
+    });
+    expect(lib.extractLines("prompts", "claude", "/f")).toEqual(["line1", "multi\nline"]);
+  });
+
+  it("skips malformed lines without crashing", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: '"ok"\nnot-json\n"also-ok"\n',
+      stderr: "",
+    });
+    expect(lib.extractLines("prompts", "claude", "/f")).toEqual(["ok", "also-ok"]);
   });
 
   it("returns [] on non-zero exit", () => {
@@ -147,19 +160,19 @@ describe("extractLines", () => {
 
 describe("extractPrompts", () => {
   it("delegates to extractLines with sub=prompts", () => {
-    spawnSync.mockReturnValueOnce({ status: 0, stdout: "user said hi\n", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: '"user said hi"\n', stderr: "" });
     expect(lib.extractPrompts("claude", "/f")).toEqual(["user said hi"]);
   });
 });
 
 describe("extractTurns", () => {
   it("delegates to extractLines with sub=turns (no limit)", () => {
-    spawnSync.mockReturnValueOnce({ status: 0, stdout: "assistant replied\n", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: '"assistant replied"\n', stderr: "" });
     expect(lib.extractTurns("claude", "/f")).toEqual(["assistant replied"]);
   });
 
   it("passes limit as extra arg when provided", () => {
-    spawnSync.mockReturnValueOnce({ status: 0, stdout: "t1\nt2\n", stderr: "" });
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: '"t1"\n"t2"\n', stderr: "" });
     lib.extractTurns("claude", "/f", 5);
     expect(spawnSync).toHaveBeenCalledWith(
       expect.any(String),

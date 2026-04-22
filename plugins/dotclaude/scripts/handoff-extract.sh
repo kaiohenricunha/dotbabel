@@ -89,12 +89,21 @@ meta_claude() {
 }
 
 # Claude user prompts, scrubbed of system/command/tool noise.
-# Content may be string OR array of content blocks.
-# Noise filtering is done in jq on the full prompt text (not line-by-line)
-# so multi-line synthetic records are correctly dropped at the record level.
+#
+# Output: one JSON-encoded string per line (jq -c). Multi-line prompts stay
+# atomic as `"line one\nline two"`; the consumer parses each line via
+# JSON.parse. This is what fixes the "digest splits by line, not by message"
+# bug — the old jq -r contract emitted raw bytes and multi-line skill-body
+# messages turned into N bogus "prompts".
+#
+# Slash-command handling: a `<command-name>/X</command-name>` wrapper is
+# rendered as compact `/X <args>` form, and the immediately-following
+# skill body (same promptId) is dropped. This requires a single-pass
+# slurp + reduce so we can track "previous record was a command wrapper"
+# across the input stream.
 prompts_claude() {
   local file="$1"
-  jq -r '
+  jq -c -n '
     def text_of:
       if type == "string" then .
       else (map(select(.type == "text") | .text) | join("\n"))
@@ -102,9 +111,7 @@ prompts_claude() {
     def is_noise:
       ltrimstr(" ") | ltrimstr("\t") | ltrimstr("\n") |
       ( startswith("<local-command-caveat>")
-        or startswith("<command-name>")
-        or startswith("<command-message>")
-        or startswith("<command-args>")
+        or startswith("<local-command-stdout>")
         or startswith("<stdin>")
         or startswith("<system-reminder>")
         or startswith("<user-prompt-submit-hook>")
@@ -115,18 +122,39 @@ prompts_claude() {
         or startswith("<event>")
         or startswith("If this event is something the user")
       );
-    select(.type == "user")
-    | .message.content
-    | text_of
-    | select(length > 0)
-    | select(is_noise | not)
+    def is_command_wrapper:
+      test("<command-name>") or test("<command-message>");
+    def compact_command:
+      (capture("<command-name>\\s*(?<n>[^<]+?)\\s*</command-name>") // null) as $n
+      | (capture("<command-args>\\s*(?<a>[^<]*?)\\s*</command-args>") // null) as $a
+      | if $n == null then "/unknown"
+        elif $a == null or ($a.a // "") == "" then $n.n
+        else "\($n.n) \($a.a)"
+        end;
+    [inputs | select(.type == "user")]
+    | reduce .[] as $r (
+        {out: [], prevWasCommand: false, prevPid: null};
+        ($r.message.content | text_of) as $t
+        | ($r.promptId // "") as $pid
+        | if $t == "" or ($t | is_noise) then .
+          elif ($t | is_command_wrapper) then
+            .out += [$t | compact_command]
+            | .prevWasCommand = true
+            | .prevPid = $pid
+          elif .prevWasCommand and .prevPid == $pid then
+            .prevWasCommand = false
+          else
+            .out += [$t] | .prevWasCommand = false | .prevPid = $pid
+          end
+      )
+    | .out[]
   ' "$file" 2>/dev/null
 }
 
 turns_claude() {
   local file="$1"
   local limit="${2:-20}"
-  jq -r '
+  jq -c '
     select(.type == "assistant")
     | .message.content
     | (map(select(.type == "text") | .text) | join("\n"))
@@ -184,9 +212,10 @@ meta_copilot() {
 
 # Always prefer .data.content (the raw user text) over .data.transformedContent
 # (which wraps the prompt in system-reminder boilerplate).
+# Output: one JSON-encoded string per line so multi-line prompts stay atomic.
 prompts_copilot() {
   local file="$1"
-  jq -r '
+  jq -c '
     select(.type == "user.message")
     | .data.content // ""
     | select(length > 0)
@@ -196,7 +225,7 @@ prompts_copilot() {
 turns_copilot() {
   local file="$1"
   local limit="${2:-20}"
-  jq -r '
+  jq -c '
     select(.type == "assistant.message")
     | (.data.content // .data.text // "")
     | select(length > 0)
@@ -229,7 +258,8 @@ prompts_codex() {
   local file="$1"
   # The first user message in every Codex session is an <environment_context>
   # block. Filter it out; every other user turn stays.
-  jq -r '
+  # Output: one JSON-encoded string per line so multi-line prompts stay atomic.
+  jq -c '
     select(.type == "response_item"
            and .payload.type == "message"
            and .payload.role == "user")
@@ -242,7 +272,7 @@ prompts_codex() {
 turns_codex() {
   local file="$1"
   local limit="${2:-20}"
-  jq -r '
+  jq -c '
     select(.type == "response_item"
            and .payload.type == "message"
            and .payload.role == "assistant")

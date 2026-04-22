@@ -14,14 +14,23 @@ setup() {
   TEST_DIR=$(mktemp -d)
 
   # --- Claude fixture: mix of real prompts + noise records ---
+  # promptId groups model Claude Code's real transcript shape:
+  #   - p-caveat: synthetic noise only
+  #   - p-typed:  real typed user prompts (one multi-line)
+  #   - p-slash:  a typed prompt + a /slash invocation + its skill body
   CLAUDE_FILE="$TEST_DIR/claude.jsonl"
   cat > "$CLAUDE_FILE" <<'EOF'
-{"type":"user","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","version":"2.1","message":{"content":"<local-command-caveat>Caveat: this was auto-generated</local-command-caveat>"}}
-{"type":"user","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"<command-name>/clear</command-name>"}}
-{"type":"user","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"Actually fix the retry loop"}}
-{"type":"user","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":[{"type":"tool_result","content":"file contents"}]}}
-{"type":"user","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":[{"type":"text","text":"<system-reminder>do not respond to this</system-reminder>"}]}}
-{"type":"user","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":[{"type":"text","text":"Run the full suite and report results"}]}}
+{"type":"user","promptId":"p-caveat","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","version":"2.1","message":{"content":"<local-command-caveat>Caveat: this was auto-generated</local-command-caveat>"}}
+{"type":"user","promptId":"p-typed","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"Actually fix the retry loop"}}
+{"type":"user","promptId":"p-typed","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":[{"type":"tool_result","content":"file contents"}]}}
+{"type":"user","promptId":"p-typed","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":[{"type":"text","text":"<system-reminder>do not respond to this</system-reminder>"}]}}
+{"type":"user","promptId":"p-typed","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":[{"type":"text","text":"Run the full suite and report\nevery failure with its stack trace"}]}}
+{"type":"user","promptId":"p-slash","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"oPEN pr"}}
+{"type":"user","promptId":"p-slash","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"<command-message>simplify</command-message>\n<command-name>/simplify</command-name>"}}
+{"type":"user","promptId":"p-slash","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"# Simplify: Code Review and Cleanup\n\nReview all changed files.\nEnd of skill body."}}
+{"type":"user","promptId":"p-slash","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"<command-message>review-pr</command-message>\n<command-name>/review-pr</command-name>\n<command-args>#80</command-args>"}}
+{"type":"user","promptId":"p-slash","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"Review a pull request: fetch comments, apply fixes.\nARGUMENTS: #80"}}
+{"type":"user","promptId":"p-bare","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"<command-name>/clear</command-name>"}}
 {"type":"assistant","message":{"content":[{"type":"text","text":"Sure, running tests now."}]}}
 {"type":"assistant","message":{"content":[{"type":"text","text":"All 205 tests passed."}]}}
 EOF
@@ -35,6 +44,7 @@ EOF
 {"type":"user.message","data":{"content":"First user prompt"}}
 {"type":"assistant.message","data":{"content":"First assistant reply"}}
 {"type":"user.message","data":{"content":"Second prompt","transformedContent":"<wrapped><system-reminder>ignore</system-reminder>Second prompt</wrapped>"}}
+{"type":"user.message","data":{"content":"Multi-line prompt\nwith two lines"}}
 EOF
   cat > "$COPILOT_DIR/workspace.yaml" <<'EOF'
 id: cccc3333-3333-3333-3333-333333333333
@@ -51,6 +61,7 @@ EOF
 {"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"Improve documentation in @README.md"}]}}
 {"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"I'll read README.md first."}]}}
 {"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"Go ahead"}]}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"text","text":"Refactor this:\n- step one\n- step two"}]}}
 {"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"Done."}]}}
 EOF
 
@@ -91,25 +102,53 @@ teardown() {
 
 # -- prompts --------------------------------------------------------------
 
-@test "prompts claude excludes local-command-caveat, command-name, tool_result, system-reminder" {
+@test "prompts claude excludes local-command-caveat, tool_result, system-reminder, and raw command-wrapper tags" {
   run "$EX" prompts claude "$CLAUDE_FILE"
   [ "$status" -eq 0 ]
   # Real prompts present:
   [[ "$output" == *"Actually fix the retry loop"* ]]
-  [[ "$output" == *"Run the full suite and report results"* ]]
+  [[ "$output" == *"Run the full suite and report"* ]]
+  [[ "$output" == *"oPEN pr"* ]]
   # Noise excluded:
   [[ "$output" != *"<local-command-caveat>"* ]]
   [[ "$output" != *"<command-name>"* ]]
+  [[ "$output" != *"<command-message>"* ]]
+  [[ "$output" != *"<command-args>"* ]]
   [[ "$output" != *"<system-reminder>"* ]]
   [[ "$output" != *"file contents"* ]]
 }
 
-@test "prompts claude count is 2 on the fixture (6 user records, 4 noisy)" {
+@test "prompts claude emits one JSON-encoded string per message (not per line)" {
   run "$EX" prompts claude "$CLAUDE_FILE"
   [ "$status" -eq 0 ]
+  # Real prompts (3) + compact slash forms (3) = 6 records.
   local n
   n=$(printf '%s\n' "$output" | grep -cv '^$')
-  [ "$n" -eq 2 ]
+  [ "$n" -eq 6 ]
+}
+
+@test "prompts claude keeps multi-line messages atomic (not split by line)" {
+  run "$EX" prompts claude "$CLAUDE_FILE"
+  [ "$status" -eq 0 ]
+  # JSON-encoded two-line message — newline is escaped as \n inside one quoted string.
+  [[ "$output" == *'"Run the full suite and report\nevery failure with its stack trace"'* ]]
+}
+
+@test "prompts claude renders /slash commands in compact form with args" {
+  run "$EX" prompts claude "$CLAUDE_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"/simplify"'* ]]
+  [[ "$output" == *'"/review-pr #80"'* ]]
+  [[ "$output" == *'"/clear"'* ]]
+}
+
+@test "prompts claude drops skill body that follows a command wrapper" {
+  run "$EX" prompts claude "$CLAUDE_FILE"
+  [ "$status" -eq 0 ]
+  # Skill body content must not leak into the prompt list.
+  [[ "$output" != *"End of skill body"* ]]
+  [[ "$output" != *"Simplify: Code Review"* ]]
+  [[ "$output" != *"ARGUMENTS: #80"* ]]
 }
 
 @test "prompts copilot extracts .data.content (not transformedContent)" {
@@ -121,12 +160,30 @@ teardown() {
   [[ "$output" != *"<wrapped>"* ]]
 }
 
+@test "prompts copilot keeps multi-line messages atomic" {
+  run "$EX" prompts copilot "$COPILOT_FILE"
+  [ "$status" -eq 0 ]
+  local n
+  n=$(printf '%s\n' "$output" | grep -cv '^$')
+  [ "$n" -eq 3 ]
+  [[ "$output" == *'"Multi-line prompt\nwith two lines"'* ]]
+}
+
 @test "prompts codex excludes environment_context" {
   run "$EX" prompts codex "$CODEX_FILE"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Improve documentation in @README.md"* ]]
   [[ "$output" == *"Go ahead"* ]]
   [[ "$output" != *"<environment_context>"* ]]
+}
+
+@test "prompts codex keeps multi-line messages atomic" {
+  run "$EX" prompts codex "$CODEX_FILE"
+  [ "$status" -eq 0 ]
+  local n
+  n=$(printf '%s\n' "$output" | grep -cv '^$')
+  [ "$n" -eq 3 ]
+  [[ "$output" == *'"Refactor this:\n- step one\n- step two"'* ]]
 }
 
 # -- turns (assistant tail) -----------------------------------------------

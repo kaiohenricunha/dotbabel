@@ -108,7 +108,15 @@ export function extractMeta(cli, file) {
   }
 }
 
-/** Extract newline-delimited output via handoff-extract.sh <sub>. */
+/**
+ * Extract JSON-encoded-per-line output via handoff-extract.sh <sub>.
+ *
+ * `prompts` and `turns` emit one JSON-encoded string per line so that
+ * multi-line messages stay atomic — splitting on `\n` here would
+ * regress #84 by turning one skill-body message into N bogus "prompts".
+ * Lines that fail to parse are skipped (defensive — the script owns the
+ * contract).
+ */
 export function extractLines(sub, cli, file, extra = []) {
   const r = runScript(EXTRACT_SH, [sub, cli, file, ...extra]);
   if (r.status !== 0) {
@@ -116,7 +124,17 @@ export function extractLines(sub, cli, file, extra = []) {
       process.stderr.write(`dotclaude-handoff: ${sub}: ${r.stderr.trim()}\n`);
     return [];
   }
-  return r.stdout.split("\n").filter((line) => line.trim().length > 0);
+  const out = [];
+  for (const line of r.stdout.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const v = JSON.parse(line);
+      if (typeof v === "string" && v.length > 0) out.push(v);
+    } catch {
+      // Script contract broken — skip the line rather than crash the digest.
+    }
+  }
+  return out;
 }
 
 /** Extract user prompt lines from a session file. */
