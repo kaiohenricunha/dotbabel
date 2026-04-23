@@ -287,10 +287,10 @@ function buildDigestJson(meta, prompts, turns, toCli) {
  * - `out === undefined` or `out === "-"` → stdout, caller provides trailing `\n`.
  * - `out === "auto"` → write a disk envelope to
  *   `<git-root>/docs/handoffs/<YYYY-MM-DD>-<cli>-<short>.md` (falls back to
- *   `$HOME/.claude/handoffs/` off-repo). Kind switches the top heading.
+ *   `$HOME/.claude/handoffs/` off-repo). `kind` switches the heading.
  * - any other string → absolute/relative path; body written verbatim.
  */
-function writeOutput(body, out, meta, kind, { prompts, sourcePath, toCli }) {
+function writeOutput(body, out, meta, { kind, prompts, sourcePath, toCli }) {
   if (out === undefined || out === "-") {
     process.stdout.write(body.endsWith("\n") ? body : body + "\n");
     return;
@@ -611,6 +611,13 @@ function resolveFilterCli() {
   return v;
 }
 
+function warnDeprecated(old, replacement) {
+  if (process.env.DOTCLAUDE_QUIET === "1") return;
+  process.stderr.write(
+    `dotclaude-handoff: ${old} is deprecated — use \`${replacement}\` instead (removed in 0.14.0)\n`
+  );
+}
+
 async function main() {
   if (argv.positional.length === 0) {
     process.stdout.write(helpText(META) + "\n");
@@ -863,14 +870,14 @@ async function main() {
       const body = argv.json
         ? JSON.stringify({ origin: meta, user_prompts: prompts }, null, 2)
         : renderDescribeMarkdown(meta, prompts);
-      writeOutput(body, out, meta, "summary", { prompts, sourcePath: hit.path, toCli });
+      writeOutput(body, out, meta, { kind: "summary", prompts, sourcePath: hit.path, toCli });
       process.exit(EXIT_CODES.OK);
     }
     const turns = extractTurns(hit.cli, hit.path, limit);
     const body = argv.json
       ? JSON.stringify(buildDigestJson(meta, prompts, turns, toCli), null, 2)
       : renderHandoffBlock(meta, prompts, turns, toCli);
-    writeOutput(body, out, meta, "digest", { prompts, sourcePath: hit.path, toCli });
+    writeOutput(body, out, meta, { kind: "digest", prompts, sourcePath: hit.path, toCli });
     process.exit(EXIT_CODES.OK);
   }
 
@@ -899,15 +906,13 @@ async function main() {
     // (#87). Emit a stderr pointer unless the caller opts out via
     // DOTCLAUDE_QUIET=1 (CI pipelines that can't update yet). `resolve`
     // stays as a scripting primitive and is not deprecated.
-    if (sub !== "resolve" && process.env.DOTCLAUDE_QUIET !== "1") {
+    if (sub !== "resolve") {
       const replacement = {
         describe: `pull ${id} --summary${argv.json ? " --json" : ""}`,
         digest: `pull ${id}`,
         file: `pull ${id} -o auto`,
       }[sub];
-      process.stderr.write(
-        `dotclaude-handoff: \`${sub} ${cli} ${id}\` is deprecated — use \`${replacement}\` instead (removed in 0.14.0)\n`
-      );
+      warnDeprecated(`\`${sub} ${cli} ${id}\``, replacement);
     }
     const { path } = resolveNarrowed(cli, id);
     if (sub === "resolve") {
@@ -974,11 +979,7 @@ async function main() {
   // Collapsed under `pull` for a four-verb surface. Behavior unchanged
   // (digest emitted to stdout); DOTCLAUDE_QUIET=1 suppresses the notice.
   const query = first;
-  if (process.env.DOTCLAUDE_QUIET !== "1") {
-    process.stderr.write(
-      `dotclaude-handoff: bare \`<query>\` is deprecated — use \`pull ${query}\` instead (removed in 0.14.0)\n`
-    );
-  }
+  warnDeprecated("bare `<query>`", `pull ${query}`);
   let hit, fallbackNote;
   if (query === "latest") {
     ({ hit, note: fallbackNote } = await resolveLatestWithHostScope({ fromCli, detectedHost }));
