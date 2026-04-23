@@ -18,13 +18,8 @@
 
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import {
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
+import { PreflightHandledError } from "./handoff-errors.mjs";
+import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 
 import { runScript } from "./handoff-remote.mjs";
 import { debug } from "./debug.mjs";
@@ -55,10 +50,7 @@ function resolveDoctorScript() {
 
 /** Returns the directory that holds the preflight cache, honoring XDG_CACHE_HOME. */
 export function currentCacheDir() {
-  return join(
-    process.env.XDG_CACHE_HOME || join(process.env.HOME || "", ".cache"),
-    "dotclaude",
-  );
+  return join(process.env.XDG_CACHE_HOME || join(process.env.HOME || "", ".cache"), "dotclaude");
 }
 
 /** Returns the absolute path to the preflight cache file. */
@@ -144,7 +136,7 @@ export function autoPreflight({ repo, verify = false, verbose = false }) {
     // Always surface the remediation block — that's the whole point of doctor.
     if (r.stdout) process.stdout.write(r.stdout);
     if (r.stderr) process.stderr.write(r.stderr);
-    throw new Error("preflight failed");
+    throw new PreflightHandledError();
   }
 
   if (verbose) {

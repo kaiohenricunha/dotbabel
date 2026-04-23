@@ -7,6 +7,13 @@
  * Stages: preflight | resolve | scrub | upload | cleanup
  */
 
+/**
+ * Sentinel thrown by autoPreflight when the doctor script fails.
+ * The doctor already wrote its remediation block to stderr, so callers
+ * must NOT emit a second structured block for this error.
+ */
+export class PreflightHandledError extends Error {}
+
 export class HandoffError extends Error {
   /**
    * @param {{stage: string, cause: string, fix: string, retry: string}} fields
@@ -131,12 +138,13 @@ export function classifyGitError(rawMsg, verb, context = {}) {
  * @returns {string}
  */
 export function formatHandoffError(err, verb) {
+  const clean = (s) => (s ?? "").replace(/\r?\n/g, " ").trim();
   return [
     `dotclaude-handoff: ${verb} failed`,
-    `  stage:  ${err.stage}`,
-    `  cause:  ${err.cause}`,
-    `  fix:    ${err.fix}`,
-    `  retry:  ${err.retry}`,
+    `  stage:  ${clean(err.stage)}`,
+    `  cause:  ${clean(err.cause)}`,
+    `  fix:    ${clean(err.fix)}`,
+    `  retry:  ${clean(err.retry)}`,
     "",
   ].join("\n");
 }

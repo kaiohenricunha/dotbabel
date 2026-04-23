@@ -1011,8 +1011,8 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
       throw new HandoffError({
         stage: "resolve",
         cause: `no ${fromCli} handoffs on transport`,
-        fix: `Push a session first: \`dotclaude handoff push --from ${fromCli}\``,
-        retry: `dotclaude handoff push --from ${fromCli}`,
+        fix: `Push a ${fromCli} session first: \`dotclaude handoff push\``,
+        retry: `dotclaude handoff fetch --from ${fromCli}`,
       });
   }
 

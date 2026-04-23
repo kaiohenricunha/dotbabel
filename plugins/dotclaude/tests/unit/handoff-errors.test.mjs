@@ -1,9 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
   HandoffError,
+  PreflightHandledError,
   classifyGitError,
   formatHandoffError,
 } from "../../src/lib/handoff-errors.mjs";
+
+describe("PreflightHandledError", () => {
+  it("is an instance of Error", () => {
+    const e = new PreflightHandledError();
+    expect(e).toBeInstanceOf(Error);
+  });
+});
 
 describe("HandoffError", () => {
   it("is an instance of Error", () => {
@@ -24,7 +32,11 @@ describe("classifyGitError", () => {
   });
 
   it("HTTP auth failure → stage upload", () => {
-    const e = classifyGitError("Authentication failed for 'https://github.com/me/repo.git'", "push", {});
+    const e = classifyGitError(
+      "Authentication failed for 'https://github.com/me/repo.git'",
+      "push",
+      {},
+    );
     expect(e.stage).toBe("upload");
     expect(e.cause).toMatch(/authentication/i);
   });
@@ -36,7 +48,11 @@ describe("classifyGitError", () => {
   });
 
   it("repo not found (gitlab phrasing) → stage preflight", () => {
-    const e = classifyGitError("remote: The project you were looking for could not be found", "push", {});
+    const e = classifyGitError(
+      "remote: The project you were looking for could not be found",
+      "push",
+      {},
+    );
     expect(e.stage).toBe("preflight");
   });
 
@@ -47,12 +63,20 @@ describe("classifyGitError", () => {
   });
 
   it("unable to access → stage upload", () => {
-    const e = classifyGitError("fatal: unable to access 'https://github.com/me/repo.git/': Could not resolve host", "push", {});
+    const e = classifyGitError(
+      "fatal: unable to access 'https://github.com/me/repo.git/': Could not resolve host",
+      "push",
+      {},
+    );
     expect(e.stage).toBe("upload");
   });
 
   it("failed to push → stage upload", () => {
-    const e = classifyGitError("error: failed to push some refs to 'git@github.com:me/store.git'", "push", {});
+    const e = classifyGitError(
+      "error: failed to push some refs to 'git@github.com:me/store.git'",
+      "push",
+      {},
+    );
     expect(e.stage).toBe("upload");
     expect(e.cause).toMatch(/push rejected/i);
   });
@@ -70,7 +94,11 @@ describe("classifyGitError", () => {
   });
 
   it("ls-remote failed → stage preflight", () => {
-    const e = classifyGitError("ls-remote failed: fatal: Could not read from remote repository", "fetch", {});
+    const e = classifyGitError(
+      "ls-remote failed: fatal: Could not read from remote repository",
+      "fetch",
+      {},
+    );
     expect(e.stage).toBe("preflight");
     expect(e.cause).toMatch(/repo unreachable/i);
   });
@@ -118,5 +146,17 @@ describe("formatHandoffError", () => {
     expect(out).toContain("cause:  SSH key not configured");
     expect(out).toContain("fix:    Add your SSH key");
     expect(out).toContain("retry:  dotclaude handoff push");
+  });
+
+  it("collapses embedded newlines in cause to a single space", () => {
+    const e = new HandoffError({
+      stage: "upload",
+      cause: "line1\nline2\nline3",
+      fix: "check it",
+      retry: "dotclaude handoff push",
+    });
+    const out = formatHandoffError(e, "push");
+    expect(out).toContain("cause:  line1 line2 line3");
+    expect(out.split("\n").filter((l) => l.startsWith("  cause:")).length).toBe(1);
   });
 });

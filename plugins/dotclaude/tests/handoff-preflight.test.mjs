@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { PreflightHandledError } from "../src/lib/handoff-errors.mjs";
 import { tmpdir } from "node:os";
 
 vi.mock("node:child_process", () => ({
@@ -255,7 +256,12 @@ describe("autoPreflight", () => {
     mkdirSync(currentCacheDir(), { recursive: true });
     writeFileSync(
       currentCacheFile(),
-      JSON.stringify({ version: 99, timestamp: new Date().toISOString(), repo: REPO, status: "ok" }),
+      JSON.stringify({
+        version: 99,
+        timestamp: new Date().toISOString(),
+        repo: REPO,
+        status: "ok",
+      }),
       "utf8",
     );
     mockDoctor(0, { stdout: "ok\n" });
@@ -263,11 +269,11 @@ describe("autoPreflight", () => {
     expect(spawnSync).toHaveBeenCalledTimes(1);
   });
 
-  it("throws 'preflight failed' when doctor exits non-zero, does NOT write cache", () => {
+  it("throws PreflightHandledError when doctor exits non-zero, does NOT write cache", () => {
     mockDoctor(1, { stderr: "Preflight failed: handoff-repo-unreachable\n" });
     const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     try {
-      expect(() => autoPreflight({ repo: REPO })).toThrow(/preflight failed/);
+      expect(() => autoPreflight({ repo: REPO })).toThrow(PreflightHandledError);
       expect(stderrSpy).toHaveBeenCalledWith(
         expect.stringContaining("Preflight failed: handoff-repo-unreachable"),
       );
@@ -288,7 +294,9 @@ describe("autoPreflight", () => {
     try {
       autoPreflight({ repo: REPO, verbose: true });
       expect(spawnSync).not.toHaveBeenCalled();
-      expect(stderrSpy).toHaveBeenCalledWith(expect.stringMatching(/preflight: cache hit \(age \d+s\)/));
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/preflight: cache hit \(age \d+s\)/),
+      );
     } finally {
       stderrSpy.mockRestore();
     }

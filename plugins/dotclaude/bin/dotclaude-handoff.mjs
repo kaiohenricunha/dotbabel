@@ -31,7 +31,12 @@
  * Exits: 0 ok, 2 not-found / runtime error, 64 usage error.
  */
 
-import { HandoffError, classifyGitError, formatHandoffError } from "../src/lib/handoff-errors.mjs";
+import {
+  HandoffError,
+  PreflightHandledError,
+  classifyGitError,
+  formatHandoffError,
+} from "../src/lib/handoff-errors.mjs";
 import { parse, helpText } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { version, escapeRegex } from "../src/index.mjs";
@@ -82,14 +87,7 @@ export { _HandoffError as HandoffError };
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve as resolvePath } from "node:path";
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const POWER_SUBS = new Set(["resolve", "describe", "digest", "file"]);
@@ -137,9 +135,7 @@ function fail(code, msg) {
 // Exits USAGE on non-ISO input.
 function parseSinceOrFail(raw, { defaultDays = null } = {}) {
   if (!raw) {
-    return defaultDays === null
-      ? null
-      : Date.now() - defaultDays * 24 * 60 * 60 * 1000;
+    return defaultDays === null ? null : Date.now() - defaultDays * 24 * 60 * 60 * 1000;
   }
   const ms = Date.parse(String(raw));
   if (Number.isNaN(ms)) fail(EXIT_CODES.USAGE, `--since must be ISO-8601, got: ${raw}`);
@@ -203,7 +199,10 @@ async function resolveAny(query) {
 function resolveNarrowed(cli, id) {
   const r = runScript(RESOLVE_SH, [cli, id]);
   if (r.status !== 0) {
-    fail(r.status === 64 ? EXIT_CODES.USAGE : 2, r.stderr.trim() || `no ${cli} session matches: ${id}`);
+    fail(
+      r.status === 64 ? EXIT_CODES.USAGE : 2,
+      r.stderr.trim() || `no ${cli} session matches: ${id}`,
+    );
   }
   return { cli, path: r.stdout.trim() };
 }
@@ -232,7 +231,9 @@ async function resolveLocalForPull(id, narrowTo) {
   if (!narrowTo && stderr.includes("multiple sessions match")) {
     return await resolveAny(id);
   }
-  const msg = stderr.trim() || (narrowTo ? `no ${narrowTo} session matches: ${id}` : `no session matches: ${id}`);
+  const msg =
+    stderr.trim() ||
+    (narrowTo ? `no ${narrowTo} session matches: ${id}` : `no session matches: ${id}`);
   process.stderr.write(`dotclaude-handoff: ${msg}\n`);
   if (process.env.DOTCLAUDE_HANDOFF_REPO) {
     process.stderr.write("for remote handoffs use `fetch <id>`\n");
@@ -342,7 +343,7 @@ function writeOutput(body, out, meta, { kind, prompts, sourcePath, toCli }) {
 function renderDescribeMarkdown(meta, prompts) {
   const lines = [];
   lines.push(
-    `**${meta.cli}** \`${meta.short_id ?? "?"}\` — \`${meta.cwd ?? "(cwd unknown)"}\` — ${meta.started_at ?? ""}`
+    `**${meta.cli}** \`${meta.short_id ?? "?"}\` — \`${meta.cwd ?? "(cwd unknown)"}\` — ${meta.started_at ?? ""}`,
   );
   lines.push("");
   lines.push("**User prompts:**");
@@ -423,9 +424,11 @@ function listLocalSessions(cli) {
 }
 
 function listAllLocalSessions() {
-  return [...listLocalSessions("claude"), ...listLocalSessions("copilot"), ...listLocalSessions("codex")].sort(
-    (a, b) => b.mtime - a.mtime
-  );
+  return [
+    ...listLocalSessions("claude"),
+    ...listLocalSessions("copilot"),
+    ...listLocalSessions("codex"),
+  ].sort((a, b) => b.mtime - a.mtime);
 }
 
 // ---- host session detection --------------------------------------------
@@ -542,6 +545,15 @@ function searchSessions({ query, cli, since, limit, fixed }) {
   return out.slice(0, Number.parseInt(limit ?? "20", 10));
 }
 
+// ---- helpers -----------------------------------------------------------
+
+function emitRemoteError(err, verb, context) {
+  if (err instanceof PreflightHandledError) return;
+  const structured =
+    err instanceof HandoffError ? err : classifyGitError(err.message, verb, context);
+  process.stderr.write(formatHandoffError(structured, verb));
+}
+
 // ---- main --------------------------------------------------------------
 
 // Seed env vars from the persisted config before anything else reads
@@ -556,7 +568,9 @@ try {
 }
 
 if (argv.help) {
-  process.stdout.write(`${helpText(META)}\n\nSee skills/handoff/SKILL.md for the full reference.\n`);
+  process.stdout.write(
+    `${helpText(META)}\n\nSee skills/handoff/SKILL.md for the full reference.\n`,
+  );
   process.exit(EXIT_CODES.OK);
 }
 if (argv.version) {
@@ -570,7 +584,8 @@ if (argv.version) {
 // dotclaude-handoff-five-form.bats.
 
 const limit = argv.flags.limit ?? "20";
-if (!/^\d+$/.test(limit.toString())) fail(EXIT_CODES.USAGE, `--limit must be a non-negative integer, got: ${limit}`);
+if (!/^\d+$/.test(limit.toString()))
+  fail(EXIT_CODES.USAGE, `--limit must be a non-negative integer, got: ${limit}`);
 
 const detectedHost = detectHost();
 const toCli = (argv.flags.to ?? (detectedHost === "unknown" ? "claude" : detectedHost)).toString();
@@ -618,7 +633,7 @@ function resolveFilterCli() {
 function warnDeprecated(old, replacement) {
   if (process.env.DOTCLAUDE_QUIET === "1") return;
   process.stderr.write(
-    `dotclaude-handoff: ${old} is deprecated — use \`${replacement}\` instead (removed in 0.14.0)\n`
+    `dotclaude-handoff: ${old} is deprecated — use \`${replacement}\` instead (removed in 0.14.0)\n`,
   );
 }
 
@@ -636,7 +651,7 @@ async function main() {
   if ((first === "push" || first === "pull" || first === "fetch") && CLIS.has(second)) {
     fail(
       EXIT_CODES.USAGE,
-      `${first} no longer takes a <cli> positional; use --from ${second} or drop it entirely`
+      `${first} no longer takes a <cli> positional; use --from ${second} or drop it entirely`,
     );
   }
 
@@ -654,13 +669,13 @@ async function main() {
     // These are diagnostics, not gates — no exit-code change.
     const configLoaded = existsSync(CONFIG_FILE);
     process.stdout.write(
-      `config: ${configLoaded ? CONFIG_FILE : "(not written yet — first push will create it)"}\n`
+      `config: ${configLoaded ? CONFIG_FILE : "(not written yet — first push will create it)"}\n`,
     );
     process.stdout.write(
-      `gh: ${ghAvailable() ? (ghAuthenticated() ? "authenticated" : "installed, not authenticated") : "not installed"}\n`
+      `gh: ${ghAvailable() ? (ghAuthenticated() ? "authenticated" : "installed, not authenticated") : "not installed"}\n`,
     );
     process.stdout.write(
-      `DOTCLAUDE_HANDOFF_REPO: ${process.env.DOTCLAUDE_HANDOFF_REPO || "(unset — will bootstrap on first push)"}\n`
+      `DOTCLAUDE_HANDOFF_REPO: ${process.env.DOTCLAUDE_HANDOFF_REPO || "(unset — will bootstrap on first push)"}\n`,
     );
     process.exit(r.status !== 0 ? r.status : EXIT_CODES.OK);
   }
@@ -700,11 +715,15 @@ async function main() {
       process.stdout.write("No handoffs found\n");
       process.exit(EXIT_CODES.OK);
     }
-    process.stdout.write("| Branch                               | CLI     | Short UUID | Project                  | Hostname                 | Tag                      |\n");
-    process.stdout.write("| ------------------------------------ | ------- | ---------- | ------------------------ | ------------------------ | ------------------------ |\n");
+    process.stdout.write(
+      "| Branch                               | CLI     | Short UUID | Project                  | Hostname                 | Tag                      |\n",
+    );
+    process.stdout.write(
+      "| ------------------------------------ | ------- | ---------- | ------------------------ | ------------------------ | ------------------------ |\n",
+    );
     for (const r of capped) {
       process.stdout.write(
-        `| ${r.branch.padEnd(36)} | ${r.cli.padEnd(7)} | ${r.short_id.padEnd(10)} | ${(r.project ?? "").padEnd(24)} | ${(r.hostname ?? "").padEnd(24)} | ${(r.tag ?? "").padEnd(24)} |\n`
+        `| ${r.branch.padEnd(36)} | ${r.cli.padEnd(7)} | ${r.short_id.padEnd(10)} | ${(r.project ?? "").padEnd(24)} | ${(r.hostname ?? "").padEnd(24)} | ${(r.tag ?? "").padEnd(24)} |\n`,
       );
     }
     process.exit(EXIT_CODES.OK);
@@ -729,12 +748,16 @@ async function main() {
       process.stdout.write(`No sessions matching '${query}'\n`);
       process.exit(EXIT_CODES.OK);
     }
-    process.stdout.write("| CLI     | Short UUID | cwd                                   | Last modified       | Match                                    |\n");
-    process.stdout.write("| ------- | ---------- | ------------------------------------- | ------------------- | ---------------------------------------- |\n");
+    process.stdout.write(
+      "| CLI     | Short UUID | cwd                                   | Last modified       | Match                                    |\n",
+    );
+    process.stdout.write(
+      "| ------- | ---------- | ------------------------------------- | ------------------- | ---------------------------------------- |\n",
+    );
     for (const h of hits) {
       const when = new Date(h.mtime).toISOString().replace("T", " ").slice(0, 19);
       process.stdout.write(
-        `| ${h.cli.padEnd(7)} | ${h.short_id.padEnd(10)} | ${(h.cwd ?? "").padEnd(37)} | ${when.padEnd(19)} | ${h.match_snippet.padEnd(40)} |\n`
+        `| ${h.cli.padEnd(7)} | ${h.short_id.padEnd(10)} | ${(h.cwd ?? "").padEnd(37)} | ${when.padEnd(19)} | ${h.match_snippet.padEnd(40)} |\n`,
       );
     }
     process.stdout.write("\nDrill in with `dotclaude handoff pull <short-uuid> --summary`.\n");
@@ -846,17 +869,9 @@ async function main() {
       );
       process.exit(EXIT_CODES.OK);
     } catch (err) {
-      // autoPreflight already streams the doctor output to stderr; a second block
-      // would be redundant. All other failures get the structured format.
-      if (err.message !== "preflight failed") {
-        const structured =
-          err instanceof HandoffError
-            ? err
-            : classifyGitError(err.message, "push", {
-                shortId: sessionHit ? shortIdFromPath(sessionHit.path) : undefined,
-              });
-        process.stderr.write(formatHandoffError(structured, "push"));
-      }
+      emitRemoteError(err, "push", {
+        shortId: sessionHit ? shortIdFromPath(sessionHit.path) : undefined,
+      });
       process.exit(2);
     }
   }
@@ -905,13 +920,7 @@ async function main() {
       process.stdout.write(content.endsWith("\n") ? content : content + "\n");
       process.exit(EXIT_CODES.OK);
     } catch (err) {
-      if (err.message !== "preflight failed") {
-        const structured =
-          err instanceof HandoffError
-            ? err
-            : classifyGitError(err.message, "fetch", { query: second ?? undefined });
-        process.stderr.write(formatHandoffError(structured, "fetch"));
-      }
+      emitRemoteError(err, "fetch", { query: second ?? undefined });
       process.exit(2);
     }
   }
@@ -945,7 +954,9 @@ async function main() {
     const prompts = extractPrompts(cli, path);
     if (sub === "describe") {
       if (argv.json) {
-        process.stdout.write(JSON.stringify({ origin: meta, user_prompts: prompts }, null, 2) + "\n");
+        process.stdout.write(
+          JSON.stringify({ origin: meta, user_prompts: prompts }, null, 2) + "\n",
+        );
         process.exit(EXIT_CODES.OK);
       }
       process.stdout.write(renderDescribeMarkdown(meta, prompts) + "\n");
