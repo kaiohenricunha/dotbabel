@@ -17,14 +17,7 @@ import { createInterface } from "node:readline";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { hostname, tmpdir } from "node:os";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 import { scrubDigest } from "./handoff-scrub.mjs";
 import { autoPreflight } from "./handoff-preflight.mjs";
@@ -63,10 +56,7 @@ export function parseHandoffBranch(branch) {
 // at library-init time and is kept only for the diagnostic display
 // in `doctor` + the test-contract `typeof mod.CONFIG_FILE === "string"`.
 function currentConfigDir() {
-  return join(
-    process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"),
-    "dotclaude",
-  );
+  return join(process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"), "dotclaude");
 }
 function currentConfigFile() {
   return join(currentConfigDir(), "handoff.env");
@@ -109,9 +99,7 @@ export function runGit(args, cwd) {
 export function runGitOrThrow(args, cwd) {
   const r = runGit(args, cwd);
   if (r.status !== 0) {
-    throw new Error(
-      `git ${args.join(" ")} failed: ${(r.stderr || r.stdout).trim()}`,
-    );
+    throw new Error(`git ${args.join(" ")} failed: ${(r.stderr || r.stdout).trim()}`);
   }
   return r;
 }
@@ -141,8 +129,7 @@ export function extractMeta(cli, file) {
 export function extractLines(sub, cli, file, extra = []) {
   const r = runScript(EXTRACT_SH, [sub, cli, file, ...extra]);
   if (r.status !== 0) {
-    if (r.stderr.trim())
-      process.stderr.write(`dotclaude-handoff: ${sub}: ${r.stderr.trim()}\n`);
+    if (r.stderr.trim()) process.stderr.write(`dotclaude-handoff: ${sub}: ${r.stderr.trim()}\n`);
     return [];
   }
   const out = [];
@@ -381,10 +368,7 @@ export function loadPersistedEnv() {
     if (!m) continue;
     const key = m[1];
     let val = m[2];
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
       val = val.slice(1, -1);
     }
     if (process.env[key] === undefined || process.env[key] === "") {
@@ -463,15 +447,11 @@ export async function bootstrapTransportRepo() {
     process.exit(2);
   }
   if (!ghAvailable()) {
-    printManualSetupBlock(
-      "`gh` CLI is not on PATH — install it from https://cli.github.com/",
-    );
+    printManualSetupBlock("`gh` CLI is not on PATH — install it from https://cli.github.com/");
     process.exit(2);
   }
   if (!ghAuthenticated()) {
-    printManualSetupBlock(
-      "`gh` is not authenticated — run `gh auth login` (scopes: repo)",
-    );
+    printManualSetupBlock("`gh` is not authenticated — run `gh auth login` (scopes: repo)");
     process.exit(2);
   }
   const login = ghLogin();
@@ -518,14 +498,7 @@ export async function bootstrapTransportRepo() {
 
   const create = spawnSync(
     "gh",
-    [
-      "repo",
-      "create",
-      `${login}/${name}`,
-      "--private",
-      "--description",
-      "dotclaude handoff store",
-    ],
+    ["repo", "create", `${login}/${name}`, "--private", "--description", "dotclaude handoff store"],
     { encoding: "utf8" },
   );
   if (create.status !== 0) {
@@ -619,10 +592,7 @@ function withShallowFetch(slug, repoUrl, refspecs, fn) {
     if (init.status !== 0) {
       throw new Error(`git init failed: ${init.stderr.trim()}`);
     }
-    const fetched = runGit(
-      ["fetch", "--depth=1", "--no-tags", "-q", repoUrl, ...refspecs],
-      tmp,
-    );
+    const fetched = runGit(["fetch", "--depth=1", "--no-tags", "-q", repoUrl, ...refspecs], tmp);
     if (fetched.status !== 0) {
       throw new Error(`fetch failed: ${fetched.stderr.trim()}`);
     }
@@ -710,7 +680,9 @@ export function probeCollision(repoUrl, branch, localSessionId, { force = false 
   if (remoteSessionId === localSessionId) {
     return { mode: "update" };
   }
-  const ownerHint = remoteSessionId ? `remote-session=${remoteSessionId}` : "remote-session=unknown";
+  const ownerHint = remoteSessionId
+    ? `remote-session=${remoteSessionId}`
+    : "remote-session=unknown";
   return forceOrFail(
     `short-id collision on ${branch}: local-session=${localSessionId} ${ownerHint}; rerun with --force-collision to override`,
   );
@@ -724,9 +696,14 @@ export async function pushRemote({
   verify = false,
   verbose = false,
   force = false,
+  dryRun = false,
 }) {
-  let repoUrl = await requireTransportRepo();
-  autoPreflight({ repo: repoUrl, verify, verbose });
+  // Dry-run uses the strict variant: it must never bootstrap (bootstrap is
+  // an online action) and must never call autoPreflight (network probe).
+  // Strict throws a HandoffError with stage=preflight if the env var is
+  // unset, which the bin's emitRemoteError formats for the user.
+  let repoUrl = dryRun ? requireTransportRepoStrict() : await requireTransportRepo();
+  if (!dryRun) autoPreflight({ repo: repoUrl, verify, verbose });
   const meta = extractMeta(cli, sessionFile);
   const prompts = extractPrompts(cli, sessionFile);
   const turns = extractTurns(cli, sessionFile);
@@ -766,6 +743,19 @@ export async function pushRemote({
   };
 
   const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
+
+  if (dryRun) {
+    return {
+      dryRun: true,
+      branch,
+      url: repoUrl,
+      description,
+      scrubbedCount,
+      digestBytes: Buffer.byteLength(scrubbed, "utf8"),
+      metadata,
+      tag: tag || null,
+    };
+  }
 
   // Pre-push collision probe: compare the remote branch's
   // metadata.session_id (if any) against the local session_id. Without
@@ -875,9 +865,7 @@ function sortByCommitterDate(candidates, repoUrl) {
     );
     return null;
   };
-  const refspecs = candidates.map(
-    (c) => `+refs/heads/${c.branch}:refs/heads/${c.branch}`,
-  );
+  const refspecs = candidates.map((c) => `+refs/heads/${c.branch}:refs/heads/${c.branch}`);
   try {
     return withShallowFetch("sort", repoUrl, refspecs, (tmp) => {
       const fer = runGit(
@@ -901,9 +889,7 @@ function sortByCommitterDate(candidates, repoUrl) {
         if (c) sorted.push(c);
       }
       if (sorted.length !== candidates.length) {
-        throw new Error(
-          `partial sort (${sorted.length}/${candidates.length} refs resolved)`,
-        );
+        throw new Error(`partial sort (${sorted.length}/${candidates.length} refs resolved)`);
       }
       return sorted;
     });
@@ -981,8 +967,7 @@ export function enrichWithDescriptions(candidates) {
 export function matchesQuery(candidate, query) {
   const q = query.toLowerCase();
   if (candidate.branch.toLowerCase().includes(q)) return true;
-  if (candidate.description && candidate.description.toLowerCase().includes(q))
-    return true;
+  if (candidate.description && candidate.description.toLowerCase().includes(q)) return true;
   if (candidate.commit && candidate.commit.toLowerCase().startsWith(q)) return true;
   return false;
 }

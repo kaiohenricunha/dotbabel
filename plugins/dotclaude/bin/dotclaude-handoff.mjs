@@ -96,7 +96,7 @@ const CLIS = new Set(["claude", "copilot", "codex"]);
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [pull|fetch|list|search|push|doctor|remote-list] [args...] [--from <cli>] [--to <cli>] [--summary] [-o <path>] [--tag <label>] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify]",
+    "dotclaude handoff [pull|fetch|list|search|push|doctor|remote-list] [args...] [--from <cli>] [--to <cli>] [--summary] [-o <path>] [--tag <label>] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run]",
   description:
     "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.",
   flags: {
@@ -115,6 +115,7 @@ const META = {
     all: { type: "boolean" },
     fixed: { type: "boolean", short: "F" },
     summary: { type: "boolean" },
+    "dry-run": { type: "boolean" },
   },
 };
 
@@ -554,6 +555,23 @@ function emitRemoteError(err, verb, context) {
   process.stderr.write(formatHandoffError(structured, verb));
 }
 
+function renderDryRunPreview(r) {
+  const m = r.metadata;
+  return [
+    "DRY-RUN (no network calls):",
+    `  branch:        ${r.branch}`,
+    `  transport:     ${r.url}`,
+    `  description:   ${r.description}`,
+    `  digest size:   ${r.digestBytes} bytes (after scrub)`,
+    `  scrub count:   ${r.scrubbedCount} secrets redacted`,
+    `  tag:           ${r.tag ?? "(none)"}`,
+    `  metadata:      cli=${m.cli} session=${m.short_id} project=${m.project} host=${m.hostname} month=${m.month}`,
+    "",
+    "run without --dry-run to push.",
+    "",
+  ].join("\n");
+}
+
 // ---- main --------------------------------------------------------------
 
 // Seed env vars from the persisted config before anything else reads
@@ -855,6 +873,7 @@ async function main() {
     const verify = Boolean(argv.flags.verify);
     const verbose = Boolean(argv.verbose);
     const force = Boolean(argv.flags["force-collision"]);
+    const dryRun = Boolean(argv.flags["dry-run"]);
     try {
       const result = await pushRemote({
         cli: sessionHit.cli,
@@ -863,10 +882,17 @@ async function main() {
         verify,
         verbose,
         force,
+        dryRun,
       });
-      process.stdout.write(
-        `${result.branch}\n${result.url}\n${result.description}\n[scrubbed ${result.scrubbedCount} secrets]\n`,
-      );
+      if (dryRun) {
+        process.stdout.write(
+          argv.json ? JSON.stringify(result, null, 2) + "\n" : renderDryRunPreview(result),
+        );
+      } else {
+        process.stdout.write(
+          `${result.branch}\n${result.url}\n${result.description}\n[scrubbed ${result.scrubbedCount} secrets]\n`,
+        );
+      }
       process.exit(EXIT_CODES.OK);
     } catch (err) {
       emitRemoteError(err, "push", {
