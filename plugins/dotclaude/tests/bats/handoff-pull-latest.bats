@@ -46,7 +46,7 @@ teardown() {
   rm -rf "$TEST_HOME" "$TRANSPORT_REPO"
 }
 
-@test "pull (bare): returns newest-committed branch, not lex-last" {
+@test "fetch (bare): returns newest-committed branch, not lex-last" {
   # Push oldest → middle → newest, >1s apart so the committer dates are
   # strictly increasing and reflect push order.
   run node "$BIN" push fffffff0
@@ -58,9 +58,9 @@ teardown() {
   run node "$BIN" push 00000001
   [ "$status" -eq 0 ]
 
-  run node "$BIN" pull
+  run node "$BIN" fetch
   [ "$status" -eq 0 ]
-  # Pulled branch must be the newest (marker-newest). If the bug is
+  # Fetched branch must be the newest (marker-newest). If the bug is
   # still present, the lex-last branch (fffffff0 / marker-oldest) is
   # returned instead.
   [[ "$output" == *"marker-newest"* ]]
@@ -68,7 +68,7 @@ teardown() {
   [[ "$output" != *"marker-middle"* ]]
 }
 
-@test "pull --from claude (no query): still returns newest by commit date" {
+@test "fetch --from claude (no query): still returns newest by commit date" {
   # Same ordering as above; verify the fromCli-scoped path also sorts
   # correctly — the filter runs before the sort, so all three remain in
   # the candidate set.
@@ -81,19 +81,19 @@ teardown() {
   run node "$BIN" push 00000001
   [ "$status" -eq 0 ]
 
-  run node "$BIN" pull --from claude
+  run node "$BIN" fetch --from claude
   [ "$status" -eq 0 ]
   [[ "$output" == *"marker-newest"* ]]
   [[ "$output" != *"marker-oldest"* ]]
 }
 
-@test "pull (bare) with a single branch: no sort attempted, fast path" {
+@test "fetch (bare) with a single branch: no sort attempted, fast path" {
   # Single-candidate short-circuit. If this regresses to unconditional
   # fetch-for-sort, the test is still green but would be slower — we
   # pin correctness, not cost.
   run node "$BIN" push fffffff0
   [ "$status" -eq 0 ]
-  run node "$BIN" pull
+  run node "$BIN" fetch
   [ "$status" -eq 0 ]
   [[ "$output" == *"marker-oldest"* ]]
 }

@@ -2,29 +2,29 @@
 id: handoff
 name: handoff
 type: skill
-version: 1.0.0
+version: 1.1.0
 domain: [devex]
 platform: [none]
 task: [documentation, debugging]
 maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-04-17
-updated: 2026-04-19
+updated: 2026-04-23
 description: >
   Transfer conversation context between agentic CLIs (Claude Code, GitHub
   Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a
   source session transcript by UUID and produces either an inline summary,
   a paste-ready handoff digest, a written markdown file, or a branch in a
-  user-owned private git repo that another machine can pull. Use when
+  user-owned private git repo that another machine can fetch. Use when
   switching agents mid-task, recovering context, or moving between
   Windows/Linux/macOS setups. Triggers on: "handoff", "transfer context",
   "continue in codex", "continue in claude", "continue in copilot",
   "switch to codex", "switch to claude", "what was that session about",
   "claude --resume", "copilot --resume", "codex resume",
   "find the session where", "search sessions", "which session did I",
-  "push handoff", "pull handoff", "handoff to other machine",
+  "push handoff", "fetch handoff", "handoff to other machine",
   "resume on my other laptop".
-argument-hint: "[<query>|push|pull|list|doctor|remote-list|search] [args...]"
+argument-hint: "[pull|push|fetch|list|search|resolve|doctor] [args...]"
 tools: Glob, Read, Grep, Bash, Write
 effort: medium
 model: sonnet
@@ -42,16 +42,19 @@ bash tool.
 ## The four forms
 
 ```
-/handoff <query>                          local cross-agent: emit <handoff>
-/handoff push [<query>] [--tag <label>]   upload to transport
-/handoff pull [<query>]                   fetch from transport
+/handoff pull [<id>] [--from <cli>] [--to <cli>] [--summary] [-o <path>]
+/handoff push [<query>] [--from <cli>] [--tag <label>] [--include-transcript]
+/handoff fetch [<query>] [--from <cli>] [--verify]
 /handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit N|--all]
 ```
 
 A bare `/handoff` with no arguments prints usage and exits 0. Every
-remote verb is explicit.
+remote verb (`push`, `fetch`) is explicit.
 
-`<query>` auto-detects across `~/.claude/projects`,
+If `--from` is set, resolution narrows to that CLI; otherwise the host is
+auto-detected; otherwise all three roots are scanned.
+
+`<id>` / `<query>` auto-detects across `~/.claude/projects`,
 `~/.copilot/session-state`, and `~/.codex/sessions`. Accepted forms:
 full UUID, short UUID (first 8 hex), `latest`, Claude `customTitle`
 alias, Codex `thread_name` alias.
@@ -67,7 +70,7 @@ resolver (globally newest across all roots) and stderr names the
 picked session. Pass `--from <cli>` to force a specific root.
 
 **Collision model.** When `<query>` matches multiple roots (or two
-remote handoffs on `pull`): TTY → interactive prompt; non-TTY → exit 2
+remote handoffs on `fetch`): TTY → interactive prompt; non-TTY → exit 2
 with a TSV candidate list on stderr.
 
 ## Sub-commands
@@ -75,45 +78,72 @@ with a TSV candidate list on stderr.
 The binary's `--help` lists the full surface and authoritative flag
 semantics. Brief summary:
 
-| Sub                   | Purpose                                                                                              |
-| --------------------- | ---------------------------------------------------------------------------------------------------- |
-| `resolve <cli> <id>`  | Print the absolute JSONL path                                                                        |
-| `describe <cli> <id>` | Inline 2–4 sentence summary + verbatim user prompts                                                  |
-| `digest <cli> <id>`   | Print a paste-ready `<handoff>` block (no transport)                                                 |
-| `file <cli> <id>`     | Write the digest to `docs/handoffs/<date>-<cli>-<short>.md`                                          |
-| `list`                | Unified local + remote table (`--local`/`--remote`, `--from`, `--since`, `--limit`/`--all`)          |
-| `search <query>`      | Substring/regex match across local sessions; `--from` / `--since` / `--limit` / `--fixed` / `--json` |
-| `push [<query>]`      | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag` / `--include-transcript`                                  |
-| `pull [<handle>]`     | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline                                      |
-| `remote-list`         | List handoffs on the transport; `--from` / `--since` / `--limit`                                     |
-| `doctor`              | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback                                             |
+| Sub                  | Purpose                                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| `pull [<id>]`        | Render local session to stdout (`<handoff>` block); `--summary` for prose; `-o` to write to disk     |
+| `resolve <cli> <id>` | Print the absolute JSONL path                                                                        |
+| `list`               | Unified local + remote table (`--local`/`--remote`, `--from`, `--since`, `--limit`/`--all`)          |
+| `search <query>`     | Substring/regex match across local sessions; `--from` / `--since` / `--limit` / `--fixed` / `--json` |
+| `push [<query>]`     | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag` / `--include-transcript`                                  |
+| `fetch [<handle>]`   | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline                                      |
+| `remote-list`        | List handoffs on the transport; `--from` / `--since` / `--limit`                                     |
+| `doctor`             | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback                                             |
 
 Cross-cutting flags (consult `--help` for the canonical list):
 
-- `--from <cli>` narrows source-CLI auto-detection on `push`, `pull`,
-  bare `<query>`, and filters `list`, `search`, and `remote-list` to
-  one root. Without it, the resolver probes all three roots. `--cli`
-  is accepted as a legacy alias on `search` and `remote-list`.
+- `--from <cli>` narrows source-CLI auto-detection on `push`, `fetch`,
+  `pull`, and filters `list`, `search`, and `remote-list` to one root.
+  Without it, the resolver probes all three roots. `--cli` is accepted
+  as a legacy alias on `search` and `remote-list`.
 - `--to <cli>` tunes the `<handoff>` block's next-step wording for a
-  target agent. Defaults to the auto-detected host.
+  target agent. Defaults to the auto-detected host. `--from` narrows
+  the source root; `--to` still resolves to the invoking host unless
+  explicitly overridden.
+- `--summary` (on `pull`) emits a prose summary + verbatim user prompts
+  instead of the full `<handoff>` block.
+- `-o <path>` (on `pull`) controls the output destination:
+  `-` forces stdout; `auto` writes to `<repo>/docs/handoffs/<date>-<cli>-<short>.md`
+  (falling back to `~/.claude/handoffs/` when off-repo) and prints the
+  file path on stdout; any other string is used as the literal output path.
 - `--since <ISO>` cuts off `list` when explicitly provided, and
   cuts off `search` and `remote-list` (default 30 days).
 - `--limit <N>` caps the row count (default 20). `--all` (on `list`)
   disables the cap.
 - `--fixed` / `-F` treats the `search` query as a literal string
   instead of a regex.
-- `--tag <label>` annotates a `push` for fuzzy `pull` later.
+- `--tag <label>` annotates a `push` for fuzzy `fetch` later.
 - `--include-transcript` adds the last 50 raw turns to a `push`
   (off by default to minimise leakage).
-- `--from-file <path>` lets `pull` load a local markdown file written
-  by `file`. Works without network access.
-- `--json` is honoured by `list`, `describe`, `remote-list`, `search`.
+- `--from-file <path>` lets `fetch` load a local markdown file written
+  by `pull -o`. Works without network access.
+- `--json` is honoured by `list`, `pull`, `remote-list`, `search`.
+
+## Cross-agent behavior
+
+(a) **`pull` stdout is the transport into the model's context.** All three
+host runtimes (Claude Code, Copilot CLI, Codex via its bash tool) capture
+stdout the same way. `pull` to stdout; the runtime delivers it.
+
+(b) **`--to` on `pull` defaults to the detected host, not `--from`.** When
+`--from` is set without `--to`, `--to` still resolves to the invoking host.
+`--from` narrows the source root; `--to` tunes the next-step wording for
+where the output will be read.
+
+(c) **Self-referential pull is allowed and renders normally.** When
+host-scoped `latest` resolves to the session the command was run from,
+the digest renders the current session into its own context. Occasionally
+useful for capturing the current session via `-o auto`.
+
+(d) **`pull <unmatched>` does not auto-forward to `fetch`.** If the local
+resolver returns no match and `$DOTCLAUDE_HANDOFF_REPO` is set, a single
+stderr hint suggests `fetch <id>`. If the variable is unset, only the
+standard no-match error appears. No silent source override.
 
 ## Prerequisites
 
 Local sub-commands need only `jq` and the session files on disk.
 
-The remote transport (`push`/`pull`/`remote-list`/`doctor`) is a
+The remote transport (`push`/`fetch`/`remote-list`/`doctor`) is a
 user-owned private git repo (any provider — GitHub, GitLab, Gitea,
 self-hosted). Required:
 
@@ -139,13 +169,13 @@ handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>
 
 e.g. `handoff/dotclaude/claude/2026-04/aaaa1111`. The store needs no
 setup beyond "be a reachable git repo"; `main` is never touched by
-`push` / `pull` / `remote-list`. GitHub UI + `git ls-remote` render
+`push` / `fetch` / `remote-list`. GitHub UI + `git ls-remote` render
 the branches directly.
 
 ## Auto-trigger contract
 
-When the user message matches any of these patterns, run the bare
-`<query>` form (local cross-agent digest) by default:
+When the user message matches any of these patterns, run `pull` (local
+cross-agent digest) by default:
 
 - Resume-command fragments: `claude --resume <uuid>`,
   `claude --resume "<name>"`, `copilot --resume=<uuid>`,
@@ -153,10 +183,10 @@ When the user message matches any of these patterns, run the bare
 - Natural language: "what was that session about", "continue in X",
   "switch to X", "handoff".
 
-Extract the `<query>` from the user message (UUID, short UUID, or
-named alias). The skill probes all three roots — no `<cli>` argument
-needed. If the query is missing or ambiguous, ask one clarifying
-question before proceeding.
+Extract the `<id>` from the user message (UUID, short UUID, or named
+alias). The skill probes all three roots — no `--from` argument needed.
+If the query is missing or ambiguous, ask one clarifying question before
+proceeding.
 
 ## Out of scope
 
@@ -174,3 +204,20 @@ question before proceeding.
 - **Fuzzy or semantic search.** `search` is substring/regex only.
 - **Persistent indexing.** Grep-at-query-time is fast enough for
   local session volumes; revisit only if p95 exceeds ~2s.
+
+## Deprecated aliases
+
+The following forms are deprecated as of 0.12.0 and removed in 0.14.0.
+They still function but emit a stderr warning on every invocation.
+
+| Old form                      | New form                     |
+| ----------------------------- | ---------------------------- |
+| `describe <cli> <id>`         | `pull <id> --summary`        |
+| `describe <cli> <id> --json`  | `pull <id> --summary --json` |
+| `digest <cli> <id>`           | `pull <id>`                  |
+| `file <cli> <id>`             | `pull <id> -o auto`          |
+| `pull <query>` (remote fetch) | `fetch <query>`              |
+
+Set `DOTCLAUDE_QUIET=1` to suppress deprecation stderr in CI pipelines
+that cannot update callers immediately. Real errors (exit 2 / exit 64)
+are never suppressed.

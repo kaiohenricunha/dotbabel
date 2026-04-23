@@ -42,13 +42,13 @@ teardown() {
   [ "$line_count" -ge $(( file_count * 9 / 10 )) ]
 }
 
-@test "pull <short-uuid> against 10k transport branches completes under 30s" {
+@test "fetch <short-uuid> against 10k transport branches completes under 30s" {
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
   export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
   make_many_transport_branches "$TRANSPORT_REPO" 10000
 
   # index 5000 → 00001388 (seeded by make_many_transport_branches as %08x).
-  run timeout 30s node "$BIN" pull 00001388
+  run timeout 30s node "$BIN" fetch 00001388
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
