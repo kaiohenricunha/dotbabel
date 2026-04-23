@@ -3,10 +3,12 @@
 #
 # Complements dotclaude-handoff-five-form.bats, which covers the user-facing
 # five-form surface. These tests chain multiple handoff scripts together
-# (resolve → extract → digest / push → pull → file / list → describe) to
+# (resolve → extract → digest / push → fetch → file / list → pull) to
 # verify the boundaries between them hold.
 
 load helpers
+
+bats_require_minimum_version 1.5.0
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
 EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
@@ -125,9 +127,9 @@ teardown() {
   run bash -c "git --git-dir='$TRANSPORT_REPO' log --format=%s $branch"
   [ "$status" -eq 0 ]
   [[ "$output" == *"shipping-the-thing"* ]]
-  # Pull-by-tag resolves and returns a valid block (content-equivalence
+  # Fetch-by-tag resolves and returns a valid block (content-equivalence
   # already asserted above; here we just prove routing works).
-  run node "$BIN" pull shipping-the-thing
+  run node "$BIN" fetch shipping-the-thing
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
@@ -159,7 +161,7 @@ teardown() {
   # assertion fails before the end of this test (no separate mktemp needed).
   local outdir="$TEST_HOME/file-out"
   mkdir -p "$outdir"
-  run node "$BIN" file claude aaaa1111 --out-dir "$outdir"
+  run --separate-stderr node "$BIN" file claude aaaa1111 --out-dir "$outdir"
   [ "$status" -eq 0 ]
   # The command prints the absolute path of the file written.
   local outpath="$output"
@@ -187,11 +189,11 @@ teardown() {
 
 # -- describe --json is a self-contained document -----------------------
 
-@test "describe --json → pipe to jq → origin.session_id equals seeded UUID" {
-  # Integration check: describe --json must be parseable by jq *and*
+@test "pull --summary --json → pipe to jq → origin.session_id equals seeded UUID" {
+  # Integration check: pull --summary --json must be parseable by jq *and*
   # expose a usable path to the session id. This is what tooling-on-top
   # (skills, agents) actually does.
-  run bash -c "node '$BIN' describe claude aaaa1111 --json | jq -r '.origin.session_id'"
+  run bash -c "node '$BIN' pull aaaa1111 --summary --json | jq -r '.origin.session_id'"
   [ "$status" -eq 0 ]
   [[ "$output" == "$CLAUDE_UUID" ]]
 }

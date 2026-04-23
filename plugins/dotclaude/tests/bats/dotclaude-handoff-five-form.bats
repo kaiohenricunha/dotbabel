@@ -1,13 +1,12 @@
 #!/usr/bin/env bats
-# Behavior tests for the five-form public surface of dotclaude-handoff.mjs:
+# Behavior tests for the public surface of dotclaude-handoff.mjs (#87):
 #
-#   dotclaude handoff                          # push host's current session
-#   dotclaude handoff <query>                  # local cross-agent: <handoff> block
-#   dotclaude handoff push [<query>] [--tag]   # explicit push
-#   dotclaude handoff pull  [<query>]          # pull by fuzzy match; bare = latest
-#   dotclaude handoff list                     # unified local + remote table
+#   dotclaude handoff pull  [<id>] [--summary] [-o <path>] [--from <cli>] [--to <cli>]
+#   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
+#   dotclaude handoff push  [<query>] [--tag]
+#   dotclaude handoff list
 #
-# Transport for push/pull tests: a local bare repo named by
+# Transport for push/fetch tests: a local bare repo named by
 # DOTCLAUDE_HANDOFF_REPO. The git transport is the only remote
 # transport since v0.9.0; no GitHub auth required.
 
@@ -31,7 +30,16 @@ setup() {
 {"type":"custom-title","customTitle":"my-feature","sessionId":"aaaa1111-1111-1111-1111-111111111111"}
 EOF
 
-  # Codex fixture: a rollout renamed to "refactor" (for collision with claude below)
+  # Copilot fixture — seeded before the sleep so codex remains newest.
+  mkdir -p "$TEST_HOME/.copilot/session-state/cccc3333-3333-3333-3333-333333333333"
+  COPILOT_FILE="$TEST_HOME/.copilot/session-state/cccc3333-3333-3333-3333-333333333333/events.jsonl"
+  cat > "$COPILOT_FILE" <<'EOF'
+{"type":"session.start","data":{"sessionId":"cccc3333-3333-3333-3333-333333333333","cwd":"/work/copilot","model":"gpt-4o"}}
+{"type":"user.message","data":{"content":"Implement the new feature"}}
+{"type":"assistant.message","data":{"content":"Working on it now."}}
+EOF
+
+  # Codex fixture (seeded last, after sleep → newest on disk).
   sleep 0.01
   mkdir -p "$TEST_HOME/.codex/sessions/2026/04/18"
   CODEX_FILE="$TEST_HOME/.codex/sessions/2026/04/18/rollout-2026-04-18T10-00-00-bbbb2222-2222-2222-2222-222222222222.jsonl"
@@ -42,78 +50,76 @@ EOF
 {"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"text","text":"running"}]}}
 EOF
 
-  # Set up a bare git repo as the remote transport endpoint and
-  # pre-initialise it with the v2 schema pin so push/pull work without
-  # each test having to run `init` first. v0.10.0 pushRemote() refuses
-  # Set up a bare git repo for the transport. The binary writes directly
-  # to `handoff/...` branches with no init / schema-pin ceremony.
+  # Set up a bare git repo as the remote transport endpoint.
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
   export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
 
-  export CLAUDE_FILE CODEX_FILE TRANSPORT_REPO
+  export CLAUDE_FILE COPILOT_FILE CODEX_FILE TRANSPORT_REPO
 }
 
 teardown() {
   rm -rf "$TEST_HOME" "$TRANSPORT_REPO"
 }
 
-# -- zero-arg and <query> (local, no network) ----------------------------
+# -- help / zero-arg surface -----------------------------------------------
 
-@test "--help prints the five-form surface" {
-  # Bare invocation no longer prints usage — it executes `push`. Help
-  # lives behind --help, which is the conventional opt-in.
+@test "--help prints pull fetch and list" {
   run node "$BIN" --help
   [ "$status" -eq 0 ]
   [[ "$output" == *"push"* ]]
   [[ "$output" == *"pull"* ]]
+  [[ "$output" == *"fetch"* ]]
   [[ "$output" == *"list"* ]]
 }
 
-@test "<query>: short UUID produces <handoff> block locally" {
-  run node "$BIN" aaaa1111
+# -- pull: local resolution -----------------------------------------------
+
+@test "pull: short UUID produces <handoff> block locally" {
+  run node "$BIN" pull aaaa1111
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
   [[ "$output" == *"</handoff>"* ]]
 }
 
-@test "<query>: customTitle alias produces <handoff> block" {
-  run node "$BIN" my-feature
+@test "pull: customTitle alias produces <handoff> block" {
+  run node "$BIN" pull my-feature
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
   [[ "$output" == *"aaaa1111"* ]]
 }
 
-@test "<query>: codex thread_name alias produces <handoff> block" {
-  run node "$BIN" my-codex-task
+@test "pull: codex thread_name alias produces <handoff> block" {
+  run node "$BIN" pull my-codex-task
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
   [[ "$output" == *"bbbb2222"* ]]
 }
 
-@test "<query>: unknown identifier exits 2" {
-  run node "$BIN" nonexistent-xyz
+@test "pull: unknown identifier exits 2" {
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
+    node "$BIN" pull nonexistent-xyz
   [ "$status" -eq 2 ]
 }
 
-# -- `latest` host-scoping (#85) -----------------------------------------
+# -- pull `latest` host-scoping (#85) ------------------------------------
 
-@test "<query> latest without host signal picks globally newest (across roots)" {
+@test "pull latest without host signal picks globally newest (across roots)" {
   # setup() sleeps between fixtures so the codex file is newer. No host
   # signal → cross-root winner = codex/bbbb2222.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
-    node "$BIN" latest
+    node "$BIN" pull latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
   [[ "$stderr" == *"host not detected"* ]]
 }
 
-@test "<query> latest with CLAUDECODE=1 narrows to claude root" {
+@test "pull latest with CLAUDECODE=1 narrows to claude root" {
   # The outer-shell probe fires; `latest` must resolve within ~/.claude
   # only, so aaaa1111 wins even though the codex fixture is newer on disk.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
-    node "$BIN" latest
+    node "$BIN" pull latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"aaaa1111"* ]]
   [[ "$output" != *"bbbb2222"* ]]
@@ -121,41 +127,57 @@ teardown() {
   [[ "$stderr" == *"aaaa1111"* ]]
 }
 
-@test "<query> latest --from codex overrides host detection" {
+@test "pull latest --from codex overrides host detection" {
   # --from must outrank detectedHost, mirroring push's precedence.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
-    node "$BIN" latest --from codex
+    node "$BIN" pull latest --from codex
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
   [[ "$output" != *"aaaa1111"* ]]
   [[ "$stderr" == *"--from codex"* ]]
 }
 
-@test "<query> latest --from with unknown cli exits 64" {
-  run node "$BIN" latest --from bogus
+@test "pull latest --from with unknown cli exits 64" {
+  run node "$BIN" pull latest --from bogus
   [ "$status" -eq 64 ]
   [[ "$output" == *"--from must be one of"* ]]
 }
 
-@test "<query> non-latest: host detection does NOT narrow (UUID lookup stays global)" {
+@test "pull non-latest: host detection does NOT narrow (UUID lookup stays global)" {
   # A short-UUID is unambiguous — narrowing by host would hide a valid
   # cross-agent match. CLAUDECODE=1 must not prevent bbbb2222 lookup.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
-    node "$BIN" bbbb2222
+    node "$BIN" pull bbbb2222
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
 }
 
-@test "<query>: collision across CLIs on non-TTY stdin exits 2 with candidate list" {
+@test "pull: collision across CLIs on non-TTY stdin exits 2 with candidate list" {
   # Introduce collision: claude customTitle "both" + codex thread_name "both"
   printf '{"type":"custom-title","customTitle":"both","sessionId":"aaaa1111-1111-1111-1111-111111111111"}\n' \
     >> "$CLAUDE_FILE"
   printf '{"type":"event_msg","payload":{"thread_name":"both","type":"thread_renamed"}}\n' \
     >> "$CODEX_FILE"
-  run node "$BIN" both </dev/null
+  run node "$BIN" pull both </dev/null
   [ "$status" -eq 2 ]
   [[ "$output" == *"claude"* ]]
   [[ "$output" == *"codex"* ]]
+}
+
+# -- pull: no-match hint for remote handoffs (#87) ------------------------
+
+@test "pull <unmatched> with DOTCLAUDE_HANDOFF_REPO set appends fetch hint" {
+  run --separate-stderr node "$BIN" pull nonexistent-tag
+  [ "$status" -eq 2 ]
+  # DOTCLAUDE_HANDOFF_REPO is set in setup(); hint must surface.
+  [[ "$stderr" == *"fetch"* ]]
+}
+
+@test "pull <unmatched> without DOTCLAUDE_HANDOFF_REPO emits no fetch hint" {
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
+    node "$BIN" pull nonexistent-tag
+  [ "$status" -eq 2 ]
+  [[ "$stderr" != *"fetch <id>"* ]]
 }
 
 # -- list (unified + filters) --------------------------------------------
@@ -181,10 +203,6 @@ teardown() {
 @test "push <query> uploads to remote (v2 branch shape)" {
   run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
-  # Confirm the transport repo has a v2 branch. The month segment
-  # reflects the current UTC month; we match with a glob rather than
-  # hard-coding the date so the test stays stable across calendar
-  # rollovers. Fixture cwd `/home/u/demo` → project slug "demo".
   run bash -c "git --git-dir='$TRANSPORT_REPO' branch -a"
   [ "$status" -eq 0 ]
   [[ "$output" =~ handoff/demo/claude/[0-9]{4}-[0-9]{2}/aaaa1111 ]]
@@ -193,8 +211,6 @@ teardown() {
 @test "push --tag label embeds tag in the transport description" {
   run node "$BIN" push my-feature --tag finishing-auth
   [ "$status" -eq 0 ]
-  # Find the branch name via ls-remote, then grep its commit message
-  # for the tag segment.
   run bash -c "git --git-dir='$TRANSPORT_REPO' for-each-ref --format='%(refname:short)' 'refs/heads/handoff/demo/claude/*/aaaa1111'"
   [ "$status" -eq 0 ]
   branch="$output"
@@ -210,39 +226,38 @@ teardown() {
   [[ "$output" == *"handoff/"* ]]
 }
 
-# -- pull (fuzzy match across description fields) ------------------------
+# -- fetch (remote git transport, formerly `pull`) -----------------------
 
-@test "pull <tag-substring> fetches by tag match" {
-  # First push with a tag, then try to pull by that tag.
+@test "fetch <tag-substring> fetches by tag match" {
   run node "$BIN" push my-feature --tag finishing-auth
   [ "$status" -eq 0 ]
-  run node "$BIN" pull finishing-auth
+  run node "$BIN" fetch finishing-auth
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
 
-@test "pull <short-uuid> fetches by short UUID match" {
+@test "fetch <short-uuid> fetches by short UUID match" {
   run node "$BIN" push my-feature
   [ "$status" -eq 0 ]
-  run node "$BIN" pull aaaa1111
+  run node "$BIN" fetch aaaa1111
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
 
-@test "pull (zero-arg) fetches the latest" {
+@test "fetch (zero-arg) fetches the latest" {
   run node "$BIN" push my-feature --tag keepme
   [ "$status" -eq 0 ]
-  run node "$BIN" pull
+  run node "$BIN" fetch
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
 }
 
-@test "pull collision on non-TTY exits 2 with candidate list" {
+@test "fetch collision on non-TTY exits 2 with candidate list" {
   run node "$BIN" push my-feature --tag alpha
   [ "$status" -eq 0 ]
   run node "$BIN" push my-codex-task --tag alpha-beta
   [ "$status" -eq 0 ]
-  run node "$BIN" pull alpha </dev/null
+  run node "$BIN" fetch alpha </dev/null
   [ "$status" -eq 2 ]
   [[ "$output" =~ handoff/demo/(claude|codex)/ ]]
 }
@@ -257,8 +272,6 @@ teardown() {
 }
 
 @test "push <cli> <query> exits 64 with the breaking-change message" {
-  # The shim catches the removed form and points the user at --from
-  # or dropping the positional entirely.
   run node "$BIN" push claude aaaa1111
   [ "$status" -eq 64 ]
   [[ "$output" == *"no longer takes a <cli> positional"* ]]
@@ -266,19 +279,22 @@ teardown() {
 }
 
 @test "pull <cli> <query> exits 64 with the breaking-change message" {
-  # Mirror of the push shim — the parallel surface keeps parallel errors.
   run node "$BIN" pull claude aaaa1111
   [ "$status" -eq 64 ]
   [[ "$output" == *"no longer takes a <cli> positional"* ]]
   [[ "$output" == *"--from claude"* ]]
 }
 
+@test "fetch <cli> <query> exits 64 with the breaking-change message" {
+  run node "$BIN" fetch codex bbbb2222
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"no longer takes a <cli> positional"* ]]
+  [[ "$output" == *"--from codex"* ]]
+}
+
 # -- --from flag ----------------------------------------------------------
 
 @test "push --from codex (no query) narrows the fallback to the codex root" {
-  # With env cleared (no host detected), --from steers the fallback away
-  # from `resolveAny("latest")` (union) to the codex-only "latest".
-  # setup() seeds codex with bbbb2222 as the newest of its root.
   run env -i HOME="$TEST_HOME" PATH="$PATH" DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
     node "$BIN" push --from codex
   [ "$status" -eq 0 ]
@@ -292,14 +308,8 @@ teardown() {
   [[ "$output" == *"--from must be one of"* ]]
 }
 
-@test "pull --from codex narrows the transport candidate pool" {
-  # Push one handoff per CLI, then pull with --from codex and confirm
-  # the returned block names the codex session (bbbb2222), not the
-  # claude one (aaaa1111). Proves --from is wired through pullRemote.
-  run node "$BIN" push my-feature
-  [ "$status" -eq 0 ]
-  run node "$BIN" push my-codex-task
-  [ "$status" -eq 0 ]
+@test "pull --from codex narrows to local codex session" {
+  # `pull --from codex` resolves locally; bbbb2222 is the only codex session.
   run node "$BIN" pull --from codex
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
@@ -312,11 +322,21 @@ teardown() {
   [[ "$output" == *"--from must be one of"* ]]
 }
 
+@test "fetch --from codex narrows the remote candidate pool" {
+  # Push one handoff per CLI, then fetch with --from codex and confirm
+  # the returned block names the codex session (bbbb2222), not the
+  # claude one (aaaa1111). Proves --from is wired through pullRemote.
+  run node "$BIN" push my-feature
+  [ "$status" -eq 0 ]
+  run node "$BIN" push my-codex-task
+  [ "$status" -eq 0 ]
+  run node "$BIN" fetch --from codex
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bbbb2222"* ]]
+  [[ "$output" != *"aaaa1111"* ]]
+}
+
 @test "push --from codex beats CLAUDECODE=1 (override precedence)" {
-  # --from is an explicit user intent and must outrank the env-var
-  # probe. Without this assertion, a regression swapping the precedence
-  # of `fromCli ?? detectedHost` would silently mis-route a user who
-  # explicitly asked for codex from inside a Claude Code session.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
     node "$BIN" push --from codex
@@ -329,9 +349,6 @@ teardown() {
 # -- honest stderr fallback notes ----------------------------------------
 
 @test "push (no args, no host signal) emits stderr note about unknown host" {
-  # env -i clears CLAUDECODE / CODEX_* / COPILOT_* leaking from the
-  # parent shell, so detectHost() returns "unknown" and the bare-push
-  # path uses the union resolver with the matching stderr note.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
     node "$BIN" push
@@ -341,9 +358,6 @@ teardown() {
 }
 
 @test "push (no args, CLAUDECODE=1) emits stderr note about claude" {
-  # The claude probe fires, so the fallback narrows to the claude root.
-  # The seeded claude session (aaaa1111) is the only one under that
-  # root, so its short-UUID must surface in the stderr note.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
     node "$BIN" push
@@ -352,13 +366,56 @@ teardown() {
   [[ "$stderr" == *"aaaa1111"* ]]
 }
 
+# -- cross-agent regression tests (#87) ----------------------------------
+# These lock in the invariants described in SKILL.md for all three hosts.
+
+@test "pull copilot session under CLAUDECODE=1 resolves globally and targets claude" {
+  # resolveAny finds cccc3333 in the copilot root.
+  # CLAUDECODE=1 → detected host = claude → --to defaults to claude.
+  # The Claude-tuned next-step hint must appear in the block.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
+    node "$BIN" pull cccc3333
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"copilot"* ]]
+  [[ "$output" == *"Continue from"* ]]
+}
+
+@test "pull zero-arg under CODEX_HOME narrows to codex root" {
+  # CODEX_HOME triggers the CODEX_* env-var probe, returning "codex" from
+  # detectHost(). Host-scoped `latest` then narrows to the codex root.
+  # bbbb2222 is the newest codex session (seeded last in setup).
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CODEX_HOME="/any/path" \
+    node "$BIN" pull
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bbbb2222"* ]]
+  [[ "$output" != *"aaaa1111"* ]]
+  [[ "$stderr" == *"latest codex session"* ]]
+  [[ "$stderr" == *"bbbb2222"* ]]
+}
+
+@test "pull --to copilot overrides detected host for the next-step hint" {
+  # --to is orthogonal to --from and detection; passing --to copilot must
+  # use the Copilot-tuned wording regardless of detected host.
+  run node "$BIN" pull aaaa1111 --to copilot
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"<handoff"* ]]
+  [[ "$output" == *"pick up where"* ]]
+}
+
+@test "pull --from copilot under CLAUDECODE=1: source narrows, --to stays claude" {
+  # --from narrows the local resolver to the copilot root.
+  # CLAUDECODE=1 makes the detected host claude.
+  # --to must still default to claude (detected host), NOT to the --from value.
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
+    node "$BIN" pull cccc3333 --from copilot
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"copilot"* ]]
+  [[ "$output" == *"Continue from"* ]]
+}
+
 # -- --via flag removal (v0.9.0 breaking change) -------------------------
 
 @test "--via with any value exits 64 (gist transport removed)" {
-  # The flag was deleted along with the gist transports. The argv
-  # parser is the first line of defence — it rejects --via as an
-  # unknown option, so legacy scripts surface the migration via the
-  # usage error rather than silently accepting a no-op flag.
   run node "$BIN" push --via github
   [ "$status" -eq 64 ]
   [[ "$output" == *"--via"* ]]

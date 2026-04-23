@@ -5,6 +5,8 @@
 
 load helpers
 
+bats_require_minimum_version 1.5.0
+
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
 EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
 DESCRIPTION="$REPO_ROOT/plugins/dotclaude/scripts/handoff-description.sh"
@@ -80,9 +82,9 @@ teardown() {
 
 # -- JSON output contract ------------------------------------------------
 
-@test "describe --json emits valid JSON parsable by jq" {
+@test "pull --summary --json emits valid JSON parsable by jq" {
   make_claude_session_tree "$TEST_HOME" "aaaa1111-1111-1111-1111-111111111111"
-  run node "$HANDOFF_BIN" describe claude latest --json
+  run --separate-stderr node "$HANDOFF_BIN" pull latest --summary --json
   [ "$status" -eq 0 ]
   # jq must be able to parse the entire output as a single JSON document.
   # If it is malformed, jq exits non-zero and the chained assertion fails.
