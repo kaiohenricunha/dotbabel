@@ -791,8 +791,8 @@ export async function pushRemote({
     scrubbed_count: scrubbedCount,
     // #91 Gap 7: write both shapes for one release cycle so deployed installs
     // that only know about `metadata.tag` keep working. New readers prefer
-    // `metadata.tags` via tagsFromMeta(); the legacy field will be dropped
-    // in a follow-up.
+    // `metadata.tags` via tagsFromMeta().
+    // TODO(#91 Gap 7 follow-up, after 0.13.0): drop the legacy `tag` field.
     tags: tagList,
     tag: tagList[0] ?? null,
   };
@@ -1258,19 +1258,24 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
 
   // Cheap pass: filter by branch name (no description fetch). Preserves the
   // O(1)-network behavior for `pull <short-uuid>` against large transports.
-  let hits = candidates.filter((c) => matchesQuery(c, query));
-  if (hits.length === 0) {
-    // No cheap match → enrich everyone and look for an exact-tag match
-    // first (#91 Gap 7), then fall back to description substring.
+  const cheap = candidates.filter((c) => matchesQuery(c, query));
+  let hits;
+  if (cheap.length === 1) {
+    // Unambiguous cheap hit — return without enriching. Saves one
+    // description fetch on the common `fetch <short-uuid>` path.
+    hits = cheap;
+  } else if (cheap.length > 1) {
+    // Multiple cheap hits — enrich for the collision UI and prefer exact-tag
+    // matches within (#91 Gap 7).
+    const enriched = enrichWithDescriptions(cheap);
+    const tagHits = enriched.filter((c) => parseTagsFromDescription(c.description).includes(query));
+    hits = tagHits.length > 0 ? tagHits : enriched;
+  } else {
+    // No cheap match — enrich everyone, try exact-tag first (#91 Gap 7),
+    // fall back to description substring.
     const enriched = enrichWithDescriptions(candidates);
     const tagHits = enriched.filter((c) => parseTagsFromDescription(c.description).includes(query));
     hits = tagHits.length > 0 ? tagHits : enriched.filter((c) => matchesQuery(c, query));
-  } else {
-    // Cheap branch-name hits exist; enrich them so the collision UI shows
-    // descriptions, and within them prefer exact-tag matches if any (#91 Gap 7).
-    const enriched = enrichWithDescriptions(hits);
-    const tagHits = enriched.filter((c) => parseTagsFromDescription(c.description).includes(query));
-    hits = tagHits.length > 0 ? tagHits : enriched;
   }
 
   if (hits.length === 0) {

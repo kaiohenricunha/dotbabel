@@ -78,16 +78,16 @@ with a TSV candidate list on stderr.
 The binary's `--help` lists the full surface and authoritative flag
 semantics. Brief summary:
 
-| Sub                  | Purpose                                                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `pull [<id>]`        | Render local session to stdout (`<handoff>` block); `--summary` for prose; `-o` to write to disk     |
-| `resolve <cli> <id>` | Print the absolute JSONL path                                                                        |
+| Sub                  | Purpose                                                                                                               |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `pull [<id>]`        | Render local session to stdout (`<handoff>` block); `--summary` for prose; `-o` to write to disk                      |
+| `resolve <cli> <id>` | Print the absolute JSONL path                                                                                         |
 | `list`               | Unified local + remote table (`--local`/`--remote`, `--from`, `--since`, `--limit`/`--all`, `--tag <name>`, `--tags`) |
-| `search <query>`     | Substring/regex match across local sessions; `--from` / `--since` / `--limit` / `--fixed` / `--json` |
-| `push [<query>]`     | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag`                                                           |
-| `fetch [<handle>]`   | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline                                      |
-| `remote-list`        | List handoffs on the transport; `--from` / `--since` / `--limit`                                     |
-| `doctor`             | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback                                             |
+| `search <query>`     | Substring/regex match across local sessions; `--from` / `--since` / `--limit` / `--fixed` / `--json`                  |
+| `push [<query>]`     | Push to `$DOTCLAUDE_HANDOFF_REPO`; `--tag`                                                                            |
+| `fetch [<handle>]`   | Fetch from `$DOTCLAUDE_HANDOFF_REPO`; `--from-file` for offline                                                       |
+| `remote-list`        | List handoffs on the transport; `--from` / `--since` / `--limit`                                                      |
+| `doctor`             | Verify `git` + `$DOTCLAUDE_HANDOFF_REPO` + `gh` fallback                                                              |
 
 Cross-cutting flags (consult `--help` for the canonical list):
 

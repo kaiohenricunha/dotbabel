@@ -858,14 +858,16 @@ async function main() {
     // #91 Gap 7: --tag <name> filters; --tags switches to histogram render.
     // Both need description-side tag info, so enrich once if either flag is
     // set (avoids the per-row fetch when neither is in play).
-    const tagFilter = (() => {
-      const t = argv.flags.tag;
-      if (Array.isArray(t) && t.length > 0) return String(t[0]);
-      if (typeof t === "string") return t;
-      return null;
-    })();
+    //
+    // Multiple --tag values on `list` are treated as OR: a row is kept if any
+    // of its tags matches any of the requested filters. The same flag is
+    // multi-value on `push` (collect) — argv.mjs returns string[] in both
+    // cases — so this is a deliberate per-verb semantic, not a smell.
+    const tagFilters = Array.isArray(argv.flags.tag)
+      ? argv.flags.tag.map(String).filter((t) => t.length > 0)
+      : [];
     const wantHistogram = Boolean(argv.flags.tags);
-    const needTags = tagFilter !== null || wantHistogram;
+    const needTags = tagFilters.length > 0 || wantHistogram;
     if (showRemote) {
       if (!process.env.DOTCLAUDE_HANDOFF_REPO) {
         remoteSkipped = true;
@@ -880,7 +882,7 @@ async function main() {
             const parsed = parseHandoffBranch(c.branch);
             if (fromCli && parsed.cli !== fromCli) continue;
             const tagList = needTags ? parseTagsFromDescription(c.description) : [];
-            if (tagFilter !== null && !tagList.includes(tagFilter)) continue;
+            if (tagFilters.length > 0 && !tagFilters.some((f) => tagList.includes(f))) continue;
             rows.push({
               location: "remote",
               cli: parsed.cli,

@@ -106,7 +106,7 @@ cmd_encode() {
   [[ "$short_id" =~ ^[0-9a-f]{8}$ ]] || die "--short-id must be exactly 8 hex chars"
   valid_month "$month" || die "--month must be YYYY-MM (got: $month)"
 
-  local project_slug hostname_slug tag_slug=""
+  local project_slug hostname_slug
   project_slug="$(slugify "$project")"
   hostname_slug="$(slugify "$hostname")"
   valid_segment "$project_slug" || die "project slug invalid after normalization: $project_slug"
