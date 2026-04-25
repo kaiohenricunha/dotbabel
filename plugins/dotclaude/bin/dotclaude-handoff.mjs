@@ -76,6 +76,8 @@ import {
   listRemoteCandidates,
   enrichWithDescriptions,
   matchesQuery,
+  // tags first-class (#91 Gap 7) — for list --tag filter and --tags histogram
+  parseTagsFromDescription,
   // prune (#91 Gap 5)
   parseDuration,
   listPruneCandidates,
@@ -106,11 +108,16 @@ const CLIS = new Set(["claude", "copilot", "codex"]);
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor|remote-list] [args...] [--from <cli>] [--to <cli>] [--summary] [-o <path>] [--tag <label>] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
+    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor|remote-list] [args...] [--from <cli>] [--to <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
     "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.",
   flags: {
-    tag: { type: "string" },
+    // #91 Gap 7: tag is multi-valued for push (--tag foo --tag bar) and a
+    // single-value filter on `list --remote --tag <name>`. argv.mjs always
+    // hands back an array when multiple is true.
+    tag: { type: "string", multiple: true },
+    // Boolean flag for `list --remote --tags` histogram mode.
+    tags: { type: "boolean" },
     from: { type: "string" },
     to: { type: "string" },
     limit: { type: "string" },
@@ -848,6 +855,17 @@ async function main() {
     }
 
     let remoteSkipped = false;
+    // #91 Gap 7: --tag <name> filters; --tags switches to histogram render.
+    // Both need description-side tag info, so enrich once if either flag is
+    // set (avoids the per-row fetch when neither is in play).
+    const tagFilter = (() => {
+      const t = argv.flags.tag;
+      if (Array.isArray(t) && t.length > 0) return String(t[0]);
+      if (typeof t === "string") return t;
+      return null;
+    })();
+    const wantHistogram = Boolean(argv.flags.tags);
+    const needTags = tagFilter !== null || wantHistogram;
     if (showRemote) {
       if (!process.env.DOTCLAUDE_HANDOFF_REPO) {
         remoteSkipped = true;
@@ -856,9 +874,13 @@ async function main() {
         );
       } else {
         try {
-          for (const c of listRemoteCandidates()) {
+          const inventory = listRemoteCandidates();
+          const enriched = needTags ? enrichWithDescriptions(inventory) : inventory;
+          for (const c of enriched) {
             const parsed = parseHandoffBranch(c.branch);
             if (fromCli && parsed.cli !== fromCli) continue;
+            const tagList = needTags ? parseTagsFromDescription(c.description) : [];
+            if (tagFilter !== null && !tagList.includes(tagFilter)) continue;
             rows.push({
               location: "remote",
               cli: parsed.cli,
@@ -866,12 +888,46 @@ async function main() {
               branch: c.branch,
               commit: c.commit,
               when: parsed.yearMonth,
+              tags: tagList,
             });
           }
         } catch (err) {
           process.stderr.write(`dotclaude-handoff: list --remote: ${err.message}\n`);
         }
       }
+    }
+
+    // Histogram mode short-circuits the row render. Aggregate over rows we
+    // already gathered (already filtered by --from / --since / --tag).
+    if (wantHistogram) {
+      const counts = new Map();
+      let untagged = 0;
+      for (const r of rows) {
+        if (!Array.isArray(r.tags) || r.tags.length === 0) {
+          untagged += 1;
+          continue;
+        }
+        for (const t of r.tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+      }
+      const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+      if (argv.json) {
+        process.stdout.write(
+          JSON.stringify({ histogram: Object.fromEntries(sorted), untagged }, null, 2) + "\n",
+        );
+        process.exit(EXIT_CODES.OK);
+      }
+      const total = rows.length;
+      process.stdout.write(
+        `tag histogram on transport (${total} branch${total === 1 ? "" : "es"}):\n`,
+      );
+      const widest = sorted.reduce((w, [k]) => Math.max(w, k.length), "(untagged)".length);
+      for (const [tag, n] of sorted) {
+        process.stdout.write(`  ${tag.padEnd(widest)}  ${n}\n`);
+      }
+      if (untagged > 0) {
+        process.stdout.write(`  ${"(untagged)".padEnd(widest)}  ${untagged}\n`);
+      }
+      process.exit(EXIT_CODES.OK);
     }
 
     rows.sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0));
@@ -918,7 +974,9 @@ async function main() {
     }
     if (fallbackNote) process.stderr.write(fallbackNote + "\n");
 
-    const tag = argv.flags.tag ? String(argv.flags.tag) : null;
+    // #91 Gap 7: --tag is multi-valued. argv.flags.tag is now string[] when
+    // any --tag was passed, or undefined. Pass through as `tags`.
+    const tags = Array.isArray(argv.flags.tag) ? argv.flags.tag.map(String) : [];
     const verify = Boolean(argv.flags.verify);
     const verbose = Boolean(argv.verbose);
     const force = Boolean(argv.flags["force-collision"]);
@@ -927,7 +985,7 @@ async function main() {
       const result = await pushRemote({
         cli: sessionHit.cli,
         path: sessionHit.path,
-        tag,
+        tags,
         verify,
         verbose,
         force,

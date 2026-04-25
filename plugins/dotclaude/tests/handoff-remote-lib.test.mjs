@@ -41,6 +41,7 @@ describe("export shape", () => {
     "PRUNE_SKIP_BUCKETS",
     "parseDuration",
     "parseHandoffBranch",
+    "parseTagsFromDescription",
     "printManualSetupBlock",
     "probeCollision",
     "projectSlugFromCwd",
@@ -55,6 +56,7 @@ describe("export shape", () => {
     "runScript",
     "slugify",
     "slugifyRepoName",
+    "tagsFromMeta",
     "v2BranchName",
     "validateTransportUrl",
   ];

@@ -252,12 +252,28 @@ teardown() {
   [[ "$output" == *"<handoff"* ]]
 }
 
-@test "fetch collision on non-TTY exits 2 with candidate list" {
+@test "fetch <tag>: exact-tag match wins over substring (#91 Gap 7)" {
+  # Two branches with overlapping tag substrings: "alpha" and "alpha-beta".
+  # Pre-Gap-7, `fetch alpha` would substring-match both and exit 2 with a
+  # collision. Post-Gap-7, exact-tag pre-pass resolves to the `alpha` branch.
   run node "$BIN" push my-feature --tag alpha
   [ "$status" -eq 0 ]
   run node "$BIN" push my-codex-task --tag alpha-beta
   [ "$status" -eq 0 ]
   run node "$BIN" fetch alpha </dev/null
+  [ "$status" -eq 0 ]
+}
+
+@test "fetch collision on non-TTY exits 2 when substring matches both descriptions" {
+  # `my-feature` substring appears in two distinct branch descriptions
+  # (one for the claude session, one for the codex session). With no
+  # exact-tag match available, the resolver falls back to substring and
+  # surfaces both candidates as a collision.
+  run node "$BIN" push my-feature
+  [ "$status" -eq 0 ]
+  run node "$BIN" push my-codex-task
+  [ "$status" -eq 0 ]
+  run node "$BIN" fetch demo </dev/null
   [ "$status" -eq 2 ]
   [[ "$output" =~ handoff/demo/(claude|codex)/ ]]
 }

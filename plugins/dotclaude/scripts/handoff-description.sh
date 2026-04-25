@@ -43,6 +43,36 @@ valid_segment() {
   [[ "$1" =~ ^[a-z0-9-]{1,40}$ ]]
 }
 
+# Validates a tag segment: comma-joined slugified tokens, each [a-z0-9-]{1,40}.
+# Used for the optional 8th segment in v2 (and v1's optional 7th).
+valid_tag_segment() {
+  local seg="$1" IFS=','
+  [[ -z "$seg" ]] && return 1
+  for token in $seg; do
+    [[ "$token" =~ ^[a-z0-9-]{1,40}$ ]] || return 1
+  done
+  return 0
+}
+
+# Emits the JSON fragment for tag/tags. Pass empty string for "no tag".
+# Output: ,"tag":"first","tags":["a","b"]   OR   ,"tag":null,"tags":[]
+emit_tags_json() {
+  local seg="$1"
+  if [[ -z "$seg" ]]; then
+    printf ',"tag":null,"tags":[]'
+    return
+  fi
+  local first="${seg%%,*}"
+  local arr="" IFS=','
+  for token in $seg; do
+    [[ -z "$token" ]] && continue
+    if [[ -z "$arr" ]]; then arr="\"$token\""
+    else arr="${arr},\"$token\""
+    fi
+  done
+  printf ',"tag":"%s","tags":[%s]' "$first" "$arr"
+}
+
 # YYYY-MM month bucket — exactly 4 digits, dash, 2 digits.
 valid_month() {
   [[ "$1" =~ ^[0-9]{4}-[0-9]{2}$ ]]
@@ -84,9 +114,20 @@ cmd_encode() {
 
   local out="handoff:v2:${project_slug}:${cli}:${month}:${short_id}:${hostname_slug}"
   if [[ -n "$tag" ]]; then
-    tag_slug="$(slugify "$tag")"
-    valid_segment "$tag_slug" || die "tag slug invalid after normalization: $tag_slug"
-    out="${out}:${tag_slug}"
+    # Multi-tag (#91 Gap 7): value may be a single tag or a comma-joined list.
+    # Split on comma, slugify each token, validate, rejoin. Single-tag input
+    # has no comma → produces a one-element list → backward compatible.
+    local tag_joined="" first=1
+    local IFS=','
+    for token in $tag; do
+      [[ -z "$token" ]] && continue
+      local s; s="$(slugify "$token")"
+      valid_segment "$s" || die "tag slug invalid after normalization: $s"
+      if (( first )); then tag_joined="$s"; first=0
+      else tag_joined="${tag_joined},${s}"
+      fi
+    done
+    [[ -n "$tag_joined" ]] && out="${out}:${tag_joined}"
   fi
 
   printf '%s\n' "$out"
@@ -111,16 +152,11 @@ decode_v2() {
   valid_segment "$project" || die "malformed v2: project slug fails charset"
   valid_segment "$hostname" || die "malformed v2: hostname slug fails charset"
   if [[ -n "${tag:-}" ]]; then
-    valid_segment "$tag" || die "malformed v2: tag slug fails charset"
+    valid_tag_segment "$tag" || die "malformed v2: tag segment fails charset"
   fi
 
-  if [[ -n "${tag:-}" ]]; then
-    printf '{"schema":"v2","cli":"%s","short_id":"%s","project":"%s","month":"%s","hostname":"%s","tag":"%s"}\n' \
-      "$cli" "$short_id" "$project" "$month" "$hostname" "$tag"
-  else
-    printf '{"schema":"v2","cli":"%s","short_id":"%s","project":"%s","month":"%s","hostname":"%s","tag":null}\n' \
-      "$cli" "$short_id" "$project" "$month" "$hostname"
-  fi
+  printf '{"schema":"v2","cli":"%s","short_id":"%s","project":"%s","month":"%s","hostname":"%s"%s}\n' \
+    "$cli" "$short_id" "$project" "$month" "$hostname" "$(emit_tags_json "${tag:-}")"
 }
 
 # Decode a legacy v1 description (read-only — no encode path). Segments:
@@ -141,18 +177,13 @@ decode_v1() {
   valid_segment "$project" || die "malformed v1: project slug fails charset"
   valid_segment "$hostname" || die "malformed v1: hostname slug fails charset"
   if [[ -n "${tag:-}" ]]; then
-    valid_segment "$tag" || die "malformed v1: tag slug fails charset"
+    valid_tag_segment "$tag" || die "malformed v1: tag segment fails charset"
   fi
 
   # Emit the same shape as v2's JSON, with month=null (legacy lacks it)
   # and schema=v1 so callers can mark these as "(legacy)" in UI.
-  if [[ -n "${tag:-}" ]]; then
-    printf '{"schema":"v1","cli":"%s","short_id":"%s","project":"%s","month":null,"hostname":"%s","tag":"%s"}\n' \
-      "$cli" "$short_id" "$project" "$hostname" "$tag"
-  else
-    printf '{"schema":"v1","cli":"%s","short_id":"%s","project":"%s","month":null,"hostname":"%s","tag":null}\n' \
-      "$cli" "$short_id" "$project" "$hostname"
-  fi
+  printf '{"schema":"v1","cli":"%s","short_id":"%s","project":"%s","month":null,"hostname":"%s"%s}\n' \
+    "$cli" "$short_id" "$project" "$hostname" "$(emit_tags_json "${tag:-}")"
 }
 
 cmd_decode() {
