@@ -43,10 +43,12 @@
 //   the test enforces the lockstep.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { parseFrontmatter } from "../src/index.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -132,12 +134,12 @@ const PHASE_1_BASELINE_FROM_RULE = Object.freeze({
  * @returns {HandoffSurface}
  */
 export function extractFromSkillMd(text) {
-  // argument-hint: "[pull|push|fetch|list|search|resolve|doctor] [args...]"
-  const argHintLine = text.match(/^argument-hint:\s*"([^"]+)"\s*$/m);
-  if (!argHintLine) {
-    throw new Error("SKILL.md: could not find `argument-hint:` frontmatter line");
+  const { frontmatter } = parseFrontmatter(text);
+  const argHint = frontmatter["argument-hint"];
+  if (typeof argHint !== "string") {
+    throw new Error("SKILL.md: frontmatter missing string `argument-hint` key");
   }
-  const firstGroup = argHintLine[1].match(/\[([^\]]+)\]/);
+  const firstGroup = argHint.match(/\[([^\]]+)\]/);
   if (!firstGroup) {
     throw new Error("SKILL.md: argument-hint missing `[verb1|verb2|...]` group");
   }
@@ -147,21 +149,20 @@ export function extractFromSkillMd(text) {
     .filter(Boolean)
     .sort();
 
-  // Cross-cutting flags section — bullets like `- \`--from <cli>\` ...`
-  // We capture from the section heading until the next `## ` heading.
+  // "Cross-cutting flags" lives as a paragraph inside `## Sub-commands` —
+  // not its own H2 — so the shared `extractTemplateSection` doesn't apply.
+  // Capture from the inline paragraph header to the next `##`/`#` heading.
   const flagsSection = text.match(/Cross-cutting flags[^\n]*\n[\s\S]*?(?=\n## |\n# |$)/);
   if (!flagsSection) {
     throw new Error("SKILL.md: could not find `Cross-cutting flags` section");
   }
   const flagTokens = new Set();
-  // Match the FIRST backtick-wrapped token at the start of each bullet line.
-  // SKILL.md bullets begin: `- \`--name <value>\` ...` or `- \`--name\` ...`
-  // We accept `--name`, `-x`, and `--name`/`-x` (slash-joined alias forms).
-  const bulletRegex = /^[\s]*-\s+`(--?[a-z][a-z0-9-]*(?:\/-?[a-zA-Z])?)/gm;
+  // Each bullet begins `- \`<token>\``; tokens may be slash-joined aliases
+  // (`--fixed/-F`) or comma-separated (`` `--name`, `-x` ``). Accept both.
+  const bulletRegex = /^\s*-\s+`(--?[a-z][a-zA-Z0-9-]*(?:[/,]\s*`?-?-?[a-zA-Z][a-zA-Z0-9-]*`?)*)/gm;
   let m;
   while ((m = bulletRegex.exec(flagsSection[0])) !== null) {
-    // Split slash-joined aliases (`--fixed/-F`) into both tokens.
-    for (const tok of m[1].split("/")) {
+    for (const tok of m[1].split(/[/,`\s]+/)) {
       if (tok && tok.startsWith("-")) flagTokens.add(tok);
     }
   }
@@ -169,7 +170,7 @@ export function extractFromSkillMd(text) {
   return {
     commands,
     flags_by_command: { "*": [...flagTokens].sort() },
-    from_rule: extractFromRule(text, "skill"),
+    from_rule: extractFromRule(text),
   };
 }
 
@@ -183,9 +184,11 @@ export function extractFromSkillMd(text) {
  * @returns {HandoffSurface}
  */
 export function extractFromHelp(text) {
-  const synopsisGroup = text.match(/dotclaude handoff\s+\[([^\]]+)\]\s+\[args/);
+  // Anchor only on the verb group; spec §5.0 keeps `--help` wording editable
+  // (`[args...]` may be rephrased as `[arguments]`, `<args>`, or omitted).
+  const synopsisGroup = text.match(/dotclaude handoff\s+\[([^\]]+)\]/);
   if (!synopsisGroup) {
-    throw new Error("--help: synopsis line missing `[verb1|verb2|...] [args...]` shape");
+    throw new Error("--help: synopsis line missing `[verb1|verb2|...]` group");
   }
   const commands = synopsisGroup[1]
     .split("|")
@@ -193,7 +196,9 @@ export function extractFromHelp(text) {
     .filter(Boolean)
     .sort();
 
-  const optsBlock = text.match(/^Options:\s*$([\s\S]*?)(?=^[A-Z][\w ]*:|\Z)/m);
+  // Capture from `Options:` to the next title-case section header or EOF.
+  // (`\Z` is not a JS regex anchor — `(?![\s\S])` is the EOF lookahead.)
+  const optsBlock = text.match(/^Options:\s*$([\s\S]*?)(?=^[A-Z][\w ]*:|(?![\s\S]))/m);
   if (!optsBlock) {
     throw new Error("--help: could not find `Options:` block");
   }
@@ -211,7 +216,7 @@ export function extractFromHelp(text) {
   return {
     commands,
     flags_by_command: { "*": [...flagTokens].sort() },
-    from_rule: extractFromRule(text, "help"),
+    from_rule: extractFromRule(text),
   };
 }
 
@@ -223,14 +228,18 @@ export function extractFromHelp(text) {
  * (or whatever Phase 2 freezes), and the baseline above will flip.
  *
  * @param {string} text
- * @param {"skill"|"help"} _source  — reserved for source-specific search heuristics; unused today
  * @returns {FromRule}
  */
-export function extractFromRule(text, _source) {
+export function extractFromRule(text) {
+  // Cheap absence check first: if `--from` doesn't appear at all, nothing
+  // could match the four-clause heuristic below.
+  if (!/--from\b/.test(text)) return { present: false, applies_to: [], mandatory_when: null };
+
   // Heuristic: a paragraph that mentions all of:
   //   (a) `--from` as a flag,
   //   (b) `push` (the verb the rule applies to),
-  //   (c) a "no <query>" / "without <query>" marker.
+  //   (c) a "no <query>" / "without <query>" marker (or synonym),
+  //   (d) a required/mandatory marker.
   // We avoid prose-exact matching per spec §5.0 (wording stays editable).
   // Keep this loose enough to find the §5.5.2 paragraph in any reasonable
   // wording, strict enough not to false-positive on incidental flag mentions.
@@ -242,7 +251,8 @@ export function extractFromRule(text, _source) {
     const mentionsNoQuery =
       /\bno\s*<?query>?\b/.test(lower) ||
       /\bwithout\s+(?:a\s+)?<?query>?\b/.test(lower) ||
-      /\bwhen\s+no\s+`?<?query>?`?\b/.test(lower);
+      /\bwhen\s+no\s+`?<?query>?`?\b/.test(lower) ||
+      /\b(?:omit(?:ting|ted)?|absent|missing)\s+(?:the\s+|a\s+)?<?query>?\b/.test(lower);
     const mentionsRequired =
       /\bmandator(?:y|ily)\b/.test(lower) ||
       /\brequired?\b/.test(lower) ||
@@ -272,11 +282,14 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     const skillText = readFileSync(SKILL_MD_PATH, "utf8");
     skillSurface = extractFromSkillMd(skillText);
 
+    // The bin sources `$XDG_CONFIG_HOME/dotclaude/handoff.env` at startup
+    // (default `$HOME/.config/...`). Point HOME at a fresh temp dir so a
+    // user's persisted handoff.env can't leak into the test, and parallel
+    // vitest workers can't collide on the same path.
+    const hermeticHome = mkdtempSync(resolve(tmpdir(), "handoff-drift-"));
     const help = execFileSync("node", [HANDOFF_BIN, "--help"], {
       encoding: "utf8",
-      // The bin sources persisted env (`~/.config/dotclaude/handoff.env`)
-      // at startup; pass an empty HOME to keep the run hermetic.
-      env: { ...process.env, HOME: "/tmp" },
+      env: { ...process.env, HOME: hermeticHome },
     });
     helpSurface = extractFromHelp(help);
   });
