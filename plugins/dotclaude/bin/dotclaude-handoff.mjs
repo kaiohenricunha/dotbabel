@@ -110,7 +110,7 @@ const META = {
   synopsis:
     "dotclaude handoff [pull|fetch|list|search|push|prune|doctor|remote-list] [args...] [--from <cli>] [--to <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
-    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.",
+    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.",
   flags: {
     // #91 Gap 7: tag is multi-valued for push (--tag foo --tag bar) and a
     // single-value filter on `list --remote --tag <name>`. argv.mjs always
@@ -969,6 +969,13 @@ async function main() {
         ? resolveNarrowed(fromCli, explicitQuery)
         : await resolveAny(explicitQuery);
     } else {
+      // §5.5.2: --from is required when push has no <query>.
+      if (!fromCli) {
+        fail(
+          EXIT_CODES.USAGE,
+          `push without a <query> requires --from <cli>\n  usage: dotclaude handoff push --from <${[...CLIS].join("|")}>`,
+        );
+      }
       ({ hit: sessionHit, note: fallbackNote } = await resolveLatestWithHostScope({
         fromCli,
         detectedHost,

@@ -95,6 +95,7 @@ Cross-cutting flags (consult `--help` for the canonical list):
   `pull`, and filters `list`, `search`, and `remote-list` to one root.
   Without it, the resolver probes all three roots. `--cli` is accepted
   as a legacy alias on `search` and `remote-list`.
+  For `push` without a query, `--from` is required.
 - `--to <cli>` tunes the `<handoff>` block's next-step wording for a
   target agent. Defaults to the auto-detected host. `--from` narrows
   the source root; `--to` still resolves to the invoking host unless

@@ -107,11 +107,11 @@ const PHASE_1_BASELINE_FLAGS_INTERSECTION = [
   "-o",
 ];
 
-/** Both sources baseline — `from_rule` is unfilled today (Phase 2 PR 3 flips this). */
+/** Both sources baseline — flipped in Phase 2 PR 3 when §5.5.2 mandatory-`--from` landed. */
 const PHASE_1_BASELINE_FROM_RULE = Object.freeze({
-  present: false,
-  applies_to: [],
-  mandatory_when: null,
+  present: true,
+  applies_to: ["push"],
+  mandatory_when: "no <query>",
 });
 
 // ---------------------------------------------------------------------------
@@ -347,7 +347,7 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     expect(intersection).toEqual(PHASE_1_BASELINE_FLAGS_INTERSECTION);
   });
 
-  it("from_rule baseline matches in both sources (Phase 2 PR 3 flips this)", () => {
+  it("from_rule baseline matches in both sources (Phase 2 PR 3: present: true, applies_to: [push])", () => {
     expect(skillSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
     expect(helpSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
   });

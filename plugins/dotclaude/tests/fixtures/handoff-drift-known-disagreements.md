@@ -45,15 +45,6 @@ source are excluded until reconciled.
 | `--tags`                                                        | `--help`                                                                       | `SKILL.md` cross-cutting block (mentioned in `--tag` prose for histogram) | Phase 2 PR 6 (SKILL.md shrink)                             |
 | `--no-color`, `--verbose`/`-v`, `--help`/`-h`, `--version`/`-V` | `--help`                                                                       | `SKILL.md`                                                                | Out of scope — universal CLI flags, no spec coverage       |
 
-## from_rule baseline
-
-`from_rule = { present: false, applies_to: [], mandatory_when: null }`
-in both sources today. Spec §5.5.2 introduces the rule paragraph; the
-test will start asserting it `present: true, applies_to: ["push"],
-mandatory_when: "no <query>"` in **Phase 2 PR 3** — the same PR that
-makes `--from` mandatory on `push` without `<query>`. Both extractors
-must update in lockstep with the binary change.
-
 ## Internal — SKILL.md self-disagreement
 
 Not an excluded symbol per se, but a third datapoint for §1's "patch-loop
