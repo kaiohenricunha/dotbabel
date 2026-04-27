@@ -1,7 +1,7 @@
 {
   "id": "handoff-skill",
   "title": "Handoff skill — cross-CLI / cross-machine session transfer",
-  "status": "draft",
+  "status": "implementing",
   "owners": ["dotclaude maintainers"],
   "linked_paths": [
     "skills/handoff/SKILL.md",
@@ -23,7 +23,7 @@
     "bats plugins/dotclaude/tests/bats/handoff-*.bats"
   ],
   "depends_on_specs": ["dotclaude-core"],
-  "active_prs": [],
+  "active_prs": [108],
   "_label_history": {
     "note": "During spec drafting, chat-time NFR labels were renumbered to sequential order in §7. Mapping preserved here for chat-history-to-spec reconciliation. Spec body uses the sequential labels exclusively.",
     "mappings": [
