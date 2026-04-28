@@ -53,7 +53,7 @@ teardown() {
 }
 
 @test "dotclaude-handoff Node runtime errors carry 'dotclaude-handoff:' prefix" {
-  run node "$HANDOFF_BIN" nonexistent-query-xyz
+  run node "$HANDOFF_BIN" pull nonexistent-query-xyz
   [ "$status" -eq 2 ]
   [[ "$output" == *"dotclaude-handoff:"* ]]
 }

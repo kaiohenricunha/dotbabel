@@ -1,9 +1,8 @@
 #!/usr/bin/env bats
-# Behavior tests for the binary-side port of `doctor`, `remote-list`,
-# and `search`. Before v0.9.0 these were skill-interpreted (Claude /
-# Copilot read SKILL.md and ran shell commands by hand); this suite
-# verifies the binary matches the documented contract so Codex can
-# invoke them directly.
+# Behavior tests for the binary-side port of `doctor` and `search`.
+# Before v0.9.0 these were skill-interpreted (Claude / Copilot read
+# SKILL.md and ran shell commands by hand); this suite verifies the
+# binary matches the documented contract so Codex can invoke them directly.
 
 load helpers
 
@@ -62,60 +61,6 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"info: DOTCLAUDE_HANDOFF_REPO is not set"* ]]
   [[ "$output" == *"auto-bootstrap"* ]] || [[ "$output" == *"will offer to create"* ]]
-}
-
-# ---- remote-list -------------------------------------------------------
-
-@test "remote-list: empty transport exits 0 with 'No handoffs found'" {
-  run node "$BIN" remote-list
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"No handoffs found"* ]]
-}
-
-@test "remote-list: after pushes, returns a table with both branches" {
-  run node "$BIN" push my-feature
-  [ "$status" -eq 0 ]
-  run node "$BIN" push my-codex-task
-  [ "$status" -eq 0 ]
-  run node "$BIN" remote-list
-  [ "$status" -eq 0 ]
-  # v2 branches include project + month; fixture cwd resolves to "demo".
-  [[ "$output" =~ handoff/demo/claude/[0-9]{4}-[0-9]{2}/aaaa1111 ]]
-  [[ "$output" =~ handoff/demo/codex/[0-9]{4}-[0-9]{2}/bbbb2222 ]]
-}
-
-@test "remote-list --cli claude filters to claude-only" {
-  run node "$BIN" push my-feature
-  run node "$BIN" push my-codex-task
-  run node "$BIN" remote-list --cli claude
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ handoff/demo/claude/[0-9]{4}-[0-9]{2}/aaaa1111 ]]
-  [[ "$output" != *"bbbb2222"* ]]
-}
-
-@test "remote-list --json emits a JSON array of handoff entries" {
-  run node "$BIN" push my-feature
-  run node "$BIN" --json remote-list
-  [ "$status" -eq 0 ]
-  # Parseable JSON and at least one entry with the expected fields.
-  [[ "$output" == *'"branch":'* ]]
-  [[ "$output" == *'"cli":'* ]]
-  [[ "$output" == *'"short_id":'* ]]
-}
-
-@test "remote-list --cli with an invalid value exits 64" {
-  run node "$BIN" remote-list --cli bogus
-  [ "$status" -eq 64 ]
-  [[ "$output" == *"--from must be one of"* ]]
-}
-
-@test "remote-list --from claude filters to claude-only (canonical flag)" {
-  run node "$BIN" push my-feature
-  run node "$BIN" push my-codex-task
-  run node "$BIN" remote-list --from claude
-  [ "$status" -eq 0 ]
-  [[ "$output" =~ handoff/demo/claude/[0-9]{4}-[0-9]{2}/aaaa1111 ]]
-  [[ "$output" != *"bbbb2222"* ]]
 }
 
 # ---- search ------------------------------------------------------------

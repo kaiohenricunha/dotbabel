@@ -286,27 +286,6 @@ teardown() {
   [ "$status" -ne 0 ]
 }
 
-@test "push <cli> <query> exits 64 with the breaking-change message" {
-  run node "$BIN" push claude aaaa1111
-  [ "$status" -eq 64 ]
-  [[ "$output" == *"no longer takes a <cli> positional"* ]]
-  [[ "$output" == *"--from claude"* ]]
-}
-
-@test "pull <cli> <query> exits 64 with the breaking-change message" {
-  run node "$BIN" pull claude aaaa1111
-  [ "$status" -eq 64 ]
-  [[ "$output" == *"no longer takes a <cli> positional"* ]]
-  [[ "$output" == *"--from claude"* ]]
-}
-
-@test "fetch <cli> <query> exits 64 with the breaking-change message" {
-  run node "$BIN" fetch codex bbbb2222
-  [ "$status" -eq 64 ]
-  [[ "$output" == *"no longer takes a <cli> positional"* ]]
-  [[ "$output" == *"--from codex"* ]]
-}
-
 # -- --from flag ----------------------------------------------------------
 
 @test "push --from codex (no query) narrows the fallback to the codex root" {

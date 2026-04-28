@@ -1,7 +1,6 @@
 #!/usr/bin/env bats
 # Tests for dotclaude-handoff.mjs: the canonical `pull` verb (--summary, -o,
-# --json) + deprecated power-user aliases (describe/digest/file). `pull`
-# collapses the old four-form local surface under one verb (#87).
+# --json). `pull` collapses the old four-form local surface under one verb (#87).
 #
 # Remote transport tests (push/fetch/list) live in dotclaude-handoff-five-form.bats.
 
@@ -60,22 +59,6 @@ teardown() {
   # a `handoff/<cli>/...` branch name. Neither may appear.
   [[ "$output" != *"scrubbed"* ]]
   [[ "$output" != *"handoff/dotclaude/"* ]]
-}
-
-@test "resolve missing args exits 64" {
-  run node "$BIN" resolve
-  [ "$status" -eq 64 ]
-}
-
-@test "resolve claude happy path" {
-  run node "$BIN" resolve claude aaaa1111
-  [ "$status" -eq 0 ]
-  [ "$output" = "$SESSION_FILE" ]
-}
-
-@test "resolve miss exits 2" {
-  run node "$BIN" resolve claude 00000000
-  [ "$status" -eq 2 ]
 }
 
 # -- canonical `pull` verb --------------------------------------------------
@@ -141,13 +124,6 @@ teardown() {
   grep -q 'Fix the retry loop' "$output"
 }
 
-@test "pull <cli> <uuid> exits 64 with the breaking-change message" {
-  run node "$BIN" pull claude aaaa1111
-  [ "$status" -eq 64 ]
-  [[ "$output" == *"no longer takes a <cli> positional"* ]]
-  [[ "$output" == *"--from claude"* ]]
-}
-
 @test "pull <unmatched> with DOTCLAUDE_HANDOFF_REPO set appends fetch hint" {
   run --separate-stderr env HOME="$TEST_HOME" DOTCLAUDE_HANDOFF_REPO="/tmp/fake-repo" \
     node "$BIN" pull nonexistent-xyz
@@ -162,40 +138,3 @@ teardown() {
   [[ "$stderr" != *"fetch <id>"* ]]
 }
 
-# -- deprecated aliases (describe / digest / file) -------------------------
-
-@test "describe emits deprecation warning on stderr" {
-  run --separate-stderr node "$BIN" describe claude aaaa1111
-  [ "$status" -eq 0 ]
-  [[ "$stderr" == *"deprecated"* ]]
-  [[ "$stderr" == *"pull aaaa1111 --summary"* ]]
-  [[ "$output" == *"Fix the retry loop"* ]]
-}
-
-@test "digest emits deprecation warning on stderr" {
-  run --separate-stderr node "$BIN" digest claude aaaa1111
-  [ "$status" -eq 0 ]
-  [[ "$stderr" == *"deprecated"* ]]
-  [[ "$stderr" == *"pull aaaa1111"* ]]
-  [[ "$output" == *"<handoff"* ]]
-}
-
-@test "file emits deprecation warning on stderr" {
-  run --separate-stderr bash -c "cd \"$TEST_HOME\" && HOME=\"$TEST_HOME\" node \"$BIN\" file claude aaaa1111"
-  [ "$status" -eq 0 ]
-  [[ "$stderr" == *"deprecated"* ]]
-  [[ "$stderr" == *"pull aaaa1111 -o auto"* ]]
-}
-
-@test "DOTCLAUDE_QUIET=1 suppresses deprecation on describe" {
-  run --separate-stderr env HOME="$TEST_HOME" DOTCLAUDE_QUIET=1 \
-    node "$BIN" describe claude aaaa1111
-  [ "$status" -eq 0 ]
-  [[ "$stderr" != *"deprecated"* ]]
-  [[ "$output" == *"Fix the retry loop"* ]]
-}
-
-@test "unknown cli in power-user sub exits 64" {
-  run node "$BIN" resolve bogus abcd1234
-  [ "$status" -eq 64 ]
-}

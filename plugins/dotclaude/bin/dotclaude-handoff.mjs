@@ -1,28 +1,20 @@
 #!/usr/bin/env node
 /**
- * dotclaude-handoff — four-verb cross-agent / cross-machine handoff (#87).
+ * dotclaude-handoff — five-verb cross-agent / cross-machine handoff (#87).
  *
  * Usage:
  *   dotclaude handoff                              print usage and exit 0 (#86)
  *   dotclaude handoff pull [<id>] [--summary] [-o <path|auto|->] [--from <cli>]
  *                                                  render a local session: <handoff> block (default),
- *                                                  --summary for describe-style markdown, -o to write to disk.
+ *                                                  --summary for inline markdown, -o to write to disk.
  *   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
  *                                                  fetch a remote handoff branch from DOTCLAUDE_HANDOFF_REPO.
- *   dotclaude handoff push [<query>] [--tag <label>]
+ *   dotclaude handoff push [<query>] [--tag <label>] [--from <cli>]
  *                                                  commit a local session as a handoff branch to the transport repo.
  *   dotclaude handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit <N>|--all]
  *   dotclaude handoff search <query> [--from <cli>] [--since <ISO>] [--limit <N>] [--fixed] [--json]
- *   dotclaude handoff remote-list [--from <cli>] [--since <ISO>] [--limit <N>]
+ *   dotclaude handoff prune --older-than <30d|6m|1y|YYYY-MM-DD> [--yes] [--dry-run]
  *   dotclaude handoff doctor
- *
- * Deprecated aliases (stderr notice, removed in 0.14.0; set DOTCLAUDE_QUIET=1 to suppress):
- *   describe <cli> <id>  → `pull <id> --summary`
- *   digest   <cli> <id>  → `pull <id>`
- *   file     <cli> <id>  → `pull <id> -o auto`
- *   <query>              → `pull <query>`
- *
- * `resolve <cli> <id>` stays unchanged — scripting primitive, not user-facing.
  *
  * `<id>` / `<query>` resolves across all three CLIs (claude, copilot, codex):
  * full UUID, short UUID (first 8 hex), `latest`, or a named alias
@@ -102,13 +94,12 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
-const POWER_SUBS = new Set(["resolve", "describe", "digest", "file"]);
 const CLIS = new Set(["claude", "copilot", "codex"]);
 
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor|remote-list] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
+    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
     "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.",
   flags: {
@@ -692,8 +683,8 @@ async function resolveLatestWithHostScope({ fromCli, detectedHost }) {
 }
 
 // Resolve the CLI filter for sub-commands that accept `--from` with a
-// `--cli` legacy alias (search, remote-list). Fails USAGE on an unknown
-// value. Returns null when neither flag was passed.
+// `--cli` legacy alias (search). Fails USAGE on an unknown value.
+// Returns null when neither flag was passed.
 function resolveFilterCli() {
   const v = fromCli ?? (argv.flags.cli ? String(argv.flags.cli) : null);
   if (v !== null && !CLIS.has(v)) {
@@ -702,32 +693,13 @@ function resolveFilterCli() {
   return v;
 }
 
-function warnDeprecated(old, replacement) {
-  if (process.env.DOTCLAUDE_QUIET === "1") return;
-  process.stderr.write(
-    `dotclaude-handoff: ${old} is deprecated — use \`${replacement}\` instead (removed in 0.14.0)\n`,
-  );
-}
-
 async function main() {
   if (argv.positional.length === 0) {
     process.stdout.write(helpText(META) + "\n");
     process.exit(EXIT_CODES.OK);
   }
 
-  // ---- breaking-change shim ---------------------------------------------
-  // A lone CLI name is never a valid query under the new surface, so
-  // catch `push/pull/fetch claude|copilot|codex` (with or without a
-  // trailing positional) and point the user at --from. Covers both the
-  // remote (push/fetch) and the new local (pull) verb families.
-  if ((first === "push" || first === "pull" || first === "fetch") && CLIS.has(second)) {
-    fail(
-      EXIT_CODES.USAGE,
-      `${first} no longer takes a <cli> positional; use --from ${second} or drop it entirely`,
-    );
-  }
-
-  // ---- doctor / remote-list / search -------------------------------------
+  // ---- doctor / search ---------------------------------------------------
   // These were previously skill-interpreted (Claude/Copilot read SKILL.md
   // and ran the steps by hand). Porting them into the binary closes the
   // Codex parity gap — Codex's bash tool can call them directly.
@@ -750,55 +722,6 @@ async function main() {
       `DOTCLAUDE_HANDOFF_REPO: ${process.env.DOTCLAUDE_HANDOFF_REPO || "(unset — will bootstrap on first push)"}\n`,
     );
     process.exit(r.status !== 0 ? r.status : EXIT_CODES.OK);
-  }
-
-  if (first === "remote-list") {
-    requireTransportRepoStrict();
-    let candidates;
-    try {
-      candidates = listRemoteCandidates();
-    } catch (err) {
-      fail(2, `remote-list failed: ${err.message}`);
-    }
-    const enriched = enrichWithDescriptions(candidates);
-    const sinceMs = parseSinceOrFail(argv.flags.since, { defaultDays: 30 });
-    const filterCli = resolveFilterCli();
-    const rows = [];
-    for (const c of enriched) {
-      const decoded = decodeDescription(c.description);
-      if (!decoded) continue;
-      if (filterCli && decoded.cli !== filterCli) continue;
-      rows.push({
-        branch: c.branch,
-        cli: decoded.cli,
-        short_id: decoded.short_id,
-        project: decoded.project,
-        hostname: decoded.hostname,
-        tag: decoded.tag ?? null,
-        commit: c.commit,
-      });
-    }
-    const capped = rows.slice(0, Number.parseInt(limit.toString(), 10));
-    if (argv.json) {
-      process.stdout.write(JSON.stringify(capped, null, 2) + "\n");
-      process.exit(EXIT_CODES.OK);
-    }
-    if (capped.length === 0) {
-      process.stdout.write("No handoffs found\n");
-      process.exit(EXIT_CODES.OK);
-    }
-    process.stdout.write(
-      "| Branch                               | CLI     | Short UUID | Project                  | Hostname                 | Tag                      |\n",
-    );
-    process.stdout.write(
-      "| ------------------------------------ | ------- | ---------- | ------------------------ | ------------------------ | ------------------------ |\n",
-    );
-    for (const r of capped) {
-      process.stdout.write(
-        `| ${r.branch.padEnd(36)} | ${r.cli.padEnd(7)} | ${r.short_id.padEnd(10)} | ${(r.project ?? "").padEnd(24)} | ${(r.hostname ?? "").padEnd(24)} | ${(r.tag ?? "").padEnd(24)} |\n`,
-      );
-    }
-    process.exit(EXIT_CODES.OK);
   }
 
   if (first === "search") {
@@ -1112,106 +1035,10 @@ async function main() {
     }
   }
 
-  // ---- power-user sub-commands (resolve/describe/digest/file) -----------
-  if (POWER_SUBS.has(first)) {
-    const sub = first;
-    const cli = second;
-    const id = third;
-    if (!cli) fail(EXIT_CODES.USAGE, `${sub} requires <cli>`);
-    if (!CLIS.has(cli)) fail(EXIT_CODES.USAGE, `cli must be one of: ${[...CLIS].join(", ")}`);
-    if (!id) fail(EXIT_CODES.USAGE, `${sub} requires an identifier after <cli>`);
-    // describe/digest/file are deprecation aliases for `pull <id>` variants
-    // (#87). Emit a stderr pointer unless the caller opts out via
-    // DOTCLAUDE_QUIET=1 (CI pipelines that can't update yet). `resolve`
-    // stays as a scripting primitive and is not deprecated.
-    if (sub !== "resolve") {
-      const replacement = {
-        describe: `pull ${id} --summary${argv.json ? " --json" : ""}`,
-        digest: `pull ${id}`,
-        file: `pull ${id} -o auto`,
-      }[sub];
-      warnDeprecated(`\`${sub} ${cli} ${id}\``, replacement);
-    }
-    const { path } = resolveNarrowed(cli, id);
-    if (sub === "resolve") {
-      process.stdout.write(`${path}\n`);
-      process.exit(EXIT_CODES.OK);
-    }
-    const meta = extractMeta(cli, path);
-    const prompts = extractPrompts(cli, path);
-    if (sub === "describe") {
-      if (argv.json) {
-        process.stdout.write(
-          JSON.stringify({ origin: meta, user_prompts: prompts }, null, 2) + "\n",
-        );
-        process.exit(EXIT_CODES.OK);
-      }
-      process.stdout.write(renderDescribeMarkdown(meta, prompts) + "\n");
-      process.exit(EXIT_CODES.OK);
-    }
-    const turns = extractTurns(cli, path, limit);
-    if (sub === "digest") {
-      process.stdout.write(renderHandoffBlock(meta, prompts, turns, toCli) + "\n");
-      process.exit(EXIT_CODES.OK);
-    }
-    if (sub === "file") {
-      const outDir = argv.flags["out-dir"];
-      let target;
-      if (outDir) {
-        target = resolvePath(outDir.toString());
-      } else {
-        const gitRes = spawnSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" });
-        target =
-          gitRes.status === 0 && gitRes.stdout.trim()
-            ? join(gitRes.stdout.trim(), "docs", "handoffs")
-            : join(process.env.HOME ?? "", ".claude", "handoffs");
-      }
-      mkdirSync(target, { recursive: true });
-      const today = new Date().toISOString().slice(0, 10);
-      const shortId = meta.short_id ?? "unknown";
-      const outPath = join(target, `${today}-${meta.cli}-${shortId}.md`);
-      const body = [
-        `# Handoff: ${meta.cli} → ${toCli}`,
-        "",
-        `_Generated: ${new Date().toISOString()}_`,
-        `_Origin session: \`${meta.session_id ?? "?"}\` (cwd: \`${meta.cwd ?? "?"}\`)_`,
-        "",
-        renderHandoffBlock(meta, prompts, turns, toCli),
-        "",
-        "---",
-        "",
-        "## Full user prompt log",
-        "",
-        ...prompts.map((p, i) => `${i + 1}. ${p}`),
-        "",
-        "## Notes",
-        "",
-        `- Source transcript: \`${path}\``,
-        `- Prompts: ${prompts.length} (verbatim); assistant turns summarized in the <handoff> block.`,
-      ].join("\n");
-      writeFileSync(outPath, body + "\n");
-      process.stdout.write(`${outPath}\n`);
-      process.exit(EXIT_CODES.OK);
-    }
-  }
-
-  // ---- bare <query>: deprecated alias for `pull <query>` (#87) ----------
-  // Collapsed under `pull` for a four-verb surface. Behavior unchanged
-  // (digest emitted to stdout); DOTCLAUDE_QUIET=1 suppresses the notice.
-  const query = first;
-  warnDeprecated("bare `<query>`", `pull ${query}`);
-  let hit, fallbackNote;
-  if (query === "latest") {
-    ({ hit, note: fallbackNote } = await resolveLatestWithHostScope({ fromCli, detectedHost }));
-  } else {
-    hit = await resolveAny(query);
-  }
-  if (fallbackNote) process.stderr.write(fallbackNote + "\n");
-  const meta = extractMeta(hit.cli, hit.path);
-  const prompts = extractPrompts(hit.cli, hit.path);
-  const turns = extractTurns(hit.cli, hit.path, limit);
-  process.stdout.write(renderHandoffBlock(meta, prompts, turns, toCli) + "\n");
-  process.exit(EXIT_CODES.OK);
+  fail(
+    EXIT_CODES.USAGE,
+    `unknown command: ${first}. Run 'dotclaude handoff --help' for valid commands.`,
+  );
 }
 
 // Only execute the CLI when invoked directly; stay import-safe for unit tests.

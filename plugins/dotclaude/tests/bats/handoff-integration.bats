@@ -3,8 +3,8 @@
 #
 # Complements dotclaude-handoff-five-form.bats, which covers the user-facing
 # five-form surface. These tests chain multiple handoff scripts together
-# (resolve → extract → digest / push → fetch → file / list → pull) to
-# verify the boundaries between them hold.
+# (resolve → extract → pull / push → fetch → list → pull) to verify
+# the boundaries between them hold.
 
 load helpers
 
@@ -56,7 +56,7 @@ teardown() {
   rm -rf "$TEST_HOME" "$TRANSPORT_REPO"
 }
 
-# -- resolve → extract → digest chain -----------------------------------
+# -- resolve → extract → pull chain --------------------------------------
 
 @test "resolve (short UUID) → extract meta → valid JSON with expected session_id" {
   # Chain the scripts by hand: resolve emits a path, extract reads it.
@@ -72,10 +72,10 @@ teardown() {
   [[ "$output" == *"\"cwd\":\"/home/u/demo\""* ]]
 }
 
-@test "resolve (customTitle) → digest via CLI → <handoff> block names the session" {
+@test "customTitle → pull via CLI → <handoff> block names the session" {
   # The five-form suite exercises customTitle lookup but doesn't assert
   # that the resulting digest carries the session_id through. Lock that in.
-  run node "$BIN" digest claude integration-demo
+  run node "$BIN" pull integration-demo
   [ "$status" -eq 0 ]
   [[ "$output" == *"<handoff"* ]]
   [[ "$output" == *"</handoff>"* ]]
@@ -134,42 +134,40 @@ teardown() {
   [[ "$output" == *"<handoff"* ]]
 }
 
-# -- list → describe chain (unified view → detail) -----------------------
+# -- list → pull --summary chain (unified view → detail) -----------------
 
-@test "list --local → describe on each candidate → 0 exit for both CLIs" {
-  # The `list` sub enumerates sessions; `describe` must accept each of
-  # them via (cli, short-UUID). Iterate both CLIs to catch layout-specific
+@test "list --local → pull --summary on each candidate → 0 exit for both CLIs" {
+  # The `list` sub enumerates sessions; `pull --summary` must accept each
+  # via (--from <cli>, short-UUID). Iterate both CLIs to catch layout-specific
   # regressions in either branch.
   run node "$BIN" list --local
   [ "$status" -eq 0 ]
   [[ "$output" == *"aaaa1111"* ]]
   [[ "$output" == *"bbbb2222"* ]]
 
-  run node "$BIN" describe claude aaaa1111
+  run node "$BIN" pull aaaa1111 --from claude --summary
   [ "$status" -eq 0 ]
   [[ "$output" == *"first prompt"* ]]
 
-  run node "$BIN" describe codex bbbb2222
+  run node "$BIN" pull bbbb2222 --from codex --summary
   [ "$status" -eq 0 ]
   [[ "$output" == *"codex prompt"* ]]
 }
 
-# -- file subcommand: digest rendered to a markdown file ----------------
+# -- pull -o <path>: handoff block written to a markdown file -----------
 
-@test "file <cli> <id> with --out-dir writes markdown containing <handoff> block" {
+@test "pull -o <path> writes a markdown file containing the <handoff> block" {
   # Nest outdir under TEST_HOME so teardown's rm -rf cleans it even if an
   # assertion fails before the end of this test (no separate mktemp needed).
-  local outdir="$TEST_HOME/file-out"
+  local outdir="$TEST_HOME/pull-out"
   mkdir -p "$outdir"
-  run --separate-stderr node "$BIN" file claude aaaa1111 --out-dir "$outdir"
+  local outpath="$outdir/aaaa1111.md"
+  run --separate-stderr node "$BIN" pull aaaa1111 --from claude -o "$outpath"
   [ "$status" -eq 0 ]
-  # The command prints the absolute path of the file written.
-  local outpath="$output"
   [ -f "$outpath" ]
   run cat "$outpath"
   [[ "$output" == *"<handoff"* ]]
   [[ "$output" == *"first prompt"* ]]
-  [[ "$output" == *"Source transcript"* ]]
 }
 
 # -- multi-push ordering in list -----------------------------------------
