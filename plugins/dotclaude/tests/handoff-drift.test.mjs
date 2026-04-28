@@ -347,7 +347,7 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     expect(intersection).toEqual(PHASE_1_BASELINE_FLAGS_INTERSECTION);
   });
 
-  it("from_rule baseline matches in both sources (Phase 2 PR 3: present: true, applies_to: [push])", () => {
+  it("from_rule baseline matches in both sources", () => {
     expect(skillSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
     expect(helpSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
   });
