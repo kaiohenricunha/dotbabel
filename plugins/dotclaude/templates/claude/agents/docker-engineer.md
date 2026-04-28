@@ -1,4 +1,11 @@
 ---
+id: docker-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [docker]
+task: [debugging, runtime-ops]
+maturity: draft
 name: docker-engineer
 description: >
   Use when designing, operating, or debugging Docker Compose stacks and running

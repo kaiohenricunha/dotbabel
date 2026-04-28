@@ -1,4 +1,11 @@
 ---
+id: gcp-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [gcp]
+task: [provisioning, debugging]
+maturity: draft
 name: gcp-engineer
 description: >
   Use when designing, debugging, or reviewing Google Cloud workloads and

@@ -1,4 +1,14 @@
 ---
+id: frontend-developer
+type: agent
+version: 1.0.0
+domain: [frontend]
+platform: [none]
+task: [scaffolding, debugging]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: frontend-developer
 description: >
   Use when building or modifying client-side code: UI components, pages, forms,

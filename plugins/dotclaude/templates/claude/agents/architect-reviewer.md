@@ -1,4 +1,11 @@
 ---
+id: architect-reviewer
+type: agent
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review]
+maturity: draft
 name: architect-reviewer
 description: >
   Use when evaluating system design, reviewing architectural decisions, assessing

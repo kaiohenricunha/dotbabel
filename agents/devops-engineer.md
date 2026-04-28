@@ -1,4 +1,14 @@
 ---
+id: devops-engineer
+type: agent
+version: 1.0.0
+domain: [devex]
+platform: [github-actions]
+task: [scaffolding, debugging]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: devops-engineer
 description: >
   Use when building or improving CI/CD pipelines, release workflows, build automation,

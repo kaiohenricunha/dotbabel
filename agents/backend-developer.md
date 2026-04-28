@@ -1,4 +1,14 @@
 ---
+id: backend-developer
+type: agent
+version: 1.0.0
+domain: [backend]
+platform: [none]
+task: [scaffolding, debugging]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: backend-developer
 description: >
   Use when building or modifying server-side code: APIs, services, data models,

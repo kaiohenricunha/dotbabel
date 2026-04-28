@@ -1,4 +1,14 @@
 ---
+id: security-engineer
+type: agent
+version: 1.0.0
+domain: [security, infra]
+platform: [kubernetes]
+task: [review, provisioning]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: security-engineer
 description: >
   Use when hardening infrastructure security posture, reviewing network policies,

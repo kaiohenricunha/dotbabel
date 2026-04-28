@@ -1,4 +1,11 @@
 ---
+id: container-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [docker]
+task: [provisioning, debugging]
+maturity: draft
 name: container-engineer
 description: >
   Use when authoring, optimizing, or reviewing container images and build pipelines.

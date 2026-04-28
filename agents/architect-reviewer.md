@@ -1,4 +1,14 @@
 ---
+id: architect-reviewer
+type: agent
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [review]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: architect-reviewer
 description: >
   Use when evaluating system design, reviewing architectural decisions, assessing

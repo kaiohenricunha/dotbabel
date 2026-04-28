@@ -1,4 +1,11 @@
 ---
+id: azure-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [azure]
+task: [provisioning, debugging]
+maturity: draft
 name: azure-engineer
 description: >
   Use when designing, debugging, or reviewing Azure workloads and service

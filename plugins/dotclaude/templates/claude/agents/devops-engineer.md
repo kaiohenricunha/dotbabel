@@ -1,4 +1,11 @@
 ---
+id: devops-engineer
+type: agent
+version: 1.0.0
+domain: [devex]
+platform: [github-actions]
+task: [scaffolding, debugging]
+maturity: draft
 name: devops-engineer
 description: >
   Use when building or improving CI/CD pipelines, release workflows, build automation,

@@ -1,4 +1,14 @@
 ---
+id: azure-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [azure]
+task: [provisioning, debugging]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: azure-engineer
 description: >
   Use when designing, debugging, or reviewing Azure workloads and service

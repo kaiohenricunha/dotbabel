@@ -1,4 +1,11 @@
 ---
+id: changelog-assistant
+type: agent
+version: 1.0.0
+domain: [writing, devex]
+platform: [none]
+task: [documentation]
+maturity: draft
 name: changelog-assistant
 description: >
   Use when generating changelog entries, drafting release notes, or summarizing

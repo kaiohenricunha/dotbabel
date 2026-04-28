@@ -1,4 +1,14 @@
 ---
+id: platform-engineer
+type: agent
+version: 1.0.0
+domain: [devex, infra]
+platform: [none]
+task: [scaffolding, provisioning]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: platform-engineer
 description: >
   Use when designing or improving internal developer platforms, golden paths, self-service

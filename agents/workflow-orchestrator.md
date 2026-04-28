@@ -1,4 +1,14 @@
 ---
+id: workflow-orchestrator
+type: agent
+version: 1.0.0
+domain: [devex]
+platform: [none]
+task: [scaffolding, debugging]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: workflow-orchestrator
 description: >
   Use when coordinating multi-step tasks that require multiple agents, managing

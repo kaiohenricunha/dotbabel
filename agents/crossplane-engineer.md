@@ -1,4 +1,14 @@
 ---
+id: crossplane-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [kubernetes, crossplane]
+task: [provisioning]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: crossplane-engineer
 description: >
   Use when designing, debugging, or reviewing Crossplane configurations and

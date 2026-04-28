@@ -2,95 +2,206 @@
   "domain": {
     "devex": [
       "agents-search",
+      "architect-reviewer",
       "audit-and-fix",
       "changelog",
+      "changelog-assistant",
       "create-assessment",
       "create-audit",
       "create-inspection",
       "dependabot-sweep",
+      "deployment-engineer",
       "detect-flaky",
+      "devops-engineer",
+      "documentation-writer",
       "fix-with-evidence",
       "git",
       "ground-first",
       "handoff",
       "markdown",
       "merge-pr",
+      "platform-engineer",
       "pre-pr",
       "review-pr",
       "review-prs",
       "security-review",
       "spec",
       "validate-spec",
-      "veracity-audit"
+      "veracity-audit",
+      "workflow-orchestrator"
     ],
     "infra": [
+      "aws-engineer",
       "aws-specialist",
+      "azure-engineer",
       "azure-specialist",
+      "container-engineer",
+      "crossplane-engineer",
       "crossplane-specialist",
+      "deployment-engineer",
+      "docker-engineer",
+      "gcp-engineer",
       "gcp-specialist",
+      "iac-engineer",
       "kubernetes-specialist",
+      "kubernetes-specialist",
+      "platform-engineer",
+      "pulumi-engineer",
       "pulumi-specialist",
+      "security-engineer",
       "terraform-specialist",
+      "terragrunt-engineer",
       "terragrunt-specialist"
     ],
-    "security": ["dependabot-sweep", "security-review"],
-    "writing": ["markdown"]
+    "backend": [
+      "backend-developer",
+      "test-engineer"
+    ],
+    "writing": [
+      "changelog-assistant",
+      "documentation-writer",
+      "markdown"
+    ],
+    "security": [
+      "compliance-auditor",
+      "dependabot-sweep",
+      "security-auditor",
+      "security-engineer",
+      "security-review"
+    ],
+    "data": [
+      "data-scientist"
+    ],
+    "frontend": [
+      "frontend-developer",
+      "test-engineer"
+    ]
   },
   "platform": {
     "none": [
       "agents-search",
+      "architect-reviewer",
       "audit-and-fix",
+      "backend-developer",
       "changelog",
+      "changelog-assistant",
+      "compliance-auditor",
       "create-assessment",
       "create-audit",
       "create-inspection",
+      "data-scientist",
+      "deployment-engineer",
       "detect-flaky",
+      "documentation-writer",
       "fix-with-evidence",
+      "frontend-developer",
       "git",
       "ground-first",
       "handoff",
       "markdown",
+      "platform-engineer",
       "pre-pr",
+      "security-auditor",
       "security-review",
       "spec",
+      "test-engineer",
       "validate-spec",
-      "veracity-audit"
+      "veracity-audit",
+      "workflow-orchestrator"
     ],
-    "aws": ["aws-specialist"],
-    "azure": ["azure-specialist"],
-    "crossplane": ["crossplane-specialist"],
-    "kubernetes": ["crossplane-specialist", "kubernetes-specialist"],
-    "github-actions": ["dependabot-sweep", "merge-pr", "review-pr", "review-prs"],
-    "gcp": ["gcp-specialist"],
-    "pulumi": ["pulumi-specialist"],
-    "terraform": ["terraform-specialist", "terragrunt-specialist"],
-    "terragrunt": ["terragrunt-specialist"]
+    "aws": [
+      "aws-engineer",
+      "aws-specialist"
+    ],
+    "azure": [
+      "azure-engineer",
+      "azure-specialist"
+    ],
+    "docker": [
+      "container-engineer",
+      "docker-engineer"
+    ],
+    "kubernetes": [
+      "crossplane-engineer",
+      "crossplane-specialist",
+      "kubernetes-specialist",
+      "kubernetes-specialist",
+      "security-engineer"
+    ],
+    "crossplane": [
+      "crossplane-engineer",
+      "crossplane-specialist"
+    ],
+    "github-actions": [
+      "dependabot-sweep",
+      "devops-engineer",
+      "merge-pr",
+      "review-pr",
+      "review-prs"
+    ],
+    "gcp": [
+      "gcp-engineer",
+      "gcp-specialist"
+    ],
+    "terraform": [
+      "iac-engineer",
+      "terraform-specialist",
+      "terragrunt-engineer",
+      "terragrunt-specialist"
+    ],
+    "terragrunt": [
+      "iac-engineer",
+      "terragrunt-engineer",
+      "terragrunt-specialist"
+    ],
+    "pulumi": [
+      "iac-engineer",
+      "pulumi-engineer",
+      "pulumi-specialist"
+    ]
   },
   "task": {
     "debugging": [
       "agents-search",
       "audit-and-fix",
+      "aws-engineer",
       "aws-specialist",
+      "azure-engineer",
       "azure-specialist",
+      "backend-developer",
+      "container-engineer",
       "create-inspection",
       "crossplane-specialist",
       "detect-flaky",
+      "devops-engineer",
+      "docker-engineer",
       "fix-with-evidence",
+      "frontend-developer",
+      "gcp-engineer",
       "gcp-specialist",
       "ground-first",
       "handoff",
+      "iac-engineer",
       "kubernetes-specialist",
+      "kubernetes-specialist",
+      "pulumi-engineer",
       "pulumi-specialist",
       "terraform-specialist",
-      "terragrunt-specialist"
+      "terragrunt-engineer",
+      "terragrunt-specialist",
+      "test-engineer",
+      "workflow-orchestrator"
     ],
     "review": [
+      "architect-reviewer",
       "audit-and-fix",
       "aws-specialist",
       "azure-specialist",
+      "compliance-auditor",
       "create-assessment",
       "create-audit",
       "crossplane-specialist",
+      "data-scientist",
       "dependabot-sweep",
       "gcp-specialist",
       "git",
@@ -101,26 +212,61 @@
       "pulumi-specialist",
       "review-pr",
       "review-prs",
+      "security-auditor",
+      "security-engineer",
       "security-review",
       "terraform-specialist",
       "terragrunt-specialist",
       "validate-spec",
       "veracity-audit"
     ],
+    "provisioning": [
+      "aws-engineer",
+      "azure-engineer",
+      "container-engineer",
+      "crossplane-engineer",
+      "gcp-engineer",
+      "iac-engineer",
+      "platform-engineer",
+      "pulumi-engineer",
+      "security-engineer",
+      "terragrunt-engineer"
+    ],
+    "scaffolding": [
+      "backend-developer",
+      "devops-engineer",
+      "frontend-developer",
+      "platform-engineer",
+      "workflow-orchestrator"
+    ],
     "documentation": [
       "changelog",
+      "changelog-assistant",
       "create-assessment",
       "create-audit",
       "create-inspection",
+      "documentation-writer",
       "handoff",
       "markdown",
       "spec"
+    ],
+    "diagnostics": [
+      "compliance-auditor",
+      "data-scientist",
+      "kubernetes-specialist",
+      "security-auditor"
+    ],
+    "runtime-ops": [
+      "deployment-engineer",
+      "docker-engineer",
+      "kubernetes-specialist"
     ],
     "testing": [
       "detect-flaky",
       "fix-with-evidence",
       "merge-pr",
       "pre-pr",
+      "test-engineer",
       "validate-spec",
       "veracity-audit"
     ]

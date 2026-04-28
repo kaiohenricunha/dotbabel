@@ -1,4 +1,11 @@
 ---
+id: compliance-auditor
+type: agent
+version: 1.0.0
+domain: [security]
+platform: [none]
+task: [review, diagnostics]
+maturity: draft
 name: compliance-auditor
 description: >
   Use when auditing data quality gates, config-driven checks, or invariant enforcement.

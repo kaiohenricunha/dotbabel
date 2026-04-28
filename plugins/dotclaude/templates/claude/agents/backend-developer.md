@@ -1,4 +1,11 @@
 ---
+id: backend-developer
+type: agent
+version: 1.0.0
+domain: [backend]
+platform: [none]
+task: [scaffolding, debugging]
+maturity: draft
 name: backend-developer
 description: >
   Use when building or modifying server-side code: APIs, services, data models,

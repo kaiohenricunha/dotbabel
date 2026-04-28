@@ -1,4 +1,11 @@
 ---
+id: iac-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [terraform, terragrunt, pulumi]
+task: [provisioning, debugging]
+maturity: draft
 name: iac-engineer
 description: >
   Use when writing, reviewing, or refactoring infrastructure-as-code modules, managing

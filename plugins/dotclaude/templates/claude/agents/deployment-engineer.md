@@ -1,4 +1,11 @@
 ---
+id: deployment-engineer
+type: agent
+version: 1.0.0
+domain: [devex, infra]
+platform: [none]
+task: [runtime-ops]
+maturity: draft
 name: deployment-engineer
 description: >
   Use when planning or executing deployment strategies, release coordination, traffic

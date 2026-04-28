@@ -1,4 +1,11 @@
 ---
+id: frontend-developer
+type: agent
+version: 1.0.0
+domain: [frontend]
+platform: [none]
+task: [scaffolding, debugging]
+maturity: draft
 name: frontend-developer
 description: >
   Use when building or modifying client-side code: UI components, pages, forms,

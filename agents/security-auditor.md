@@ -1,4 +1,14 @@
 ---
+id: security-auditor
+type: agent
+version: 1.0.0
+domain: [security]
+platform: [none]
+task: [review, diagnostics]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: security-auditor
 description: >
   Use when conducting security audits, reviewing code for vulnerabilities,

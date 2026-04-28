@@ -1,4 +1,11 @@
 ---
+id: test-engineer
+type: agent
+version: 1.0.0
+domain: [backend, frontend]
+platform: [none]
+task: [testing, debugging]
+maturity: draft
 name: test-engineer
 description: >
   Use when writing tests, auditing test coverage, fixing flaky tests, or setting

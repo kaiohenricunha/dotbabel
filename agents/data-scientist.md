@@ -1,4 +1,14 @@
 ---
+id: data-scientist
+type: agent
+version: 1.0.0
+domain: [data]
+platform: [none]
+task: [review, diagnostics]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: data-scientist
 description: >
   Use when validating statistical models, scoring formulas, or config-driven math.

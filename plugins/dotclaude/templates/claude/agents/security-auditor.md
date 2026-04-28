@@ -1,4 +1,11 @@
 ---
+id: security-auditor
+type: agent
+version: 1.0.0
+domain: [security]
+platform: [none]
+task: [review, diagnostics]
+maturity: draft
 name: security-auditor
 description: >
   Use when conducting security audits, reviewing code for vulnerabilities,

@@ -1,4 +1,11 @@
 ---
+id: documentation-writer
+type: agent
+version: 1.0.0
+domain: [writing, devex]
+platform: [none]
+task: [documentation]
+maturity: draft
 name: documentation-writer
 description: >
   Use when writing or updating documentation: user guides, READMEs, API references,

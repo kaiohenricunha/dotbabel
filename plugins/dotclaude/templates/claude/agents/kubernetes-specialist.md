@@ -1,4 +1,11 @@
 ---
+id: kubernetes-specialist
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [kubernetes]
+task: [debugging, diagnostics, runtime-ops]
+maturity: draft
 name: kubernetes-specialist
 description: >
   Use when designing, debugging, or reviewing Kubernetes workloads and cluster

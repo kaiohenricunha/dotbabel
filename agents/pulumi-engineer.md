@@ -1,4 +1,14 @@
 ---
+id: pulumi-engineer
+type: agent
+version: 1.0.0
+domain: [infra]
+platform: [pulumi]
+task: [provisioning, debugging]
+maturity: draft
+owner: "@kaiohenricunha"
+created: 2026-04-28
+updated: 2026-04-28
 name: pulumi-engineer
 description: >
   Use when working with Pulumi stacks, component resources, or the Automation
