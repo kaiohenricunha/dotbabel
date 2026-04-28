@@ -8,23 +8,25 @@ _Last updated: v0.11.0_
 
 The `/handoff` skill moves live session context from one agentic CLI to another —
 Claude Code, GitHub Copilot CLI, OpenAI Codex CLI — on the same machine or across
-machines. Nine sub-commands, one transport (a user-owned private git repo), one
-scrubbed digest.
+machines. Seven sub-commands (doctor, fetch, list, prune, pull, push, search),
+one transport (a user-owned private git repo), one scrubbed digest.
 
 ---
 
 ## When to use it
 
-| Situation                                        | Sub-command                             |
-| ------------------------------------------------ | --------------------------------------- |
-| Continue a Claude Code session in Codex          | `digest` → paste-in                     |
-| Pick up the same work on a different laptop      | `push` (machine A) → `pull` (machine B) |
-| Persist the handoff to a markdown file for later | `file`                                  |
-| Inspect a session's purpose without loading it   | `describe`                              |
-| Find an old session by topic                     | `search "k8s networking"`               |
-| List recent sessions                             | `list`                                  |
-| Check what's waiting for you on the transport    | `remote-list`                           |
-| Diagnose why `push`/`pull` isn't working         | `doctor`                                |
+| Situation                                            | Sub-command               |
+| ---------------------------------------------------- | ------------------------- |
+| Continue a session in another CLI (in-place render)  | `pull latest`             |
+| Pick up the same work on a different machine         | `push` (A) → `pull` (B)   |
+| Persist context as a markdown file                   | `pull -o <path>`          |
+| Inspect a session's summary without loading it       | `pull --summary`          |
+| Find an old session by topic                         | `search "k8s networking"` |
+| List recent sessions                                 | `list`                    |
+| Check what's waiting on the remote                   | `list --remote`           |
+| Fetch a specific session from the remote by tag/UUID | `fetch`                   |
+| Remove old remote handoff branches                   | `prune --older-than 30d`  |
+| Diagnose why `push`/`pull` isn't working             | `doctor`                  |
 
 ---
 
@@ -59,6 +61,10 @@ source ~/.config/dotclaude/handoff.env
 ```
 
 to your `~/.bashrc` or `~/.zshrc`.
+
+When calling `dotclaude handoff push` with no query argument, `--from <cli>` is
+required — the flag identifies which local session to upload (e.g. `--from codex`).
+Skill invocations (`/handoff push`) auto-fill `--from` from the host session.
 
 **On machine B** (any CLI):
 
@@ -128,29 +134,39 @@ wins.
 | `/handoff pull [<q>]` | Fetch from transport; zero-arg = newest branch                                              |
 | `/handoff list`       | Unified local + remote table (`--local`/`--remote`, `--from`, `--since`, `--limit`/`--all`) |
 
+Sub-commands that render content accept `--summary` (terse inline) and `-o <path|auto|->` (write to file).
+
 Every `<query>` can be a full UUID, short UUID (first 8 hex), `latest`,
 a Claude `customTitle`, or a Codex `thread_name`.
-
-Power-user sub-commands (`resolve`, `describe`, `digest`, `file`) stay
-reachable for scripting — each takes an explicit `<cli>` `<id>`. Full
-argument semantics live in [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).
 
 ---
 
 ## Common patterns
 
-**Persist important context as a markdown file:**
+**Persist context as a markdown file:**
 
 ```
-/handoff file claude latest
-# writes to docs/handoffs/<date>-<origin>-<short-id>.md
+/handoff pull latest -o auto
+# writes to docs/handoffs/<date>-claude-<short-id>.md
 ```
 
 **Recover context after `/clear`:**
 
 ```
-/handoff search "auth middleware" --cli claude --since 2026-04-01
+/handoff search "auth middleware" --from claude --since 2026-04-01
 /handoff <uuid-from-search>      # bare <query> form drops the block in place
+```
+
+**Search with exact-string match (no regex):**
+
+```
+/handoff search "auth middleware" --from claude --fixed
+```
+
+**Scripting with structured output:**
+
+```bash
+dotclaude handoff pull latest --json | jq '.summary'
 ```
 
 **Scheduled remote handoff** (e.g. running as a /loop or cron):
