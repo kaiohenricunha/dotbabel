@@ -715,10 +715,9 @@ async function main() {
   if (first === "search") {
     const query = second;
     if (!query) fail(EXIT_CODES.USAGE, "search requires a <query> argument");
-    const filterCli = fromCli;
     const hits = searchSessions({
       query,
-      cli: filterCli,
+      cli: fromCli,
       since: argv.flags.since ? String(argv.flags.since) : null,
       limit: limit.toString(),
       fixed: Boolean(argv.flags.fixed),

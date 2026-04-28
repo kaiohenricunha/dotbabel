@@ -1,8 +1,9 @@
 # Handoff prerequisites — git transport checklist and remediation
 
-The remote sub-commands (`push`, `pull`, `fetch`) require a
-working git transport. `/handoff doctor` runs the checklist below and
-prints a remediation block on failure. The reusable implementation
+Remote transport operations (`push`, `fetch`, `list --remote`, `prune`)
+require a working git transport. `/handoff doctor` runs the checklist
+below and prints a remediation block on failure. (`pull` is a local
+render verb and does not need git transport.) The reusable implementation
 lives at `plugins/dotclaude/scripts/handoff-doctor.sh`.
 
 ## Output contract

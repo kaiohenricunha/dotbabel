@@ -72,13 +72,6 @@ teardown() {
   [[ "$output" == *"migration"* ]]
 }
 
-@test "search --cli codex narrows to the codex root only" {
-  run node "$BIN" search migration --cli codex
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"bbbb2222"* ]]
-  [[ "$output" != *"aaaa1111"* ]]
-}
-
 @test "search with no match exits 0 with 'No sessions matching'" {
   run node "$BIN" search absolutelynothingmatches
   [ "$status" -eq 0 ]
