@@ -42,7 +42,7 @@ the right invocation.
 | `continue in <cli>` / `switch to <cli>` / `pull from <cli>`            | `dotclaude handoff pull <id> --from <cli>`           |
 | `what was that session about` + identifier                             | `dotclaude handoff pull <id> --summary`              |
 | `push handoff` / `send to other machine` / `save this`                 | `dotclaude handoff push --from <host-cli> [--tag …]` |
-| `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotclaude handoff fetch <query-or-prompt>`          |
+| `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotclaude handoff fetch [<query>]`                  |
 
 Extract `<id>` from the user message (UUID, short UUID, or named alias).
 The resolver probes Claude / Copilot / Codex roots automatically. If the
@@ -61,7 +61,7 @@ is running in (`claude` for Claude Code, `copilot` for GitHub Copilot CLI,
 
 Brief reference. `dotclaude handoff --help` is authoritative.
 
-- `--from <cli>` narrows source-CLI auto-detection on `push`, `fetch`, `pull`; filters `list` and `search`.
+- `--from <cli>` narrows source-CLI auto-detection on `push`, `fetch`, `pull`; filters `list`, `search`, and `prune`.
 - `--summary` (on `pull`) emits a prose summary instead of the full `<handoff>` block.
 - `-o <path>` (on `pull`) controls output: `-` forces stdout; `auto` writes to `<repo>/docs/handoffs/<date>-<cli>-<short>.md`; any other string is a literal path.
 - `--since <ISO>` cuts off `list` and `search` (default 30 days for `search`).
