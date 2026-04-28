@@ -17,13 +17,12 @@
 //   surface in lockstep across sources.
 //
 // Phase 1 scope (deliberately minimal — see fixtures/handoff-drift-known-disagreements.md).
-//   - Sources: 2 of 3. Just `--help` + SKILL.md. `docs/handoff-guide.md`
-//     is heavily drifted today (per spec §1) and joins as a third source
-//     in Phase 2 PR 8 after docs reconciliation lands.
-//   - Symbols asserted: the *intersection* of stable symbols. Today that
-//     is `[doctor, fetch, list, pull, push, search]` for commands and a
-//     small intersection for global flags. As Phase 2 PRs reconcile each
-//     disagreement, the intersection grows and the fixture shrinks.
+//   - Sources: 3 of 3. `--help`, SKILL.md, and `docs/handoff-guide.md`.
+//     All three sources are reconciled as of Phase 2 PR 8.
+//   - Symbols asserted: the *intersection* of stable symbols across all
+//     three sources. That is `[doctor, fetch, list, prune, pull, push, search]`
+//     for commands and 8 global flags. The fixture documents the small set
+//     of symbols present in only one or two sources.
 //   - `from_rule` is asserted `{ present: false, applies_to: [], mandatory_when: null }`
 //     in both sources today; spec §5.5.2's mandatory-`--from` rule lands
 //     in Phase 2 PR 3 and both extractors flip in lockstep with the binary
@@ -55,6 +54,7 @@ const repoRoot = resolve(__dirname, "../../..");
 
 const SKILL_MD_PATH = resolve(repoRoot, "skills/handoff/SKILL.md");
 const HANDOFF_BIN = resolve(repoRoot, "plugins/dotclaude/bin/dotclaude-handoff.mjs");
+const GUIDE_MD_PATH = resolve(repoRoot, "docs/handoff-guide.md");
 
 /**
  * @typedef {object} FromRule
@@ -267,6 +267,58 @@ export function extractFromRule(text) {
   return { present: false, applies_to: [], mandatory_when: null };
 }
 
+/**
+ * Parse `docs/handoff-guide.md`.
+ *
+ * Sub-commands come from the `## When to use it` table's second column —
+ * each non-header row's cell is scanned for backtick-wrapped lowercase-alpha
+ * tokens (the verb names). Global flags come from the `## The five forms`
+ * and `## Common patterns` sections, scanned for `--flag` and `-o` tokens.
+ *
+ * @param {string} text
+ * @returns {HandoffSurface}
+ */
+export function extractFromGuide(text) {
+  // Commands: parse second column of "When to use it" table.
+  const whenSection = text.match(/## When to use it\s+([\s\S]*?)(?=\n## |\n# |$)/);
+  if (!whenSection) {
+    throw new Error("handoff-guide.md: could not find `## When to use it` section");
+  }
+  const commandSet = new Set();
+  // Each non-header row: | <situation> | <sub-command cell> |
+  // Extract all `word` tokens from second column where word is lowercase alpha.
+  const rowRegex = /^\|[^|]+\|([^|]+)\|/gm;
+  let m;
+  while ((m = rowRegex.exec(whenSection[1])) !== null) {
+    const cell = m[1];
+    const verbRegex = /`([a-z]+)/g;
+    let vm;
+    while ((vm = verbRegex.exec(cell)) !== null) {
+      commandSet.add(vm[1]);
+    }
+  }
+  const commands = [...commandSet].sort();
+
+  // Flags: scan "The five forms" and "Common patterns" sections.
+  const flagSections = text.match(
+    /(?:## The five forms|## Common patterns)[\s\S]*?(?=\n## |$)/g,
+  );
+  const flagTokens = new Set();
+  for (const section of flagSections ?? []) {
+    const flagRegex = /(?<![a-zA-Z0-9])(--[a-z][a-zA-Z0-9-]+|-o)(?![a-zA-Z0-9-])/g;
+    let fm;
+    while ((fm = flagRegex.exec(section)) !== null) {
+      flagTokens.add(fm[1]);
+    }
+  }
+
+  return {
+    commands,
+    flags_by_command: { "*": [...flagTokens].sort() },
+    from_rule: extractFromRule(text),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -276,6 +328,8 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
   let skillSurface;
   /** @type {HandoffSurface} */
   let helpSurface;
+  /** @type {HandoffSurface} */
+  let guideSurface;
 
   beforeAll(() => {
     const skillText = readFileSync(SKILL_MD_PATH, "utf8");
@@ -291,12 +345,16 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
       env: { ...process.env, HOME: hermeticHome, XDG_CONFIG_HOME: hermeticHome },
     });
     helpSurface = extractFromHelp(help);
+
+    const guideText = readFileSync(GUIDE_MD_PATH, "utf8");
+    guideSurface = extractFromGuide(guideText);
   });
 
   it("test-the-test: each extractor returns a HandoffSurface struct", () => {
     for (const [name, surface] of [
       ["SKILL.md", skillSurface],
       ["--help", helpSurface],
+      ["guide", guideSurface],
     ]) {
       // Top-level shape.
       expect(surface, name).toEqual(
@@ -335,19 +393,26 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
 
   it("commands intersection across sources matches Phase 1 baseline", () => {
     const skillSet = new Set(skillSurface.commands);
-    const intersection = helpSurface.commands.filter((c) => skillSet.has(c)).sort();
+    const guideSet = new Set(guideSurface.commands);
+    const intersection = helpSurface.commands
+      .filter((c) => skillSet.has(c) && guideSet.has(c))
+      .sort();
     expect(intersection).toEqual(PHASE_1_BASELINE_COMMANDS);
   });
 
   it("global-flag intersection across sources matches Phase 1 baseline", () => {
     const skillFlags = new Set(skillSurface.flags_by_command["*"] ?? []);
+    const guideFlags = new Set(guideSurface.flags_by_command["*"] ?? []);
     const helpFlags = helpSurface.flags_by_command["*"] ?? [];
-    const intersection = helpFlags.filter((f) => skillFlags.has(f)).sort();
+    const intersection = helpFlags
+      .filter((f) => skillFlags.has(f) && guideFlags.has(f))
+      .sort();
     expect(intersection).toEqual(PHASE_1_BASELINE_FLAGS_INTERSECTION);
   });
 
-  it("from_rule baseline matches in both sources", () => {
+  it("from_rule baseline matches in all sources", () => {
     expect(skillSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
     expect(helpSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
+    expect(guideSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
   });
 });
