@@ -53,15 +53,8 @@
       "terragrunt-engineer",
       "terragrunt-specialist"
     ],
-    "backend": [
-      "backend-developer",
-      "test-engineer"
-    ],
-    "writing": [
-      "changelog-assistant",
-      "documentation-writer",
-      "markdown"
-    ],
+    "backend": ["backend-developer", "test-engineer"],
+    "writing": ["changelog-assistant", "documentation-writer", "markdown"],
     "security": [
       "compliance-auditor",
       "dependabot-sweep",
@@ -69,13 +62,8 @@
       "security-engineer",
       "security-review"
     ],
-    "data": [
-      "data-scientist"
-    ],
-    "frontend": [
-      "frontend-developer",
-      "test-engineer"
-    ]
+    "data": ["data-scientist"],
+    "frontend": ["frontend-developer", "test-engineer"]
   },
   "platform": {
     "none": [
@@ -109,18 +97,9 @@
       "veracity-audit",
       "workflow-orchestrator"
     ],
-    "aws": [
-      "aws-engineer",
-      "aws-specialist"
-    ],
-    "azure": [
-      "azure-engineer",
-      "azure-specialist"
-    ],
-    "docker": [
-      "container-engineer",
-      "docker-engineer"
-    ],
+    "aws": ["aws-engineer", "aws-specialist"],
+    "azure": ["azure-engineer", "azure-specialist"],
+    "docker": ["container-engineer", "docker-engineer"],
     "kubernetes": [
       "crossplane-engineer",
       "crossplane-specialist",
@@ -128,10 +107,7 @@
       "kubernetes-specialist",
       "security-engineer"
     ],
-    "crossplane": [
-      "crossplane-engineer",
-      "crossplane-specialist"
-    ],
+    "crossplane": ["crossplane-engineer", "crossplane-specialist"],
     "github-actions": [
       "dependabot-sweep",
       "devops-engineer",
@@ -139,26 +115,15 @@
       "review-pr",
       "review-prs"
     ],
-    "gcp": [
-      "gcp-engineer",
-      "gcp-specialist"
-    ],
+    "gcp": ["gcp-engineer", "gcp-specialist"],
     "terraform": [
       "iac-engineer",
       "terraform-specialist",
       "terragrunt-engineer",
       "terragrunt-specialist"
     ],
-    "terragrunt": [
-      "iac-engineer",
-      "terragrunt-engineer",
-      "terragrunt-specialist"
-    ],
-    "pulumi": [
-      "iac-engineer",
-      "pulumi-engineer",
-      "pulumi-specialist"
-    ]
+    "terragrunt": ["iac-engineer", "terragrunt-engineer", "terragrunt-specialist"],
+    "pulumi": ["iac-engineer", "pulumi-engineer", "pulumi-specialist"]
   },
   "task": {
     "debugging": [
@@ -256,11 +221,7 @@
       "kubernetes-specialist",
       "security-auditor"
     ],
-    "runtime-ops": [
-      "deployment-engineer",
-      "docker-engineer",
-      "kubernetes-specialist"
-    ],
+    "runtime-ops": ["deployment-engineer", "docker-engineer", "kubernetes-specialist"],
     "testing": [
       "detect-flaky",
       "fix-with-evidence",
