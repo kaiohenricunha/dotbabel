@@ -43,6 +43,7 @@ source are excluded until reconciled.
 | `--older-than`, `--yes`                                         | `--help`                                                                       | `SKILL.md`                                                                | Phase 2 PR 6 (SKILL.md shrink)                             |
 | `--cli`                                                         | `--help`, SKILL.md (mentioned as "legacy alias on `search` and `remote-list`") | (cross-cutting bullet)                                                    | Phase 2 PR 7 — migration to `--from`                       |
 | `--tags`                                                        | `--help`                                                                       | `SKILL.md` cross-cutting block (mentioned in `--tag` prose for histogram) | Phase 2 PR 6 (SKILL.md shrink)                             |
+| `--to`                                                          | `SKILL.md` (synopsis line 45 + cross-cutting bullet 98-101 + cross-agent rule §b 129-132) | `--help` (binary dropped in PR 4 — `pull` next-step now always uses detected host) | Phase 2 PR 6 (SKILL.md shrink) — drop the cross-cutting bullet + §b paragraph |
 | `--no-color`, `--verbose`/`-v`, `--help`/`-h`, `--version`/`-V` | `--help`                                                                       | `SKILL.md`                                                                | Out of scope — universal CLI flags, no spec coverage       |
 
 ## Internal — SKILL.md self-disagreement

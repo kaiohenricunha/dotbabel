@@ -103,7 +103,6 @@ const PHASE_1_BASELINE_FLAGS_INTERSECTION = [
   "--since",
   "--summary",
   "--tag",
-  "--to",
   "-o",
 ];
 

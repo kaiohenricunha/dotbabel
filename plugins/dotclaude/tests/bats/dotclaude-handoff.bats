@@ -97,20 +97,6 @@ teardown() {
   echo "$output" | jq -e '.user_prompts | length >= 2' >/dev/null
 }
 
-@test "pull emits a <handoff> block with next-step tuned for --to codex" {
-  run node "$BIN" pull aaaa1111 --to codex
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"<handoff"* ]]
-  [[ "$output" == *"</handoff>"* ]]
-  [[ "$output" == *"Next step"* ]]
-}
-
-@test "pull --to claude produces imperative next step" {
-  run node "$BIN" pull aaaa1111 --to claude
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"<handoff"* ]]
-}
-
 @test "pull --json emits structured digest JSON" {
   run node "$BIN" pull aaaa1111 --json
   [ "$status" -eq 0 ]
