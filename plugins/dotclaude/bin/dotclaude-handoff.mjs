@@ -4,7 +4,7 @@
  *
  * Usage:
  *   dotclaude handoff                              print usage and exit 0 (#86)
- *   dotclaude handoff pull [<id>] [--summary] [-o <path|auto|->] [--from <cli>] [--to <cli>]
+ *   dotclaude handoff pull [<id>] [--summary] [-o <path|auto|->] [--from <cli>]
  *                                                  render a local session: <handoff> block (default),
  *                                                  --summary for describe-style markdown, -o to write to disk.
  *   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
@@ -108,7 +108,7 @@ const CLIS = new Set(["claude", "copilot", "codex"]);
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor|remote-list] [args...] [--from <cli>] [--to <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
+    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor|remote-list] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
     "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.",
   flags: {
@@ -119,7 +119,6 @@ const META = {
     // Boolean flag for `list --remote --tags` histogram mode.
     tags: { type: "boolean" },
     from: { type: "string" },
-    to: { type: "string" },
     limit: { type: "string" },
     since: { type: "string" },
     cli: { type: "string" },
@@ -662,8 +661,7 @@ if (!/^\d+$/.test(limit.toString()))
   fail(EXIT_CODES.USAGE, `--limit must be a non-negative integer, got: ${limit}`);
 
 const detectedHost = detectHost();
-const toCli = (argv.flags.to ?? (detectedHost === "unknown" ? "claude" : detectedHost)).toString();
-if (!CLIS.has(toCli)) fail(EXIT_CODES.USAGE, `--to must be one of: ${[...CLIS].join(", ")}`);
+const toCli = detectedHost === "unknown" ? "claude" : detectedHost;
 
 const fromCli = argv.flags.from ? String(argv.flags.from) : null;
 if (fromCli !== null && !CLIS.has(fromCli)) {

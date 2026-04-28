@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Behavior tests for the public surface of dotclaude-handoff.mjs (#87):
 #
-#   dotclaude handoff pull  [<id>] [--summary] [-o <path>] [--from <cli>] [--to <cli>]
+#   dotclaude handoff pull  [<id>] [--summary] [-o <path>] [--from <cli>]
 #   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
 #   dotclaude handoff push  [<query>] [--tag]
 #   dotclaude handoff list
@@ -384,7 +384,7 @@ teardown() {
 
 @test "pull copilot session under CLAUDECODE=1 resolves globally and targets claude" {
   # resolveAny finds cccc3333 in the copilot root.
-  # CLAUDECODE=1 → detected host = claude → --to defaults to claude.
+  # CLAUDECODE=1 → detected host = claude → next-step uses claude wording.
   # The Claude-tuned next-step hint must appear in the block.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
     node "$BIN" pull cccc3333
@@ -406,19 +406,10 @@ teardown() {
   [[ "$stderr" == *"bbbb2222"* ]]
 }
 
-@test "pull --to copilot overrides detected host for the next-step hint" {
-  # --to is orthogonal to --from and detection; passing --to copilot must
-  # use the Copilot-tuned wording regardless of detected host.
-  run node "$BIN" pull aaaa1111 --to copilot
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"<handoff"* ]]
-  [[ "$output" == *"pick up where"* ]]
-}
-
-@test "pull --from copilot under CLAUDECODE=1: source narrows, --to stays claude" {
+@test "pull --from copilot under CLAUDECODE=1: source narrows, next-step uses detected host" {
   # --from narrows the local resolver to the copilot root.
   # CLAUDECODE=1 makes the detected host claude.
-  # --to must still default to claude (detected host), NOT to the --from value.
+  # Next-step wording reflects the detected host (claude), not --from.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
     node "$BIN" pull cccc3333 --from copilot
   [ "$status" -eq 0 ]
