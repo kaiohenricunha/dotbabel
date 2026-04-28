@@ -157,7 +157,7 @@ session without it.
 ## Notes
 
 - Codex sessions routinely exceed 100k lines because tool-call output
-  is logged inline. For the `describe` sub-command, truncate the
+  is logged inline. For the `pull --summary` verb, truncate the
   assistant transcript to the last ~20 turns before summarizing.
 - `payload.content` is always an array. `content[0].text` is the
   common case but probe with `content | length` before trusting it.

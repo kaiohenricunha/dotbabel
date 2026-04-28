@@ -69,4 +69,4 @@ Scrubbing is best-effort. It does not catch:
 - Anything the user consciously wrote in prose ("my password is …").
 
 Before pushing sensitive sessions, review the digest locally with
-`/handoff digest <cli> <uuid>` first.
+`dotclaude handoff pull <uuid>` first.

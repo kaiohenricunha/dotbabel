@@ -85,20 +85,7 @@ binary:
 - Non-TTY (scripts/CI): exits 2 with a TSV candidate list on stderr so
   the caller can parse and retry with a more specific query.
 
-## Power-user sub-commands
-
-The five-form shape above is the primary surface. For scripting you
-can still use:
-
-```
-dotclaude handoff resolve  <cli> <id>        # file path only
-dotclaude handoff describe <cli> <id>        # inline markdown summary
-dotclaude handoff digest   <cli> <id>        # full <handoff> block
-dotclaude handoff file     <cli> <id>        # write to docs/handoffs/
-```
-
-All subcommands support `--help`, `--version`, `--json`, `--verbose`,
-`--no-color`. Exit codes: 0 ok, 2 not found / parse error, 64 usage.
+See `dotclaude handoff --help` for the full sub-command and flag reference.
 
 ## Why the binary and not the skill file?
 

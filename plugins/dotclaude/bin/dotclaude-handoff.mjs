@@ -99,7 +99,7 @@ const CLIS = new Set(["claude", "copilot", "codex"]);
 const META = {
   name: "dotclaude-handoff",
   synopsis:
-    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--cli <cli>] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
+    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
     "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.",
   flags: {
@@ -112,7 +112,6 @@ const META = {
     from: { type: "string" },
     limit: { type: "string" },
     since: { type: "string" },
-    cli: { type: "string" },
     "out-dir": { type: "string" },
     output: { type: "string", short: "o" },
     local: { type: "boolean" },
@@ -682,17 +681,6 @@ async function resolveLatestWithHostScope({ fromCli, detectedHost }) {
   return { hit, note: `host not detected, using latest across all clis: ${shortId}` };
 }
 
-// Resolve the CLI filter for sub-commands that accept `--from` with a
-// `--cli` legacy alias (search). Fails USAGE on an unknown value.
-// Returns null when neither flag was passed.
-function resolveFilterCli() {
-  const v = fromCli ?? (argv.flags.cli ? String(argv.flags.cli) : null);
-  if (v !== null && !CLIS.has(v)) {
-    fail(EXIT_CODES.USAGE, `--from must be one of: ${[...CLIS].join(", ")}`);
-  }
-  return v;
-}
-
 async function main() {
   if (argv.positional.length === 0) {
     process.stdout.write(helpText(META) + "\n");
@@ -727,7 +715,7 @@ async function main() {
   if (first === "search") {
     const query = second;
     if (!query) fail(EXIT_CODES.USAGE, "search requires a <query> argument");
-    const filterCli = resolveFilterCli();
+    const filterCli = fromCli;
     const hits = searchSessions({
       query,
       cli: filterCli,

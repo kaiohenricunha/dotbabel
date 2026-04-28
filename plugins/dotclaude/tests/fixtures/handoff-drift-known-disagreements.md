@@ -23,7 +23,6 @@ The Phase 1 test extracts a flat global flag set from each source and
 asserts agreement on the intersection. Flags that appear in only one
 source are excluded until reconciled.
 
-| Flag                                                            | Present in | Missing from | Resolves in                                                               |
-| --------------------------------------------------------------- | ---------- | ------------ | ------------------------------------------------------------------------- |
-| `--cli`                                                         | `--help`   | `SKILL.md`   | Phase 2 PR 7 — `--cli` removed from binary in favor of canonical `--from` |
-| `--no-color`, `--verbose`/`-v`, `--help`/`-h`, `--version`/`-V` | `--help`   | `SKILL.md`   | Out of scope — universal CLI flags, no spec coverage                      |
+| Flag                                                            | Present in | Missing from | Resolves in                                          |
+| --------------------------------------------------------------- | ---------- | ------------ | ---------------------------------------------------- |
+| `--no-color`, `--verbose`/`-v`, `--help`/`-h`, `--version`/`-V` | `--help`   | `SKILL.md`   | Out of scope — universal CLI flags, no spec coverage |

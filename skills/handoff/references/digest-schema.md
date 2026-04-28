@@ -33,7 +33,7 @@ next_step_suggestion: |
   One sentence the target agent should pick up from.
 ```
 
-## Rendering: `<handoff>` block (for `digest` and `file` sub-commands)
+## Rendering: `<handoff>` block (`pull` verb)
 
 ```markdown
 <handoff origin="<cli>" session="<short-id>" cwd="<cwd>">
@@ -63,7 +63,7 @@ next_step_suggestion: |
 The `<handoff>` tag is intentional: target agents can detect it
 reliably and distinguish digest content from surrounding commentary.
 
-## Rendering: `describe` sub-command (terse inline summary)
+## Rendering: `pull --summary` output (terse inline summary)
 
 ```markdown
 **<cli>** `<short-id>` — `<cwd>` — <started-at>
@@ -77,9 +77,9 @@ reliably and distinguish digest content from surrounding commentary.
 ```
 
 No `<handoff>` wrapper. No key findings, artifacts, or next step —
-those belong in `digest`/`file`.
+those belong in `pull` (full block) or `pull -o auto` (file output).
 
-## Rendering: `file` sub-command (markdown doc)
+## Rendering: `pull -o <path>` output (markdown doc)
 
 ```markdown
 # Handoff: <origin.cli> → <target.cli>
@@ -108,19 +108,6 @@ _Origin session: `<full-uuid>` (cwd: `<cwd>`)_
 File path: `docs/handoffs/<YYYY-MM-DD>-<origin.cli>-<short-id>.md` when
 a `docs/` directory exists at the repo root, else
 `~/.claude/handoffs/<YYYY-MM-DD>-<origin.cli>-<short-id>.md`.
-
-## Target-CLI tuning (the `--to` flag)
-
-The only field that changes with `--to` is `next_step_suggestion`:
-
-- `--to claude` — phrase the next step as an imperative Claude can
-  follow directly ("Continue the refactor by editing …").
-- `--to codex` — include explicit filepaths and a concrete sub-task,
-  since Codex prefers task-shaped inputs.
-- `--to copilot` — phrase as a question or "help me with …" since
-  Copilot pairs with the user.
-
-All other fields are identical regardless of target.
 
 ## Size bounds
 

@@ -1,6 +1,6 @@
 # Handoff prerequisites — git transport checklist and remediation
 
-The remote sub-commands (`push`, `pull`, `remote-list`) require a
+The remote sub-commands (`push`, `pull`, `fetch`) require a
 working git transport. `/handoff doctor` runs the checklist below and
 prints a remediation block on failure. The reusable implementation
 lives at `plugins/dotclaude/scripts/handoff-doctor.sh`.
@@ -85,8 +85,7 @@ warn: system clock reports year <YYYY>; git auth may fail with signature errors 
 
 ## Air-gapped / offline path
 
-`/handoff file <cli> <uuid>` writes a local markdown artifact with a
-`<handoff>` block at the top. Move it via any out-of-band channel
-(USB stick, secure copy, encrypted email) and run
-`/handoff pull --from-file <path>` on the destination machine. No
-network required.
+Run `dotclaude handoff pull <uuid> -o <path>` on the source machine to write
+a local markdown file. Move it via any out-of-band channel (USB stick, secure
+copy, encrypted email), then paste the file's markdown content into the target
+session. No network or binary required on the destination.
