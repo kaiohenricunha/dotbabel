@@ -6,9 +6,59 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ## Unreleased
 
+## [1.0.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.11.0...v1.0.0) (2026-04-29)
+
+The v1.0 stable cut of `@dotclaude/dotclaude`. Locks the handoff v2
+surface, fixes the busybox/Alpine substrate crash, formalizes spec
+templates that the v0.11.0 binary already implemented, and adds a CI
+gate that prevents the release-pipeline drift behind #133/#134.
+
+See [docs/migrations/v1.0.md](./docs/migrations/v1.0.md) for the full
+verb-rename mapping and migration examples.
+
+### ⚠ BREAKING CHANGES
+
+- **handoff:** verb-rename surface redesign (#87, lands in this release). The pre-v1 `pull` verb (which fetched from the remote) and `--to <cli>` flag are gone. `--from <cli>` is now mandatory whenever the verb cannot infer the producing CLI from the input. Per spec §6.5 migration table:
+
+  | Before (≤0.10.x)                          | After (v1.0)                                                |
+  | ----------------------------------------- | ----------------------------------------------------------- |
+  | `dotclaude handoff pull <id>`             | `dotclaude handoff fetch <id>`                              |
+  | `dotclaude handoff pull <id> --to claude` | `dotclaude handoff fetch <id>` (consumer CLI is implicit)   |
+  | `dotclaude handoff push <id>`             | `dotclaude handoff push <id>` (unchanged when `<id>` given) |
+  | `dotclaude handoff push --from <cli>`     | unchanged; `--from` required when `<id>` is omitted         |
+  | (no equivalent)                           | `dotclaude handoff pull <id>` — render a **local** session  |
+
+  `pull` is now strictly local — it renders a local session as a
+  `<handoff>` block, summary markdown (`--summary`), or a file
+  (`-o <path>`). `fetch` is the remote-transport verb. `--to` is
+  removed; the consumer CLI is always implicit (it's the one running
+  the binary).
+
 ### Added
 
-- **handoff:** push/pull now auto-run preflight on first use within a 5-minute window; `--verify` forces re-run. `doctor` verb unchanged.
+- **handoff:** `pull <id>` local rendering with `--summary` and `-o <path|auto|->` modes (#87). Stream isolation per spec §5.5.1 OPS-2: `<handoff>`/summary/path on stdout, progress on stderr.
+- **handoff:** `prune --older-than <30d|6m|1y|YYYY-MM-DD>` for transport cleanup, with `--dry-run` and `--yes`.
+- **handoff:** `--tag <label>` (multi-valued on push, single-value filter on `list --remote --tag`) and `list --remote --tags` histogram.
+- **handoff:** push/fetch auto-run preflight on first use within a 5-minute window; `--verify` forces re-run. `doctor` verb unchanged.
+- **handoff:** `<handoff>` block surfaces source CLI's customTitle / thread_name when present; resolver accepts named aliases on codex.
+- **release:** `.github/workflows/release-gate.yml` enforces version-tag alignment on every PR to main and runs the published-tarball-vs-source diff on release PRs (#134).
+- **docs:** `docs/migrations/v1.0.md` migration guide; spec §5.3.2 amended to formalize the narrowed `no <cli> session matches` form when `--from` is set.
+
+### Fixed
+
+- **handoff #129:** `pick_newest()` no longer crashes on busybox/Alpine. The runtime `||` fallback chain (find -printf → stat -f → stat -c) is replaced by a single probe at script init that detects GNU/BSD/posix substrates and selects one deterministic path. Fixed in #139.
+- **handoff #135:** pull no-match stderr no longer double-prefixes `dotclaude-handoff: handoff-resolve: ...`. Fixed in #140 — the resolver script's prefix is stripped before the binary's own prefix is added.
+- **handoff #130:** `js-yaml` is now lazy-loaded inside `build-index.mjs`. `dotclaude handoff --help` and other handoff commands no longer require `js-yaml` to be installed. Fixed in #140.
+
+### Documentation
+
+- **handoff #131 — system requirements (out of scope: sh-only environments).** The handoff toolchain requires `bash` 4+, `jq` 1.6+, `perl` 5.x, `git` 2.x, and GNU coreutils on the path. POSIX `sh`-only environments (e.g. minimal Alpine without bash installed) are unsupported. Substrate detection at script init handles GNU vs BSD vs busybox coreutils transparently as long as bash is present. See [docs/handoff-guide.md](./docs/handoff-guide.md#system-requirements).
+
+- **handoff #132 — known property: branch namespace is host-agnostic.** Handoff branches are named `handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>` (no hostname segment). If you fetch a session on machine A, edit it locally, then push from machine B against the same short-uuid, the second push **overwrites** the first. The short-uuid collision check (`metadata.json:hostname`) detects cross-host overwrites and exits 2 unless `--force-collision` is set, but the branch namespace itself is host-agnostic by design. See [docs/handoff-guide.md](./docs/handoff-guide.md#cross-host-collision-semantics).
+
+- **handoff CP-1 — Copilot slash-handler does not pass `--summary` / `-o` flags through.** `/handoff pull latest --summary` and `/handoff pull latest -o <path>` exit 64 inside the Copilot CLI before the binary is invoked (the Copilot slash parser strips flag-prefixed arguments). Mitigation: invoke the bare binary, e.g. `!dotclaude handoff pull latest --summary`. The Claude Code and Codex slash paths are unaffected.
+
+- **handoff CX-1 — progress messages go to stderr per spec §5.5.1 OPS-2.** When capturing the first line of `pull <id>` output (e.g. inside the Codex `!`-shell which displays the interleaved combined stream), redirect stderr explicitly: `dotclaude handoff pull <id> 2>/dev/null | head -1`. The `<handoff>` block, summary markdown, and `-o`-target path are stdout; the `latest <cli> session: <id>` and `using --from <cli> override` lines are stderr.
 
 ## [0.11.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.10.0...v0.11.0) (2026-04-20)
 

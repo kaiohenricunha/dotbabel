@@ -702,19 +702,15 @@ where `msg` already contains `handoff-resolve: no session matches:` from
 
 No CRITICAL or WARNING issues found in Phase 2 beyond #133 itself.
 
-### Phase 3 — CC slash-command path (deferred until #133 ships)
+### Phase 3 — CC slash-command path (runnable post-publish)
 
-**Deferred by design.** With the npm-published binary structurally
-broken, every slash-command surface row would be dominated by the
-release drift rather than the SKILL.md interpretation contract under
-test. Running it now would produce 7 of 8 rows showing
-`dotclaude-handoff: no handoffs match: <query>` exit 2 — which is the
-already-locked Phase 1 finding, not new signal about CC's slash
-expansion. Row 8 (`bogusabc`) would be ironically the only "correct"
-exit, but for the wrong reason: it lands on the genuine no-match path
-of the broken `pullRemote`, indistinguishable from the legitimate
-miss. **Re-run Phase 3 after the new release ships and the global
-`dotclaude` matches the repo binary.**
+**Runnable after the v1.0.0 cut ships to npm.** With the published
+binary aligned to the repo via the v1.0.0 release + manual
+`npm publish` cutover, this phase becomes the post-release smoke test:
+drives the SKILL.md interpretation contract end-to-end across CC's
+`/handoff` slash expansion, with the
+[release-gate workflow](../../.github/workflows/release-gate.yml)
+ensuring no future drift between repo and registry.
 
 The 8 commands the next session should walk:
 
@@ -916,17 +912,20 @@ The "trailing blank" delta is a baseline-generator artifact (`echo`
 between sections), not a binary divergence. Codex row 4's empty diff
 proves the binary's stdout is byte-stable across invocation contexts.
 
-### Phase 4 — Cross-agent dogfood (pending)
+### Phase 4 — Cross-agent dogfood (runnable post-publish)
 
-Requires #133 fixed **or** the workaround alias used end-to-end. Steps:
+**Runnable after the v1.0.0 cut.** Once `npm view @dotclaude/dotclaude version`
+returns `1.0.0` and the source bin matches the published bin (verified
+by `release-gate.yml`'s tarball-source diff), the global `dotclaude`
+no longer needs the `!dotclaude-fixed` workaround alias. Steps:
 
-1. From this CC session, run `/handoff pull latest --from claude`
-   and capture the `<handoff>` block.
+1. From CC, run `/handoff pull latest --from claude` and capture the
+   `<handoff>` block.
 2. Open Codex, paste the block as the first message. Verify Codex
    references the in-progress work (does not ask "what is this?").
-3. Reverse: from a real Codex session, `!dotclaude-fixed pull latest --from codex`,
+3. Reverse: from Codex, `!dotclaude handoff pull latest --from codex`,
    paste into CC.
-4. Repeat: from a real Copilot session, `!dotclaude-fixed pull latest --from copilot`,
+4. Repeat: from Copilot, `!dotclaude handoff pull latest --from copilot`,
    paste into both CC and Codex.
 
 Stop conditions: a `<handoff>` block that the next agent does NOT pick
@@ -937,22 +936,25 @@ semantic-correctness check.
 
 ### Verdict update — v1.0 readiness
 
-| Blocker                                                               | Status                                                                                                                                                                                                               |
-| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **#129**                                                              | **Closed** in [#139](https://github.com/kaiohenricunha/dotclaude/pull/139). Substrate portability fixed via `_STAT_FLAVOR` probe-once in `handoff-resolve.sh`.                                                       |
-| **#133**                                                              | Open, **not a code bug**. Release-pipeline action only: bump version, tag, `npm publish`. Repo binary @ `be25258` is functionally green per the 13-row matrix above. Verbatim diff evidence in Phase 1.              |
-| #134 (new)                                                            | Process bug: `package.json:version` not bumped between npm publish and 17+ post-publish commits. Filed as [#134](https://github.com/kaiohenricunha/dotclaude/issues/134). Root cause behind #133. v1.0.x mitigation. |
-| #135 (new)                                                            | **Closed** — Pull stderr `handoff-resolve:` double-prefix stripped in `dotclaude-handoff.mjs`. Spec §5.3.2 template now matches actual output.                                                                       |
-| #136 (new)                                                            | **Closed** — Spec §5.3.2 amended to formalize narrowed `no <cli> session matches` form when `--from` is set, alongside the unnarrowed form. No code change.                                                          |
-| #130                                                                  | **Closed** — `js-yaml` import in `build-index.mjs` made lazy via `createRequire`; `dotclaude-handoff --help` no longer requires `js-yaml` to be present.                                                             |
-| CP-1                                                                  | INFO — Copilot's slash-handler rejects `--summary` / `-o` flags before invoking the binary. Documentation-only; not a dotclaude bug. v1.0 release-notes material.                                                    |
-| CX-1                                                                  | INFO — Codex's `!`-shell capture displays interleaved stream; OPS-2 is honored on the binary side. Documentation-only; not a dotclaude bug. v1.0 release-notes material.                                             |
-| CX-2 / [#137](https://github.com/kaiohenricunha/dotclaude/issues/137) | **Positive** — R-7 quoting risk does not materialize; bare-binary surface is symmetric across CC / Copilot `!` / Codex `!`. Tracking issue filed to lock the symmetry in CI. v1.0.x or v1.1.                         |
+| Blocker                                                               | Status                                                                                                                                                                                                            |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **#129**                                                              | **Closed** in [#139](https://github.com/kaiohenricunha/dotclaude/pull/139). Substrate portability fixed via `_STAT_FLAVOR` probe-once in `handoff-resolve.sh`.                                                    |
+| **#133**                                                              | **Closes on merge + npm publish of v1.0.0.** package.json bumped to 1.0.0 in this release PR; tag and `npm publish` are the manual cutover after merge. Repo binary at HEAD is the binary that ships.             |
+| #134 (new)                                                            | **Closed** — Structurally prevented by `.github/workflows/release-gate.yml`. Non-release PRs may not change `package.json` version; release PRs run a tarball-vs-source diff that catches drift before it ships.  |
+| #135 (new)                                                            | **Closed** in [#140](https://github.com/kaiohenricunha/dotclaude/pull/140) — Pull stderr `handoff-resolve:` double-prefix stripped in `dotclaude-handoff.mjs`. Spec §5.3.2 template now matches actual output.    |
+| #136 (new)                                                            | **Closed** in [#140](https://github.com/kaiohenricunha/dotclaude/pull/140) — Spec §5.3.2 amended to formalize narrowed `no <cli> session matches` form when `--from` is set, alongside the unnarrowed form.       |
+| #130                                                                  | **Closed** in [#140](https://github.com/kaiohenricunha/dotclaude/pull/140) — `js-yaml` made lazy via `createRequire` in `build-index.mjs`; `dotclaude-handoff --help` no longer requires `js-yaml` to be present. |
+| CP-1                                                                  | INFO — Copilot's slash-handler rejects `--summary` / `-o` flags before invoking the binary. Documentation-only; not a dotclaude bug. v1.0 release-notes material.                                                 |
+| CX-1                                                                  | INFO — Codex's `!`-shell capture displays interleaved stream; OPS-2 is honored on the binary side. Documentation-only; not a dotclaude bug. v1.0 release-notes material.                                          |
+| CX-2 / [#137](https://github.com/kaiohenricunha/dotclaude/issues/137) | **Positive** — R-7 quoting risk does not materialize; bare-binary surface is symmetric across CC / Copilot `!` / Codex `!`. Tracking issue filed to lock the symmetry in CI. v1.0.x or v1.1.                      |
 
-**v1.0 = unblocked once #133 ships**: #129 closed via #139; #135 / #136
-/ #130 closed in this PR's bundle. #133 still needs a release.
-Phase 2.5 / Phase 4 findings remain release-notes material — none are
-blockers on their own.
+**v1.0 ready to ship.** All blockers closed: issue 129 via PR 139;
+issues 135, 136, and 130 via PR 140; issue 134 structurally via the
+release-gate workflow. Issue 133 closes on merge of this release PR
+plus the manual `npm publish v1.0.0` cutover. Phase 3 and Phase 4
+findings move from "deferred" to "runnable post-publish" smoke tests;
+CP-1 and CX-1 are documented in the v1.0 release notes per spec
+§5.5.1 and §5.5.2.
 
 Closing note on the audit-coverage gap that let #133 ship: the
 F-2 matrix in the original audit pushed/fetched with explicit `--tag`

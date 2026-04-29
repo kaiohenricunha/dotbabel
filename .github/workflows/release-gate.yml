@@ -1,0 +1,172 @@
+name: release-gate
+
+# Structural fix for #134 — prevents the v0.11.0-style drift where
+# package.json on `main` advanced past the npm-published binary without
+# being formalized as a release.
+#
+# Two checks:
+#   - version-tag-alignment: every PR to main. Non-release PRs may not
+#     change package.json version. Release PRs (title prefix `release(`)
+#     must bump it and may not collide with an existing tag.
+#   - tarball-source-diff: only on release PRs. Downloads the most
+#     recently published tarball from npm and diffs the shipped binary
+#     against the repo source at the matching git tag. Catches the
+#     "previous release was already drifted" failure mode that produced
+#     #133.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  version-tag-alignment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Read versions and detect release intent
+        id: ctx
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          pkg_version=$(node -p "require('./package.json').version")
+          base_version=$(git show "origin/$BASE_REF:package.json" | node -e "
+            let s='';
+            process.stdin.on('data', c => s += c);
+            process.stdin.on('end', () => console.log(JSON.parse(s).version));
+          ")
+          latest_tag=$(git tag --list 'v*' --sort=-version:refname | head -1 || true)
+          latest_tag_version=${latest_tag#v}
+
+          # Treat manual release( PRs and release-please automated PRs as release PRs.
+          is_release_pr=false
+          case "$PR_TITLE" in
+            release\(*) is_release_pr=true ;;
+          esac
+          case "$HEAD_REF" in
+            release-please--*) is_release_pr=true ;;
+          esac
+
+          {
+            echo "pkg_version=$pkg_version"
+            echo "base_version=$base_version"
+            echo "latest_tag_version=$latest_tag_version"
+            echo "is_release_pr=$is_release_pr"
+          } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Enforce version-bump policy
+        env:
+          PKG: ${{ steps.ctx.outputs.pkg_version }}
+          BASE: ${{ steps.ctx.outputs.base_version }}
+          TAG_V: ${{ steps.ctx.outputs.latest_tag_version }}
+          IS_RELEASE: ${{ steps.ctx.outputs.is_release_pr }}
+        run: |
+          set -euo pipefail
+          echo "package.json version on PR HEAD : $PKG"
+          echo "package.json version on $GITHUB_BASE_REF: $BASE"
+          echo "latest git tag                   : v$TAG_V"
+          echo "is release PR (title release(...)): $IS_RELEASE"
+
+          if [ "$IS_RELEASE" = "true" ]; then
+            if [ "$PKG" = "$BASE" ]; then
+              echo "::error::release PR must bump package.json version (still $BASE)"
+              exit 1
+            fi
+            if git tag --list "v$PKG" | grep -q .; then
+              echo "::error::tag v$PKG already exists; pick a new version"
+              exit 1
+            fi
+            echo "release PR OK: bumping $BASE → $PKG (no existing v$PKG tag)"
+          else
+            if [ "$PKG" != "$BASE" ]; then
+              echo "::error::non-release PR changed package.json version from $BASE to $PKG"
+              echo "::error::only PRs titled 'release(...)' may bump version (#134 drift gate)"
+              exit 1
+            fi
+            echo "non-release PR OK: package.json version unchanged ($PKG)"
+          fi
+
+  tarball-source-diff:
+    needs: version-tag-alignment
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.pull_request.title, 'release(')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Diff most-recent published tarball against tagged source
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          pkg_name=$(node -p "require('./package.json').name")
+          latest_tag=$(git tag --list 'v*' --sort=-version:refname | head -1 || true)
+          if [ -z "$latest_tag" ]; then
+            echo "no previous git tag — first release, nothing to diff against."
+            exit 0
+          fi
+          prev_version=${latest_tag#v}
+
+          if echo "$PR_BODY" | grep -q '\[skip-prev-release-check\]'; then
+            echo "::warning::PR body opts out of the previous-release diff check via [skip-prev-release-check]"
+            echo "this is intended only for the v1.0.0 cut, where v0.11.0 is known-drifted (#133)."
+            exit 0
+          fi
+
+          if ! npm view "$pkg_name@$prev_version" version >/dev/null 2>&1; then
+            echo "previous version $pkg_name@$prev_version is not on npm — nothing to diff."
+            exit 0
+          fi
+
+          tarball_url=$(npm view "$pkg_name@$prev_version" dist.tarball)
+          work=$(mktemp -d)
+          curl -sL "$tarball_url" -o "$work/pkg.tgz"
+          mkdir -p "$work/extracted"
+          tar -xzf "$work/pkg.tgz" -C "$work/extracted"
+
+          source_paths=(
+            "plugins/dotclaude/bin/dotclaude-handoff.mjs"
+            "plugins/dotclaude/bin/dotclaude.mjs"
+            "plugins/dotclaude/bin/dotclaude-bootstrap.mjs"
+            "plugins/dotclaude/bin/dotclaude-sync.mjs"
+            "plugins/dotclaude/bin/dotclaude-doctor.mjs"
+          )
+
+          drift_count=0
+          for rel in "${source_paths[@]}"; do
+            shipped="$work/extracted/package/$rel"
+            if [ ! -f "$shipped" ] || ! git cat-file -e "$latest_tag:$rel" 2>/dev/null; then
+              echo "skip $rel (missing on one side at $latest_tag)"
+              continue
+            fi
+            if ! git show "$latest_tag:$rel" | diff -q "$shipped" - >/dev/null 2>&1; then
+              echo "::error::$rel: published $pkg_name@$prev_version diverges from git $latest_tag"
+              drift_count=$((drift_count + 1))
+            else
+              echo "ok: $rel matches between npm $prev_version and git $latest_tag"
+            fi
+          done
+
+          if [ "$drift_count" -gt 0 ]; then
+            echo "::error::$drift_count file(s) differ between npm $prev_version and git $latest_tag — that release was already drifted (#134 class)."
+            echo "::error::fix the prior release first, or add [skip-prev-release-check] to this PR body if knowingly cutting forward."
+            exit 1
+          fi
+          echo "previous release health check OK."
