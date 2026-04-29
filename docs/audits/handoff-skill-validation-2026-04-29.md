@@ -219,7 +219,7 @@ $ node $BIN prune --older-than 0d --yes
 deleted 2 branch(es).
 
 $ git ls-remote --heads $TRANSPORT
-22ee8056…	refs/heads/handoff/proj/claude/2026-04/bbbbbbbb   ← only the foreign-host branch survives
+22ee8056…  refs/heads/handoff/proj/claude/2026-04/bbbbbbbb   ← only the foreign-host branch survives
 ```
 
 ### F-4 — Backward compat + error paths
@@ -413,11 +413,11 @@ this:
 1. `busybox find -printf '%T@'` exits non-zero ⇒ `||` falls through. ✓ (correct)
 2. `busybox stat -f '%Fm' <path>` **accepts the `-f` flag but ignores
    it**, dumps the **default multi-line `stat <path>`** output (starting
-   with `  File: "<path>"`), and **exits 0**. ✗ The `||` does not fall
+   with `File: "<path>"`), and **exits 0**. ✗ The `||` does not fall
    through — `frac` captures multi-line garbage.
 3. The third fallback (`stat -c '%Y'`) is therefore never reached.
 4. `[[ "$frac" == *.* ]]` matches because the path contains `.jsonl`.
-5. `secs="${frac%%.*}"` ⇒ `  File: "/tmp/…/foo` (everything before the
+5. `secs="${frac%%.*}"` ⇒ `File: "/tmp/…/foo` (everything before the
    first `.`).
 6. Bash arithmetic `$(( ${secs:-0} * 1000 ))` interprets non-numeric
    strings as **variable names** to dereference. The first non-quoted
@@ -477,30 +477,30 @@ The bug is **upstream of the binary code** that lives on `main`. The
 binary at `be25258` is correct; the **published binary** is the wrong
 one.
 
-  - Surface-redesign commit
-    [`33d2a34`](https://github.com/kaiohenricunha/dotclaude/commit/33d2a34)
-    (PR #102, lands #87) on **2026-04-23** split `pull` (local) from
-    `fetch` (remote). Before it, `pull` was the remote-fetch verb.
-  - Tag `v0.11.0` was cut from `385bb9a` on **2026-04-20**, three days
-    earlier. `git merge-base --is-ancestor 33d2a34 v0.11.0` ⇒ false.
-    `git tag --contains 33d2a34` ⇒ empty.
-  - `package.json` on `main @ be25258` still reads `"version": "0.11.0"`.
-    Two non-equivalent binaries share one version string: the
-    npm-published one (pre-#87) and the repo HEAD one (post-#87).
-  - The npm-installed bin is what every CC slash-command invocation
-    shells to (resolves to
-    `/home/kaioh/.nvm/versions/node/v22.22.2/lib/node_modules/@dotclaude/dotclaude/plugins/dotclaude/bin/dotclaude-handoff.mjs`).
-  - Installed bin's `pull` dispatch (lines 1259–1267 of the installed
-    file) calls `pullRemote(query, fromCli)` →
-    `fetchRemoteBranch`. With `query="latest"`, remote-side
-    `enrichWithDescriptions` finds zero candidates and the path throws
-    at `plugins/dotclaude/src/lib/handoff-remote.mjs:1283-1290`:
-    `cause: 'no handoffs match: latest'`. **Exit 2.**
-  - Repo bin's `pull` dispatch
-    (`plugins/dotclaude/bin/dotclaude-handoff.mjs:928-945`, with
-    `resolveLatestWithHostScope` at `670-681`) calls
-    `runScript(handoff-resolve.sh, [<cli>, "latest"])` and emits a
-    `<handoff>` block.
+- Surface-redesign commit
+  [`33d2a34`](https://github.com/kaiohenricunha/dotclaude/commit/33d2a34)
+  (PR #102, lands #87) on **2026-04-23** split `pull` (local) from
+  `fetch` (remote). Before it, `pull` was the remote-fetch verb.
+- Tag `v0.11.0` was cut from `385bb9a` on **2026-04-20**, three days
+  earlier. `git merge-base --is-ancestor 33d2a34 v0.11.0` ⇒ false.
+  `git tag --contains 33d2a34` ⇒ empty.
+- `package.json` on `main @ be25258` still reads `"version": "0.11.0"`.
+  Two non-equivalent binaries share one version string: the
+  npm-published one (pre-#87) and the repo HEAD one (post-#87).
+- The npm-installed bin is what every CC slash-command invocation
+  shells to (resolves to
+  `/home/kaioh/.nvm/versions/node/v22.22.2/lib/node_modules/@dotclaude/dotclaude/plugins/dotclaude/bin/dotclaude-handoff.mjs`).
+- Installed bin's `pull` dispatch (lines 1259–1267 of the installed
+  file) calls `pullRemote(query, fromCli)` →
+  `fetchRemoteBranch`. With `query="latest"`, remote-side
+  `enrichWithDescriptions` finds zero candidates and the path throws
+  at `plugins/dotclaude/src/lib/handoff-remote.mjs:1283-1290`:
+  `cause: 'no handoffs match: latest'`. **Exit 2.**
+- Repo bin's `pull` dispatch
+  (`plugins/dotclaude/bin/dotclaude-handoff.mjs:928-945`, with
+  `resolveLatestWithHostScope` at `670-681`) calls
+  `runScript(handoff-resolve.sh, [<cli>, "latest"])` and emits a
+  `<handoff>` block.
 
 #### Trace evidence
 
@@ -597,15 +597,15 @@ Verbatim from the published 0.11.0 file, lines 1259–1267 — the entire
 
 ```js
 if (first === "pull") {
-    try {
-      const hit = await pullRemote(second, fromCli);
-      const { content } = fetchRemoteBranch(hit.branch);
-      process.stdout.write(content.endsWith("\n") ? content : content + "\n");
-      process.exit(EXIT_CODES.OK);
-    } catch (err) {
-      fail(2, `pull failed: ${err.message}`);
-    }
+  try {
+    const hit = await pullRemote(second, fromCli);
+    const { content } = fetchRemoteBranch(hit.branch);
+    process.stdout.write(content.endsWith("\n") ? content : content + "\n");
+    process.exit(EXIT_CODES.OK);
+  } catch (err) {
+    fail(2, `pull failed: ${err.message}`);
   }
+}
 ```
 
 And lines 850–851 of the published `pullRemote`, the exact emit site of
@@ -623,14 +623,14 @@ characterization above is verifiable from the registry tarball.
 
 Pure release-pipeline action — no code change required:
 
-  1. Bump `package.json` to `0.12.0` (or `0.11.1`); release-please
-     should already have a PR open against `main` since multiple
-     `feat:` and `fix:` commits since `v0.11.0` qualify.
-  2. Tag and `npm publish`.
-  3. Add a CI assertion that `npm pack` of `main` produces a `bin/`
-     byte-identical to the working tree's `plugins/dotclaude/bin/` —
-     so future tag-vs-`main` drift fails fast and is surfaced as a
-     diff, not a subtly broken release.
+1. Bump `package.json` to `0.12.0` (or `0.11.1`); release-please
+   should already have a PR open against `main` since multiple
+   `feat:` and `fix:` commits since `v0.11.0` qualify.
+2. Tag and `npm publish`.
+3. Add a CI assertion that `npm pack` of `main` produces a `bin/`
+   byte-identical to the working tree's `plugins/dotclaude/bin/` —
+   so future tag-vs-`main` drift fails fast and is surfaced as a
+   diff, not a subtly broken release.
 
 Stop condition triggered per the validation prompt
 ("Phase 1 reveals the bug is upstream of the binary"). Phases 2/3 below
@@ -650,21 +650,21 @@ Pre-flight (session roots populated, UUIDs pinned):
 ~/.copilot/session-state/ — 3 sessions; latest copilot short-uuid: 704c9f8b
 ```
 
-| #  | Command                                               | Expected | Exit | First-line stdout (or stderr-shape for fail rows)                                                                  | Verdict |
-| -- | ----------------------------------------------------- | -------- | ---- | ------------------------------------------------------------------------------------------------------------------ | ------- |
-| 1  | `pull latest`                                         | pass     | 0    | `<handoff origin="claude" session="d72922a1" cwd="…/dotclaude" target="claude">`                                   | ✓       |
-| 2  | `pull latest --from claude`                           | pass     | 0    | `<handoff origin="claude" session="d72922a1" cwd="…/dotclaude" target="claude">`                                   | ✓       |
-| 3  | `pull latest --from copilot`                          | pass     | 0    | `<handoff origin="copilot" session="704c9f8b" cwd="/home/kaioh/projects" target="claude">`                         | ✓       |
-| 4  | `pull latest --from codex`                            | pass     | 0    | `<handoff origin="codex" session="019d9dbf" cwd="/home/kaioh" target="claude">`                                    | ✓       |
-| 5  | `pull d72922a1`                                       | pass     | 0    | `<handoff origin="claude" session="d72922a1" …>` (1559 B, identical to row 1)                                      | ✓       |
-| 6  | `pull 704c9f8b`                                       | pass     | 0    | `<handoff origin="copilot" session="704c9f8b" …>` (2287 B, identical to row 3)                                     | ✓       |
-| 7  | `pull 019d9dbf`                                       | pass     | 0    | `<handoff origin="codex" session="019d9dbf" …>` (1908 B, identical to row 4)                                       | ✓       |
-| 8  | `pull d72922a1 --from claude`                         | pass     | 0    | `<handoff origin="claude" session="d72922a1" …>` (1559 B, identical to row 5)                                      | ✓       |
-| 9  | `pull d72922a1 --from codex`                          | fail 2   | 2    | stderr: `dotclaude-handoff: no codex session matches: d72922a1`                                                    | ✓ ¹     |
-| 10 | `pull d72922a1-fb38-49ff-8f32-fde136c707bf`           | pass     | 0    | `<handoff origin="claude" session="d72922a1" …>` (1559 B, identical to row 5)                                      | ✓       |
-| 11 | `pull bogusabc`                                       | fail 2   | 2    | stderr: `dotclaude-handoff: handoff-resolve: no session matches: bogusabc`                                         | ✓ ²     |
-| 12 | `pull latest --summary`                               | pass     | 0    | `**claude** \`d72922a1\` — \`…/dotclaude\` — 2026-04-29T17:34:34Z` (427 B; **strictly smaller than row 1's 1559 B**) | ✓       |
-| 13 | `pull latest -o /tmp/cc-bin.md`                       | pass     | 0    | stdout: `/tmp/cc-bin.md` (15 B, no `<handoff>`); file: 1559 B mode 0644, opens with `<handoff origin="claude" …>`  | ✓       |
+| #   | Command                                     | Expected | Exit | First-line stdout (or stderr-shape for fail rows)                                                                    | Verdict |
+| --- | ------------------------------------------- | -------- | ---- | -------------------------------------------------------------------------------------------------------------------- | ------- |
+| 1   | `pull latest`                               | pass     | 0    | `<handoff origin="claude" session="d72922a1" cwd="…/dotclaude" target="claude">`                                     | ✓       |
+| 2   | `pull latest --from claude`                 | pass     | 0    | `<handoff origin="claude" session="d72922a1" cwd="…/dotclaude" target="claude">`                                     | ✓       |
+| 3   | `pull latest --from copilot`                | pass     | 0    | `<handoff origin="copilot" session="704c9f8b" cwd="/home/kaioh/projects" target="claude">`                           | ✓       |
+| 4   | `pull latest --from codex`                  | pass     | 0    | `<handoff origin="codex" session="019d9dbf" cwd="/home/kaioh" target="claude">`                                      | ✓       |
+| 5   | `pull d72922a1`                             | pass     | 0    | `<handoff origin="claude" session="d72922a1" …>` (1559 B, identical to row 1)                                        | ✓       |
+| 6   | `pull 704c9f8b`                             | pass     | 0    | `<handoff origin="copilot" session="704c9f8b" …>` (2287 B, identical to row 3)                                       | ✓       |
+| 7   | `pull 019d9dbf`                             | pass     | 0    | `<handoff origin="codex" session="019d9dbf" …>` (1908 B, identical to row 4)                                         | ✓       |
+| 8   | `pull d72922a1 --from claude`               | pass     | 0    | `<handoff origin="claude" session="d72922a1" …>` (1559 B, identical to row 5)                                        | ✓       |
+| 9   | `pull d72922a1 --from codex`                | fail 2   | 2    | stderr: `dotclaude-handoff: no codex session matches: d72922a1`                                                      | ✓ ¹     |
+| 10  | `pull d72922a1-fb38-49ff-8f32-fde136c707bf` | pass     | 0    | `<handoff origin="claude" session="d72922a1" …>` (1559 B, identical to row 5)                                        | ✓       |
+| 11  | `pull bogusabc`                             | fail 2   | 2    | stderr: `dotclaude-handoff: handoff-resolve: no session matches: bogusabc`                                           | ✓ ²     |
+| 12  | `pull latest --summary`                     | pass     | 0    | `**claude** \`d72922a1\` — \`…/dotclaude\` — 2026-04-29T17:34:34Z` (427 B; **strictly smaller than row 1's 1559 B**) | ✓       |
+| 13  | `pull latest -o /tmp/cc-bin.md`             | pass     | 0    | stdout: `/tmp/cc-bin.md` (15 B, no `<handoff>`); file: 1559 B mode 0644, opens with `<handoff origin="claude" …>`    | ✓       |
 
 All 13 rows behave per spec. Block grammar holds on every "pass" row
 (`<handoff origin="…" session="…" cwd="…" target="claude">` … `</handoff>`).
@@ -683,22 +683,22 @@ where `msg` already contains `handoff-resolve: no session matches:` from
 
 #### Cross-row invariants verified
 
-  - `pull <short-uuid>` (rows 5, 6, 7) and `pull latest --from <cli>`
-    (rows 2, 3, 4) produce **byte-identical** stdout when they resolve
-    to the same session — confirms the renderer is not influenced by
-    the discriminator path (UUID vs `latest+--from`).
-  - Row 12's summary mode is 427 bytes vs. row 1's 1559 — **strictly
-    smaller**, holds the spec invariant.
-  - Row 13's `-o` mode writes to disk (mode 0644, byte-identical to
-    row 1's stdout content) and prints only the path on stdout. No
-    `<handoff>` block on stdout, exit 0.
+- `pull <short-uuid>` (rows 5, 6, 7) and `pull latest --from <cli>`
+  (rows 2, 3, 4) produce **byte-identical** stdout when they resolve
+  to the same session — confirms the renderer is not influenced by
+  the discriminator path (UUID vs `latest+--from`).
+- Row 12's summary mode is 427 bytes vs. row 1's 1559 — **strictly
+  smaller**, holds the spec invariant.
+- Row 13's `-o` mode writes to disk (mode 0644, byte-identical to
+  row 1's stdout content) and prints only the path on stdout. No
+  `<handoff>` block on stdout, exit 0.
 
 ### Phase 2 — issues found (separate from #133)
 
-| ID  | Severity | Issue                                                                                                                                           | Location                                                                                                                                                  | Recommendation                                                                                                                                                                                                                                                                            |
-| --- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P-1 | INFO     | Pull no-match stderr leaks the resolver-script's `handoff-resolve:` prefix. Spec §5.3.2 prescribes `dotclaude-handoff: no session matches: <q>`; actual is `dotclaude-handoff: handoff-resolve: no session matches: <q>` (double-prefix). Filed as [#135](https://github.com/kaiohenricunha/dotclaude/issues/135).            | Resolver: `plugins/dotclaude/scripts/handoff-resolve.sh:20` (`die_runtime`). Pass-through: `plugins/dotclaude/bin/dotclaude-handoff.mjs:245`.            | Strip the inner `handoff-resolve: ` prefix when passing through, or have `die_runtime` print without the prefix when called via the binary's `runScript`. One-line fix. Not v1.0-blocking — the message is still understandable, just noisy. Add a bats test pinning the spec template. |
-| P-2 | INFO     | Pull `--from <cli>` no-match stderr is CLI-narrowed (`no <cli> session matches`), spec §5.3.2 only prescribes the unnarrowed `no session matches`. Filed as [#136](https://github.com/kaiohenricunha/dotclaude/issues/136).            | `plugins/dotclaude/bin/dotclaude-handoff.mjs:244`.                                                                                                       | Either (a) update spec §5.3.2 to permit the narrower form when `--from` is set (the user-facing message is more useful), or (b) tighten the binary to match spec template exactly. Prefer (a) — the narrowed form is a real ergonomic improvement.                                       |
+| ID  | Severity | Issue                                                                                                                                                                                                                                                                                                              | Location                                                                                                                                      | Recommendation                                                                                                                                                                                                                                                                         |
+| --- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P-1 | INFO     | Pull no-match stderr leaks the resolver-script's `handoff-resolve:` prefix. Spec §5.3.2 prescribes `dotclaude-handoff: no session matches: <q>`; actual is `dotclaude-handoff: handoff-resolve: no session matches: <q>` (double-prefix). Filed as [#135](https://github.com/kaiohenricunha/dotclaude/issues/135). | Resolver: `plugins/dotclaude/scripts/handoff-resolve.sh:20` (`die_runtime`). Pass-through: `plugins/dotclaude/bin/dotclaude-handoff.mjs:245`. | Strip the inner `handoff-resolve:` prefix when passing through, or have `die_runtime` print without the prefix when called via the binary's `runScript`. One-line fix. Not v1.0-blocking — the message is still understandable, just noisy. Add a bats test pinning the spec template. |
+| P-2 | INFO     | Pull `--from <cli>` no-match stderr is CLI-narrowed (`no <cli> session matches`), spec §5.3.2 only prescribes the unnarrowed `no session matches`. Filed as [#136](https://github.com/kaiohenricunha/dotclaude/issues/136).                                                                                        | `plugins/dotclaude/bin/dotclaude-handoff.mjs:244`.                                                                                            | Either (a) update spec §5.3.2 to permit the narrower form when `--from` is set (the user-facing message is more useful), or (b) tighten the binary to match spec template exactly. Prefer (a) — the narrowed form is a real ergonomic improvement.                                     |
 
 No CRITICAL or WARNING issues found in Phase 2 beyond #133 itself.
 
@@ -718,14 +718,14 @@ miss. **Re-run Phase 3 after the new release ships and the global
 
 The 8 commands the next session should walk:
 
-  1. `/handoff pull latest`
-  2. `/handoff pull latest --from claude`
-  3. `/handoff pull d72922a1`
-  4. `/handoff pull d72922a1 --from claude`
-  5. `/handoff pull latest --summary`
-  6. `/handoff pull latest -o /tmp/cc-pull.md`
-  7. `/handoff pull d72922a1-fb38-49ff-8f32-fde136c707bf`
-  8. `/handoff pull bogusabc`
+1. `/handoff pull latest`
+2. `/handoff pull latest --from claude`
+3. `/handoff pull d72922a1`
+4. `/handoff pull d72922a1 --from claude`
+5. `/handoff pull latest --summary`
+6. `/handoff pull latest -o /tmp/cc-pull.md`
+7. `/handoff pull d72922a1-fb38-49ff-8f32-fde136c707bf`
+8. `/handoff pull bogusabc`
 
 Audit-coverage note: when Phase 3 runs, it should also assert that
 CC's bash expansion matches the SKILL.md auto-trigger contract
@@ -742,19 +742,19 @@ User walked the Copilot and Codex checklists; results below.
 
 #### Copilot — slash-command surface
 
-| Row | Slash command                                | Copilot expansion                                       | Output (first line)                                                                                                                                                                                                  | Exit | Verdict                              |
-| --- | -------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ------------------------------------ |
-| 1   | `/handoff pull latest`                       | `dotclaude handoff pull latest`                         | `dotclaude-handoff: no handoffs match: latest`                                                                                                                                                                       | 2    | #133 (stale npm bin), expected       |
-| 2   | `/handoff pull latest --from copilot`        | `dotclaude handoff pull latest --from copilot`          | `dotclaude-handoff: no copilot handoffs found on transport`                                                                                                                                                          | 2    | #133, expected (`pullRemote` path)   |
-| 3   | `/handoff pull 704c9f8b`                     | `dotclaude handoff pull 704c9f8b`                       | `dotclaude-handoff: no handoffs match: 704c9f8b`                                                                                                                                                                     | 2    | #133, expected                       |
-| 4   | `/handoff pull latest --summary`             | `dotclaude handoff pull latest --summary`               | `dotclaude-handoff: Unknown option '--summary'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- "--summary"`                                          | 64   | **CP-1: Copilot product behavior**   |
-| 5   | `/handoff pull latest -o /tmp/cp-pull.md`    | `dotclaude handoff pull latest -o /tmp/cp-pull.md`      | `dotclaude-handoff: Unknown option '-o'. …`                                                                                                                                                                           | 64   | **CP-1: Copilot product behavior**   |
+| Row | Slash command                             | Copilot expansion                                  | Output (first line)                                                                                                                                                         | Exit | Verdict                            |
+| --- | ----------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------- |
+| 1   | `/handoff pull latest`                    | `dotclaude handoff pull latest`                    | `dotclaude-handoff: no handoffs match: latest`                                                                                                                              | 2    | #133 (stale npm bin), expected     |
+| 2   | `/handoff pull latest --from copilot`     | `dotclaude handoff pull latest --from copilot`     | `dotclaude-handoff: no copilot handoffs found on transport`                                                                                                                 | 2    | #133, expected (`pullRemote` path) |
+| 3   | `/handoff pull 704c9f8b`                  | `dotclaude handoff pull 704c9f8b`                  | `dotclaude-handoff: no handoffs match: 704c9f8b`                                                                                                                            | 2    | #133, expected                     |
+| 4   | `/handoff pull latest --summary`          | `dotclaude handoff pull latest --summary`          | `dotclaude-handoff: Unknown option '--summary'. To specify a positional argument starting with a '-', place it at the end of the command after '--', as in '-- "--summary"` | 64   | **CP-1: Copilot product behavior** |
+| 5   | `/handoff pull latest -o /tmp/cp-pull.md` | `dotclaude handoff pull latest -o /tmp/cp-pull.md` | `dotclaude-handoff: Unknown option '-o'. …`                                                                                                                                 | 64   | **CP-1: Copilot product behavior** |
 
 Slash-command **expansion contract is honored** in rows 1–3
 (`/handoff pull <args>` → `dotclaude handoff pull <args>` verbatim, no
 LLM-added flags or fallbacks). The error in rows 4–5 is foreign to
-dotclaude — phrasing like *"To specify a positional argument starting
-with a '-', place it at the end of the command after '--'"* matches
+dotclaude — phrasing like _"To specify a positional argument starting
+with a '-', place it at the end of the command after '--'"_ matches
 Commander.js / yargs error verbiage and is not present in
 `bin/dotclaude-handoff.mjs`. Confirmed by spec-template comparison: the
 dotclaude binary uses `dotclaude-handoff: unknown flag: <flag>`
@@ -769,15 +769,15 @@ should pass.
 
 #### Copilot — bare-binary surface (workaround alias)
 
-| Row | Command                                            | Output (first line of stdout)                                                                | Exit | Diff vs CC baseline (pin-stable)                          |
-| --- | -------------------------------------------------- | -------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------- |
-| 6   | `!dotclaude-fixed pull latest`                     | `<handoff origin="copilot" session="8297e379" cwd="…" target="copilot">` ¹                   | 0    | shape-only — Copilot session is the running one, not pinned |
-| 7   | `!dotclaude-fixed pull latest --from copilot`      | `<handoff origin="copilot" session="8297e379" cwd="…" target="copilot">` ¹                   | 0    | shape-only — same drift as row 6                          |
-| 8   | `!dotclaude-fixed pull 704c9f8b`                   | `<handoff origin="copilot" session="704c9f8b" cwd="/home/kaioh/projects" target="copilot">`  | 0    | **byte-equivalent ²**                                     |
-| 9   | `!dotclaude-fixed pull 704c9f8b --summary`         | `**copilot** `704c9f8b` — `/home/kaioh/projects` — 2026-04-29T17:02:08Z`                     | 0    | **byte-equivalent ²**                                     |
+| Row | Command                                       | Output (first line of stdout)                                                               | Exit | Diff vs CC baseline (pin-stable)                            |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------------- | ---- | ----------------------------------------------------------- |
+| 6   | `!dotclaude-fixed pull latest`                | `<handoff origin="copilot" session="8297e379" cwd="…" target="copilot">` ¹                  | 0    | shape-only — Copilot session is the running one, not pinned |
+| 7   | `!dotclaude-fixed pull latest --from copilot` | `<handoff origin="copilot" session="8297e379" cwd="…" target="copilot">` ¹                  | 0    | shape-only — same drift as row 6                            |
+| 8   | `!dotclaude-fixed pull 704c9f8b`              | `<handoff origin="copilot" session="704c9f8b" cwd="/home/kaioh/projects" target="copilot">` | 0    | **byte-equivalent ²**                                       |
+| 9   | `!dotclaude-fixed pull 704c9f8b --summary`    | `**copilot**` `704c9f8b`—`/home/kaioh/projects`—`2026-04-29T17:02:08Z`                      | 0    | **byte-equivalent ²**                                       |
 
 ¹ User captured `8297e379`, not the baseline-time copilot-latest
-`704c9f8b`. The Copilot CLI session the user was inside *is* the new
+`704c9f8b`. The Copilot CLI session the user was inside _is_ the new
 "latest" (Copilot writes to its own `events.jsonl` while open). Shape
 is correct: `<handoff origin="copilot" session="<8hex>" cwd="…" target="copilot">`.
 
@@ -792,7 +792,7 @@ $ diff <(node $REPO_BIN pull 704c9f8b 2>/dev/null) \
     <(awk '/^=== <copilot-uuid:704c9f8b> ===$/{flag=1; next} /^=== /{flag=0} flag' \
          /tmp/handoff-pull-x-cli-cc-baseline.txt)
 48a49
-> 
+>
 [diff exit=1, single trailing blank from baseline section separator]
 ```
 
@@ -804,19 +804,19 @@ stdout when launched from CC's bash and from Copilot's `!`-shell.
 
 #### Codex — bare-binary surface (workaround alias)
 
-| Row | Command                                       | Output captured (interleaved-stream first line, see CX-1)                                                | Exit | Notes                                                                                          |
-| --- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------- |
-| 1   | `!dotclaude-fixed pull latest`                | `latest codex session: 019dda3a`                                                                         | 0    | progress on stderr; stdout `<handoff>` block exists below — see CX-1                           |
-| 2   | `!dotclaude-fixed pull latest --from codex`   | `using --from codex override, latest codex session: 019dda3a`                                            | 0    | stderr-progress; pin-stable section is shape-only — Codex session active                       |
-| 3   | `!dotclaude-fixed pull latest --from claude`  | `using --from claude override, latest claude session: 4d461655`                                          | 0    | resolves the squadranks-pinned session — the very `claude-pinned` UUID we baselined at 18:22Z  |
-| 4   | `!dotclaude-fixed pull 019d9dbf`              | `<handoff origin="codex" session="019d9dbf" cwd="/home/kaioh" target="codex">`                           | 0    | **byte-equivalent to baseline `<codex-uuid:019d9dbf>` section (diff exit 0, zero artifacts)**  |
-| 5   | `!dotclaude-fixed pull latest --summary`      | `latest codex session: 019dda3a`                                                                         | 0    | stderr-progress; stdout summary markdown follows — see CX-1                                    |
-| 6   | `!dotclaude-fixed pull latest -o /tmp/cx-pull.md` | `latest codex session: 019dda3a`                                                                     | 0    | stderr-progress; stdout `/tmp/cx-pull.md` (path) follows — see CX-1                            |
+| Row | Command                                           | Output captured (interleaved-stream first line, see CX-1)                      | Exit | Notes                                                                                         |
+| --- | ------------------------------------------------- | ------------------------------------------------------------------------------ | ---- | --------------------------------------------------------------------------------------------- |
+| 1   | `!dotclaude-fixed pull latest`                    | `latest codex session: 019dda3a`                                               | 0    | progress on stderr; stdout `<handoff>` block exists below — see CX-1                          |
+| 2   | `!dotclaude-fixed pull latest --from codex`       | `using --from codex override, latest codex session: 019dda3a`                  | 0    | stderr-progress; pin-stable section is shape-only — Codex session active                      |
+| 3   | `!dotclaude-fixed pull latest --from claude`      | `using --from claude override, latest claude session: 4d461655`                | 0    | resolves the squadranks-pinned session — the very `claude-pinned` UUID we baselined at 18:22Z |
+| 4   | `!dotclaude-fixed pull 019d9dbf`                  | `<handoff origin="codex" session="019d9dbf" cwd="/home/kaioh" target="codex">` | 0    | **byte-equivalent to baseline `<codex-uuid:019d9dbf>` section (diff exit 0, zero artifacts)** |
+| 5   | `!dotclaude-fixed pull latest --summary`          | `latest codex session: 019dda3a`                                               | 0    | stderr-progress; stdout summary markdown follows — see CX-1                                   |
+| 6   | `!dotclaude-fixed pull latest -o /tmp/cx-pull.md` | `latest codex session: 019dda3a`                                               | 0    | stderr-progress; stdout `/tmp/cx-pull.md` (path) follows — see CX-1                           |
 
 #### CX-1 (analysis) — Codex's `!` displays interleaved stream, **NOT** an OPS-2 violation
 
 User flagged a possible OPS-2 violation: rows 1, 5, 6 show only the
-"latest codex session: <id>" line, not the actual `<handoff>` /
+"latest codex session: `<id>`" line, not the actual `<handoff>` /
 summary / file-path output. Verified by isolating streams in CC's bash:
 
 ```text
@@ -849,9 +849,10 @@ $ ls -la /tmp/p25-disk.md
 ```
 
 **Verdict.** The binary is well-behaved per OPS-2:
-  - **stdout**: `<handoff>` block, summary markdown, `-o`-target path.
-  - **stderr**: progress messages (`latest <cli> session: <id>`,
-    `using --from <cli> override, …`).
+
+- **stdout**: `<handoff>` block, summary markdown, `-o`-target path.
+- **stderr**: progress messages (`latest <cli> session: <id>`,
+  `using --from <cli> override, …`).
 
 What the user observed was Codex's `!`-shell capture method
 **displaying the interleaved combined stream**, with stderr arriving
@@ -871,9 +872,9 @@ flag-prefixed arguments (especially `--from`, `-o <path>`, full UUID
 hex strings with embedded dashes). Codex rows 1–6 demonstrate the
 opposite:
 
-  - `--from codex`, `--from claude`, `--summary`: passed through (rows 2, 3, 5).
-  - `-o /tmp/cx-pull.md`: passed through (row 6, file written, exit 0).
-  - 8-hex UUID `019d9dbf`: passed through (row 4, byte-identical to CC baseline).
+- `--from codex`, `--from claude`, `--summary`: passed through (rows 2, 3, 5).
+- `-o /tmp/cx-pull.md`: passed through (row 6, file written, exit 0).
+- 8-hex UUID `019d9dbf`: passed through (row 4, byte-identical to CC baseline).
 
 No escape artifacts (`\!`, doubled backslashes, dropped arguments).
 `dotclaude handoff pull` is **R-7 safe under Codex** — the contract
@@ -882,11 +883,11 @@ the bare-binary surface.
 
 #### Phase 2.5 — additional issues found
 
-| ID   | Severity | Finding                                                                                                                                                                                                                                                                  | Location / context                                                                                                       | Recommendation                                                                                                                                                                                                                                                                              |
-| ---- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------| ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CP-1 | INFO     | **Copilot's slash-handler rejects `--summary` and `-o <path>` before invoking the binary** (exit 64, parser-message verbiage matches Commander.js / yargs, not `bin/dotclaude-handoff.mjs`'s `unknown flag:` template). `/handoff pull latest --summary` and `/handoff pull latest -o <path>` are **unreachable through Copilot's slash path regardless of #133**. | Copilot CLI product behavior, not dotclaude code. Reproducer: any `/<cmd> args --flag` form where `--flag` starts with `-`. | Document in v1.0 release notes / SKILL.md "known surface gaps": Copilot users should use `!dotclaude handoff pull latest --summary` (bare-binary path) or rephrase to a positional. Optionally pursue with the Copilot CLI team.                                                            |
-| CX-1 | INFO     | Codex's `!`-shell capture **displays the interleaved stream**, with line-buffered stderr surfacing before block-buffered stdout. Users may misread the "first line" as the operative output and conclude OPS-2 is violated when it isn't.                                | Codex CLI display behavior, not dotclaude code. Verified by stream-isolation in CC's bash.                              | **Scripting guidance** — when capturing `pull`'s first line in pipelines or scripts, redirect: `dotclaude handoff pull latest 2>/dev/null \| head -1` for the operative stdout (the `<handoff>` block / summary / `-o`-target path), or `2>&1` to keep interleaving order intact for human reading. Add this one-line note alongside CP-1 in the v1.0 release notes / SKILL.md "known surface gaps" section. Spec §5.5.1 OPS-2 is honored on the binary side — no code change needed; this is purely user-facing scripting hygiene. |
-| CX-2 | (none)   | **Positive finding** — R-7 quoting risk did not materialize. `--from`, `-o`, dash-flag arguments, and hex UUIDs all pass through Codex's `!`-shell intact. Confirms the bare-binary surface is invocation-context-symmetric across all 3 CLIs.                          | Codex `!`-shell verified by 6 rows of bare-binary invocation against pin-stable + drifting fixtures.                     | Note in v1.0 release notes that bare-binary `dotclaude handoff pull` is uniformly callable from CC, Copilot `!`-shell, and Codex `!`-shell. Tracking issue [#137](https://github.com/kaiohenricunha/dotclaude/issues/137) for the CI matrix job that exercises the four pin-stable invocations on Linux substrate to lock the symmetry.                                  |
+| ID   | Severity | Finding                                                                                                                                                                                                                                                                                                                                                            | Location / context                                                                                                          | Recommendation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CP-1 | INFO     | **Copilot's slash-handler rejects `--summary` and `-o <path>` before invoking the binary** (exit 64, parser-message verbiage matches Commander.js / yargs, not `bin/dotclaude-handoff.mjs`'s `unknown flag:` template). `/handoff pull latest --summary` and `/handoff pull latest -o <path>` are **unreachable through Copilot's slash path regardless of #133**. | Copilot CLI product behavior, not dotclaude code. Reproducer: any `/<cmd> args --flag` form where `--flag` starts with `-`. | Document in v1.0 release notes / SKILL.md "known surface gaps": Copilot users should use `!dotclaude handoff pull latest --summary` (bare-binary path) or rephrase to a positional. Optionally pursue with the Copilot CLI team.                                                                                                                                                                                                                                                                                                    |
+| CX-1 | INFO     | Codex's `!`-shell capture **displays the interleaved stream**, with line-buffered stderr surfacing before block-buffered stdout. Users may misread the "first line" as the operative output and conclude OPS-2 is violated when it isn't.                                                                                                                          | Codex CLI display behavior, not dotclaude code. Verified by stream-isolation in CC's bash.                                  | **Scripting guidance** — when capturing `pull`'s first line in pipelines or scripts, redirect: `dotclaude handoff pull latest 2>/dev/null \| head -1` for the operative stdout (the `<handoff>` block / summary / `-o`-target path), or `2>&1` to keep interleaving order intact for human reading. Add this one-line note alongside CP-1 in the v1.0 release notes / SKILL.md "known surface gaps" section. Spec §5.5.1 OPS-2 is honored on the binary side — no code change needed; this is purely user-facing scripting hygiene. |
+| CX-2 | (none)   | **Positive finding** — R-7 quoting risk did not materialize. `--from`, `-o`, dash-flag arguments, and hex UUIDs all pass through Codex's `!`-shell intact. Confirms the bare-binary surface is invocation-context-symmetric across all 3 CLIs.                                                                                                                     | Codex `!`-shell verified by 6 rows of bare-binary invocation against pin-stable + drifting fixtures.                        | Note in v1.0 release notes that bare-binary `dotclaude handoff pull` is uniformly callable from CC, Copilot `!`-shell, and Codex `!`-shell. Tracking issue [#137](https://github.com/kaiohenricunha/dotclaude/issues/137) for the CI matrix job that exercises the four pin-stable invocations on Linux substrate to lock the symmetry.                                                                                                                                                                                             |
 
 #### Diff harness verification (CC bash, post-receipt)
 
@@ -919,14 +920,14 @@ proves the binary's stdout is byte-stable across invocation contexts.
 
 Requires #133 fixed **or** the workaround alias used end-to-end. Steps:
 
-  1. From this CC session, run `/handoff pull latest --from claude`
-     and capture the `<handoff>` block.
-  2. Open Codex, paste the block as the first message. Verify Codex
-     references the in-progress work (does not ask "what is this?").
-  3. Reverse: from a real Codex session, `!dotclaude-fixed pull latest --from codex`,
-     paste into CC.
-  4. Repeat: from a real Copilot session, `!dotclaude-fixed pull latest --from copilot`,
-     paste into both CC and Codex.
+1. From this CC session, run `/handoff pull latest --from claude`
+   and capture the `<handoff>` block.
+2. Open Codex, paste the block as the first message. Verify Codex
+   references the in-progress work (does not ask "what is this?").
+3. Reverse: from a real Codex session, `!dotclaude-fixed pull latest --from codex`,
+   paste into CC.
+4. Repeat: from a real Copilot session, `!dotclaude-fixed pull latest --from copilot`,
+   paste into both CC and Codex.
 
 Stop conditions: a `<handoff>` block that the next agent does NOT pick
 up context from is a **block-grammar drift** — more serious than #133
@@ -936,16 +937,16 @@ semantic-correctness check.
 
 ### Verdict update — v1.0 readiness
 
-| Blocker  | Status                                                                                                                                  |
-| -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **#129** | Open. Substrate portability (busybox/Alpine `pick_newest`). Code-fix needed in `plugins/dotclaude/scripts/handoff-resolve.sh:39–62`.    |
-| **#133** | Open, **not a code bug**. Release-pipeline action only: bump version, tag, `npm publish`. Repo binary @ `be25258` is functionally green per the 13-row matrix above. Verbatim diff evidence in Phase 1. |
-| #134 (new) | Process bug: `package.json:version` not bumped between npm publish and 17+ post-publish commits. Filed at https://github.com/kaiohenricunha/dotclaude/issues/134. Root cause behind #133. v1.0.x mitigation. |
-| #135 (new) | INFO — Pull stderr leaks `handoff-resolve:` prefix. https://github.com/kaiohenricunha/dotclaude/issues/135. v1.0.x patch material. |
-| #136 (new) | INFO — Pull `--from <cli>` no-match stderr is CLI-narrowed; spec drift. https://github.com/kaiohenricunha/dotclaude/issues/136. v1.0.x patch material. |
-| CP-1 | INFO — Copilot's slash-handler rejects `--summary` / `-o` flags before invoking the binary. Documentation-only; not a dotclaude bug. v1.0 release-notes material. |
-| CX-1 | INFO — Codex's `!`-shell capture displays interleaved stream; OPS-2 is honored on the binary side. Documentation-only; not a dotclaude bug. v1.0 release-notes material. |
-| CX-2 / [#137](https://github.com/kaiohenricunha/dotclaude/issues/137) | **Positive** — R-7 quoting risk does not materialize; bare-binary surface is symmetric across CC / Copilot `!` / Codex `!`. Tracking issue filed to lock the symmetry in CI. v1.0.x or v1.1. |
+| Blocker                                                               | Status                                                                                                                                                                                                               |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **#129**                                                              | Open. Substrate portability (busybox/Alpine `pick_newest`). Code-fix needed in `plugins/dotclaude/scripts/handoff-resolve.sh:39–62`.                                                                                 |
+| **#133**                                                              | Open, **not a code bug**. Release-pipeline action only: bump version, tag, `npm publish`. Repo binary @ `be25258` is functionally green per the 13-row matrix above. Verbatim diff evidence in Phase 1.              |
+| #134 (new)                                                            | Process bug: `package.json:version` not bumped between npm publish and 17+ post-publish commits. Filed as [#134](https://github.com/kaiohenricunha/dotclaude/issues/134). Root cause behind #133. v1.0.x mitigation. |
+| #135 (new)                                                            | INFO — Pull stderr leaks `handoff-resolve:` prefix. Filed as [#135](https://github.com/kaiohenricunha/dotclaude/issues/135). v1.0.x patch material.                                                                  |
+| #136 (new)                                                            | INFO — Pull `--from <cli>` no-match stderr is CLI-narrowed; spec drift. Filed as [#136](https://github.com/kaiohenricunha/dotclaude/issues/136). v1.0.x patch material.                                              |
+| CP-1                                                                  | INFO — Copilot's slash-handler rejects `--summary` / `-o` flags before invoking the binary. Documentation-only; not a dotclaude bug. v1.0 release-notes material.                                                    |
+| CX-1                                                                  | INFO — Codex's `!`-shell capture displays interleaved stream; OPS-2 is honored on the binary side. Documentation-only; not a dotclaude bug. v1.0 release-notes material.                                             |
+| CX-2 / [#137](https://github.com/kaiohenricunha/dotclaude/issues/137) | **Positive** — R-7 quoting risk does not materialize; bare-binary surface is symmetric across CC / Copilot `!` / Codex `!`. Tracking issue filed to lock the symmetry in CI. v1.0.x or v1.1.                         |
 
 **v1.0 = unblocked once both ship**: #129 needs a one-liner in the
 resolver; #133 needs a release. After that, #134 / #135 / #136 and any
