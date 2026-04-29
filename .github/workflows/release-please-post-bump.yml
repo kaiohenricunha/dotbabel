@@ -1,0 +1,61 @@
+name: release-please-post-bump
+
+# Runs after release-please bumps package.json on a release branch.
+# Regenerates the two artefacts that dogfood CI checks in --check mode:
+#   1. index/artifacts.json + index/by-type.json + index/by-facet.json
+#      (version field in the envelope comes from package.json)
+#   2. docs/*.md  _Last updated: vX.Y.Z_ stamps
+#
+# No-loop guarantee: the post-bump commit touches only index/ + docs/, not
+# package.json, so the paths filter never re-fires on the commit itself.
+#
+# PAT required: GITHUB_TOKEN pushes suppress the pull_request (synchronize)
+# event on the open release PR — without the PAT, dogfood CI never re-runs
+# against the fixed commit.
+#
+# Tracking issue: #144
+
+on:
+  push:
+    branches:
+      - "release-please--**"
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  post-bump:
+    name: regen index + stamp docs after version bump
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: regen index
+        run: node plugins/dotclaude/bin/dotclaude-index.mjs
+
+      - name: stamp doc versions
+        run: node scripts/stamp-doc-versions.mjs
+
+      - name: commit if anything changed
+        run: |
+          git diff --quiet index/ docs/ && {
+            echo "Nothing changed — index and stamps already current."
+            exit 0
+          }
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index/ docs/
+          git commit -m "chore: refresh index envelope + doc stamps for $(node -p "require('./package.json').version")"
+          git push
