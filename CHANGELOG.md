@@ -6,6 +6,13 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ## Unreleased
 
+## [1.0.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.0.0...v1.0.1) (2026-04-29)
+
+
+### Fixed
+
+* re-baseline release-please at v1.0.0 ([#142](https://github.com/kaiohenricunha/dotclaude/issues/142)) ([78e2619](https://github.com/kaiohenricunha/dotclaude/commit/78e2619235619ad727513f6e3681530d039563cc))
+
 ## [1.0.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.11.0...v1.0.0) (2026-04-29)
 
 The v1.0 stable cut of `@dotclaude/dotclaude`. Locks the handoff v2
