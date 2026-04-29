@@ -34,21 +34,30 @@ EOF
 UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
 SHORT_UUID_RE='^[0-9a-f]{8}$'
 
+# Detect stat/find flavor once at init. busybox stat accepts -f but ignores the
+# format string, dumps multi-line default output, and exits 0 — a runtime
+# fallback chain can't detect this. Probe once and take a single deterministic path.
+_STAT_FLAVOR=posix
+if stat --version 2>&1 | grep -q GNU; then
+  _STAT_FLAVOR=gnu
+elif stat -f '%m' "$0" 2>/dev/null | grep -qE '^[0-9]+$'; then
+  _STAT_FLAVOR=bsd
+fi
+
 # Pick newest by mtime from a newline-separated list on stdin. Prints path only.
 # Pure-bash loop: no word-splitting on paths with spaces, no subshell per file.
 pick_newest() {
-  local best_ms=0 best_path="" file frac secs frac_ms
+  local best_ms=0 best_path="" file frac secs frac_part frac_ms
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
-    # GNU find -printf gives fractional epoch seconds (e.g. 1700000000.123456789).
-    # BSD stat -f %Fm gives the same. Whole-second fallbacks for minimal platforms.
-    frac=$(find "$file" -maxdepth 0 -printf '%T@' 2>/dev/null \
-           || stat -f '%Fm' "$file" 2>/dev/null \
-           || stat -c '%Y' "$file" 2>/dev/null \
-           || echo 0)
+    case "$_STAT_FLAVOR" in
+      gnu) frac=$(find "$file" -maxdepth 0 -printf '%T@' 2>/dev/null || echo 0) ;;
+      bsd) frac=$(stat -f '%Fm' "$file" 2>/dev/null || echo 0) ;;
+      *)   frac=$(stat -c '%Y' "$file" 2>/dev/null || echo 0) ;;
+    esac
     if [[ "$frac" == *.* ]]; then
       secs="${frac%%.*}"
-      local frac_part="${frac#*.}000"          # pad to ≥3 digits
+      frac_part="${frac#*.}000"
       frac_ms=$(( ${secs:-0} * 1000 + 10#${frac_part:0:3} ))
     else
       frac_ms=$(( ${frac:-0} * 1000 ))

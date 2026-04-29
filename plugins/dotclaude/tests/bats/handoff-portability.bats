@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
-# Force each branch of the GNU/BSD fallback chains in handoff-resolve
-# (pick_newest: find -printf %T@ → stat -f %Fm → stat -c %Y) and
-# handoff-extract (file_iso_mtime: date -r → date -d @stat) by shimming
-# PATH so the higher-precedence tool exits non-zero.
+# Portability tests for handoff-resolve (GNU primary path) and handoff-extract.
+# pick_newest now uses a probe-once approach (_STAT_FLAVOR) rather than a
+# runtime fallback chain; busybox substrate coverage lives in
+# handoff-resolve-busybox.bats.
 
 load helpers
 
@@ -40,71 +40,11 @@ seed_fractional_pair() {
 }
 
 @test "pick_newest picks newest via find -printf %T@ (GNU primary)" {
-  # Baseline for the fallback tests: without a shim, the resolver should
-  # resolve the fractional-ms delta via find -printf.
+  # Verifies the gnu probe path: on a GNU/Linux system _STAT_FLAVOR=gnu and
+  # pick_newest uses find -printf %T@ for fractional-ms resolution.
   local older="aaaa1111-1111-1111-1111-111111111111"
   local newer="bbbb2222-2222-2222-2222-222222222222"
   seed_fractional_pair "$older" "$newer"
-  run "$RESOLVE" claude latest
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"$newer.jsonl" ]]
-}
-
-@test "pick_newest falls back to BSD stat -f %Fm when find -printf fails" {
-  local older="cccc3333-3333-3333-3333-333333333333"
-  local newer="dddd4444-4444-4444-4444-444444444444"
-  seed_fractional_pair "$older" "$newer"
-
-  # Shim: exit 1 on pick_newest's `-printf '%T@'` probe, delegate
-  # everything else to the real `find`.
-  local shim
-  shim=$(with_fake_tool_bin find '
-for arg in "$@"; do
-  if [[ "$arg" == "%T@" ]]; then
-    exit 1
-  fi
-done
-exec /usr/bin/find "$@"
-')
-  SHIM_DIRS+=("$shim")
-
-  run "$RESOLVE" claude latest
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"$newer.jsonl" ]]
-}
-
-@test "pick_newest falls back to stat -c %Y when find -printf and stat -f fail" {
-  # With both fractional-precision paths disabled, pick_newest falls back
-  # to whole-second mtime — so stamps must be ≥1s apart to resolve order.
-  local older="eeee5555-5555-5555-5555-555555555555"
-  local newer="ffff6666-6666-6666-6666-666666666666"
-  local dir="$TEST_HOME/.claude/projects/-demo"
-  mkdir -p "$dir"
-  printf '{"cwd":"/x","sessionId":"%s"}\n' "$older" > "$dir/$older.jsonl"
-  printf '{"cwd":"/x","sessionId":"%s"}\n' "$newer" > "$dir/$newer.jsonl"
-  touch -d '2026-04-18 10:00:00' "$dir/$older.jsonl"
-  touch -d '2026-04-18 10:00:02' "$dir/$newer.jsonl"
-
-  # Shim find to reject -printf, and stat to reject -f %Fm.
-  local find_shim stat_shim
-  find_shim=$(with_fake_tool_bin find '
-for arg in "$@"; do
-  [[ "$arg" == "%T@" ]] && exit 1
-done
-exec /usr/bin/find "$@"
-')
-  stat_shim=$(with_fake_tool_bin stat '
-prev=""
-for arg in "$@"; do
-  if [[ "$prev" == "-f" && "$arg" == "%Fm" ]]; then
-    exit 1
-  fi
-  prev="$arg"
-done
-exec /usr/bin/stat "$@"
-')
-  SHIM_DIRS+=("$find_shim" "$stat_shim")
-
   run "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"$newer.jsonl" ]]
