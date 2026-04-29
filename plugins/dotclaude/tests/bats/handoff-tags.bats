@@ -1,8 +1,8 @@
 #!/usr/bin/env bats
 # Integration tests for #91 Gap 7: tags first-class.
 #
-# Covers (a) multi-tag push writes both metadata.tags and legacy
-# metadata.tag, (b) exact-tag pull resolution beats substring,
+# Covers (a) multi-tag push writes metadata.tags without legacy metadata.tag,
+# (b) exact-tag pull resolution beats substring,
 # (c) `list --remote --tag <name>` filter, (d) `list --remote --tags`
 # histogram, (e) legacy single-tag metadata still resolves through
 # the migration helper, (f) special-char tag slugification round-trip.
@@ -72,9 +72,9 @@ teardown() {
   [ -f "${STUB_DOCTOR:-}" ] && rm -f "$STUB_DOCTOR"
 }
 
-# ---- 1: multi-tag push writes both tags array and legacy tag field --------
+# ---- 1: multi-tag push writes tags array (no legacy tag field) ------------
 
-@test "push --tag foo --tag bar: writes metadata.tags=[foo,bar] and tag=foo" {
+@test "push --tag foo --tag bar: writes metadata.tags=[foo,bar] without legacy tag field" {
   run --separate-stderr node "$BIN" push --from claude --tag foo --tag bar
   [ "$status" -eq 0 ]
 
@@ -85,7 +85,7 @@ teardown() {
   echo "$checkout/metadata.json:"
   cat "$checkout/metadata.json"
   jq -e '.tags == ["foo","bar"]' "$checkout/metadata.json" >/dev/null
-  jq -e '.tag == "foo"' "$checkout/metadata.json" >/dev/null
+  jq -e 'has("tag") | not' "$checkout/metadata.json" >/dev/null
   rm -rf "$checkout"
 }
 

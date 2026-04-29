@@ -571,7 +571,7 @@ function renderDryRunPreview(r) {
     `  description:   ${r.description}`,
     `  digest size:   ${r.digestBytes} bytes (after scrub)`,
     `  scrub count:   ${r.scrubbedCount} secrets redacted`,
-    `  tag:           ${r.tag ?? "(none)"}`,
+    `  tags:          ${r.tags?.length > 0 ? r.tags.join(", ") : "(none)"}`,
     `  metadata:      cli=${m.cli} session=${m.short_id} project=${m.project} host=${m.hostname} month=${m.month}`,
     "",
     "run without --dry-run to push.",

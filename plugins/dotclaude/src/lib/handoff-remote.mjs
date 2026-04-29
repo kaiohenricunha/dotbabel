@@ -789,12 +789,7 @@ export async function pushRemote({
     hostname: host,
     created_at: new Date().toISOString(),
     scrubbed_count: scrubbedCount,
-    // #91 Gap 7: write both shapes for one release cycle so deployed installs
-    // that only know about `metadata.tag` keep working. New readers prefer
-    // `metadata.tags` via tagsFromMeta().
-    // TODO(#91 Gap 7 follow-up, after 0.13.0): drop the legacy `tag` field.
     tags: tagList,
-    tag: tagList[0] ?? null,
   };
 
   const branch = v2BranchName({ project, cli: meta.cli, month, shortId });
@@ -809,7 +804,6 @@ export async function pushRemote({
       digestBytes: Buffer.byteLength(scrubbed, "utf8"),
       metadata,
       tags: tagList,
-      tag: tagList[0] ?? null,
     };
   }
 
