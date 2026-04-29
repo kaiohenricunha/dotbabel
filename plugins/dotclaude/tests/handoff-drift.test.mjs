@@ -153,7 +153,6 @@ export function extractFromSkillMd(text) {
   // Safety: do NOT use `\n# ` as an additional terminator — bash comment
   // lines inside any future code block in this section look like `# text`
   // and would prematurely truncate the match, silently dropping flags.
-  // Terminating only on `\n## ` (H2) and `$` (EOF) is correct and sufficient.
   const flagsSection = text.match(/Cross-cutting flags[^\n]*\n[\s\S]*?(?=\n## |$)/);
   if (!flagsSection) {
     throw new Error("SKILL.md: could not find `Cross-cutting flags` section");
@@ -330,7 +329,7 @@ export function extractFromGuide(text) {
   // `## Common patterns` contains a bash comment `# writes to docs/...`
   // inside a fenced code block; using `\n# ` here would silently truncate
   // that section and cause the flags in the code examples after the comment
-  // to be missed. Confirmed correct as of Phase 2 PR 8.
+  // to be missed.
   const flagSections = text.match(
     /(?:## The five forms|## Common patterns)[\s\S]*?(?=\n## |$)/g,
   );
