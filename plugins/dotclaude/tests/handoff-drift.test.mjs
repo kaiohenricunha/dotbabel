@@ -148,10 +148,12 @@ export function extractFromSkillMd(text) {
     .filter(Boolean)
     .sort();
 
-  // "Cross-cutting flags" lives as a paragraph inside `## Sub-commands` —
-  // not its own H2 — so the shared `extractTemplateSection` doesn't apply.
-  // Capture from the inline paragraph header to the next `##`/`#` heading.
-  const flagsSection = text.match(/Cross-cutting flags[^\n]*\n[\s\S]*?(?=\n## |\n# |$)/);
+  // "Cross-cutting flags" is an H2 in SKILL.md (## Cross-cutting flags).
+  // Capture from that heading to the next H2 or EOF only.
+  // Safety: do NOT use `\n# ` as an additional terminator — bash comment
+  // lines inside any future code block in this section look like `# text`
+  // and would prematurely truncate the match, silently dropping flags.
+  const flagsSection = text.match(/Cross-cutting flags[^\n]*\n[\s\S]*?(?=\n## |$)/);
   if (!flagsSection) {
     throw new Error("SKILL.md: could not find `Cross-cutting flags` section");
   }
@@ -197,6 +199,9 @@ export function extractFromHelp(text) {
 
   // Capture from `Options:` to the next title-case section header or EOF.
   // (`\Z` is not a JS regex anchor — `(?![\s\S])` is the EOF lookahead.)
+  // Safety: the terminator is `^[A-Z][\w ]*:` (title-case word followed by
+  // colon), which bash comment lines (`# text`) can never match. No `\n# `
+  // fragility here; the boundary is inherently immune to bash comments.
   const optsBlock = text.match(/^Options:\s*$([\s\S]*?)(?=^[A-Z][\w ]*:|(?![\s\S]))/m);
   if (!optsBlock) {
     throw new Error("--help: could not find `Options:` block");
@@ -242,6 +247,18 @@ export function extractFromRule(text) {
   // We avoid prose-exact matching per spec §5.0 (wording stays editable).
   // Keep this loose enough to find the §5.5.2 paragraph in any reasonable
   // wording, strict enough not to false-positive on incidental flag mentions.
+  //
+  // False-positive audit (Phase 3 W-4, as of dc32931):
+  //   The guide now has 3+ paragraphs mentioning `--from`; none trigger all
+  //   four clauses simultaneously except the intended §5.5.2 paragraph
+  //   ("When calling push with no query argument, --from is required…").
+  //   - The `list` table row (line ~135) mentions `--from` but has no "no
+  //     query" / "required" prose in the same paragraph.
+  //   - The search examples (lines ~156, ~163) appear in code blocks; the
+  //     paragraph separator `\n\s*\n` splits them from any surrounding prose
+  //     that might contain "required", so they don't form a four-clause match.
+  //   No false positive risk identified. Re-verify if new guide paragraphs
+  //   describe `--from` as required on `push` in proximity to "no query".
   const paragraphs = text.split(/\n\s*\n/);
   for (const p of paragraphs) {
     const lower = p.toLowerCase();
@@ -282,7 +299,13 @@ export function extractFromRule(text) {
  */
 export function extractFromGuide(text) {
   // Commands: parse second column of "When to use it" table.
-  const whenSection = text.match(/## When to use it\s+([\s\S]*?)(?=\n## |\n# |$)/);
+  // Safety: terminate only on `\n## ` (next H2) or EOF, not `\n# `.
+  // handoff-guide.md contains a bash comment `# writes to docs/...` inside
+  // a code block in `## Common patterns`; that line must not terminate
+  // the "When to use it" section (which ends at the next H2 well before it).
+  // Using `\n# ` here would be harmless today but becomes a trap if a code
+  // example with a comment is ever added to the "When to use it" section.
+  const whenSection = text.match(/## When to use it\s+([\s\S]*?)(?=\n## |$)/);
   if (!whenSection) {
     throw new Error("handoff-guide.md: could not find `## When to use it` section");
   }
@@ -302,6 +325,11 @@ export function extractFromGuide(text) {
   const commands = [...commandSet].sort();
 
   // Flags: scan "The five forms" and "Common patterns" sections.
+  // Safety: terminates on `\n## ` (next H2) or `$` (EOF) only — no `\n# `.
+  // `## Common patterns` contains a bash comment `# writes to docs/...`
+  // inside a fenced code block; using `\n# ` here would silently truncate
+  // that section and cause the flags in the code examples after the comment
+  // to be missed.
   const flagSections = text.match(
     /(?:## The five forms|## Common patterns)[\s\S]*?(?=\n## |$)/g,
   );
