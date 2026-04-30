@@ -98,8 +98,8 @@ teardown() {
 
 # --- cell 27: two positionals — first-arg wins -------------------------------
 
-@test "pull latest uuid2 (two positionals): exits 0, first arg resolves (cell 27)" {
-  run node "$BIN" pull latest "$CLAUDE_SHORT"
+@test "pull latest invalid-query (two positionals): exits 0, first arg resolves (cell 27)" {
+  run node "$BIN" pull latest "not-a-real-session"
   [ "$status" -eq 0 ]
   [[ "$output" == *"session=\"$CLAUDE_SHORT\""* ]]
 }
