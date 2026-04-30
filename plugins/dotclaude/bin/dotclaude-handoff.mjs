@@ -355,12 +355,12 @@ function writeOutput(body, out, meta, { kind, prompts, sourcePath, toCli }) {
       `- Prompts: ${(prompts ?? []).length} (verbatim); assistant turns summarized above.`,
     ].join("\n");
     writeFileSync(outPath, envelope + "\n");
-    process.stdout.write(`${outPath}\n`);
+    process.stderr.write(`${outPath}\n`);
     return;
   }
   const outPath = resolvePath(out.toString());
   writeFileSync(outPath, body.endsWith("\n") ? body : body + "\n");
-  process.stdout.write(`${outPath}\n`);
+  process.stderr.write(`${outPath}\n`);
 }
 
 function renderDescribeMarkdown(meta, prompts) {
