@@ -936,8 +936,8 @@ semantic-correctness check.
 
 **Result (2026-04-30, post-v1.0.1).** Dogfood passed: from a CC session
 running the v1.0.1 pull-validation matrix (report at
-`/tmp/handoff-pull-validation-v1.0.1.md`, surfacing issues #147 / #148 /
-#149), the `<handoff>` block was pasted into a fresh Codex session.
+`/tmp/handoff-pull-validation-v1.0.1.md`, surfacing issues #147 / #148 / #149),
+the `<handoff>` block was pasted into a fresh Codex session.
 Codex resumed coherently, independently confirmed the cell-14 / cell-33
 false-positive analysis (case (b) — coverage gap, not path-specific
 behavior), agreed with the #148 fix scope, and filed [#152](https://github.com/kaiohenricunha/dotclaude/issues/152)
