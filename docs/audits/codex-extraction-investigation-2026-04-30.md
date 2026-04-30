@@ -31,13 +31,13 @@ Pulling Codex session `019ddf95` produced a `<handoff>` block whose assistant-tu
 
 5 Codex rollouts on disk, spanning 13 days (Apr 17 → Apr 30 2026). All surfaced by `dotclaude handoff list --from codex`; no hidden older sessions. Diversity matrix:
 
-| Short UUID | Date | Lines | Size | Profile |
-|------------|------|-------|------|---------|
-| `019d9dbf` | 2026-04-17 (oldest) | 76 | 191 KB | Rich agent session (Copilot session-finding work) |
-| `019dda3a` | 2026-04-29 | 19 | 63 KB | Short interactive (binary testing) |
-| `019ddea6` | 2026-04-30 10:49 | 63 | 244 KB | Rich agent session, MCP-rich |
-| `019ddf94` | 2026-04-30 15:09 | 5 | 23 KB | Genuinely shell-only |
-| `019ddf95` | 2026-04-30 15:10 (newest) | 17 | 40 KB | Genuinely shell-only (the trigger) |
+| Short UUID | Date                      | Lines | Size   | Profile                                           |
+| ---------- | ------------------------- | ----- | ------ | ------------------------------------------------- |
+| `019d9dbf` | 2026-04-17 (oldest)       | 76    | 191 KB | Rich agent session (Copilot session-finding work) |
+| `019dda3a` | 2026-04-29                | 19    | 63 KB  | Short interactive (binary testing)                |
+| `019ddea6` | 2026-04-30 10:49          | 63    | 244 KB | Rich agent session, MCP-rich                      |
+| `019ddf94` | 2026-04-30 15:09          | 5     | 23 KB  | Genuinely shell-only                              |
+| `019ddf95` | 2026-04-30 15:10 (newest) | 17    | 40 KB  | Genuinely shell-only (the trigger)                |
 
 ### Phase 2 — Raw rollout structure
 
@@ -49,18 +49,19 @@ Assistant content lives in **two redundant locations**:
 2. **`event_msg` records** with `.payload.type == "agent_message"`, text directly at `.payload.message`.
 
 User content mirrors:
+
 - `response_item.payload.role == "user"` with `.payload.content[].text` (block type `input_text`)
 - `event_msg.payload.type == "user_message"` with `.payload.message`
 
 #### Per-session assistant census
 
-| Short UUID | response_item assistant | event_msg agent_message | Profile |
-|------------|------------------------|------------------------|---------|
-| `019d9dbf` | 7 | 7 | Rich agent session |
-| `019dda3a` | 2 | 2 | Short interactive |
-| `019ddea6` | 6 | 6 | MCP-rich |
-| `019ddf94` | 0 | 0 | Genuinely shell-only |
-| `019ddf95` | 0 | 0 | Genuinely shell-only |
+| Short UUID | response_item assistant | event_msg agent_message | Profile              |
+| ---------- | ----------------------- | ----------------------- | -------------------- |
+| `019d9dbf` | 7                       | 7                       | Rich agent session   |
+| `019dda3a` | 2                       | 2                       | Short interactive    |
+| `019ddea6` | 6                       | 6                       | MCP-rich             |
+| `019ddf94` | 0                       | 0                       | Genuinely shell-only |
+| `019ddf95` | 0                       | 0                       | Genuinely shell-only |
 
 `response_item` and `event_msg` mirrors are 1:1 in every session tested.
 
@@ -88,13 +89,13 @@ turns_codex() {
 
 The filter reads exactly the path Phase 2 confirmed valid:
 
-| Predicate | Phase 2 evidence | Match |
-|-----------|------------------|-------|
-| `.type == "response_item"` | Present in all 5 sessions (40/8/35/1/4 records) | ✓ |
-| `.payload.type == "message"` | Subset within response_item where role applies | ✓ |
-| `.payload.role == "assistant"` | 7/2/6/0/0 records across the 5 sessions | ✓ |
-| `.payload.content[0].text` | Sample showed `{"type":"output_text","text":"…"}` at `content[0]` | ✓ |
-| `select(length > 0)` | Empty-string guard | ✓ |
+| Predicate                      | Phase 2 evidence                                                  | Match |
+| ------------------------------ | ----------------------------------------------------------------- | ----- |
+| `.type == "response_item"`     | Present in all 5 sessions (40/8/35/1/4 records)                   | ✓     |
+| `.payload.type == "message"`   | Subset within response_item where role applies                    | ✓     |
+| `.payload.role == "assistant"` | 7/2/6/0/0 records across the 5 sessions                           | ✓     |
+| `.payload.content[0].text`     | Sample showed `{"type":"output_text","text":"…"}` at `content[0]` | ✓     |
+| `select(length > 0)`           | Empty-string guard                                                | ✓     |
 
 ### Phase 4 — Layer comparison
 
@@ -103,13 +104,13 @@ For each session, two layers were tested independently:
 - **Layer 1**: `bash handoff-extract.sh turns codex <rollout> 0` (extractor function direct, via the script's `main` dispatch)
 - **Layer 2**: `dotclaude handoff pull <short> --from codex` (full extractor + render pipeline)
 
-| Session | Phase 2 expected | Layer 1 lines | Layer 2 rendered | Diagnosis |
-|---------|------------------|---------------|------------------|-----------|
-| `019d9dbf` | 7 | 7 | 7 quoted assistant blocks | Works |
-| `019dda3a` | 2 | 2 | 2 quoted assistant blocks | Works |
-| `019ddea6` | 6 | 6 | 6 quoted assistant blocks (incl. MCP-rich) | Works |
-| `019ddf94` | 0 | 0 | `_(no assistant output captured)_` | Correct (true negative) |
-| `019ddf95` | 0 | 0 | `_(no assistant output captured)_` | Correct (true negative) |
+| Session    | Phase 2 expected | Layer 1 lines | Layer 2 rendered                           | Diagnosis               |
+| ---------- | ---------------- | ------------- | ------------------------------------------ | ----------------------- |
+| `019d9dbf` | 7                | 7             | 7 quoted assistant blocks                  | Works                   |
+| `019dda3a` | 2                | 2             | 2 quoted assistant blocks                  | Works                   |
+| `019ddea6` | 6                | 6             | 6 quoted assistant blocks (incl. MCP-rich) | Works                   |
+| `019ddf94` | 0                | 0             | `_(no assistant output captured)_`         | Correct (true negative) |
+| `019ddf95` | 0                | 0             | `_(no assistant output captured)_`         | Correct (true negative) |
 
 **Layer 1 == Layer 2 == Phase 2 expected count, across every session.** No discrepancy at any layer.
 
@@ -122,6 +123,7 @@ For each session, two layers were tested independently:
 The original observation that triggered this investigation (`019ddf95` returning the empty-assistant placeholder) was a true negative. Phase 2 confirmed that session genuinely has zero `response_item.role=="assistant"` and zero `event_msg.agent_message` records. The user typed shell commands without engaging the AI in that session. The placeholder rendered correctly.
 
 The filter at `handoff-extract.sh:279-291` correctly:
+
 - Identifies assistant `response_item` records (3/5 sessions had them)
 - Extracts `.payload.content[0].text` (safe — single-block invariant confirmed)
 - Returns empty for sessions with no assistant content
@@ -176,12 +178,12 @@ Session `019ddea6` contained `mcp_tool_call_end` events the extractor doesn't re
 
 Phase 1 → Phase 2 → Phase 3 → Phase 4 is a reusable debugging recipe for any future "extractor returned X, did it actually work?" question:
 
-| Phase | Question | Output |
-|-------|----------|--------|
-| 1 | What's available? | Diverse-sample inventory across the input space |
-| 2 | What's the raw shape? | Top-level keys, payload paths, distinct discriminator values, content-block census |
-| 3 | What does the extractor expect? | Verbatim filter + path-by-path comparison vs. Phase 2 evidence |
-| 4 | Does the pipeline produce the right thing? | Layer 1 (filter direct) vs. Layer 2 (full pipeline) vs. Phase 2 expectation |
+| Phase | Question                                   | Output                                                                             |
+| ----- | ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 1     | What's available?                          | Diverse-sample inventory across the input space                                    |
+| 2     | What's the raw shape?                      | Top-level keys, payload paths, distinct discriminator values, content-block census |
+| 3     | What does the extractor expect?            | Verbatim filter + path-by-path comparison vs. Phase 2 evidence                     |
+| 4     | Does the pipeline produce the right thing? | Layer 1 (filter direct) vs. Layer 2 (full pipeline) vs. Phase 2 expectation        |
 
 The key discipline: **separate "is the data there" from "does the filter find it" from "does the pipeline render it."** Conflating them produces shallow diagnoses.
 
