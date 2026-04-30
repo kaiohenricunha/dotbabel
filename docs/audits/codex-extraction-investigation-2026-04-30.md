@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-30
 **Trigger:** `dotclaude handoff pull 019ddf95 --from codex` returned `_(no assistant output captured)_`. Question: substrate bug, upstream format limitation, or something between?
-**Scope:** `plugins/dotclaude/scripts/handoff-extract.sh` codex case (`turns_codex`, lines 279–291) and the wrapper render path it feeds.
+**Scope:** `plugins/dotclaude/scripts/handoff-extract.sh` codex case (`turns_codex`) and the wrapper render path it feeds.
 **Verdict:** No bug. The original output was a true negative.
 
 ---
@@ -69,7 +69,7 @@ For the richest session (`019d9dbf`), `.payload.content[*].type` flattened acros
 
 ### Phase 3 — Extractor filter
 
-`turns_codex`, `plugins/dotclaude/scripts/handoff-extract.sh:279-291`:
+`turns_codex` in `plugins/dotclaude/scripts/handoff-extract.sh`:
 
 ```bash
 turns_codex() {
@@ -122,7 +122,7 @@ For each session, two layers were tested independently:
 
 The original observation that triggered this investigation (`019ddf95` returning the empty-assistant placeholder) was a true negative. Phase 2 confirmed that session genuinely has zero `response_item.role=="assistant"` and zero `event_msg.agent_message` records. The user typed shell commands without engaging the AI in that session. The placeholder rendered correctly.
 
-The filter at `handoff-extract.sh:279-291` correctly:
+The `turns_codex` filter in `handoff-extract.sh` correctly:
 
 - Identifies assistant `response_item` records (3/5 sessions had them)
 - Extracts `.payload.content[0].text` (safe — single-block invariant confirmed)
@@ -153,7 +153,7 @@ The filter at `handoff-extract.sh:279-291` correctly:
 
 The filter reads `response_item` only and ignores the `event_msg.agent_message` mirror. Phase 2 showed 1:1 correspondence in every tested session, so this is fine today. But if Codex ever desyncs them — streaming interruption, partial session writes, future schema change that drops one form — content would silently disappear from handoffs.
 
-- **Recommendation**: Add a source comment at `handoff-extract.sh:284` documenting the chosen path and the mirror's existence. Optionally, hardening for v1.x: fallback chain `(response_item assistant turns) ?? (event_msg agent_message events)`.
+- **Recommendation**: Add a source comment above `turns_codex` in `handoff-extract.sh` documenting the chosen path and the mirror's existence. Optionally, hardening for v1.x: fallback chain `(response_item assistant turns) ?? (event_msg agent_message events)`.
 - **Severity**: P4 (speculative; no observed divergence).
 - **Why bank**: cheap to document; expensive to debug if it ever fires.
 
