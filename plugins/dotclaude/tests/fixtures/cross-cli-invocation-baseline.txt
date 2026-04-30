@@ -1,15 +1,15 @@
 === claude-pull ===
 <handoff origin="claude" session="aaaa1111" cwd="/seed/claude" target="claude">
 
-**Summary.** Session opened with: "(no user prompts captured)". Last assistant output (truncated): "(no assistant turns captured)". Full prompt log and assistant tail follow for context.
+**Summary.** Session opened with: "(session contained no user prompts)". Last assistant output (truncated): "(session contained no assistant turns)". Full prompt log and assistant tail follow for context.
 
 **User prompts (last 10, in order).**
 
-1. (no user prompts captured)
+1. (session contained no user prompts)
 
 **Last assistant turns (tail).**
 
-_(no assistant output captured)_
+_(session contained no assistant turns)_
 **Next step.** Continue from the last assistant turn using the same file scope and goals summarized above.
 
 </handoff>
@@ -17,15 +17,15 @@ _(no assistant output captured)_
 === copilot-pull ===
 <handoff origin="copilot" session="bbbb1111" cwd="/seed/copilot" target="claude">
 
-**Summary.** Session opened with: "(no user prompts captured)". Last assistant output (truncated): "(no assistant turns captured)". Full prompt log and assistant tail follow for context.
+**Summary.** Session opened with: "(session contained no user prompts)". Last assistant output (truncated): "(session contained no assistant turns)". Full prompt log and assistant tail follow for context.
 
 **User prompts (last 10, in order).**
 
-1. (no user prompts captured)
+1. (session contained no user prompts)
 
 **Last assistant turns (tail).**
 
-_(no assistant output captured)_
+_(session contained no assistant turns)_
 **Next step.** Continue from the last assistant turn using the same file scope and goals summarized above.
 
 </handoff>
@@ -35,22 +35,22 @@ _(no assistant output captured)_
 
 **User prompts:**
 
-- (no user prompts captured)
+- (session contained no user prompts)
 
 **Prompt count:** 0
 === /copilot-pull-summary ===
 === codex-pull ===
 <handoff origin="codex" session="cccc1111" cwd="/seed/codex" target="claude">
 
-**Summary.** Session opened with: "(no user prompts captured)". Last assistant output (truncated): "(no assistant turns captured)". Full prompt log and assistant tail follow for context.
+**Summary.** Session opened with: "(session contained no user prompts)". Last assistant output (truncated): "(session contained no assistant turns)". Full prompt log and assistant tail follow for context.
 
 **User prompts (last 10, in order).**
 
-1. (no user prompts captured)
+1. (session contained no user prompts)
 
 **Last assistant turns (tail).**
 
-_(no assistant output captured)_
+_(session contained no assistant turns)_
 **Next step.** Continue from the last assistant turn using the same file scope and goals summarized above.
 
 </handoff>

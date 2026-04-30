@@ -204,8 +204,8 @@ describe("nextStepFor", () => {
 describe("mechanicalSummary", () => {
   it("uses placeholder text when arrays are empty", () => {
     const s = lib.mechanicalSummary([], []);
-    expect(s).toContain("(no user prompts captured)");
-    expect(s).toContain("(no assistant turns captured)");
+    expect(s).toContain("(session contained no user prompts)");
+    expect(s).toContain("(session contained no assistant turns)");
   });
 
   it("clips prompt and turn to 160 chars with ellipsis", () => {
@@ -240,8 +240,8 @@ describe("renderHandoffBlock", () => {
 
   it("handles empty prompts with fallback text", () => {
     const block = lib.renderHandoffBlock(meta, [], [], "claude");
-    expect(block).toContain("(no user prompts captured)");
-    expect(block).toContain("_(no assistant output captured)_");
+    expect(block).toContain("(session contained no user prompts)");
+    expect(block).toContain("_(session contained no assistant turns)_");
   });
 
   it("caps prompts at last 10", () => {

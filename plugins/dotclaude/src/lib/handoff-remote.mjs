@@ -166,8 +166,8 @@ export function nextStepFor(toCli) {
 
 /** Produce a one-sentence summary: first prompt + last assistant turn (clipped). */
 export function mechanicalSummary(prompts, turns) {
-  const first = prompts[0] ?? "(no user prompts captured)";
-  const last = turns[turns.length - 1] ?? "(no assistant turns captured)";
+  const first = prompts[0] ?? "(session contained no user prompts)";
+  const last = turns[turns.length - 1] ?? "(session contained no assistant turns)";
   const clip = (s, n) => (s.length > n ? `${s.slice(0, n).trim()}…` : s);
   return `Session opened with: "${clip(first, 160)}". Last assistant output (truncated): "${clip(last, 160)}". Full prompt log and assistant tail follow for context.`;
 }
@@ -187,7 +187,7 @@ export function renderHandoffBlock(meta, prompts, turns, toCli) {
   lines.push("");
   lines.push("**User prompts (last 10, in order).**");
   lines.push("");
-  if (promptsCapped.length === 0) lines.push("1. (no user prompts captured)");
+  if (promptsCapped.length === 0) lines.push("1. (session contained no user prompts)");
   else
     promptsCapped.forEach((p, i) => {
       const trimmed = p.length > 300 ? `${p.slice(0, 300).trim()}…` : p;
@@ -196,7 +196,7 @@ export function renderHandoffBlock(meta, prompts, turns, toCli) {
   lines.push("");
   lines.push("**Last assistant turns (tail).**");
   lines.push("");
-  if (turnsTail.length === 0) lines.push("_(no assistant output captured)_");
+  if (turnsTail.length === 0) lines.push("_(session contained no assistant turns)_");
   else
     for (const t of turnsTail) {
       const trimmed = t.length > 400 ? `${t.slice(0, 400).trim()}…` : t;

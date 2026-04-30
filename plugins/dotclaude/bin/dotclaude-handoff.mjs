@@ -372,7 +372,7 @@ function renderDescribeMarkdown(meta, prompts) {
   lines.push("**User prompts:**");
   lines.push("");
   const toShow = prompts.slice(0, 10);
-  if (toShow.length === 0) lines.push("- (no user prompts captured)");
+  if (toShow.length === 0) lines.push("- (session contained no user prompts)");
   else for (const p of toShow) lines.push(`- ${p.length > 200 ? `${p.slice(0, 200).trim()}…` : p}`);
   if (prompts.length > 10) lines.push(`- …and ${prompts.length - 10} more (truncated)`);
   lines.push("");

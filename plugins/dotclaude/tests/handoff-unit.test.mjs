@@ -142,8 +142,8 @@ describe("nextStepFor", () => {
 describe("mechanicalSummary", () => {
   it("handles empty prompts and turns", () => {
     const s = mechanicalSummary([], []);
-    expect(s).toContain("(no user prompts captured)");
-    expect(s).toContain("(no assistant turns captured)");
+    expect(s).toContain("(session contained no user prompts)");
+    expect(s).toContain("(session contained no assistant turns)");
   });
 
   it("quotes the first prompt and the last turn", () => {

@@ -248,8 +248,8 @@ describe("nextStepFor", () => {
 describe("mechanicalSummary", () => {
   it("uses placeholder text when both arrays are empty", () => {
     const s = lib.mechanicalSummary([], []);
-    expect(s).toContain("(no user prompts captured)");
-    expect(s).toContain("(no assistant turns captured)");
+    expect(s).toContain("(session contained no user prompts)");
+    expect(s).toContain("(session contained no assistant turns)");
   });
 
   it("uses first prompt and last turn when both arrays are non-empty", () => {
@@ -289,12 +289,12 @@ describe("renderHandoffBlock", () => {
 
   it("renders the fallback when prompts are empty", () => {
     const block = lib.renderHandoffBlock(meta, [], [], "claude");
-    expect(block).toContain("(no user prompts captured)");
+    expect(block).toContain("(session contained no user prompts)");
   });
 
   it("renders the fallback when turns are empty", () => {
     const block = lib.renderHandoffBlock(meta, [], [], "claude");
-    expect(block).toContain("_(no assistant output captured)_");
+    expect(block).toContain("_(session contained no assistant turns)_");
   });
 
   it("renders prompts and turns when present", () => {

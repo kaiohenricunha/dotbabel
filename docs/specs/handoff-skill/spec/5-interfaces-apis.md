@@ -170,8 +170,8 @@ is removed (target is implicit per ARCH-2).
 
 **Empty-content fallbacks (frozen):**
 
-- No prompts: `1. (no user prompts captured)`.
-- No turns: `_(no assistant output captured)_` in place of the quote block.
+- No prompts: `1. (session contained no user prompts)`.
+- No turns: `_(session contained no assistant turns)_` in place of the quote block.
 
 **Generic Next-step line (frozen text):**
 
