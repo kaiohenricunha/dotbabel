@@ -52,6 +52,13 @@
       "lastValidated": null
     },
     {
+      "name": "create-experiment",
+      "path": ".claude/commands/create-experiment.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "create-inspection",
       "path": ".claude/commands/create-inspection.md",
       "checksum": "",

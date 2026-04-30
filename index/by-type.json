@@ -45,6 +45,7 @@
     "changelog",
     "create-assessment",
     "create-audit",
+    "create-experiment",
     "create-inspection",
     "dependabot-sweep",
     "detect-flaky",

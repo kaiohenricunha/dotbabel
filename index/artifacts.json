@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-04-29T22:16:23.815Z",
+  "generatedAt": "2026-04-30T13:37:16.375Z",
   "version": "1.0.1",
   "artifacts": [
     {
@@ -205,6 +205,21 @@
       "path": "commands/create-audit.md",
       "name": "create-audit",
       "description": "Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "create-experiment",
+      "type": "command",
+      "path": "commands/create-experiment.md",
+      "name": "create-experiment",
+      "description": "Run a scoped, local-only experiment to try things out before committing to a spec or roadmap, and save the report to docs/experiments/. Use when the user is exploring options, comparing libraries, validating assumptions, or prototyping an approach. Sits before /spec (which is heavier and design-oriented).\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
