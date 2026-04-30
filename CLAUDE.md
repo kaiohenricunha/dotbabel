@@ -172,4 +172,5 @@ Quick-invoke disciplines for recurring friction:
 | `/create-audit <subject>`      | Evidence-based audit doc to `docs/audits/`                                                                |
 | `/create-assessment <target>`  | 0–10 graded assessment doc to `docs/assessments/`                                                         |
 | `/create-inspection <problem>` | Investigate a problem and surface viable fix options to `docs/inspections/`                               |
+| `/create-experiment <topic>`   | Run a local sandboxed experiment to try options before committing to a spec — saves to `docs/experiments/` |
 | `/spec <subject>`              | Only when a spec/design doc is explicitly requested                                                       |

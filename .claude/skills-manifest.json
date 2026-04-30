@@ -204,6 +204,13 @@
       "checksum": "sha256:347be395b0f8003816b4f3ed3bb777a63a3f9f7ae300d6f050b499ff66cfd3b0",
       "dependencies": [],
       "lastValidated": "2026-04-28"
+    },
+    {
+      "name": "create-experiment",
+      "path": ".claude/commands/create-experiment.md",
+      "checksum": "sha256:bf797e14ec8dc20261abb78b7099a3a08615ab2abc4608c5c006422f7b46e9d5",
+      "dependencies": [],
+      "lastValidated": "2026-04-30"
     }
   ]
 }
