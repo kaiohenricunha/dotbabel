@@ -303,8 +303,9 @@ teardown() {
 }
 
 @test "pull --from codex narrows to local codex session" {
-  # `pull --from codex` resolves locally; bbbb2222 is the only codex session.
-  run node "$BIN" pull --from codex
+  # `pull latest --from codex` resolves locally; bbbb2222 is the only codex session.
+  # Explicit `latest` is required per §5.2.1 (<query> mandatory always).
+  run node "$BIN" pull latest --from codex
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
   [[ "$output" != *"aaaa1111"* ]]
@@ -372,12 +373,13 @@ teardown() {
   [[ "$output" == *"Continue from"* ]]
 }
 
-@test "pull zero-arg under CODEX_HOME narrows to codex root" {
+@test "pull latest under CODEX_HOME narrows to codex root" {
   # CODEX_HOME triggers the CODEX_* env-var probe, returning "codex" from
   # detectHost(). Host-scoped `latest` then narrows to the codex root.
   # bbbb2222 is the newest codex session (seeded last in setup).
+  # Explicit `latest` is required per §5.2.1 (<query> mandatory always).
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CODEX_HOME="/any/path" \
-    node "$BIN" pull
+    node "$BIN" pull latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"bbbb2222"* ]]
   [[ "$output" != *"aaaa1111"* ]]

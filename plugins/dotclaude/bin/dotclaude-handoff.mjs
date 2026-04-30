@@ -4,7 +4,7 @@
  *
  * Usage:
  *   dotclaude handoff                              print usage and exit 0 (#86)
- *   dotclaude handoff pull [<id>] [--summary] [-o <path|auto|->] [--from <cli>]
+ *   dotclaude handoff pull <query> [--summary] [-o <path|auto|->] [--from <cli>]
  *                                                  render a local session: <handoff> block (default),
  *                                                  --summary for inline markdown, -o to write to disk.
  *   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
@@ -946,7 +946,8 @@ async function main() {
     // runs the local resolver — never forwards to remote. When local misses
     // and DOTCLAUDE_HANDOFF_REPO is set, resolveLocalForPull appends a
     // single stderr hint pointing at `fetch` (#87).
-    const id = second ?? "latest";
+    if (second === undefined) fail(EXIT_CODES.USAGE, "pull requires a <query>");
+    const id = second;
     const summaryMode = Boolean(argv.flags.summary);
     const out = argv.flags.output != null ? String(argv.flags.output) : undefined;
     let hit;
