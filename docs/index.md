@@ -1,6 +1,6 @@
 # `@dotclaude/dotclaude` — docs
 
-_Last updated: v1.1.0_
+_Last updated: v1.1.1_
 
 dotclaude is an opinionated Claude Code toolkit shipped as a portable
 npm package + Claude Code plugin. It curates a library of skills,

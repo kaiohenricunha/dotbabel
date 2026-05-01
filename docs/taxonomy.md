@@ -1,6 +1,6 @@
 # dotclaude Taxonomy
 
-_Last updated: v1.1.0_
+_Last updated: v1.1.1_
 
 The dotclaude taxonomy organizes every artifact (agents, skills, commands, hooks, templates) by **type** (flat directory) and **facets** (YAML frontmatter). This avoids the placement ambiguity of domain-first hierarchies and lets the generated index serve any faceted query.
 

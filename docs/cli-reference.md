@@ -1,6 +1,6 @@
 # CLI reference
 
-_Last updated: v1.1.0_
+_Last updated: v1.1.1_
 
 Every bin honors the **dotclaude-wide flag set** in addition to its own:
 

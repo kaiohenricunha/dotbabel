@@ -1,6 +1,6 @@
 {
   "name": "@dotclaude/dotclaude",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "An opinionated Claude Code toolkit: skills, slash commands, cloud/IaC specialists, and an optional spec-governance CLI.",
   "type": "module",
   "main": "plugins/dotclaude/src/index.mjs",
