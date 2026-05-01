@@ -322,7 +322,7 @@ export function extractFabricationRule(text) {
     const mentionsRequired =
       /\bverbatim\b/.test(lower) ||
       /\b(?:stop|halt)\b/.test(lower) ||
-      /\breport[^a-z]*(?:error|failure)\b/.test(lower);
+      /\breport\b(?:[\s-]+[a-z]+){0,4}[\s-]+(?:error|failure)\b/.test(lower);
     if (mentionsFailure && mentionsBinary && mentionsForbidden && mentionsRequired) {
       return { present: true };
     }
