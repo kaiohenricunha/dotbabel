@@ -1,6 +1,6 @@
 # Upgrade guide
 
-_Last updated: v1.2.0_
+_Last updated: v1.2.1_
 
 ## 0.1.x → 0.2.0
 
