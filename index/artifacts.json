@@ -1,7 +1,7 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-04-30T22:15:55.841Z",
-  "version": "1.1.1",
+  "generatedAt": "2026-05-01T16:20:43.332Z",
+  "version": "1.2.0",
   "artifacts": [
     {
       "id": "agents-search",

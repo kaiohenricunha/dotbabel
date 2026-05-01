@@ -6,6 +6,18 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ## Unreleased
 
+## [1.2.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.1.1...v1.2.0) (2026-05-01)
+
+
+### Added
+
+* **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotclaude/issues/157)) ([85d927d](https://github.com/kaiohenricunha/dotclaude/commit/85d927dd68db8dda481bf48b49c59d8ddf5546ac))
+
+
+### Fixed
+
+* **drift-test:** loosen report heuristic to match cross-word phrasing ([9efb93c](https://github.com/kaiohenricunha/dotclaude/commit/9efb93cb7ae503392c028bec8dae433e776de0b2))
+
 ## [1.1.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.1.0...v1.1.1) (2026-04-30)
 
 

@@ -1,6 +1,6 @@
 # dotclaude Taxonomy Governance
 
-_Last updated: v1.1.1_
+_Last updated: v1.2.0_
 
 ## Ownership
 
