@@ -23,10 +23,12 @@ setup() {
   export DOTCLAUDE_HANDOFF_REPO="/nonexistent/pull-input-val-$$"
   export DOTCLAUDE_QUIET=1
 
+  CLAUDE_UUID2="ffff2222-3333-3333-3333-333333333333"
   CLAUDE_UUID="eeee1111-2222-2222-2222-222222222222"
-  make_claude_session_tree "$TEST_HOME" "$CLAUDE_UUID"
+  make_claude_session_tree "$TEST_HOME" "$CLAUDE_UUID2" "$CLAUDE_UUID"
   CLAUDE_SHORT="${CLAUDE_UUID:0:8}"
-  export CLAUDE_UUID CLAUDE_SHORT
+  CLAUDE_SHORT2="${CLAUDE_UUID2:0:8}"
+  export CLAUDE_UUID CLAUDE_SHORT CLAUDE_UUID2 CLAUDE_SHORT2
 }
 
 teardown() {
@@ -98,8 +100,9 @@ teardown() {
 
 # --- cell 27: two positionals — first-arg wins -------------------------------
 
-@test "pull latest invalid-query (two positionals): exits 0, first arg resolves (cell 27)" {
-  run node "$BIN" pull latest "not-a-real-session"
+@test "pull latest <uuid2> (two positionals): exits 0, first arg (latest) wins, second ignored (cell 27)" {
+  run node "$BIN" pull latest "$CLAUDE_SHORT2"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"session=\"$CLAUDE_SHORT\""* ]]
+  [[ "$output" == *"session=\"$CLAUDE_SHORT\""* ]]   # latest = uuid, resolves
+  [[ "$output" != *"session=\"$CLAUDE_SHORT2\""* ]]  # uuid2 (second arg) ignored
 }

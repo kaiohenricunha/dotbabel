@@ -79,6 +79,13 @@ npx dotclaude-doctor         # self-diagnostic
   `chore(scope): summary`, …
 - **PR body** must contain `## Summary` + `## Test plan` sections. Use
   `gh pr create --body-file` to avoid heredoc quoting pitfalls.
+- **Merge strategy**: `feat:` and `fix:` PRs → **squash-merge** (one commit
+  on `main` = one CHANGELOG entry). `chore:` PRs — specifically
+  release-please's own `chore(main): release X.Y.Z` — → **merge-commit**;
+  release-please expects that shape. Using merge-commit on `feat:`/`fix:` PRs
+  causes release-please to emit duplicate CHANGELOG entries: one from the
+  merge SHA's PR reference and one from the individual conventional-commit SHA.
+  PR #163 triggered this in v1.2.0 and required a manual splice.
 - **Never** force-push someone else's branch, `--amend` a published commit,
   or pass `--no-verify` / `--no-gpg-sign`.
 - Open commits are preferred over `--amend` once a PR is in review.
