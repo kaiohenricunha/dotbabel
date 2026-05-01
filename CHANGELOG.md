@@ -12,7 +12,6 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 ### Fixed
 
 * **handoff:** tighten cell-27 test to lock first-arg-wins ([#155](https://github.com/kaiohenricunha/dotclaude/issues/155)) ([250c7d2](https://github.com/kaiohenricunha/dotclaude/commit/250c7d2c30f11435a4b9247dec67e8fb00ee6b98))
-* re-land v1.2.1 commits after parser-rejected squash ([#166](https://github.com/kaiohenricunha/dotclaude/issues/166) recovery) ([548cc09](https://github.com/kaiohenricunha/dotclaude/commit/548cc093323263dbd6d3cb212b0acefe1b8238d3))
 
 
 ### Documentation
