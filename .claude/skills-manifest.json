@@ -187,7 +187,7 @@
     {
       "name": "handoff",
       "path": ".claude/skills/handoff/SKILL.md",
-      "checksum": "sha256:a2cc3765c4de9d12909fd4a19e646975fba305be21ce48694d09e47b020f0157",
+      "checksum": "sha256:b83b55dadf14eeac53eb1e1e8f2ea3659b77344358288c5f03c8f9ba960e9df4",
       "dependencies": [],
       "lastValidated": "2026-05-01"
     },

@@ -86,7 +86,6 @@ distinguish a hand-rolled block from a real one.
 Brief reference. `dotclaude handoff --help` is authoritative.
 
 - `--from <cli>` narrows source-CLI auto-detection on `push`, `fetch`, `pull`; filters `list`, `search`, and `prune`.
-  For `pull latest`, omitting `--from` triggers host auto-detection: `CLAUDECODE=1` / `COPILOT_*` / `CODEX` env signals → narrowed to that CLI's root; host undetectable → cross-root union (newest mtime across all three roots).
 - `--summary` (on `pull`) emits a prose summary instead of the full `<handoff>` block.
 - `-o <path>` (on `pull`) controls output: `-` forces stdout; `auto` writes to `<repo>/docs/handoffs/<date>-<cli>-<short>.md`; any other string is a literal path.
 - `--since <ISO>` cuts off `list` and `search` (default 30 days for `search`).

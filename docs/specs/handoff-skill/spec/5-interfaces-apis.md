@@ -340,8 +340,6 @@ Frozen across `pull`, `push`, `fetch`, `describe`:
 | Branch suffix (fetch only) | partial branch path                                            | trailing-`/<short>` match against ls-remote |
 | Commit prefix (fetch only) | `[0-9a-f]{4,40}`                                               | matches commit hash prefix in ls-remote     |
 
-**`latest` resolution precedence** (`--from` > detected host > cross-root union): when `--from` is omitted, the binary checks environment signals (`CLAUDECODE=1`, any `COPILOT_*`, `CODEX`) to detect the host CLI and narrows to that root. When the host is undetectable, it falls back to cross-root union — the newest session by mtime across all three roots.
-
 Copilot has **no** alias support; UUID / short / `latest` only (per
 `handoff-resolve.sh:151`). Claude does; Codex does.
 
