@@ -11,7 +11,6 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ### Added
 
-* **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotclaude/issues/157)) ([32e3bdc](https://github.com/kaiohenricunha/dotclaude/commit/32e3bdc24c67150f8a1709169db224fe7f3e7d71))
 * **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotclaude/issues/157)) ([85d927d](https://github.com/kaiohenricunha/dotclaude/commit/85d927dd68db8dda481bf48b49c59d8ddf5546ac))
 
 
