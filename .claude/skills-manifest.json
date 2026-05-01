@@ -187,9 +187,9 @@
     {
       "name": "handoff",
       "path": ".claude/skills/handoff/SKILL.md",
-      "checksum": "sha256:66129dd0c5c49af5e047570b9c9f2c2046f2c6e2b0c8f64a972f658f9896131c",
+      "checksum": "sha256:b83b55dadf14eeac53eb1e1e8f2ea3659b77344358288c5f03c8f9ba960e9df4",
       "dependencies": [],
-      "lastValidated": "2026-04-30"
+      "lastValidated": "2026-05-01"
     },
     {
       "name": "review-prs",

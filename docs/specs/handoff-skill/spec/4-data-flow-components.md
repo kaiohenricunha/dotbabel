@@ -430,3 +430,25 @@ contract single-pathed.
 the source pinned" and "user shouldn't have to type ceremony." The
 host LLM is the right place to fill the flag because it's the only
 component that always knows the answer with certainty.
+
+### KD-7 — SKILL.md auto-trigger contract forbids fabrication when the binary cannot run
+
+The skill markdown explicitly instructs host LLMs (Claude / Copilot /
+Codex) that when the `dotclaude handoff` binary cannot be executed —
+for any reason: permission denied, sandbox restriction, binary
+missing, network failure — they MUST NOT reconstruct a `<handoff>`
+block from raw session JSONL files. The required behavior is a
+three-step protocol: report the tool-execution error verbatim,
+instruct the user to run the command manually, and stop. ARCH-10's
+drift test asserts the rule stays present in `skills/handoff/SKILL.md`
+across edits, the same way the symbol-list intersection guards the
+`--from` rule from KD-6.
+
+**Reasoning**: the binary is the authoritative producer of `<handoff>`
+blocks — it owns the scrub passes, the extraction shape, and the
+metadata schema the transport depends on. Fabricated blocks may be
+schema-valid but bypass scrubbing entirely, exposing secrets if
+pushed; they also synthesize content from raw transcripts without
+the per-CLI extraction normalization §4.1 step 4 specifies. The host
+LLM is the only component that observes the failed invocation, so it
+is the right place to enforce the rule.

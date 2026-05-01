@@ -60,6 +60,27 @@ is running in (`claude` for Claude Code, `copilot` for GitHub Copilot CLI,
 `codex` for Codex). The flag is required in that mode; the binary exits
 64 without it.
 
+## Tool execution failures
+
+When the `dotclaude` binary cannot be executed for any reason —
+permission denied, binary not found, network failure, sandbox
+restriction — do NOT fabricate, reconstruct, or synthesize a
+`<handoff>` block from raw session JSONL files. Report the
+tool-execution error verbatim and stop; instruct the user to run
+the command manually in a shell where `dotclaude` is available.
+
+Specifically:
+
+1. Quote the exact command attempted and the failure message.
+2. Tell the user to run it themselves and paste the output back.
+3. Do not infer, summarize, or proceed as if the call had succeeded.
+
+Why: the binary is the authoritative producer of `<handoff>` blocks
+— it owns the scrub passes (`push` redaction) and the extraction
+logic §4 data flow depends on. Fabricated output may pass shape
+validation but bypasses scrubbing entirely; the consumer cannot
+distinguish a hand-rolled block from a real one.
+
 ## Cross-cutting flags
 
 Brief reference. `dotclaude handoff --help` is authoritative.

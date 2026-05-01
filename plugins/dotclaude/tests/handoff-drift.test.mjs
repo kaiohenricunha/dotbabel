@@ -285,6 +285,52 @@ export function extractFromRule(text) {
 }
 
 /**
+ * Structural search for the fabrication-forbidden rule paragraph (KD-7).
+ * SKILL.md-only: --help and the user-facing guide don't need to discuss
+ * what consumers should do on a failed invocation, so this is asymmetric
+ * to extractFromRule (which checks all 3 sources).
+ *
+ * Heuristic: a paragraph that mentions all four clauses simultaneously,
+ * the same approach as extractFromRule. Loose enough to survive wording
+ * changes per spec §5.0; strict enough that incidental mentions of
+ * "fabricate" or "dotclaude" alone don't false-positive.
+ *
+ * @param {string} text
+ * @returns {{ present: boolean }}
+ */
+export function extractFabricationRule(text) {
+  // Cheap absence check: if no forbidden-behavior verb appears at all,
+  // no paragraph could match the four-clause conjunction below.
+  if (!/\b(fabricat|reconstruct|synthesi[sz]e)/i.test(text)) {
+    return { present: false };
+  }
+
+  const paragraphs = text.split(/\n\s*\n/);
+  for (const p of paragraphs) {
+    const lower = p.toLowerCase();
+    const mentionsFailure =
+      /\bpermission\s+denied\b/.test(lower) ||
+      /\btool[\s-]execution\b/.test(lower) ||
+      /\bcannot\s+(?:be\s+)?(?:execute|run|invoke)/.test(lower) ||
+      /\bsandbox\b/.test(lower) ||
+      /\bbinary\s+(?:not\s+found|missing)\b/.test(lower);
+    const mentionsBinary = /\bdotclaude\b/.test(lower);
+    const mentionsForbidden =
+      /\bfabricat/.test(lower) ||
+      /\breconstruct/.test(lower) ||
+      /\bsynthesi[sz]e/.test(lower);
+    const mentionsRequired =
+      /\bverbatim\b/.test(lower) ||
+      /\b(?:stop|halt)\b/.test(lower) ||
+      /\breport\b(?:[\s-]+[a-z]+){0,4}[\s-]+(?:error|failure)\b/.test(lower);
+    if (mentionsFailure && mentionsBinary && mentionsForbidden && mentionsRequired) {
+      return { present: true };
+    }
+  }
+  return { present: false };
+}
+
+/**
  * Parse `docs/handoff-guide.md`.
  *
  * Sub-commands come from the `## When to use it` table's second column —
@@ -444,5 +490,10 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     expect(skillSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
     expect(helpSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
     expect(guideSurface.from_rule).toEqual(PHASE_1_BASELINE_FROM_RULE);
+  });
+
+  it("SKILL.md contains the fabrication-forbidden rule (KD-7)", () => {
+    const text = readFileSync(SKILL_MD_PATH, "utf8");
+    expect(extractFabricationRule(text)).toEqual({ present: true });
   });
 });
