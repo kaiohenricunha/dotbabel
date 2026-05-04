@@ -4,6 +4,8 @@
 # runtime fallback chain; busybox substrate coverage lives in
 # handoff-resolve-busybox.bats.
 
+bats_require_minimum_version 1.5.0
+
 load helpers
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
@@ -45,7 +47,7 @@ seed_fractional_pair() {
   local older="aaaa1111-1111-1111-1111-111111111111"
   local newer="bbbb2222-2222-2222-2222-222222222222"
   seed_fractional_pair "$older" "$newer"
-  run "$RESOLVE" claude latest
+  run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"$newer.jsonl" ]]
 }

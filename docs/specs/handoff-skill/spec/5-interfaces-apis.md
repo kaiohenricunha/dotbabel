@@ -186,11 +186,11 @@ per-target variants exist.
 
 ### 5.2.1 `pull <query> [flags]`
 
-| Flag           | Type       | Default | Mandatory when | Notes                                                                  |
-| -------------- | ---------- | ------- | -------------- | ---------------------------------------------------------------------- |
-| `<query>`      | positional | n/a     | always         | UUID / 8-hex short / `latest` / Claude customTitle / Codex thread_name |
-| `--from <cli>` | string     | (none)  | optional       | narrow to one root; values: `claude` \| `copilot` \| `codex`           |
-| `--limit <N>`  | integer    | 20      | optional       | turns extraction tail length                                           |
+| Flag           | Type       | Default | Mandatory when | Notes                                                                                                  |
+| -------------- | ---------- | ------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `<query>`      | positional | n/a     | always         | UUID / 8-hex short / `latest` / Claude customTitle / Claude aiTitle / Codex thread_name / Copilot name |
+| `--from <cli>` | string     | (none)  | optional       | narrow to one root; values: `claude` \| `copilot` \| `codex`                                           |
+| `--limit <N>`  | integer    | 20      | optional       | turns extraction tail length                                                                           |
 
 No `--to`. No `--json`. No `--out-dir`. No environment-variable detection.
 
@@ -275,13 +275,13 @@ command and locks the **prefix** of the stderr template.
 
 ### 5.3.2 `pull`-specific exits
 
-| Code | Condition                                | Stderr template                                                                    |
-| ---- | ---------------------------------------- | ---------------------------------------------------------------------------------- |
-| 2    | no session matches (no `--from`)         | `dotclaude-handoff: no session matches: <query>`                                   |
-| 2    | no session matches (with `--from <cli>`) | `dotclaude-handoff: no <cli> session matches: <query>`                             |
-| 2    | multiple sessions match (non-TTY)        | header `dotclaude-handoff: multiple sessions match "<query>":` + TSV lines (5.3.5) |
-| 64   | unknown flag                             | `dotclaude-handoff: unknown flag: <flag>` + usage                                  |
-| 64   | missing `<query>`                        | `dotclaude-handoff: pull requires a <query>` + usage                               |
+| Code | Condition                                | Stderr template                                                                                                                                                             |
+| ---- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2    | no session matches (no `--from`)         | `dotclaude-handoff: no session matches: <query>`                                                                                                                            |
+| 2    | no session matches (with `--from <cli>`) | `dotclaude-handoff: no <cli> session matches: <query>`                                                                                                                      |
+| 2    | multiple sessions match (non-TTY)        | header `dotclaude-handoff: multiple sessions match "<query>":` + TSV lines (5.3.5) + trailing hint line `hint: pass --from <cli> to narrow, or use UUID/short-UUID prefix.` |
+| 64   | unknown flag                             | `dotclaude-handoff: unknown flag: <flag>` + usage                                                                                                                           |
+| 64   | missing `<query>`                        | `dotclaude-handoff: pull requires a <query>` + usage                                                                                                                        |
 
 When `--from <cli>` is set the no-match message is narrowed to the requested
 CLI ("no `<cli>` session matches"), giving a clearer diagnostic when the user
@@ -315,35 +315,37 @@ lookups (no `--from`). Both forms are stable public output (#136).
 Both `pull` and `fetch` emit candidate lines on multi-match (non-TTY).
 Column order is fixed; tools parsing this format can rely on field positions.
 
-| Command | Columns (tab-separated, in order)                     |
-| ------- | ----------------------------------------------------- |
-| `pull`  | `<cli>`, `<session_id>`, `<absolute-path>`, `<query>` |
-| `fetch` | `<branch>`, `<commit>`, `<description>`, `<query>`    |
+| Command | Columns (tab-separated, in order)                                              |
+| ------- | ------------------------------------------------------------------------------ |
+| `pull`  | `<cli>`, `<short-id>`, `<absolute-path>`, `<matched-value>`, `<matched-field>` |
+| `fetch` | `<branch>`, `<commit>`, `<description>`, `<query>`                             |
 
 One candidate per line. No header row in the TSV (the human-readable
 header line above the TSV is plain prose, ignored by parsers). Fields
 are guaranteed not to contain literal tabs (resolver / git outputs are
-controlled).
+controlled). Alias-form `<matched-value>` is sanitized at emit
+(tabs/newlines collapsed to single space) — see §5.4 alias rows.
 
 ## 5.4 `<query>` valid forms (cross-cutting)
 
 Frozen across `pull`, `push`, `fetch`, `describe`:
 
-| Form                       | Lexical                                                        | Notes                                       |
-| -------------------------- | -------------------------------------------------------------- | ------------------------------------------- |
-| Full UUID                  | `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` | exact match on session id                   |
-| Short UUID                 | `[0-9a-f]{8}`                                                  | first 8 hex of session id                   |
-| Literal `latest`           | exactly the string `latest`                                    | newest by mtime in target root(s)           |
-| Claude `customTitle` alias | non-hex string ≤ 256 chars                                     | scanned via `customTitle` JSONL records     |
-| Codex `thread_name` alias  | non-hex string ≤ 256 chars                                     | scanned via `event_msg.thread_name` records |
-| Tag (fetch only)           | `[a-z0-9-]{1,40}`                                              | matches description tag segment             |
-| Branch suffix (fetch only) | partial branch path                                            | trailing-`/<short>` match against ls-remote |
-| Commit prefix (fetch only) | `[0-9a-f]{4,40}`                                               | matches commit hash prefix in ls-remote     |
+| Form                       | Lexical                                                        | Notes                                                                                              |
+| -------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Full UUID                  | `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` | exact match on session id                                                                          |
+| Short UUID                 | `[0-9a-f]{8}`                                                  | first 8 hex of session id                                                                          |
+| Literal `latest`           | exactly the string `latest`, case-insensitive                  | newest by mtime in target root(s); `latest`/`Latest`/`LATEST` all match                            |
+| Claude `customTitle` alias | non-hex string ≤ 256 chars                                     | scanned via `customTitle` JSONL records (case-insensitive exact match; collisions → 5-col TSV)     |
+| Claude `aiTitle` alias     | non-hex string ≤ 256 chars                                     | scanned via `ai-title` JSONL records (case-insensitive exact match; collisions → 5-col TSV)        |
+| Codex `thread_name` alias  | non-hex string ≤ 256 chars                                     | scanned via `event_msg.thread_name` records (case-insensitive exact match; collisions → 5-col TSV) |
+| Copilot `name` alias       | non-hex string ≤ 256 chars                                     | scanned via `workspace.yaml:name` key (case-insensitive exact match; collisions → 5-col TSV)       |
+| Tag (fetch only)           | `[a-z0-9-]{1,40}`                                              | matches description tag segment                                                                    |
+| Branch suffix (fetch only) | partial branch path                                            | trailing-`/<short>` match against ls-remote                                                        |
+| Commit prefix (fetch only) | `[0-9a-f]{4,40}`                                               | matches commit hash prefix in ls-remote                                                            |
+
+**Resolution precedence** (input-shape-driven): when a query lexically matches multiple forms, precedence is UUID > short-UUID > `latest` > alias. UUID-shaped queries are not consulted as aliases (no fall-through on miss). The `latest` keyword check is case-insensitive (`latest`/`Latest`/`LATEST` all preempt alias matching); a session whose alias case-folds to `latest` remains reachable via UUID or short-UUID.
 
 **`latest` resolution precedence** (`--from` > detected host > cross-root union): when `--from` is omitted, the binary checks environment signals (`CLAUDECODE=1`, any `COPILOT_*`, `CODEX`) to detect the host CLI and narrows to that root. When the host is undetectable, it falls back to cross-root union — the newest session by mtime across all three roots.
-
-Copilot has **no** alias support; UUID / short / `latest` only (per
-`handoff-resolve.sh:151`). Claude does; Codex does.
 
 ## 5.5 SKILL.md auto-trigger contract (testable)
 

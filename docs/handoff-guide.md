@@ -137,7 +137,10 @@ wins.
 Sub-commands that render content accept `--summary` (terse inline) and `-o <path|auto|->` (write to file).
 
 Every `<query>` can be a full UUID, short UUID (first 8 hex), `latest`,
-a Claude `customTitle`, or a Codex `thread_name`.
+or a deliberate-label alias: Claude `customTitle`/`aiTitle`, Codex
+`thread_name`, or Copilot `workspace.yaml:name`. Aliases match
+case-insensitively. Resolution precedence: UUID > short-UUID > `latest` >
+alias (no fall-through on miss).
 
 ---
 
@@ -161,6 +164,14 @@ a Claude `customTitle`, or a Codex `thread_name`.
 
 ```
 /handoff search "auth middleware" --from claude --fixed
+```
+
+**Resolve by deliberate label (case-insensitive):**
+
+```
+/handoff pull "refactor extract pipeline"   # matches Claude aiTitle "Refactor Extract Pipeline" (case-folded)
+/handoff pull "pull latest changes"         # matches Copilot workspace.yaml:name "Pull Latest Changes"
+/handoff pull "my-feature"                  # matches Codex thread_name "my-feature"
 ```
 
 **Scripting with structured output:**

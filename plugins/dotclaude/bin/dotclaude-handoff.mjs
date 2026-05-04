@@ -18,7 +18,9 @@
  *
  * `<id>` / `<query>` resolves across all three CLIs (claude, copilot, codex):
  * full UUID, short UUID (first 8 hex), `latest`, or a named alias
- * (Claude customTitle, Codex thread_name). `latest` is host-scoped (#85).
+ * (Claude customTitle/aiTitle, Codex thread_name, Copilot workspace.yaml:name).
+ * Aliases use case-insensitive exact match. `latest` is host-scoped (#85).
+ * Resolution precedence: UUID > short-UUID > latest > alias (no fall-through).
  *
  * Exits: 0 ok, 2 not-found / runtime error, 64 usage error.
  */
@@ -101,7 +103,7 @@ const META = {
   synopsis:
     "dotclaude handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
-    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.",
+    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.\n\nA `<query>` resolves by full UUID, short UUID (first 8 hex), `latest`, or a deliberate-label alias: claude `customTitle`/`aiTitle`, codex `thread_name`, or copilot `workspace.yaml:name`. Aliases match case-insensitively. Resolution precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).",
   flags: {
     // #91 Gap 7: tag is multi-valued for push (--tag foo --tag bar) and a
     // single-value filter on `list --remote --tag <name>`. argv.mjs always
@@ -153,10 +155,6 @@ function parseSinceOrFail(raw, { defaultDays = null } = {}) {
 // ---- resolver / extractor bridge ---------------------------------------
 
 /**
- * @typedef {{cli: string, sessionId: string, path: string, query: string}} Candidate
- */
-
-/**
  * Strip the resolver-script's `handoff-resolve:` prefix from captured stderr
  * so the binary's own `dotclaude-handoff:` prefix doesn't double up (#135).
  * Returns the trimmed remainder.
@@ -166,6 +164,47 @@ function parseSinceOrFail(raw, { defaultDays = null } = {}) {
  */
 function stripResolverPrefix(raw) {
   return raw.trim().replace(/^handoff-resolve:\s*/, "");
+}
+
+/**
+ * Parse a 5-column TSV candidate list from a captured `handoff-resolve.sh` stderr
+ * (collision case) and dispatch to TTY prompt or non-TTY stderr passthrough per
+ * ARCH-3. Used by `resolveAny`, `resolveNarrowed`, and `resolveLocalForPull` —
+ * single source of truth for the §5.3.5 5-column contract.
+ *
+ * Each candidate row has 5 tab-separated fields per §5.3.5:
+ *   <cli> <short-id> <absolute-path> <matched-value> <matched-field>
+ *
+ * Edge case: if stderr contains the "multiple sessions match" header but no
+ * lines parse as 5-tab-field rows (corrupted resolver output), fall through
+ * to the non-TTY passthrough path — better to surface the raw stderr than to
+ * prompt with an empty candidate list.
+ *
+ * @param {string} stderr  captured stderr from the resolver
+ * @param {string} query   original user query (for the TTY prompt header)
+ * @returns {Promise<{cli: string, path: string}>}  resolved on TTY pick
+ */
+async function parseCollisionAndDispatch(stderr, query) {
+  const candidates = [];
+  for (const line of stderr.split("\n")) {
+    const parts = line.split("\t");
+    if (parts.length === 5) {
+      candidates.push({
+        cli: parts[0],
+        shortId: parts[1],
+        path: parts[2],
+        matchedValue: parts[3],
+        matchedField: parts[4],
+      });
+    }
+  }
+  if (process.stdin.isTTY && candidates.length > 0) {
+    return await promptCollisionChoice(query, candidates);
+  }
+  // Non-TTY OR corrupted stderr (header without parseable rows):
+  // surface the raw resolver stderr verbatim and exit 2.
+  process.stderr.write(stderr);
+  process.exit(2);
 }
 
 /**
@@ -186,7 +225,8 @@ async function resolveAny(query) {
     return { cli, path };
   }
   // status != 0. If stderr begins with "multiple sessions match", it is a
-  // collision. Otherwise it's "no session matches" or an env error.
+  // collision (intra-CLI alias collision passed through, OR cross-CLI union of
+  // alias hits). Otherwise it's "no session matches" or an env error.
   const stderr = r.stderr;
   if (!stderr.includes("multiple sessions match")) {
     fail(
@@ -194,49 +234,44 @@ async function resolveAny(query) {
       stripResolverPrefix(stderr) || `no session matches: ${query}`,
     );
   }
-  // Parse candidate TSV lines (4 fields: cli\tsid\tpath\tquery).
-  const candidates = [];
-  for (const line of stderr.split("\n")) {
-    const parts = line.split("\t");
-    if (parts.length === 4) {
-      candidates.push({ cli: parts[0], sessionId: parts[1], path: parts[2], query: parts[3] });
-    }
-  }
-  if (process.stdin.isTTY) {
-    return await promptCollisionChoice(query, candidates);
-  }
-  // Non-TTY: pass through the script's stderr and exit 2.
-  process.stderr.write(stderr);
-  process.exit(2);
+  return await parseCollisionAndDispatch(stderr, query);
 }
 
 /**
- * Resolve `<id>` against a single CLI's root. Thin wrapper over the
- * per-CLI entry point of handoff-resolve.sh — no collision handling
- * because the per-CLI resolvers return at most one hit.
+ * Resolve `<id>` against a single CLI's root. Thin wrapper over the per-CLI
+ * entry point of handoff-resolve.sh. Collisions can occur on alias scans
+ * (claude customTitle/aiTitle, codex thread_name, copilot name) when multiple
+ * sessions share the same alias value within one CLI's root — handled via
+ * parseCollisionAndDispatch (TTY prompt or non-TTY stderr passthrough).
  *
  * @param {string} cli    one of CLIS
  * @param {string} id     uuid | short-uuid | "latest" | alias
- * @returns {{cli: string, path: string}}
+ * @returns {Promise<{cli: string, path: string}>}
  */
-function resolveNarrowed(cli, id) {
+async function resolveNarrowed(cli, id) {
   const r = runScript(RESOLVE_SH, [cli, id]);
-  if (r.status !== 0) {
-    fail(
-      r.status === 64 ? EXIT_CODES.USAGE : 2,
-      stripResolverPrefix(r.stderr) || `no ${cli} session matches: ${id}`,
-    );
+  if (r.status === 0) {
+    return { cli, path: r.stdout.trim() };
   }
-  return { cli, path: r.stdout.trim() };
+  // status != 0. Same dispatch as resolveAny: collision if "multiple sessions
+  // match" prefix; otherwise a "not found"/env error.
+  const stderr = r.stderr;
+  if (stderr.includes("multiple sessions match")) {
+    return await parseCollisionAndDispatch(stderr, id);
+  }
+  fail(
+    r.status === 64 ? EXIT_CODES.USAGE : 2,
+    stripResolverPrefix(stderr) || `no ${cli} session matches: ${id}`,
+  );
 }
 
 /**
  * Local resolver variant for the `pull` verb. Mirrors resolveAny /
- * resolveNarrowed but intercepts the no-match path so the binary can
- * append a single stderr hint (`for remote handoffs use fetch <id>`)
- * when a remote transport is configured — without auto-forwarding.
- * Collisions in the union path still route through resolveAny's TTY
- * prompt / non-TTY candidate dump.
+ * resolveNarrowed but intercepts the no-match path so the binary can append a
+ * single stderr hint (`for remote handoffs use fetch <id>`) when a remote
+ * transport is configured — without auto-forwarding. Collisions are dispatched
+ * via parseCollisionAndDispatch in both narrowTo-given (per-CLI alias) and
+ * null (cross-CLI union / per-CLI passed through resolve_any) paths.
  *
  * @param {string} id
  * @param {string|null} narrowTo   one of CLIS, or null for union lookup.
@@ -251,9 +286,12 @@ async function resolveLocalForPull(id, narrowTo) {
     return { cli, path };
   }
   const stderr = r.stderr;
-  if (!narrowTo && stderr.includes("multiple sessions match")) {
-    return await resolveAny(id);
+  if (stderr.includes("multiple sessions match")) {
+    // Collision in either narrowTo-given (per-CLI alias collision) or null
+    // (cross-CLI union or per-CLI alias collision aggregated by resolve_any).
+    return await parseCollisionAndDispatch(stderr, id);
   }
+  // No-match path: emit "not found" with optional remote-handoff hint.
   const msg =
     stripResolverPrefix(stderr) ||
     (narrowTo ? `no ${narrowTo} session matches: ${id}` : `no session matches: ${id}`);
@@ -264,10 +302,27 @@ async function resolveLocalForPull(id, narrowTo) {
   process.exit(r.status === 64 ? EXIT_CODES.USAGE : 2);
 }
 
+/**
+ * Render the collision candidate menu and prompt the user to pick one.
+ * Each candidate is rendered on a single line with the (cli/matched-field)
+ * disambiguation tag, the matched value (case as stored by the resolver,
+ * soft-truncated at 80 chars for pathological lengths), and the short-id in
+ * brackets for traceability. The path is omitted from the rendered line —
+ * users pick by N, and short-id provides the unique identifier.
+ *
+ * @param {string} query  the original user query (header line)
+ * @param {Array<{cli: string, shortId: string, path: string, matchedValue: string, matchedField: string}>} candidates
+ * @returns {Promise<{cli: string, path: string}>}
+ */
 async function promptCollisionChoice(query, candidates) {
   process.stderr.write(`dotclaude-handoff: multiple sessions match "${query}":\n`);
   candidates.forEach((c, i) => {
-    process.stderr.write(`  [${i + 1}] ${c.cli.padEnd(8)} ${c.sessionId}  ${c.path}\n`);
+    const tag = `(${c.cli}/${c.matchedField})`;
+    const displayValue =
+      c.matchedValue.length > 80 ? c.matchedValue.slice(0, 77) + "..." : c.matchedValue;
+    process.stderr.write(
+      `  [${i + 1}] ${tag.padEnd(22)} ${displayValue.padEnd(50)} [${c.shortId}]\n`,
+    );
   });
   const rl = createInterface({ input: process.stdin, output: process.stderr });
   const ans = await new Promise((resolve) => {
@@ -685,7 +740,7 @@ function shortIdFromPath(path) {
 async function resolveLatestWithHostScope({ fromCli, detectedHost }) {
   const narrowTo = fromCli ?? (detectedHost !== "unknown" ? detectedHost : null);
   if (narrowTo) {
-    const hit = resolveNarrowed(narrowTo, "latest");
+    const hit = await resolveNarrowed(narrowTo, "latest");
     const shortId = shortIdFromPath(hit.path);
     const prefix = fromCli ? `using --from ${narrowTo} override, ` : "";
     return { hit, note: `${prefix}latest ${narrowTo} session: ${shortId}` };
@@ -888,7 +943,7 @@ async function main() {
       // explicit query — it would silently mis-route a user who
       // typed `push <codex-alias>` from inside a Claude Code session.
       sessionHit = fromCli
-        ? resolveNarrowed(fromCli, explicitQuery)
+        ? await resolveNarrowed(fromCli, explicitQuery)
         : await resolveAny(explicitQuery);
     } else {
       // §5.5.2: --from is required when push has no <query>.
@@ -951,8 +1006,11 @@ async function main() {
     const summaryMode = Boolean(argv.flags.summary);
     const out = argv.flags.output != null ? String(argv.flags.output) : undefined;
     let hit;
-    if (id === "latest") {
+    if (id.toLowerCase() === "latest") {
       // Host-scope the `latest` shortcut per #85: --from > detected host > union.
+      // Case-fold matches the resolver's case-glob (Decision 2) so mixed-case
+      // `Latest`/`LATEST` enter the host-scoped path here instead of falling
+      // through to `any` resolution.
       const { hit: latestHit, note } = await resolveLatestWithHostScope({ fromCli, detectedHost });
       if (note) process.stderr.write(note + "\n");
       hit = latestHit;

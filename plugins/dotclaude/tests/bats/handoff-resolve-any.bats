@@ -3,11 +3,14 @@
 #
 # The `any` mode probes all three session roots (claude, copilot, codex)
 # and:
-#   - returns the single matching path when exactly one root resolves
-#   - on collision (two or more roots match), exits 2 with a TSV
-#     candidate list on stderr. One line per candidate:
-#       <cli>\t<session-id>\t<path>\t<label>
+#   - returns the single matching path on stdout plus matched-field=/
+#     matched-value= metadata on stderr when exactly one root resolves
+#   - on collision (two or more roots match), exits 2 with a 5-column TSV
+#     candidate list on stderr per §5.3.5:
+#       <cli>\t<short-id>\t<path>\t<matched-value>\t<matched-field>
 #   - on no match, exits 2 with a "no session matches" message
+
+bats_require_minimum_version 1.5.0
 
 load helpers
 
@@ -61,13 +64,13 @@ teardown() {
 }
 
 @test "any: resolves claude full UUID" {
-  run "$RESOLVE" any aaaa2222-2222-2222-2222-222222222222
+  run --separate-stderr "$RESOLVE" any aaaa2222-2222-2222-2222-222222222222
   [ "$status" -eq 0 ]
   [ "$output" = "$CLAUDE_PLAIN_FILE" ]
 }
 
 @test "any: resolves claude short UUID" {
-  run "$RESOLVE" any aaaa2222
+  run --separate-stderr "$RESOLVE" any aaaa2222
   [ "$status" -eq 0 ]
   [ "$output" = "$CLAUDE_PLAIN_FILE" ]
 }
@@ -76,7 +79,7 @@ teardown() {
   # Temporarily break the codex collision fixture to ensure customTitle
   # scan still works. Rename just the codex alias record away.
   sed -i 's/refactor/refactor-codex/' "$CODEX_ALIAS_FILE"
-  run "$RESOLVE" any refactor
+  run --separate-stderr "$RESOLVE" any refactor
   [ "$status" -eq 0 ]
   [ "$output" = "$CLAUDE_ALIAS_FILE" ]
 }
@@ -84,27 +87,32 @@ teardown() {
 @test "any: resolves codex thread_name alias when unique" {
   # Temporarily break the claude collision fixture.
   sed -i 's/refactor/refactor-claude/' "$CLAUDE_ALIAS_FILE"
-  run "$RESOLVE" any refactor
+  run --separate-stderr "$RESOLVE" any refactor
   [ "$status" -eq 0 ]
   [ "$output" = "$CODEX_ALIAS_FILE" ]
 }
 
 @test "any: resolves codex full UUID" {
-  run "$RESOLVE" any eeee5555-5555-5555-5555-555555555555
+  run --separate-stderr "$RESOLVE" any eeee5555-5555-5555-5555-555555555555
   [ "$status" -eq 0 ]
   [ "$output" = "$CODEX_ALIAS_FILE" ]
 }
 
 @test "any: resolves copilot full UUID" {
-  run "$RESOLVE" any dddd3333-3333-3333-3333-333333333333
+  run --separate-stderr "$RESOLVE" any dddd3333-3333-3333-3333-333333333333
   [ "$status" -eq 0 ]
   [ "$output" = "$COPILOT_FILE" ]
 }
 
-@test "any: latest picks newest across all three roots" {
-  run "$RESOLVE" any latest
+@test "any: latest picks newest across all three roots and emits matched-field=latest metadata" {
+  # Verifies (d).9 closure of the (d).7 gap: the `any latest` early-return
+  # block in resolve_any now emits matched-field=/matched-value= stderr
+  # metadata mirroring the per-CLI single-hit contract.
+  run --separate-stderr "$RESOLVE" any latest
   [ "$status" -eq 0 ]
   [ "$output" = "$CODEX_NEWEST_FILE" ]
+  [[ "$stderr" == *"matched-field=latest"* ]]
+  [[ "$stderr" == *"matched-value=latest"* ]]
 }
 
 @test "any: unknown identifier exits 2 with structured error" {
@@ -118,13 +126,47 @@ teardown() {
   # default fixture.
   run "$RESOLVE" any refactor
   [ "$status" -eq 2 ]
-  # Expect at least two candidate lines, each with 4 TSV fields.
-  # Candidate line shape: <cli>\t<session-id>\t<path>\t<label>
+  # Expect at least two candidate lines, each with 5 TSV fields per §5.3.5:
+  # <cli>\t<short-id>\t<path>\t<matched-value>\t<matched-field>
   # bats' $output includes both stdout and stderr.
   [[ "$output" == *"claude"* ]]
   [[ "$output" == *"codex"* ]]
   [[ "$output" == *"cccc1111"* ]]
   [[ "$output" == *"eeee5555"* ]]
+}
+
+@test "any: cross-CLI collision claude customTitle + copilot name emits 5-col TSV" {
+  # Two distinct CLIs, different alias mechanisms (claude customTitle vs copilot
+  # workspace.yaml:name), same matched value. Verifies (d).9 cross-CLI
+  # aggregation: per-CLI single hits aggregate into resolve_any's tsv array,
+  # multi-hit dispatch fires emit_collision_tsv. Each row carries the per-CLI
+  # matched-field tag — disambiguation is preserved across CLIs.
+  local claude_uuid="bbbb7777-7777-7777-7777-777777777777"
+  local copilot_uuid="bbbb8888-8888-8888-8888-888888888888"
+
+  # Add claude session with customTitle "shared-cross-cli"
+  local claude_path="$TEST_HOME/.claude/projects/-home-u-demo/$claude_uuid.jsonl"
+  printf '{"cwd":"/home/u/demo","sessionId":"%s","version":"2.1"}\n' "$claude_uuid" > "$claude_path"
+  set_claude_custom_title "$claude_path" "$claude_uuid" "shared-cross-cli"
+
+  # Add copilot session with workspace.yaml:name "shared-cross-cli"
+  make_copilot_session_tree "$TEST_HOME" "$copilot_uuid"
+  set_copilot_workspace_name "$TEST_HOME" "$copilot_uuid" "shared-cross-cli"
+  local copilot_path="$TEST_HOME/.copilot/session-state/$copilot_uuid/events.jsonl"
+
+  run --separate-stderr "$RESOLVE" any "shared-cross-cli"
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"multiple sessions match"* ]]
+  [[ "$stderr" == *"$claude_path"* ]]
+  [[ "$stderr" == *"$copilot_path"* ]]
+  # Cross-CLI: each row has a different matched-field; verify exactly 1 of each.
+  local claude_rows
+  claude_rows=$(echo "$stderr" | grep -c $'\t'"customTitle"$)
+  [ "$claude_rows" -eq 1 ]
+  local copilot_rows
+  copilot_rows=$(echo "$stderr" | grep -c $'\t'"name"$)
+  [ "$copilot_rows" -eq 1 ]
 }
 
 @test "any: missing identifier exits 64" {
@@ -135,7 +177,7 @@ teardown() {
 @test "any: graceful degrade when only one root exists" {
   # Remove copilot and codex fixtures; any <claude-uuid> should still work.
   rm -rf "$TEST_HOME/.copilot" "$TEST_HOME/.codex"
-  run "$RESOLVE" any aaaa2222
+  run --separate-stderr "$RESOLVE" any aaaa2222
   [ "$status" -eq 0 ]
   [ "$output" = "$CLAUDE_PLAIN_FILE" ]
 }

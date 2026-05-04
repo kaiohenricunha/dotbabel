@@ -141,6 +141,45 @@ make_codex_session_tree() {
   export CODEX_SESSION_UUIDS
 }
 
+# set_copilot_workspace_name <home> <uuid> <name>
+# Set the top-level `name:` field in a copilot session's workspace.yaml — the
+# alias surface for `copilot --resume`'s picker. Use AFTER make_copilot_session_tree
+# (which only seeds events.jsonl). Decorative `summary:` companion is set to
+# the same value to mirror copilot's actual on-disk format.
+set_copilot_workspace_name() {
+  local home="$1" uuid="$2" name="$3"
+  local dir="$home/.copilot/session-state/$uuid"
+  mkdir -p "$dir"
+  printf 'id: %s\nname: %s\nsummary: %s\n' "$uuid" "$name" "$name" > "$dir/workspace.yaml"
+}
+
+# set_claude_custom_title <session-jsonl-path> <uuid> <title>
+# Append a `custom-title` JSONL record (the user-set alias `claude --resume "<name>"`
+# stores) to an existing claude session file. Caller is responsible for creating
+# the file with its `cwd`/`sessionId` header record first.
+set_claude_custom_title() {
+  local path="$1" uuid="$2" title="$3"
+  printf '{"type":"custom-title","customTitle":"%s","sessionId":"%s"}\n' "$title" "$uuid" >> "$path"
+}
+
+# set_claude_ai_title <session-jsonl-path> <uuid> <title>
+# Append an `ai-title` JSONL record (the auto-generated TUI summary Claude Code
+# emits) to an existing claude session file. Caller is responsible for creating
+# the file with its `cwd`/`sessionId` header record first.
+set_claude_ai_title() {
+  local path="$1" uuid="$2" title="$3"
+  printf '{"type":"ai-title","aiTitle":"%s","sessionId":"%s"}\n' "$title" "$uuid" >> "$path"
+}
+
+# set_codex_thread_name <rollout-jsonl-path> <uuid> <name>
+# Append an `event_msg` thread-rename record (the user-set `codex thread rename`
+# alias surface) to an existing codex rollout file. Caller is responsible for
+# creating the file with its `session_meta` header record first.
+set_codex_thread_name() {
+  local path="$1" uuid="$2" name="$3"
+  printf '{"type":"event_msg","payload":{"thread_id":"%s","thread_name":"%s","type":"thread_renamed"}}\n' "$uuid" "$name" >> "$path"
+}
+
 # make_many_codex_sessions <home> <count>
 # Bulk-seed <count> codex sessions under ~/.codex/sessions/2026/04/18/.
 # Avoids the per-iteration `sleep 0.01` of `make_codex_session_tree` so 10k

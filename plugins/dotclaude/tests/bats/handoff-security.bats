@@ -3,6 +3,8 @@
 # Each test asserts that a hostile input is neutralised (regex gate rejects,
 # jq --arg literalises, grep -F disables regex, symlinks don't escape, etc.).
 
+bats_require_minimum_version 1.5.0
+
 load helpers
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
@@ -60,7 +62,7 @@ teardown() {
   printf '{"cwd":"/x","sessionId":"%s","version":"2.1"}\n{"type":"custom-title","customTitle":"; rm -rf /","sessionId":"%s"}\n' \
     "$uuid" "$uuid" > "$dir/$uuid.jsonl"
   # The alias scan must find it by literal-match; grep -F + jq --arg keep it safe.
-  run "$RESOLVE" claude "; rm -rf /"
+  run --separate-stderr "$RESOLVE" claude "; rm -rf /"
   [ "$status" -eq 0 ]
   [[ "$output" == *"$uuid.jsonl" ]]
 }
@@ -103,7 +105,7 @@ teardown() {
   # resolver only calls find under the session root; -name filters exclude
   # /etc/passwd regardless, so the symlink must not surface it.
   ln -s /etc "$TEST_HOME/.claude/projects/escape"
-  run "$RESOLVE" claude latest
+  run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" != *"/etc/passwd"* ]]
   [[ "$output" == *".jsonl" ]]

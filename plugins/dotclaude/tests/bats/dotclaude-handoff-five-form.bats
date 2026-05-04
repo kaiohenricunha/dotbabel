@@ -127,6 +127,20 @@ teardown() {
   [[ "$stderr" == *"aaaa1111"* ]]
 }
 
+@test "pull Latest (mixed case) under CLAUDECODE=1 narrows to claude root" {
+  # The resolver case-folds the `latest` keyword (Decision 2). The wrapper's
+  # host-scope dispatch must do the same — otherwise mixed-case `Latest`
+  # bypasses resolveLatestWithHostScope and falls through to `any Latest`,
+  # which case-folds at the resolver layer and returns the cross-root newest
+  # (codex here, not the host-scoped claude).
+  run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
+    node "$BIN" pull Latest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"aaaa1111"* ]]
+  [[ "$output" != *"bbbb2222"* ]]
+  [[ "$stderr" == *"latest claude session"* ]]
+}
+
 @test "pull latest --from codex overrides host detection" {
   # --from must outrank detectedHost, mirroring push's precedence.
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" CLAUDECODE=1 \
@@ -162,6 +176,90 @@ teardown() {
   [ "$status" -eq 2 ]
   [[ "$output" == *"claude"* ]]
   [[ "$output" == *"codex"* ]]
+}
+
+@test "pull (no --from): wrapper passes through intra-CLI claude customTitle collision verbatim" {
+  # 2 distinct claude sessions sharing customTitle. Wrapper path:
+  # resolveLocalForPull(narrowTo=null) → resolveAny → parseCollisionAndDispatch
+  # → non-TTY stderr passthrough. Verifies the resolveAny aggregation wires
+  # correctly from per-CLI single-hit emits into a 2-row collision TSV.
+  local uuid1="aaaa4444-4444-4444-4444-444444444444"
+  local uuid2="aaaa5555-5555-5555-5555-555555555555"
+  local dir1="$TEST_HOME/.claude/projects/-home-u-collide1"
+  local dir2="$TEST_HOME/.claude/projects/-home-u-collide2"
+  mkdir -p "$dir1" "$dir2"
+  local path1="$dir1/$uuid1.jsonl"
+  local path2="$dir2/$uuid2.jsonl"
+  printf '{"type":"user","cwd":"/c1","sessionId":"%s","version":"2.1","message":{"content":"hi"}}\n' "$uuid1" > "$path1"
+  set_claude_custom_title "$path1" "$uuid1" "shared-title"
+  printf '{"type":"user","cwd":"/c2","sessionId":"%s","version":"2.1","message":{"content":"hi"}}\n' "$uuid2" > "$path2"
+  set_claude_custom_title "$path2" "$uuid2" "shared-title"
+
+  run --separate-stderr node "$BIN" pull "shared-title" </dev/null
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"multiple sessions match"* ]]
+  [[ "$stderr" == *"$path1"* ]]
+  [[ "$stderr" == *"$path2"* ]]
+  local row_count
+  row_count=$(echo "$stderr" | grep -c $'\t'"customTitle"$)
+  [ "$row_count" -eq 2 ]
+}
+
+@test "pull --from copilot: wrapper passes through intra-CLI copilot name collision verbatim" {
+  # 2 distinct copilot sessions sharing workspace.yaml:name. Wrapper path:
+  # resolveLocalForPull(narrowTo="copilot") → resolveNarrowed → per-CLI
+  # emit_collision_tsv → parseCollisionAndDispatch → stderr passthrough.
+  # Verifies resolveNarrowed's collision-aware extension from Step 3 (3).
+  local uuid1="cccc4444-4444-4444-4444-444444444444"
+  local uuid2="cccc5555-5555-5555-5555-555555555555"
+  make_copilot_session_tree "$TEST_HOME" "$uuid1"
+  make_copilot_session_tree "$TEST_HOME" "$uuid2"
+  set_copilot_workspace_name "$TEST_HOME" "$uuid1" "shared-name"
+  set_copilot_workspace_name "$TEST_HOME" "$uuid2" "shared-name"
+  local path1="$TEST_HOME/.copilot/session-state/$uuid1/events.jsonl"
+  local path2="$TEST_HOME/.copilot/session-state/$uuid2/events.jsonl"
+
+  run --separate-stderr node "$BIN" pull "shared-name" --from copilot </dev/null
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"multiple sessions match"* ]]
+  [[ "$stderr" == *"$path1"* ]]
+  [[ "$stderr" == *"$path2"* ]]
+  local row_count
+  row_count=$(echo "$stderr" | grep -c $'\t'"name"$)
+  [ "$row_count" -eq 2 ]
+}
+
+@test "pull (no --from): wrapper passes through cross-CLI claude+copilot collision verbatim" {
+  # 1 claude + 1 copilot sharing alias value across distinct alias mechanisms.
+  # Wrapper path: resolveLocalForPull(narrowTo=null) → resolveAny → cross-CLI
+  # aggregation → 5-col TSV with mixed matched-field rows. Each row carries
+  # the per-CLI matched-field tag — disambiguation preserved end-to-end.
+  local claude_uuid="aaaa6666-6666-6666-6666-666666666666"
+  local copilot_uuid="cccc6666-6666-6666-6666-666666666666"
+  local claude_dir="$TEST_HOME/.claude/projects/-home-u-cross"
+  mkdir -p "$claude_dir"
+  local claude_path="$claude_dir/$claude_uuid.jsonl"
+  printf '{"type":"user","cwd":"/cross","sessionId":"%s","version":"2.1","message":{"content":"hi"}}\n' "$claude_uuid" > "$claude_path"
+  set_claude_custom_title "$claude_path" "$claude_uuid" "shared-cross-cli"
+
+  make_copilot_session_tree "$TEST_HOME" "$copilot_uuid"
+  set_copilot_workspace_name "$TEST_HOME" "$copilot_uuid" "shared-cross-cli"
+  local copilot_path="$TEST_HOME/.copilot/session-state/$copilot_uuid/events.jsonl"
+
+  run --separate-stderr node "$BIN" pull "shared-cross-cli" </dev/null
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"multiple sessions match"* ]]
+  [[ "$stderr" == *"$claude_path"* ]]
+  [[ "$stderr" == *"$copilot_path"* ]]
+  local claude_rows
+  claude_rows=$(echo "$stderr" | grep -c $'\t'"customTitle"$)
+  [ "$claude_rows" -eq 1 ]
+  local copilot_rows
+  copilot_rows=$(echo "$stderr" | grep -c $'\t'"name"$)
+  [ "$copilot_rows" -eq 1 ]
 }
 
 # -- pull: no-match hint for remote handoffs (#87) ------------------------

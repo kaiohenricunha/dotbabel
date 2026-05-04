@@ -5,6 +5,8 @@
 # cannot detect the failure). The stat probe at init detects this case
 # and sets _STAT_FLAVOR=posix, causing pick_newest to use `stat -c %Y`.
 
+bats_require_minimum_version 1.5.0
+
 load helpers
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
@@ -60,7 +62,7 @@ teardown() {
   shim=$(with_fake_tool_bin stat "$BUSYBOX_STAT_BODY")
   SHIM_DIRS+=("$shim")
 
-  run "$RESOLVE" claude latest
+  run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"$newer.jsonl" ]]
 }
@@ -77,7 +79,7 @@ teardown() {
   shim=$(with_fake_tool_bin stat "$BUSYBOX_STAT_BODY")
   SHIM_DIRS+=("$shim")
 
-  run "$RESOLVE" claude latest
+  run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"$uuid.jsonl" ]]
 }
@@ -102,7 +104,7 @@ esac
 ')
   SHIM_DIRS+=("$shim")
 
-  run "$RESOLVE" claude latest
+  run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" == *"$uuid.jsonl" ]]
 }

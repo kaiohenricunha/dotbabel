@@ -2,6 +2,8 @@
 # Regression seeds: each test locks in a bug previously fixed in the
 # handoff scripts. Failing any of these means a fix has been lost.
 
+bats_require_minimum_version 1.5.0
+
 load helpers
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
@@ -73,7 +75,7 @@ teardown() {
   export HOME="$TEST_HOME/home with spaces"
   mkdir -p "$HOME"
   make_claude_session_tree "$HOME" "dddd4444-4444-4444-4444-444444444444"
-  run "$RESOLVE" claude dddd4444
+  run --separate-stderr "$RESOLVE" claude dddd4444
   [ "$status" -eq 0 ]
   [[ "$output" == *"dddd4444-4444-4444-4444-444444444444.jsonl" ]]
 }
@@ -109,7 +111,7 @@ teardown() {
   mkdir -p "$(dirname "$path")"
   printf '{"type":"session_meta","payload":{"id":"%s","cwd":"/work"}}\n{"type":"event_msg","payload":{"thread_id":"%s","thread_name":"regression-target","type":"thread_renamed"}}\n' \
     "$uuid" "$uuid" > "$path"
-  run "$RESOLVE" codex "regression-target"
+  run --separate-stderr "$RESOLVE" codex "regression-target"
   [ "$status" -eq 0 ]
   [ "$output" = "$path" ]
 }
