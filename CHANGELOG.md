@@ -11,7 +11,6 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ### Added
 
-* **handoff:** support deliberate-label aliases in pull/fetch resolution ([#158](https://github.com/kaiohenricunha/dotclaude/issues/158)) ([22207e2](https://github.com/kaiohenricunha/dotclaude/commit/22207e2c857dfe65fbf61c4bb3e266222d76ce38))
 * **handoff:** support deliberate-label aliases in pull/fetch resolution ([#158](https://github.com/kaiohenricunha/dotclaude/issues/158)) ([81c9a15](https://github.com/kaiohenricunha/dotclaude/commit/81c9a15b8e8c7d83a601e8c71acb3cc9f43a0bd1))
 
 
@@ -23,7 +22,6 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ### Documentation
 
-* **audits:** bank [#158](https://github.com/kaiohenricunha/dotclaude/issues/158) alias-resolver investigation memo ([49dad23](https://github.com/kaiohenricunha/dotclaude/commit/49dad23c7a6ffc84db59edcf6fcf96322b112665))
 * **audits:** bank [#158](https://github.com/kaiohenricunha/dotclaude/issues/158) alias-resolver investigation memo (deliberate-label scope) ([cd153b6](https://github.com/kaiohenricunha/dotclaude/commit/cd153b6b03f29fa567cea957418fad36ac116c1d))
 
 ## [1.2.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.0...v1.2.1) (2026-05-01)
