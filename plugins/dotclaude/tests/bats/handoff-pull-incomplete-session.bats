@@ -74,10 +74,16 @@ teardown() {
 # --- case 3: all sessions incomplete → clean exit 2 + §5.3.2 template -------
 
 @test "pull latest --from copilot: exits 2 with §5.3.2 template when all dirs incomplete" {
+  # Pre-(d).9 helper-fix, this test passed because pick_newest exited 1 on
+  # empty input which (via pipefail) silenced the resolver's structured
+  # die_runtime — wrapper fallback "no copilot session matches: latest" then
+  # fired. Post-fix, the resolver correctly emits "no copilot sessions found
+  # under <root>" and the wrapper passes that through; the fallback path no
+  # longer runs. The test now asserts on the canonical resolver message.
   seed_incomplete_copilot "$TEST_HOME" "$INCOMPLETE_UUID"
   seed_incomplete_copilot "$TEST_HOME" "$VALID_UUID"
 
   run node "$BIN" pull latest --from copilot
   [ "$status" -eq 2 ]
-  [[ "$output" == *"no copilot session matches: latest"* ]]
+  [[ "$output" == *"no copilot sessions found under"* ]]
 }

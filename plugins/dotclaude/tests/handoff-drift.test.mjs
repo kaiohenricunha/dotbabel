@@ -76,6 +76,7 @@ const GUIDE_MD_PATH = resolve(repoRoot, "docs/handoff-guide.md");
  * @property {string[]} commands  — sorted, lowercase sub-command names (e.g. `["doctor", "fetch", ...]`)
  * @property {Record<string, string[]>} flags_by_command  — `"*"` → sorted global flag tokens (each `--name` or `-x`)
  * @property {FromRule} from_rule
+ * @property {string[]} alias_mechanisms  — sorted unique alias-resolution mechanism names found in source
  */
 
 // ---------------------------------------------------------------------------
@@ -112,6 +113,14 @@ const PHASE_1_BASELINE_FROM_RULE = Object.freeze({
   applies_to: ["push"],
   mandatory_when: "no <query>",
 });
+
+/**
+ * Cross-source intersection of alias-resolution mechanisms (#158).
+ * All 4 forms must appear in --help, SKILL.md, AND handoff-guide.md
+ * (Steps 5+6 of the v1.3.0 alias-resolver work updated each source
+ * to enumerate the 4 mechanisms by canonical name).
+ */
+const PHASE_2_BASELINE_ALIAS_MECHANISMS = ["aiTitle", "customTitle", "name", "thread_name"];
 
 // ---------------------------------------------------------------------------
 // Extractors
@@ -172,6 +181,7 @@ export function extractFromSkillMd(text) {
     commands,
     flags_by_command: { "*": [...flagTokens].sort() },
     from_rule: extractFromRule(text),
+    alias_mechanisms: extractAliasMechanisms(text),
   };
 }
 
@@ -221,6 +231,7 @@ export function extractFromHelp(text) {
     commands,
     flags_by_command: { "*": [...flagTokens].sort() },
     from_rule: extractFromRule(text),
+    alias_mechanisms: extractAliasMechanisms(text),
   };
 }
 
@@ -343,6 +354,36 @@ export function extractFabricationRule(text) {
  * @param {string} text
  * @returns {HandoffSurface}
  */
+
+/**
+ * Scan a source for canonical alias-mechanism names. The handoff resolver
+ * dispatches alias queries through 4 mechanisms — claude `customTitle`,
+ * claude `aiTitle`, codex `thread_name`, copilot `workspace.yaml:name` —
+ * and ARCH-10 asserts that all 4 are documented across the cross-source
+ * triangle (--help / SKILL.md / handoff-guide.md). When any source
+ * documents fewer than 4, the alias surface has drifted out of sync with
+ * the resolver implementation; the test fails to surface that.
+ *
+ * The mechanism names map to canonical strings the sources MUST mention:
+ * `customTitle`, `aiTitle`, `thread_name`, and `workspace.yaml:name` (the
+ * copilot mechanism uses the full `workspace.yaml:name` form to disambiguate
+ * from incidental `--name` flags or generic "name" prose). If a future
+ * source documents copilot's alias mechanism without using the canonical
+ * form, that's drift worth surfacing — the test should fail, not be
+ * patched to pass via fallback regexes.
+ *
+ * @param {string} text
+ * @returns {string[]}  sorted unique mechanism names found
+ */
+export function extractAliasMechanisms(text) {
+  const found = new Set();
+  if (/\bcustomTitle\b/.test(text)) found.add("customTitle");
+  if (/\baiTitle\b/.test(text)) found.add("aiTitle");
+  if (/\bthread_name\b/.test(text)) found.add("thread_name");
+  if (/workspace\.yaml:name\b/.test(text)) found.add("name");
+  return [...found].sort();
+}
+
 export function extractFromGuide(text) {
   // Commands: parse second column of "When to use it" table.
   // Safety: terminate only on `\n## ` (next H2) or EOF, not `\n# `.
@@ -392,6 +433,7 @@ export function extractFromGuide(text) {
     commands,
     flags_by_command: { "*": [...flagTokens].sort() },
     from_rule: extractFromRule(text),
+    alias_mechanisms: extractAliasMechanisms(text),
   };
 }
 
@@ -443,6 +485,7 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
             present: expect.any(Boolean),
             applies_to: expect.any(Array),
           }),
+          alias_mechanisms: expect.any(Array),
         }),
       );
       // Element-type checks.
@@ -457,6 +500,10 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
         `${name} flags_by_command values`,
       ).toBe(true);
       expect(surface.from_rule.applies_to.every((c) => typeof c === "string")).toBe(true);
+      expect(
+        surface.alias_mechanisms.every((m) => typeof m === "string"),
+        `${name} alias_mechanisms`,
+      ).toBe(true);
       expect(
         surface.from_rule.mandatory_when === null ||
           typeof surface.from_rule.mandatory_when === "string",
@@ -484,6 +531,15 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
       .filter((f) => skillFlags.has(f) && guideFlags.has(f))
       .sort();
     expect(intersection).toEqual(PHASE_1_BASELINE_FLAGS_INTERSECTION);
+  });
+
+  it("alias mechanisms intersection across sources matches Phase 2 baseline (#158)", () => {
+    const skillSet = new Set(skillSurface.alias_mechanisms);
+    const guideSet = new Set(guideSurface.alias_mechanisms);
+    const intersection = helpSurface.alias_mechanisms
+      .filter((m) => skillSet.has(m) && guideSet.has(m))
+      .sort();
+    expect(intersection).toEqual(PHASE_2_BASELINE_ALIAS_MECHANISMS);
   });
 
   it("from_rule baseline matches in all sources", () => {

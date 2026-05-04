@@ -141,6 +141,18 @@ make_codex_session_tree() {
   export CODEX_SESSION_UUIDS
 }
 
+# set_copilot_workspace_name <home> <uuid> <name>
+# Set the top-level `name:` field in a copilot session's workspace.yaml — the
+# alias surface for `copilot --resume`'s picker. Use AFTER make_copilot_session_tree
+# (which only seeds events.jsonl). Decorative `summary:` companion is set to
+# the same value to mirror copilot's actual on-disk format.
+set_copilot_workspace_name() {
+  local home="$1" uuid="$2" name="$3"
+  local dir="$home/.copilot/session-state/$uuid"
+  mkdir -p "$dir"
+  printf 'id: %s\nname: %s\nsummary: %s\n' "$uuid" "$name" "$name" > "$dir/workspace.yaml"
+}
+
 # make_many_codex_sessions <home> <count>
 # Bulk-seed <count> codex sessions under ~/.codex/sessions/2026/04/18/.
 # Avoids the per-iteration `sleep 0.01` of `make_codex_session_tree` so 10k

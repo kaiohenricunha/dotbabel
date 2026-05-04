@@ -3,6 +3,8 @@
 # Degenerate inputs: empty files, unicode, CRLF, whitespace in paths,
 # prefix collisions, and negative/zero --limit values.
 
+bats_require_minimum_version 1.5.0
+
 load helpers
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
@@ -82,7 +84,7 @@ teardown() {
   mkdir -p "$dir"
   printf '{"cwd":"/x","sessionId":"%s"}\n{"type":"custom-title","customTitle":"🚀 launch","sessionId":"%s"}\n' \
     "$uuid" "$uuid" > "$dir/$uuid.jsonl"
-  run "$RESOLVE" claude "🚀 launch"
+  run --separate-stderr "$RESOLVE" claude "🚀 launch"
   [ "$status" -eq 0 ]
   [[ "$output" == *"$uuid.jsonl" ]]
 }
@@ -95,7 +97,7 @@ teardown() {
   export HOME="$TEST_HOME/home with spaces"
   mkdir -p "$HOME"
   make_claude_session_tree "$HOME" "dddd4444-4444-4444-4444-444444444444"
-  run "$RESOLVE" claude dddd4444
+  run --separate-stderr "$RESOLVE" claude dddd4444
   [ "$status" -eq 0 ]
   [[ "$output" == *"dddd4444-4444-4444-4444-444444444444.jsonl" ]]
 }
@@ -117,7 +119,7 @@ teardown() {
   fi
   touch -d '2026-01-01 00:00:00.500000000' "$mid"
   touch -d '2026-01-01 00:00:00.900000000' "$newer"
-  run "$RESOLVE" claude abcd1234
+  run --separate-stderr "$RESOLVE" claude abcd1234
   [ "$status" -eq 0 ]
   [[ "$output" == *"000000000003.jsonl" ]]
 }

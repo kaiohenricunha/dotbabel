@@ -62,7 +62,7 @@ teardown() {
   # Chain the scripts by hand: resolve emits a path, extract reads it.
   # This catches any disagreement between the two on what a session file
   # looks like (e.g., if resolve accepts a path extract can't parse).
-  run "$RESOLVE" claude aaaa1111
+  run --separate-stderr "$RESOLVE" claude aaaa1111
   [ "$status" -eq 0 ]
   local path="$output"
   [ -n "$path" ]
@@ -86,7 +86,7 @@ teardown() {
   # Codex alias path runs through a separate grep-prefilter branch in
   # resolve; the happy-path existence is covered elsewhere, but the
   # resolve→extract chain across the codex layout is worth pinning.
-  run "$RESOLVE" codex codex-thread
+  run --separate-stderr "$RESOLVE" codex codex-thread
   [ "$status" -eq 0 ]
   local path="$output"
   run "$EXTRACT" prompts codex "$path"

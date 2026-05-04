@@ -2,7 +2,7 @@
 id: handoff
 name: handoff
 type: skill
-version: 1.2.0
+version: 1.3.0
 domain: [devex]
 platform: [none]
 task: [documentation, debugging]
@@ -44,10 +44,12 @@ the right invocation.
 | `push handoff` / `send to other machine` / `save this`                 | `dotclaude handoff push --from <host-cli> [--tag …]` |
 | `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotclaude handoff fetch [<query>]`                  |
 
-Extract `<id>` from the user message (UUID, short UUID, or named alias).
+Extract `<id>` from the user message (UUID, short UUID, or a deliberate-label
+alias: claude `customTitle`/`aiTitle`, codex `thread_name`, or copilot
+`workspace.yaml:name`). Aliases match case-insensitively. Resolution
+precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).
 The resolver probes Claude / Copilot / Codex roots automatically. If the
-query is missing or ambiguous, ask one clarifying question before
-proceeding.
+query is missing or ambiguous, ask one clarifying question before proceeding.
 
 ## The `--from` filling rule
 
