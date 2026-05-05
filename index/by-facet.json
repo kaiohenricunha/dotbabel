@@ -58,15 +58,8 @@
       "terragrunt-engineer",
       "terragrunt-specialist"
     ],
-    "backend": [
-      "backend-developer",
-      "test-engineer"
-    ],
-    "writing": [
-      "changelog-assistant",
-      "documentation-writer",
-      "markdown"
-    ],
+    "backend": ["backend-developer", "test-engineer"],
+    "writing": ["changelog-assistant", "documentation-writer", "markdown"],
     "security": [
       "compliance-auditor",
       "dependabot-sweep",
@@ -74,13 +67,8 @@
       "security-engineer",
       "security-review"
     ],
-    "data": [
-      "data-scientist"
-    ],
-    "frontend": [
-      "frontend-developer",
-      "test-engineer"
-    ]
+    "data": ["data-scientist"],
+    "frontend": ["frontend-developer", "test-engineer"]
   },
   "platform": {
     "none": [
@@ -115,20 +103,9 @@
       "veracity-audit",
       "workflow-orchestrator"
     ],
-    "aws": [
-      "aws-engineer",
-      "aws-specialist",
-      "deploy-status",
-      "rollback-prod"
-    ],
-    "azure": [
-      "azure-engineer",
-      "azure-specialist"
-    ],
-    "docker": [
-      "container-engineer",
-      "docker-engineer"
-    ],
+    "aws": ["aws-engineer", "aws-specialist", "deploy-status", "rollback-prod"],
+    "azure": ["azure-engineer", "azure-specialist"],
+    "docker": ["container-engineer", "docker-engineer"],
     "kubernetes": [
       "crossplane-engineer",
       "crossplane-specialist",
@@ -136,10 +113,7 @@
       "kubernetes-specialist",
       "security-engineer"
     ],
-    "crossplane": [
-      "crossplane-engineer",
-      "crossplane-specialist"
-    ],
+    "crossplane": ["crossplane-engineer", "crossplane-specialist"],
     "github-actions": [
       "dependabot-sweep",
       "devops-engineer",
@@ -147,34 +121,17 @@
       "review-pr",
       "review-prs"
     ],
-    "vercel": [
-      "deploy-status",
-      "rollback-prod"
-    ],
-    "flyio": [
-      "deploy-status",
-      "rollback-prod"
-    ],
-    "gcp": [
-      "gcp-engineer",
-      "gcp-specialist"
-    ],
+    "vercel": ["deploy-status", "rollback-prod"],
+    "flyio": ["deploy-status", "rollback-prod"],
+    "gcp": ["gcp-engineer", "gcp-specialist"],
     "terraform": [
       "iac-engineer",
       "terraform-specialist",
       "terragrunt-engineer",
       "terragrunt-specialist"
     ],
-    "terragrunt": [
-      "iac-engineer",
-      "terragrunt-engineer",
-      "terragrunt-specialist"
-    ],
-    "pulumi": [
-      "iac-engineer",
-      "pulumi-engineer",
-      "pulumi-specialist"
-    ]
+    "terragrunt": ["iac-engineer", "terragrunt-engineer", "terragrunt-specialist"],
+    "pulumi": ["iac-engineer", "pulumi-engineer", "pulumi-specialist"]
   },
   "task": {
     "debugging": [
@@ -291,9 +248,7 @@
       "validate-spec",
       "veracity-audit"
     ],
-    "incident-response": [
-      "rollback-prod"
-    ]
+    "incident-response": ["rollback-prod"]
   },
   "maturity": {
     "validated": [
