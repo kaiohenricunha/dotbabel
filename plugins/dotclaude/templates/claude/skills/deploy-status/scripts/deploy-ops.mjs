@@ -628,7 +628,7 @@ function inspectVercelDeployment(target, deployment, ctx) {
 function resolveFlyCli() {
   for (const candidate of ["flyctl", "fly"]) {
     const result = runSync(candidate, ["version"], { timeoutMs: 10_000 });
-    if (result.ok || result.status === 0) return candidate;
+    if (!result.error) return candidate;
   }
   return "flyctl";
 }
@@ -786,11 +786,12 @@ export function statusReport(opts) {
   let hasDrift = false;
   let hasUnknown = false;
 
+  const flyCli = resolveFlyCli();
   for (const target of targets) {
     const adapter = adapters[target.kind];
     try {
-      adapter.auth(target, { root });
-      const [current] = adapter.releases(target, { root });
+      adapter.auth(target, { root, flyCli });
+      const [current] = adapter.releases(target, { root, flyCli });
       const drift = compareToMain(current.sha, mainSha, root);
       hasDrift ||= drift.drift;
       hasUnknown ||= drift.unknown;
@@ -905,7 +906,7 @@ export async function rollbackReport(opts) {
         : `- ${targetLabel(result.target)}: failed - ${result.error}`,
     )
     .join("\n");
-  const status = statusReport({ root, targets });
+  const status = statusReport({ root, targets, noFetch: true });
   output += `\n\nPost-rollback deploy status:\n${status.text}`;
 
   const failed = results.some((result) => !result.ok);
@@ -923,15 +924,24 @@ function confirmRollback() {
     process.stdout.write("\nType ROLLBACK PROD to continue: ");
     process.stdin.setEncoding("utf8");
     let input = "";
-    process.stdin.on("data", (chunk) => {
+    let settled = false;
+    function done(value) {
+      if (settled) return;
+      settled = true;
+      process.stdin.removeListener("data", onData);
+      process.stdin.removeListener("end", onEnd);
+      process.stdin.pause();
+      resolve(value);
+    }
+    function onData(chunk) {
       input += chunk;
-      if (input.includes("\n")) {
-        resolve(input.trim() === "ROLLBACK PROD");
-      }
-    });
-    process.stdin.on("end", () => {
-      resolve(input.trim() === "ROLLBACK PROD");
-    });
+      if (input.includes("\n")) done(input.trim() === "ROLLBACK PROD");
+    }
+    function onEnd() {
+      done(input.trim() === "ROLLBACK PROD");
+    }
+    process.stdin.on("data", onData);
+    process.stdin.on("end", onEnd);
   });
 }
 

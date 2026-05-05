@@ -209,7 +209,7 @@
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
       "checksum": "sha256:6653d4949e705d765df5e2ee1782a858ea7ecc46e59fe540b74d3872d5f4e2da",
-      "dependencies": [],
+      "dependencies": ["deploy-status"],
       "lastValidated": "2026-05-05"
     },
     {
