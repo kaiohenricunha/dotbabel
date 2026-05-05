@@ -66,64 +66,28 @@ or `dotclaude sync --help` for full options.
 
 ### What you get
 
-30 skills and commands are wired into every Claude Code session:
+The bootstrap wires the authored library into every Claude Code session:
 
-**Cloud, IaC & Container specialists** — activate automatically when you mention the relevant technology:
+- `skills/` provides reusable workflows and specialists. Skills can be invoked
+  directly with `/skill-name` and can also activate from natural-language
+  requests when their metadata matches.
+- `commands/` keeps the existing explicit slash-command prompt templates for
+  workflows such as `/ground-first`, `/fix-with-evidence`, and `/pre-pr`.
+- `agents/` provides specialized Claude Code subagents copied during bootstrap.
+- `CLAUDE.md` provides the global rule floor for every session.
 
-| Skill / Agent                                                    | Triggers on                                                        | What it does                                                                      |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| [`aws-specialist`](skills/aws-specialist/SKILL.md)               | "AWS", "IAM role", "Lambda", "ECS", "S3"…                          | Deep-dive AWS architecture review, IAM audits, multi-service debugging            |
-| [`azure-specialist`](skills/azure-specialist/SKILL.md)           | "Azure", "AKS", "Managed Identity", "Bicep"…                       | Azure workload review, identity audits, ARM/Bicep guidance                        |
-| [`gcp-specialist`](skills/gcp-specialist/SKILL.md)               | "GCP", "GKE", "Cloud Run", "Workload Identity"…                    | GCP architecture review, IAM hierarchy, serverless guidance                       |
-| [`kubernetes-specialist`](skills/kubernetes-specialist/SKILL.md) | "kubernetes", "k8s", "pod", "helm chart"…                          | Cluster troubleshooting, workload design, network policy review                   |
-| [`crossplane-specialist`](skills/crossplane-specialist/SKILL.md) | "Crossplane", "XRD", "Composition", "Claim"…                       | XRD design, Composition correctness, provider config audit                        |
-| [`terraform-specialist`](skills/terraform-specialist/SKILL.md)   | "Terraform", "state file", "IaC module"…                           | Module design, state management, workspace review                                 |
-| [`terragrunt-specialist`](skills/terragrunt-specialist/SKILL.md) | "Terragrunt", "run-all", "DRY Terraform"…                          | DRY hierarchy review, dependency graph, env layout                                |
-| [`pulumi-specialist`](skills/pulumi-specialist/SKILL.md)         | "Pulumi", "ComponentResource", "stack"…                            | Stack review, Automation API audit, secrets management                            |
-| [`docker-engineer`](agents/docker-engineer.md)                   | "docker compose", "docker exec", "container logs", "docker stats"… | Multi-service Compose orchestration, runtime container ops, supply chain analysis |
+Do not treat this README as the catalog. The source-of-truth inventory is
+generated from artifact frontmatter under [`index/`](index/), checked in CI
+with `dotclaude index --check`, and explained in
+[`docs/taxonomy.md`](docs/taxonomy.md).
 
-**Engineering workflow** — slash commands:
-
-| Command                                            | Invoke                         | What it does                                                                                                                       |
-| -------------------------------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| [`git`](commands/git.md)                           | `/git`                         | Conventional commits, PR creation, branch naming                                                                                   |
-| [`changelog`](commands/changelog.md)               | `/changelog`                   | Generate changelog entry from git history                                                                                          |
-| [`merge-pr`](commands/merge-pr.md)                 | `/merge-pr <N>`                | Full local verification gate before merge                                                                                          |
-| [`pre-pr`](commands/pre-pr.md) ¹                   | `/pre-pr [base-branch]`        | Quality gate before opening a PR: simplify, security-review, test suite                                                            |
-| [`review-pr`](commands/review-pr.md)               | `/review-pr <N>`               | Fetch comments, apply fixes, resolve threads                                                                                       |
-| [`review-prs`](commands/review-prs.md) ¹           | `/review-prs <N1> [N2 N3 ...]` | Batch-review multiple PRs in parallel with one sub-agent per PR                                                                    |
-| [`audit-and-fix`](commands/audit-and-fix.md)       | `/audit-and-fix <domain>`      | Audit → cluster findings → spawn parallel fix PRs                                                                                  |
-| [`dependabot-sweep`](commands/dependabot-sweep.md) | `/dependabot-sweep`            | Batch-triage all open Dependabot PRs                                                                                               |
-| [`handoff`](skills/handoff/SKILL.md)               | `/handoff <sub-command>`       | Transfer session context between AI agents (Claude Code, Copilot CLI, Codex) and across machines via a user-owned private git repo |
-
-> ¹ `maturity: draft` — functional but not yet tested across all project types.
-
-**Debugging & quality:**
-
-| Command                                              | Invoke                       | What it does                                   |
-| ---------------------------------------------------- | ---------------------------- | ---------------------------------------------- |
-| [`ground-first`](commands/ground-first.md)           | `/ground-first <subject>`    | Code-grounded analysis before any edit         |
-| [`fix-with-evidence`](commands/fix-with-evidence.md) | `/fix-with-evidence <issue>` | Reproduce → Fix → Verify → PR loop             |
-| [`detect-flaky`](commands/detect-flaky.md)           | `/detect-flaky <test-cmd>`   | Find and fix flaky tests by repeated execution |
-| [`security-review`](commands/security-review.md)     | `/security-review`           | Scan changed files for OWASP vulnerabilities   |
-
-**Analysis & documentation:**
-
-| Command                                              | Invoke                         | What it does                                              |
-| ---------------------------------------------------- | ------------------------------ | --------------------------------------------------------- |
-| [`create-audit`](commands/create-audit.md)           | `/create-audit <subject>`      | Evidence-based audit doc → `docs/audits/`                 |
-| [`create-inspection`](commands/create-inspection.md) | `/create-inspection <problem>` | Investigate and surface fix options → `docs/inspections/` |
-| [`create-assessment`](commands/create-assessment.md) | `/create-assessment <target>`  | 0–10 graded assessment doc → `docs/assessments/`          |
-| [`markdown`](commands/markdown.md)                   | `/markdown <path>`             | Fix markdown formatting and structure                     |
-
-**Spec & governance** — one optional pillar of the toolkit. Skip this section if you're not adopting spec-driven workflows.
-
-| Command / Skill                                    | Invoke                                                                                                                                | What it does                                    |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| [`spec`](skills/spec/SKILL.md)                     | `/spec <id> "<title>"`                                                                                                                | Interactive spec authoring → `docs/specs/`      |
-| [`validate-spec`](skills/validate-spec/SKILL.md)   | `/validate-spec <id>`                                                                                                                 | Audit an implemented spec against the codebase  |
-| [`agents-search`](skills/agents-search/SKILL.md)   | `/agents-search list`                                                                                                                 | Discover, search, and manage Claude Code agents |
-| [`veracity-audit`](skills/veracity-audit/SKILL.md) | `/veracity-audit audit --config <config> --quality-config <quality-config> --pipeline-dir <pipeline-dir> --scoring-dir <scoring-dir>` | Audit a data pipeline for veracity and value    |
+```bash
+dotclaude list --type skill
+dotclaude list --type command
+dotclaude search handoff
+dotclaude show handoff --type skill
+dotclaude index --check
+```
 
 See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
 
@@ -157,7 +121,7 @@ After `./bootstrap.sh`, open any repo in Claude Code and try:
 # <query> = short UUID, full UUID, 'latest', Claude customTitle, or Codex thread_name
 ```
 
-Every command is context-aware — it reads your repo's files, history, and CI state.
+These workflows are context-aware: they read your repo's files, history, and CI state.
 
 ---
 
