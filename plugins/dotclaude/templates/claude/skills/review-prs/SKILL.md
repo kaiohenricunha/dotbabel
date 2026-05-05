@@ -1,7 +1,7 @@
 ---
 id: review-prs
 name: review-prs
-type: command
+type: skill
 version: 1.0.1
 domain: [devex]
 platform: [github-actions]
@@ -10,7 +10,9 @@ maturity: draft
 description: >
   Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated
   worktree, aggregate results into a summary table.
+  Triggers on: "review all PRs", "check my PRs", "PR status".
 argument-hint: "<N1> [N2 N3 ...] — space-separated PR numbers"
+tools: Bash, Read, Grep
 model: opus
 headless_safe: false
 ---

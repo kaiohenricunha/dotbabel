@@ -1,15 +1,17 @@
 ---
 id: audit-and-fix
 name: audit-and-fix
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
 task: [review, debugging]
 maturity: validated
 description: >
-  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to "audit and fix" or kicks off an overnight cleanup run.
+  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.
+  Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
 argument-hint: "[domain]"
+tools: Read, Grep, Glob, Bash
 model: opus
 ---
 
@@ -21,7 +23,7 @@ Arguments: `$ARGUMENTS` — the audit domain (e.g. "hardcoded business logic", "
 
 ## Steps
 
-1. **Run the audit.** Delegate to `/create-audit $ARGUMENTS`. This produces `docs/audits/<topic-slug>-<YYYY-MM-DD>.md` with Findings and Issues tables. Commit the audit file on a new branch `audit/<topic-slug>-<date>` and push.
+1. **Run the audit.** Invoke the `/create-audit` skill. This produces `docs/audits/<topic-slug>-<YYYY-MM-DD>.md` with Findings and Issues tables. Commit the audit file on a new branch `audit/<topic-slug>-<date>` and push.
 
 2. **Cluster findings into PR groups.** Read the audit's Issues table and group findings by:
    - Same file or package → same cluster

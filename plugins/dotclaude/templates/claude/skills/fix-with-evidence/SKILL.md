@@ -1,15 +1,17 @@
 ---
 id: fix-with-evidence
 name: fix-with-evidence
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
 task: [debugging, testing]
 maturity: validated
 description: >
-  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.
+  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop.
+  Triggers on: "fix this", "apply fix", "solve issue".
 argument-hint: "[issue]"
+tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
 

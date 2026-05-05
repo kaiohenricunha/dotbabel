@@ -241,6 +241,17 @@ if (argv.flags.check) {
 
 // Full rebuild
 let written = 0;
+
+// Clean up existing template artifacts to prevent orphans from old runs.
+if (!argv.flags.check) {
+  for (const dir of ["commands", "skills", "agents"]) {
+    const d = join(templateRoot, dir);
+    if (existsSync(d)) {
+      spawnSync("rm", ["-rf", d]);
+    }
+  }
+}
+
 for (const [destPath, content] of files) {
   mkdirSync(destPath.slice(0, destPath.lastIndexOf("/")), { recursive: true });
   writeFileSync(destPath, content);

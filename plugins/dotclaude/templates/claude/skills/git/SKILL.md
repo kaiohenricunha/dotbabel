@@ -1,7 +1,7 @@
 ---
 id: git
 name: git
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
@@ -9,7 +9,9 @@ task: [review]
 maturity: validated
 description: >
   Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.
+  Triggers on: "conventional commit", "create PR", "push changes".
 argument-hint: "[subcommand]"
+tools: Bash, Read
 model: sonnet
 ---
 

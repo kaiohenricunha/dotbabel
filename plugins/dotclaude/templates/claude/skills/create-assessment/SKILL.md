@@ -1,16 +1,18 @@
 ---
 id: create-assessment
 name: create-assessment
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
 task: [review, documentation]
 maturity: validated
 description: >
-  Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.
+  Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/.
+  Triggers on: "grade", "rate", "score", "evaluate", "assess".
 argument-hint: "[target]"
-model: sonnet
+tools: Read, Grep, Glob, Bash, Write
+model: opus
 ---
 
 Create a structured assessment document that grades a target on a 0-10 scale using a weighted rubric and save it to the project's `docs/assessments/` directory.

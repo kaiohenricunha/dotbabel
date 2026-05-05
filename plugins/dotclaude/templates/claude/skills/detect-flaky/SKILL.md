@@ -1,15 +1,18 @@
 ---
 id: detect-flaky
 name: detect-flaky
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
 task: [testing, debugging]
 maturity: validated
 description: >
-  Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.
+  Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript
+  codebases by repeated execution + root-cause analysis.
+  Triggers on: "detect flaky tests", "find flaky tests", "diagnose flaky tests".
 argument-hint: "[test-command]"
+tools: Grep, Glob, Read, Bash
 model: sonnet
 ---
 

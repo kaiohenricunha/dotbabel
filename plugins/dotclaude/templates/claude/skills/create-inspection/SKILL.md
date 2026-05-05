@@ -1,27 +1,29 @@
 ---
 id: create-inspection
 name: create-inspection
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
-task: [debugging, documentation]
+task: [review, documentation]
 maturity: validated
 description: >
-  Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Use when the user needs to understand *how* to fix something before committing to an approach. Sits between /create-audit (find problems) and /fix-with-evidence (implement the fix).
-argument-hint: "[problem or subject]"
-model: sonnet
+  Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/.
+  Triggers on: "how should I fix", "what are my options", "investigate before I touch".
+argument-hint: "[problem]"
+tools: Read, Grep, Glob, Bash, Write
+model: opus
 ---
 
 Investigate a specific problem and produce a structured fix-path document saved to the project's `docs/inspections/` directory.
 
-Trigger: when the user asks "how should I fix X", "what are my options for Y", "investigate Z before I touch it", or triggers directly via `/create-inspection`. Also useful before running `/fix-with-evidence` to pre-evaluate approaches.
+Trigger: when the user asks "how should I fix X", "what are my options for Y", "investigate Z before I touch it", or triggers directly via `/create-inspection`. Also useful before invoking the `/fix-with-evidence` skill to pre-evaluate approaches.
 
 Arguments: `$ARGUMENTS` — a description of the problem or subject to inspect (e.g. "auth token refresh race condition", "N+1 queries in /api/dashboard", "flaky E2E login test"). Required — if empty, ask the user.
 
 ## Purpose
 
-`/create-inspection` is **not** an audit (it doesn't enumerate all issues) and **not** a fix (it doesn't implement anything). Its output is a **decision document**: here is what is broken, here are the viable paths to fix it, here is a recommended approach with rationale.
+`/create-inspection` is **not** an audit (it doesn't enumerate all issues) and **not** a fix (it doesn't implement anything). Its output is a **decision document**: here is what is broken, here are the viable paths to fix it, here is a recommended approach with rationale. Sits between the `/create-audit` skill (find problems) and the `/fix-with-evidence` skill (implement the fix).
 
 ## Steps
 
