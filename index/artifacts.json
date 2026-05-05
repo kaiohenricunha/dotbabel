@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-04T16:22:41.159Z",
+  "generatedAt": "2026-05-05T14:24:45.053Z",
   "version": "1.3.0",
   "artifacts": [
     {
@@ -35,10 +35,10 @@
     },
     {
       "id": "audit-and-fix",
-      "type": "command",
-      "path": "commands/audit-and-fix.md",
+      "type": "skill",
+      "path": "skills/audit-and-fix/SKILL.md",
       "name": "audit-and-fix",
-      "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to \"audit and fix\" or kicks off an overnight cleanup run.\n",
+      "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: \"audit and fix\", \"clean up domain\", \"overnight cleanup\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -186,10 +186,10 @@
     },
     {
       "id": "create-assessment",
-      "type": "command",
-      "path": "commands/create-assessment.md",
+      "type": "skill",
+      "path": "skills/create-assessment/SKILL.md",
       "name": "create-assessment",
-      "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.\n",
+      "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Triggers on: \"grade\", \"rate\", \"score\", \"evaluate\", \"assess\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -201,10 +201,10 @@
     },
     {
       "id": "create-audit",
-      "type": "command",
-      "path": "commands/create-audit.md",
+      "type": "skill",
+      "path": "skills/create-audit/SKILL.md",
       "name": "create-audit",
-      "description": "Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.\n",
+      "description": "Create an evidence-based audit document and save it to docs/audits/. Triggers on: \"audit\", \"review\", \"assessment\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -216,10 +216,10 @@
     },
     {
       "id": "create-experiment",
-      "type": "command",
-      "path": "commands/create-experiment.md",
+      "type": "skill",
+      "path": "skills/create-experiment/SKILL.md",
       "name": "create-experiment",
-      "description": "Run a scoped, local-only experiment to try things out before committing to a spec or roadmap, and save the report to docs/experiments/. Use when the user is exploring options, comparing libraries, validating assumptions, or prototyping an approach. Sits before /spec (which is heavier and design-oriented).\n",
+      "description": "Run a scoped, local-only experiment and save the report to docs/experiments/. Triggers on: \"let's try\", \"compare A vs B\", \"prototype\", \"explore\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -231,14 +231,14 @@
     },
     {
       "id": "create-inspection",
-      "type": "command",
-      "path": "commands/create-inspection.md",
+      "type": "skill",
+      "path": "skills/create-inspection/SKILL.md",
       "name": "create-inspection",
-      "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Use when the user needs to understand *how* to fix something before committing to an approach. Sits between /create-audit (find problems) and /fix-with-evidence (implement the fix).\n",
+      "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Triggers on: \"how should I fix\", \"what are my options\", \"investigate before I touch\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
-        "task": ["debugging", "documentation"],
+        "task": ["review", "documentation"],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -321,10 +321,10 @@
     },
     {
       "id": "detect-flaky",
-      "type": "command",
-      "path": "commands/detect-flaky.md",
+      "type": "skill",
+      "path": "skills/detect-flaky/SKILL.md",
       "name": "detect-flaky",
-      "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.\n",
+      "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis. Triggers on: \"detect flaky tests\", \"find flaky tests\", \"diagnose flaky tests\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -381,10 +381,10 @@
     },
     {
       "id": "fix-with-evidence",
-      "type": "command",
-      "path": "commands/fix-with-evidence.md",
+      "type": "skill",
+      "path": "skills/fix-with-evidence/SKILL.md",
       "name": "fix-with-evidence",
-      "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.\n",
+      "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on: \"fix this\", \"apply fix\", \"solve issue\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -441,10 +441,10 @@
     },
     {
       "id": "git",
-      "type": "command",
-      "path": "commands/git.md",
+      "type": "skill",
+      "path": "skills/git/SKILL.md",
       "name": "git",
-      "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.\n",
+      "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions. Triggers on: \"conventional commit\", \"create PR\", \"push changes\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -456,10 +456,10 @@
     },
     {
       "id": "ground-first",
-      "type": "command",
-      "path": "commands/ground-first.md",
+      "type": "skill",
+      "path": "skills/ground-first/SKILL.md",
       "name": "ground-first",
-      "description": "Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.\n",
+      "description": "Produce a code-grounded analysis before any edit is proposed. Triggers on: \"analyze\", \"understand behavior\", \"how does this work\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -622,10 +622,10 @@
     },
     {
       "id": "review-pr",
-      "type": "command",
-      "path": "commands/review-pr.md",
+      "type": "skill",
+      "path": "skills/review-pr/SKILL.md",
       "name": "review-pr",
-      "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.\n",
+      "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads. Triggers on: \"review PR\", \"review pull request\", \"check PR\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["github-actions"],
@@ -637,10 +637,10 @@
     },
     {
       "id": "review-prs",
-      "type": "command",
-      "path": "commands/review-prs.md",
+      "type": "skill",
+      "path": "skills/review-prs/SKILL.md",
       "name": "review-prs",
-      "description": "Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table.\n",
+      "description": "Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table. Triggers on: \"review all PRs\", \"check my PRs\", \"PR status\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["github-actions"],
@@ -682,10 +682,10 @@
     },
     {
       "id": "security-review",
-      "type": "command",
-      "path": "commands/security-review.md",
+      "type": "skill",
+      "path": "skills/security-review/SKILL.md",
       "name": "security-review",
-      "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.\n",
+      "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes. Triggers on: \"security review\", \"check for secrets\", \"vulnerability scan\".\n",
       "facets": {
         "domain": ["devex", "security"],
         "platform": ["none"],

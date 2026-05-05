@@ -28,7 +28,7 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 - Before proposing fixes, **read the relevant source files**. Use `Grep` + `Glob` + `Read` to locate current behavior.
 - Cite `file:line` references in every analysis. Claims without citations are not grounded.
 - Do not propose edits until the analysis is confirmed against real code. "The file is probably named X" is not grounding — open it.
-- When unsure, run `/ground-first <subject>` to enforce the read-first discipline.
+- When unsure, invoke the `/ground-first` skill to enforce the read-first discipline.
 - **Surface assumptions before coding.** If a request has multiple valid interpretations, list them explicitly. In interactive sessions, ask before picking one. In autonomous/headless mode, state the chosen interpretation and proceed. "Make it faster" → clarify which dimension (latency, throughput, perceived UX) before writing code.
 - **Surgical orphan cleanup.** When your changes make an import or variable unused, remove it. Remove a function only after verifying it is not part of a public/exported API and has no remaining references (use a repo-wide search); otherwise keep it or deprecate it. Don't remove pre-existing dead code your changes didn't create — mention it instead.
 

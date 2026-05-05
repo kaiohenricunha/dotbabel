@@ -11,7 +11,7 @@
     },
     {
       "name": "audit-and-fix",
-      "path": ".claude/commands/audit-and-fix.md",
+      "path": ".claude/skills/audit-and-fix/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
@@ -39,28 +39,28 @@
     },
     {
       "name": "create-assessment",
-      "path": ".claude/commands/create-assessment.md",
+      "path": ".claude/skills/create-assessment/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "create-audit",
-      "path": ".claude/commands/create-audit.md",
+      "path": ".claude/skills/create-audit/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "create-experiment",
-      "path": ".claude/commands/create-experiment.md",
+      "path": ".claude/skills/create-experiment/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "create-inspection",
-      "path": ".claude/commands/create-inspection.md",
+      "path": ".claude/skills/create-inspection/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
@@ -81,14 +81,14 @@
     },
     {
       "name": "detect-flaky",
-      "path": ".claude/commands/detect-flaky.md",
+      "path": ".claude/skills/detect-flaky/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "fix-with-evidence",
-      "path": ".claude/commands/fix-with-evidence.md",
+      "path": ".claude/skills/fix-with-evidence/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
@@ -102,14 +102,14 @@
     },
     {
       "name": "git",
-      "path": ".claude/commands/git.md",
+      "path": ".claude/skills/git/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "ground-first",
-      "path": ".claude/commands/ground-first.md",
+      "path": ".claude/skills/ground-first/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
@@ -158,21 +158,21 @@
     },
     {
       "name": "review-pr",
-      "path": ".claude/commands/review-pr.md",
+      "path": ".claude/skills/review-pr/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "review-prs",
-      "path": ".claude/commands/review-prs.md",
+      "path": ".claude/skills/review-prs/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
       "name": "security-review",
-      "path": ".claude/commands/security-review.md",
+      "path": ".claude/skills/security-review/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
