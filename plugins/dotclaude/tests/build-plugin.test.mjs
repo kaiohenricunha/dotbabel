@@ -4,12 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import {
-  mkdtempSync,
-  mkdirSync,
-  writeFileSync,
-  readFileSync,
-} from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -205,6 +200,51 @@ describe("build-plugin", () => {
     expect(content).toContain("maturity:");
   });
 
+  it("copies skill references, examples, and scripts to templates", () => {
+    const root = mkRepo();
+    writeSkill(root, "deploy-tool", "See references/vercel.md.");
+    mkdirSync(join(root, "skills", "deploy-tool", "references"), { recursive: true });
+    writeFileSync(
+      join(root, "skills", "deploy-tool", "references", "vercel.md"),
+      "Vercel notes.\n",
+      {
+        flag: "w",
+      },
+    );
+    mkdirSync(join(root, "skills", "deploy-tool", "examples"), { recursive: true });
+    writeFileSync(
+      join(root, "skills", "deploy-tool", "examples", "deploy-targets.example.json"),
+      "{}\n",
+    );
+    mkdirSync(join(root, "skills", "deploy-tool", "scripts", "lib"), { recursive: true });
+    writeFileSync(
+      join(root, "skills", "deploy-tool", "scripts", "lib", "helper.mjs"),
+      "export const ok = true;\n",
+    );
+    buildIndex(root);
+    const r = runBuild(root);
+    expect(r.status).toBe(0);
+
+    const skillRoot = join(
+      root,
+      "plugins",
+      "dotclaude",
+      "templates",
+      "claude",
+      "skills",
+      "deploy-tool",
+    );
+    expect(readFileSync(join(skillRoot, "references", "vercel.md"), "utf8")).toBe(
+      "Vercel notes.\n",
+    );
+    expect(readFileSync(join(skillRoot, "examples", "deploy-targets.example.json"), "utf8")).toBe(
+      "{}\n",
+    );
+    expect(readFileSync(join(skillRoot, "scripts", "lib", "helper.mjs"), "utf8")).toBe(
+      "export const ok = true;\n",
+    );
+  });
+
   it("copies command file to templates/claude/commands/<slug>.md", () => {
     const root = mkRepo();
     writeCommand(root, "my-cmd");
@@ -305,7 +345,7 @@ describe("build-plugin", () => {
       "my-agent.md",
     );
     const content = readFileSync(agentPath, "utf8");
-    expect(content).toContain("name: \"my-agent\"");
+    expect(content).toContain('name: "my-agent"');
     expect(content).toContain("Agent body.");
   });
 

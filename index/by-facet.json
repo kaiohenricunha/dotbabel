@@ -11,6 +11,7 @@
       "create-experiment",
       "create-inspection",
       "dependabot-sweep",
+      "deploy-status",
       "deployment-engineer",
       "detect-flaky",
       "devops-engineer",
@@ -25,6 +26,7 @@
       "pre-pr",
       "review-pr",
       "review-prs",
+      "rollback-prod",
       "security-review",
       "spec",
       "validate-spec",
@@ -39,6 +41,7 @@
       "container-engineer",
       "crossplane-engineer",
       "crossplane-specialist",
+      "deploy-status",
       "deployment-engineer",
       "docker-engineer",
       "gcp-engineer",
@@ -49,6 +52,7 @@
       "platform-engineer",
       "pulumi-engineer",
       "pulumi-specialist",
+      "rollback-prod",
       "security-engineer",
       "terraform-specialist",
       "terragrunt-engineer",
@@ -99,7 +103,7 @@
       "veracity-audit",
       "workflow-orchestrator"
     ],
-    "aws": ["aws-engineer", "aws-specialist"],
+    "aws": ["aws-engineer", "aws-specialist", "deploy-status", "rollback-prod"],
     "azure": ["azure-engineer", "azure-specialist"],
     "docker": ["container-engineer", "docker-engineer"],
     "kubernetes": [
@@ -117,6 +121,8 @@
       "review-pr",
       "review-prs"
     ],
+    "vercel": ["deploy-status", "rollback-prod"],
+    "flyio": ["deploy-status", "rollback-prod"],
     "gcp": ["gcp-engineer", "gcp-specialist"],
     "terraform": [
       "iac-engineer",
@@ -152,6 +158,7 @@
       "kubernetes-specialist",
       "pulumi-engineer",
       "pulumi-specialist",
+      "rollback-prod",
       "terraform-specialist",
       "terragrunt-engineer",
       "terragrunt-specialist",
@@ -222,10 +229,16 @@
     "diagnostics": [
       "compliance-auditor",
       "data-scientist",
+      "deploy-status",
       "kubernetes-specialist",
       "security-auditor"
     ],
-    "runtime-ops": ["deployment-engineer", "docker-engineer", "kubernetes-specialist"],
+    "runtime-ops": [
+      "deploy-status",
+      "deployment-engineer",
+      "docker-engineer",
+      "kubernetes-specialist"
+    ],
     "testing": [
       "detect-flaky",
       "fix-with-evidence",
@@ -234,7 +247,8 @@
       "test-engineer",
       "validate-spec",
       "veracity-audit"
-    ]
+    ],
+    "incident-response": ["rollback-prod"]
   },
   "maturity": {
     "validated": [
@@ -275,6 +289,7 @@
       "container-engineer",
       "crossplane-engineer",
       "data-scientist",
+      "deploy-status",
       "deployment-engineer",
       "devops-engineer",
       "docker-engineer",
@@ -288,6 +303,7 @@
       "pre-pr",
       "pulumi-engineer",
       "review-prs",
+      "rollback-prod",
       "security-auditor",
       "security-engineer",
       "terragrunt-engineer",
