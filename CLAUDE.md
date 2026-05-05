@@ -156,21 +156,44 @@ be documented here — `dotclaude-check-instruction-drift` enforces this invaria
 Any PR touching one of these paths must carry either `Spec ID: dotclaude-core`
 or a `## No-spec rationale` section in its body.
 
-## Slash Commands Reference
+## Skills, Commands, and Discovery
 
-Quick-invoke disciplines for recurring friction:
+Claude Code now treats skills and custom commands as the same slash-invoked
+family: `commands/foo.md` and `skills/foo/SKILL.md` both expose `/foo`.
+Skills are the preferred shape for new reusable workflows because they support
+supporting files, richer frontmatter, automatic model invocation, direct user
+invocation, and lazy-loaded references. Existing `commands/` files remain valid;
+do not migrate them just for naming.
 
-| Command                        | When                                                                                                       |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
-| `/ground-first <subject>`      | Before any non-trivial fix — forces code-inspection analysis before edits                                  |
-| `/merge-pr <N>`                | Before merging any PR — full local verification with optional data-regression gate via `regression_paths`  |
-| `/pre-pr [base-branch]`        | Quality gate before opening a PR — simplify, security-review, full test suite                              |
-| `/fix-with-evidence <issue>`   | For any bug fix — enforces Reproduce → Fix → Verify → PR loop                                              |
-| `/dependabot-sweep`            | Batch-triage all open Dependabot PRs with parallel subagents                                               |
-| `/review-prs <N1> [N2 ...]`    | Batch-review multiple PRs in parallel — one sub-agent per PR, aggregated summary table                     |
-| `/audit-and-fix <domain>`      | Long-running audit-then-implement pipeline across many PRs                                                 |
-| `/create-audit <subject>`      | Evidence-based audit doc to `docs/audits/`                                                                 |
-| `/create-assessment <target>`  | 0–10 graded assessment doc to `docs/assessments/`                                                          |
-| `/create-inspection <problem>` | Investigate a problem and surface viable fix options to `docs/inspections/`                                |
-| `/create-experiment <topic>`   | Run a local sandboxed experiment to try options before committing to a spec — saves to `docs/experiments/` |
-| `/spec <subject>`              | Only when a spec/design doc is explicitly requested                                                        |
+Use `skills/<id>/SKILL.md` when:
+
+- Natural-language requests should route to the workflow, not only `/id`.
+- The workflow needs `references/`, scripts, templates, examples, or other
+  supporting files.
+- Invocation behavior matters: `disable-model-invocation`, `user-invocable`,
+  `allowed-tools`, `model`, `effort`, or `context` belongs in skill frontmatter.
+- The capability should appear in the generated taxonomy as a reusable skill.
+
+Use `commands/<name>.md` only for simple existing single-file prompt templates
+where explicit slash invocation is the whole interface and no supporting files
+or automatic routing are wanted. For side-effectful workflows implemented as
+skills, set `disable-model-invocation: true`; do not fall back to commands
+solely for safety.
+
+`handoff` intentionally stays a skill: phrases like "continue in codex" and
+"push handoff" should auto-route, while `/handoff` still works as a direct
+invocation.
+
+Loading model: skill descriptions are available for discovery, full `SKILL.md`
+content loads only when invoked, and supporting files load only when referenced.
+Do not maintain static command or skill tables in this file. When editing this
+dotclaude repository, the authoritative inventory is generated from artifact
+frontmatter:
+
+```bash
+node plugins/dotclaude/bin/dotclaude-index.mjs --check
+node plugins/dotclaude/bin/dotclaude-list.mjs --type skill
+node plugins/dotclaude/bin/dotclaude-list.mjs --type command
+node plugins/dotclaude/bin/dotclaude-search.mjs <query>
+node plugins/dotclaude/bin/dotclaude-show.mjs <id> --type skill
+```
