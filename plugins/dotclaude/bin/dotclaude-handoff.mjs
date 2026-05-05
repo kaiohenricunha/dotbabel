@@ -1035,6 +1035,12 @@ async function main() {
   }
 
   if (first === "fetch") {
+    if (argv.flags.summary) {
+      fail(
+        EXIT_CODES.USAGE,
+        "--summary is only valid on `pull`; `fetch` retrieves the rendered handoff.md from the branch tip",
+      );
+    }
     const verify = Boolean(argv.flags.verify);
     const verbose = Boolean(argv.verbose);
     try {
