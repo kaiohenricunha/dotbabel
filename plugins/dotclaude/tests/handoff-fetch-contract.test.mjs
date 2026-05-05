@@ -4,6 +4,7 @@
 //   - <query> positional accepted
 //   - --from <cli> accepted
 //   - --limit <N> accepted
+//   - --summary exits 64 because it is pull-only
 //   - unknown flag exits 64 (§4.3 step 1, §5.3.1)
 //
 // Companion to plugins/dotclaude/tests/bats/handoff-fetch-remote-download.bats
@@ -90,6 +91,14 @@ describe("handoff fetch — §5.2.3 argv contract (Phase 2 PR 2)", () => {
     const result = runHandoff(["fetch", "deadbeef", "--limit", "5"], hermeticHome);
     expect(result.status).not.toBe(64);
     expect(result.stderr).not.toMatch(/unknown option/i);
+  });
+
+  it("exits 64 on --summary because summaries are pull-only", () => {
+    const result = runHandoff(["fetch", "deadbeef", "--summary"], hermeticHome);
+    expect(result.status).toBe(64);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toMatch(/--summary is only valid on `pull`/);
+    expect(result.stderr).toMatch(/`fetch` retrieves the rendered handoff\.md/);
   });
 
   it("exits 64 on an unknown flag (§4.3 step 1, §5.3.1)", () => {
