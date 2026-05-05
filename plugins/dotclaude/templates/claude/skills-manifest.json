@@ -181,9 +181,7 @@
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
       "checksum": "",
-      "dependencies": [
-        "deploy-status"
-      ],
+      "dependencies": [],
       "lastValidated": null
     },
     {
