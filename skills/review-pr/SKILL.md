@@ -1,7 +1,7 @@
 ---
 id: review-pr
 name: review-pr
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [github-actions]
@@ -12,7 +12,9 @@ created: 2025-01-01
 updated: 2026-04-17
 description: >
   Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.
+  Triggers on: "review PR", "review pull request", "check PR".
 argument-hint: "[PR#]"
+tools: Bash, Read, Grep, Glob
 model: sonnet
 ---
 
@@ -105,7 +107,7 @@ git worktree remove .claude/worktrees/pr-$NUMBER
 
 ### 6. Security review
 
-Before pushing, run the security review skill on the PR diff:
+Before pushing, run the `/security-review` skill on the PR diff:
 
 ```
 /security-review $NUMBER

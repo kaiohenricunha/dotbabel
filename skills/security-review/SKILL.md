@@ -1,7 +1,7 @@
 ---
 id: security-review
 name: security-review
-type: command
+type: skill
 version: 1.0.0
 domain: [devex, security]
 platform: [none]
@@ -12,7 +12,9 @@ created: 2025-01-01
 updated: 2026-04-17
 description: >
   Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.
+  Triggers on: "security review", "check for secrets", "vulnerability scan".
 argument-hint: "[PR# | path | staged]"
+tools: Bash, Read, Grep
 model: opus
 ---
 

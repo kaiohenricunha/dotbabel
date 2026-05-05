@@ -1,7 +1,7 @@
 ---
 id: create-experiment
 name: create-experiment
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
@@ -11,8 +11,10 @@ owner: "@kaiohenricunha"
 created: 2026-04-29
 updated: 2026-04-30
 description: >
-  Run a scoped, local-only experiment to try things out before committing to a spec or roadmap, and save the report to docs/experiments/. Use when the user is exploring options, comparing libraries, validating assumptions, or prototyping an approach. Sits before /spec (which is heavier and design-oriented).
+  Run a scoped, local-only experiment and save the report to docs/experiments/.
+  Triggers on: "let's try", "compare A vs B", "prototype", "explore".
 argument-hint: "[topic or hypothesis]"
+tools: Read, Grep, Glob, Bash, Write
 model: sonnet
 ---
 

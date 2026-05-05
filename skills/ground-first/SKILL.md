@@ -1,7 +1,7 @@
 ---
 id: ground-first
 name: ground-first
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
@@ -11,8 +11,10 @@ owner: "@kaiohenricunha"
 created: 2025-01-01
 updated: 2026-04-17
 description: >
-  Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.
+  Produce a code-grounded analysis before any edit is proposed.
+  Triggers on: "analyze", "understand behavior", "how does this work".
 argument-hint: "[subject]"
+tools: Read, Grep, Glob, Bash
 model: opus
 ---
 

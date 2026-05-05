@@ -1,7 +1,7 @@
 ---
 id: create-audit
 name: create-audit
-type: command
+type: skill
 version: 1.0.0
 domain: [devex]
 platform: [none]
@@ -11,8 +11,10 @@ owner: "@kaiohenricunha"
 created: 2025-01-01
 updated: 2026-04-17
 description: >
-  Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.
+  Create an evidence-based audit document and save it to docs/audits/.
+  Triggers on: "audit", "review", "assessment".
 argument-hint: "[subject]"
+tools: Read, Grep, Glob, Bash, Write
 model: opus
 ---
 

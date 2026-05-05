@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotclaude.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-04T16:22:41.159Z",
+  "generatedAt": "2026-05-05T14:24:45.053Z",
   "version": "1.3.0",
   "artifacts": [
     {
@@ -10,9 +10,15 @@
       "name": "agents-search",
       "description": "Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: \"search agents\", \"list agents\", \"find agent\", \"what agents\", \"agent catalog\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -25,9 +31,15 @@
       "name": "architect-reviewer",
       "description": "Use when evaluating system design, reviewing architectural decisions, assessing technology choices, or identifying structural anti-patterns. Triggers on: \"review architecture\", \"design review\", \"architecture concerns\", \"tech stack\", \"coupling\", \"scalability review\", \"ADR review\". Uses opus — cross-cutting architectural analysis requires deep reasoning across large codebases.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -35,14 +47,21 @@
     },
     {
       "id": "audit-and-fix",
-      "type": "command",
-      "path": "commands/audit-and-fix.md",
+      "type": "skill",
+      "path": "skills/audit-and-fix/SKILL.md",
       "name": "audit-and-fix",
-      "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Trigger: user asks to \"audit and fix\" or kicks off an overnight cleanup run.\n",
+      "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: \"audit and fix\", \"clean up domain\", \"overnight cleanup\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "debugging"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -55,14 +74,23 @@
       "name": "aws-engineer",
       "description": "Use when designing, debugging, or reviewing AWS workloads and service integrations. Triggers on: \"AWS\", \"EC2\", \"ECS\", \"EKS\", \"Lambda\", \"S3\", \"IAM role\", \"VPC\", \"RDS\", \"DynamoDB\", \"CloudFront\", \"ALB\", \"Route53\", \"CloudFormation\", \"CDK\", \"API Gateway\", \"EventBridge\", \"SQS\", \"SNS\". Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["aws"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "aws"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha",
-      "related": ["aws-specialist"]
+      "related": [
+        "aws-specialist"
+      ]
     },
     {
       "id": "aws-specialist",
@@ -71,9 +99,16 @@
       "name": "aws-specialist",
       "description": "Deep-dive AWS architecture review, debugging, and service design. Use for structured investigations of AWS-specific issues, cost or IAM audits, and multi-service design reviews. Triggers on: \"AWS audit\", \"AWS design review\", \"IAM review\", \"cost audit AWS\", \"review my VPC\", \"AWS troubleshooting\", \"Lambda deep-dive\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["aws"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "aws"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -86,9 +121,16 @@
       "name": "azure-engineer",
       "description": "Use when designing, debugging, or reviewing Azure workloads and service integrations. Triggers on: \"Azure\", \"AKS\", \"ACI\", \"App Service\", \"Azure Functions\", \"Blob Storage\", \"VNet\", \"App Gateway\", \"Front Door\", \"EntraID\", \"Managed Identity\", \"ARM template\", \"Bicep\", \"Azure DevOps\", \"ACR\", \"Service Bus\", \"Logic Apps\", \"Cosmos DB\". Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["azure"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "azure"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -101,9 +143,16 @@
       "name": "azure-specialist",
       "description": "Deep-dive Azure architecture review, debugging, and service design. Use for structured investigations of Azure-specific issues, identity or cost audits, and multi-service design reviews. Triggers on: \"Azure audit\", \"Azure design review\", \"EntraID review\", \"Managed Identity debug\", \"review my Azure\", \"Azure troubleshooting\", \"AKS deep-dive\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["azure"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "azure"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -116,9 +165,16 @@
       "name": "backend-developer",
       "description": "Use when building or modifying server-side code: APIs, services, data models, background jobs, or infrastructure logic. Triggers on: \"build API\", \"add endpoint\", \"database schema\", \"backend service\", \"server-side\", \"REST\", \"GraphQL\", \"background job\", \"migration\". Uses sonnet — everyday backend implementation benefits from balanced capability and throughput.\n",
       "facets": {
-        "domain": ["backend"],
-        "platform": ["none"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "backend"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -131,9 +187,15 @@
       "name": "changelog",
       "description": "Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -146,9 +208,16 @@
       "name": "changelog-assistant",
       "description": "Use when generating changelog entries, drafting release notes, or summarizing git history for a release. Triggers on: \"generate changelog\", \"release notes\", \"what changed\", \"CHANGELOG\", \"summarize commits\", \"release summary\", \"version bump notes\". Uses haiku — changelog generation from git history is formulaic and lightweight; fast output benefits release flow.\n",
       "facets": {
-        "domain": ["writing", "devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "writing",
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -161,9 +230,16 @@
       "name": "compliance-auditor",
       "description": "Use when auditing data quality gates, config-driven checks, or invariant enforcement. Cross-references declaration files against runtime enforcement code to find declared-not-enforced and enforced-not-declared gaps. Read-only — produces a coverage matrix, never modifies code or config. Triggers on: \"gate coverage\", \"quality check audit\", \"data invariants\", \"declared vs enforced\", \"config vs code gaps\", \"quality gate completeness\".\n",
       "facets": {
-        "domain": ["security"],
-        "platform": ["none"],
-        "task": ["review", "diagnostics"],
+        "domain": [
+          "security"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "diagnostics"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -176,9 +252,16 @@
       "name": "container-engineer",
       "description": "Use when authoring, optimizing, or reviewing container images and build pipelines. Triggers on: \"Dockerfile\", \"container image\", \"multi-stage build\", \"image size\", \"OCI\", \"Docker Compose\", \"container registry\", \"base image\", \"layer cache\". Uses sonnet — container image optimization is structured and pattern-driven; sonnet provides the right depth without excess cost.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["docker"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "docker"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -186,14 +269,21 @@
     },
     {
       "id": "create-assessment",
-      "type": "command",
-      "path": "commands/create-assessment.md",
+      "type": "skill",
+      "path": "skills/create-assessment/SKILL.md",
       "name": "create-assessment",
-      "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Use for numeric grades; use /create-audit for issue-triage.\n",
+      "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Triggers on: \"grade\", \"rate\", \"score\", \"evaluate\", \"assess\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -201,14 +291,21 @@
     },
     {
       "id": "create-audit",
-      "type": "command",
-      "path": "commands/create-audit.md",
+      "type": "skill",
+      "path": "skills/create-audit/SKILL.md",
       "name": "create-audit",
-      "description": "Create an evidence-based audit document and save it to docs/audits/. Trigger: user asks for an audit, review, or assessment of any system, feature, or component.\n",
+      "description": "Create an evidence-based audit document and save it to docs/audits/. Triggers on: \"audit\", \"review\", \"assessment\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -216,14 +313,21 @@
     },
     {
       "id": "create-experiment",
-      "type": "command",
-      "path": "commands/create-experiment.md",
+      "type": "skill",
+      "path": "skills/create-experiment/SKILL.md",
       "name": "create-experiment",
-      "description": "Run a scoped, local-only experiment to try things out before committing to a spec or roadmap, and save the report to docs/experiments/. Use when the user is exploring options, comparing libraries, validating assumptions, or prototyping an approach. Sits before /spec (which is heavier and design-oriented).\n",
+      "description": "Run a scoped, local-only experiment and save the report to docs/experiments/. Triggers on: \"let's try\", \"compare A vs B\", \"prototype\", \"explore\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -231,14 +335,21 @@
     },
     {
       "id": "create-inspection",
-      "type": "command",
-      "path": "commands/create-inspection.md",
+      "type": "skill",
+      "path": "skills/create-inspection/SKILL.md",
       "name": "create-inspection",
-      "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Use when the user needs to understand *how* to fix something before committing to an approach. Sits between /create-audit (find problems) and /fix-with-evidence (implement the fix).\n",
+      "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Triggers on: \"how should I fix\", \"what are my options\", \"investigate before I touch\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -251,9 +362,16 @@
       "name": "crossplane-engineer",
       "description": "Use when designing, debugging, or reviewing Crossplane configurations and Kubernetes-native IaC. Triggers on: \"Crossplane\", \"XRD\", \"Composition\", \"CompositeResource\", \"Claim\", \"managed resource\", \"provider config\", \"ProviderConfig\", \"composite resource definition\", \"Crossplane package\". Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["kubernetes", "crossplane"],
-        "task": ["provisioning"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes",
+          "crossplane"
+        ],
+        "task": [
+          "provisioning"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -266,9 +384,17 @@
       "name": "crossplane-specialist",
       "description": "Deep-dive Crossplane platform review: XRD design, Composition correctness, provider config audit, managed resource health, and GitOps integration. Use for structured investigations of stuck Claims, composition pipeline bugs, and credential injection patterns. Triggers on: \"Crossplane audit\", \"XRD review\", \"Composition debug\", \"stuck Claim\", \"managed resource stuck\", \"provider config review\", \"Crossplane GitOps\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["crossplane", "kubernetes"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "crossplane",
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -281,9 +407,16 @@
       "name": "data-scientist",
       "description": "Use when validating statistical models, scoring formulas, or config-driven math. Audits formula correctness, boundary conditions, config-vs-code drift, and output scale changes. Read-only — surfaces findings, never modifies code. Triggers on: \"validate scoring math\", \"check formula\", \"config drift\", \"boundary conditions\", \"statistical model audit\", \"rating algorithm review\".\n",
       "facets": {
-        "domain": ["data"],
-        "platform": ["none"],
-        "task": ["review", "diagnostics"],
+        "domain": [
+          "data"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "diagnostics"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -296,9 +429,16 @@
       "name": "dependabot-sweep",
       "description": "Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.\n",
       "facets": {
-        "domain": ["devex", "security"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex",
+          "security"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -311,9 +451,16 @@
       "name": "deployment-engineer",
       "description": "Use when planning or executing deployment strategies, release coordination, traffic shifting, or rollback procedures. Triggers on: \"deployment strategy\", \"blue/green\", \"canary release\", \"rolling update\", \"traffic shifting\", \"rollback\", \"release coordination\", \"feature flag\", \"progressive delivery\", \"deploy to production\". Uses sonnet — deployment strategy execution is structured; sonnet handles the reasoning without over-provisioning cost.\n",
       "facets": {
-        "domain": ["devex", "infra"],
-        "platform": ["none"],
-        "task": ["runtime-ops"],
+        "domain": [
+          "devex",
+          "infra"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "runtime-ops"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -321,14 +468,21 @@
     },
     {
       "id": "detect-flaky",
-      "type": "command",
-      "path": "commands/detect-flaky.md",
+      "type": "skill",
+      "path": "skills/detect-flaky/SKILL.md",
       "name": "detect-flaky",
-      "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis.\n",
+      "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis. Triggers on: \"detect flaky tests\", \"find flaky tests\", \"diagnose flaky tests\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["testing", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "testing",
+          "debugging"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -341,9 +495,16 @@
       "name": "devops-engineer",
       "description": "Use when building or improving CI/CD pipelines, release workflows, build automation, or developer tooling. Triggers on: \"CI pipeline\", \"CD workflow\", \"GitHub Actions\", \"build automation\", \"artifact\", \"release workflow\", \"environment promotion\", \"pipeline stage\", \"deploy pipeline\", \"lint CI\". Uses sonnet — CI/CD pipeline work is structured and iterative; sonnet matches the workload.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -356,9 +517,16 @@
       "name": "docker-engineer",
       "description": "Use when designing, operating, or debugging Docker Compose stacks and running containers. Triggers on: \"docker compose up\", \"docker compose exec\", \"docker compose ps\", \"docker compose down\", \"docker compose restart\", \"compose stack\", \"multi-service compose\", \"service dependencies\", \"docker exec\", \"inspect container\", \"container logs\", \"docker logs\", \"container networking\", \"docker network\", \"running container\", \"container debug\", \"docker stats\", \"docker scout\". Uses sonnet — Compose design and runtime ops are structured; sonnet provides the right depth.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["docker"],
-        "task": ["debugging", "runtime-ops"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "docker"
+        ],
+        "task": [
+          "debugging",
+          "runtime-ops"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -371,9 +539,16 @@
       "name": "documentation-writer",
       "description": "Use when writing or updating documentation: user guides, READMEs, API references, onboarding materials, docstrings, or inline docs. Triggers on: \"write docs\", \"update README\", \"API documentation\", \"document this\", \"user guide\", \"onboarding guide\", \"add examples\", \"explain how\". Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.\n",
       "facets": {
-        "domain": ["writing", "devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "writing",
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -381,14 +556,21 @@
     },
     {
       "id": "fix-with-evidence",
-      "type": "command",
-      "path": "commands/fix-with-evidence.md",
+      "type": "skill",
+      "path": "skills/fix-with-evidence/SKILL.md",
       "name": "fix-with-evidence",
-      "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop where each phase gates on the previous. Trigger: any bug-fix request.\n",
+      "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on: \"fix this\", \"apply fix\", \"solve issue\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "testing"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -401,9 +583,16 @@
       "name": "frontend-developer",
       "description": "Use when building or modifying client-side code: UI components, pages, forms, state management, or client-side data fetching. Triggers on: \"build UI\", \"React component\", \"frontend\", \"CSS\", \"accessibility\", \"form validation\", \"client-side\", \"Next.js page\", \"Tailwind\". Uses sonnet — everyday frontend implementation benefits from balanced capability and response speed.\n",
       "facets": {
-        "domain": ["frontend"],
-        "platform": ["none"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "frontend"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -416,9 +605,16 @@
       "name": "gcp-engineer",
       "description": "Use when designing, debugging, or reviewing Google Cloud workloads and service integrations. Triggers on: \"GCP\", \"Google Cloud\", \"GKE\", \"Cloud Run\", \"GCE\", \"Cloud Functions\", \"Pub/Sub\", \"GCS\", \"BigQuery\", \"Cloud Build\", \"Workload Identity\", \"Service Account\", \"VPC\", \"Cloud Armor\", \"Cloud CDN\", \"Deployment Manager\", \"Config Connector\". Uses opus — GCP architecture across Workload Identity, VPC networks, and IAM hierarchies requires deep reasoning to avoid security gaps.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["gcp"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "gcp"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -431,9 +627,16 @@
       "name": "gcp-specialist",
       "description": "Deep-dive Google Cloud architecture review, debugging, and service design. Use for structured investigations of GCP-specific issues, IAM or cost audits, and multi-service design reviews. Triggers on: \"GCP audit\", \"GCP design review\", \"Workload Identity debug\", \"IAM review GCP\", \"review my GKE\", \"GCP troubleshooting\", \"Cloud Run deep-dive\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["gcp"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "gcp"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -441,14 +644,20 @@
     },
     {
       "id": "git",
-      "type": "command",
-      "path": "commands/git.md",
+      "type": "skill",
+      "path": "skills/git/SKILL.md",
       "name": "git",
-      "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.\n",
+      "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions. Triggers on: \"conventional commit\", \"create PR\", \"push changes\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -456,14 +665,21 @@
     },
     {
       "id": "ground-first",
-      "type": "command",
-      "path": "commands/ground-first.md",
+      "type": "skill",
+      "path": "skills/ground-first/SKILL.md",
       "name": "ground-first",
-      "description": "Produce a code-grounded analysis before any edit is proposed. Use when the user asks for a fix/change/investigation and has not yet confirmed you understand current behavior.\n",
+      "description": "Produce a code-grounded analysis before any edit is proposed. Triggers on: \"analyze\", \"understand behavior\", \"how does this work\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -476,9 +692,16 @@
       "name": "handoff",
       "description": "Transfer conversation context between agentic CLIs (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a source session transcript by UUID and produces either an inline summary, a paste-ready handoff digest, a written markdown file, or a branch in a user-owned private git repo that another machine can fetch. Use when switching agents mid-task, recovering context, or moving between Windows/Linux/macOS setups. Triggers on: \"handoff\", \"transfer context\", \"continue in codex\", \"continue in claude\", \"continue in copilot\", \"switch to codex\", \"switch to claude\", \"what was that session about\", \"claude --resume\", \"copilot --resume\", \"codex resume\", \"find the session where\", \"search sessions\", \"which session did I\", \"push handoff\", \"fetch handoff\", \"handoff to other machine\", \"resume on my other laptop\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.3.0",
@@ -491,9 +714,18 @@
       "name": "iac-engineer",
       "description": "Use when writing, reviewing, or refactoring infrastructure-as-code modules, managing state, or handling drift detection. Triggers on: \"Terraform\", \"Pulumi\", \"OpenTofu\", \"infrastructure as code\", \"IaC module\", \"state file\", \"drift detection\", \"resource graph\", \"provider\", \"workspace\", \"remote state\". Uses sonnet — IaC authoring is structured and pattern-driven; sonnet covers the depth needed without excess cost.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["terraform", "terragrunt", "pulumi"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform",
+          "terragrunt",
+          "pulumi"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -506,14 +738,24 @@
       "name": "kubernetes-specialist",
       "description": "Use when designing, debugging, or reviewing Kubernetes workloads and cluster configuration. Triggers on: \"kubernetes\", \"k8s\", \"pod\", \"deployment\", \"cluster\", \"kubectl\", \"namespace\", \"ingress\", \"helm chart\", \"workload\", \"node not ready\". Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["kubernetes"],
-        "task": ["debugging", "diagnostics", "runtime-ops"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "diagnostics",
+          "runtime-ops"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha",
-      "related": ["kubernetes-specialist"]
+      "related": [
+        "kubernetes-specialist"
+      ]
     },
     {
       "id": "kubernetes-specialist",
@@ -522,9 +764,16 @@
       "name": "kubernetes-specialist",
       "description": "Deep-dive Kubernetes troubleshooting, workload design, and cluster health review. Use when you need a structured investigation of a cluster issue, a design review of Kubernetes manifests, or a health audit of a namespace or workload. Triggers on: \"debug kubernetes\", \"why is my pod\", \"review my manifests\", \"cluster health\", \"kubernetes design review\", \"k8s audit\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["kubernetes"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -537,9 +786,16 @@
       "name": "markdown",
       "description": "Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.\n",
       "facets": {
-        "domain": ["devex", "writing"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex",
+          "writing"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -552,9 +808,16 @@
       "name": "merge-pr",
       "description": "Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in docs/repo-facts.json.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -567,9 +830,17 @@
       "name": "platform-engineer",
       "description": "Use when designing or improving internal developer platforms, golden paths, self-service tooling, or environment parity. Triggers on: \"developer platform\", \"internal tooling\", \"golden path\", \"paved road\", \"developer experience\", \"self-service\", \"environment parity\", \"platform team\", \"scaffolding\", \"service catalog\". Uses opus — platform design decisions compound over time; deep reasoning prevents golden-path choices that become maintenance burdens.\n",
       "facets": {
-        "domain": ["devex", "infra"],
-        "platform": ["none"],
-        "task": ["scaffolding", "provisioning"],
+        "domain": [
+          "devex",
+          "infra"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "provisioning"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -582,9 +853,16 @@
       "name": "pre-pr",
       "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the full test suite, and surface a go/no-go summary before opening a pull request.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.1",
@@ -597,9 +875,16 @@
       "name": "pulumi-engineer",
       "description": "Use when working with Pulumi stacks, component resources, or the Automation API. Triggers on: \"Pulumi\", \"pulumi up\", \"pulumi stack\", \"ComponentResource\", \"Pulumi ESC\", \"Automation API\", \"pulumi.Config\", \"pulumi new\", \"stack reference\", \"StackReference\". Uses sonnet — Pulumi stack work is code-first and structured; sonnet matches the task depth.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["pulumi"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "pulumi"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -612,9 +897,16 @@
       "name": "pulumi-specialist",
       "description": "Deep-dive Pulumi stack review, component design, Automation API audit, and secrets management. Use for structured investigations of Pulumi stack drift, ComponentResource coupling, ESC configuration, and Automation API workflows. Triggers on: \"Pulumi audit\", \"stack review\", \"Automation API review\", \"ComponentResource design\", \"ESC audit\", \"Pulumi secrets\", \"Pulumi testing\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["pulumi"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "pulumi"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -622,14 +914,20 @@
     },
     {
       "id": "review-pr",
-      "type": "command",
-      "path": "commands/review-pr.md",
+      "type": "skill",
+      "path": "skills/review-pr/SKILL.md",
       "name": "review-pr",
-      "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.\n",
+      "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads. Triggers on: \"review PR\", \"review pull request\", \"check PR\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -637,14 +935,20 @@
     },
     {
       "id": "review-prs",
-      "type": "command",
-      "path": "commands/review-prs.md",
+      "type": "skill",
+      "path": "skills/review-prs/SKILL.md",
       "name": "review-prs",
-      "description": "Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table.\n",
+      "description": "Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table. Triggers on: \"review all PRs\", \"check my PRs\", \"PR status\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.1",
@@ -657,9 +961,16 @@
       "name": "security-auditor",
       "description": "Use when conducting security audits, reviewing code for vulnerabilities, assessing secrets exposure, or evaluating compliance posture. Triggers on: \"audit security\", \"find vulnerabilities\", \"check secrets\", \"OWASP review\", \"security scan\", \"CVE\", \"threat model\". Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.\n",
       "facets": {
-        "domain": ["security"],
-        "platform": ["none"],
-        "task": ["review", "diagnostics"],
+        "domain": [
+          "security"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "diagnostics"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -672,9 +983,17 @@
       "name": "security-engineer",
       "description": "Use when hardening infrastructure security posture, reviewing network policies, managing secrets, or assessing supply-chain risks. Triggers on: \"infrastructure hardening\", \"network policy\", \"secrets management\", \"RBAC\", \"admission controller\", \"mTLS\", \"supply chain\", \"image signing\", \"privilege escalation\", \"security posture\". Uses opus — infrastructure hardening and privilege analysis require deep reasoning; a missed vector has high downstream cost.\n",
       "facets": {
-        "domain": ["security", "infra"],
-        "platform": ["kubernetes"],
-        "task": ["review", "provisioning"],
+        "domain": [
+          "security",
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "review",
+          "provisioning"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -682,14 +1001,21 @@
     },
     {
       "id": "security-review",
-      "type": "command",
-      "path": "commands/security-review.md",
+      "type": "skill",
+      "path": "skills/security-review/SKILL.md",
       "name": "security-review",
-      "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.\n",
+      "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes. Triggers on: \"security review\", \"check for secrets\", \"vulnerability scan\".\n",
       "facets": {
-        "domain": ["devex", "security"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex",
+          "security"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -702,9 +1028,15 @@
       "name": "spec",
       "description": "Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on \"let's spec this out\", \"create a spec\", \"design doc\", \"write a technical plan\", \"plan the architecture\". Works for greenfield and brownfield projects. Outputs to docs/specs/.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -717,9 +1049,16 @@
       "name": "terraform-specialist",
       "description": "Deep-dive Terraform architecture review, module design, state management, and migration. Use for structured investigations of Terraform workspaces, provider configuration, module coupling, import workflows, and test coverage. Triggers on: \"Terraform audit\", \"module review\", \"state management\", \"Terraform import\", \"workspace design\", \"provider config review\", \"Terraform testing\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["terraform"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -732,9 +1071,17 @@
       "name": "terragrunt-engineer",
       "description": "Use when working with Terragrunt configurations, DRY Terraform patterns, or multi-environment root-module hierarchies. Triggers on: \"Terragrunt\", \"terragrunt.hcl\", \"run-all\", \"DRY Terraform\", \"dependency block\", \"env hierarchy\", \"root module\", \"terragrunt hooks\", \"generate block\". Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["terragrunt", "terraform"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terragrunt",
+          "terraform"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -747,9 +1094,17 @@
       "name": "terragrunt-specialist",
       "description": "Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all orchestration analysis. Use for structured investigations of multi-environment Terragrunt layouts, dependency graphs, remote state config, and hook correctness. Triggers on: \"Terragrunt audit\", \"run-all review\", \"dependency block\", \"DRY pattern review\", \"env hierarchy audit\", \"mock_outputs\", \"terragrunt hooks\".\n",
       "facets": {
-        "domain": ["infra"],
-        "platform": ["terraform", "terragrunt"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform",
+          "terragrunt"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -762,9 +1117,17 @@
       "name": "test-engineer",
       "description": "Use when writing tests, auditing test coverage, fixing flaky tests, or setting up test infrastructure. Triggers on: \"write tests\", \"add test coverage\", \"fix flaky test\", \"integration test\", \"test suite\", \"coverage report\", \"missing tests\", \"test CI\". Uses sonnet — test design benefits from reasoning about edge cases and failure modes; sonnet balances depth and speed.\n",
       "facets": {
-        "domain": ["backend", "frontend"],
-        "platform": ["none"],
-        "task": ["testing", "debugging"],
+        "domain": [
+          "backend",
+          "frontend"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "testing",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -777,9 +1140,16 @@
       "name": "validate-spec",
       "description": "Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to \"validate a spec\", \"audit a spec\", \"check if spec is implemented\", \"verify the spec is done\", \"is this spec really done\", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "validated"
       },
       "version": "1.0.0",
@@ -792,9 +1162,16 @@
       "name": "veracity-audit",
       "description": "Audit a data pipeline for Veracity and Value. Dispatches data-scientist, compliance-auditor, and data-engineer agents with project context injected at dispatch time. All source paths are supplied via flags — no defaults, no project assumptions. Subcommands: audit (full pipeline walk), score-check (scoring math only), gate-check (gate coverage only), source-trace <label> (single source end-to-end). Invoke when: \"audit pipeline\", \"veracity check\", \"scoring math correct?\", \"check gates\", \"trace source\", \"verify quality gates\", \"formula correct?\".\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -807,9 +1184,16 @@
       "name": "workflow-orchestrator",
       "description": "Use when coordinating multi-step tasks that require multiple agents, managing parallel workstreams, or planning and delegating complex implementation efforts. Triggers on: \"orchestrate\", \"coordinate agents\", \"parallel tasks\", \"multi-step plan\", \"delegate work\", \"break down\", \"dispatch subagents\". Uses opus — orchestration quality compounds across delegated agents; poor decomposition cascades into downstream failures.\n",
       "facets": {
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft"
       },
       "version": "1.0.0",
