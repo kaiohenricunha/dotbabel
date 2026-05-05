@@ -16,7 +16,6 @@ description: >
 argument-hint: "[problem]"
 tools: Read, Grep, Glob, Bash, Write
 model: opus
-
 ---
 
 Investigate a specific problem and produce a structured fix-path document saved to the project's `docs/inspections/` directory.

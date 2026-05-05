@@ -16,7 +16,6 @@ description: >
 argument-hint: "[target]"
 tools: Read, Grep, Glob, Bash, Write
 model: opus
-
 ---
 
 Create a structured assessment document that grades a target on a 0-10 scale using a weighted rubric and save it to the project's `docs/assessments/` directory.

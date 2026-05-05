@@ -8,82 +8,70 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ## [1.3.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.1...v1.3.0) (2026-05-04)
 
-
 ### Added
 
-* **handoff:** support deliberate-label aliases in pull/fetch resolution ([#158](https://github.com/kaiohenricunha/dotclaude/issues/158)) ([81c9a15](https://github.com/kaiohenricunha/dotclaude/commit/81c9a15b8e8c7d83a601e8c71acb3cc9f43a0bd1))
-
+- **handoff:** support deliberate-label aliases in pull/fetch resolution ([#158](https://github.com/kaiohenricunha/dotclaude/issues/158)) ([81c9a15](https://github.com/kaiohenricunha/dotclaude/commit/81c9a15b8e8c7d83a601e8c71acb3cc9f43a0bd1))
 
 ### Fixed
 
-* **audits:** fix markdownlint + prettier violations in alias-resolver memo ([5ac4541](https://github.com/kaiohenricunha/dotclaude/commit/5ac4541e3e983cc90aa29b016dd73368a7787d6f))
-* **handoff:** unify claude alias scans + case-fold wrapper latest dispatch ([e7be150](https://github.com/kaiohenricunha/dotclaude/commit/e7be1502ccaaeed6129601d08d6959e6f8e68570))
-
+- **audits:** fix markdownlint + prettier violations in alias-resolver memo ([5ac4541](https://github.com/kaiohenricunha/dotclaude/commit/5ac4541e3e983cc90aa29b016dd73368a7787d6f))
+- **handoff:** unify claude alias scans + case-fold wrapper latest dispatch ([e7be150](https://github.com/kaiohenricunha/dotclaude/commit/e7be1502ccaaeed6129601d08d6959e6f8e68570))
 
 ### Documentation
 
-* **audits:** bank [#158](https://github.com/kaiohenricunha/dotclaude/issues/158) alias-resolver investigation memo (deliberate-label scope) ([cd153b6](https://github.com/kaiohenricunha/dotclaude/commit/cd153b6b03f29fa567cea957418fad36ac116c1d))
+- **audits:** bank [#158](https://github.com/kaiohenricunha/dotclaude/issues/158) alias-resolver investigation memo (deliberate-label scope) ([cd153b6](https://github.com/kaiohenricunha/dotclaude/commit/cd153b6b03f29fa567cea957418fad36ac116c1d))
 
 ## [1.2.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.0...v1.2.1) (2026-05-01)
 
-
 ### Fixed
 
-* **handoff:** tighten cell-27 test to lock first-arg-wins ([#155](https://github.com/kaiohenricunha/dotclaude/issues/155)) ([250c7d2](https://github.com/kaiohenricunha/dotclaude/commit/250c7d2c30f11435a4b9247dec67e8fb00ee6b98))
-
+- **handoff:** tighten cell-27 test to lock first-arg-wins ([#155](https://github.com/kaiohenricunha/dotclaude/issues/155)) ([250c7d2](https://github.com/kaiohenricunha/dotclaude/commit/250c7d2c30f11435a4b9247dec67e8fb00ee6b98))
 
 ### Documentation
 
-* **contributing:** document PR merge strategy convention ([#165](https://github.com/kaiohenricunha/dotclaude/issues/165)) ([897cb02](https://github.com/kaiohenricunha/dotclaude/commit/897cb02a256f971a25ca962e48450de92c03bdb2))
-* **handoff:** document latest host-scoping precedence ([1f175fc](https://github.com/kaiohenricunha/dotclaude/commit/1f175fc7ce6548048d62a056257329cfe32fdad1))
+- **contributing:** document PR merge strategy convention ([#165](https://github.com/kaiohenricunha/dotclaude/issues/165)) ([897cb02](https://github.com/kaiohenricunha/dotclaude/commit/897cb02a256f971a25ca962e48450de92c03bdb2))
+- **handoff:** document latest host-scoping precedence ([1f175fc](https://github.com/kaiohenricunha/dotclaude/commit/1f175fc7ce6548048d62a056257329cfe32fdad1))
 
 ## [1.2.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.1.1...v1.2.0) (2026-05-01)
 
-
 ### Added
 
-* **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotclaude/issues/157)) ([85d927d](https://github.com/kaiohenricunha/dotclaude/commit/85d927dd68db8dda481bf48b49c59d8ddf5546ac))
-
+- **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotclaude/issues/157)) ([85d927d](https://github.com/kaiohenricunha/dotclaude/commit/85d927dd68db8dda481bf48b49c59d8ddf5546ac))
 
 ### Fixed
 
-* **drift-test:** loosen report heuristic to match cross-word phrasing ([9efb93c](https://github.com/kaiohenricunha/dotclaude/commit/9efb93cb7ae503392c028bec8dae433e776de0b2))
+- **drift-test:** loosen report heuristic to match cross-word phrasing ([9efb93c](https://github.com/kaiohenricunha/dotclaude/commit/9efb93cb7ae503392c028bec8dae433e776de0b2))
 
 ## [1.1.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.1.0...v1.1.1) (2026-04-30)
 
-
 ### Fixed
 
-* **handoff:** harmonize empty-state placeholder wording ([#159](https://github.com/kaiohenricunha/dotclaude/issues/159)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
-* **ci:** make post-bump regen output prettier-compliant ([#156](https://github.com/kaiohenricunha/dotclaude/issues/156)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
-* **handoff:** add codex rollout format-drift bats coverage ([#160](https://github.com/kaiohenricunha/dotclaude/issues/160)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
+- **handoff:** harmonize empty-state placeholder wording ([#159](https://github.com/kaiohenricunha/dotclaude/issues/159)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
+- **ci:** make post-bump regen output prettier-compliant ([#156](https://github.com/kaiohenricunha/dotclaude/issues/156)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
+- **handoff:** add codex rollout format-drift bats coverage ([#160](https://github.com/kaiohenricunha/dotclaude/issues/160)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
 
 ## [1.1.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.0.1...v1.1.0) (2026-04-30)
 
-
 ### Added
 
-* **commands:** add /create-experiment sandboxed exploration skill ([#150](https://github.com/kaiohenricunha/dotclaude/issues/150)) ([4bbf8a2](https://github.com/kaiohenricunha/dotclaude/commit/4bbf8a209630a6e21b2f864b6756b055189974cc))
-
+- **commands:** add /create-experiment sandboxed exploration skill ([#150](https://github.com/kaiohenricunha/dotclaude/issues/150)) ([4bbf8a2](https://github.com/kaiohenricunha/dotclaude/commit/4bbf8a209630a6e21b2f864b6756b055189974cc))
 
 ### Fixed
 
-* **handoff:** reject empty `--from` value ([#147](https://github.com/kaiohenricunha/dotclaude/issues/147)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-* **handoff:** `pull -o <path>` stdout contract per §5.5.1 OPS-2 ([#148](https://github.com/kaiohenricunha/dotclaude/issues/148)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-* **handoff:** document resolver session-validity rules in spec §4.1.1 ([#149](https://github.com/kaiohenricunha/dotclaude/issues/149)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-* **handoff:** `pull` requires explicit `<query>` per spec §5.2.1. Previous versions silently defaulted to `latest` when the positional was omitted, which contradicted the spec. The fix removes the implicit default; users who relied on bare `dotclaude handoff pull` as shorthand must now type `dotclaude handoff pull latest`. Narrowing behavior of `pull latest` (host detection via env vars + `--from`) is unchanged. ([#152](https://github.com/kaiohenricunha/dotclaude/issues/152)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-
+- **handoff:** reject empty `--from` value ([#147](https://github.com/kaiohenricunha/dotclaude/issues/147)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** `pull -o <path>` stdout contract per §5.5.1 OPS-2 ([#148](https://github.com/kaiohenricunha/dotclaude/issues/148)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** document resolver session-validity rules in spec §4.1.1 ([#149](https://github.com/kaiohenricunha/dotclaude/issues/149)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** `pull` requires explicit `<query>` per spec §5.2.1. Previous versions silently defaulted to `latest` when the positional was omitted, which contradicted the spec. The fix removes the implicit default; users who relied on bare `dotclaude handoff pull` as shorthand must now type `dotclaude handoff pull latest`. Narrowing behavior of `pull latest` (host detection via env vars + `--from`) is unchanged. ([#152](https://github.com/kaiohenricunha/dotclaude/issues/152)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
 
 ### Documentation
 
-* **audit:** append Pair B engagement-depth note to Phase 4 result block ([#153](https://github.com/kaiohenricunha/dotclaude/issues/153)) ([42c1fae](https://github.com/kaiohenricunha/dotclaude/commit/42c1faee15b59e012c70be47aa0d9bfa9f1501a3))
+- **audit:** append Pair B engagement-depth note to Phase 4 result block ([#153](https://github.com/kaiohenricunha/dotclaude/issues/153)) ([42c1fae](https://github.com/kaiohenricunha/dotclaude/commit/42c1faee15b59e012c70be47aa0d9bfa9f1501a3))
 
 ## [1.0.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.0.0...v1.0.1) (2026-04-29)
 
-
 ### Fixed
 
-* re-baseline release-please at v1.0.0 ([#142](https://github.com/kaiohenricunha/dotclaude/issues/142)) ([78e2619](https://github.com/kaiohenricunha/dotclaude/commit/78e2619235619ad727513f6e3681530d039563cc))
+- re-baseline release-please at v1.0.0 ([#142](https://github.com/kaiohenricunha/dotclaude/issues/142)) ([78e2619](https://github.com/kaiohenricunha/dotclaude/commit/78e2619235619ad727513f6e3681530d039563cc))
 
 ## [1.0.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.11.0...v1.0.0) (2026-04-29)
 
@@ -141,68 +129,60 @@ verb-rename mapping and migration examples.
 
 ## [0.11.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.10.0...v0.11.0) (2026-04-20)
 
-
 ### ⚠ BREAKING CHANGES
 
-* **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotclaude/issues/80))
+- **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotclaude/issues/80))
 
 ### Added
 
-* **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotclaude/issues/80)) ([ab02686](https://github.com/kaiohenricunha/dotclaude/commit/ab026867a2b3665d413961cb1f9faf6ae8cecc85))
+- **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotclaude/issues/80)) ([ab02686](https://github.com/kaiohenricunha/dotclaude/commit/ab026867a2b3665d413961cb1f9faf6ae8cecc85))
 
 ## [0.10.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.9.0...v0.10.0) (2026-04-20)
 
-
 ### ⚠ BREAKING CHANGES
 
-* **handoff:** every `dotclaude handoff push` now requires a one-time `dotclaude handoff init` against $DOTCLAUDE_HANDOFF_REPO. Existing v1 branches remain readable; writes always emit the new v2 shape. Migrate script lands as a follow-up (plan PR C). Migration is one command: `dotclaude handoff init`.
+- **handoff:** every `dotclaude handoff push` now requires a one-time `dotclaude handoff init` against $DOTCLAUDE_HANDOFF_REPO. Existing v1 branches remain readable; writes always emit the new v2 shape. Migrate script lands as a follow-up (plan PR C). Migration is one command: `dotclaude handoff init`.
 
 ### Added
 
-* **handoff:** v2 store taxonomy + schema enforcement + init ([#73](https://github.com/kaiohenricunha/dotclaude/issues/73)) ([6da64bb](https://github.com/kaiohenricunha/dotclaude/commit/6da64bb80f7e25d489d1ee92bef2416d3a1674a2))
+- **handoff:** v2 store taxonomy + schema enforcement + init ([#73](https://github.com/kaiohenricunha/dotclaude/issues/73)) ([6da64bb](https://github.com/kaiohenricunha/dotclaude/commit/6da64bb80f7e25d489d1ee92bef2416d3a1674a2))
 
 ## [0.9.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.8.0...v0.9.0) (2026-04-20)
 
-
 ### ⚠ BREAKING CHANGES
 
-* **handoff:** `--via github`, `--via gist-token`, `--via git-fallback`, `DOTCLAUDE_GH_TOKEN`, and the `references/transport-github.md` file are removed. Migration is `s/ --via git-fallback//g` across any script that called `dotclaude handoff push|pull --via git-fallback`; gist users move to a private git repo (`gh repo create handoff-store --private` + `export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git`) and delete leftover gists with `gh gist list` + `gh gist delete <id>`.
+- **handoff:** `--via github`, `--via gist-token`, `--via git-fallback`, `DOTCLAUDE_GH_TOKEN`, and the `references/transport-github.md` file are removed. Migration is `s/ --via git-fallback//g` across any script that called `dotclaude handoff push|pull --via git-fallback`; gist users move to a private git repo (`gh repo create handoff-store --private` + `export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git`) and delete leftover gists with `gh gist list` + `gh gist delete <id>`.
 
 ### Added
 
-* **handoff:** promote doctor, remote-list, search into the binary ([#71](https://github.com/kaiohenricunha/dotclaude/issues/71)) ([7ea0883](https://github.com/kaiohenricunha/dotclaude/commit/7ea08833104ebe89292e4b280468670fbb08bff0))
-* **handoff:** remove gist transports, drop --via flag ([#68](https://github.com/kaiohenricunha/dotclaude/issues/68)) ([9aec0dc](https://github.com/kaiohenricunha/dotclaude/commit/9aec0dc0902a58831898ad34ccda97be06250b3f))
-
+- **handoff:** promote doctor, remote-list, search into the binary ([#71](https://github.com/kaiohenricunha/dotclaude/issues/71)) ([7ea0883](https://github.com/kaiohenricunha/dotclaude/commit/7ea08833104ebe89292e4b280468670fbb08bff0))
+- **handoff:** remove gist transports, drop --via flag ([#68](https://github.com/kaiohenricunha/dotclaude/issues/68)) ([9aec0dc](https://github.com/kaiohenricunha/dotclaude/commit/9aec0dc0902a58831898ad34ccda97be06250b3f))
 
 ### Changed
 
-* **handoff:** rename git-fallback internals to remote ([#70](https://github.com/kaiohenricunha/dotclaude/issues/70)) ([fc8fbf7](https://github.com/kaiohenricunha/dotclaude/commit/fc8fbf773d2e2380d4b9e7097d41a47c53f86b9f))
-
+- **handoff:** rename git-fallback internals to remote ([#70](https://github.com/kaiohenricunha/dotclaude/issues/70)) ([fc8fbf7](https://github.com/kaiohenricunha/dotclaude/commit/fc8fbf773d2e2380d4b9e7097d41a47c53f86b9f))
 
 ### Documentation
 
-* **handoff:** slim SKILL.md to a thin wrapper around the binary ([#72](https://github.com/kaiohenricunha/dotclaude/issues/72)) ([fee18d7](https://github.com/kaiohenricunha/dotclaude/commit/fee18d7d3ed86e3ced9c6257ff38791c4a74c135))
+- **handoff:** slim SKILL.md to a thin wrapper around the binary ([#72](https://github.com/kaiohenricunha/dotclaude/issues/72)) ([fee18d7](https://github.com/kaiohenricunha/dotclaude/commit/fee18d7d3ed86e3ced9c6257ff38791c4a74c135))
 
 ## [0.8.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.7.0...v0.8.0) (2026-04-19)
 
-
 ### ⚠ BREAKING CHANGES
 
-* **handoff:** `push <cli> <query>` and `pull <cli> <handle>` now exit 64 with a migration message pointing at `--from`. Power-user subs (resolve/describe/digest/file) keep their explicit `<cli> <id>`.
+- **handoff:** `push <cli> <query>` and `pull <cli> <handle>` now exit 64 with a migration message pointing at `--from`. Power-user subs (resolve/describe/digest/file) keep their explicit `<cli> <id>`.
 
 ### Added
 
-* **handoff:** drop &lt;cli&gt; positional from push/pull ([#66](https://github.com/kaiohenricunha/dotclaude/issues/66)) ([a172e0e](https://github.com/kaiohenricunha/dotclaude/commit/a172e0e3b736094c43b80047ed2e217ed30a8301))
-
+- **handoff:** drop &lt;cli&gt; positional from push/pull ([#66](https://github.com/kaiohenricunha/dotclaude/issues/66)) ([a172e0e](https://github.com/kaiohenricunha/dotclaude/commit/a172e0e3b736094c43b80047ed2e217ed30a8301))
 
 ### Fixed
 
-* **test:** avoid bats $output capture for 10k-session stress test ([#63](https://github.com/kaiohenricunha/dotclaude/issues/63)) ([e1145b0](https://github.com/kaiohenricunha/dotclaude/commit/e1145b016e7a7266f133178084d13d04126d86b0))
-
+- **test:** avoid bats $output capture for 10k-session stress test ([#63](https://github.com/kaiohenricunha/dotclaude/issues/63)) ([e1145b0](https://github.com/kaiohenricunha/dotclaude/commit/e1145b016e7a7266f133178084d13d04126d86b0))
 
 ### Documentation
 
-* add Copilot instructions, review config, and AGENTS.md ([#65](https://github.com/kaiohenricunha/dotclaude/issues/65)) ([eb1aca4](https://github.com/kaiohenricunha/dotclaude/commit/eb1aca425b46467b64162c3b5c8ab1d4dcb9280c))
+- add Copilot instructions, review config, and AGENTS.md ([#65](https://github.com/kaiohenricunha/dotclaude/issues/65)) ([eb1aca4](https://github.com/kaiohenricunha/dotclaude/commit/eb1aca425b46467b64162c3b5c8ab1d4dcb9280c))
 
 ## [0.7.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.6.0...v0.7.0) (2026-04-19)
 
