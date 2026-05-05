@@ -2,13 +2,13 @@
   "targets": [
     {
       "kind": "vercel",
-      "project": "squadranks",
+      "project": "my-app",
       "projectId": "prj_...",
       "team": "team_..."
     },
     {
       "kind": "fly",
-      "app": "wc-squad-rankings-api"
+      "app": "my-api"
     },
     {
       "kind": "aws-amplify",

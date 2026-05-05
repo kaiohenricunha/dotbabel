@@ -188,7 +188,7 @@ function buildExpected() {
         name: artifact.id,
         path: `.claude/skills/${artifact.id}/SKILL.md`,
         checksum: "",
-        dependencies: [],
+        dependencies: Array.isArray(artifact.dependencies) ? artifact.dependencies : [],
         lastValidated: null,
       });
     } else if (artifact.type === "command") {
