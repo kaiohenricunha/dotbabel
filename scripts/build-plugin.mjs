@@ -6,6 +6,7 @@
  * For each skill in skills/<slug>/SKILL.md:
  *   → plugins/dotclaude/templates/claude/skills/<slug>/SKILL.md
  *     (frontmatter stripped of owner, created, updated)
+ *   → supporting references/, examples/, and scripts/ files copied verbatim
  *
  * For each command in commands/<slug>.md:
  *   → plugins/dotclaude/templates/claude/commands/<slug>.md
@@ -40,6 +41,7 @@ import { spawnSync } from "node:child_process";
 const TOOL_VERSION = "1.0.0";
 /** Fields stripped from consumer-facing frontmatter. */
 const AUTHORING_FIELDS = new Set(["owner", "created", "updated"]);
+const SKILL_SUPPORT_DIRS = ["references", "examples", "scripts"];
 
 const META = {
   name: "build-plugin",
@@ -126,6 +128,29 @@ function stripAuthoringFields(content) {
 }
 
 /**
+ * Return all regular files below a directory, relative to that directory.
+ *
+ * @param {string} dir
+ * @returns {string[]}
+ */
+function walkRelativeFiles(dir) {
+  const files = [];
+  function walk(current, prefix = "") {
+    for (const entry of readdirSync(current).sort()) {
+      const abs = join(current, entry);
+      const rel = prefix ? join(prefix, entry) : entry;
+      if (statSync(abs).isDirectory()) {
+        walk(abs, rel);
+      } else if (statSync(abs).isFile()) {
+        files.push(rel);
+      }
+    }
+  }
+  walk(dir);
+  return files;
+}
+
+/**
  * Build the in-memory representation of what the templates + manifest should
  * look like given the current index.
  *
@@ -146,17 +171,16 @@ function buildExpected() {
       const destPath = join(templateRoot, "skills", artifact.id, "SKILL.md");
       files.set(destPath, stripped);
 
-      // Copy references/ subdir so relative links in SKILL.md resolve in templates.
-      const refsDir = join(repoRoot, "skills", artifact.id, "references");
-      if (existsSync(refsDir)) {
-        for (const refFile of readdirSync(refsDir).sort()) {
-          const refSrc = join(refsDir, refFile);
-          if (statSync(refSrc).isFile()) {
-            files.set(
-              join(templateRoot, "skills", artifact.id, "references", refFile),
-              readFileSync(refSrc, "utf8"),
-            );
-          }
+      // Copy lazy-loaded support files so SKILL.md references and helper scripts
+      // resolve in both bootstrap and npm template installs.
+      for (const supportDirName of SKILL_SUPPORT_DIRS) {
+        const supportDir = join(repoRoot, "skills", artifact.id, supportDirName);
+        if (!existsSync(supportDir)) continue;
+        for (const relFile of walkRelativeFiles(supportDir)) {
+          files.set(
+            join(templateRoot, "skills", artifact.id, supportDirName, relFile),
+            readFileSync(join(supportDir, relFile), "utf8"),
+          );
         }
       }
 
@@ -208,9 +232,7 @@ if (argv.flags.check) {
   } else {
     const existing = readFileSync(manifestPath, "utf8");
     if (existing !== manifestText) {
-      out.fail(
-        "skills-manifest.json is stale — run `node scripts/build-plugin.mjs` to regenerate",
-      );
+      out.fail("skills-manifest.json is stale — run `node scripts/build-plugin.mjs` to regenerate");
       stale = true;
     }
   }

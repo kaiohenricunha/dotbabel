@@ -45,6 +45,13 @@
       "lastValidated": "2026-05-05"
     },
     {
+      "name": "deploy-status",
+      "path": ".claude/skills/deploy-status/SKILL.md",
+      "checksum": "sha256:be675b1528c7d9a7e6619868b7ed9f90c8e80d27d6f1e4eeb8ea85e3fb0b1794",
+      "dependencies": [],
+      "lastValidated": "2026-05-05"
+    },
+    {
       "name": "fix-with-evidence",
       "path": ".claude/skills/fix-with-evidence/SKILL.md",
       "checksum": "sha256:c75cd2f1f6268140dda2da98b634940bebac03a0c01781e17628f8cf502e3c49",
@@ -195,6 +202,13 @@
       "name": "review-prs",
       "path": ".claude/skills/review-prs/SKILL.md",
       "checksum": "sha256:6f7c8b4fa94084265a5fae3237225e7ba4b3e225678955ed5f0f1c14c3193733",
+      "dependencies": [],
+      "lastValidated": "2026-05-05"
+    },
+    {
+      "name": "rollback-prod",
+      "path": ".claude/skills/rollback-prod/SKILL.md",
+      "checksum": "sha256:6653d4949e705d765df5e2ee1782a858ea7ecc46e59fe540b74d3872d5f4e2da",
       "dependencies": [],
       "lastValidated": "2026-05-05"
     },
