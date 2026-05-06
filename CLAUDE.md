@@ -1,19 +1,19 @@
 # CLAUDE.md — Global Claude Code Rules
 
-> **Two ways to use dotclaude:**
+> **Two ways to use dotbabel:**
 >
 > - **TL;DR — just want skills & commands:** Clone this repo and run `./bootstrap.sh`.
 >   That wires `commands/`, `skills/`, and this file into `~/.claude/` in one step.
 >   No npm required.
-> - **Want more:** Install `@dotclaude/dotclaude` for the full CLI — `dotclaude bootstrap`,
->   `dotclaude sync`, `dotclaude doctor`, `dotclaude init`, `dotclaude detect-drift`,
+> - **Want more:** Install `@dotbabel/dotbabel` for the full CLI — `dotbabel bootstrap`,
+>   `dotbabel sync`, `dotbabel doctor`, `dotbabel init`, `dotbabel detect-drift`,
 >   and the spec-governance validators.
 >   See [README.md](./README.md) or [docs/quickstart.md](./docs/quickstart.md).
 >
 > **This file is for the bootstrap path.** It gets symlinked into `~/.claude/CLAUDE.md`
 > by `bootstrap.sh` and sets the global rule floor for every Claude Code session.
-> **Consumers of `@dotclaude/dotclaude` do NOT inherit it** — the plugin's behavior
-> lives in `plugins/dotclaude/` and [docs/](./docs/). Contributors should read
+> **Consumers of `@dotbabel/dotbabel` do NOT inherit it** — the plugin's behavior
+> lives in `plugins/dotbabel/` and [docs/](./docs/). Contributors should read
 > [CONTRIBUTING.md](./CONTRIBUTING.md) first.
 
 Universal behavior for every Claude Code session in every repo. Project-level `CLAUDE.md` files extend and may override these, but should not repeat them.
@@ -21,7 +21,7 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 ## Local filesystem conventions
 
 - All projects live at `$HOME/projects/`. Do not search the home directory or default locations.
-- Global Claude config lives wherever you cloned `dotclaude` and is symlinked into `~/.claude/`. Edit files in the clone, not `~/.claude/` directly.
+- Global Claude config lives wherever you cloned `dotbabel` and is symlinked into `~/.claude/`. Edit files in the clone, not `~/.claude/` directly.
 
 ## Code Changes
 
@@ -95,7 +95,7 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 - Required sections in every PR body:
   - `## Summary` — 1–3 bullets describing the change.
   - `## Test plan` — bulleted markdown checklist.
-  - `## Spec ID` heading followed by the spec id — if the project uses spec IDs (check for `specs/` or `docs/specs/`). Must be an H2 heading; `dotclaude-check-spec-coverage` extracts it via H2 regex.
+  - `## Spec ID` heading followed by the spec id — if the project uses spec IDs (check for `specs/` or `docs/specs/`). Must be an H2 heading; `dotbabel-check-spec-coverage` extracts it via H2 regex.
 - Never merge a PR with failing CI without explicit user approval.
 
 ## Shell & Scripting
@@ -139,9 +139,9 @@ Scope `--allowedTools` tightly — prefer `Bash(gh:*)` over `Bash(*)`. Combine w
 
 ## Protected paths (dogfood)
 
-This repository governs itself with `@dotclaude/dotclaude`. The authoritative
+This repository governs itself with `@dotbabel/dotbabel`. The authoritative
 list of protected paths lives in `docs/repo-facts.json` and every entry must
-be documented here — `dotclaude-check-instruction-drift` enforces this invariant.
+be documented here — `dotbabel-check-instruction-drift` enforces this invariant.
 
 - `CLAUDE.md` — this file.
 - `README.md` — top-level public README.
@@ -149,11 +149,11 @@ be documented here — `dotclaude-check-instruction-drift` enforces this invaria
 - `.claude/**` — skill manifest, settings, hooks.
 - `docs/repo-facts.json` — the facts source of truth.
 - `docs/specs/**/spec.json` — spec metadata governed by the spec-anchored workflow.
-- `plugins/dotclaude/src/**` — the npm package's source of truth.
-- `plugins/dotclaude/bin/**` — the shipped bin entrypoints.
-- `plugins/dotclaude/templates/**` — scaffolding templates consumers install.
+- `plugins/dotbabel/src/**` — the npm package's source of truth.
+- `plugins/dotbabel/bin/**` — the shipped bin entrypoints.
+- `plugins/dotbabel/templates/**` — scaffolding templates consumers install.
 
-Any PR touching one of these paths must carry either `Spec ID: dotclaude-core`
+Any PR touching one of these paths must carry either `Spec ID: dotbabel-core`
 or a `## No-spec rationale` section in its body.
 
 ## Skills, Commands, and Discovery
@@ -187,13 +187,13 @@ invocation.
 Loading model: skill descriptions are available for discovery, full `SKILL.md`
 content loads only when invoked, and supporting files load only when referenced.
 Do not maintain static command or skill tables in this file. When editing this
-dotclaude repository, the authoritative inventory is generated from artifact
+dotbabel repository, the authoritative inventory is generated from artifact
 frontmatter:
 
 ```bash
-node plugins/dotclaude/bin/dotclaude-index.mjs --check
-node plugins/dotclaude/bin/dotclaude-list.mjs --type skill
-node plugins/dotclaude/bin/dotclaude-list.mjs --type command
-node plugins/dotclaude/bin/dotclaude-search.mjs <query>
-node plugins/dotclaude/bin/dotclaude-show.mjs <id> --type skill
+node plugins/dotbabel/bin/dotbabel-index.mjs --check
+node plugins/dotbabel/bin/dotbabel-list.mjs --type skill
+node plugins/dotbabel/bin/dotbabel-list.mjs --type command
+node plugins/dotbabel/bin/dotbabel-search.mjs <query>
+node plugins/dotbabel/bin/dotbabel-show.mjs <id> --type skill
 ```
