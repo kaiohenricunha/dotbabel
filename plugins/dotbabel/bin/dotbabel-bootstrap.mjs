@@ -6,7 +6,7 @@
  * Idempotent — safe to re-run.
  *
  * Flags:
- *   --source <path>      Path to a local dotbabel git clone. Overrides DOTCLAUDE_DIR.
+ *   --source <path>      Path to a local dotbabel git clone. Overrides DOTBABEL_DIR.
  *   --target <dir>       Override destination directory. Default: ~/.claude
  *   --quiet              Suppress per-file progress; print summary only.
  *   --json               Emit a JSON array of events on stdout.

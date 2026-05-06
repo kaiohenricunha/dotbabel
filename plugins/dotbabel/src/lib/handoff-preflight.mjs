@@ -8,7 +8,7 @@
  *
  * Cache file: `$XDG_CACHE_HOME/dotbabel/handoff-doctor.json` (fallback
  * `$HOME/.cache/dotbabel/handoff-doctor.json`). Invalidated when the recorded
- * `repo` no longer matches `process.env.DOTCLAUDE_HANDOFF_REPO`, when the TTL
+ * `repo` no longer matches the resolved `HANDOFF_REPO` env var, when the TTL
  * has expired, when the cache schema version differs, when the file is
  * corrupt or missing, or when the caller passes `verify: true`.
  *
@@ -23,6 +23,7 @@ import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "
 
 import { runScript } from "./handoff-remote.mjs";
 import { debug } from "./debug.mjs";
+import { env as legacyEnv, cacheDir as legacyCacheDir } from "./legacy-compat.mjs";
 
 /** Cache schema version — increment to invalidate all existing entries. */
 export const CACHE_SCHEMA_VERSION = 1;
@@ -39,18 +40,19 @@ const SCRIPTS = resolvePath(__dirname, "..", "..", "scripts");
 export const DOCTOR_SH = join(SCRIPTS, "handoff-doctor.sh");
 
 /**
- * Resolve the doctor script to run. Honors `DOTCLAUDE_DOCTOR_SH` so the bats
- * suite can swap in a counter-shim without patching the shipped script. Any
+ * Resolve the doctor script to run. Honors `DOTBABEL_DOCTOR_SH` (legacy
+ * `DOTCLAUDE_DOCTOR_SH` honored as fallback through 2.x) so the bats suite
+ * can swap in a counter-shim without patching the shipped script. Any
  * production path leaves this unset and gets the bundled `handoff-doctor.sh`.
  */
 function resolveDoctorScript() {
-  const override = process.env.DOTCLAUDE_DOCTOR_SH;
+  const override = legacyEnv("DOCTOR_SH");
   return override && override.length > 0 ? override : DOCTOR_SH;
 }
 
-/** Returns the directory that holds the preflight cache, honoring XDG_CACHE_HOME. */
+/** Returns the directory that holds the preflight cache, with legacy fallback. */
 export function currentCacheDir() {
-  return join(process.env.XDG_CACHE_HOME || join(process.env.HOME || "", ".cache"), "dotbabel");
+  return legacyCacheDir();
 }
 
 /** Returns the absolute path to the preflight cache file. */

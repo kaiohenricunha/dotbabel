@@ -8,7 +8,7 @@
  *                                                  render a local session: <handoff> block (default),
  *                                                  --summary for inline markdown, -o to write to disk.
  *   dotbabel handoff fetch [<query>] [--from <cli>] [--verify]
- *                                                  fetch a remote handoff branch from DOTCLAUDE_HANDOFF_REPO.
+ *                                                  fetch a remote handoff branch from DOTBABEL_HANDOFF_REPO.
  *   dotbabel handoff push [<query>] [--tag <label>] [--from <cli>]
  *                                                  commit a local session as a handoff branch to the transport repo.
  *   dotbabel handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit <N>|--all]
@@ -91,6 +91,7 @@ import {
   parseHandoffBranch,
 } from "../src/lib/handoff-remote.mjs";
 export { _HandoffError as HandoffError };
+import { env as legacyEnv } from "../src/lib/legacy-compat.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve as resolvePath } from "node:path";
@@ -104,7 +105,7 @@ const META = {
   synopsis:
     "dotbabel handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
-    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.\n\nA `<query>` resolves by full UUID, short UUID (first 8 hex), `latest`, or a deliberate-label alias: claude `customTitle`/`aiTitle`, codex `thread_name`, copilot `workspace.yaml:name`, or gemini `checkpoint`. Aliases match case-insensitively. Resolution precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).",
+    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTBABEL_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.\n\nA `<query>` resolves by full UUID, short UUID (first 8 hex), `latest`, or a deliberate-label alias: claude `customTitle`/`aiTitle`, codex `thread_name`, copilot `workspace.yaml:name`, or gemini `checkpoint`. Aliases match case-insensitively. Resolution precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).",
   flags: {
     // #91 Gap 7: tag is multi-valued for push (--tag foo --tag bar) and a
     // single-value filter on `list --remote --tag <name>`. argv.mjs always
@@ -297,7 +298,7 @@ async function resolveLocalForPull(id, narrowTo) {
     stripResolverPrefix(stderr) ||
     (narrowTo ? `no ${narrowTo} session matches: ${id}` : `no session matches: ${id}`);
   process.stderr.write(`dotbabel-handoff: ${msg}\n`);
-  if (process.env.DOTCLAUDE_HANDOFF_REPO) {
+  if (legacyEnv("HANDOFF_REPO")) {
     process.stderr.write("for remote handoffs use `fetch <id>`\n");
   }
   process.exit(r.status === 64 ? EXIT_CODES.USAGE : 2);
@@ -798,7 +799,7 @@ async function main() {
       `gh: ${ghAvailable() ? (ghAuthenticated() ? "authenticated" : "installed, not authenticated") : "not installed"}\n`,
     );
     process.stdout.write(
-      `DOTCLAUDE_HANDOFF_REPO: ${process.env.DOTCLAUDE_HANDOFF_REPO || "(unset — will bootstrap on first push)"}\n`,
+      `DOTBABEL_HANDOFF_REPO: ${legacyEnv("HANDOFF_REPO") || "(unset — will bootstrap on first push)"}\n`,
     );
     process.exit(r.status !== 0 ? r.status : EXIT_CODES.OK);
   }
@@ -868,10 +869,10 @@ async function main() {
     const wantHistogram = Boolean(argv.flags.tags);
     const needTags = tagFilters.length > 0 || wantHistogram;
     if (showRemote) {
-      if (!process.env.DOTCLAUDE_HANDOFF_REPO) {
+      if (!legacyEnv("HANDOFF_REPO")) {
         remoteSkipped = true;
         process.stderr.write(
-          "dotbabel-handoff: list --remote: DOTCLAUDE_HANDOFF_REPO not set; skipping remote enumeration\n",
+          "dotbabel-handoff: list --remote: DOTBABEL_HANDOFF_REPO not set; skipping remote enumeration\n",
         );
       } else {
         try {
@@ -1021,7 +1022,7 @@ async function main() {
     // Local render verb. Collapses the previous describe/digest/file/bare
     // surface under one verb with --summary and -o <path|auto|->. Always
     // runs the local resolver — never forwards to remote. When local misses
-    // and DOTCLAUDE_HANDOFF_REPO is set, resolveLocalForPull appends a
+    // and DOTBABEL_HANDOFF_REPO is set, resolveLocalForPull appends a
     // single stderr hint pointing at `fetch` (#87).
     if (second === undefined) fail(EXIT_CODES.USAGE, "pull requires a <query>");
     const id = second;

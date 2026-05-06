@@ -2,6 +2,7 @@ import { execFileSync } from "child_process";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 import { debug } from "./lib/debug.mjs";
+import { env as legacyEnv } from "./lib/legacy-compat.mjs";
 
 /**
  * Execution context threaded through every validator.
@@ -26,7 +27,8 @@ import { debug } from "./lib/debug.mjs";
  * three-step fallback:
  *
  *   1. `repoRoot` option passed in.
- *   2. `DOTCLAUDE_REPO_ROOT` env var.
+ *   2. `DOTBABEL_REPO_ROOT` env var (legacy `DOTCLAUDE_REPO_ROOT` honored
+ *      via legacy-compat fallback through 2.x).
  *   3. `git rev-parse --show-toplevel` in the current working directory.
  *
  * Throws when none of the three produce a value (typically when running
@@ -38,11 +40,11 @@ import { debug } from "./lib/debug.mjs";
 export function createHarnessContext({ repoRoot } = {}) {
   const root =
     repoRoot ??
-    process.env.DOTCLAUDE_REPO_ROOT ??
+    legacyEnv("REPO_ROOT") ??
     resolveRepoRootFromGit();
   if (!root) {
     throw new Error(
-      "harness: repoRoot not provided; pass { repoRoot } or set DOTCLAUDE_REPO_ROOT, or run inside a git repo",
+      "harness: repoRoot not provided; pass { repoRoot } or set DOTBABEL_REPO_ROOT, or run inside a git repo",
     );
   }
   return {
@@ -359,7 +361,7 @@ export function isBotActor(actor) {
  * `HARNESS_CHANGED_FILES` (CSV) when set; otherwise falls back to
  * `git diff --name-only origin/<base>...HEAD`, defaulting `base` to
  * `GITHUB_BASE_REF || "main"`. Returns `[]` on git failure — the failure is
- * surfaced via `debug("git:diff", …)` when `DOTCLAUDE_DEBUG=1`.
+ * surfaced via `debug("git:diff", …)` when `DOTBABEL_DEBUG=1`.
  *
  * @returns {string[]}
  */

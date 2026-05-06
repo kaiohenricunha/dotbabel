@@ -21,6 +21,12 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 
 import { scrubDigest } from "./handoff-scrub.mjs";
 import { autoPreflight } from "./handoff-preflight.mjs";
+import {
+  configDir as legacyConfigDir,
+  env as legacyEnv,
+  setEnv as legacySetEnv,
+  unsetEnv as legacyUnsetEnv,
+} from "./legacy-compat.mjs";
 
 // ---- constants ---------------------------------------------------------
 
@@ -56,7 +62,9 @@ export function parseHandoffBranch(branch) {
 // at library-init time and is kept only for the diagnostic display
 // in `doctor` + the test-contract `typeof mod.CONFIG_FILE === "string"`.
 function currentConfigDir() {
-  return join(process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"), "dotbabel");
+  // Routes through legacy-compat so v1 users with ~/.config/dotclaude/ keep
+  // working through 2.x (with a one-time DOTBABEL_LEGACY_CONFIG warning).
+  return legacyConfigDir();
 }
 function currentConfigFile() {
   return join(currentConfigDir(), "handoff.env");
@@ -219,7 +227,7 @@ export function validateTransportUrl(url) {
   if (!/^(https?:\/\/|git@|ssh:\/\/|file:\/\/|\/)/.test(url))
     fail(
       2,
-      `DOTCLAUDE_HANDOFF_REPO must be an https://, git@, ssh://, file://, or absolute path (got: ${url})`,
+      `DOTBABEL_HANDOFF_REPO must be an https://, git@, ssh://, file://, or absolute path (got: ${url})`,
     );
   return url;
 }
@@ -227,7 +235,7 @@ export function validateTransportUrl(url) {
 /**
  * Redact `user:token@` credentials from URLs embedded in a string before it
  * goes to stderr. Guards against CWE-532 leaks when a user sets
- * DOTCLAUDE_HANDOFF_REPO=https://user:token@host/... and git echoes the
+ * DOTBABEL_HANDOFF_REPO=https://user:token@host/... and git echoes the
  * full URL on transport failure.
  */
 function redactUrlSecrets(s) {
@@ -451,11 +459,11 @@ export function printManualSetupBlock(reason) {
     "",
     "Set it up manually:",
     "  1. gh repo create <you>/dotbabel-handoff-store --private",
-    "  2. export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotbabel-handoff-store.git",
+    "  2. export DOTBABEL_HANDOFF_REPO=git@github.com:<you>/dotbabel-handoff-store.git",
     "  3. dotbabel handoff push   # retries",
     "",
     "Alternative providers (GitLab, Gitea, self-hosted) work too — set",
-    "DOTCLAUDE_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.",
+    "DOTBABEL_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.",
     "",
   ];
   process.stderr.write(msg.join("\n"));
@@ -553,7 +561,7 @@ export function seedTransportDefaultBranch(login, name, repoUrl) {
 
 /**
  * Interactively create a private GitHub repo for handoff storage via `gh`.
- * Writes the URL to the persisted env file and sets DOTCLAUDE_HANDOFF_REPO.
+ * Writes the URL to the persisted env file and sets DOTBABEL_HANDOFF_REPO.
  * Exits 2 with a manual-setup block when non-TTY, gh missing, or user aborts.
  */
 export async function bootstrapTransportRepo() {
@@ -579,7 +587,7 @@ export async function bootstrapTransportRepo() {
   process.stderr.write(
     [
       "",
-      "DOTCLAUDE_HANDOFF_REPO is not set — dotbabel can set this up for you.",
+      "DOTBABEL_HANDOFF_REPO is not set — dotbabel can set this up for you.",
       "",
       `  Detected: gh CLI authenticated as @${login}.`,
       `  Plan: create private repo  ${login}/<name>`,
@@ -660,7 +668,7 @@ export async function bootstrapTransportRepo() {
     configFile,
     `# Written by dotbabel handoff on ${new Date().toISOString()}\n` +
       `# Sourceable from your shell rc:  source ${configFile}\n` +
-      `export DOTCLAUDE_HANDOFF_REPO=${url}\n`,
+      `export DOTBABEL_HANDOFF_REPO=${url}\n`,
     { mode: 0o600 },
   );
   process.stderr.write(`  ✓ wrote ${configFile}\n`);
@@ -668,7 +676,7 @@ export async function bootstrapTransportRepo() {
     `    (add \`source ${configFile}\` to ~/.bashrc or ~/.zshrc to persist across shells)\n`,
   );
 
-  process.env.DOTCLAUDE_HANDOFF_REPO = url;
+  legacySetEnv("HANDOFF_REPO", url);
   return url;
 }
 
@@ -677,7 +685,7 @@ export async function bootstrapTransportRepo() {
  * is missing. Call site for push/pull/list/doctor.
  */
 export async function requireTransportRepo() {
-  const existing = process.env.DOTCLAUDE_HANDOFF_REPO;
+  const existing = legacyEnv("HANDOFF_REPO");
   if (existing) return validateTransportUrl(existing);
   const fresh = await bootstrapTransportRepo();
   return validateTransportUrl(fresh);
@@ -688,12 +696,12 @@ export async function requireTransportRepo() {
  * Use for read-only paths (list, doctor) that cannot trigger interactive bootstrap.
  */
 export function requireTransportRepoStrict() {
-  const url = process.env.DOTCLAUDE_HANDOFF_REPO;
+  const url = legacyEnv("HANDOFF_REPO");
   if (!url)
     throw new HandoffError({
       stage: "preflight",
       cause: "transport not configured",
-      fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTCLAUDE_HANDOFF_REPO manually",
+      fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTBABEL_HANDOFF_REPO manually",
       retry: "dotbabel handoff push",
     });
   return validateTransportUrl(url);
@@ -959,17 +967,17 @@ export async function pushRemote({
     if (!isRepoMissingError(err.message)) throw err;
     if (!isTty()) {
       printManualSetupBlock(
-        `configured repo is unreachable (${process.env.DOTCLAUDE_HANDOFF_REPO}) and we can't prompt in non-interactive mode`,
+        `configured repo is unreachable (${legacyEnv("HANDOFF_REPO")}) and we can't prompt in non-interactive mode`,
       );
       throw err;
     }
     process.stderr.write(
-      `\n  The configured repo (${process.env.DOTCLAUDE_HANDOFF_REPO}) is unreachable.\n`,
+      `\n  The configured repo (${legacyEnv("HANDOFF_REPO")}) is unreachable.\n`,
     );
     const again = await promptLine("  Re-bootstrap (create a new one)? [y/N] ");
     if (!/^y(es)?$/i.test(again)) throw err;
     // Clear the stale URL so bootstrapTransportRepo() doesn't short-circuit.
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    legacyUnsetEnv("HANDOFF_REPO");
     const fresh = await bootstrapTransportRepo();
     return doPush(validateTransportUrl(fresh));
   }

@@ -49,7 +49,7 @@ const PATTERNS = [
     re: /repository not found|project.*could not be found|does not appear to be a git repository/i,
     stage: "preflight",
     cause: "transport repo not found",
-    fix: "Reconfigure DOTCLAUDE_HANDOFF_REPO or run `dotbabel handoff push` to re-bootstrap",
+    fix: "Reconfigure DOTBABEL_HANDOFF_REPO or run `dotbabel handoff push` to re-bootstrap",
   },
   {
     re: /Could not resolve host/i,
@@ -76,10 +76,10 @@ const PATTERNS = [
     fix: "Reinstall dotbabel: `npm install -g @dotbabel/dotbabel`",
   },
   {
-    re: /DOTCLAUDE_HANDOFF_REPO is not set/i,
+    re: /(DOTBABEL|DOTCLAUDE)_HANDOFF_REPO is not set/i,
     stage: "preflight",
     cause: "transport not configured",
-    fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTCLAUDE_HANDOFF_REPO manually",
+    fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTBABEL_HANDOFF_REPO manually",
   },
   {
     re: /ls-remote failed/i,

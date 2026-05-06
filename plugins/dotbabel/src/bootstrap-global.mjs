@@ -52,7 +52,7 @@ function pkgRoot() {
  *
  * Priority:
  *   1. `sourceOpt` (explicit --source flag)
- *   2. `env.DOTCLAUDE_DIR`
+ *   2. `env.DOTBABEL_DIR` (legacy `env.DOTCLAUDE_DIR` honored as fallback through 2.x)
  *   3. `pkgRoot()` — walk up to find bootstrap.sh
  *
  * @param {string|undefined} sourceOpt
@@ -61,7 +61,16 @@ function pkgRoot() {
  */
 export function resolveSource(sourceOpt, env) {
   if (sourceOpt) return sourceOpt;
-  if (env && env.DOTCLAUDE_DIR) return env.DOTCLAUDE_DIR;
+  if (env) {
+    if (env.DOTBABEL_DIR) return env.DOTBABEL_DIR;
+    if (env.DOTCLAUDE_DIR) {
+      process.emitWarning(
+        "DOTCLAUDE_DIR is deprecated; use DOTBABEL_DIR (removal in 3.0.0)",
+        { code: "DOTBABEL_LEGACY_ENV", type: "DeprecationWarning" },
+      );
+      return env.DOTCLAUDE_DIR;
+    }
+  }
   return pkgRoot();
 }
 

@@ -1,5 +1,6 @@
 /**
- * Debug logger gated on `DOTCLAUDE_DEBUG=1`.
+ * Debug logger gated on `DOTBABEL_DEBUG=1` (legacy `DOTCLAUDE_DEBUG=1` honored
+ * via legacy-compat fallback through 2.x).
  *
  * Replaces silent `catch` blocks in `spec-harness-lib.mjs:28-29` and `:184-186`
  * (legacy behavior) with opt-in diagnostic output. When the env flag is unset,
@@ -15,14 +16,16 @@
  * @param {...unknown} args
  * @returns {void}
  */
+import { env } from './legacy-compat.mjs';
+
 export function debug(tag, ...args) {
-  if (process.env.DOTCLAUDE_DEBUG !== '1') return;
+  if (env('DEBUG') !== '1') return;
   process.stderr.write(`[harness:${tag}] ${args.map(stringify).join(' ')}\n`);
 }
 
 /** @returns {boolean} */
 export function isDebug() {
-  return process.env.DOTCLAUDE_DEBUG === '1';
+  return env('DEBUG') === '1';
 }
 
 /** @param {unknown} v */
