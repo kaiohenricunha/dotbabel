@@ -19,12 +19,12 @@ jobs:
           shellcheck --severity=warning -x \
             bootstrap.sh \
             sync.sh \
-            plugins/dotclaude/scripts/*.sh \
-            plugins/dotclaude/scripts/lib/*.sh \
-            plugins/dotclaude/hooks/*.sh \
-            plugins/dotclaude/tests/*.sh \
-            plugins/dotclaude/templates/claude/hooks/*.sh \
-            plugins/dotclaude/templates/githooks/pre-commit
+            plugins/dotbabel/scripts/*.sh \
+            plugins/dotbabel/scripts/lib/*.sh \
+            plugins/dotbabel/hooks/*.sh \
+            plugins/dotbabel/tests/*.sh \
+            plugins/dotbabel/templates/claude/hooks/*.sh \
+            plugins/dotbabel/templates/githooks/pre-commit
 
   markdownlint:
     runs-on: ubuntu-latest
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with: { node-version: "22" }
-      - run: node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src
+      - run: node scripts/check-jsdoc-coverage.mjs plugins/dotbabel/src
 
   prettier:
     runs-on: ubuntu-latest

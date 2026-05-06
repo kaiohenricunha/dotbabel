@@ -19,18 +19,18 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with: { node-version: "22", cache: "npm" }
       - run: npm ci
-      - run: node plugins/dotclaude/bin/dotclaude-validate-skills.mjs
-      - run: node plugins/dotclaude/bin/dotclaude-validate-specs.mjs
-      - run: node plugins/dotclaude/bin/dotclaude-check-instruction-drift.mjs
+      - run: node plugins/dotbabel/bin/dotbabel-validate-skills.mjs
+      - run: node plugins/dotbabel/bin/dotbabel-validate-specs.mjs
+      - run: node plugins/dotbabel/bin/dotbabel-check-instruction-drift.mjs
       - name: check-spec-coverage (PR context)
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_ACTOR: ${{ github.event.pull_request.user.login || github.actor }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
-        run: node plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs
-      - run: node plugins/dotclaude/bin/dotclaude-doctor.mjs
-      - run: node plugins/dotclaude/bin/dotclaude-index.mjs --check
+        run: node plugins/dotbabel/bin/dotbabel-check-spec-coverage.mjs
+      - run: node plugins/dotbabel/bin/dotbabel-doctor.mjs
+      - run: node plugins/dotbabel/bin/dotbabel-index.mjs --check
       - run: node scripts/build-plugin.mjs --check
       - name: docs version stamps match package.json
         run: node scripts/stamp-doc-versions.mjs --check
@@ -47,7 +47,7 @@ jobs:
         env:
           DOTCLAUDE_REPO_ROOT: ${{ github.workspace }}/examples/minimal-consumer
         run: |
-          node plugins/dotclaude/bin/dotclaude-validate-skills.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"
+          node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"
           # validate-specs requires docs/specs/ — the scaffold ships an empty
           # docs/specs/ (README only), so listSpecDirs returns [] and result is ok.
-          node plugins/dotclaude/bin/dotclaude-validate-specs.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"
+          node plugins/dotbabel/bin/dotbabel-validate-specs.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"

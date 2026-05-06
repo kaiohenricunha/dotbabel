@@ -28,9 +28,9 @@ jobs:
       - name: vitest + coverage
         run: npm test -- --coverage
       - name: validate-settings behavior suite
-        run: bash plugins/dotclaude/tests/test_validate_settings.sh
+        run: bash plugins/dotbabel/tests/test_validate_settings.sh
       - name: bats
-        run: npx bats plugins/dotclaude/tests/bats/
+        run: npx bats plugins/dotbabel/tests/bats/
       - name: Upload coverage
         if: matrix.node == '22'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

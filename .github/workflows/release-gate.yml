@@ -142,11 +142,11 @@ jobs:
           tar -xzf "$work/pkg.tgz" -C "$work/extracted"
 
           source_paths=(
-            "plugins/dotclaude/bin/dotclaude-handoff.mjs"
-            "plugins/dotclaude/bin/dotclaude.mjs"
-            "plugins/dotclaude/bin/dotclaude-bootstrap.mjs"
-            "plugins/dotclaude/bin/dotclaude-sync.mjs"
-            "plugins/dotclaude/bin/dotclaude-doctor.mjs"
+            "plugins/dotbabel/bin/dotbabel-handoff.mjs"
+            "plugins/dotbabel/bin/dotbabel.mjs"
+            "plugins/dotbabel/bin/dotbabel-bootstrap.mjs"
+            "plugins/dotbabel/bin/dotbabel-sync.mjs"
+            "plugins/dotbabel/bin/dotbabel-doctor.mjs"
           )
 
           drift_count=0
