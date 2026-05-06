@@ -35,6 +35,7 @@
     "create-experiment",
     "create-inspection",
     "crossplane-specialist",
+    "deploy-status",
     "detect-flaky",
     "fix-with-evidence",
     "gcp-specialist",
@@ -45,6 +46,7 @@
     "pulumi-specialist",
     "review-pr",
     "review-prs",
+    "rollback-prod",
     "security-review",
     "spec",
     "terraform-specialist",
@@ -52,7 +54,13 @@
     "validate-spec",
     "veracity-audit"
   ],
-  "command": ["changelog", "dependabot-sweep", "markdown", "merge-pr", "pre-pr"],
+  "command": [
+    "changelog",
+    "dependabot-sweep",
+    "markdown",
+    "merge-pr",
+    "pre-pr"
+  ],
   "hook": [],
   "template": []
 }

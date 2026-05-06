@@ -19,6 +19,13 @@
 REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../../.." && pwd)"
 export REPO_ROOT
 
+# Scrub host-CLI detection environment variables to ensure tests are hermetic.
+unset CLAUDECODE CLAUDE_CODE_SSE_PORT
+unset GITHUB_COPILOT_CLI COPILOT_SESSION
+unset CODEX_HOME CODEX_SESSION_ID
+unset GEMINI_CLI GEMINI_CLI_SESSION
+unset GEMINI_CLI_NO_RELAUNCH
+
 make_tmp_home() {
   local dir
   dir=$(mktemp -d)

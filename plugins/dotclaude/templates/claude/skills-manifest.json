@@ -80,6 +80,13 @@
       "lastValidated": null
     },
     {
+      "name": "deploy-status",
+      "path": ".claude/skills/deploy-status/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "detect-flaky",
       "path": ".claude/skills/detect-flaky/SKILL.md",
       "checksum": "",
@@ -166,6 +173,13 @@
     {
       "name": "review-prs",
       "path": ".claude/skills/review-prs/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
+      "name": "rollback-prod",
+      "path": ".claude/skills/rollback-prod/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null

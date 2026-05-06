@@ -477,6 +477,81 @@ export async function promptLine(message) {
 }
 
 /**
+ * Ensure the transport repo has `main` as its default branch so the first
+ * handoff push doesn't get pinned as HEAD (issue #180). Idempotent: safe
+ * to run on a fresh repo, an already-seeded repo, or a buggy repo whose
+ * current default is a `handoff/*` ref.
+ *
+ * Steps:
+ *   1. Probe `git ls-remote --heads <url> refs/heads/main`. If absent,
+ *      build an inert `main` in a tmp repo (init -b main, README, commit,
+ *      push) so the next step has a valid target.
+ *   2. PATCH the GitHub repo's default_branch to `main` unconditionally.
+ *      The PATCH is the remediation hook for already-bootstrapped buggy
+ *      repos that already have `main` but still default to a handoff ref.
+ *
+ * The PATCH is non-fatal: a failed flip leaves the repo functional but
+ * still bug-prone, so we surface a one-line warning and let the caller
+ * print remediation steps. Push failure is fatal — without `main` the
+ * default-branch flip would silently target a missing ref.
+ *
+ * @param {string} login    GitHub username from `gh api user`
+ * @param {string} name     repo name (e.g. "dotclaude-handoff-store")
+ * @param {string} repoUrl  ssh URL from `gh repo view`
+ * @returns {{ seeded: boolean, defaultBranchPatched: boolean, warning?: string }}
+ */
+export function seedTransportDefaultBranch(login, name, repoUrl) {
+  let seeded = false;
+  const probe = runGit(["ls-remote", "--heads", repoUrl, "refs/heads/main"], process.cwd());
+  if (probe.status !== 0 || !probe.stdout.trim()) {
+    const tmp = mkdtempSync(join(tmpdir(), "handoff-bootstrap-seed-"));
+    try {
+      runGitOrThrow(["init", "-q", "-b", "main"], tmp);
+      writeFileSync(
+        join(tmp, "README.md"),
+        "# dotclaude handoff transport store\n\nManaged by `dotclaude handoff`. Do not edit by hand.\n",
+      );
+      runGitOrThrow(["add", "README.md"], tmp);
+      runGitOrThrow(
+        [
+          "-c",
+          "user.email=dotclaude@local",
+          "-c",
+          "user.name=dotclaude",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-m",
+          "chore: seed default branch",
+          "-q",
+        ],
+        tmp,
+      );
+      runGitOrThrow(["push", "-q", repoUrl, "main"], tmp);
+      seeded = true;
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+  const patch = spawnSync(
+    "gh",
+    ["api", "-X", "PATCH", `repos/${login}/${name}`, "-f", "default_branch=main"],
+    { encoding: "utf8" },
+  );
+  if (patch.status !== 0) {
+    const detail =
+      (patch.stderr || patch.stdout || "").trim().split("\n")[0] ||
+      `gh exited ${patch.status ?? "?"}`;
+    return {
+      seeded,
+      defaultBranchPatched: false,
+      warning: `could not set default branch to main (${detail}); run \`gh api -X PATCH repos/${login}/${name} -f default_branch=main\` to remediate`,
+    };
+  }
+  return { seeded, defaultBranchPatched: true };
+}
+
+/**
  * Interactively create a private GitHub repo for handoff storage via `gh`.
  * Writes the URL to the persisted env file and sets DOTCLAUDE_HANDOFF_REPO.
  * Exits 2 with a manual-setup block when non-TTY, gh missing, or user aborts.
@@ -565,6 +640,20 @@ export async function bootstrapTransportRepo() {
     view.status === 0 && view.stdout.trim()
       ? view.stdout.trim()
       : `git@github.com:${login}/${name}.git`;
+
+  // Seed `main` as the default branch BEFORE any handoff push lands, so
+  // GitHub doesn't pin the first handoff ref as HEAD (issue #180).
+  // Idempotent — re-running bootstrap on a buggy already-bootstrapped
+  // repo also remediates it.
+  const seed = seedTransportDefaultBranch(login, name, url);
+  if (seed.seeded) {
+    process.stderr.write("  ✓ seeded `main` as default branch\n");
+  } else {
+    process.stderr.write("  ✓ default branch already initialized\n");
+  }
+  if (seed.warning) {
+    process.stderr.write(`  ⚠ ${seed.warning}\n`);
+  }
 
   mkdirSync(currentConfigDir(), { recursive: true, mode: 0o700 });
   writeFileSync(
@@ -1175,13 +1264,120 @@ export function listPruneCandidates({ olderThanMs, fromCli = null, repoUrl }) {
 }
 
 /**
+ * Escape a branch name for embedding in a RegExp. Branch names contain `/`
+ * and digits; `.` and `+` are theoretically possible.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Parse `git push --porcelain --delete` stdout into per-ref outcomes for
+ * the input branches. Each status line is tab-delimited:
+ *
+ *   <flag>\t<from>:<to>\t<summary>[ (<reason>)]
+ *
+ * For deletes, `<from>:<to>` is `:refs/heads/<branch>`. Recognized
+ * combinations:
+ *
+ *   -\t:<ref>\t[deleted]
+ *   !\t:<ref>\t[remote rejected] (<reason>)
+ *   !\t:<ref>\t[rejected] (<reason>)
+ *   !\t:<ref>\t[error] (<reason>)
+ *
+ * Porcelain is the preferred classification path because the format is
+ * stable across git versions and machine-readable. A branch matched by
+ * no line is returned in `unclassified` so the caller can fall back to
+ * stderr parsing or a per-ref retry.
+ *
+ * @param {string} stdout
+ * @param {string[]} branches
+ * @returns {{ deleted: string[], failures: Array<{branch: string, reason: string}>, unclassified: string[] }}
+ */
+export function parsePushDeletePorcelain(stdout, branches) {
+  const text = stdout || "";
+  const deleted = [];
+  const failures = [];
+  const unclassified = [];
+  for (const branch of branches) {
+    const refPattern = `(?:refs/heads/)?${escapeRegExp(branch)}`;
+    const deletedRe = new RegExp(`^-\\t:${refPattern}\\t\\[deleted\\]`, "m");
+    const rejectedRe = new RegExp(
+      `^!\\t:${refPattern}\\t\\[(?:remote rejected|rejected|error)\\](?:\\s+\\((.*)\\))?`,
+      "m",
+    );
+    if (deletedRe.test(text)) {
+      deleted.push(branch);
+      continue;
+    }
+    const m = text.match(rejectedRe);
+    if (m) {
+      const reason = redactUrlSecrets((m[1] || "").trim()) || "rejected";
+      failures.push({ branch, reason });
+      continue;
+    }
+    unclassified.push(branch);
+  }
+  return { deleted, failures, unclassified };
+}
+
+/**
+ * Parse `git push --delete` stderr into per-ref outcomes for the input
+ * branches. Recognized line shapes (modern git, human format):
+ *
+ *   - [deleted]         <ref>
+ *   ! [remote rejected] <ref> (<reason>)
+ *   ! [rejected]        <ref> (<reason>)
+ *   ! [error]           <ref> (<reason>)
+ *
+ * Used as a fallback when `--porcelain` stdout is missing/incomplete.
+ * `<ref>` may appear with or without the `refs/heads/` prefix.
+ *
+ * @param {string} stderr
+ * @param {string[]} branches
+ * @returns {{ deleted: string[], failures: Array<{branch: string, reason: string}>, unclassified: string[] }}
+ */
+export function parsePushDeleteStderr(stderr, branches) {
+  const text = stderr || "";
+  const deleted = [];
+  const failures = [];
+  const unclassified = [];
+  for (const branch of branches) {
+    const refPattern = `(?:refs/heads/)?${escapeRegExp(branch)}`;
+    const deletedRe = new RegExp(`^\\s*-\\s*\\[deleted\\]\\s+${refPattern}\\s*$`, "m");
+    const rejectedRe = new RegExp(
+      `^\\s*!\\s*\\[(?:remote rejected|rejected|error)\\]\\s+${refPattern}\\s+\\((.*)\\)\\s*$`,
+      "m",
+    );
+    if (deletedRe.test(text)) {
+      deleted.push(branch);
+      continue;
+    }
+    const m = text.match(rejectedRe);
+    if (m) {
+      const reason = redactUrlSecrets((m[1] || "").trim()) || "rejected";
+      failures.push({ branch, reason });
+      continue;
+    }
+    unclassified.push(branch);
+  }
+  return { deleted, failures, unclassified };
+}
+
+/**
  * Delete N remote branches in one `git push --delete` call. Works from a
  * throwaway tmp git repo — no working tree, no commits required.
  *
- * Returns per-branch results: branches absent from the failures array
- * succeeded. The git protocol surfaces per-ref status, but parsing it
- * portably is brittle; on a non-zero overall exit we treat the whole batch
- * as failed and surface the raw stderr for the bin's error formatter.
+ * On non-zero overall exit, parse `git push --delete` per-ref status from
+ * stderr to partition the input into deleted vs. rejected. Branches the
+ * parser cannot classify are retried one by one (bounded), so a corrupt
+ * or unfamiliar stderr never causes us to lose a per-ref outcome silently.
+ * If the parser produces no signal at all, fall back to the legacy
+ * "all-failed with raw stderr" behavior so the operator still sees the
+ * underlying error.
  *
  * @param {string} repoUrl
  * @param {string[]} branches
@@ -1196,15 +1392,46 @@ export function deleteRemoteBranches(repoUrl, branches) {
       throw new Error(`git init failed: ${init.stderr.trim()}`);
     }
     const refs = branches.map((b) => `refs/heads/${b}`);
-    const r = runGit(["push", "-q", repoUrl, "--delete", ...refs], tmp);
+    const r = runGit(["push", "--porcelain", repoUrl, "--delete", ...refs], tmp);
     if (r.status === 0) {
       return { deleted: branches.slice(), failures: [] };
     }
-    const reason = redactUrlSecrets((r.stderr || r.stdout).trim()) || "unknown error";
-    return {
-      deleted: [],
-      failures: branches.map((branch) => ({ branch, reason })),
-    };
+    const stdout = r.stdout || "";
+    const stderr = r.stderr || "";
+    const fromPorcelain = parsePushDeletePorcelain(stdout, branches);
+    const fromStderr = parsePushDeleteStderr(stderr, fromPorcelain.unclassified);
+    const deleted = [...fromPorcelain.deleted, ...fromStderr.deleted];
+    const failures = [...fromPorcelain.failures, ...fromStderr.failures];
+    for (const branch of fromStderr.unclassified) {
+      const rr = runGit(["push", "--porcelain", repoUrl, "--delete", `refs/heads/${branch}`], tmp);
+      if (rr.status === 0) {
+        deleted.push(branch);
+        continue;
+      }
+      const rrPorcelain = parsePushDeletePorcelain(rr.stdout || "", [branch]);
+      if (rrPorcelain.deleted.length === 1) {
+        deleted.push(branch);
+        continue;
+      }
+      if (rrPorcelain.failures.length === 1) {
+        failures.push(rrPorcelain.failures[0]);
+        continue;
+      }
+      const rrText = (rr.stderr || rr.stdout || "").trim();
+      const rrStderr = parsePushDeleteStderr(rrText, [branch]);
+      if (rrStderr.failures.length === 1) {
+        failures.push(rrStderr.failures[0]);
+        continue;
+      }
+      const firstLine = redactUrlSecrets(rrText).split("\n")[0].trim();
+      failures.push({ branch, reason: firstLine || "unknown error" });
+    }
+    if (deleted.length === 0 && failures.length === 0) {
+      const raw = stderr.trim() || stdout.trim();
+      const reason = redactUrlSecrets(raw) || "unknown error";
+      return { deleted: [], failures: branches.map((branch) => ({ branch, reason })) };
+    }
+    return { deleted, failures };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }

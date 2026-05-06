@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-06T14:38:58.709Z",
+  "generatedAt": "2026-05-06T14:54:57.831Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -41,6 +41,13 @@
       "name": "detect-flaky",
       "path": ".claude/skills/detect-flaky/SKILL.md",
       "checksum": "sha256:088b6790ca5a2a3e17c333a1325e9a0789fd7887071b18df92378e4a3ae88edc",
+      "dependencies": [],
+      "lastValidated": "2026-05-06"
+    },
+    {
+      "name": "deploy-status",
+      "path": ".claude/skills/deploy-status/SKILL.md",
+      "checksum": "sha256:be675b1528c7d9a7e6619868b7ed9f90c8e80d27d6f1e4eeb8ea85e3fb0b1794",
       "dependencies": [],
       "lastValidated": "2026-05-06"
     },
@@ -196,6 +203,15 @@
       "path": ".claude/skills/review-prs/SKILL.md",
       "checksum": "sha256:6f7c8b4fa94084265a5fae3237225e7ba4b3e225678955ed5f0f1c14c3193733",
       "dependencies": [],
+      "lastValidated": "2026-05-06"
+    },
+    {
+      "name": "rollback-prod",
+      "path": ".claude/skills/rollback-prod/SKILL.md",
+      "checksum": "sha256:6653d4949e705d765df5e2ee1782a858ea7ecc46e59fe540b74d3872d5f4e2da",
+      "dependencies": [
+        "deploy-status"
+      ],
       "lastValidated": "2026-05-06"
     },
     {
