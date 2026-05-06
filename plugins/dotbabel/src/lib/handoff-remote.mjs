@@ -23,6 +23,7 @@ import { scrubDigest } from "./handoff-scrub.mjs";
 import { autoPreflight } from "./handoff-preflight.mjs";
 import {
   configDir as legacyConfigDir,
+  canonicalConfigDir,
   env as legacyEnv,
   setEnv as legacySetEnv,
   unsetEnv as legacyUnsetEnv,
@@ -61,14 +62,27 @@ export function parseHandoffBranch(branch) {
 // reload. The exported CONFIG_FILE constant below captures the path
 // at library-init time and is kept only for the diagnostic display
 // in `doctor` + the test-contract `typeof mod.CONFIG_FILE === "string"`.
+// READ helpers — fall back to ~/.config/dotclaude/ if the canonical dir is
+// absent so v1 users keep working through 2.x (one-time DOTBABEL_LEGACY_CONFIG
+// warning per process). loadPersistedEnv() and other read paths use these.
 function currentConfigDir() {
-  // Routes through legacy-compat so v1 users with ~/.config/dotclaude/ keep
-  // working through 2.x (with a one-time DOTBABEL_LEGACY_CONFIG warning).
   return legacyConfigDir();
 }
 function currentConfigFile() {
   return join(currentConfigDir(), "handoff.env");
 }
+
+// WRITE helpers — canonical only, never the legacy dir. Bootstrap/persist
+// uses these so a v1 user's new state lands in ~/.config/dotbabel/ and the
+// legacy directory stays read-only (the migration rule is "writes always go
+// to canonical"; the legacy dir must not gain new files in 2.x).
+function bootstrapConfigDir() {
+  return canonicalConfigDir();
+}
+function bootstrapConfigFile() {
+  return join(bootstrapConfigDir(), "handoff.env");
+}
+
 /** Path to the persisted handoff env file; evaluated at library-init time. */
 export const CONFIG_FILE = currentConfigFile();
 
@@ -583,7 +597,11 @@ export async function bootstrapTransportRepo() {
     process.exit(2);
   }
 
-  const configFile = currentConfigFile();
+  // Bootstrap is a write path — show and use the canonical-only target so
+  // a v1 user's new state lands in ~/.config/dotbabel/ rather than being
+  // written back into ~/.config/dotclaude/ (migration rule: writes always
+  // go to canonical; legacy dir is read-only fallback).
+  const configFile = bootstrapConfigFile();
   process.stderr.write(
     [
       "",
@@ -663,7 +681,7 @@ export async function bootstrapTransportRepo() {
     process.stderr.write(`  ⚠ ${seed.warning}\n`);
   }
 
-  mkdirSync(currentConfigDir(), { recursive: true, mode: 0o700 });
+  mkdirSync(bootstrapConfigDir(), { recursive: true, mode: 0o700 });
   writeFileSync(
     configFile,
     `# Written by dotbabel handoff on ${new Date().toISOString()}\n` +

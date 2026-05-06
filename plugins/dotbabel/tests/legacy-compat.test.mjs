@@ -187,6 +187,50 @@ describe("env()", () => {
   });
 });
 
+describe("canonicalConfigDir() / canonicalCacheDir()", () => {
+  // Regression for PR #186 reviewer concern: writes must never land in the
+  // legacy directory. canonicalConfigDir/Cache are write-side helpers that
+  // ignore legacy and never warn — even if only the legacy dir exists.
+
+  it("canonicalConfigDir returns canonical even when ONLY legacy exists", async () => {
+    mkdirSync(join(HOME, ".config", "dotclaude"), { recursive: true });
+    const { canonicalConfigDir } = await freshModule();
+    expect(canonicalConfigDir()).toBe(join(HOME, ".config", "dotbabel"));
+    // No fallback warning — this is a write-target probe, not a read.
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
+  });
+
+  it("canonicalConfigDir returns canonical when neither dir exists", async () => {
+    const { canonicalConfigDir } = await freshModule();
+    expect(canonicalConfigDir()).toBe(join(HOME, ".config", "dotbabel"));
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
+  });
+
+  it("canonicalConfigDir returns canonical when both exist (no warning either)", async () => {
+    mkdirSync(join(HOME, ".config", "dotbabel"), { recursive: true });
+    mkdirSync(join(HOME, ".config", "dotclaude"), { recursive: true });
+    const { canonicalConfigDir } = await freshModule();
+    expect(canonicalConfigDir()).toBe(join(HOME, ".config", "dotbabel"));
+    expect(captured().callCount).toBe(0);
+  });
+
+  it("canonicalCacheDir mirrors canonicalConfigDir semantics", async () => {
+    mkdirSync(join(HOME, ".cache", "dotclaude"), { recursive: true });
+    const { canonicalCacheDir } = await freshModule();
+    expect(canonicalCacheDir()).toBe(join(HOME, ".cache", "dotbabel"));
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CACHE");
+  });
+
+  it("read-side configDir() still falls back (read/write helpers are separate)", async () => {
+    mkdirSync(join(HOME, ".config", "dotclaude"), { recursive: true });
+    const { configDir, canonicalConfigDir } = await freshModule();
+    // Read path SHOULD see the legacy dir.
+    expect(configDir()).toBe(join(HOME, ".config", "dotclaude"));
+    // Write path SHOULD ignore it.
+    expect(canonicalConfigDir()).toBe(join(HOME, ".config", "dotbabel"));
+  });
+});
+
 describe("setEnv() / unsetEnv()", () => {
   it("setEnv writes only to canonical", async () => {
     const { setEnv } = await freshModule();

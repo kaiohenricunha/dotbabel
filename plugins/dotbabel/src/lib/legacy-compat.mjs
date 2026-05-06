@@ -46,6 +46,12 @@ function xdgCacheHome() {
  * path and emits a one-time DOTBABEL_LEGACY_CONFIG deprecation warning. If
  * neither exists, returns the canonical path (suitable as a first-write target).
  *
+ * **READ-only contract.** Use this for reading existing files. Writes must go
+ * through {@link canonicalConfigDir} so a v1 user with `~/.config/dotclaude/`
+ * doesn't have new bootstrap state written back into the legacy directory —
+ * the legacy directory must stay read-only so the user actually graduates to
+ * `~/.config/dotbabel/` over time.
+ *
  * @returns {string}
  */
 export function configDir() {
@@ -61,6 +67,30 @@ export function configDir() {
     return legacy;
   }
   return canonical;
+}
+
+/**
+ * Returns the canonical dotbabel config directory path with no legacy fallback.
+ * **Always** `${XDG_CONFIG_HOME:-$HOME/.config}/dotbabel`, regardless of whether
+ * `~/.config/dotclaude/` exists.
+ *
+ * Use this for **write paths** (bootstrap, persist) so the legacy directory
+ * stays read-only and v1 users actively migrate to the new location.
+ *
+ * @returns {string}
+ */
+export function canonicalConfigDir() {
+  return join(xdgConfigHome(), "dotbabel");
+}
+
+/**
+ * Canonical-only counterpart of {@link cacheDir}, for symmetry. Use for any
+ * cache-write call sites that should never target the legacy directory.
+ *
+ * @returns {string}
+ */
+export function canonicalCacheDir() {
+  return join(xdgCacheHome(), "dotbabel");
 }
 
 /**
