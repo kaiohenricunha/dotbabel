@@ -419,7 +419,7 @@ export function buildIndex(artifacts) {
   for (const type of ARTIFACT_TYPES) byType[type].sort();
 
   const artifactsJson = {
-    $schema: "https://dotclaude.dev/schemas/index.schema.json",
+    $schema: "https://dotbabel.dev/schemas/index.schema.json",
     generatedAt: new Date(0).toISOString(), // deterministic placeholder; CLI overwrites
     version: pkgVersion,
     artifacts: entries,
@@ -457,12 +457,12 @@ function compileSchemas(schemasDir) {
   }
   /** @type {Record<ArtifactType, any>} */
   const validators = {
-    agent: ajv.getSchema("https://dotclaude.dev/schemas/agent.schema.json"),
-    skill: ajv.getSchema("https://dotclaude.dev/schemas/skill.schema.json"),
-    command: ajv.getSchema("https://dotclaude.dev/schemas/command.schema.json"),
-    hook: ajv.getSchema("https://dotclaude.dev/schemas/hook.schema.json"),
+    agent: ajv.getSchema("https://dotbabel.dev/schemas/agent.schema.json"),
+    skill: ajv.getSchema("https://dotbabel.dev/schemas/skill.schema.json"),
+    command: ajv.getSchema("https://dotbabel.dev/schemas/command.schema.json"),
+    hook: ajv.getSchema("https://dotbabel.dev/schemas/hook.schema.json"),
     template: ajv.getSchema(
-      "https://dotclaude.dev/schemas/template.schema.json",
+      "https://dotbabel.dev/schemas/template.schema.json",
     ),
   };
   return { ajv, validators };

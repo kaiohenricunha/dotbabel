@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dotclaude.dev/schemas/common.schema.json",
-  "title": "dotclaude common artifact fields",
+  "$id": "https://dotbabel.dev/schemas/common.schema.json",
+  "title": "dotbabel common artifact fields",
   "description": "Shared fields every taxonomy artifact must carry after Phase 2 backfill.",
   "type": "object",
   "additionalProperties": true,

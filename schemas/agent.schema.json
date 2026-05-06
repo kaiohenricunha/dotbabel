@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dotclaude.dev/schemas/agent.schema.json",
-  "title": "dotclaude agent artifact",
+  "$id": "https://dotbabel.dev/schemas/agent.schema.json",
+  "title": "dotbabel agent artifact",
   "description": "Shape for agent YAML frontmatter. Phase 1: every field optional.",
   "allOf": [{ "$ref": "common.schema.json" }],
   "type": "object",

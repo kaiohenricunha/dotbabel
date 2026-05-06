@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dotclaude.dev/schemas/index.schema.json",
-  "title": "dotclaude index",
+  "$id": "https://dotbabel.dev/schemas/index.schema.json",
+  "title": "dotbabel index",
   "description": "Envelope for index/artifacts.json — metadata wrapper around an array of IndexEntry objects.",
   "type": "object",
   "additionalProperties": false,
