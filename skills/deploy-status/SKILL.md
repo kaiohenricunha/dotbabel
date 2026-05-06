@@ -38,7 +38,7 @@ each target matches `origin/main`.
    elif [ -f "skills/deploy-status/scripts/deploy-ops.mjs" ]; then
      DEPLOY_OPS="skills/deploy-status/scripts/deploy-ops.mjs"
    else
-     echo "deploy-status helper not found; re-run dotclaude bootstrap or dotclaude init" >&2
+     echo "deploy-status helper not found; re-run dotbabel bootstrap or dotbabel init" >&2
      exit 2
    fi
    ```

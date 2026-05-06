@@ -10,8 +10,8 @@ directory derived from the session's cwd.
 ```
 
 - `<project-slug>` — the session cwd with `/` replaced by `-` and the
-  leading `/` preserved (e.g. `/home/kaioh/projects/kaiohenricunha/dotclaude`
-  → `-home-kaioh-projects-kaiohenricunha-dotclaude`).
+  leading `/` preserved (e.g. `/home/kaioh/projects/kaiohenricunha/dotbabel`
+  → `-home-kaioh-projects-kaiohenricunha-dotbabel`).
 - `<session-id>` — a UUID v4. Matches the value a user passes to
   `claude --resume <uuid>`.
 
@@ -43,7 +43,7 @@ done < <(find ~/.claude/projects -maxdepth 2 -type f -name '*.jsonl')
 ```
 
 Reference implementation:
-`plugins/dotclaude/scripts/handoff-resolve.sh any <name>` (or the
+`plugins/dotbabel/scripts/handoff-resolve.sh any <name>` (or the
 per-CLI form `handoff-resolve.sh claude <name>` for scripting).
 
 **Latest** — newest `.jsonl` across all project dirs by mtime (GNU/BSD
@@ -109,7 +109,7 @@ Drop any prompt whose first non-whitespace content starts with:
 - `<event>` — raw monitor events
 - `If this event is something the user` — monitor heuristic preamble
 
-Reference implementation: `plugins/dotclaude/scripts/handoff-extract.sh
+Reference implementation: `plugins/dotbabel/scripts/handoff-extract.sh
 prompts claude <file>`.
 
 ### Assistant turns (text only)

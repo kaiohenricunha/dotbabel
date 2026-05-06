@@ -3,7 +3,7 @@
 The `push` sub-command pipes the rendered digest through a
 redaction pass before uploading. This file is the authoritative list
 of patterns. The reusable implementation lives at
-`plugins/dotclaude/scripts/handoff-scrub.sh`.
+`plugins/dotbabel/scripts/handoff-scrub.sh`.
 
 ## Contract
 
@@ -69,4 +69,4 @@ Scrubbing is best-effort. It does not catch:
 - Anything the user consciously wrote in prose ("my password is …").
 
 Before pushing sensitive sessions, review the digest locally with
-`dotclaude handoff pull <uuid>` first.
+`dotbabel handoff pull <uuid>` first.

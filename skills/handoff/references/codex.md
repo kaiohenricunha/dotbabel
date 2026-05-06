@@ -38,7 +38,7 @@ find ~/.codex/sessions -type f -name 'rollout-*.jsonl' 2>/dev/null \
 ```
 
 Reference implementation:
-`plugins/dotclaude/scripts/handoff-resolve.sh any <alias>` (or the
+`plugins/dotbabel/scripts/handoff-resolve.sh any <alias>` (or the
 per-CLI form `handoff-resolve.sh codex <alias>` for scripting).
 
 **Latest** — newest rollout by mtime (GNU/BSD portable):

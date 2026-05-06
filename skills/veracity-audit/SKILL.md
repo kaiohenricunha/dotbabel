@@ -69,7 +69,7 @@ If any are missing, halt:
 
 ```
 Missing agent(s): <list>
-Run: dotclaude bootstrap
+Run: dotbabel bootstrap
 Then re-invoke this skill.
 ```
 
