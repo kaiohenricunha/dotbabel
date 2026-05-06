@@ -1,5 +1,5 @@
 {
-  "project_name": "@dotclaude/dotclaude",
+  "project_name": "@dotbabel/dotbabel",
   "project_type": "node",
   "team_count": 1,
   "protected_paths": [
@@ -9,9 +9,9 @@
     ".claude/**",
     "docs/repo-facts.json",
     "docs/specs/**/spec.json",
-    "plugins/dotclaude/src/**",
-    "plugins/dotclaude/bin/**",
-    "plugins/dotclaude/templates/**"
+    "plugins/dotbabel/src/**",
+    "plugins/dotbabel/bin/**",
+    "plugins/dotbabel/templates/**"
   ],
   "instruction_files": ["CLAUDE.md", "README.md"],
   "regression_paths": []
