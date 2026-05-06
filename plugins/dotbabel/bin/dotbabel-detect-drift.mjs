@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * dotclaude-detect-drift — thin bin wrapping `plugins/dotclaude/scripts/detect-branch-drift.mjs`
- * so `npx dotclaude-detect-drift` works (fixes the broken invocation at
- * `plugins/dotclaude/templates/workflows/detect-drift.yml:15`).
+ * dotbabel-detect-drift — thin bin wrapping `plugins/dotbabel/scripts/detect-branch-drift.mjs`
+ * so `npx dotbabel-detect-drift` works (fixes the broken invocation at
+ * `plugins/dotbabel/templates/workflows/detect-drift.yml:15`).
  *
  * Forwards every flag through. Owns --help / --version only.
  *
@@ -19,10 +19,10 @@ const args = process.argv.slice(2);
 if (args.includes("--help") || args.includes("-h")) {
   process.stdout.write(
     [
-      "dotclaude-detect-drift [OPTIONS]",
+      "dotbabel-detect-drift [OPTIONS]",
       "",
       "Flag .claude/commands/*.md and skills/**/SKILL.md that diverge from origin/main",
-      "for longer than the drift threshold. Wraps plugins/dotclaude/scripts/detect-branch-drift.mjs.",
+      "for longer than the drift threshold. Wraps plugins/dotbabel/scripts/detect-branch-drift.mjs.",
       "",
       "Options:",
       "  --help, -h           show this help",

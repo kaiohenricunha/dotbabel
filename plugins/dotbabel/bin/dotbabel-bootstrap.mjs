@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * dotclaude-bootstrap — set up or refresh ~/.claude/.
+ * dotbabel-bootstrap — set up or refresh ~/.claude/.
  *
  * Symlinks commands/, skills/, CLAUDE.md, and copies agent templates into place.
  * Idempotent — safe to re-run.
  *
  * Flags:
- *   --source <path>      Path to a local dotclaude git clone. Overrides DOTCLAUDE_DIR.
+ *   --source <path>      Path to a local dotbabel git clone. Overrides DOTCLAUDE_DIR.
  *   --target <dir>       Override destination directory. Default: ~/.claude
  *   --quiet              Suppress per-file progress; print summary only.
  *   --json               Emit a JSON array of events on stdout.
@@ -24,8 +24,8 @@ import { version } from "../src/index.mjs";
 import { bootstrapGlobal } from "../src/bootstrap-global.mjs";
 
 const META = {
-  name: "dotclaude-bootstrap",
-  synopsis: "dotclaude-bootstrap [OPTIONS]",
+  name: "dotbabel-bootstrap",
+  synopsis: "dotbabel-bootstrap [OPTIONS]",
   description: "Set up (or refresh) ~/.claude/ by symlinking commands/, skills/, CLAUDE.md, and copying agent templates into place. Idempotent — safe to re-run.",
   flags: {
     source: { type: "string" },

@@ -2,9 +2,9 @@
 /**
  * Umbrella dispatcher. Usage:
  *
- *   dotclaude --version
- *   dotclaude --help
- *   dotclaude <subcommand> [args...]      # delegates to dotclaude-<subcommand>.mjs
+ *   dotbabel --version
+ *   dotbabel --help
+ *   dotbabel <subcommand> [args...]      # delegates to dotbabel-<subcommand>.mjs
  *
  * Known subcommands mirror the bin/* entries shipped by the package:
  *   validate-skills, validate-specs, check-spec-coverage,
@@ -41,17 +41,17 @@ const SUBCOMMANDS = [
 function printUsage() {
   process.stdout.write(
     [
-      "dotclaude — Claude Code toolkit CLI (bootstrap, doctor, validators, governance)",
+      "dotbabel — Claude Code toolkit CLI (bootstrap, doctor, validators, governance)",
       "",
       "Usage:",
-      "  dotclaude <subcommand> [options]",
-      "  dotclaude --version",
-      "  dotclaude --help",
+      "  dotbabel <subcommand> [options]",
+      "  dotbabel --version",
+      "  dotbabel --help",
       "",
       "Subcommands:",
-      ...SUBCOMMANDS.map((s) => `  ${s.padEnd(26)}runs dotclaude-${s}`),
+      ...SUBCOMMANDS.map((s) => `  ${s.padEnd(26)}runs dotbabel-${s}`),
       "",
-      "Every subcommand also exists as a standalone bin (e.g. `npx dotclaude-doctor`).",
+      "Every subcommand also exists as a standalone bin (e.g. `npx dotbabel-doctor`).",
       "Each subcommand supports --help / --version / --json / --verbose / --no-color.",
       "",
       "Exit codes: 0 ok, 1 validation failure, 2 env error, 64 usage error.",
@@ -75,16 +75,16 @@ if (args[0] === "--version" || args[0] === "-V") {
 const sub = args[0];
 if (!SUBCOMMANDS.includes(sub)) {
   process.stderr.write(
-    `dotclaude: unknown subcommand '${sub}'. Run 'dotclaude --help' for the list.\n`
+    `dotbabel: unknown subcommand '${sub}'. Run 'dotbabel --help' for the list.\n`
   );
   process.exit(EXIT_CODES.USAGE);
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const binPath = resolve(__dirname, `dotclaude-${sub}.mjs`);
+const binPath = resolve(__dirname, `dotbabel-${sub}.mjs`);
 if (!existsSync(binPath)) {
   process.stderr.write(
-    `dotclaude: bin 'dotclaude-${sub}' not found at ${binPath}. Did the package install correctly?\n`
+    `dotbabel: bin 'dotbabel-${sub}' not found at ${binPath}. Did the package install correctly?\n`
   );
   process.exit(EXIT_CODES.ENV);
 }

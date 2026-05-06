@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotclaude-init — scaffold the harness template tree into a target repository.
+ * dotbabel-init — scaffold the harness template tree into a target repository.
  *
  * Flags:
  *   --project-name <name>    defaults to basename(cwd)
@@ -24,8 +24,8 @@ import { scaffoldHarness } from "../src/index.mjs";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const META = {
-  name: "dotclaude-init",
-  synopsis: "dotclaude-init [OPTIONS]",
+  name: "dotbabel-init",
+  synopsis: "dotbabel-init [OPTIONS]",
   description: "Scaffold the harness template tree (.claude/, docs/, .github/workflows/, githooks/) into the current repo.",
   flags: {
     "project-name": { type: "string" },

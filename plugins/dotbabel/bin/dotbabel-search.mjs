@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * dotclaude-search — full-text search over the taxonomy index.
+ * dotbabel-search — full-text search over the taxonomy index.
  *
- * Usage: dotclaude-search <query> [OPTIONS]
+ * Usage: dotbabel-search <query> [OPTIONS]
  *
  * Exits: 0 ok (including no matches), 2 env error (index missing), 64 usage error.
  */
@@ -15,8 +15,8 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const META = {
-  name: "dotclaude-search",
-  synopsis: "dotclaude-search <query> [OPTIONS]",
+  name: "dotbabel-search",
+  synopsis: "dotbabel-search <query> [OPTIONS]",
   description: "Full-text search over name, id, and description in the taxonomy index.",
   flags: {
     "repo-root": { type: "string" },
@@ -52,7 +52,7 @@ function resolveRepoRoot() {
 }
 
 if (argv.positional.length === 0) {
-  process.stderr.write("usage: dotclaude-search <query> [OPTIONS]\n");
+  process.stderr.write("usage: dotbabel-search <query> [OPTIONS]\n");
   process.exit(EXIT_CODES.USAGE);
 }
 
@@ -60,7 +60,7 @@ const repoRoot = resolveRepoRoot();
 const indexPath = join(repoRoot, "index", "artifacts.json");
 
 if (!existsSync(indexPath)) {
-  process.stderr.write("index not found — run dotclaude-index to build it\n");
+  process.stderr.write("index not found — run dotbabel-index to build it\n");
   process.exit(EXIT_CODES.ENV);
 }
 

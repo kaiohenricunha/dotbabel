@@ -1,20 +1,20 @@
 #!/usr/bin/env node
 /**
- * dotclaude-handoff — five-verb cross-agent / cross-machine handoff (#87).
+ * dotbabel-handoff — five-verb cross-agent / cross-machine handoff (#87).
  *
  * Usage:
- *   dotclaude handoff                              print usage and exit 0 (#86)
- *   dotclaude handoff pull <query> [--summary] [-o <path|auto|->] [--from <cli>]
+ *   dotbabel handoff                              print usage and exit 0 (#86)
+ *   dotbabel handoff pull <query> [--summary] [-o <path|auto|->] [--from <cli>]
  *                                                  render a local session: <handoff> block (default),
  *                                                  --summary for inline markdown, -o to write to disk.
- *   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
+ *   dotbabel handoff fetch [<query>] [--from <cli>] [--verify]
  *                                                  fetch a remote handoff branch from DOTCLAUDE_HANDOFF_REPO.
- *   dotclaude handoff push [<query>] [--tag <label>] [--from <cli>]
+ *   dotbabel handoff push [<query>] [--tag <label>] [--from <cli>]
  *                                                  commit a local session as a handoff branch to the transport repo.
- *   dotclaude handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit <N>|--all]
- *   dotclaude handoff search <query> [--from <cli>] [--since <ISO>] [--limit <N>] [--fixed] [--json]
- *   dotclaude handoff prune --older-than <30d|6m|1y|YYYY-MM-DD> [--yes] [--dry-run]
- *   dotclaude handoff doctor
+ *   dotbabel handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit <N>|--all]
+ *   dotbabel handoff search <query> [--from <cli>] [--since <ISO>] [--limit <N>] [--fixed] [--json]
+ *   dotbabel handoff prune --older-than <30d|6m|1y|YYYY-MM-DD> [--yes] [--dry-run]
+ *   dotbabel handoff doctor
  *
  * `<id>` / `<query>` resolves across all four CLIs (claude, copilot, codex, gemini):
  * full UUID, short UUID (first 8 hex), `latest`, or a named alias
@@ -100,9 +100,9 @@ import { createInterface } from "node:readline";
 const CLIS = new Set(["claude", "copilot", "codex", "gemini"]);
 
 const META = {
-  name: "dotclaude-handoff",
+  name: "dotbabel-handoff",
   synopsis:
-    "dotclaude handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
+    "dotbabel handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
     "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.\n\nA `<query>` resolves by full UUID, short UUID (first 8 hex), `latest`, or a deliberate-label alias: claude `customTitle`/`aiTitle`, codex `thread_name`, copilot `workspace.yaml:name`, or gemini `checkpoint`. Aliases match case-insensitively. Resolution precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).",
   flags: {
@@ -137,7 +137,7 @@ const DOCTOR_SH = join(SCRIPTS, "handoff-doctor.sh");
 // Local fail — mirrors the library's internal helper so bin-side usage
 // doesn't depend on the library exporting it. Kept trivial on purpose.
 function fail(code, msg) {
-  if (msg) process.stderr.write(`dotclaude-handoff: ${msg}\n`);
+  if (msg) process.stderr.write(`dotbabel-handoff: ${msg}\n`);
   process.exit(code);
 }
 
@@ -157,7 +157,7 @@ function parseSinceOrFail(raw, { defaultDays = null } = {}) {
 
 /**
  * Strip the resolver-script's `handoff-resolve:` prefix from captured stderr
- * so the binary's own `dotclaude-handoff:` prefix doesn't double up (#135).
+ * so the binary's own `dotbabel-handoff:` prefix doesn't double up (#135).
  * Returns the trimmed remainder.
  *
  * @param {string} raw
@@ -296,7 +296,7 @@ async function resolveLocalForPull(id, narrowTo) {
   const msg =
     stripResolverPrefix(stderr) ||
     (narrowTo ? `no ${narrowTo} session matches: ${id}` : `no session matches: ${id}`);
-  process.stderr.write(`dotclaude-handoff: ${msg}\n`);
+  process.stderr.write(`dotbabel-handoff: ${msg}\n`);
   if (process.env.DOTCLAUDE_HANDOFF_REPO) {
     process.stderr.write("for remote handoffs use `fetch <id>`\n");
   }
@@ -316,7 +316,7 @@ async function resolveLocalForPull(id, narrowTo) {
  * @returns {Promise<{cli: string, path: string}>}
  */
 async function promptCollisionChoice(query, candidates) {
-  process.stderr.write(`dotclaude-handoff: multiple sessions match "${query}":\n`);
+  process.stderr.write(`dotbabel-handoff: multiple sessions match "${query}":\n`);
   candidates.forEach((c, i) => {
     const tag = `(${c.cli}/${c.matchedField})`;
     const displayValue =
@@ -525,7 +525,7 @@ function listAllLocalSessions() {
  * Best-effort identification of the agentic CLI the binary is running
  * inside. Returns "claude" | "copilot" | "codex" | "gemini" | "unknown".
  *
- * All four signals below are UNCONFIRMED in the dotclaude codebase:
+ * All four signals below are UNCONFIRMED in the dotbabel codebase:
  * neither the repo nor the upstream CLIs document stable env-var
  * contracts. The probes are intentionally cheap — a false positive
  * only steers `bare push` into a narrower root than `resolveAny`,
@@ -534,7 +534,7 @@ function listAllLocalSessions() {
  *
  * Probe order matters when multiple probes fire: claude probes run
  * first, then codex, then copilot, then gemini. The realistic multi-signal case
- * is env inheritance — e.g. `dotclaude-handoff` invoked inside a
+ * is env inheritance — e.g. `dotbabel-handoff` invoked inside a
  * Codex session that was launched from a Claude Code bash shell
  * inherits `CLAUDECODE=1`. In that case "claude wins", which is a
  * sensible default because the outer shell is typically the source
@@ -667,7 +667,7 @@ function renderDryRunPreview(r) {
 
 function renderPrunePreview({ candidates, skipped, total }, { dryRun }) {
   const lines = [
-    `dotclaude-handoff prune: ${candidates.length} of ${total} branch(es) eligible for delete`,
+    `dotbabel-handoff prune: ${candidates.length} of ${total} branch(es) eligible for delete`,
   ];
   const B = PRUNE_SKIP_BUCKETS;
   if (skipped[B.byHost] || skipped[B.byMissingMeta] || skipped[B.byFromCli] || skipped[B.byAge]) {
@@ -735,7 +735,7 @@ if (argv.version) {
 // Note: `--via` was removed in v0.9.0 along with the gist transports.
 // The argv parser rejects it as an unknown option; no explicit guard
 // needed here. Bats coverage for the rejection lives in
-// dotclaude-handoff-five-form.bats.
+// dotbabel-handoff-five-form.bats.
 
 const limit = argv.flags.limit ?? "20";
 if (!/^\d+$/.test(limit.toString()))
@@ -833,7 +833,7 @@ async function main() {
         `| ${h.cli.padEnd(7)} | ${h.short_id.padEnd(10)} | ${(h.cwd ?? "").padEnd(37)} | ${when.padEnd(19)} | ${h.match_snippet.padEnd(40)} |\n`,
       );
     }
-    process.stdout.write("\nDrill in with `dotclaude handoff pull <short-uuid> --summary`.\n");
+    process.stdout.write("\nDrill in with `dotbabel handoff pull <short-uuid> --summary`.\n");
     process.exit(EXIT_CODES.OK);
   }
 
@@ -871,7 +871,7 @@ async function main() {
       if (!process.env.DOTCLAUDE_HANDOFF_REPO) {
         remoteSkipped = true;
         process.stderr.write(
-          "dotclaude-handoff: list --remote: DOTCLAUDE_HANDOFF_REPO not set; skipping remote enumeration\n",
+          "dotbabel-handoff: list --remote: DOTCLAUDE_HANDOFF_REPO not set; skipping remote enumeration\n",
         );
       } else {
         try {
@@ -893,7 +893,7 @@ async function main() {
             });
           }
         } catch (err) {
-          process.stderr.write(`dotclaude-handoff: list --remote: ${err.message}\n`);
+          process.stderr.write(`dotbabel-handoff: list --remote: ${err.message}\n`);
         }
       }
     }
@@ -972,7 +972,7 @@ async function main() {
       if (!fromCli) {
         fail(
           EXIT_CODES.USAGE,
-          `push without a <query> requires --from <cli>\n  usage: dotclaude handoff push --from <${[...CLIS].join("|")}>`,
+          `push without a <query> requires --from <cli>\n  usage: dotbabel handoff push --from <${[...CLIS].join("|")}>`,
         );
       }
       ({ hit: sessionHit, note: fallbackNote } = await resolveLatestWithHostScope({
@@ -1125,7 +1125,7 @@ async function main() {
 
   fail(
     EXIT_CODES.USAGE,
-    `unknown command: ${first}. Run 'dotclaude handoff --help' for valid commands.`,
+    `unknown command: ${first}. Run 'dotbabel handoff --help' for valid commands.`,
   );
 }
 

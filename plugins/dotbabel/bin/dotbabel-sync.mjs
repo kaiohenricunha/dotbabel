@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * dotclaude-sync — pull, push, or show status for a dotclaude installation.
+ * dotbabel-sync — pull, push, or show status for a dotbabel installation.
  *
  * Subcommands:
- *   pull     Fetch the latest dotclaude version and re-bootstrap ~/.claude/.
+ *   pull     Fetch the latest dotbabel version and re-bootstrap ~/.claude/.
  *   status   Show the current version / git status.
  *   push     Commit and push local changes (clone mode only).
  *
  * Options:
- *   --source <path>   Path to a local dotclaude git clone. Activates clone mode.
+ *   --source <path>   Path to a local dotbabel git clone. Activates clone mode.
  *   --quiet           Suppress per-file progress; print summary only.
  *   --json            Emit a JSON array of events on stdout.
  *   --no-color        Suppress ANSI colour.
@@ -26,9 +26,9 @@ import { syncGlobal } from "../src/sync-global.mjs";
 const VALID_SUBCOMMANDS = ["pull", "status", "push"];
 
 const META = {
-  name: "dotclaude-sync",
-  synopsis: "dotclaude-sync <subcommand> [OPTIONS]",
-  description: "Pull, push, or show status for a dotclaude installation. Subcommands: pull, status, push.",
+  name: "dotbabel-sync",
+  synopsis: "dotbabel-sync <subcommand> [OPTIONS]",
+  description: "Pull, push, or show status for a dotbabel installation. Subcommands: pull, status, push.",
   flags: {
     source: { type: "string" },
     quiet: { type: "boolean" },

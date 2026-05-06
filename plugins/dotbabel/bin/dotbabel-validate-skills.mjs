@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotclaude-validate-skills — validates `.claude/skills-manifest.json` against
+ * dotbabel-validate-skills — validates `.claude/skills-manifest.json` against
  * the sha256 checksums recorded for every indexed skill/command, and flags
  * orphan files on disk + dependency cycles.
  *
@@ -23,8 +23,8 @@ import {
 } from "../src/index.mjs";
 
 const META = {
-  name: "dotclaude-validate-skills",
-  synopsis: "dotclaude-validate-skills [OPTIONS]",
+  name: "dotbabel-validate-skills",
+  synopsis: "dotbabel-validate-skills [OPTIONS]",
   description: "Validate .claude/skills-manifest.json checksums, orphans, and DAG. Also runs agent frontmatter validation and trigger-overlap detection. Use --update to rewrite checksums in place. Use --strict to promote agent overlap warnings to errors.",
   flags: {
     "repo-root": { type: "string" },
@@ -92,7 +92,7 @@ if (result.ok) {
 }
 
 // --- agents validation ---
-const agentsDir = resolve(ctx.repoRoot, "plugins", "dotclaude", "templates", "claude");
+const agentsDir = resolve(ctx.repoRoot, "plugins", "dotbabel", "templates", "claude");
 let agentsResult;
 try {
   agentsResult = validateAgents(agentsDir);

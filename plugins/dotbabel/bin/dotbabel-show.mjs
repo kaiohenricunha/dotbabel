@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * dotclaude-show — display a single artifact by id.
+ * dotbabel-show — display a single artifact by id.
  *
- * Usage: dotclaude-show <id> [OPTIONS]
+ * Usage: dotbabel-show <id> [OPTIONS]
  *
  * Exits: 0 ok, 1 artifact not found, 2 env error (index missing), 64 usage error.
  */
@@ -15,8 +15,8 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const META = {
-  name: "dotclaude-show",
-  synopsis: "dotclaude-show <id> [OPTIONS]",
+  name: "dotbabel-show",
+  synopsis: "dotbabel-show <id> [OPTIONS]",
   description:
     "Display a single artifact by its id from the taxonomy index. When an agent and a skill share the same id, use --type agent|skill|command to disambiguate.",
   flags: {
@@ -53,7 +53,7 @@ function resolveRepoRoot() {
 }
 
 if (argv.positional.length === 0) {
-  process.stderr.write("usage: dotclaude-show <id> [OPTIONS]\n");
+  process.stderr.write("usage: dotbabel-show <id> [OPTIONS]\n");
   process.exit(EXIT_CODES.USAGE);
 }
 
@@ -61,7 +61,7 @@ const repoRoot = resolveRepoRoot();
 const indexPath = join(repoRoot, "index", "artifacts.json");
 
 if (!existsSync(indexPath)) {
-  process.stderr.write("index not found — run dotclaude-index to build it\n");
+  process.stderr.write("index not found — run dotbabel-index to build it\n");
   process.exit(EXIT_CODES.ENV);
 }
 

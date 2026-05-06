@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotclaude-doctor — diagnostic self-check.
+ * dotbabel-doctor — diagnostic self-check.
  *
  * Walks through every invariant a consumer repo (or the harness repo itself,
  * when dogfooding) must satisfy for validators to run:
@@ -11,7 +11,7 @@
  *   manifest     .claude/skills-manifest.json checksums match (via validateManifest)
  *   specs        docs/specs/ scanned; validateSpecs clean
  *   drift        checkInstructionDrift clean
- *   hook         plugins/dotclaude/hooks/guard-destructive-git.sh present + exec bit
+ *   hook         plugins/dotbabel/hooks/guard-destructive-git.sh present + exec bit
  *   bootstrap    ~/.claude/CLAUDE.md symlink present (informational — warn only)
  *
  * Exit codes: 0 all green, 1 one or more checks failed (validation), 2 env error.
@@ -34,8 +34,8 @@ import {
 } from "../src/index.mjs";
 
 const META = {
-  name: "dotclaude-doctor",
-  synopsis: "dotclaude-doctor [OPTIONS]",
+  name: "dotbabel-doctor",
+  synopsis: "dotbabel-doctor [OPTIONS]",
   description: "Run the harness self-diagnostic across env, repo, facts, manifest, specs, drift, and hooks.",
   flags: {
     "repo-root": { type: "string" },
@@ -133,7 +133,7 @@ try {
 }
 
 // hook
-const hookPath = resolve(ctx.repoRoot, "plugins/dotclaude/hooks/guard-destructive-git.sh");
+const hookPath = resolve(ctx.repoRoot, "plugins/dotbabel/hooks/guard-destructive-git.sh");
 if (existsSync(hookPath)) {
   const mode = statSync(hookPath).mode & 0o111;
   if (mode) out.pass("guard-destructive-git.sh present + executable");
@@ -149,10 +149,10 @@ try {
   if (l.isSymbolicLink()) {
     out.pass(`~/.claude/CLAUDE.md is a symlink (bootstrap active)`);
   } else {
-    out.warn(`~/.claude/CLAUDE.md exists but is not a symlink — run 'dotclaude bootstrap' to wire it up`);
+    out.warn(`~/.claude/CLAUDE.md exists but is not a symlink — run 'dotbabel bootstrap' to wire it up`);
   }
 } catch {
-  out.warn(`~/.claude/CLAUDE.md missing — run 'dotclaude bootstrap' to install global config`);
+  out.warn(`~/.claude/CLAUDE.md missing — run 'dotbabel bootstrap' to install global config`);
 }
 
 out.flush();

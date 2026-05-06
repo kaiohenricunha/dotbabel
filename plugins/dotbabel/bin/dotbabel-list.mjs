@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * dotclaude-list — list artifacts from the taxonomy index with optional filters.
+ * dotbabel-list — list artifacts from the taxonomy index with optional filters.
  *
- * Usage: dotclaude-list [OPTIONS]
+ * Usage: dotbabel-list [OPTIONS]
  *
  * Exits: 0 ok, 2 env error (index missing), 64 usage error.
  */
@@ -15,8 +15,8 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const META = {
-  name: "dotclaude-list",
-  synopsis: "dotclaude-list [OPTIONS]",
+  name: "dotbabel-list",
+  synopsis: "dotbabel-list [OPTIONS]",
   description: "List artifacts from the taxonomy index, with optional facet filters.",
   flags: {
     "repo-root": { type: "string" },
@@ -59,7 +59,7 @@ const repoRoot = resolveRepoRoot();
 const indexPath = join(repoRoot, "index", "artifacts.json");
 
 if (!existsSync(indexPath)) {
-  process.stderr.write("index not found — run dotclaude-index to build it\n");
+  process.stderr.write("index not found — run dotbabel-index to build it\n");
   process.exit(EXIT_CODES.ENV);
 }
 

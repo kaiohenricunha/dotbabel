@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotclaude-validate-specs — validates every `docs/specs/<id>/spec.json` in the
+ * dotbabel-validate-specs — validates every `docs/specs/<id>/spec.json` in the
  * repo against the structured-error contract from `validate-specs.mjs`.
  *
  * Exits: 0 all specs valid, 1 one or more validation failures, 2 env error,
@@ -19,8 +19,8 @@ import {
 } from "../src/index.mjs";
 
 const META = {
-  name: "dotclaude-validate-specs",
-  synopsis: "dotclaude-validate-specs [OPTIONS]",
+  name: "dotbabel-validate-specs",
+  synopsis: "dotbabel-validate-specs [OPTIONS]",
   description: "Validate every spec.json under docs/specs/ against the StructuredError contract.",
   flags: {
     "repo-root": { type: "string" },

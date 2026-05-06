@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotclaude-check-instruction-drift — cross-references `docs/repo-facts.json`
+ * dotbabel-check-instruction-drift — cross-references `docs/repo-facts.json`
  * against instruction files (CLAUDE.md, README.md, …) to catch stale
  * team_count claims, missing protected-path documentation, and broken
  * instruction-file references.
@@ -19,8 +19,8 @@ import {
 } from "../src/index.mjs";
 
 const META = {
-  name: "dotclaude-check-instruction-drift",
-  synopsis: "dotclaude-check-instruction-drift [OPTIONS]",
+  name: "dotbabel-check-instruction-drift",
+  synopsis: "dotbabel-check-instruction-drift [OPTIONS]",
   description: "Detect drift between docs/repo-facts.json and instruction files (team_count, protected_paths, instruction_files).",
   flags: {
     "repo-root": { type: "string" },

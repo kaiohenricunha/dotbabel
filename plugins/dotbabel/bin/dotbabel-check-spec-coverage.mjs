@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotclaude-check-spec-coverage — verifies that every change to a protected
+ * dotbabel-check-spec-coverage — verifies that every change to a protected
  * path is covered by an approved/implementing/done spec, or the PR body
  * carries a `## No-spec rationale` section.
  *
@@ -20,8 +20,8 @@ import {
 } from "../src/index.mjs";
 
 const META = {
-  name: "dotclaude-check-spec-coverage",
-  synopsis: "dotclaude-check-spec-coverage [OPTIONS]",
+  name: "dotbabel-check-spec-coverage",
+  synopsis: "dotbabel-check-spec-coverage [OPTIONS]",
   description: "Check that protected-path changes are covered by a spec (or a No-spec rationale) in the current PR.",
   flags: {
     "repo-root": { type: "string" },
