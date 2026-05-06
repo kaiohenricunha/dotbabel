@@ -1,10 +1,54 @@
 # Changelog
 
-All notable changes to `@dotclaude/dotclaude` land here. Format follows
+All notable changes to `@dotbabel/dotbabel` land here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+Historical entries below v2.0.0 reference the legacy package name
+`@dotclaude/dotclaude` and the legacy `plugins/dotclaude/` path — these are
+preserved verbatim because they describe state at the time of release.
+
 ## Unreleased
+
+## [2.0.0] - YYYY-MM-DD
+
+### BREAKING CHANGES
+
+- **rebrand:** project renamed from `dotclaude` to `dotbabel` to position the
+  toolkit as model-agnostic governance for any agentic CLI (Claude Code,
+  Codex, Gemini, Copilot).
+  - npm package: `@dotclaude/dotclaude` → `@dotbabel/dotbabel`
+  - all 15 CLI binaries renamed: `dotclaude-*` → `dotbabel-*`
+  - schema `$id` host: `dotclaude.dev` → `dotbabel.dev`
+  - directory: `plugins/dotclaude/` → `plugins/dotbabel/`
+  - spec IDs: `dotclaude-core` → `dotbabel-core`, `dotclaude-agents` → `dotbabel-agents`
+  - canonical config dir: `~/.config/dotbabel/`
+  - canonical cache dir: `~/.cache/dotbabel/`
+  - canonical env-var prefix: `DOTBABEL_*` (12 vars; see Migration below)
+
+### Migration
+
+A read-fallback compatibility layer keeps v1.x setups working through the
+2.x release window. **All compat shims are removed in 3.0.0.**
+
+- `~/.config/dotclaude/` and `~/.cache/dotclaude/` are still honored when
+  the canonical paths are absent. A one-time `process.emitWarning` with code
+  `DOTBABEL_LEGACY_CONFIG` (or `_CACHE`) fires per process on fallback.
+- All 12 `DOTCLAUDE_*` env vars fall back when the corresponding `DOTBABEL_*`
+  is unset. A one-time warning with code `DOTBABEL_LEGACY_ENV` fires per
+  process per variable.
+- Writes always target canonical paths; legacy files are never mutated.
+- The persisted handoff env file (`<configDir>/handoff.env`) is now written
+  with `export DOTBABEL_HANDOFF_REPO=...`.
+
+To migrate cleanly:
+1. `npm install -g @dotbabel/dotbabel` (uninstall `@dotclaude/dotclaude` if needed).
+2. `dotbabel bootstrap` to update `~/.claude/` symlinks.
+3. Rename `DOTCLAUDE_*` env vars in your shell rc files to `DOTBABEL_*`.
+4. (Optional) `mv ~/.config/dotclaude ~/.config/dotbabel` to silence the
+   `DOTBABEL_LEGACY_CONFIG` warning.
+
+See `docs/upgrade-guide.md` for the full migration walkthrough.
 
 ## [1.3.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.1...v1.3.0) (2026-05-04)
 
