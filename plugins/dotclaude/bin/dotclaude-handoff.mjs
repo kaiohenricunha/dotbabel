@@ -680,7 +680,13 @@ function renderPruneResult({ deleted, failures }) {
   if (deleted.length) lines.push(`deleted ${deleted.length} branch(es).`);
   if (failures.length) {
     lines.push(`failed: ${failures.length}`);
-    for (const f of failures) lines.push(`  ${f.branch}: ${f.reason}`);
+    for (const f of failures) {
+      const reason =
+        String(f.reason ?? "")
+          .split("\n")[0]
+          .trim() || "unknown error";
+      lines.push(`  ${f.branch}: ${reason}`);
+    }
   }
   lines.push("");
   return lines.join("\n");

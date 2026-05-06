@@ -1290,7 +1290,7 @@ describe("deleteRemoteBranches", () => {
     expect(spawnSync).not.toHaveBeenCalled();
   });
 
-  it("issues a single batched push --delete and reports all branches deleted on success", () => {
+  it("issues a single batched push --porcelain --delete and reports all branches deleted on success", () => {
     spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
     spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // push --delete
     const r = lib.deleteRemoteBranches("https://x.test/repo.git", [
@@ -1302,16 +1302,25 @@ describe("deleteRemoteBranches", () => {
       "handoff/p/claude/2026-01/bbbbbbbb",
     ]);
     expect(r.failures).toEqual([]);
-    // The single push call carried both refs.
+    // The single push call carried both refs and used --porcelain.
     const pushCall = spawnSync.mock.calls.find(
       (c) => c[0] === "git" && Array.isArray(c[1]) && c[1].includes("--delete"),
     );
+    expect(pushCall[1]).toContain("--porcelain");
     expect(pushCall[1]).toContain("refs/heads/handoff/p/claude/2026-01/aaaaaaaa");
     expect(pushCall[1]).toContain("refs/heads/handoff/p/claude/2026-01/bbbbbbbb");
   });
 
-  it("reports per-branch failures with redacted URLs on push error", () => {
+  it("falls back to legacy all-failed report with redacted URLs when neither porcelain stdout nor stderr classify any ref (and parser-driven retry also fails)", () => {
+    // git init
     spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // batched push --delete: total auth failure, no per-ref status lines on stdout or stderr.
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "",
+      stderr: "fatal: unable to access 'https://user:tok@x.test/repo.git/': denied",
+    });
+    // per-ref retry: same auth error.
     spawnSync.mockReturnValueOnce({
       status: 1,
       stdout: "",
@@ -1327,9 +1336,178 @@ describe("deleteRemoteBranches", () => {
     expect(r.failures[0].reason).toMatch(/\*\*\*@/);
   });
 
+  it("partitions partial-success porcelain stdout into deleted + rejected (issue #179 reproduction)", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    const stdout = [
+      "To github.com:owner/repo.git",
+      "-\t:refs/heads/handoff/dotclaude/claude/2026-04/98d26b79\t[deleted]",
+      "-\t:refs/heads/handoff/dotclaude/claude/2026-05/00837a18\t[deleted]",
+      "-\t:refs/heads/handoff/squadranks/claude/2026-05/d6243fc6\t[deleted]",
+      "!\t:refs/heads/handoff/dotclaude/claude/2026-04/3668f1d7\t[remote rejected] (refusing to delete the current branch: refs/heads/handoff/dotclaude/claude/2026-04/3668f1d7)",
+      "Done",
+    ].join("\n");
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout,
+      stderr: "error: failed to push some refs to 'github.com:owner/repo.git'",
+    });
+    const r = lib.deleteRemoteBranches("https://x.test/repo.git", [
+      "handoff/dotclaude/claude/2026-04/3668f1d7",
+      "handoff/dotclaude/claude/2026-04/98d26b79",
+      "handoff/dotclaude/claude/2026-05/00837a18",
+      "handoff/squadranks/claude/2026-05/d6243fc6",
+    ]);
+    expect(r.deleted.sort()).toEqual([
+      "handoff/dotclaude/claude/2026-04/98d26b79",
+      "handoff/dotclaude/claude/2026-05/00837a18",
+      "handoff/squadranks/claude/2026-05/d6243fc6",
+    ]);
+    expect(r.failures).toHaveLength(1);
+    expect(r.failures[0].branch).toBe("handoff/dotclaude/claude/2026-04/3668f1d7");
+    expect(r.failures[0].reason).toMatch(/refusing to delete the current branch/);
+  });
+
+  it("falls back to stderr parsing when porcelain stdout is missing (older git)", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    // No porcelain output (older git that ignores --porcelain), human stderr present.
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "",
+      stderr: [
+        "To github.com:owner/repo.git",
+        " - [deleted]         handoff/p/claude/2026-01/aaaaaaaa",
+        " ! [remote rejected] handoff/p/claude/2026-01/bbbbbbbb (refusing to delete the current branch)",
+        "error: failed to push some refs",
+      ].join("\n"),
+    });
+    const r = lib.deleteRemoteBranches("https://x.test/repo.git", [
+      "handoff/p/claude/2026-01/aaaaaaaa",
+      "handoff/p/claude/2026-01/bbbbbbbb",
+    ]);
+    expect(r.deleted).toEqual(["handoff/p/claude/2026-01/aaaaaaaa"]);
+    expect(r.failures).toHaveLength(1);
+    expect(r.failures[0].branch).toBe("handoff/p/claude/2026-01/bbbbbbbb");
+    expect(r.failures[0].reason).toMatch(/refusing to delete the current branch/);
+  });
+
+  it("retries unparsed branches per-ref and merges the retry outcome", () => {
+    // git init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // batched push: A classified as deleted via porcelain, B missing entirely.
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "-\t:refs/heads/handoff/p/claude/2026-01/aaaaaaaa\t[deleted]\n",
+      stderr: "",
+    });
+    // per-ref retry for B succeeds.
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    const r = lib.deleteRemoteBranches("https://x.test/repo.git", [
+      "handoff/p/claude/2026-01/aaaaaaaa",
+      "handoff/p/claude/2026-01/bbbbbbbb",
+    ]);
+    expect(r.deleted.sort()).toEqual([
+      "handoff/p/claude/2026-01/aaaaaaaa",
+      "handoff/p/claude/2026-01/bbbbbbbb",
+    ]);
+    expect(r.failures).toEqual([]);
+  });
+
+  it("retries unparsed branches per-ref and reports a single-line reason on retry failure", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "-\t:refs/heads/handoff/p/claude/2026-01/aaaaaaaa\t[deleted]\n",
+      stderr: "",
+    });
+    // Per-ref retry for B fails with a porcelain-shaped rejection.
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout:
+        "!\t:refs/heads/handoff/p/claude/2026-01/bbbbbbbb\t[remote rejected] (pre-receive hook declined)\n",
+      stderr: "error: failed to push some refs",
+    });
+    const r = lib.deleteRemoteBranches("https://x.test/repo.git", [
+      "handoff/p/claude/2026-01/aaaaaaaa",
+      "handoff/p/claude/2026-01/bbbbbbbb",
+    ]);
+    expect(r.deleted).toEqual(["handoff/p/claude/2026-01/aaaaaaaa"]);
+    expect(r.failures).toHaveLength(1);
+    expect(r.failures[0].branch).toBe("handoff/p/claude/2026-01/bbbbbbbb");
+    expect(r.failures[0].reason).toBe("pre-receive hook declined");
+    // Reason must be single-line so the renderer cannot duplicate a multi-line block.
+    expect(r.failures[0].reason).not.toMatch(/\n/);
+  });
+
   it("throws when git init fails", () => {
     spawnSync.mockReturnValueOnce({ status: 1, stdout: "", stderr: "disk full" });
     expect(() => lib.deleteRemoteBranches("url", ["handoff/x"])).toThrow(/git init failed/);
+  });
+});
+
+describe("parsePushDeletePorcelain", () => {
+  it("classifies tab-delimited per-ref status lines", () => {
+    const stdout = [
+      "To github.com:owner/repo.git",
+      "-\t:refs/heads/handoff/x/claude/2026-01/aaaaaaaa\t[deleted]",
+      "!\t:refs/heads/handoff/x/claude/2026-01/bbbbbbbb\t[remote rejected] (default branch protected)",
+      "!\t:refs/heads/handoff/x/claude/2026-01/cccccccc\t[rejected] (non-fast-forward)",
+      "!\t:refs/heads/handoff/x/claude/2026-01/dddddddd\t[error] (hook declined)",
+      "Done",
+    ].join("\n");
+    const r = lib.parsePushDeletePorcelain(stdout, [
+      "handoff/x/claude/2026-01/aaaaaaaa",
+      "handoff/x/claude/2026-01/bbbbbbbb",
+      "handoff/x/claude/2026-01/cccccccc",
+      "handoff/x/claude/2026-01/dddddddd",
+      "handoff/x/claude/2026-01/eeeeeeee",
+    ]);
+    expect(r.deleted).toEqual(["handoff/x/claude/2026-01/aaaaaaaa"]);
+    expect(r.failures.map((f) => [f.branch, f.reason])).toEqual([
+      ["handoff/x/claude/2026-01/bbbbbbbb", "default branch protected"],
+      ["handoff/x/claude/2026-01/cccccccc", "non-fast-forward"],
+      ["handoff/x/claude/2026-01/dddddddd", "hook declined"],
+    ]);
+    expect(r.unclassified).toEqual(["handoff/x/claude/2026-01/eeeeeeee"]);
+  });
+
+  it("returns all branches as unclassified for empty stdout", () => {
+    const r = lib.parsePushDeletePorcelain("", ["handoff/x/claude/2026-01/aaaaaaaa"]);
+    expect(r.deleted).toEqual([]);
+    expect(r.failures).toEqual([]);
+    expect(r.unclassified).toEqual(["handoff/x/claude/2026-01/aaaaaaaa"]);
+  });
+});
+
+describe("parsePushDeleteStderr", () => {
+  it("classifies each line shape and reports unmatched branches as unclassified", () => {
+    const stderr = [
+      "To github.com:owner/repo.git",
+      " - [deleted]         handoff/x/claude/2026-01/aaaaaaaa",
+      " ! [remote rejected] handoff/x/claude/2026-01/bbbbbbbb (default branch protected)",
+      " ! [rejected]        handoff/x/claude/2026-01/cccccccc (non-fast-forward)",
+      " ! [error]           handoff/x/claude/2026-01/dddddddd (hook declined)",
+    ].join("\n");
+    const r = lib.parsePushDeleteStderr(stderr, [
+      "handoff/x/claude/2026-01/aaaaaaaa",
+      "handoff/x/claude/2026-01/bbbbbbbb",
+      "handoff/x/claude/2026-01/cccccccc",
+      "handoff/x/claude/2026-01/dddddddd",
+      "handoff/x/claude/2026-01/eeeeeeee",
+    ]);
+    expect(r.deleted).toEqual(["handoff/x/claude/2026-01/aaaaaaaa"]);
+    expect(r.failures.map((f) => [f.branch, f.reason])).toEqual([
+      ["handoff/x/claude/2026-01/bbbbbbbb", "default branch protected"],
+      ["handoff/x/claude/2026-01/cccccccc", "non-fast-forward"],
+      ["handoff/x/claude/2026-01/dddddddd", "hook declined"],
+    ]);
+    expect(r.unclassified).toEqual(["handoff/x/claude/2026-01/eeeeeeee"]);
+  });
+
+  it("returns all branches as unclassified for empty stderr", () => {
+    const r = lib.parsePushDeleteStderr("", ["handoff/x/claude/2026-01/aaaaaaaa"]);
+    expect(r.deleted).toEqual([]);
+    expect(r.failures).toEqual([]);
+    expect(r.unclassified).toEqual(["handoff/x/claude/2026-01/aaaaaaaa"]);
   });
 });
 

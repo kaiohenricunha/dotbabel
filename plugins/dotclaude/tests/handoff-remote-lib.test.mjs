@@ -41,6 +41,8 @@ describe("export shape", () => {
     "PRUNE_SKIP_BUCKETS",
     "parseDuration",
     "parseHandoffBranch",
+    "parsePushDeletePorcelain",
+    "parsePushDeleteStderr",
     "parseTagsFromDescription",
     "printManualSetupBlock",
     "probeCollision",
