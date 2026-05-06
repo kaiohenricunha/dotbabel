@@ -1186,17 +1186,66 @@ function escapeRegExp(s) {
 }
 
 /**
+ * Parse `git push --porcelain --delete` stdout into per-ref outcomes for
+ * the input branches. Each status line is tab-delimited:
+ *
+ *   <flag>\t<from>:<to>\t<summary>[ (<reason>)]
+ *
+ * For deletes, `<from>:<to>` is `:refs/heads/<branch>`. Recognized
+ * combinations:
+ *
+ *   -\t:<ref>\t[deleted]
+ *   !\t:<ref>\t[remote rejected] (<reason>)
+ *   !\t:<ref>\t[rejected] (<reason>)
+ *   !\t:<ref>\t[error] (<reason>)
+ *
+ * Porcelain is the preferred classification path because the format is
+ * stable across git versions and machine-readable. A branch matched by
+ * no line is returned in `unclassified` so the caller can fall back to
+ * stderr parsing or a per-ref retry.
+ *
+ * @param {string} stdout
+ * @param {string[]} branches
+ * @returns {{ deleted: string[], failures: Array<{branch: string, reason: string}>, unclassified: string[] }}
+ */
+export function parsePushDeletePorcelain(stdout, branches) {
+  const text = stdout || "";
+  const deleted = [];
+  const failures = [];
+  const unclassified = [];
+  for (const branch of branches) {
+    const refPattern = `(?:refs/heads/)?${escapeRegExp(branch)}`;
+    const deletedRe = new RegExp(`^-\\t:${refPattern}\\t\\[deleted\\]`, "m");
+    const rejectedRe = new RegExp(
+      `^!\\t:${refPattern}\\t\\[(?:remote rejected|rejected|error)\\](?:\\s+\\((.*)\\))?`,
+      "m",
+    );
+    if (deletedRe.test(text)) {
+      deleted.push(branch);
+      continue;
+    }
+    const m = text.match(rejectedRe);
+    if (m) {
+      const reason = redactUrlSecrets((m[1] || "").trim()) || "rejected";
+      failures.push({ branch, reason });
+      continue;
+    }
+    unclassified.push(branch);
+  }
+  return { deleted, failures, unclassified };
+}
+
+/**
  * Parse `git push --delete` stderr into per-ref outcomes for the input
- * branches. Recognized line shapes (modern git):
+ * branches. Recognized line shapes (modern git, human format):
  *
  *   - [deleted]         <ref>
  *   ! [remote rejected] <ref> (<reason>)
  *   ! [rejected]        <ref> (<reason>)
  *   ! [error]           <ref> (<reason>)
  *
- * `<ref>` may appear with or without the `refs/heads/` prefix. A branch
- * matched by no line is returned in `unclassified` so the caller can
- * fall back to a per-ref retry.
+ * Used as a fallback when `--porcelain` stdout is missing/incomplete.
+ * `<ref>` may appear with or without the `refs/heads/` prefix.
  *
  * @param {string} stderr
  * @param {string[]} branches
@@ -1254,31 +1303,43 @@ export function deleteRemoteBranches(repoUrl, branches) {
       throw new Error(`git init failed: ${init.stderr.trim()}`);
     }
     const refs = branches.map((b) => `refs/heads/${b}`);
-    const r = runGit(["push", "-q", repoUrl, "--delete", ...refs], tmp);
+    const r = runGit(["push", "--porcelain", repoUrl, "--delete", ...refs], tmp);
     if (r.status === 0) {
       return { deleted: branches.slice(), failures: [] };
     }
-    const stderr = r.stderr || r.stdout || "";
-    const parsed = parsePushDeleteStderr(stderr, branches);
-    const deleted = parsed.deleted.slice();
-    const failures = parsed.failures.slice();
-    for (const branch of parsed.unclassified) {
-      const rr = runGit(["push", "-q", repoUrl, "--delete", `refs/heads/${branch}`], tmp);
+    const stdout = r.stdout || "";
+    const stderr = r.stderr || "";
+    const fromPorcelain = parsePushDeletePorcelain(stdout, branches);
+    const fromStderr = parsePushDeleteStderr(stderr, fromPorcelain.unclassified);
+    const deleted = [...fromPorcelain.deleted, ...fromStderr.deleted];
+    const failures = [...fromPorcelain.failures, ...fromStderr.failures];
+    for (const branch of fromStderr.unclassified) {
+      const rr = runGit(["push", "--porcelain", repoUrl, "--delete", `refs/heads/${branch}`], tmp);
       if (rr.status === 0) {
         deleted.push(branch);
         continue;
       }
+      const rrPorcelain = parsePushDeletePorcelain(rr.stdout || "", [branch]);
+      if (rrPorcelain.deleted.length === 1) {
+        deleted.push(branch);
+        continue;
+      }
+      if (rrPorcelain.failures.length === 1) {
+        failures.push(rrPorcelain.failures[0]);
+        continue;
+      }
       const rrText = (rr.stderr || rr.stdout || "").trim();
-      const retryParsed = parsePushDeleteStderr(rrText, [branch]);
-      if (retryParsed.failures.length === 1) {
-        failures.push(retryParsed.failures[0]);
+      const rrStderr = parsePushDeleteStderr(rrText, [branch]);
+      if (rrStderr.failures.length === 1) {
+        failures.push(rrStderr.failures[0]);
         continue;
       }
       const firstLine = redactUrlSecrets(rrText).split("\n")[0].trim();
       failures.push({ branch, reason: firstLine || "unknown error" });
     }
     if (deleted.length === 0 && failures.length === 0) {
-      const reason = redactUrlSecrets(stderr.trim()) || "unknown error";
+      const raw = stderr.trim() || stdout.trim();
+      const reason = redactUrlSecrets(raw) || "unknown error";
       return { deleted: [], failures: branches.map((branch) => ({ branch, reason })) };
     }
     return { deleted, failures };
