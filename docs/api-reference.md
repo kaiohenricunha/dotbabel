@@ -2,7 +2,7 @@
 
 _Last updated: v1.3.0_
 
-The public contract lives at `plugins/dotclaude/src/index.mjs` — import from
+The public contract lives at `plugins/dotbabel/src/index.mjs` — import from
 the package root, not deep paths:
 
 ```js
@@ -37,19 +37,19 @@ import {
   getPullRequestContext,
   isBotActor,
   getChangedFiles,
-} from "@dotclaude/dotclaude";
+} from "@dotbabel/dotbabel";
 ```
 
 **Every symbol is documented with JSDoc in-source.** Run
-`node scripts/check-jsdoc-coverage.mjs plugins/dotclaude/src` in the repo to
+`node scripts/check-jsdoc-coverage.mjs plugins/dotbabel/src` in the repo to
 assert coverage is complete.
 
 ## Typical usage
 
 ```js
-import { createHarnessContext, validateSpecs, formatError } from "@dotclaude/dotclaude";
+import { createHarnessContext, validateSpecs, formatError } from "@dotbabel/dotbabel";
 
-const ctx = createHarnessContext(); // resolves repo root via git or DOTCLAUDE_REPO_ROOT
+const ctx = createHarnessContext(); // resolves repo root via git or DOTBABEL_REPO_ROOT
 const { ok, errors } = validateSpecs(ctx);
 
 if (!ok) {
@@ -108,8 +108,8 @@ A few commonly-reached-for modules are also exposed as sub-paths in
 `package.json.exports`:
 
 ```js
-import { ValidationError, ERROR_CODES } from "@dotclaude/dotclaude/errors";
-import { EXIT_CODES } from "@dotclaude/dotclaude/exit-codes";
+import { ValidationError, ERROR_CODES } from "@dotbabel/dotbabel/errors";
+import { EXIT_CODES } from "@dotbabel/dotbabel/exit-codes";
 ```
 
 Deep imports beyond these three subpaths are **not** part of the public
@@ -121,7 +121,7 @@ contract; any reshuffle inside `src/` can happen in a minor bump.
 `package.json`). Consumers can gate on it:
 
 ```js
-import { version } from "@dotclaude/dotclaude";
+import { version } from "@dotbabel/dotbabel";
 if (!version.startsWith("0.2.")) throw new Error(`unsupported harness: ${version}`);
 ```
 

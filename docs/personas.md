@@ -17,12 +17,12 @@ parts of it. Pick yours, then follow the "Start here" column.
 
 | Path                                                                   | Who consumes it                          |
 | ---------------------------------------------------------------------- | ---------------------------------------- |
-| `package.json`, `plugins/dotclaude/src/**`, `plugins/dotclaude/bin/**` | Consumer + library user                  |
-| `plugins/dotclaude/templates/**`                                       | Consumer (installed by `dotclaude-init`) |
-| `plugins/dotclaude/.claude-plugin/plugin.json`                         | Claude Code when the plugin is enabled   |
+| `package.json`, `plugins/dotbabel/src/**`, `plugins/dotbabel/bin/**` | Consumer + library user                  |
+| `plugins/dotbabel/templates/**`                                       | Consumer (installed by `dotbabel-init`) |
+| `plugins/dotbabel/.claude-plugin/plugin.json`                         | Claude Code when the plugin is enabled   |
 | `bootstrap.sh`, `sync.sh`, `commands/**`, `skills/**`                  | Dotfile user                             |
-| `CLAUDE.md`, `docs/specs/dotclaude-core/**`, `.claude/**` at repo root | Contributors + the dogfood CI            |
-| `docs/**` (excluding `specs/dotclaude-core/`)                          | All of the above                         |
+| `CLAUDE.md`, `docs/specs/dotbabel-core/**`, `.claude/**` at repo root | Contributors + the dogfood CI            |
+| `docs/**` (excluding `specs/dotbabel-core/`)                          | All of the above                         |
 
 ## Why the dual-purpose layout
 
@@ -33,5 +33,5 @@ dotfile-specific top-level scripts (`bootstrap.sh`, `sync.sh`, `commands/`,
 `skills/`) via `package.json.files`.
 
 If the dotfile side feels like noise when you're only consuming the npm
-package: **it is.** Install via `npm i -D @dotclaude/dotclaude` and you
-never see `bootstrap.sh` — only `node_modules/.../plugins/dotclaude/`.
+package: **it is.** Install via `npm i -D @dotbabel/dotbabel` and you
+never see `bootstrap.sh` — only `node_modules/.../plugins/dotbabel/`.

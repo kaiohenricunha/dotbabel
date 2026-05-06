@@ -8,8 +8,8 @@ The work Kaio needs this repo to do splits into two distinct audiences:
 
 1. **Personal dotfiles** — `commands/`, `skills/`, `CLAUDE.md`, bootstrapped
    into `~/.claude/` via `bootstrap.sh`.
-2. **`@dotclaude/dotclaude` npm package** — a reusable plugin other repos
-   install via `npm i -D`. Lives under `plugins/dotclaude/`.
+2. **`@dotbabel/dotbabel` npm package** — a reusable plugin other repos
+   install via `npm i -D`. Lives under `plugins/dotbabel/`.
 
 The overlap is large: both surfaces define slash commands, skills, hooks,
 and CI workflows. Keeping two repos in sync by copy-paste was the status
@@ -20,13 +20,13 @@ quo; drift appeared within days.
 Single repo. Two top-level trees:
 
 ```
-dotclaude/
+dotbabel/
 ├─ commands/  skills/  CLAUDE.md  bootstrap.sh  sync.sh    ← dotfile persona
-└─ plugins/dotclaude/                                         ← npm package
+└─ plugins/dotbabel/                                         ← npm package
 ```
 
 `package.json.files` excludes the dotfile-only paths from the npm tarball.
-Consumers installing the package see only `plugins/dotclaude/`. The author's
+Consumers installing the package see only `plugins/dotbabel/`. The author's
 `bootstrap.sh` symlinks from `commands/` and `skills/` into `~/.claude/`.
 
 ## Consequences
@@ -39,7 +39,7 @@ Consumers installing the package see only `plugins/dotclaude/`. The author's
   matrix to pick their entry-point — added cognitive cost.
 - `package.json.files` becomes a trust boundary: a missing entry there
   silently ships dotfile scripts into consumer installs. Covered by an
-  integration test that asserts `plugins/dotclaude/scripts/*` _is_ shipped
+  integration test that asserts `plugins/dotbabel/scripts/*` _is_ shipped
   and `bootstrap.sh` _is not_.
 
 ## Alternatives considered
@@ -59,4 +59,4 @@ Consumers installing the package see only `plugins/dotclaude/`. The author's
 - The first external contributor to the dotfile tree (implies a third
   audience, strengthens the split-repo case).
 - The first consumer requesting a tighter tarball that excludes
-  `plugins/dotclaude/tests/`.
+  `plugins/dotbabel/tests/`.

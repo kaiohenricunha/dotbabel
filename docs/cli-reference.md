@@ -2,7 +2,7 @@
 
 _Last updated: v1.3.0_
 
-Every bin honors the **dotclaude-wide flag set** in addition to its own:
+Every bin honors the **dotbabel-wide flag set** in addition to its own:
 
 | Flag                    | Shape | Behavior                                                                           |
 | ----------------------- | ----- | ---------------------------------------------------------------------------------- |
@@ -12,7 +12,7 @@ Every bin honors the **dotclaude-wide flag set** in addition to its own:
 | `--verbose`, `-v`       | bool  | Print every `StructuredError` field (code, pointer, expected, got, hint, category) |
 | `--no-color`            | bool  | Suppress ANSI escapes regardless of TTY detection                                  |
 | `NO_COLOR=` env         | env   | Same as `--no-color`, honors the cross-tool convention                             |
-| `DOTCLAUDE_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
+| `DOTBABEL_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
 
 **Exit codes** follow a single convention across every bin:
 
@@ -23,35 +23,35 @@ Every bin honors the **dotclaude-wide flag set** in addition to its own:
 | 2    | `ENV`        | Misconfigured environment (missing file, bad git repo, unreadable facts)                      |
 | 64   | `USAGE`      | Bad CLI invocation (unknown flag, missing positional). `64` matches BSD `sysexits.h EX_USAGE` |
 
-**The umbrella `dotclaude`** forwards to each `dotclaude-<sub>` bin:
+**The umbrella `dotbabel`** forwards to each `dotbabel-<sub>` bin:
 
 ```
 # Governance validators
-dotclaude validate-specs [OPTIONS]
-dotclaude validate-skills [OPTIONS]
-dotclaude check-spec-coverage [OPTIONS]
-dotclaude check-instruction-drift [OPTIONS]
-dotclaude detect-drift [OPTIONS]
-dotclaude doctor [OPTIONS]
-dotclaude init [OPTIONS]
+dotbabel validate-specs [OPTIONS]
+dotbabel validate-skills [OPTIONS]
+dotbabel check-spec-coverage [OPTIONS]
+dotbabel check-instruction-drift [OPTIONS]
+dotbabel detect-drift [OPTIONS]
+dotbabel doctor [OPTIONS]
+dotbabel init [OPTIONS]
 
 # Installation lifecycle (added v0.4.0)
-dotclaude bootstrap [OPTIONS]
-dotclaude sync <pull|push|status> [OPTIONS]
+dotbabel bootstrap [OPTIONS]
+dotbabel sync <pull|push|status> [OPTIONS]
 
 # Taxonomy discovery (added v0.4.0)
-dotclaude index [OPTIONS]
-dotclaude search <query> [OPTIONS]
-dotclaude list [OPTIONS]
-dotclaude show <id> [OPTIONS]
+dotbabel index [OPTIONS]
+dotbabel search <query> [OPTIONS]
+dotbabel list [OPTIONS]
+dotbabel show <id> [OPTIONS]
 ```
 
-Each subcommand also exists standalone — `npx dotclaude-doctor` and
-`npx dotclaude doctor` are identical.
+Each subcommand also exists standalone — `npx dotbabel-doctor` and
+`npx dotbabel doctor` are identical.
 
 ---
 
-## `dotclaude-validate-specs`
+## `dotbabel-validate-specs`
 
 Validate every `docs/specs/<id>/spec.json` against the `StructuredError`
 contract.
@@ -63,8 +63,8 @@ contract.
 **Typical invocations:**
 
 ```bash
-npx dotclaude-validate-specs
-npx dotclaude-validate-specs --json | jq -r '.events[] | select(.kind == "fail") | .details.code'
+npx dotbabel-validate-specs
+npx dotbabel-validate-specs --json | jq -r '.events[] | select(.kind == "fail") | .details.code'
 ```
 
 **Emitted codes**: `SPEC_JSON_INVALID`, `SPEC_STATUS_INVALID`,
@@ -74,7 +74,7 @@ npx dotclaude-validate-specs --json | jq -r '.events[] | select(.kind == "fail")
 
 ---
 
-## `dotclaude-validate-skills`
+## `dotbabel-validate-skills`
 
 Validate `.claude/skills-manifest.json` — checksums, orphan files on disk,
 and the `dependencies[]` DAG.
@@ -89,7 +89,7 @@ and the `dependencies[]` DAG.
 
 ---
 
-## `dotclaude-check-instruction-drift`
+## `dotbabel-check-instruction-drift`
 
 Cross-reference `docs/repo-facts.json` against instruction files (CLAUDE.md,
 README.md). Flags stale `team_count` claims, undocumented `protected_paths`,
@@ -104,7 +104,7 @@ and broken `instruction_files` references.
 
 ---
 
-## `dotclaude-check-spec-coverage`
+## `dotbabel-check-spec-coverage`
 
 PR-time gate. Confirms every change to a protected path is covered by an
 `approved|implementing|done` spec, or the PR body carries a
@@ -126,7 +126,7 @@ Reads context from the environment — designed for GitHub Actions:
 
 ---
 
-## `dotclaude-doctor`
+## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
 hook. Prints `✓/✗/⚠` per check.
@@ -139,11 +139,11 @@ hook. Prints `✓/✗/⚠` per check.
 
 ---
 
-## `dotclaude-detect-drift`
+## `dotbabel-detect-drift`
 
 Flags `.claude/commands/*.md` that have diverged from `origin/main` for
 longer than 14 days. Thin wrapper over
-`plugins/dotclaude/scripts/detect-branch-drift.mjs`.
+`plugins/dotbabel/scripts/detect-branch-drift.mjs`.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
@@ -154,7 +154,7 @@ for more than 14 days.
 
 ---
 
-## `dotclaude-init`
+## `dotbabel-init`
 
 Scaffold the template tree into a target repo.
 
@@ -188,18 +188,18 @@ contract:
   `~/.claude/file-history/`
 
 ```bash
-bash plugins/dotclaude/scripts/validate-settings.sh
-bash plugins/dotclaude/scripts/validate-settings.sh --json <path>
+bash plugins/dotbabel/scripts/validate-settings.sh
+bash plugins/dotbabel/scripts/validate-settings.sh --json <path>
 ```
 
 `--json` emits `{events:[{check,category,status,message}], counts:{fail,warn}}`.
 
 ---
 
-## `dotclaude-bootstrap` _(added v0.4.0)_
+## `dotbabel-bootstrap` _(added v0.4.0)_
 
 Set up or refresh `~/.claude/` by symlinking `commands/`, `skills/`, and
-`CLAUDE.md` from the dotclaude source, and copying agent templates into
+`CLAUDE.md` from the dotbabel source, and copying agent templates into
 `~/.claude/agents/`. Idempotent — safe to re-run after pulling new commits.
 Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`.
 
@@ -208,31 +208,31 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 
 | Flag              | Default     |                                                  |
 | ----------------- | ----------- | ------------------------------------------------ |
-| `--source <path>` | npm install | Path to a local dotclaude git clone (clone mode) |
+| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode) |
 | `--target <dir>`  | `~/.claude` | Override destination directory                   |
 | `--quiet`         | false       | Suppress per-file progress; print summary only   |
 
 **Typical invocations:**
 
 ```bash
-dotclaude bootstrap
-dotclaude bootstrap --source ~/projects/dotclaude   # clone mode
-dotclaude bootstrap --quiet
+dotbabel bootstrap
+dotbabel bootstrap --source ~/projects/dotbabel   # clone mode
+dotbabel bootstrap --quiet
 ```
 
 **Returns** a summary with counts: `{linked, skipped, backed_up}`.
 
 ---
 
-## `dotclaude-sync` _(added v0.4.0)_
+## `dotbabel-sync` _(added v0.4.0)_
 
-Pull, push, or check status for a dotclaude installation. Works in two modes:
+Pull, push, or check status for a dotbabel installation. Works in two modes:
 **npm mode** (default — installed globally via npm) or **clone mode** (local
 git checkout, activated with `--source`).
 
 | Flag              | Default     |                                     |
 | ----------------- | ----------- | ----------------------------------- |
-| `--source <path>` | npm install | Path to a local dotclaude git clone |
+| `--source <path>` | npm install | Path to a local dotbabel git clone |
 | `--quiet`         | false       | Suppress per-file progress          |
 
 **Subcommands:**
@@ -246,14 +246,14 @@ git checkout, activated with `--source`).
 **Typical invocations:**
 
 ```bash
-dotclaude sync pull            # update to latest
-dotclaude sync status          # check installed version
-dotclaude sync push            # commit + push local changes (clone mode)
+dotbabel sync pull            # update to latest
+dotbabel sync status          # check installed version
+dotbabel sync push            # commit + push local changes (clone mode)
 ```
 
 ---
 
-## `dotclaude-index` _(added v0.4.0)_
+## `dotbabel-index` _(added v0.4.0)_
 
 Rebuild the taxonomy index (`index/artifacts.json`, `index/by-type.json`,
 `index/by-facet.json`) from authored artifacts in `agents/`, `skills/`,
@@ -269,19 +269,19 @@ and `show` can operate.
 **Typical invocations:**
 
 ```bash
-dotclaude index                    # rebuild
-dotclaude index --check            # CI freshness gate — exit 1 if stale
-dotclaude index --strict           # fail on any warning
+dotbabel index                    # rebuild
+dotbabel index --check            # CI freshness gate — exit 1 if stale
+dotbabel index --strict           # fail on any warning
 ```
 
 **Emitted codes** (when `--check` fails): `INDEX_STALE`.
 
 ---
 
-## `dotclaude-search` _(added v0.4.0)_
+## `dotbabel-search` _(added v0.4.0)_
 
 Full-text search over the taxonomy index by name, id, and description.
-Requires `dotclaude index` to have been run at least once.
+Requires `dotbabel index` to have been run at least once.
 
 | Flag                 | Default          |                                                        |
 | -------------------- | ---------------- | ------------------------------------------------------ |
@@ -291,19 +291,19 @@ Requires `dotclaude index` to have been run at least once.
 **Typical invocations:**
 
 ```bash
-dotclaude search kubernetes
-dotclaude search "IaC module" --type skill
-dotclaude search aws --json | jq -r '.[] | .id'
+dotbabel search kubernetes
+dotbabel search "IaC module" --type skill
+dotbabel search aws --json | jq -r '.[] | .id'
 ```
 
 Searches are case-insensitive. Exit 2 if the index is missing.
 
 ---
 
-## `dotclaude-list` _(added v0.4.0)_
+## `dotbabel-list` _(added v0.4.0)_
 
 List all artifacts from the taxonomy index with optional facet filters.
-Requires `dotclaude index` to have been run at least once.
+Requires `dotbabel index` to have been run at least once.
 
 | Flag                    | Default          |                          |
 | ----------------------- | ---------------- | ------------------------ |
@@ -320,15 +320,15 @@ combine with AND logic.
 **Typical invocations:**
 
 ```bash
-dotclaude list
-dotclaude list --type command
-dotclaude list --domain devex --maturity validated
-dotclaude list --json | jq -r '.[].id'
+dotbabel list
+dotbabel list --type command
+dotbabel list --domain devex --maturity validated
+dotbabel list --json | jq -r '.[].id'
 ```
 
 ---
 
-## `dotclaude-show` _(added v0.4.0)_
+## `dotbabel-show` _(added v0.4.0)_
 
 Display detailed metadata for a single artifact by its id. When a skill and
 agent share an id, use `--type` to disambiguate.
@@ -341,9 +341,9 @@ agent share an id, use `--type` to disambiguate.
 **Typical invocations:**
 
 ```bash
-dotclaude show aws-specialist
-dotclaude show review-pr --type command
-dotclaude show pre-pr --json
+dotbabel show aws-specialist
+dotbabel show review-pr --type command
+dotbabel show pre-pr --json
 ```
 
 Exit 1 if the artifact is not found. Exit 2 if the index is missing.

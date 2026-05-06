@@ -17,7 +17,7 @@ _Last updated: v1.3.0_
 
 ```bash
 cd your-project
-npm install --save-dev @dotclaude/dotclaude
+npm install --save-dev @dotbabel/dotbabel
 ```
 
 The package has **zero runtime dependencies**. It registers seven bins under
@@ -25,19 +25,19 @@ The package has **zero runtime dependencies**. It registers seven bins under
 
 ```
 harness
-dotclaude-doctor
-dotclaude-detect-drift
-dotclaude-init
-dotclaude-validate-specs
-dotclaude-validate-skills
-dotclaude-check-spec-coverage
-dotclaude-check-instruction-drift
+dotbabel-doctor
+dotbabel-detect-drift
+dotbabel-init
+dotbabel-validate-specs
+dotbabel-validate-skills
+dotbabel-check-spec-coverage
+dotbabel-check-instruction-drift
 ```
 
 ### 2. Scaffold the governance tree
 
 ```bash
-npx dotclaude-init --project-name your-project --project-type node
+npx dotbabel-init --project-name your-project --project-type node
 ```
 
 This writes:
@@ -54,7 +54,7 @@ substituted at scaffold time.
 ### 3. Run the self-diagnostic
 
 ```bash
-npx dotclaude-doctor
+npx dotbabel-doctor
 ```
 
 You should see `✓` rows for env, repo, facts, manifest, specs, drift, hook.
@@ -90,7 +90,7 @@ Minimum viable `spec.json`:
 Validate it:
 
 ```bash
-npx dotclaude-validate-specs
+npx dotbabel-validate-specs
 ```
 
 Green. You're done.
@@ -104,7 +104,7 @@ In GitHub branch protection, require the three shipped workflows:
 - `ai-review` — PR review (optional)
 
 Any PR touching a protected path (see `docs/repo-facts.json`) must now carry
-a `Spec ID:` or `## No-spec rationale` section. `dotclaude-check-spec-coverage`
+a `Spec ID:` or `## No-spec rationale` section. `dotbabel-check-spec-coverage`
 enforces it.
 
 ### Next
