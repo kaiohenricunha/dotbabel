@@ -1511,6 +1511,98 @@ describe("parsePushDeleteStderr", () => {
   });
 });
 
+// ---- seedTransportDefaultBranch ---------------------------------------
+
+describe("seedTransportDefaultBranch", () => {
+  beforeEach(() => {
+    spawnSync.mockReset();
+    mkdtempSync.mockReset().mockReturnValue("/tmp/mock-seed");
+  });
+
+  it("no-ops the seed when main already exists on the remote and PATCHes default to main", () => {
+    // ls-remote: main exists.
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abcdef0123456789abcdef0123456789abcdef01\trefs/heads/main\n",
+      stderr: "",
+    });
+    // gh api PATCH: success.
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    const r = lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git");
+    expect(r).toEqual({ seeded: false, defaultBranchPatched: true });
+    // Two spawns total (no init/add/commit/push).
+    expect(spawnSync).toHaveBeenCalledTimes(2);
+    const cmds = spawnSync.mock.calls.map((c) => `${c[0]} ${c[1].slice(0, 2).join(" ")}`);
+    expect(cmds[0]).toMatch(/^git ls-remote/);
+    expect(cmds[1]).toMatch(/^gh api/);
+  });
+
+  it("seeds main via init/add/commit/push when ls-remote returns no refs, then PATCHes default", () => {
+    // ls-remote: empty stdout.
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // git init -b main
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // git add README.md
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // git commit
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // git push
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    // gh api PATCH
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    const r = lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git");
+    expect(r).toEqual({ seeded: true, defaultBranchPatched: true });
+    const initCall = spawnSync.mock.calls.find(
+      (c) => c[0] === "git" && Array.isArray(c[1]) && c[1].includes("init"),
+    );
+    expect(initCall[1]).toContain("-b");
+    expect(initCall[1]).toContain("main");
+    const pushCall = spawnSync.mock.calls.find(
+      (c) => c[0] === "git" && Array.isArray(c[1]) && c[1][0] === "push",
+    );
+    expect(pushCall[1]).toContain("git@github.com:alice/store.git");
+    expect(pushCall[1]).toContain("main");
+    const patchCall = spawnSync.mock.calls.find(
+      (c) => c[0] === "gh" && Array.isArray(c[1]) && c[1].includes("PATCH"),
+    );
+    expect(patchCall[1]).toContain("repos/alice/store");
+    expect(patchCall[1]).toContain("default_branch=main");
+  });
+
+  it("returns a warning instead of throwing when the gh PATCH fails", () => {
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abcdef0123456789abcdef0123456789abcdef01\trefs/heads/main\n",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "",
+      stderr: "HTTP 403: Resource not accessible by integration",
+    });
+    const r = lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git");
+    expect(r.seeded).toBe(false);
+    expect(r.defaultBranchPatched).toBe(false);
+    expect(r.warning).toMatch(/could not set default branch to main/);
+    expect(r.warning).toMatch(/repos\/alice\/store/);
+  });
+
+  it("throws when push of seeded main fails (cannot establish main on remote)", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // ls-remote empty
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git add
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git commit
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "",
+      stderr: "fatal: unable to access remote",
+    });
+    expect(() =>
+      lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git"),
+    ).toThrow(/git push.*main.*failed/);
+  });
+});
+
 // ---- probeCollision ----------------------------------------------------
 
 describe("probeCollision", () => {
