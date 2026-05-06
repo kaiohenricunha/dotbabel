@@ -6,6 +6,26 @@ All notable changes to `@dotclaude/dotclaude` land here. Format follows
 
 ## Unreleased
 
+## [1.4.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.3.0...v1.4.0) (2026-05-06)
+
+
+### Added
+
+* **core:** migrate complex commands to skills ([#177](https://github.com/kaiohenricunha/dotclaude/issues/177)) ([13c105e](https://github.com/kaiohenricunha/dotclaude/commit/13c105e644be6f20bb446c0cd37a857dfaa2f7a9))
+* **handoff:** implement Gemini support ([#185](https://github.com/kaiohenricunha/dotclaude/issues/185)) ([1234b60](https://github.com/kaiohenricunha/dotclaude/commit/1234b6013109deba2075c6c8ff830e9cd44c1cff))
+* **skills:** add deploy status and rollback workflows ([#182](https://github.com/kaiohenricunha/dotclaude/issues/182)) ([28120b4](https://github.com/kaiohenricunha/dotclaude/commit/28120b40c2d90f58aff19b20ef2684df8ddf8fc2))
+
+
+### Fixed
+
+* **handoff:** partition push --delete stderr for accurate prune reporting ([#183](https://github.com/kaiohenricunha/dotclaude/issues/183)) ([7fa6b7f](https://github.com/kaiohenricunha/dotclaude/commit/7fa6b7f16c99d3477a26d23c63823d8652f01139))
+* **handoff:** seed main as transport repo default during bootstrap ([#184](https://github.com/kaiohenricunha/dotclaude/issues/184)) ([6c3dabf](https://github.com/kaiohenricunha/dotclaude/commit/6c3dabffd974df94035306f9630dbb8bb368fcd5))
+
+
+### Documentation
+
+* clarify skills and command inventory ([#175](https://github.com/kaiohenricunha/dotclaude/issues/175)) ([42e1b5f](https://github.com/kaiohenricunha/dotclaude/commit/42e1b5f465d95462b9c684e24c172b058759b8bb))
+
 ## [1.3.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.1...v1.3.0) (2026-05-04)
 
 ### Added
