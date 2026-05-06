@@ -1175,13 +1175,71 @@ export function listPruneCandidates({ olderThanMs, fromCli = null, repoUrl }) {
 }
 
 /**
+ * Escape a branch name for embedding in a RegExp. Branch names contain `/`
+ * and digits; `.` and `+` are theoretically possible.
+ *
+ * @param {string} s
+ * @returns {string}
+ */
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Parse `git push --delete` stderr into per-ref outcomes for the input
+ * branches. Recognized line shapes (modern git):
+ *
+ *   - [deleted]         <ref>
+ *   ! [remote rejected] <ref> (<reason>)
+ *   ! [rejected]        <ref> (<reason>)
+ *   ! [error]           <ref> (<reason>)
+ *
+ * `<ref>` may appear with or without the `refs/heads/` prefix. A branch
+ * matched by no line is returned in `unclassified` so the caller can
+ * fall back to a per-ref retry.
+ *
+ * @param {string} stderr
+ * @param {string[]} branches
+ * @returns {{ deleted: string[], failures: Array<{branch: string, reason: string}>, unclassified: string[] }}
+ */
+export function parsePushDeleteStderr(stderr, branches) {
+  const text = stderr || "";
+  const deleted = [];
+  const failures = [];
+  const unclassified = [];
+  for (const branch of branches) {
+    const refPattern = `(?:refs/heads/)?${escapeRegExp(branch)}`;
+    const deletedRe = new RegExp(`^\\s*-\\s*\\[deleted\\]\\s+${refPattern}\\s*$`, "m");
+    const rejectedRe = new RegExp(
+      `^\\s*!\\s*\\[(?:remote rejected|rejected|error)\\]\\s+${refPattern}\\s+\\((.*)\\)\\s*$`,
+      "m",
+    );
+    if (deletedRe.test(text)) {
+      deleted.push(branch);
+      continue;
+    }
+    const m = text.match(rejectedRe);
+    if (m) {
+      const reason = redactUrlSecrets((m[1] || "").trim()) || "rejected";
+      failures.push({ branch, reason });
+      continue;
+    }
+    unclassified.push(branch);
+  }
+  return { deleted, failures, unclassified };
+}
+
+/**
  * Delete N remote branches in one `git push --delete` call. Works from a
  * throwaway tmp git repo — no working tree, no commits required.
  *
- * Returns per-branch results: branches absent from the failures array
- * succeeded. The git protocol surfaces per-ref status, but parsing it
- * portably is brittle; on a non-zero overall exit we treat the whole batch
- * as failed and surface the raw stderr for the bin's error formatter.
+ * On non-zero overall exit, parse `git push --delete` per-ref status from
+ * stderr to partition the input into deleted vs. rejected. Branches the
+ * parser cannot classify are retried one by one (bounded), so a corrupt
+ * or unfamiliar stderr never causes us to lose a per-ref outcome silently.
+ * If the parser produces no signal at all, fall back to the legacy
+ * "all-failed with raw stderr" behavior so the operator still sees the
+ * underlying error.
  *
  * @param {string} repoUrl
  * @param {string[]} branches
@@ -1200,11 +1258,30 @@ export function deleteRemoteBranches(repoUrl, branches) {
     if (r.status === 0) {
       return { deleted: branches.slice(), failures: [] };
     }
-    const reason = redactUrlSecrets((r.stderr || r.stdout).trim()) || "unknown error";
-    return {
-      deleted: [],
-      failures: branches.map((branch) => ({ branch, reason })),
-    };
+    const stderr = r.stderr || r.stdout || "";
+    const parsed = parsePushDeleteStderr(stderr, branches);
+    const deleted = parsed.deleted.slice();
+    const failures = parsed.failures.slice();
+    for (const branch of parsed.unclassified) {
+      const rr = runGit(["push", "-q", repoUrl, "--delete", `refs/heads/${branch}`], tmp);
+      if (rr.status === 0) {
+        deleted.push(branch);
+        continue;
+      }
+      const rrText = (rr.stderr || rr.stdout || "").trim();
+      const retryParsed = parsePushDeleteStderr(rrText, [branch]);
+      if (retryParsed.failures.length === 1) {
+        failures.push(retryParsed.failures[0]);
+        continue;
+      }
+      const firstLine = redactUrlSecrets(rrText).split("\n")[0].trim();
+      failures.push({ branch, reason: firstLine || "unknown error" });
+    }
+    if (deleted.length === 0 && failures.length === 0) {
+      const reason = redactUrlSecrets(stderr.trim()) || "unknown error";
+      return { deleted: [], failures: branches.map((branch) => ({ branch, reason })) };
+    }
+    return { deleted, failures };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
