@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Behavior tests for the `any` mode of plugins/dotclaude/scripts/handoff-resolve.sh.
 #
-# The `any` mode probes all three session roots (claude, copilot, codex)
+# The `any` mode probes all four session roots (claude, copilot, codex, gemini)
 # and:
 #   - returns the single matching path on stdout plus matched-field=/
 #     matched-value= metadata on stderr when exactly one root resolves
@@ -44,6 +44,13 @@ setup() {
   printf '{"type":"session_meta","payload":{"id":"eeee5555-5555-5555-5555-555555555555","cwd":"/work"}}\n{"type":"event_msg","payload":{"thread_id":"eeee5555-5555-5555-5555-555555555555","thread_name":"refactor","type":"thread_renamed"}}\n' \
     > "$CODEX_ALIAS_FILE"
 
+  # Gemini fixture: checkpoint alias "gemini-only".
+  mkdir -p "$TEST_HOME/.gemini/tmp/demo/chats"
+  GEMINI_ALIAS_FILE="$TEST_HOME/.gemini/tmp/demo/chats/session-2026-04-18T10-30-9999aaaa.jsonl"
+  printf '{"sessionId":"9999aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","projectHash":"h","startTime":"2026-04-18T10:30:00.000Z","kind":"main"}\n{"type":"info","content":"Conversation checkpoint saved with tag: gemini-only."}\n' \
+    > "$GEMINI_ALIAS_FILE"
+  printf '{"authType":"oauth","history":[]}\n' > "$TEST_HOME/.gemini/tmp/demo/checkpoint-gemini-only.json"
+
   # Newer codex rollout — explicit mtime ordering via `touch -t` (POSIX,
   # portable across GNU and BSD/macOS), since `sleep` fractions are
   # unreliable across filesystems (tmpfs mtime resolution is often 1s).
@@ -52,11 +59,12 @@ setup() {
     > "$CODEX_NEWEST_FILE"
   touch -t 202604180900.00 "$CLAUDE_ALIAS_FILE"
   touch -t 202604181000.00 "$CLAUDE_PLAIN_FILE"
+  touch -t 202604181030.00 "$GEMINI_ALIAS_FILE"
   touch -t 202604181100.00 "$COPILOT_FILE"
   touch -t 202604181200.00 "$CODEX_ALIAS_FILE"
   touch -t 202604181300.00 "$CODEX_NEWEST_FILE"
 
-  export CLAUDE_ALIAS_FILE CLAUDE_PLAIN_FILE COPILOT_FILE CODEX_ALIAS_FILE CODEX_NEWEST_FILE
+  export CLAUDE_ALIAS_FILE CLAUDE_PLAIN_FILE COPILOT_FILE CODEX_ALIAS_FILE CODEX_NEWEST_FILE GEMINI_ALIAS_FILE
 }
 
 teardown() {
@@ -92,6 +100,14 @@ teardown() {
   [ "$output" = "$CODEX_ALIAS_FILE" ]
 }
 
+@test "any: resolves gemini checkpoint alias when unique" {
+  run --separate-stderr "$RESOLVE" any gemini-only
+  [ "$status" -eq 0 ]
+  [ "$output" = "$GEMINI_ALIAS_FILE" ]
+  [[ "$stderr" == *"matched-field=checkpoint"* ]]
+  [[ "$stderr" == *"matched-value=gemini-only"* ]]
+}
+
 @test "any: resolves codex full UUID" {
   run --separate-stderr "$RESOLVE" any eeee5555-5555-5555-5555-555555555555
   [ "$status" -eq 0 ]
@@ -104,7 +120,7 @@ teardown() {
   [ "$output" = "$COPILOT_FILE" ]
 }
 
-@test "any: latest picks newest across all three roots and emits matched-field=latest metadata" {
+@test "any: latest picks newest across all four roots and emits matched-field=latest metadata" {
   # Verifies (d).9 closure of the (d).7 gap: the `any latest` early-return
   # block in resolve_any now emits matched-field=/matched-value= stderr
   # metadata mirroring the per-CLI single-hit contract.
@@ -167,6 +183,32 @@ teardown() {
   local copilot_rows
   copilot_rows=$(echo "$stderr" | grep -c $'\t'"name"$)
   [ "$copilot_rows" -eq 1 ]
+}
+
+@test "any: cross-CLI collision claude customTitle + gemini checkpoint emits 5-col TSV" {
+  local claude_uuid="bbbb9999-9999-9999-9999-999999999999"
+  local claude_path="$TEST_HOME/.claude/projects/-home-u-demo/$claude_uuid.jsonl"
+  printf '{"cwd":"/home/u/demo","sessionId":"%s","version":"2.1"}\n' "$claude_uuid" > "$claude_path"
+  set_claude_custom_title "$claude_path" "$claude_uuid" "shared-gemini"
+
+  local gemini_dir="$TEST_HOME/.gemini/tmp/other"
+  mkdir -p "$gemini_dir/chats"
+  local gemini_path="$gemini_dir/chats/session-2026-04-18T14-30-aaaa9999.jsonl"
+  printf '{"sessionId":"aaaa9999-9999-9999-9999-999999999999","projectHash":"h","startTime":"2026-04-18T14:30:00.000Z","kind":"main"}\n{"type":"info","content":"Conversation checkpoint saved with tag: shared-gemini."}\n' > "$gemini_path"
+  printf '{"authType":"oauth","history":[]}\n' > "$gemini_dir/checkpoint-shared-gemini.json"
+
+  run --separate-stderr "$RESOLVE" any "shared-gemini"
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"multiple sessions match"* ]]
+  [[ "$stderr" == *"$claude_path"* ]]
+  [[ "$stderr" == *"$gemini_path"* ]]
+  local claude_rows
+  claude_rows=$(echo "$stderr" | grep -c $'\t'"customTitle"$)
+  [ "$claude_rows" -eq 1 ]
+  local gemini_rows
+  gemini_rows=$(echo "$stderr" | grep -c $'\t'"checkpoint"$)
+  [ "$gemini_rows" -eq 1 ]
 }
 
 @test "any: missing identifier exits 64" {

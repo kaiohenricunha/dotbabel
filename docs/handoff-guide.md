@@ -138,9 +138,9 @@ Sub-commands that render content accept `--summary` (terse inline) and `-o <path
 
 Every `<query>` can be a full UUID, short UUID (first 8 hex), `latest`,
 or a deliberate-label alias: Claude `customTitle`/`aiTitle`, Codex
-`thread_name`, or Copilot `workspace.yaml:name`. Aliases match
-case-insensitively. Resolution precedence: UUID > short-UUID > `latest` >
-alias (no fall-through on miss).
+`thread_name`, Copilot `workspace.yaml:name`, or Gemini `checkpoint`
+(`/chat save <tag>`). Aliases match case-insensitively. Resolution
+precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).
 
 ---
 
@@ -172,6 +172,7 @@ alias (no fall-through on miss).
 /handoff pull "refactor extract pipeline"   # matches Claude aiTitle "Refactor Extract Pipeline" (case-folded)
 /handoff pull "pull latest changes"         # matches Copilot workspace.yaml:name "Pull Latest Changes"
 /handoff pull "my-feature"                  # matches Codex thread_name "my-feature"
+/handoff pull "test"                        # matches Gemini checkpoint "test" from /chat save test
 ```
 
 **Scripting with structured output:**

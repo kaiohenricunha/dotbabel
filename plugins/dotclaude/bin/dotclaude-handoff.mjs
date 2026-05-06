@@ -16,9 +16,10 @@
  *   dotclaude handoff prune --older-than <30d|6m|1y|YYYY-MM-DD> [--yes] [--dry-run]
  *   dotclaude handoff doctor
  *
- * `<id>` / `<query>` resolves across all three CLIs (claude, copilot, codex):
+ * `<id>` / `<query>` resolves across all four CLIs (claude, copilot, codex, gemini):
  * full UUID, short UUID (first 8 hex), `latest`, or a named alias
- * (Claude customTitle/aiTitle, Codex thread_name, Copilot workspace.yaml:name).
+ * (Claude customTitle/aiTitle, Codex thread_name, Copilot workspace.yaml:name,
+ * Gemini checkpoint).
  * Aliases use case-insensitive exact match. `latest` is host-scoped (#85).
  * Resolution precedence: UUID > short-UUID > latest > alias (no fall-through).
  *
@@ -96,14 +97,14 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
-const CLIS = new Set(["claude", "copilot", "codex"]);
+const CLIS = new Set(["claude", "copilot", "codex", "gemini"]);
 
 const META = {
   name: "dotclaude-handoff",
   synopsis:
     "dotclaude handoff [pull|fetch|list|search|push|prune|doctor] [args...] [--from <cli>] [--summary] [-o <path>] [--tag <label>...] [--tags] [--since <ISO>] [--limit <N>] [--verify] [--dry-run] [--older-than <30d|6m|1y|YYYY-MM-DD>] [--yes]",
   description:
-    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.\n\nA `<query>` resolves by full UUID, short UUID (first 8 hex), `latest`, or a deliberate-label alias: claude `customTitle`/`aiTitle`, codex `thread_name`, or copilot `workspace.yaml:name`. Aliases match case-insensitively. Resolution precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).",
+    "Cross-agent and cross-machine session handoff. `pull <id>` renders a local session as <handoff> block (or --summary / -o <path>). push/fetch handle the remote transport (a user-owned private git repo named by DOTCLAUDE_HANDOFF_REPO). push/fetch auto-run a preflight check (cached 5 min); --verify forces re-run.\n\nFor push without a query, --from <cli> is required. Omitting --from exits 64 with a usage hint.\n\nA `<query>` resolves by full UUID, short UUID (first 8 hex), `latest`, or a deliberate-label alias: claude `customTitle`/`aiTitle`, codex `thread_name`, copilot `workspace.yaml:name`, or gemini `checkpoint`. Aliases match case-insensitively. Resolution precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).",
   flags: {
     // #91 Gap 7: tag is multi-valued for push (--tag foo --tag bar) and a
     // single-value filter on `list --remote --tag <name>`. argv.mjs always
@@ -240,7 +241,7 @@ async function resolveAny(query) {
 /**
  * Resolve `<id>` against a single CLI's root. Thin wrapper over the per-CLI
  * entry point of handoff-resolve.sh. Collisions can occur on alias scans
- * (claude customTitle/aiTitle, codex thread_name, copilot name) when multiple
+ * (claude customTitle/aiTitle, codex thread_name, copilot name, gemini checkpoint) when multiple
  * sessions share the same alias value within one CLI's root — handled via
  * parseCollisionAndDispatch (TTY prompt or non-TTY stderr passthrough).
  *
@@ -341,6 +342,7 @@ function cliFromPath(path) {
   if (path.includes("/.claude/projects/")) return "claude";
   if (path.includes("/.copilot/session-state/")) return "copilot";
   if (path.includes("/.codex/sessions/")) return "codex";
+  if (path.includes("/.gemini/tmp/")) return "gemini";
   return "claude";
 }
 
@@ -438,6 +440,7 @@ function renderDescribeMarkdown(meta, prompts) {
 // ---- local session enumeration (list --local) --------------------------
 
 const UUID_HEAD_RE = /([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/;
+const GEMINI_SESSION_HEAD_RE = /\/session-[^/]*-([0-9a-f]{8})\.jsonl$/;
 
 const CLI_LAYOUTS = {
   claude: {
@@ -454,6 +457,11 @@ const CLI_LAYOUTS = {
     root: (home) => join(home, ".codex", "sessions"),
     walk: 3,
     match: (name) => name.startsWith("rollout-") && name.endsWith(".jsonl"),
+  },
+  gemini: {
+    root: (home) => join(home, ".gemini", "tmp"),
+    walk: 2,
+    match: (name) => name.startsWith("session-") && name.endsWith(".jsonl"),
   },
 };
 
@@ -492,7 +500,8 @@ function listLocalSessions(cli) {
     } catch {
       continue;
     }
-    const m = file.match(UUID_HEAD_RE);
+    const m =
+      file.match(UUID_HEAD_RE) ?? (cli === "gemini" ? file.match(GEMINI_SESSION_HEAD_RE) : null);
     const shortId = m ? m[1] : "?";
     const when = new Date(mtime * 1000).toISOString().replace("T", " ").slice(0, 16);
     rows.push({ location: "local", cli, short_id: shortId, file, mtime, when });
@@ -506,6 +515,7 @@ function listAllLocalSessions() {
     ...listLocalSessions("claude"),
     ...listLocalSessions("copilot"),
     ...listLocalSessions("codex"),
+    ...listLocalSessions("gemini"),
   ].sort((a, b) => b.mtime - a.mtime);
 }
 
@@ -513,7 +523,7 @@ function listAllLocalSessions() {
 
 /**
  * Best-effort identification of the agentic CLI the binary is running
- * inside. Returns "claude" | "copilot" | "codex" | "unknown".
+ * inside. Returns "claude" | "copilot" | "codex" | "gemini" | "unknown".
  *
  * All four signals below are UNCONFIRMED in the dotclaude codebase:
  * neither the repo nor the upstream CLIs document stable env-var
@@ -523,7 +533,7 @@ function listAllLocalSessions() {
  * falls back to "unknown" and the union resolver.
  *
  * Probe order matters when multiple probes fire: claude probes run
- * first, then codex, then copilot. The realistic multi-signal case
+ * first, then codex, then copilot, then gemini. The realistic multi-signal case
  * is env inheritance — e.g. `dotclaude-handoff` invoked inside a
  * Codex session that was launched from a Claude Code bash shell
  * inherits `CLAUDECODE=1`. In that case "claude wins", which is a
@@ -531,7 +541,7 @@ function listAllLocalSessions() {
  * of truth; callers who want the inner CLI should pass `--from`.
  *
  * @param {NodeJS.ProcessEnv} [env]
- * @returns {"claude" | "copilot" | "codex" | "unknown"}
+ * @returns {"claude" | "copilot" | "codex" | "gemini" | "unknown"}
  */
 function detectHost(env = process.env) {
   // UNCONFIRMED: Claude Code is widely believed to set CLAUDECODE=1
@@ -550,6 +560,12 @@ function detectHost(env = process.env) {
   // avoid guessing which GitHub tooling variant is in use.
   for (const k in env) {
     if (k.startsWith("GITHUB_COPILOT_") || k.startsWith("COPILOT_")) return "copilot";
+  }
+  // UNCONFIRMED: Gemini CLI sets GEMINI_CLI=1 and GEMINI_CLI_* vars for IDE
+  // detection. Check the exact var first, then the prefix as a fallback.
+  if (env.GEMINI_CLI === "1") return "gemini";
+  for (const k in env) {
+    if (k.startsWith("GEMINI_CLI_")) return "gemini";
   }
   return "unknown";
 }

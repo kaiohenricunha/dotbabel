@@ -91,6 +91,34 @@ describe("v2BranchName", () => {
       }),
     ).toBe("handoff/my-project/codex/2026-04/ff00aa11");
   });
+
+  it("allows gemini as the cli segment", () => {
+    expect(
+      lib.v2BranchName({
+        project: "dotclaude",
+        cli: "gemini",
+        month: "2026-05",
+        shortId: "9999aaaa",
+      }),
+    ).toBe("handoff/dotclaude/gemini/2026-05/9999aaaa");
+  });
+});
+
+describe("parseHandoffBranch", () => {
+  it("parses gemini v2 and legacy v1 branch names", () => {
+    expect(lib.parseHandoffBranch("handoff/dotclaude/gemini/2026-05/9999aaaa")).toEqual({
+      version: 2,
+      cli: "gemini",
+      shortId: "9999aaaa",
+      yearMonth: "2026-05",
+    });
+    expect(lib.parseHandoffBranch("handoff/gemini/9999aaaa")).toEqual({
+      version: 1,
+      cli: "gemini",
+      shortId: "9999aaaa",
+      yearMonth: "",
+    });
+  });
 });
 
 describe("monthBucket", () => {

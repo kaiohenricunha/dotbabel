@@ -67,6 +67,12 @@ describe("handoff push — §5.5.2 mandatory-`--from` contract (Phase 2 PR 3)", 
     expect(result.stderr).not.toMatch(/requires --from/i);
   });
 
+  it("push --from gemini without <query> is accepted (parser does not reject)", () => {
+    const result = runHandoff(["push", "--from", "gemini"], hermeticHome);
+    expect(result.status).not.toBe(64);
+    expect(result.stderr).not.toMatch(/requires --from/i);
+  });
+
   it("push <query> without --from is accepted (explicit query exempts the rule)", () => {
     const result = runHandoff(["push", "deadbeef"], hermeticHome);
     expect(result.status).not.toBe(64);

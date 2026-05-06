@@ -116,11 +116,17 @@ const PHASE_1_BASELINE_FROM_RULE = Object.freeze({
 
 /**
  * Cross-source intersection of alias-resolution mechanisms (#158).
- * All 4 forms must appear in --help, SKILL.md, AND handoff-guide.md
+ * All 5 forms must appear in --help, SKILL.md, AND handoff-guide.md
  * (Steps 5+6 of the v1.3.0 alias-resolver work updated each source
- * to enumerate the 4 mechanisms by canonical name).
+ * to enumerate the resolver mechanisms by canonical name).
  */
-const PHASE_2_BASELINE_ALIAS_MECHANISMS = ["aiTitle", "customTitle", "name", "thread_name"];
+const PHASE_2_BASELINE_ALIAS_MECHANISMS = [
+  "aiTitle",
+  "checkpoint",
+  "customTitle",
+  "name",
+  "thread_name",
+];
 
 // ---------------------------------------------------------------------------
 // Extractors
@@ -357,17 +363,18 @@ export function extractFabricationRule(text) {
 
 /**
  * Scan a source for canonical alias-mechanism names. The handoff resolver
- * dispatches alias queries through 4 mechanisms — claude `customTitle`,
- * claude `aiTitle`, codex `thread_name`, copilot `workspace.yaml:name` —
- * and ARCH-10 asserts that all 4 are documented across the cross-source
+ * dispatches alias queries through 5 mechanisms — claude `customTitle`,
+ * claude `aiTitle`, codex `thread_name`, copilot `workspace.yaml:name`,
+ * gemini `checkpoint` —
+ * and ARCH-10 asserts that all 5 are documented across the cross-source
  * triangle (--help / SKILL.md / handoff-guide.md). When any source
- * documents fewer than 4, the alias surface has drifted out of sync with
+ * documents fewer than 5, the alias surface has drifted out of sync with
  * the resolver implementation; the test fails to surface that.
  *
  * The mechanism names map to canonical strings the sources MUST mention:
- * `customTitle`, `aiTitle`, `thread_name`, and `workspace.yaml:name` (the
- * copilot mechanism uses the full `workspace.yaml:name` form to disambiguate
- * from incidental `--name` flags or generic "name" prose). If a future
+ * `customTitle`, `aiTitle`, `thread_name`, `workspace.yaml:name`, and
+ * `checkpoint` (the copilot mechanism uses the full `workspace.yaml:name`
+ * form to disambiguate from incidental `--name` flags or generic "name" prose). If a future
  * source documents copilot's alias mechanism without using the canonical
  * form, that's drift worth surfacing — the test should fail, not be
  * patched to pass via fallback regexes.
@@ -381,6 +388,7 @@ export function extractAliasMechanisms(text) {
   if (/\baiTitle\b/.test(text)) found.add("aiTitle");
   if (/\bthread_name\b/.test(text)) found.add("thread_name");
   if (/workspace\.yaml:name\b/.test(text)) found.add("name");
+  if (/\bcheckpoint\b/.test(text)) found.add("checkpoint");
   return [...found].sort();
 }
 

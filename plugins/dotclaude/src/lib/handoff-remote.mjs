@@ -26,9 +26,9 @@ import { autoPreflight } from "./handoff-preflight.mjs";
 
 /** Matches v2 handoff branch names: handoff/<project>/<cli>/<YYYY-MM>/<shortId>. */
 export const V2_BRANCH_RE =
-  /^handoff\/[a-z0-9-]+\/(claude|copilot|codex)\/\d{4}-\d{2}\/[0-9a-f]{8}$/;
+  /^handoff\/[a-z0-9-]+\/(claude|copilot|codex|gemini)\/\d{4}-\d{2}\/[0-9a-f]{8}$/;
 /** Matches legacy v1 handoff branch names: handoff/<cli>/<shortId>. */
-export const V1_BRANCH_RE = /^handoff\/(claude|copilot|codex)\/[0-9a-f]{8}$/;
+export const V1_BRANCH_RE = /^handoff\/(claude|copilot|codex|gemini)\/[0-9a-f]{8}$/;
 
 /**
  * Decompose a handoff branch into `{version, cli, shortId, yearMonth}`.

@@ -84,7 +84,23 @@ EOF
 {"type":"event_msg","payload":{"type":"exec_command_end","exit_code":0,"stdout":"ok"}}
 EOF
 
-  export CLAUDE_FILE COPILOT_FILE COPILOT_DIR CODEX_FILE CODEX_EMPTY_FILE TEST_DIR
+  # --- Gemini fixture: project root sidecar + session JSONL transcript.
+  GEMINI_DIR="$TEST_DIR/gemini-project"
+  mkdir -p "$GEMINI_DIR/chats"
+  printf '/work/gemini-demo\n' > "$GEMINI_DIR/.project_root"
+  GEMINI_FILE="$GEMINI_DIR/chats/session-2026-05-06T14-11-9999aaaa.jsonl"
+  cat > "$GEMINI_FILE" <<'EOF'
+{"sessionId":"9999aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","projectHash":"h","startTime":"2026-05-06T14:11:01.780Z","lastUpdated":"2026-05-06T14:11:01.780Z","kind":"main"}
+{"type":"user","timestamp":"2026-05-06T14:11:04.000Z","content":[{"text":"First Gemini prompt"}]}
+{"type":"gemini","timestamp":"2026-05-06T14:11:05.000Z","content":"First Gemini reply","model":"gemini-2.5-pro"}
+{"type":"gemini","timestamp":"2026-05-06T14:11:05.100Z","content":"First Gemini reply","model":"gemini-2.5-pro","toolCalls":[{"name":"ReadFile"}]}
+{"type":"info","timestamp":"2026-05-06T14:11:06.000Z","content":"Conversation checkpoint saved with tag: test."}
+{"type":"user","timestamp":"2026-05-06T14:11:07.000Z","content":[{"text":"Multi-line Gemini prompt\nwith two lines"}]}
+{"type":"gemini","timestamp":"2026-05-06T14:11:08.000Z","content":"","thoughts":"tool-only thought"}
+{"type":"gemini","timestamp":"2026-05-06T14:11:09.000Z","content":"Second Gemini reply","model":"gemini-2.5-pro"}
+EOF
+
+  export CLAUDE_FILE COPILOT_FILE COPILOT_DIR CODEX_FILE CODEX_EMPTY_FILE GEMINI_FILE GEMINI_DIR TEST_DIR
 }
 
 teardown() {
@@ -117,6 +133,17 @@ teardown() {
   [[ "$output" == *'"cwd":"/work/demo"'* ]]
   [[ "$output" == *'"session_id":"eeee5555-5555-5555-5555-555555555555"'* ]]
   [[ "$output" == *'"short_id":"eeee5555"'* ]]
+}
+
+@test "meta gemini reads header record and .project_root cwd" {
+  run "$EX" meta gemini "$GEMINI_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"cli":"gemini"'* ]]
+  [[ "$output" == *'"cwd":"/work/gemini-demo"'* ]]
+  [[ "$output" == *'"session_id":"9999aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"'* ]]
+  [[ "$output" == *'"short_id":"9999aaaa"'* ]]
+  [[ "$output" == *'"model":"gemini-2.5-pro"'* ]]
+  [[ "$output" == *'"started_at":"2026-05-06T14:11:01.780Z"'* ]]
 }
 
 # -- prompts --------------------------------------------------------------
@@ -205,6 +232,17 @@ teardown() {
   [[ "$output" == *'"Refactor this:\n- step one\n- step two"'* ]]
 }
 
+@test "prompts gemini extracts text parts and keeps multi-line messages atomic" {
+  run "$EX" prompts gemini "$GEMINI_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"First Gemini prompt"'* ]]
+  [[ "$output" == *'"Multi-line Gemini prompt\nwith two lines"'* ]]
+  [[ "$output" != *"Conversation checkpoint"* ]]
+  local n
+  n=$(printf '%s\n' "$output" | grep -cv '^$')
+  [ "$n" -eq 2 ]
+}
+
 # -- turns (assistant tail) -----------------------------------------------
 
 @test "turns claude returns assistant messages in order" {
@@ -225,6 +263,17 @@ teardown() {
   run "$EX" turns codex "$CODEX_EMPTY_FILE"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
+}
+
+@test "turns gemini returns non-empty assistant content and dedupes adjacent duplicates" {
+  run "$EX" turns gemini "$GEMINI_FILE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"First Gemini reply"* ]]
+  [[ "$output" == *"Second Gemini reply"* ]]
+  [[ "$output" != *"tool-only thought"* ]]
+  local first_rows
+  first_rows=$(echo "$output" | grep -c "First Gemini reply")
+  [ "$first_rows" -eq 1 ]
 }
 
 @test "prompts codex returns empty when only environment_context user record exists" {

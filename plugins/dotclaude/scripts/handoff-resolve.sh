@@ -4,18 +4,19 @@
 # Usage:
 #   handoff-resolve.sh <cli> <identifier>
 #
-# cli:          claude | copilot | codex | any
+# cli:          claude | copilot | codex | gemini | any
 # identifier:   full UUID (36 chars), short UUID (first 8 hex),
 #               the literal word `latest` (case-insensitive), or an alias:
 #                 - claude:  customTitle (`claude --resume "<name>"`) or aiTitle
 #                            (auto-generated TUI summary)
 #                 - codex:   thread_name (user-set, `event_msg.thread_name`)
 #                 - copilot: workspace.yaml:name (auto-generated session label)
+#                 - gemini:  checkpoint tag (`/chat save <name>`)
 #               Aliases: case-insensitive exact match. Decision 4 precedence:
 #               UUID > short-UUID > latest > alias (no fall-through on miss).
 #
 # Stdout (success):  absolute path to the resolved JSONL
-# Stderr (success):  matched-field=<uuid|short-uuid|latest|customTitle|aiTitle|thread_name|name>
+# Stderr (success):  matched-field=<uuid|short-uuid|latest|customTitle|aiTitle|thread_name|name|checkpoint>
 #                    matched-value=<sanitized matched value>
 # Stderr (collision, alias-form): handoff-resolve: multiple sessions match "<id>":
 #                    + 5-column TSV rows + hint line (see §5.3.5 / §5.3.2)
@@ -32,12 +33,13 @@ die_runtime() { printf 'handoff-resolve: %s\n' "$1" >&2; exit 2; }
 
 usage() {
   cat <<'EOF' >&2
-usage: handoff-resolve.sh <any|claude|copilot|codex> <uuid|short-uuid|latest|alias>
+usage: handoff-resolve.sh <any|claude|copilot|codex|gemini> <uuid|short-uuid|latest|alias>
 
-  any       probe all three CLIs; on collision, exit 2 with TSV candidates on stderr
+  any       probe all four CLIs; on collision, exit 2 with TSV candidates on stderr
   claude    resolve in ~/.claude/projects only
   copilot   resolve in ~/.copilot/session-state only
   codex     resolve in ~/.codex/sessions only
+  gemini    resolve in ~/.gemini/tmp only
 EOF
   exit 64
 }
@@ -488,6 +490,128 @@ resolve_codex() {
   die_runtime "codex session not found for identifier: $id"
 }
 
+gemini_session_id_from_file() {
+  local file="$1"
+  local sid=""
+  if command -v jq >/dev/null 2>&1; then
+    sid="$(jq -r 'select(.sessionId != null) | .sessionId' "$file" 2>/dev/null | sed -n '1p' || true)"
+  fi
+  if [[ -z "$sid" ]]; then
+    local base
+    base=$(basename "$file" .jsonl)
+    sid="$(printf '%s' "$base" | grep -oE '[0-9a-f]{8}$' || true)"
+  fi
+  printf '%s' "$sid"
+}
+
+resolve_gemini() {
+  local id="$1"
+  local root="${HOME}/.gemini/tmp"
+  [[ -d "$root" ]] || die_runtime "gemini session root not found: $root"
+
+  if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
+    local hit
+    hit="$(find "$root" -maxdepth 3 -type f -path '*/chats/session-*.jsonl' 2>/dev/null | pick_newest)"
+    [[ -n "$hit" ]] || die_runtime "no gemini sessions found under $root"
+    printf '%s\n' "$hit"
+    printf 'matched-field=latest\n' >&2
+    printf 'matched-value=latest\n' >&2
+    return 0
+  fi
+
+  # Full UUID. Gemini stores the full sessionId in the first JSONL record and
+  # mirrors only the first 8 hex chars in the filename.
+  if [[ "$id" =~ $UUID_RE ]]; then
+    local f sid
+    while IFS= read -r f; do
+      sid="$(gemini_session_id_from_file "$f")"
+      if [[ "$sid" == "$id" ]]; then
+        printf '%s\n' "$f"
+        printf 'matched-field=uuid\n' >&2
+        printf 'matched-value=%s\n' "$(sanitize_for_tsv "$id")" >&2
+        return 0
+      fi
+    done < <(find "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id:0:8}.jsonl" 2>/dev/null)
+    die_runtime "gemini session not found for uuid: $id"
+  fi
+
+  # Short UUID — Gemini filenames end with the 8-hex session prefix.
+  if [[ "$id" =~ $SHORT_UUID_RE ]]; then
+    local hit
+    hit="$(find "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id}.jsonl" 2>/dev/null | pick_newest)"
+    [[ -n "$hit" ]] || die_runtime "gemini session not found for short-uuid: $id"
+    printf '%s\n' "$hit"
+    printf 'matched-field=short-uuid\n' >&2
+    printf 'matched-value=%s\n' "$(sanitize_for_tsv "$id")" >&2
+    return 0
+  fi
+
+  # Gemini `/chat save <tag>` writes checkpoint-<tag>.json and appends an info
+  # record to the active session JSONL. The checkpoint file is a conversation
+  # snapshot, not a pointer, so resolution uses the checkpoint name as the alias
+  # surface and maps it back to the newest same-project session carrying the
+  # exact "Conversation checkpoint saved with tag: <tag>." info record.
+  if command -v jq >/dev/null 2>&1; then
+    local id_lower
+    id_lower="$(printf '%s' "$id" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+    local checkpoint tag tag_lower project_dir session_path sid
+    local -a checkpoint_rows=()
+    local checkpoint_hit_path="" checkpoint_hit_value=""
+    local seen_paths=""
+    while IFS= read -r checkpoint; do
+      tag=$(basename "$checkpoint")
+      tag="${tag#checkpoint-}"
+      tag="${tag%.json}"
+      [[ -n "$tag" ]] || continue
+      tag_lower="$(printf '%s' "$tag" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
+      [[ "$tag_lower" == "$id_lower" ]] || continue
+      project_dir=$(dirname "$checkpoint")
+      [[ -d "${project_dir}/chats" ]] || continue
+      session_path="$(
+        find "${project_dir}/chats" -maxdepth 1 -type f -name 'session-*.jsonl' 2>/dev/null \
+          | while IFS= read -r f; do
+              jq -e --arg tag "$tag" '
+                select(.type == "info"
+                       and ((.content // "") | ascii_downcase)
+                           == (("Conversation checkpoint saved with tag: " + $tag + ".") | ascii_downcase))
+              ' "$f" >/dev/null 2>&1 && printf '%s\n' "$f"
+            done \
+          | pick_newest \
+          || true
+      )"
+      [[ -n "$session_path" ]] || continue
+      case " $seen_paths " in
+        *" $session_path "*) continue ;;
+      esac
+      seen_paths="$seen_paths $session_path"
+      sid="$(gemini_session_id_from_file "$session_path")"
+      checkpoint_hit_path="$session_path"
+      checkpoint_hit_value="$tag"
+      checkpoint_rows+=("$(printf '%s\t%s\t%s\t%s\t%s' \
+        "gemini" \
+        "$(short_id_from_session "$sid")" \
+        "$session_path" \
+        "$(sanitize_for_tsv "$tag")" \
+        "checkpoint")")
+    done < <(find "$root" -maxdepth 2 -type f -name 'checkpoint-*.json' 2>/dev/null)
+
+    case ${#checkpoint_rows[@]} in
+      0) ;;  # no resolvable checkpoint alias; fall through to die_runtime
+      1)
+        printf '%s\n' "$checkpoint_hit_path"
+        printf 'matched-field=checkpoint\n' >&2
+        printf 'matched-value=%s\n' "$(sanitize_for_tsv "$checkpoint_hit_value")" >&2
+        return 0
+        ;;
+      *)
+        emit_collision_tsv "$id" "${checkpoint_rows[@]}"
+        ;;
+    esac
+  fi
+
+  die_runtime "gemini session not found for identifier: $id"
+}
+
 # Extract a session id from a resolved path, per-CLI convention.
 session_id_from_path() {
   local cli="$1" path="$2"
@@ -504,10 +628,13 @@ session_id_from_path() {
         | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
         | tail -1
       ;;
+    gemini)
+      gemini_session_id_from_file "$path"
+      ;;
   esac
 }
 
-# `any` mode: probe all three CLIs. On exactly-one match emit single path on stdout
+# `any` mode: probe all four CLIs. On exactly-one match emit single path on stdout
 # plus matched-field=/matched-value= metadata on stderr (mirroring per-CLI single-hit
 # contract). On multi-match (intra-CLI alias collision passed through, OR cross-CLI
 # union of single hits with the same alias), emit 5-column TSV via emit_collision_tsv.
@@ -522,12 +649,13 @@ session_id_from_path() {
 resolve_any() {
   local id="$1"
 
-  # Special case: `any latest` picks the newest jsonl across all three roots.
+  # Special case: `any latest` picks the newest jsonl across all four roots.
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local roots=()
     [[ -d "${HOME}/.claude/projects" ]]       && roots+=("${HOME}/.claude/projects")
     [[ -d "${HOME}/.copilot/session-state" ]] && roots+=("${HOME}/.copilot/session-state")
     [[ -d "${HOME}/.codex/sessions" ]]        && roots+=("${HOME}/.codex/sessions")
+    [[ -d "${HOME}/.gemini/tmp" ]]            && roots+=("${HOME}/.gemini/tmp")
     [[ ${#roots[@]} -gt 0 ]] || die_runtime "no session roots found under \$HOME"
     local hit
     hit="$(find "${roots[@]}" -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
@@ -546,7 +674,7 @@ resolve_any() {
   local hits=()
   local tsv=()
   local cli path sid matched_field matched_value first_field row_path row err_tmp
-  for cli in claude copilot codex; do
+  for cli in claude copilot codex gemini; do
     err_tmp=$(mktemp) || die_runtime "mktemp failed"
     if path=$("resolve_$cli" "$id" 2>"$err_tmp"); then
       # Single-hit case: extract metadata, build 5-column row.
@@ -569,14 +697,14 @@ resolve_any() {
     elif grep -q '^handoff-resolve: multiple sessions match' "$err_tmp"; then
       # Per-CLI alias collision: aggregate the 5-tab-field rows into resolve_any's
       # tsv array (skipping the per-CLI emit_collision_tsv header and trailing hint).
-      # Each row's first field is the cli name (claude|copilot|codex), and the row
+      # Each row's first field is the cli name, and the row
       # already carries the per-CLI's matched-field/matched-value — no
       # re-construction needed.
       while IFS= read -r row; do
         [[ "$row" == *$'\t'* ]] || continue
         first_field="${row%%$'\t'*}"
         case "$first_field" in
-          claude|copilot|codex)
+          claude|copilot|codex|gemini)
             tsv+=("$row")
             row_path=$(printf '%s' "$row" | cut -f3)
             hits+=("$row_path")
@@ -623,7 +751,8 @@ main() {
     claude)  resolve_claude "$id" ;;
     copilot) resolve_copilot "$id" ;;
     codex)   resolve_codex "$id" ;;
-    *)       die_usage "cli must be one of: any, claude, copilot, codex (got: $cli)" ;;
+    gemini)  resolve_gemini "$id" ;;
+    *)       die_usage "cli must be one of: any, claude, copilot, codex, gemini (got: $cli)" ;;
   esac
 }
 
