@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
-if echo "$staged" | grep -qE '^\.claude/(commands|skills)/'; then
-  echo "dotclaude: auto-updating skills-manifest.json"
-  npx dotclaude-validate-skills --update
-  git add .claude/skills-manifest.json
-fi

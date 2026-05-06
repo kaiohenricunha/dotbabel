@@ -26,7 +26,7 @@ Stub records exist in the issue tracker; they will land as additional ADRs
 when a related change is proposed:
 
 - 0003..0006 SEC-1..4 hardening decisions (enforced today in
-  `plugins/dotclaude/scripts/validate-settings.sh`; the ADRs capture the
+  `plugins/dotbabel/scripts/validate-settings.sh`; the ADRs capture the
   _why_).
 - 0007..0008 OPS-1..2 hardening decisions (same).
 - 0009 LSP plugins owned by `claude-code-lsps`.

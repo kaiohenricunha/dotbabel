@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/kaiohenricunha/dotclaude/security/advisories/new
+    url: https://github.com/kaiohenricunha/dotbabel/security/advisories/new
     about: Please file security issues privately via a GitHub Security Advisory, not a public issue.
   - name: Quickstart docs
-    url: https://github.com/kaiohenricunha/dotclaude/blob/main/docs/quickstart.md
+    url: https://github.com/kaiohenricunha/dotbabel/blob/main/docs/quickstart.md
     about: 5-minute walkthrough from install to first green validator.
   - name: Troubleshooting (indexed by ERROR_CODES)
-    url: https://github.com/kaiohenricunha/dotclaude/blob/main/docs/troubleshooting.md
+    url: https://github.com/kaiohenricunha/dotbabel/blob/main/docs/troubleshooting.md
     about: Look up any validator failure code.

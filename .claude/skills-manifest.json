@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-06T14:54:57.831Z",
+  "generatedAt": "2026-05-06T19:31:11.332Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -47,7 +47,7 @@
     {
       "name": "deploy-status",
       "path": ".claude/skills/deploy-status/SKILL.md",
-      "checksum": "sha256:be675b1528c7d9a7e6619868b7ed9f90c8e80d27d6f1e4eeb8ea85e3fb0b1794",
+      "checksum": "sha256:f9128b2d793a9878e4288b1c54cb539ac0dc2165f0ecb9cff4f85c97906fe5d4",
       "dependencies": [],
       "lastValidated": "2026-05-06"
     },
@@ -187,14 +187,14 @@
     {
       "name": "veracity-audit",
       "path": ".claude/skills/veracity-audit/SKILL.md",
-      "checksum": "sha256:2dc1c4213ab6650d685e7b2243ddda91fce2ceba224ca3da3951afeb37d12946",
+      "checksum": "sha256:ca6a137a6d9316de931a26d8a9bf2126d8c1f5005e53a5abd2a722f745fb1080",
       "dependencies": [],
       "lastValidated": "2026-05-06"
     },
     {
       "name": "handoff",
       "path": ".claude/skills/handoff/SKILL.md",
-      "checksum": "sha256:2e80299d80ebcc623064630fe014dcb9d16fe85ff479b2daa54abcb17f1866b5",
+      "checksum": "sha256:c5b84124feec666c2174fe85b578d5b8d1fb96169194e4c21a4ce2b3239cf83f",
       "dependencies": [],
       "lastValidated": "2026-05-06"
     },
@@ -208,14 +208,14 @@
     {
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
-      "checksum": "sha256:6653d4949e705d765df5e2ee1782a858ea7ecc46e59fe540b74d3872d5f4e2da",
+      "checksum": "sha256:32a58bb0feb413e7f44148347d62283332ba259273a6c8f6d4a514876cc484dd",
       "dependencies": ["deploy-status"],
       "lastValidated": "2026-05-06"
     },
     {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
-      "checksum": "sha256:347be395b0f8003816b4f3ed3bb777a63a3f9f7ae300d6f050b499ff66cfd3b0",
+      "checksum": "sha256:fc1b81ff49b9ec010542172ce5dab42350b974bff08ab86c805fac5bedc78a1a",
       "dependencies": [],
       "lastValidated": "2026-05-06"
     },

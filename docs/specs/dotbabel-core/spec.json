@@ -1,0 +1,37 @@
+{
+  "id": "dotbabel-core",
+  "title": "@dotbabel/dotbabel — core library + plugin",
+  "status": "done",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "package.json",
+    "bootstrap.sh",
+    "sync.sh",
+    "CLAUDE.md",
+    "README.md",
+    ".claude/**",
+    "docs/repo-facts.json",
+    "docs/specs/**/spec.json",
+    "plugins/dotbabel/src/**",
+    "plugins/dotbabel/bin/**",
+    "plugins/dotbabel/scripts/**",
+    "plugins/dotbabel/hooks/**",
+    "plugins/dotbabel/templates/**",
+    "plugins/dotbabel/tests/**",
+    "plugins/dotbabel/.claude-plugin/**",
+    ".github/workflows/**",
+    ".github/CODEOWNERS",
+    ".github/dependabot.yml",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/ISSUE_TEMPLATE/**"
+  ],
+  "acceptance_commands": [
+    "npm test",
+    "npx dotbabel-validate-skills",
+    "npx dotbabel-validate-specs",
+    "npx dotbabel-check-instruction-drift",
+    "node -e \"import('@dotbabel/dotbabel').then(m => process.exit(Object.keys(m).length >= 24 ? 0 : 1))\""
+  ],
+  "depends_on_specs": [],
+  "active_prs": []
+}

@@ -1,8 +1,8 @@
-# dotclaude Taxonomy
+# dotbabel Taxonomy
 
 _Last updated: v1.3.0_
 
-The dotclaude taxonomy organizes every artifact (agents, skills, commands, hooks, templates) by **type** (flat directory) and **facets** (YAML frontmatter). This avoids the placement ambiguity of domain-first hierarchies and lets the generated index serve any faceted query.
+The dotbabel taxonomy organizes every artifact (agents, skills, commands, hooks, templates) by **type** (flat directory) and **facets** (YAML frontmatter). This avoids the placement ambiguity of domain-first hierarchies and lets the generated index serve any faceted query.
 
 ## Why type-first?
 
@@ -13,7 +13,7 @@ Domain, platform, task, and maturity are many-to-many with artifacts. They live 
 ## Repo layout
 
 ```
-dotclaude/
+dotbabel/
   agents/            # .md, flat
   skills/            # directory-per-skill: <slug>/SKILL.md
   commands/          # .md, flat
@@ -75,18 +75,18 @@ See `docs/facet-definitions.md` for enum definitions with examples.
 
 ```bash
 # Rebuild the index
-node plugins/dotclaude/bin/dotclaude-index.mjs
+node plugins/dotbabel/bin/dotbabel-index.mjs
 
 # Verify freshness (CI)
-node plugins/dotclaude/bin/dotclaude-index.mjs --check
+node plugins/dotbabel/bin/dotbabel-index.mjs --check
 
 # Strict mode (fail on any schema warning)
-node plugins/dotclaude/bin/dotclaude-index.mjs --strict
+node plugins/dotbabel/bin/dotbabel-index.mjs --strict
 
 # Search
-dotclaude search <query>
-dotclaude list --type skill --domain infra --maturity validated
-dotclaude show <id>
+dotbabel search <query>
+dotbabel list --type skill --domain infra --maturity validated
+dotbabel show <id>
 ```
 
 ## Naming conventions
@@ -106,12 +106,12 @@ See `docs/governance.md` for the full promotion ladder and CI gates.
 
 Agents and skills are complementary, not redundant. For any domain deep enough to justify both, keep each artifact in its lane and link them via `related:`.
 
-- **Agent** = thin persona + routing. Trigger keywords, tool list, and the four-section dotclaude pattern (`## Expertise`, `## Working Approach`, `## Standards` or `## Constraints`, `## Collaboration`). Target ~50 lines.
+- **Agent** = thin persona + routing. Trigger keywords, tool list, and the four-section dotbabel pattern (`## Expertise`, `## Working Approach`, `## Standards` or `## Constraints`, `## Collaboration`). Target ~50 lines.
 - **Skill** = procedural runbook. Multi-phase workflow, command catalogs, and supporting `references/` docs. As deep as the domain warrants.
 
 **When to split vs. fatten an agent:** if a domain needs more than ~3 reference documents, a multi-phase procedure, or step-by-step command examples, author the depth as a skill and keep the agent thin. A 200-line agent is a smell — the content probably belongs in a skill.
 
-**Linking:** the agent's frontmatter declares `related: [<skill-id>]` so Claude can read the skill on invocation. Both artifacts share the same base `id` (e.g. `kubernetes-specialist` agent, `kubernetes-specialist` skill). Use `dotclaude show <id> --type agent|skill` to disambiguate when both exist.
+**Linking:** the agent's frontmatter declares `related: [<skill-id>]` so Claude can read the skill on invocation. Both artifacts share the same base `id` (e.g. `kubernetes-specialist` agent, `kubernetes-specialist` skill). Use `dotbabel show <id> --type agent|skill` to disambiguate when both exist.
 
 Canonical examples in this repo:
 

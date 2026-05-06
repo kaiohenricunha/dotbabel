@@ -270,18 +270,18 @@ command and locks the **prefix** of the stderr template.
 | ---- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | 0    | success                                                                 | (none)                                                                                                               |
 | 1    | preflight check failed (recoverable)                                    | `Preflight failed: <reason>` followed by `What's wrong:` / `How to fix:` block (existing `handoff-doctor.sh` format) |
-| 2    | runtime error (resolution miss, transport failure, scrub failure, etc.) | `dotclaude-handoff: <reason>`                                                                                        |
-| 64   | usage error (unknown flag, missing positional, conflicting flags)       | `dotclaude-handoff: <reason>` followed by `Usage: …` block                                                           |
+| 2    | runtime error (resolution miss, transport failure, scrub failure, etc.) | `dotbabel-handoff: <reason>`                                                                                         |
+| 64   | usage error (unknown flag, missing positional, conflicting flags)       | `dotbabel-handoff: <reason>` followed by `Usage: …` block                                                            |
 
 ### 5.3.2 `pull`-specific exits
 
-| Code | Condition                                | Stderr template                                                                                                                                                             |
-| ---- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2    | no session matches (no `--from`)         | `dotclaude-handoff: no session matches: <query>`                                                                                                                            |
-| 2    | no session matches (with `--from <cli>`) | `dotclaude-handoff: no <cli> session matches: <query>`                                                                                                                      |
-| 2    | multiple sessions match (non-TTY)        | header `dotclaude-handoff: multiple sessions match "<query>":` + TSV lines (5.3.5) + trailing hint line `hint: pass --from <cli> to narrow, or use UUID/short-UUID prefix.` |
-| 64   | unknown flag                             | `dotclaude-handoff: unknown flag: <flag>` + usage                                                                                                                           |
-| 64   | missing `<query>`                        | `dotclaude-handoff: pull requires a <query>` + usage                                                                                                                        |
+| Code | Condition                                | Stderr template                                                                                                                                                            |
+| ---- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2    | no session matches (no `--from`)         | `dotbabel-handoff: no session matches: <query>`                                                                                                                            |
+| 2    | no session matches (with `--from <cli>`) | `dotbabel-handoff: no <cli> session matches: <query>`                                                                                                                      |
+| 2    | multiple sessions match (non-TTY)        | header `dotbabel-handoff: multiple sessions match "<query>":` + TSV lines (5.3.5) + trailing hint line `hint: pass --from <cli> to narrow, or use UUID/short-UUID prefix.` |
+| 64   | unknown flag                             | `dotbabel-handoff: unknown flag: <flag>` + usage                                                                                                                           |
+| 64   | missing `<query>`                        | `dotbabel-handoff: pull requires a <query>` + usage                                                                                                                        |
 
 When `--from <cli>` is set the no-match message is narrowed to the requested
 CLI ("no `<cli>` session matches"), giving a clearer diagnostic when the user
@@ -290,25 +290,25 @@ lookups (no `--from`). Both forms are stable public output (#136).
 
 ### 5.3.3 `push`-specific exits
 
-| Code | Condition                                                                  | Stderr template                                                                                                                                    |
-| ---- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2    | transport not configured (env unset, non-TTY)                              | `dotclaude-handoff: transport not configured` + manual-setup block (5.5.2)                                                                         |
-| 2    | scrub fail-closed                                                          | `dotclaude-handoff: scrub not applied: <reason>`                                                                                                   |
-| 2    | short-id collision, different session_id                                   | `dotclaude-handoff: short-id collision on <branch>: local-session=<X> remote-session=<Y>; rerun with --force-collision to override`                |
-| 2    | metadata.json missing on existing branch (legacy + no `--force-collision`) | `dotclaude-handoff: short-id collision on <branch>: existing branch has no provable owner (<git error>); rerun with --force-collision to override` |
-| 64   | no `<query>` and no `--from`                                               | `dotclaude-handoff: push: --from required when no <query> is given` + usage                                                                        |
-| 64   | unknown flag                                                               | `dotclaude-handoff: unknown flag: <flag>` + usage                                                                                                  |
+| Code | Condition                                                                  | Stderr template                                                                                                                                   |
+| ---- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2    | transport not configured (env unset, non-TTY)                              | `dotbabel-handoff: transport not configured` + manual-setup block (5.5.2)                                                                         |
+| 2    | scrub fail-closed                                                          | `dotbabel-handoff: scrub not applied: <reason>`                                                                                                   |
+| 2    | short-id collision, different session_id                                   | `dotbabel-handoff: short-id collision on <branch>: local-session=<X> remote-session=<Y>; rerun with --force-collision to override`                |
+| 2    | metadata.json missing on existing branch (legacy + no `--force-collision`) | `dotbabel-handoff: short-id collision on <branch>: existing branch has no provable owner (<git error>); rerun with --force-collision to override` |
+| 64   | no `<query>` and no `--from`                                               | `dotbabel-handoff: push: --from required when no <query> is given` + usage                                                                        |
+| 64   | unknown flag                                                               | `dotbabel-handoff: unknown flag: <flag>` + usage                                                                                                  |
 
 ### 5.3.4 `fetch`-specific exits
 
-| Code | Condition                                 | Stderr template                                                                    |
-| ---- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
-| 2    | transport not configured                  | `dotclaude-handoff: transport not configured` + "run push first" hint              |
-| 2    | no remote handoffs match                  | `dotclaude-handoff: no remote handoffs match: <query>`                             |
-| 2    | multiple handoffs match (non-TTY)         | header `dotclaude-handoff: multiple handoffs match "<query>":` + TSV lines (5.3.5) |
-| 2    | too many description-substring candidates | `dotclaude-handoff: too many candidates, narrow the query`                         |
-| 64   | unknown flag                              | `dotclaude-handoff: unknown flag: <flag>` + usage                                  |
-| 64   | missing `<query>`                         | `dotclaude-handoff: fetch requires a <query>` + usage                              |
+| Code | Condition                                 | Stderr template                                                                   |
+| ---- | ----------------------------------------- | --------------------------------------------------------------------------------- |
+| 2    | transport not configured                  | `dotbabel-handoff: transport not configured` + "run push first" hint              |
+| 2    | no remote handoffs match                  | `dotbabel-handoff: no remote handoffs match: <query>`                             |
+| 2    | multiple handoffs match (non-TTY)         | header `dotbabel-handoff: multiple handoffs match "<query>":` + TSV lines (5.3.5) |
+| 2    | too many description-substring candidates | `dotbabel-handoff: too many candidates, narrow the query`                         |
+| 64   | unknown flag                              | `dotbabel-handoff: unknown flag: <flag>` + usage                                  |
+| 64   | missing `<query>`                         | `dotbabel-handoff: fetch requires a <query>` + usage                              |
 
 ### 5.3.5 TSV candidate-list format (frozen column order)
 
@@ -360,14 +360,14 @@ phrase → invocation mapping below. ARCH-10's drift-test asserts:
 
 ### 5.5.1 Phrase-pattern → binary-form mapping (frozen)
 
-| Trigger phrase pattern                                                 | Binary invocation                                          |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `handoff` + identifier (UUID / short / `latest` / alias)               | `dotclaude handoff pull <id>`                              |
-| `continue in <cli>` / `switch to <cli>` / `pull from <cli>` + id       | `dotclaude handoff pull <id> --from <cli>`                 |
-| `claude --resume <id>` / `codex resume <id>` / `copilot --resume=<id>` | `dotclaude handoff pull <id>`                              |
-| `what was that session about` + identifier                             | `dotclaude handoff describe <id>`                          |
-| `push handoff` / `send to other machine` / `save this`                 | `dotclaude handoff push --from <host-cli> [--tag <label>]` |
-| `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotclaude handoff fetch <query-or-prompt-user>`           |
+| Trigger phrase pattern                                                 | Binary invocation                                         |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- |
+| `handoff` + identifier (UUID / short / `latest` / alias)               | `dotbabel handoff pull <id>`                              |
+| `continue in <cli>` / `switch to <cli>` / `pull from <cli>` + id       | `dotbabel handoff pull <id> --from <cli>`                 |
+| `claude --resume <id>` / `codex resume <id>` / `copilot --resume=<id>` | `dotbabel handoff pull <id>`                              |
+| `what was that session about` + identifier                             | `dotbabel handoff describe <id>`                          |
+| `push handoff` / `send to other machine` / `save this`                 | `dotbabel handoff push --from <host-cli> [--tag <label>]` |
+| `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotbabel handoff fetch <query-or-prompt-user>`           |
 
 ### 5.5.2 The `--from` filling rule (frozen text)
 
@@ -376,7 +376,7 @@ four-clause structural match — presence of `--from`, `push`, a "no
 query" marker, and a "required" marker — per spec §5.0 which keeps
 wording editable while enforcing semantics):
 
-> When invoking `dotclaude handoff push` without a `<query>` positional,
+> When invoking `dotbabel handoff push` without a `<query>` positional,
 > include `--from <your-cli>` where `<your-cli>` is the agent the host
 > LLM is running in (`claude` for Claude Code, `copilot` for GitHub
 > Copilot CLI, `codex` for Codex). The binary requires this flag in
@@ -395,13 +395,13 @@ Direct/scripted callers may pass them; the host LLM does not.
 Locked structure (✓ icons, exact whitespace are decoration; reorderable but each line semantic must appear):
 
 ```
-DOTCLAUDE_HANDOFF_REPO is not set — dotclaude can set this up for you.
+DOTBABEL_HANDOFF_REPO is not set — dotbabel can set this up for you.
 
   Detected: gh CLI authenticated as @<login>.
   Plan: create private repo  <login>/<name>
         persist URL to       <config-file>
 
-  Repo name? [dotclaude-handoff-store] █
+  Repo name? [dotbabel-handoff-store] █
   Create <login>/<name> and proceed? [y/N] █
   ✓ created <login>/<name>             ; or "✓ repo <login>/<name> already exists — reusing"
   ✓ wrote <config-file>
@@ -417,12 +417,12 @@ The prompts MUST gate on (a) detected `gh` login, (b) repo-name confirmation,
 Can't auto-bootstrap the handoff store: <reason>
 
 Set it up manually:
-  1. gh repo create <you>/dotclaude-handoff-store --private
-  2. export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotclaude-handoff-store.git
-  3. dotclaude handoff push   # retries
+  1. gh repo create <you>/dotbabel-handoff-store --private
+  2. export DOTBABEL_HANDOFF_REPO=git@github.com:<you>/dotbabel-handoff-store.git
+  3. dotbabel handoff push   # retries
 
 Alternative providers (GitLab, Gitea, self-hosted) work too — set
-DOTCLAUDE_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.
+DOTBABEL_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.
 ```
 
 `<reason>` is one of: `not running in an interactive terminal`,
@@ -444,7 +444,7 @@ Diagnostic-line shape (frozen):
 ```
 config: <path-or-"(not written yet — first push will create it)">
 gh: <"authenticated" | "installed, not authenticated" | "not installed">
-DOTCLAUDE_HANDOFF_REPO: <url-or-"(unset — will bootstrap on first push)">
+DOTBABEL_HANDOFF_REPO: <url-or-"(unset — will bootstrap on first push)">
 ```
 
 Failure block shape (frozen, on stderr):

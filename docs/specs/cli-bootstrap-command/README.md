@@ -1,6 +1,6 @@
 # cli-bootstrap-command — Engineering Spec
 
-> Add `dotclaude bootstrap` and `dotclaude sync` commands to the CLI so developers can set up and update their global `~/.claude/` configuration without running `bootstrap.sh` directly.
+> Add `dotbabel bootstrap` and `dotbabel sync` commands to the CLI so developers can set up and update their global `~/.claude/` configuration without running `bootstrap.sh` directly.
 >
 > Created: 2026-04-15
 

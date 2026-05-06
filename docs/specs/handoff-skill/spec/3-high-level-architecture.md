@@ -4,7 +4,7 @@
 
 ## System Overview
 
-The handoff skill is a single binary (`dotclaude handoff`) plus a thin
+The handoff skill is a single binary (`dotbabel handoff`) plus a thin
 natural-language trigger surface (`skills/handoff/SKILL.md`) and a frozen
 shell substrate that knows each agent CLI's transcript format. All three
 agents (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI) reach the same
@@ -15,7 +15,7 @@ binary entrypoint:
 │  Claude Code                Copilot CLI               Codex CLI      │
 │  ────────────               ───────────               ─────────      │
 │  loads SKILL.md             loads SKILL.md            no skill load  │
-│  /handoff … or              /handoff … or             !dotclaude     │
+│  /handoff … or              /handoff … or             !dotbabel     │
 │  natural language           natural language          handoff …      │
 │         │                          │                       │        │
 │         └────────────┬─────────────┴───────────┬───────────┘        │
@@ -25,7 +25,7 @@ binary entrypoint:
 │                      └────────────┬────────────┘                    │
 │                                   ▼                                  │
 │                       ┌───────────────────────────┐                 │
-│                       │   dotclaude handoff       │  ← public       │
+│                       │   dotbabel handoff       │  ← public       │
 │                       │   bin (Node.js)           │    contract     │
 │                       └───────────────────────────┘                 │
 │                              │                                       │
@@ -52,7 +52,7 @@ binary entrypoint:
 
          ┌─────────────────────────────────────────┐
          │  Private GitHub repo                    │
-         │  $DOTCLAUDE_HANDOFF_REPO                │
+         │  $DOTBABEL_HANDOFF_REPO                │
          │                                         │
          │  refs/heads/handoff/                    │
          │    <project>/<cli>/<YYYY-MM>/<short>    │
@@ -100,7 +100,7 @@ Tagged **ARCH-3**: source CLI is resolved in this priority order:
 There is no env-var detection step. The previous `detectHost()` probes
 (`CLAUDECODE`, `CODEX_*`, `GITHUB_COPILOT_*` / `COPILOT_*`) admit
 `UNCONFIRMED` status in their own code (legacy `detectHost()` in
-`plugins/dotclaude/bin/dotclaude-handoff.mjs`), and an unreliable signal that
+`plugins/dotbabel/bin/dotbabel-handoff.mjs`), and an unreliable signal that
 silently picks the wrong source is exactly the failure mode §1 is
 designed to stop. Instead:
 
@@ -120,32 +120,32 @@ that SKILL.md, `--help`, and `docs/handoff-guide.md` all reference
 
 ## Components
 
-| Component                                          | Role                                                    | Fate in this spec                               |
-| -------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
-| `skills/handoff/SKILL.md`                          | Natural-language trigger surface for Claude/Copilot     | Shrinks to ~45 lines; points at binary `--help` |
-| `plugins/dotclaude/bin/dotclaude-handoff.mjs`      | Public CLI: argv parse, dispatch, render `--help`       | Reshaped to three primaries + four supporting   |
-| `plugins/dotclaude/src/lib/handoff-remote.mjs`     | Shared lib: render, encode/decode, transport, bootstrap | Restructured around the three-verb partition    |
-| `plugins/dotclaude/src/lib/handoff-scrub.mjs`      | Fail-closed scrub wrapper                               | Unchanged                                       |
-| `plugins/dotclaude/scripts/handoff-resolve.sh`     | Per-CLI session resolution (UUID/alias/latest)          | Frozen substrate (§2)                           |
-| `plugins/dotclaude/scripts/handoff-extract.sh`     | Per-CLI jq filters for meta/prompts/turns               | Frozen substrate (§2)                           |
-| `plugins/dotclaude/scripts/handoff-scrub.sh`       | Eight-pattern perl scrubber                             | Patterns frozen (§2)                            |
-| `plugins/dotclaude/scripts/handoff-description.sh` | Encode/decode `handoff:v2:…` description                | Schema reviewed in §5                           |
-| `plugins/dotclaude/scripts/handoff-doctor.sh`      | Preflight checks for the git transport                  | Reduced to current single transport             |
-| `docs/handoff-guide.md`                            | Long-form user guide                                    | Reconciled with binary surface, drift-tested    |
-| `skills/handoff/references/*.md`                   | Per-CLI reference docs + redaction + transport          | Pruned of removed transports / flags            |
+| Component                                         | Role                                                    | Fate in this spec                               |
+| ------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+| `skills/handoff/SKILL.md`                         | Natural-language trigger surface for Claude/Copilot     | Shrinks to ~45 lines; points at binary `--help` |
+| `plugins/dotbabel/bin/dotbabel-handoff.mjs`       | Public CLI: argv parse, dispatch, render `--help`       | Reshaped to three primaries + four supporting   |
+| `plugins/dotbabel/src/lib/handoff-remote.mjs`     | Shared lib: render, encode/decode, transport, bootstrap | Restructured around the three-verb partition    |
+| `plugins/dotbabel/src/lib/handoff-scrub.mjs`      | Fail-closed scrub wrapper                               | Unchanged                                       |
+| `plugins/dotbabel/scripts/handoff-resolve.sh`     | Per-CLI session resolution (UUID/alias/latest)          | Frozen substrate (§2)                           |
+| `plugins/dotbabel/scripts/handoff-extract.sh`     | Per-CLI jq filters for meta/prompts/turns               | Frozen substrate (§2)                           |
+| `plugins/dotbabel/scripts/handoff-scrub.sh`       | Eight-pattern perl scrubber                             | Patterns frozen (§2)                            |
+| `plugins/dotbabel/scripts/handoff-description.sh` | Encode/decode `handoff:v2:…` description                | Schema reviewed in §5                           |
+| `plugins/dotbabel/scripts/handoff-doctor.sh`      | Preflight checks for the git transport                  | Reduced to current single transport             |
+| `docs/handoff-guide.md`                           | Long-form user guide                                    | Reconciled with binary surface, drift-tested    |
+| `skills/handoff/references/*.md`                  | Per-CLI reference docs + redaction + transport          | Pruned of removed transports / flags            |
 
 ## Data Stores
 
-| Store                                    | Role                                               | Access Pattern                                             |
-| ---------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| `~/.claude/projects/`                    | Claude Code session JSONLs                         | Read on `pull`, `push` (current), `search`, `list --local` |
-| `~/.copilot/session-state/`              | Copilot CLI session JSONL + `workspace.yaml`       | Read on `pull`, `push` (current), `search`, `list --local` |
-| `~/.codex/sessions/`                     | Codex CLI rollout JSONLs (deep date-bucketed tree) | Read on `pull`, `push` (current), `search`, `list --local` |
-| `$DOTCLAUDE_HANDOFF_REPO`                | Private GitHub repo, single transport              | Write on `push`; read on `fetch`, `list --remote`          |
-| `$XDG_CONFIG_HOME/dotclaude/handoff.env` | Persisted env (`DOTCLAUDE_HANDOFF_REPO=…`)         | Sourced at binary start; written by self-bootstrap         |
+| Store                                   | Role                                               | Access Pattern                                             |
+| --------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| `~/.claude/projects/`                   | Claude Code session JSONLs                         | Read on `pull`, `push` (current), `search`, `list --local` |
+| `~/.copilot/session-state/`             | Copilot CLI session JSONL + `workspace.yaml`       | Read on `pull`, `push` (current), `search`, `list --local` |
+| `~/.codex/sessions/`                    | Codex CLI rollout JSONLs (deep date-bucketed tree) | Read on `pull`, `push` (current), `search`, `list --local` |
+| `$DOTBABEL_HANDOFF_REPO`                | Private GitHub repo, single transport              | Write on `push`; read on `fetch`, `list --remote`          |
+| `$XDG_CONFIG_HOME/dotbabel/handoff.env` | Persisted env (`DOTBABEL_HANDOFF_REPO=…`)          | Sourced at binary start; written by self-bootstrap         |
 
 Tagged **ARCH-4**: there is exactly **one** remote per user, named by
-`$DOTCLAUDE_HANDOFF_REPO`. Multi-remote / multi-store is out of scope (§2).
+`$DOTBABEL_HANDOFF_REPO`. Multi-remote / multi-store is out of scope (§2).
 The repo URL is persisted to a config file so `gh repo create` ceremony
 happens at most once per machine.
 
@@ -223,30 +223,30 @@ Tagged **ARCH-9** (scalability targets):
 | Tool   | Purpose                                          | Required for                         | Fallback                                 |
 | ------ | ------------------------------------------------ | ------------------------------------ | ---------------------------------------- |
 | `git`  | All remote transport operations                  | `push`, `fetch`, `list --remote`     | None — required                          |
-| `gh`   | Auto-bootstrap of the private repo on first push | First `push` only (interactive)      | Manual `export DOTCLAUDE_HANDOFF_REPO=…` |
+| `gh`   | Auto-bootstrap of the private repo on first push | First `push` only (interactive)      | Manual `export DOTBABEL_HANDOFF_REPO=…`  |
 | `jq`   | Per-CLI JSONL extraction                         | `pull`, `push`, `search`, `describe` | None — required                          |
 | `perl` | Scrub-pattern engine                             | `push` (fail-closed)                 | None — required (push aborts if missing) |
 | `bash` | Substrate runtime                                | All shell scripts                    | None — required                          |
 
 No HTTP libraries, no cloud SDKs, no auth daemons. Everything goes through
-either `git` (which the user has authenticated for `$DOTCLAUDE_HANDOFF_REPO`)
+either `git` (which the user has authenticated for `$DOTBABEL_HANDOFF_REPO`)
 or `gh` (used once at bootstrap).
 
 ## Deployment
 
-The binary ships via the existing `@dotclaude/dotclaude` npm package
+The binary ships via the existing `@dotbabel/dotbabel` npm package
 (unchanged per §2):
 
-- Installed binary: `~/.local/bin/dotclaude` (symlink) →
-  `<node-prefix>/lib/node_modules/@dotclaude/dotclaude/plugins/dotclaude/bin/dotclaude.mjs`,
-  which dispatches `handoff` to `dotclaude-handoff.mjs`.
+- Installed binary: `~/.local/bin/dotbabel` (symlink) →
+  `<node-prefix>/lib/node_modules/@dotbabel/dotbabel/plugins/dotbabel/bin/dotbabel.mjs`,
+  which dispatches `handoff` to `dotbabel-handoff.mjs`.
 - Skill markdown: `~/.claude/skills/handoff/SKILL.md` (symlink to the
   package's `skills/handoff/SKILL.md`); auto-loaded by Claude Code and
   Copilot CLI; not loaded by Codex.
 - Shell scripts: live next to the binary in the package; resolved via
   `__dirname` from the bin entrypoint.
-- Config: `$XDG_CONFIG_HOME/dotclaude/handoff.env` (default
-  `~/.config/dotclaude/handoff.env`), mode 0600, written by self-bootstrap.
+- Config: `$XDG_CONFIG_HOME/dotbabel/handoff.env` (default
+  `~/.config/dotbabel/handoff.env`), mode 0600, written by self-bootstrap.
 
 There is no daemon, no service, no background process. The binary runs
 synchronously per invocation and exits.
@@ -254,7 +254,7 @@ synchronously per invocation and exits.
 ## Drift-Detection Constraint
 
 Tagged **ARCH-10**: the drift gate is phased. In Phase 1, a single test
-asserts that `skills/handoff/SKILL.md` and `dotclaude handoff --help`
+asserts that `skills/handoff/SKILL.md` and `dotbabel handoff --help`
 output agree on the list of primary commands, supporting commands, and
 flags. In Phase 2, `docs/handoff-guide.md` is promoted into the same
 agreement check as the third source. The enforced comparison is on the

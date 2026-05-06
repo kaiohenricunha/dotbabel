@@ -2,22 +2,22 @@
 
 _Last updated: v1.3.0_
 
-Every file under `plugins/dotclaude/templates/` is written verbatim into a
-consumer repo by `dotclaude-init`, with `{{placeholder}}` tokens substituted
+Every file under `plugins/dotbabel/templates/` is written verbatim into a
+consumer repo by `dotbabel-init`, with `{{placeholder}}` tokens substituted
 at scaffold time.
 
 Substitution logic lives at
-[`../plugins/dotclaude/src/init-harness-scaffold.mjs`](../plugins/dotclaude/src/init-harness-scaffold.mjs);
+[`../plugins/dotbabel/src/init-harness-scaffold.mjs`](../plugins/dotbabel/src/init-harness-scaffold.mjs);
 test coverage (including the "unrecognized placeholder survives" contract)
 is at
-[`../plugins/dotclaude/tests/init-harness-scaffold.test.mjs`](../plugins/dotclaude/tests/init-harness-scaffold.test.mjs).
+[`../plugins/dotbabel/tests/init-harness-scaffold.test.mjs`](../plugins/dotbabel/tests/init-harness-scaffold.test.mjs).
 
 ## Placeholders
 
 | Token              | Source                                                 | Default         |
 | ------------------ | ------------------------------------------------------ | --------------- |
-| `{{project_name}}` | `dotclaude-init --project-name`                        | `basename(cwd)` |
-| `{{project_type}}` | `dotclaude-init --project-type`                        | `"unknown"`     |
+| `{{project_name}}` | `dotbabel-init --project-name`                         | `basename(cwd)` |
+| `{{project_type}}` | `dotbabel-init --project-type`                         | `"unknown"`     |
 | `{{today}}`        | `new Date().toISOString().slice(0,10)` (scaffold time) | —               |
 
 Tokens not listed above pass through unchanged. That's intentional — a
@@ -52,13 +52,13 @@ templates/
   destructive git calls. Exit 2 per Claude Code hook protocol. See
   [ADR-0014](./adr/0014-cli-tick-cross-warn-format.md) for the ✓/✗/⚠ format inheritance.
 - **`claude/skills-manifest.json`** — minimal `{version:1, skills:[]}`
-  seed. Run `npx dotclaude-validate-skills --update` after adding skills to
+  seed. Run `npx dotbabel-validate-skills --update` after adding skills to
   populate checksums.
 - **`claude/settings.json`** — wires the guard hook into PreToolUse.
 - **`claude/settings.headless.json`** — same surface but with CI-friendly
   permissions (no interactive prompts).
 - **`docs/repo-facts.json`** — the facts source of truth.
-  `dotclaude-check-instruction-drift` cross-references it with `CLAUDE.md`
+  `dotbabel-check-instruction-drift` cross-references it with `CLAUDE.md`
   and `README.md`.
 - **`docs/specs/README.md`** — onboarding doc for the spec workflow.
 - **`githooks/pre-commit`** — auto-refreshes the manifest when a skill
@@ -70,11 +70,11 @@ templates/
 
 ## Changing a template
 
-1. Edit the file under `plugins/dotclaude/templates/…`.
+1. Edit the file under `plugins/dotbabel/templates/…`.
 2. Re-run the scaffolder into a scratch tmpdir:
    ```bash
    TMP=$(mktemp -d); cd $TMP; git init -q
-   node /path/to/dotclaude/plugins/dotclaude/bin/dotclaude-init.mjs \
+   node /path/to/dotbabel/plugins/dotbabel/bin/dotbabel-init.mjs \
      --project-name scratch --project-type node
    ```
 3. Inspect the output.

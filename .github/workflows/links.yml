@@ -35,5 +35,5 @@ jobs:
             --exclude '^https?://(www\.)?npmjs\.com/' \
             --exclude '^https?://(www\.)?contributor-covenant\.org/' \
             --exclude '^https?://github\.com/[^/]+/[^/]+/compare/' \
-            --exclude-path 'plugins/dotclaude/templates' \
-            'docs/**/*.md' '*.md' 'plugins/dotclaude/**/*.md'
+            --exclude-path 'plugins/dotbabel/templates' \
+            'docs/**/*.md' '*.md' 'plugins/dotbabel/**/*.md'

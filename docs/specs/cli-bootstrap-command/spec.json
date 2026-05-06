@@ -1,8 +1,8 @@
 {
   "id": "cli-bootstrap-command",
-  "title": "dotclaude bootstrap + sync CLI commands",
+  "title": "dotbabel bootstrap + sync CLI commands",
   "status": "draft",
-  "owners": ["dotclaude maintainers"],
+  "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "package.json",
     "bootstrap.sh",
@@ -10,22 +10,22 @@
     "commands/**",
     "skills/**",
     "CLAUDE.md",
-    "plugins/dotclaude/src/bootstrap-global.mjs",
-    "plugins/dotclaude/src/sync-global.mjs",
-    "plugins/dotclaude/src/index.mjs",
-    "plugins/dotclaude/bin/dotclaude-bootstrap.mjs",
-    "plugins/dotclaude/bin/dotclaude-sync.mjs",
-    "plugins/dotclaude/bin/dotclaude.mjs",
-    "plugins/dotclaude/bin/dotclaude-doctor.mjs",
-    "plugins/dotclaude/tests/bootstrap-global.test.mjs",
-    "plugins/dotclaude/tests/sync-global.test.mjs"
+    "plugins/dotbabel/src/bootstrap-global.mjs",
+    "plugins/dotbabel/src/sync-global.mjs",
+    "plugins/dotbabel/src/index.mjs",
+    "plugins/dotbabel/bin/dotbabel-bootstrap.mjs",
+    "plugins/dotbabel/bin/dotbabel-sync.mjs",
+    "plugins/dotbabel/bin/dotbabel.mjs",
+    "plugins/dotbabel/bin/dotbabel-doctor.mjs",
+    "plugins/dotbabel/tests/bootstrap-global.test.mjs",
+    "plugins/dotbabel/tests/sync-global.test.mjs"
   ],
   "acceptance_commands": [
     "npm test",
-    "node plugins/dotclaude/bin/dotclaude-bootstrap.mjs --help",
-    "node plugins/dotclaude/bin/dotclaude-sync.mjs --help",
-    "npx dotclaude-validate-specs"
+    "node plugins/dotbabel/bin/dotbabel-bootstrap.mjs --help",
+    "node plugins/dotbabel/bin/dotbabel-sync.mjs --help",
+    "npx dotbabel-validate-specs"
   ],
-  "depends_on_specs": ["dotclaude-core"],
+  "depends_on_specs": ["dotbabel-core"],
   "active_prs": []
 }

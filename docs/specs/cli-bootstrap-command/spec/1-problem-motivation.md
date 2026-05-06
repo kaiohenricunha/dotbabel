@@ -4,10 +4,10 @@
 
 ## Why
 
-The dotclaude distribution is currently split across two disconnected tools:
-`bootstrap.sh` (a shell script that wires `~/.claude/`) and the `dotclaude`
+The dotbabel distribution is currently split across two disconnected tools:
+`bootstrap.sh` (a shell script that wires `~/.claude/`) and the `dotbabel`
 CLI (an npm package that governs per-repo spec workflows). A developer who
-installs `npm install -g @dotclaude/dotclaude` gets no way to set up their
+installs `npm install -g @dotbabel/dotbabel` gets no way to set up their
 global `~/.claude/` from the same tool — they must separately discover,
 clone, and run `bootstrap.sh`. Likewise, keeping the global config current
 requires knowing where the clone lives and running `./sync.sh pull` from it.
@@ -20,23 +20,23 @@ This creates two classes of friction:
    creates unnecessary cognitive load when the CLI could handle both.
 
 2. **Update friction.** Pulling recent configuration changes requires
-   navigating to the dotclaude clone and running a shell script. There is no
-   `dotclaude sync pull` that a developer can run from any directory.
+   navigating to the dotbabel clone and running a shell script. There is no
+   `dotbabel sync pull` that a developer can run from any directory.
 
 ## What
 
-Add two new subcommands to the `dotclaude` CLI:
+Add two new subcommands to the `dotbabel` CLI:
 
-- **`dotclaude bootstrap`** — sets up (or refreshes) `~/.claude/` by
+- **`dotbabel bootstrap`** — sets up (or refreshes) `~/.claude/` by
   symlinking `commands/`, `skills/`, `CLAUDE.md`, and the agents template
   directory into place. Works in two modes:
   - **npm mode** (default): sources files from the npm package's own install
     directory; no git clone required.
-  - **clone mode** (`--source <path>` / `DOTCLAUDE_DIR`): sources files from
+  - **clone mode** (`--source <path>` / `DOTBABEL_DIR`): sources files from
     a local git clone, identical behavior to `bootstrap.sh`.
 
-- **`dotclaude sync`** — manages keeping the global config current:
-  - `pull`: in npm mode, runs `npm update -g @dotclaude/dotclaude` then
+- **`dotbabel sync`** — manages keeping the global config current:
+  - `pull`: in npm mode, runs `npm update -g @dotbabel/dotbabel` then
     re-bootstraps; in clone mode, `git fetch + rebase` then re-bootstraps.
   - `status`: in npm mode, reports current vs. latest npm version; in clone
     mode, delegates to `git status --short` on the clone.

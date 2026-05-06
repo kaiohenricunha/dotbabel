@@ -56,7 +56,7 @@ concrete tells:
 - The skill description, the references, the binary `--help`, and the actual
   binary code disagree on what flags exist (e.g. `--from-file` is documented
   in `skills/handoff/SKILL.md` and `references/prerequisites.md` but not
-  wired in `plugins/dotclaude/bin/dotclaude-handoff.mjs`).
+  wired in `plugins/dotbabel/bin/dotbabel-handoff.mjs`).
 - Cosmetic flags (`--to`) are required to do things that should be automatic
   — the target CLI is implicitly "wherever the user pastes," yet the binary
   treats it as a value the user must declare.

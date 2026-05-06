@@ -12,4 +12,4 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
         with: { node-version: "22" }
-      - run: npx --yes @dotclaude/dotclaude dotclaude-detect-drift
+      - run: npx --yes @dotbabel/dotbabel dotbabel-detect-drift

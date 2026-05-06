@@ -1,79 +1,124 @@
 # Changelog
 
-All notable changes to `@dotclaude/dotclaude` land here. Format follows
+All notable changes to `@dotbabel/dotbabel` land here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), versioning follows
 [SemVer](https://semver.org/spec/v2.0.0.html).
 
+Historical entries below v2.0.0 reference the legacy package name
+`@dotclaude/dotclaude` and the legacy `plugins/dotclaude/` path — these are
+preserved verbatim because they describe state at the time of release.
+
 ## Unreleased
 
-## [1.3.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.1...v1.3.0) (2026-05-04)
+## [2.0.0] - YYYY-MM-DD
+
+### BREAKING CHANGES
+
+- **rebrand:** project renamed from `dotclaude` to `dotbabel` to position the
+  toolkit as model-agnostic governance for any agentic CLI (Claude Code,
+  Codex, Gemini, Copilot).
+  - npm package: `@dotclaude/dotclaude` → `@dotbabel/dotbabel`
+  - all 15 CLI binaries renamed: `dotclaude-*` → `dotbabel-*`
+  - schema `$id` host: `dotclaude.dev` → `dotbabel.dev`
+  - directory: `plugins/dotclaude/` → `plugins/dotbabel/`
+  - spec IDs: `dotclaude-core` → `dotbabel-core`, `dotclaude-agents` → `dotbabel-agents`
+  - canonical config dir: `~/.config/dotbabel/`
+  - canonical cache dir: `~/.cache/dotbabel/`
+  - canonical env-var prefix: `DOTBABEL_*` (12 vars; see Migration below)
+
+### Migration
+
+A read-fallback compatibility layer keeps v1.x setups working through the
+2.x release window. **All compat shims are removed in 3.0.0.**
+
+- `~/.config/dotclaude/` and `~/.cache/dotclaude/` are still honored when
+  the canonical paths are absent. A one-time `process.emitWarning` with code
+  `DOTBABEL_LEGACY_CONFIG` (or `_CACHE`) fires per process on fallback.
+- All 12 `DOTCLAUDE_*` env vars fall back when the corresponding `DOTBABEL_*`
+  is unset. A one-time warning with code `DOTBABEL_LEGACY_ENV` fires per
+  process per variable.
+- Writes always target canonical paths; legacy files are never mutated.
+- The persisted handoff env file (`<configDir>/handoff.env`) is now written
+  with `export DOTBABEL_HANDOFF_REPO=...`.
+
+To migrate cleanly:
+
+1. `npm install -g @dotbabel/dotbabel` (uninstall `@dotclaude/dotclaude` if needed).
+2. `dotbabel bootstrap` to update `~/.claude/` symlinks.
+3. Rename `DOTCLAUDE_*` env vars in your shell rc files to `DOTBABEL_*`.
+4. (Optional) `mv ~/.config/dotclaude ~/.config/dotbabel` to silence the
+   `DOTBABEL_LEGACY_CONFIG` warning.
+
+See `docs/upgrade-guide.md` for the full migration walkthrough.
+
+## [1.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v1.2.1...v1.3.0) (2026-05-04)
 
 ### Added
 
-- **handoff:** support deliberate-label aliases in pull/fetch resolution ([#158](https://github.com/kaiohenricunha/dotclaude/issues/158)) ([81c9a15](https://github.com/kaiohenricunha/dotclaude/commit/81c9a15b8e8c7d83a601e8c71acb3cc9f43a0bd1))
+- **handoff:** support deliberate-label aliases in pull/fetch resolution ([#158](https://github.com/kaiohenricunha/dotbabel/issues/158)) ([81c9a15](https://github.com/kaiohenricunha/dotbabel/commit/81c9a15b8e8c7d83a601e8c71acb3cc9f43a0bd1))
 
 ### Fixed
 
-- **audits:** fix markdownlint + prettier violations in alias-resolver memo ([5ac4541](https://github.com/kaiohenricunha/dotclaude/commit/5ac4541e3e983cc90aa29b016dd73368a7787d6f))
-- **handoff:** unify claude alias scans + case-fold wrapper latest dispatch ([e7be150](https://github.com/kaiohenricunha/dotclaude/commit/e7be1502ccaaeed6129601d08d6959e6f8e68570))
+- **audits:** fix markdownlint + prettier violations in alias-resolver memo ([5ac4541](https://github.com/kaiohenricunha/dotbabel/commit/5ac4541e3e983cc90aa29b016dd73368a7787d6f))
+- **handoff:** unify claude alias scans + case-fold wrapper latest dispatch ([e7be150](https://github.com/kaiohenricunha/dotbabel/commit/e7be1502ccaaeed6129601d08d6959e6f8e68570))
 
 ### Documentation
 
-- **audits:** bank [#158](https://github.com/kaiohenricunha/dotclaude/issues/158) alias-resolver investigation memo (deliberate-label scope) ([cd153b6](https://github.com/kaiohenricunha/dotclaude/commit/cd153b6b03f29fa567cea957418fad36ac116c1d))
+- **audits:** bank [#158](https://github.com/kaiohenricunha/dotbabel/issues/158) alias-resolver investigation memo (deliberate-label scope) ([cd153b6](https://github.com/kaiohenricunha/dotbabel/commit/cd153b6b03f29fa567cea957418fad36ac116c1d))
 
-## [1.2.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.2.0...v1.2.1) (2026-05-01)
+## [1.2.1](https://github.com/kaiohenricunha/dotbabel/compare/v1.2.0...v1.2.1) (2026-05-01)
 
 ### Fixed
 
-- **handoff:** tighten cell-27 test to lock first-arg-wins ([#155](https://github.com/kaiohenricunha/dotclaude/issues/155)) ([250c7d2](https://github.com/kaiohenricunha/dotclaude/commit/250c7d2c30f11435a4b9247dec67e8fb00ee6b98))
+- **handoff:** tighten cell-27 test to lock first-arg-wins ([#155](https://github.com/kaiohenricunha/dotbabel/issues/155)) ([250c7d2](https://github.com/kaiohenricunha/dotbabel/commit/250c7d2c30f11435a4b9247dec67e8fb00ee6b98))
 
 ### Documentation
 
-- **contributing:** document PR merge strategy convention ([#165](https://github.com/kaiohenricunha/dotclaude/issues/165)) ([897cb02](https://github.com/kaiohenricunha/dotclaude/commit/897cb02a256f971a25ca962e48450de92c03bdb2))
-- **handoff:** document latest host-scoping precedence ([1f175fc](https://github.com/kaiohenricunha/dotclaude/commit/1f175fc7ce6548048d62a056257329cfe32fdad1))
+- **contributing:** document PR merge strategy convention ([#165](https://github.com/kaiohenricunha/dotbabel/issues/165)) ([897cb02](https://github.com/kaiohenricunha/dotbabel/commit/897cb02a256f971a25ca962e48450de92c03bdb2))
+- **handoff:** document latest host-scoping precedence ([1f175fc](https://github.com/kaiohenricunha/dotbabel/commit/1f175fc7ce6548048d62a056257329cfe32fdad1))
 
-## [1.2.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.1.1...v1.2.0) (2026-05-01)
+## [1.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v1.1.1...v1.2.0) (2026-05-01)
 
 ### Added
 
-- **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotclaude/issues/157)) ([85d927d](https://github.com/kaiohenricunha/dotclaude/commit/85d927dd68db8dda481bf48b49c59d8ddf5546ac))
+- **handoff:** forbid fabrication when binary execution fails ([#157](https://github.com/kaiohenricunha/dotbabel/issues/157)) ([85d927d](https://github.com/kaiohenricunha/dotbabel/commit/85d927dd68db8dda481bf48b49c59d8ddf5546ac))
 
 ### Fixed
 
-- **drift-test:** loosen report heuristic to match cross-word phrasing ([9efb93c](https://github.com/kaiohenricunha/dotclaude/commit/9efb93cb7ae503392c028bec8dae433e776de0b2))
+- **drift-test:** loosen report heuristic to match cross-word phrasing ([9efb93c](https://github.com/kaiohenricunha/dotbabel/commit/9efb93cb7ae503392c028bec8dae433e776de0b2))
 
-## [1.1.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.1.0...v1.1.1) (2026-04-30)
+## [1.1.1](https://github.com/kaiohenricunha/dotbabel/compare/v1.1.0...v1.1.1) (2026-04-30)
 
 ### Fixed
 
-- **handoff:** harmonize empty-state placeholder wording ([#159](https://github.com/kaiohenricunha/dotclaude/issues/159)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
-- **ci:** make post-bump regen output prettier-compliant ([#156](https://github.com/kaiohenricunha/dotclaude/issues/156)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
-- **handoff:** add codex rollout format-drift bats coverage ([#160](https://github.com/kaiohenricunha/dotclaude/issues/160)) ([#161](https://github.com/kaiohenricunha/dotclaude/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotclaude/commit/c871fc21506623093c7111b836b5a80db150cb7e))
+- **handoff:** harmonize empty-state placeholder wording ([#159](https://github.com/kaiohenricunha/dotbabel/issues/159)) ([#161](https://github.com/kaiohenricunha/dotbabel/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotbabel/commit/c871fc21506623093c7111b836b5a80db150cb7e))
+- **ci:** make post-bump regen output prettier-compliant ([#156](https://github.com/kaiohenricunha/dotbabel/issues/156)) ([#161](https://github.com/kaiohenricunha/dotbabel/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotbabel/commit/c871fc21506623093c7111b836b5a80db150cb7e))
+- **handoff:** add codex rollout format-drift bats coverage ([#160](https://github.com/kaiohenricunha/dotbabel/issues/160)) ([#161](https://github.com/kaiohenricunha/dotbabel/issues/161)) ([c871fc2](https://github.com/kaiohenricunha/dotbabel/commit/c871fc21506623093c7111b836b5a80db150cb7e))
 
-## [1.1.0](https://github.com/kaiohenricunha/dotclaude/compare/v1.0.1...v1.1.0) (2026-04-30)
+## [1.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v1.0.1...v1.1.0) (2026-04-30)
 
 ### Added
 
-- **commands:** add /create-experiment sandboxed exploration skill ([#150](https://github.com/kaiohenricunha/dotclaude/issues/150)) ([4bbf8a2](https://github.com/kaiohenricunha/dotclaude/commit/4bbf8a209630a6e21b2f864b6756b055189974cc))
+- **commands:** add /create-experiment sandboxed exploration skill ([#150](https://github.com/kaiohenricunha/dotbabel/issues/150)) ([4bbf8a2](https://github.com/kaiohenricunha/dotbabel/commit/4bbf8a209630a6e21b2f864b6756b055189974cc))
 
 ### Fixed
 
-- **handoff:** reject empty `--from` value ([#147](https://github.com/kaiohenricunha/dotclaude/issues/147)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-- **handoff:** `pull -o <path>` stdout contract per §5.5.1 OPS-2 ([#148](https://github.com/kaiohenricunha/dotclaude/issues/148)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-- **handoff:** document resolver session-validity rules in spec §4.1.1 ([#149](https://github.com/kaiohenricunha/dotclaude/issues/149)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
-- **handoff:** `pull` requires explicit `<query>` per spec §5.2.1. Previous versions silently defaulted to `latest` when the positional was omitted, which contradicted the spec. The fix removes the implicit default; users who relied on bare `dotclaude handoff pull` as shorthand must now type `dotclaude handoff pull latest`. Narrowing behavior of `pull latest` (host detection via env vars + `--from`) is unchanged. ([#152](https://github.com/kaiohenricunha/dotclaude/issues/152)) ([#154](https://github.com/kaiohenricunha/dotclaude/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotclaude/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** reject empty `--from` value ([#147](https://github.com/kaiohenricunha/dotbabel/issues/147)) ([#154](https://github.com/kaiohenricunha/dotbabel/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotbabel/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** `pull -o <path>` stdout contract per §5.5.1 OPS-2 ([#148](https://github.com/kaiohenricunha/dotbabel/issues/148)) ([#154](https://github.com/kaiohenricunha/dotbabel/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotbabel/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** document resolver session-validity rules in spec §4.1.1 ([#149](https://github.com/kaiohenricunha/dotbabel/issues/149)) ([#154](https://github.com/kaiohenricunha/dotbabel/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotbabel/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
+- **handoff:** `pull` requires explicit `<query>` per spec §5.2.1. Previous versions silently defaulted to `latest` when the positional was omitted, which contradicted the spec. The fix removes the implicit default; users who relied on bare `dotclaude handoff pull` as shorthand must now type `dotclaude handoff pull latest`. Narrowing behavior of `pull latest` (host detection via env vars + `--from`) is unchanged. ([#152](https://github.com/kaiohenricunha/dotbabel/issues/152)) ([#154](https://github.com/kaiohenricunha/dotbabel/issues/154)) ([c02c13e](https://github.com/kaiohenricunha/dotbabel/commit/c02c13ef810066d5f1756b7767138da04e13ae96))
 
 ### Documentation
 
-- **audit:** append Pair B engagement-depth note to Phase 4 result block ([#153](https://github.com/kaiohenricunha/dotclaude/issues/153)) ([42c1fae](https://github.com/kaiohenricunha/dotclaude/commit/42c1faee15b59e012c70be47aa0d9bfa9f1501a3))
+- **audit:** append Pair B engagement-depth note to Phase 4 result block ([#153](https://github.com/kaiohenricunha/dotbabel/issues/153)) ([42c1fae](https://github.com/kaiohenricunha/dotbabel/commit/42c1faee15b59e012c70be47aa0d9bfa9f1501a3))
 
-## [1.0.1](https://github.com/kaiohenricunha/dotclaude/compare/v1.0.0...v1.0.1) (2026-04-29)
+## [1.0.1](https://github.com/kaiohenricunha/dotbabel/compare/v1.0.0...v1.0.1) (2026-04-29)
 
 ### Fixed
 
-- re-baseline release-please at v1.0.0 ([#142](https://github.com/kaiohenricunha/dotclaude/issues/142)) ([78e2619](https://github.com/kaiohenricunha/dotclaude/commit/78e2619235619ad727513f6e3681530d039563cc))
+- re-baseline release-please at v1.0.0 ([#142](https://github.com/kaiohenricunha/dotbabel/issues/142)) ([78e2619](https://github.com/kaiohenricunha/dotbabel/commit/78e2619235619ad727513f6e3681530d039563cc))
 
-## [1.0.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.11.0...v1.0.0) (2026-04-29)
+## [1.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.11.0...v1.0.0) (2026-04-29)
 
 The v1.0 stable cut of `@dotclaude/dotclaude`. Locks the handoff v2
 surface, fixes the busybox/Alpine substrate crash, formalizes spec
@@ -127,17 +172,17 @@ verb-rename mapping and migration examples.
 
 - **handoff CX-1 — progress messages go to stderr per spec §5.5.1 OPS-2.** When capturing the first line of `pull <id>` output (e.g. inside the Codex `!`-shell which displays the interleaved combined stream), redirect stderr explicitly: `dotclaude handoff pull <id> 2>/dev/null | head -1`. The `<handoff>` block, summary markdown, and `-o`-target path are stdout; the `latest <cli> session: <id>` and `using --from <cli> override` lines are stderr.
 
-## [0.11.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.10.0...v0.11.0) (2026-04-20)
+## [0.11.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.10.0...v0.11.0) (2026-04-20)
 
 ### ⚠ BREAKING CHANGES
 
-- **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotclaude/issues/80))
+- **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotbabel/issues/80))
 
 ### Added
 
-- **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotclaude/issues/80)) ([ab02686](https://github.com/kaiohenricunha/dotclaude/commit/ab026867a2b3665d413961cb1f9faf6ae8cecc85))
+- **handoff:** self-bootstrap push — drop init ceremony and schema pin ([#80](https://github.com/kaiohenricunha/dotbabel/issues/80)) ([ab02686](https://github.com/kaiohenricunha/dotbabel/commit/ab026867a2b3665d413961cb1f9faf6ae8cecc85))
 
-## [0.10.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.9.0...v0.10.0) (2026-04-20)
+## [0.10.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.9.0...v0.10.0) (2026-04-20)
 
 ### ⚠ BREAKING CHANGES
 
@@ -145,9 +190,9 @@ verb-rename mapping and migration examples.
 
 ### Added
 
-- **handoff:** v2 store taxonomy + schema enforcement + init ([#73](https://github.com/kaiohenricunha/dotclaude/issues/73)) ([6da64bb](https://github.com/kaiohenricunha/dotclaude/commit/6da64bb80f7e25d489d1ee92bef2416d3a1674a2))
+- **handoff:** v2 store taxonomy + schema enforcement + init ([#73](https://github.com/kaiohenricunha/dotbabel/issues/73)) ([6da64bb](https://github.com/kaiohenricunha/dotbabel/commit/6da64bb80f7e25d489d1ee92bef2416d3a1674a2))
 
-## [0.9.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.8.0...v0.9.0) (2026-04-20)
+## [0.9.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.8.0...v0.9.0) (2026-04-20)
 
 ### ⚠ BREAKING CHANGES
 
@@ -155,18 +200,18 @@ verb-rename mapping and migration examples.
 
 ### Added
 
-- **handoff:** promote doctor, remote-list, search into the binary ([#71](https://github.com/kaiohenricunha/dotclaude/issues/71)) ([7ea0883](https://github.com/kaiohenricunha/dotclaude/commit/7ea08833104ebe89292e4b280468670fbb08bff0))
-- **handoff:** remove gist transports, drop --via flag ([#68](https://github.com/kaiohenricunha/dotclaude/issues/68)) ([9aec0dc](https://github.com/kaiohenricunha/dotclaude/commit/9aec0dc0902a58831898ad34ccda97be06250b3f))
+- **handoff:** promote doctor, remote-list, search into the binary ([#71](https://github.com/kaiohenricunha/dotbabel/issues/71)) ([7ea0883](https://github.com/kaiohenricunha/dotbabel/commit/7ea08833104ebe89292e4b280468670fbb08bff0))
+- **handoff:** remove gist transports, drop --via flag ([#68](https://github.com/kaiohenricunha/dotbabel/issues/68)) ([9aec0dc](https://github.com/kaiohenricunha/dotbabel/commit/9aec0dc0902a58831898ad34ccda97be06250b3f))
 
 ### Changed
 
-- **handoff:** rename git-fallback internals to remote ([#70](https://github.com/kaiohenricunha/dotclaude/issues/70)) ([fc8fbf7](https://github.com/kaiohenricunha/dotclaude/commit/fc8fbf773d2e2380d4b9e7097d41a47c53f86b9f))
+- **handoff:** rename git-fallback internals to remote ([#70](https://github.com/kaiohenricunha/dotbabel/issues/70)) ([fc8fbf7](https://github.com/kaiohenricunha/dotbabel/commit/fc8fbf773d2e2380d4b9e7097d41a47c53f86b9f))
 
 ### Documentation
 
-- **handoff:** slim SKILL.md to a thin wrapper around the binary ([#72](https://github.com/kaiohenricunha/dotclaude/issues/72)) ([fee18d7](https://github.com/kaiohenricunha/dotclaude/commit/fee18d7d3ed86e3ced9c6257ff38791c4a74c135))
+- **handoff:** slim SKILL.md to a thin wrapper around the binary ([#72](https://github.com/kaiohenricunha/dotbabel/issues/72)) ([fee18d7](https://github.com/kaiohenricunha/dotbabel/commit/fee18d7d3ed86e3ced9c6257ff38791c4a74c135))
 
-## [0.8.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.7.0...v0.8.0) (2026-04-19)
+## [0.8.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.7.0...v0.8.0) (2026-04-19)
 
 ### ⚠ BREAKING CHANGES
 
@@ -174,38 +219,38 @@ verb-rename mapping and migration examples.
 
 ### Added
 
-- **handoff:** drop &lt;cli&gt; positional from push/pull ([#66](https://github.com/kaiohenricunha/dotclaude/issues/66)) ([a172e0e](https://github.com/kaiohenricunha/dotclaude/commit/a172e0e3b736094c43b80047ed2e217ed30a8301))
+- **handoff:** drop &lt;cli&gt; positional from push/pull ([#66](https://github.com/kaiohenricunha/dotbabel/issues/66)) ([a172e0e](https://github.com/kaiohenricunha/dotbabel/commit/a172e0e3b736094c43b80047ed2e217ed30a8301))
 
 ### Fixed
 
-- **test:** avoid bats $output capture for 10k-session stress test ([#63](https://github.com/kaiohenricunha/dotclaude/issues/63)) ([e1145b0](https://github.com/kaiohenricunha/dotclaude/commit/e1145b016e7a7266f133178084d13d04126d86b0))
+- **test:** avoid bats $output capture for 10k-session stress test ([#63](https://github.com/kaiohenricunha/dotbabel/issues/63)) ([e1145b0](https://github.com/kaiohenricunha/dotbabel/commit/e1145b016e7a7266f133178084d13d04126d86b0))
 
 ### Documentation
 
-- add Copilot instructions, review config, and AGENTS.md ([#65](https://github.com/kaiohenricunha/dotclaude/issues/65)) ([eb1aca4](https://github.com/kaiohenricunha/dotclaude/commit/eb1aca425b46467b64162c3b5c8ab1d4dcb9280c))
+- add Copilot instructions, review config, and AGENTS.md ([#65](https://github.com/kaiohenricunha/dotbabel/issues/65)) ([eb1aca4](https://github.com/kaiohenricunha/dotbabel/commit/eb1aca425b46467b64162c3b5c8ab1d4dcb9280c))
 
-## [0.7.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.6.0...v0.7.0) (2026-04-19)
-
-### Added
-
-- **handoff:** shell-scripts-first refactor + dotclaude-handoff binary ([#58](https://github.com/kaiohenricunha/dotclaude/issues/58)) ([176cb9d](https://github.com/kaiohenricunha/dotclaude/commit/176cb9dd9a0c1ba5362bd783604343aaa4815b19))
-
-## [0.6.0](https://github.com/kaiohenricunha/dotclaude/compare/v0.5.0...v0.6.0) (2026-04-18)
+## [0.7.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.6.0...v0.7.0) (2026-04-19)
 
 ### Added
 
-- /pre-pr and /review-prs commands + CLAUDE.md rule refinements ([#51](https://github.com/kaiohenricunha/dotclaude/issues/51)) ([4e300ca](https://github.com/kaiohenricunha/dotclaude/commit/4e300ca399555d9b2fc8f018d30fe55fcbe977f4))
-- **ci:** automate semantic versioning with release-please ([#52](https://github.com/kaiohenricunha/dotclaude/issues/52)) ([67e7949](https://github.com/kaiohenricunha/dotclaude/commit/67e79491a190c6dfa51188de55daf80169be7436))
+- **handoff:** shell-scripts-first refactor + dotclaude-handoff binary ([#58](https://github.com/kaiohenricunha/dotbabel/issues/58)) ([176cb9d](https://github.com/kaiohenricunha/dotbabel/commit/176cb9dd9a0c1ba5362bd783604343aaa4815b19))
+
+## [0.6.0](https://github.com/kaiohenricunha/dotbabel/compare/v0.5.0...v0.6.0) (2026-04-18)
+
+### Added
+
+- /pre-pr and /review-prs commands + CLAUDE.md rule refinements ([#51](https://github.com/kaiohenricunha/dotbabel/issues/51)) ([4e300ca](https://github.com/kaiohenricunha/dotbabel/commit/4e300ca399555d9b2fc8f018d30fe55fcbe977f4))
+- **ci:** automate semantic versioning with release-please ([#52](https://github.com/kaiohenricunha/dotbabel/issues/52)) ([67e7949](https://github.com/kaiohenricunha/dotbabel/commit/67e79491a190c6dfa51188de55daf80169be7436))
 
 ### Fixed
 
-- **ci:** allow release-please CHANGELOG formatting in lint checks ([#55](https://github.com/kaiohenricunha/dotclaude/issues/55)) ([7b0c048](https://github.com/kaiohenricunha/dotclaude/commit/7b0c0484425b508d0e15373725f3710963adadca))
-- **ci:** fix release-please config — drop ### prefix, add include-component-in-tag: false ([#54](https://github.com/kaiohenricunha/dotclaude/issues/54)) ([e7ae3e3](https://github.com/kaiohenricunha/dotclaude/commit/e7ae3e3495f8fd76dedd47213d46458bc6211d28))
-- remove squadranks vocabulary from project-agnostic surface ([#57](https://github.com/kaiohenricunha/dotclaude/issues/57)) ([59b5c63](https://github.com/kaiohenricunha/dotclaude/commit/59b5c6314861ad45150f5fa1c9087c057fc39175))
+- **ci:** allow release-please CHANGELOG formatting in lint checks ([#55](https://github.com/kaiohenricunha/dotbabel/issues/55)) ([7b0c048](https://github.com/kaiohenricunha/dotbabel/commit/7b0c0484425b508d0e15373725f3710963adadca))
+- **ci:** fix release-please config — drop ### prefix, add include-component-in-tag: false ([#54](https://github.com/kaiohenricunha/dotbabel/issues/54)) ([e7ae3e3](https://github.com/kaiohenricunha/dotbabel/commit/e7ae3e3495f8fd76dedd47213d46458bc6211d28))
+- remove squadranks vocabulary from project-agnostic surface ([#57](https://github.com/kaiohenricunha/dotbabel/issues/57)) ([59b5c63](https://github.com/kaiohenricunha/dotbabel/commit/59b5c6314861ad45150f5fa1c9087c057fc39175))
 
 ### Documentation
 
-- close v0.4-v0.5 coverage gaps + automate version stamps ([#56](https://github.com/kaiohenricunha/dotclaude/issues/56)) ([6e121c7](https://github.com/kaiohenricunha/dotclaude/commit/6e121c7721b5a504fe84cf65ea0539c2cf0f3f4e))
+- close v0.4-v0.5 coverage gaps + automate version stamps ([#56](https://github.com/kaiohenricunha/dotbabel/issues/56)) ([6e121c7](https://github.com/kaiohenricunha/dotbabel/commit/6e121c7721b5a504fe84cf65ea0539c2cf0f3f4e))
 
 ## [Unreleased]
 

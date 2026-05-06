@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dotclaude.dev/schemas/index-entry.schema.json",
-  "title": "dotclaude index entry",
+  "$id": "https://dotbabel.dev/schemas/index-entry.schema.json",
+  "title": "dotbabel index entry",
   "description": "Shape of one row in index/artifacts.json. Facet arrays default to [] when absent.",
   "type": "object",
   "additionalProperties": true,

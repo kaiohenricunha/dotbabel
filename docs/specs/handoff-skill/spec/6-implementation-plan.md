@@ -9,7 +9,7 @@
 >
 > **The on-disk remote format does not change.** Per §3 ARCH-6 the v1
 > description decoder is already preserved and only v2 encodes.
-> Existing pushed branches in users' `$DOTCLAUDE_HANDOFF_REPO` keep
+> Existing pushed branches in users' `$DOTBABEL_HANDOFF_REPO` keep
 > working through the verb rename — there is no data migration, just
 > a CLI surface migration. This makes the big-bang less scary.
 
@@ -53,13 +53,13 @@ major-version release.
 Five parallel workstreams. Dependencies (edges) determine merge ordering
 within and between phases.
 
-| ID  | Workstream                          | Files (primary)                                                                               |
-| --- | ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| W-1 | Binary surface refactor             | `plugins/dotclaude/bin/dotclaude-handoff.mjs`, `plugins/dotclaude/src/lib/handoff-remote.mjs` |
-| W-2 | SKILL.md + references rewrite       | `skills/handoff/SKILL.md`, `skills/handoff/references/*.md`                                   |
-| W-3 | Tests update                        | `plugins/dotclaude/tests/bats/handoff-*.bats`, `plugins/dotclaude/tests/handoff-*.test.mjs`   |
-| W-4 | Drift-detection test infrastructure | `plugins/dotclaude/tests/handoff-drift.test.mjs` (new), CI wiring in `.github/workflows/`     |
-| W-5 | Long-form docs reconciliation       | `docs/handoff-guide.md`                                                                       |
+| ID  | Workstream                          | Files (primary)                                                                            |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| W-1 | Binary surface refactor             | `plugins/dotbabel/bin/dotbabel-handoff.mjs`, `plugins/dotbabel/src/lib/handoff-remote.mjs` |
+| W-2 | SKILL.md + references rewrite       | `skills/handoff/SKILL.md`, `skills/handoff/references/*.md`                                |
+| W-3 | Tests update                        | `plugins/dotbabel/tests/bats/handoff-*.bats`, `plugins/dotbabel/tests/handoff-*.test.mjs`  |
+| W-4 | Drift-detection test infrastructure | `plugins/dotbabel/tests/handoff-drift.test.mjs` (new), CI wiring in `.github/workflows/`   |
+| W-5 | Long-form docs reconciliation       | `docs/handoff-guide.md`                                                                    |
 
 ### Dependency edges
 
@@ -152,7 +152,7 @@ Reference: `docs/plans/handoff-skill-prompts.md` — **to be written at implemen
 
 | Workstream | UNIT                                                                                | INTEGRATION                                                                              | POST-DEPLOY (manual)                                                                              |
 | ---------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| W-1        | argv parser per command (5.2 flag matrices), exit codes per command (5.3 templates) | end-to-end `pull` / `push` / `fetch` against `file://` bare repo (existing bats pattern) | one round-trip against the real `$DOTCLAUDE_HANDOFF_REPO` from a fresh shell                      |
+| W-1        | argv parser per command (5.2 flag matrices), exit codes per command (5.3 templates) | end-to-end `pull` / `push` / `fetch` against `file://` bare repo (existing bats pattern) | one round-trip against the real `$DOTBABEL_HANDOFF_REPO` from a fresh shell                       |
 | W-2        | n/a (markdown)                                                                      | drift-test asserts §5.5 mapping survives the rewrite                                     | trigger a real `/handoff` via Claude Code from a session, confirm Bash invocation matches mapping |
 | W-3        | bats coverage per command kept ≥ 90%                                                | every primary command + every supporting command + every error path in §5.3              | run full bats suite from `npm test` on macOS + Linux                                              |
 | W-4        | unit test for the symbol-list extractor itself                                      | drift-test runs in CI on every PR; intentional drift (test fixture) must fail it         | n/a                                                                                               |
@@ -165,23 +165,23 @@ dev runs `npm test` to surface drift before push.
 
 > **The migration that doesn't happen:** the on-disk remote format
 > doesn't change. v1 description decode is preserved; only v2 encodes.
-> Existing branches in users' `$DOTCLAUDE_HANDOFF_REPO` keep working
+> Existing branches in users' `$DOTBABEL_HANDOFF_REPO` keep working
 > through the verb rename. There is **no data migration step in this
 > spec.**
 
 The migration table for the major-version CHANGELOG:
 
-| Old surface (v0.x)                                | New surface (v1.x)                                | User action required                                                                                                                                                                                                                |
-| ------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dotclaude handoff <query>` (bare positional)     | `dotclaude handoff pull <query>`                  | Add the `pull` verb                                                                                                                                                                                                                 |
-| `dotclaude handoff pull <query>` (remote fetch)   | `dotclaude handoff fetch <query>`                 | Rename invocation: `pull` → `fetch` for remote retrieval                                                                                                                                                                            |
-| `dotclaude handoff push --to <cli>`               | `dotclaude handoff push` (no `--to`)              | Remove `--to`. The flag did nothing functional; it tuned a one-line Next-step text that's now generic                                                                                                                               |
-| `dotclaude handoff push` (env-detection fallback) | `dotclaude handoff push --from <cli>` (mandatory) | When pushing without a `<query>`, pass `--from <your-cli>`. The skill's auto-trigger contract fills this for slash-command users; direct shell users must add it. **Calling `push` without either will exit 64 with a usage hint.** |
-| `dotclaude handoff digest <cli> <id>`             | `dotclaude handoff describe <id> --json`          | Use `describe --json` for scripting (preview without rendering)                                                                                                                                                                     |
-| `dotclaude handoff file <cli> <id>`               | `dotclaude handoff pull <id> > <path>`            | Pipe the rendered block to a file; the dedicated `file` sub is removed                                                                                                                                                              |
-| `dotclaude handoff resolve <cli> <id>`            | (removed)                                         | Internal sub no longer exposed; was scripting-only and unused                                                                                                                                                                       |
-| `dotclaude handoff remote-list`                   | `dotclaude handoff list --remote`                 | Use `list --remote` (and `list --local` for local sessions)                                                                                                                                                                         |
-| `metadata.json.tag` (legacy field)                | `metadata.json.tags` (array)                      | None — readers ignore unknowns, the legacy single-tag field is dropped from writes in Phase 3                                                                                                                                       |
+| Old surface (v0.x)                               | New surface (v1.x)                               | User action required                                                                                                                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dotbabel handoff <query>` (bare positional)     | `dotbabel handoff pull <query>`                  | Add the `pull` verb                                                                                                                                                                                                                 |
+| `dotbabel handoff pull <query>` (remote fetch)   | `dotbabel handoff fetch <query>`                 | Rename invocation: `pull` → `fetch` for remote retrieval                                                                                                                                                                            |
+| `dotbabel handoff push --to <cli>`               | `dotbabel handoff push` (no `--to`)              | Remove `--to`. The flag did nothing functional; it tuned a one-line Next-step text that's now generic                                                                                                                               |
+| `dotbabel handoff push` (env-detection fallback) | `dotbabel handoff push --from <cli>` (mandatory) | When pushing without a `<query>`, pass `--from <your-cli>`. The skill's auto-trigger contract fills this for slash-command users; direct shell users must add it. **Calling `push` without either will exit 64 with a usage hint.** |
+| `dotbabel handoff digest <cli> <id>`             | `dotbabel handoff describe <id> --json`          | Use `describe --json` for scripting (preview without rendering)                                                                                                                                                                     |
+| `dotbabel handoff file <cli> <id>`               | `dotbabel handoff pull <id> > <path>`            | Pipe the rendered block to a file; the dedicated `file` sub is removed                                                                                                                                                              |
+| `dotbabel handoff resolve <cli> <id>`            | (removed)                                        | Internal sub no longer exposed; was scripting-only and unused                                                                                                                                                                       |
+| `dotbabel handoff remote-list`                   | `dotbabel handoff list --remote`                 | Use `list --remote` (and `list --local` for local sessions)                                                                                                                                                                         |
+| `metadata.json.tag` (legacy field)               | `metadata.json.tags` (array)                     | None — readers ignore unknowns, the legacy single-tag field is dropped from writes in Phase 3                                                                                                                                       |
 
 Three user-visible breakages explicit in the table because they have
 different user-affordance shapes:
@@ -192,13 +192,13 @@ different user-affordance shapes:
 
 ## 6.6 Rollback Plan
 
-| Scenario                                                  | Action                                                                                                                                                                                            | Notes                                                                                    |
-| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Critical bug discovered post-release                      | Publish a **patch release** that restores the prior surface (revert the cutover commits, bump major's first patch). Users `npm install -g @dotclaude/dotclaude@<prior-major>` to pin until fixed. | The drift test on the revert PR catches partial reverts; CI must pass before publishing. |
-| Bug discovered between Phase 2 and release                | Revert the offending Phase 2 PR(s) on `main`. Drift test stays green because the assertions revert with the surface change.                                                                       | This is the cheap rollback window — no users affected because no release has shipped.    |
-| Bug discovered during Phase 3 (post-cutover, pre-release) | Same as above — revert offending PR. Phase 3 is internal cleanup; no user-visible state to migrate.                                                                                               | Same drift-test invariant.                                                               |
-| Phase 1 drift test itself is buggy                        | Revert W-4 PR. Phase 1 has no other artifacts.                                                                                                                                                    | Trivial.                                                                                 |
-| User pins to old major and never upgrades                 | Acceptable. v0.x stays on npm under its tags; users upgrade when they're ready.                                                                                                                   | This is what semver major is for.                                                        |
+| Scenario                                                  | Action                                                                                                                                                                                          | Notes                                                                                    |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Critical bug discovered post-release                      | Publish a **patch release** that restores the prior surface (revert the cutover commits, bump major's first patch). Users `npm install -g @dotbabel/dotbabel@<prior-major>` to pin until fixed. | The drift test on the revert PR catches partial reverts; CI must pass before publishing. |
+| Bug discovered between Phase 2 and release                | Revert the offending Phase 2 PR(s) on `main`. Drift test stays green because the assertions revert with the surface change.                                                                     | This is the cheap rollback window — no users affected because no release has shipped.    |
+| Bug discovered during Phase 3 (post-cutover, pre-release) | Same as above — revert offending PR. Phase 3 is internal cleanup; no user-visible state to migrate.                                                                                             | Same drift-test invariant.                                                               |
+| Phase 1 drift test itself is buggy                        | Revert W-4 PR. Phase 1 has no other artifacts.                                                                                                                                                  | Trivial.                                                                                 |
+| User pins to old major and never upgrades                 | Acceptable. v0.x stays on npm under its tags; users upgrade when they're ready.                                                                                                                 | This is what semver major is for.                                                        |
 
 ### Things explicitly NOT in the rollback plan
 

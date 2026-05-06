@@ -4,16 +4,16 @@
 
 ## CLI Interface
 
-### `dotclaude bootstrap`
+### `dotbabel bootstrap`
 
 ```
-dotclaude-bootstrap [OPTIONS]
+dotbabel-bootstrap [OPTIONS]
 
 Set up (or refresh) ~/.claude/ by symlinking commands/, skills/, CLAUDE.md,
 and copying agent templates into place. Idempotent — safe to re-run.
 
 Options:
-  --source <path>   Path to a local dotclaude git clone. Overrides DOTCLAUDE_DIR.
+  --source <path>   Path to a local dotbabel git clone. Overrides DOTBABEL_DIR.
                     Default: npm package install directory.
   --target <dir>    Override destination directory. Default: ~/.claude
   --quiet           Suppress per-file progress; print summary only.
@@ -25,26 +25,26 @@ Options:
 Exit codes: 0 ok, 1 validation failure, 2 env error, 64 usage error.
 
 Examples:
-  dotclaude bootstrap
-  dotclaude bootstrap --source ~/projects/dotclaude
-  DOTCLAUDE_DIR=~/projects/dotclaude dotclaude bootstrap --quiet
+  dotbabel bootstrap
+  dotbabel bootstrap --source ~/projects/dotbabel
+  DOTBABEL_DIR=~/projects/dotbabel dotbabel bootstrap --quiet
 ```
 
-### `dotclaude sync`
+### `dotbabel sync`
 
 ```
-dotclaude-sync <subcommand> [OPTIONS]
+dotbabel-sync <subcommand> [OPTIONS]
 
 Subcommands:
-  pull      Update dotclaude and re-bootstrap ~/.claude/
-            npm mode:   npm update -g @dotclaude/dotclaude, then bootstrap
+  pull      Update dotbabel and re-bootstrap ~/.claude/
+            npm mode:   npm update -g @dotbabel/dotbabel, then bootstrap
             clone mode: git fetch + rebase origin/main, then bootstrap
   status    Show current version vs. latest (npm mode) or git status (clone mode)
-  push      [clone mode only] Secret-scan, commit, and push the dotclaude clone
+  push      [clone mode only] Secret-scan, commit, and push the dotbabel clone
 
 Options:
-  --source <path>   Path to local dotclaude git clone (activates clone mode).
-                    Overrides DOTCLAUDE_DIR.
+  --source <path>   Path to local dotbabel git clone (activates clone mode).
+                    Overrides DOTBABEL_DIR.
   --quiet           Summary output only.
   --json            JSON output mode.
   --no-color
@@ -54,15 +54,15 @@ Options:
 Exit codes: 0 ok, 1 failure, 2 env error (git/npm not found), 64 usage error.
 
 Examples:
-  dotclaude sync pull
-  dotclaude sync status
-  dotclaude sync pull --source ~/projects/dotclaude
-  dotclaude sync push --source ~/projects/dotclaude
+  dotbabel sync pull
+  dotbabel sync status
+  dotbabel sync pull --source ~/projects/dotbabel
+  dotbabel sync push --source ~/projects/dotbabel
 ```
 
-### Updated `dotclaude` dispatcher
+### Updated `dotbabel` dispatcher
 
-`dotclaude.mjs` SUBCOMMANDS array gains two entries:
+`dotbabel.mjs` SUBCOMMANDS array gains two entries:
 
 ```js
 const SUBCOMMANDS = [
@@ -78,20 +78,20 @@ const SUBCOMMANDS = [
 ];
 ```
 
-### Updated `dotclaude-doctor`
+### Updated `dotbabel-doctor`
 
 Doctor gains one new check section — **bootstrap** — reporting the state of
 each expected symlink in `~/.claude/`:
 
 ```
-  ✓ CLAUDE.md         → /path/to/dotclaude/CLAUDE.md
+  ✓ CLAUDE.md         → /path/to/dotbabel/CLAUDE.md
   ✓ commands/         → 14 files linked
   ✓ skills/           → 12 dirs linked
-  ⚠ agents/           → 0 files (run dotclaude bootstrap to install)
+  ⚠ agents/           → 0 files (run dotbabel bootstrap to install)
 ```
 
 If `~/.claude/` has never been bootstrapped, doctor emits a single `warn`
-suggesting `dotclaude bootstrap` rather than failing with an error.
+suggesting `dotbabel bootstrap` rather than failing with an error.
 
 ## Node API Surface
 
@@ -102,7 +102,7 @@ Two new exports added to `index.mjs`:
  * Set up or refresh ~/.claude/ by symlinking source files into the target.
  *
  * @param {object} [opts]
- * @param {string} [opts.source]   Path to dotclaude root. Defaults to pkg root.
+ * @param {string} [opts.source]   Path to dotbabel root. Defaults to pkg root.
  * @param {string} [opts.target]   Destination dir. Defaults to $HOME/.claude.
  * @param {boolean} [opts.quiet]
  * @param {boolean} [opts.json]
@@ -133,25 +133,25 @@ export { syncGlobal } from "./sync-global.mjs";
     "commands/",
     "skills/",
     "CLAUDE.md",
-    "plugins/dotclaude/src/",
-    "plugins/dotclaude/bin/",
-    "plugins/dotclaude/scripts/",
-    "plugins/dotclaude/templates/",
-    "plugins/dotclaude/hooks/",
-    "plugins/dotclaude/README.md",
-    "plugins/dotclaude/.claude-plugin/"
+    "plugins/dotbabel/src/",
+    "plugins/dotbabel/bin/",
+    "plugins/dotbabel/scripts/",
+    "plugins/dotbabel/templates/",
+    "plugins/dotbabel/hooks/",
+    "plugins/dotbabel/README.md",
+    "plugins/dotbabel/.claude-plugin/"
   ],
   "bin": {
-    "dotclaude": "./plugins/dotclaude/bin/dotclaude.mjs",
-    "dotclaude-bootstrap": "./plugins/dotclaude/bin/dotclaude-bootstrap.mjs",
-    "dotclaude-sync": "./plugins/dotclaude/bin/dotclaude-sync.mjs",
-    "dotclaude-doctor": "./plugins/dotclaude/bin/dotclaude-doctor.mjs",
-    "dotclaude-detect-drift": "./plugins/dotclaude/bin/dotclaude-detect-drift.mjs",
-    "dotclaude-validate-skills": "./plugins/dotclaude/bin/dotclaude-validate-skills.mjs",
-    "dotclaude-check-spec-coverage": "./plugins/dotclaude/bin/dotclaude-check-spec-coverage.mjs",
-    "dotclaude-validate-specs": "./plugins/dotclaude/bin/dotclaude-validate-specs.mjs",
-    "dotclaude-check-instruction-drift": "./plugins/dotclaude/bin/dotclaude-check-instruction-drift.mjs",
-    "dotclaude-init": "./plugins/dotclaude/bin/dotclaude-init.mjs"
+    "dotbabel": "./plugins/dotbabel/bin/dotbabel.mjs",
+    "dotbabel-bootstrap": "./plugins/dotbabel/bin/dotbabel-bootstrap.mjs",
+    "dotbabel-sync": "./plugins/dotbabel/bin/dotbabel-sync.mjs",
+    "dotbabel-doctor": "./plugins/dotbabel/bin/dotbabel-doctor.mjs",
+    "dotbabel-detect-drift": "./plugins/dotbabel/bin/dotbabel-detect-drift.mjs",
+    "dotbabel-validate-skills": "./plugins/dotbabel/bin/dotbabel-validate-skills.mjs",
+    "dotbabel-check-spec-coverage": "./plugins/dotbabel/bin/dotbabel-check-spec-coverage.mjs",
+    "dotbabel-validate-specs": "./plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
+    "dotbabel-check-instruction-drift": "./plugins/dotbabel/bin/dotbabel-check-instruction-drift.mjs",
+    "dotbabel-init": "./plugins/dotbabel/bin/dotbabel-init.mjs"
   }
 }
 ```

@@ -18,10 +18,10 @@ work well interactively (humans reading terminal output) _and_ in CI
 **Keep the gold-standard format.** Every bin + every shell script uses the
 same `✓/✗/⚠` prefix, factored into two helpers that stay byte-compatible:
 
-- `plugins/dotclaude/src/lib/output.mjs` — `createOutput({ json, noColor })`
+- `plugins/dotbabel/src/lib/output.mjs` — `createOutput({ json, noColor })`
   returns a `{ pass, fail, warn, info, flush, counts }` interface. Mirrors
   the shell helper.
-- `plugins/dotclaude/scripts/lib/output.sh` — `pass`/`fail`/`warn`/`out_init`/
+- `plugins/dotbabel/scripts/lib/output.sh` — `pass`/`fail`/`warn`/`out_init`/
   `out_flush`. Consumed via `source "$SCRIPT_DIR/lib/output.sh"`.
 
 `--json` is the machine mode. In that mode, the ✓/✗/⚠ lines are replaced

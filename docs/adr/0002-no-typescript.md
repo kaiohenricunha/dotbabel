@@ -4,7 +4,7 @@
 
 ## Context
 
-Every new Node package defaults to TypeScript. For `@dotclaude/dotclaude`
+Every new Node package defaults to TypeScript. For `@dotbabel/dotbabel`
 the question was whether to adopt TS from day one or stay on plain `.mjs`
 with JSDoc.
 

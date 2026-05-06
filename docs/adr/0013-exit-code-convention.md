@@ -25,7 +25,7 @@ A single named enum, exported as `EXIT_CODES`, consumed by every bin:
 authors can then write:
 
 ```yaml
-- run: npx dotclaude-validate-specs
+- run: npx dotbabel-validate-specs
 - if: failure()
   run: |
     case $? in

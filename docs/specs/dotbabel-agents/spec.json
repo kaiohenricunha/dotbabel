@@ -1,0 +1,22 @@
+{
+  "id": "dotbabel-agents",
+  "title": "First-class agent support in dotbabel",
+  "status": "done",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "bootstrap.sh",
+    ".claude/skills-manifest.json",
+    "commands/**",
+    "skills/**",
+    "plugins/dotbabel/.claude-plugin/plugin.json",
+    "plugins/dotbabel/templates/claude/agents/**",
+    "plugins/dotbabel/src/validate-skills-inventory.mjs",
+    "plugins/dotbabel/src/lib/errors.mjs",
+    "plugins/dotbabel/src/index.mjs",
+    "plugins/dotbabel/bin/dotbabel-validate-skills.mjs",
+    "plugins/dotbabel/tests/validate-skills-inventory.test.mjs"
+  ],
+  "acceptance_commands": ["npm test", "node plugins/dotbabel/bin/dotbabel-validate-skills.mjs ."],
+  "depends_on_specs": ["dotbabel-core"],
+  "active_prs": []
+}

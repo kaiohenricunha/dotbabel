@@ -2,7 +2,7 @@
 
 _Last updated: v1.3.0_
 
-Bootstrap dotclaude into `~/.claude/` in under 30 seconds. No npm, no Node required.
+Bootstrap dotbabel into `~/.claude/` in under 30 seconds. No npm, no Node required.
 
 **Who this is for:** anyone who wants `/pre-pr`, `/dependabot-sweep`, `/review-prs`,
 cloud/IaC specialists, and the full commands library available in every project they
@@ -13,12 +13,12 @@ open in Claude Code. You manage it like any dotfile — pull to update, push to 
 ## 1. Clone
 
 ```bash
-git clone https://github.com/kaiohenricunha/dotclaude.git ~/projects/dotclaude
-cd ~/projects/dotclaude
+git clone https://github.com/kaiohenricunha/dotbabel.git ~/projects/dotbabel
+cd ~/projects/dotbabel
 ```
 
 > **Windows:** symlinks require elevated permissions. Use WSL (where the CLI works),
-> or run `./bootstrap.sh` from Git Bash instead of using `dotclaude bootstrap`
+> or run `./bootstrap.sh` from Git Bash instead of using `dotbabel bootstrap`
 > natively on Windows.
 
 ## 2. Bootstrap
@@ -40,7 +40,7 @@ Expected output:
 ✓ skills/aws-specialist/
 ...
 bootstrap complete — 29 items linked, 0 skipped, 0 backed up
-Run 'dotclaude-doctor' to verify the install.
+Run 'dotbabel-doctor' to verify the install.
 ```
 
 Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>` before
@@ -48,10 +48,10 @@ being replaced.
 
 ## 3. Verify
 
-If `dotclaude` is on your PATH (it is if you installed via npm globally):
+If `dotbabel` is on your PATH (it is if you installed via npm globally):
 
 ```bash
-dotclaude-doctor
+dotbabel-doctor
 ```
 
 Otherwise, open any repo in Claude Code and type:
@@ -96,10 +96,10 @@ Help me debug this Kubernetes pod restart loop.
 ## 5. Stay current
 
 ```bash
-# Pull latest dotclaude and re-bootstrap ~/.claude/ in one command
+# Pull latest dotbabel and re-bootstrap ~/.claude/ in one command
 ./sync.sh pull
-# or, if dotclaude is on PATH:
-dotclaude sync pull
+# or, if dotbabel is on PATH:
+dotbabel sync pull
 ```
 
 Check what version you're on:
@@ -107,7 +107,7 @@ Check what version you're on:
 ```bash
 ./sync.sh status
 # or:
-dotclaude sync status
+dotbabel sync status
 ```
 
 ## 6. Push your customizations (optional)
@@ -117,7 +117,7 @@ If you've edited commands or skills locally and want to push them back:
 ```bash
 ./sync.sh push
 # or:
-dotclaude sync push
+dotbabel sync push
 ```
 
 The push runs a secret scan before committing — it refuses files containing
@@ -145,10 +145,10 @@ restart the Claude Code session (`/clear` or quit and reopen).
 That's expected on first run if you had existing files in `~/.claude/`. The originals
 are preserved as `<name>.bak-<timestamp>`. Review them before deleting.
 
-**You see `command not found: dotclaude-doctor`.**
+**You see `command not found: dotbabel-doctor`.**
 
-`dotclaude-doctor` is part of the npm package, not the bootstrap path. It's optional.
-To get it: `npm install -g @dotclaude/dotclaude`. Or just open Claude Code and verify
+`dotbabel-doctor` is part of the npm package, not the bootstrap path. It's optional.
+To get it: `npm install -g @dotbabel/dotbabel`. Or just open Claude Code and verify
 the commands load by trying `/git` or `/ground-first`.
 
 **A skill was updated upstream but your session still runs the old version.**
@@ -160,13 +160,13 @@ after a pull the new version is live — but the running session cached the old 
 
 ## What gets symlinked
 
-| `~/.claude/` path      | Source                                       |
-| ---------------------- | -------------------------------------------- |
-| `CLAUDE.md`            | `CLAUDE.md` (global rules for all sessions)  |
-| `commands/*.md`        | `commands/*.md` (all slash commands)         |
-| `skills/*/`            | `skills/*/` (all skill directories)          |
-| `hooks/*.sh`           | `plugins/dotclaude/hooks/*.sh`               |
-| `agents/*.md` (copied) | `plugins/dotclaude/templates/claude/agents/` |
+| `~/.claude/` path      | Source                                      |
+| ---------------------- | ------------------------------------------- |
+| `CLAUDE.md`            | `CLAUDE.md` (global rules for all sessions) |
+| `commands/*.md`        | `commands/*.md` (all slash commands)        |
+| `skills/*/`            | `skills/*/` (all skill directories)         |
+| `hooks/*.sh`           | `plugins/dotbabel/hooks/*.sh`               |
+| `agents/*.md` (copied) | `plugins/dotbabel/templates/claude/agents/` |
 
 > Agents are **copied**, not symlinked — Claude Code resolves agent paths at startup
 > and needs real files, not symlinks, on some platforms.
@@ -177,4 +177,4 @@ after a pull the new version is live — but the running session cached the old 
 
 - [docs/index.md](./index.md) — full docs nav
 - [CLAUDE.md](../CLAUDE.md) — the global rules installed by bootstrap
-- [cli-reference.md](./cli-reference.md) — `dotclaude bootstrap`, `sync`, and all CLI subcommands
+- [cli-reference.md](./cli-reference.md) — `dotbabel bootstrap`, `sync`, and all CLI subcommands

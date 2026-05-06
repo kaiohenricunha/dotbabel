@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dotclaude.dev/schemas/facets.schema.json",
-  "title": "dotclaude taxonomy facets",
+  "$id": "https://dotbabel.dev/schemas/facets.schema.json",
+  "title": "dotbabel taxonomy facets",
   "description": "Shared enum definitions for faceted artifact metadata.",
   "$defs": {
     "domain": {

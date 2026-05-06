@@ -9,7 +9,7 @@ _Last updated: v1.3.0_
 │  Consumer repo                                                       │
 │  ┌────────────────────────┐    ┌──────────────────────────────────┐  │
 │  │  GitHub Actions        │    │  Local dev                       │  │
-│  │  validate-skills.yml   │    │  npm test / npx dotclaude-doctor   │  │
+│  │  validate-skills.yml   │    │  npm test / npx dotbabel-doctor   │  │
 │  │  detect-drift.yml      │    │  pre-commit → auto-update        │  │
 │  │  ai-review.yml         │    │                                  │  │
 │  └──────┬─────────────────┘    └──────────┬───────────────────────┘  │
@@ -17,9 +17,9 @@ _Last updated: v1.3.0_
           │                                 │
 ┌─────────▼─────────────────────────────────▼──────────────────────────┐
 │  bin/*                                                               │
-│  dotclaude  dotclaude-doctor  dotclaude-init  dotclaude-validate-{specs,  │
-│  skills}  dotclaude-check-{spec-coverage, instruction-drift}         │
-│  dotclaude-detect-drift                                               │
+│  dotbabel    dotbabel-doctor  dotbabel-init  dotbabel-validate-{specs,  │
+│  skills}  dotbabel-check-{spec-coverage, instruction-drift}         │
+│  dotbabel-detect-drift                                               │
 │  Each bin: parse(lib/argv) → validator → createOutput(lib/output)    │
 │            → formatError(lib/errors) → exit(lib/exit-codes)          │
 └─────────┬────────────────────────────────────────────────────────────┘
@@ -56,14 +56,14 @@ env, git history, and the spec tree.
 ```
 validate-skills.yml
        │
-       ▼  (runs `npx dotclaude-check-spec-coverage`)
-bin/dotclaude-check-spec-coverage.mjs
+       ▼  (runs `npx dotbabel-check-spec-coverage`)
+bin/dotbabel-check-spec-coverage.mjs
        │
        │ 1. parse(argv, {--repo-root})
        ▼
 createHarnessContext({ repoRoot })
        │
-       │ 2. resolve repoRoot: arg → DOTCLAUDE_REPO_ROOT → git rev-parse
+       │ 2. resolve repoRoot: arg → DOTBABEL_REPO_ROOT → git rev-parse
        ▼
 getPullRequestContext()         ← reads GITHUB_EVENT_NAME / PR_BODY / GITHUB_ACTOR
 getChangedFiles()               ← HARNESS_CHANGED_FILES csv || git diff origin/<base>...HEAD

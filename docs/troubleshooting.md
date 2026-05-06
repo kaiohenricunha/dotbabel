@@ -5,7 +5,7 @@ _Last updated: v1.3.0_
 Indexed by `ERROR_CODES`. When a validator fails, look up the `.code` value
 from its `ValidationError` here.
 
-Debug flag: set `DOTCLAUDE_DEBUG=1` to route previously-silent git-probe
+Debug flag: set `DOTBABEL_DEBUG=1` to route previously-silent git-probe
 catches (`resolveRepoRootFromGit`, `getChangedFiles`) to stderr tagged
 `[harness:git:*]`.
 
@@ -60,12 +60,12 @@ A `.claude/skills-manifest.json` entry points at a path that does not exist on d
 ### `MANIFEST_CHECKSUM_MISMATCH`
 
 A file's content drifted from the recorded sha256.
-**Fix**: `npx dotclaude-validate-skills --update` to recompute and accept the new content, or restore the file to its original state.
+**Fix**: `npx dotbabel-validate-skills --update` to recompute and accept the new content, or restore the file to its original state.
 
 ### `MANIFEST_ORPHAN_FILE`
 
 A file under `.claude/commands/` or `.claude/skills/<name>/SKILL.md` is not indexed in the manifest.
-**Fix**: `npx dotclaude-validate-skills --update` to pick it up (add a manifest entry), or delete the file.
+**Fix**: `npx dotbabel-validate-skills --update` to pick it up (add a manifest entry), or delete the file.
 
 ### `MANIFEST_DEPENDENCY_CYCLE`
 
@@ -121,12 +121,12 @@ An `instruction_files` entry points at a path that does not exist.
 
 ### `SCAFFOLD_CONFLICT`
 
-`dotclaude-init` refuses to overwrite an already-initialized repo.
+`dotbabel-init` refuses to overwrite an already-initialized repo.
 **Fix**: pass `--force` to overwrite, or remove `.claude/skills-manifest.json` / `docs/specs/` first.
 
 ### `SCAFFOLD_USAGE`
 
-Bad CLI invocation of `dotclaude-init` (e.g. flag without a value).
+Bad CLI invocation of `dotbabel-init` (e.g. flag without a value).
 **Fix**: see `--help`.
 
 ---
@@ -167,12 +167,12 @@ Settings JSON is malformed OR an MCP command / hook target / enabled plugin does
 ### `ENV_REPO_ROOT_UNKNOWN`
 
 `createHarnessContext()` could not resolve a repo root.
-**Fix**: pass `--repo-root <path>` or `DOTCLAUDE_REPO_ROOT=<path>`, or run inside a git worktree.
+**Fix**: pass `--repo-root <path>` or `DOTBABEL_REPO_ROOT=<path>`, or run inside a git worktree.
 
 ### `ENV_FACTS_MISSING`
 
 `docs/repo-facts.json` is missing or unreadable.
-**Fix**: scaffold with `dotclaude-init` or author the file (see `plugins/dotclaude/templates/docs/repo-facts.json`).
+**Fix**: scaffold with `dotbabel-init` or author the file (see `plugins/dotbabel/templates/docs/repo-facts.json`).
 
 ### `USAGE_UNKNOWN_FLAG`
 
@@ -203,7 +203,7 @@ If missing: re-run `./bootstrap.sh`. If present: restart the Claude Code session
 
 ### A skill runs but uses outdated behavior
 
-The session cached an older version. Run `./sync.sh pull` (or `dotclaude sync pull`)
+The session cached an older version. Run `./sync.sh pull` (or `dotbabel sync pull`)
 to fetch the latest, then restart the session.
 
 ### A specialist skill doesn't auto-activate
@@ -234,11 +234,11 @@ HARNESS_SYNC_SKIP_SECRET_SCAN=1 ./sync.sh push
 
 ### Taxonomy commands (`search`, `list`, `show`) return "index missing"
 
-Run `dotclaude index` first to build the artifact index. The index is generated
+Run `dotbabel index` first to build the artifact index. The index is generated
 from `agents/`, `skills/`, `commands/`, etc. and must be rebuilt after adding or
 renaming artifacts.
 
 ```bash
-dotclaude index
-dotclaude search kubernetes
+dotbabel index
+dotbabel search kubernetes
 ```

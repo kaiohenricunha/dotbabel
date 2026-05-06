@@ -41,28 +41,28 @@ one transport (a user-owned private git repo), one scrubbed digest.
 On the **first** push the binary walks you through a one-time setup:
 
 ```
-DOTCLAUDE_HANDOFF_REPO is not set — dotclaude can set this up for you.
+DOTBABEL_HANDOFF_REPO is not set — dotbabel can set this up for you.
 
   Detected: gh CLI authenticated as @kaiohenricunha.
   Plan: create private repo  kaiohenricunha/<name>
-        persist URL to       ~/.config/dotclaude/handoff.env
+        persist URL to       ~/.config/dotbabel/handoff.env
 
-  Repo name? [dotclaude-handoff-store]
-  Create kaiohenricunha/dotclaude-handoff-store and proceed? [y/N] y
-  ✓ created kaiohenricunha/dotclaude-handoff-store
-  ✓ wrote ~/.config/dotclaude/handoff.env
+  Repo name? [dotbabel-handoff-store]
+  Create kaiohenricunha/dotbabel-handoff-store and proceed? [y/N] y
+  ✓ created kaiohenricunha/dotbabel-handoff-store
+  ✓ wrote ~/.config/dotbabel/handoff.env
 ```
 
 Subsequent pushes read the persisted URL silently. To make the URL
 available in regular shells too, add:
 
 ```bash
-source ~/.config/dotclaude/handoff.env
+source ~/.config/dotbabel/handoff.env
 ```
 
 to your `~/.bashrc` or `~/.zshrc`.
 
-When calling `dotclaude handoff push` with no query argument, `--from <cli>` is
+When calling `dotbabel handoff push` with no query argument, `--from <cli>` is
 required — the flag identifies which local session to upload (e.g. `--from codex`).
 Skill invocations (`/handoff push`) auto-fill `--from` from the host session.
 
@@ -84,14 +84,14 @@ name.
 ## The transport
 
 One transport, always: a user-owned private git repo named by
-`$DOTCLAUDE_HANDOFF_REPO`. Any provider works (GitHub, GitLab, Gitea,
+`$DOTBABEL_HANDOFF_REPO`. Any provider works (GitHub, GitLab, Gitea,
 self-hosted, bare local path). Each handoff lands as a branch:
 
 ```
 handoff/<project>/<cli>/<YYYY-MM>/<short-uuid>
 ```
 
-e.g. `handoff/dotclaude/claude/2026-04/aaaa1111`. `main` is untouched —
+e.g. `handoff/dotbabel/claude/2026-04/aaaa1111`. `main` is untouched —
 the binary only reads and writes `handoff/...` branches, so you can
 reuse an existing repo without disturbing its content.
 
@@ -102,7 +102,7 @@ reuse an existing repo without disturbing its content.
 
 If either is missing, `push` prints a three-line manual-setup block
 (create the repo, export the env var, retry) and exits 2. Set
-`$DOTCLAUDE_HANDOFF_REPO` manually for GitLab, Gitea, or headless
+`$DOTBABEL_HANDOFF_REPO` manually for GitLab, Gitea, or headless
 workflows.
 
 ## Config file
@@ -110,15 +110,15 @@ workflows.
 The auto-bootstrap writes this file on success:
 
 ```
-~/.config/dotclaude/handoff.env
-  # Written by dotclaude handoff on 2026-04-20T…
-  # Sourceable from your shell rc:  source ~/.config/dotclaude/handoff.env
-  export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotclaude-handoff-store.git
+~/.config/dotbabel/handoff.env
+  # Written by dotbabel handoff on 2026-04-20T…
+  # Sourceable from your shell rc:  source ~/.config/dotbabel/handoff.env
+  export DOTBABEL_HANDOFF_REPO=git@github.com:<you>/dotbabel-handoff-store.git
 ```
 
 Mode 0600. Edit by hand to switch stores, or delete to force a
 re-bootstrap on the next push. The binary sources this file at start-up
-only when `$DOTCLAUDE_HANDOFF_REPO` is unset or empty — an explicit
+only when `$DOTBABEL_HANDOFF_REPO` is unset or empty — an explicit
 non-empty env var always
 wins.
 
@@ -178,7 +178,7 @@ precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).
 **Scripting with structured output:**
 
 ```bash
-dotclaude handoff pull latest --json | jq '.summary'
+dotbabel handoff pull latest --json | jq '.summary'
 ```
 
 **Scheduled remote handoff** (e.g. running as a /loop or cron):
@@ -188,7 +188,7 @@ dotclaude handoff pull latest --json | jq '.summary'
 ```
 
 Headless runs skip the interactive bootstrap — set
-`$DOTCLAUDE_HANDOFF_REPO` in the scheduler's environment.
+`$DOTBABEL_HANDOFF_REPO` in the scheduler's environment.
 
 ---
 
@@ -211,7 +211,7 @@ See [troubleshooting.md — skills & commands](./troubleshooting.md#skills--comm
 Quick diagnostic:
 
 ```
-dotclaude handoff doctor
+dotbabel handoff doctor
 ```
 
 It prints a one-line status for `git`, the transport URL, the persisted

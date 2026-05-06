@@ -32,20 +32,20 @@ model: sonnet
 
 # Handoff — Cross-CLI Session Context Transfer
 
-Thin wrapper around the `dotclaude handoff` binary. The binary is the
-authoritative contract; run `dotclaude handoff --help` for the full
+Thin wrapper around the `dotbabel handoff` binary. The binary is the
+authoritative contract; run `dotbabel handoff --help` for the full
 sub-command list and flag reference. This file maps natural language to
 the right invocation.
 
 ## Auto-trigger phrase mapping
 
-| Trigger phrase                                                         | Invocation                                           |
-| ---------------------------------------------------------------------- | ---------------------------------------------------- |
-| `handoff <id>` / resume-command fragments                              | `dotclaude handoff pull <id>`                        |
-| `continue in <cli>` / `switch to <cli>` / `pull from <cli>`            | `dotclaude handoff pull <id> --from <cli>`           |
-| `what was that session about` + identifier                             | `dotclaude handoff pull <id> --summary`              |
-| `push handoff` / `send to other machine` / `save this`                 | `dotclaude handoff push --from <host-cli> [--tag …]` |
-| `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotclaude handoff fetch [<query>]`                  |
+| Trigger phrase                                                         | Invocation                                          |
+| ---------------------------------------------------------------------- | --------------------------------------------------- |
+| `handoff <id>` / resume-command fragments                              | `dotbabel handoff pull <id>`                        |
+| `continue in <cli>` / `switch to <cli>` / `pull from <cli>`            | `dotbabel handoff pull <id> --from <cli>`           |
+| `what was that session about` + identifier                             | `dotbabel handoff pull <id> --summary`              |
+| `push handoff` / `send to other machine` / `save this`                 | `dotbabel handoff push --from <host-cli> [--tag …]` |
+| `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotbabel handoff fetch [<query>]`                  |
 
 Extract `<id>` from the user message (UUID, short UUID, or a deliberate-label
 alias: claude `customTitle`/`aiTitle`, codex `thread_name`, copilot
@@ -57,7 +57,7 @@ query is missing or ambiguous, ask one clarifying question before proceeding.
 
 ## The `--from` filling rule
 
-When invoking `dotclaude handoff push` without a query positional,
+When invoking `dotbabel handoff push` without a query positional,
 include `--from <your-cli>` where `<your-cli>` is the agent the host LLM
 is running in (`claude` for Claude Code, `copilot` for GitHub Copilot CLI,
 `codex` for Codex). The flag is required in that mode; the binary exits
@@ -65,12 +65,12 @@ is running in (`claude` for Claude Code, `copilot` for GitHub Copilot CLI,
 
 ## Tool execution failures
 
-When the `dotclaude` binary cannot be executed for any reason —
+When the `dotbabel` binary cannot be executed for any reason —
 permission denied, binary not found, network failure, sandbox
 restriction — do NOT fabricate, reconstruct, or synthesize a
 `<handoff>` block from raw session JSONL files. Report the
 tool-execution error verbatim and stop; instruct the user to run
-the command manually in a shell where `dotclaude` is available.
+the command manually in a shell where `dotbabel` is available.
 
 Specifically:
 
@@ -86,7 +86,7 @@ distinguish a hand-rolled block from a real one.
 
 ## Cross-cutting flags
 
-Brief reference. `dotclaude handoff --help` is authoritative.
+Brief reference. `dotbabel handoff --help` is authoritative.
 
 - `--from <cli>` narrows source-CLI auto-detection on `push`, `fetch`, `pull`; filters `list`, `search`, and `prune`.
   For `pull latest`, omitting `--from` triggers host auto-detection: `CLAUDECODE=1` / `COPILOT_*` / `CODEX_*` / `GEMINI_CLI*` env signals → narrowed to that CLI's root; host undetectable → cross-root union (newest mtime across all four roots).
@@ -106,7 +106,7 @@ Brief reference. `dotclaude handoff --help` is authoritative.
 
 ## Internal references
 
-- `dotclaude handoff --help` — authoritative flag and sub-command list.
+- `dotbabel handoff --help` — authoritative flag and sub-command list.
 - `references/prerequisites.md` — install matrix and remote-transport setup.
 - `references/from-codex.md` — Codex-specific notes.
 - `references/redaction.md` — scrubber behavior.

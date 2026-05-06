@@ -1,7 +1,7 @@
 # Alias Resolver Investigation (#158)
 
 **Date:** 2026-05-02
-**Trigger:** [GitHub issue #158](https://github.com/kaiohenricunha/dotclaude/issues/158) — request for an "alias" form in `dotclaude handoff pull` that resolves a session by the human-readable name a CLI's `--resume` UX displays ("Upgrade dotclaude and configure globally", "Handoff Pull Validation", etc.), not just by UUID prefix or `latest`.
+**Trigger:** [GitHub issue #158](https://github.com/kaiohenricunha/dotbabel/issues/158) — request for an "alias" form in `dotclaude handoff pull` that resolves a session by the human-readable name a CLI's `--resume` UX displays ("Upgrade dotclaude and configure globally", "Handoff Pull Validation", etc.), not just by UUID prefix or `latest`.
 **Scope:** `plugins/dotclaude/scripts/handoff-resolve.sh` resolver dispatch, `plugins/dotclaude/bin/dotclaude-handoff.mjs` wrapper TSV consumer, and `docs/specs/handoff-skill/spec/5-interfaces-apis.md` §5.2.1 / §5.4 grammar.
 **Verdict:** **PROCEED** with deliberate-label alias resolution. Single PR, v1.3.0 `feat:` scope, estimated 8–9 hours focused work.
 

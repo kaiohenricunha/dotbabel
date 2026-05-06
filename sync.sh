@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sync.sh — pull/push convenience wrapper for dotclaude.
+# sync.sh — pull/push convenience wrapper for dotbabel.
 #
 # Subcommands:
 #   pull    fetch origin, rebase onto origin/main, re-run bootstrap.sh
@@ -9,7 +9,7 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-# Regex catches the common literal-secret shapes we care about in dotclaude.
+# Regex catches the common literal-secret shapes we care about in dotbabel.
 # High-entropy random strings still slip through; this is a last-ditch guard,
 # not a full DLP system. We deliberately match on:
 #   *_KEY / *_TOKEN / *_SECRET assignments with 20+ char values
@@ -62,7 +62,7 @@ case "$cmd" in
         exit 1
       fi
     fi
-    git commit -m "dotclaude: sync $(date +%Y-%m-%d)"
+    git commit -m "dotbabel: sync $(date +%Y-%m-%d)"
     git push
     ;;
   status)

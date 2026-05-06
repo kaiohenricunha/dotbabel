@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dotclaude.dev/schemas/hook.schema.json",
-  "title": "dotclaude hook artifact",
+  "$id": "https://dotbabel.dev/schemas/hook.schema.json",
+  "title": "dotbabel hook artifact",
   "description": "Shape for hook YAML frontmatter. Phase 1: every field optional.",
   "allOf": [{ "$ref": "common.schema.json" }],
   "type": "object",

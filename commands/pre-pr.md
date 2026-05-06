@@ -104,7 +104,7 @@ Then unstage:
 git restore --staged .
 ```
 
-If the skill is not available in this session (not bootstrapped, non-dotclaude environment):
+If the skill is not available in this session (not bootstrapped, non-dotbabel environment):
 
 ```
 ⚠ security-review skill not available — skipping. Run /security-review manually before opening the PR.
@@ -150,7 +150,7 @@ Never claim pre-existing without running this proof.
 Do not generate the PR body — that is `/git pr`'s responsibility. Just surface a reminder of required sections so the user can write them before opening:
 
 ```
-PR body checklist (dotclaude conventions):
+PR body checklist (dotbabel conventions):
   [ ] ## Summary — 1–3 bullets describing the change
   [ ] ## Test plan — bulleted markdown checklist
   [ ] ## Spec ID — required if this repo uses specs (check for docs/specs/)

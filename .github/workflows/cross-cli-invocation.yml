@@ -2,7 +2,7 @@ name: cross-cli-invocation
 
 # Locks the cross-CLI invocation symmetry contract surfaced as a positive
 # finding in the 2026-04-29 audit (Phase 2.5, CX-2). The audit verified that
-# `dotclaude handoff pull` produces byte-equivalent stdout when launched from
+# `dotbabel handoff pull` produces byte-equivalent stdout when launched from
 # Claude Code's bash, Copilot CLI's `!`-shell, and Codex CLI's `!`-shell. CI
 # can't run the AI hosts, but it CAN run the shell wrappers each host
 # delegates to: direct bash, `bash -c`, and `sh -c`. Catching a regression
@@ -23,11 +23,11 @@ on:
     branches: [main]
   pull_request:
     paths:
-      - "plugins/dotclaude/bin/**"
-      - "plugins/dotclaude/scripts/**"
-      - "plugins/dotclaude/src/**"
-      - "plugins/dotclaude/tests/fixtures/cross-cli-invocation/**"
-      - "plugins/dotclaude/tests/fixtures/cross-cli-invocation-baseline.txt"
+      - "plugins/dotbabel/bin/**"
+      - "plugins/dotbabel/scripts/**"
+      - "plugins/dotbabel/src/**"
+      - "plugins/dotbabel/tests/fixtures/cross-cli-invocation/**"
+      - "plugins/dotbabel/tests/fixtures/cross-cli-invocation-baseline.txt"
       - ".github/workflows/cross-cli-invocation.yml"
   workflow_dispatch:
 
@@ -46,7 +46,7 @@ jobs:
           cache: "npm"
       - run: npm ci
       - name: baseline matches current binary output
-        run: bash plugins/dotclaude/tests/fixtures/cross-cli-invocation/regenerate-baseline.sh --check
+        run: bash plugins/dotbabel/tests/fixtures/cross-cli-invocation/regenerate-baseline.sh --check
 
   symmetry:
     name: ${{ matrix.invocation_context }} × ${{ matrix.row }}
@@ -74,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           work=$(mktemp -d)
-          eval "$(bash plugins/dotclaude/tests/fixtures/cross-cli-invocation/seed.sh "$work")"
+          eval "$(bash plugins/dotbabel/tests/fixtures/cross-cli-invocation/seed.sh "$work")"
           {
             echo "work=$work"
             echo "claude_short=$CLAUDE_SHORT"
@@ -87,7 +87,7 @@ jobs:
         env:
           WORK: ${{ steps.seed.outputs.work }}
           # NB: deliberately NOT named CLAUDE_*/COPILOT_*/CODEX_* — those
-          # prefixes are exactly what dotclaude-handoff.mjs:detectHost matches
+          # prefixes are exactly what dotbabel-handoff.mjs:detectHost matches
           # as host-CLI markers, so naming a fixture short-id `CODEX_SHORT`
           # would make detectHost return "codex" and corrupt the rendered
           # `target` attribute. The scrub below is also defensive, but
@@ -106,7 +106,7 @@ jobs:
           export DOTCLAUDE_QUIET=1
           export TZ=UTC
 
-          # Scrub host-CLI detection markers (dotclaude-handoff.mjs:detectHost).
+          # Scrub host-CLI detection markers (dotbabel-handoff.mjs:detectHost).
           # GH Actions runners are clean today, but defending against a future
           # runner that injects a CODEX_/COPILOT_/CLAUDECODE marker keeps the
           # symmetry contract anchored in the wrapper, not the host.
@@ -117,7 +117,7 @@ jobs:
             esac
           done < <(env)
 
-          BIN="$GITHUB_WORKSPACE/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+          BIN="$GITHUB_WORKSPACE/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
           case "$ROW" in
             claude-pull)         args=("pull" "$FIXTURE_CLAUDE_SHORT") ;;
@@ -163,7 +163,7 @@ jobs:
           ROW: ${{ matrix.row }}
         run: |
           set -euo pipefail
-          baseline="plugins/dotclaude/tests/fixtures/cross-cli-invocation-baseline.txt"
+          baseline="plugins/dotbabel/tests/fixtures/cross-cli-invocation-baseline.txt"
 
           # Extract just this row's section from the baseline file. Section
           # markers are `=== <row> ===` / `=== /<row> ===`.
@@ -177,7 +177,7 @@ jobs:
           if ! diff -u "$expected" "$CAPTURED"; then
             echo "::error::cross-CLI symmetry broken: $ROW under ${{ matrix.invocation_context }} diverges from baseline"
             echo "::error::see diff above; if intentional, regenerate via:"
-            echo "::error::  bash plugins/dotclaude/tests/fixtures/cross-cli-invocation/regenerate-baseline.sh"
+            echo "::error::  bash plugins/dotbabel/tests/fixtures/cross-cli-invocation/regenerate-baseline.sh"
             exit 1
           fi
           echo "✓ $ROW under ${{ matrix.invocation_context }} matches baseline"

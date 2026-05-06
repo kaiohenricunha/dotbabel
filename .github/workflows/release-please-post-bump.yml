@@ -43,7 +43,7 @@ jobs:
       - run: npm ci
 
       - name: regen index
-        run: node plugins/dotclaude/bin/dotclaude-index.mjs
+        run: node plugins/dotbabel/bin/dotbabel-index.mjs
 
       - name: format regen output
         run: npx --yes prettier@3 --write index/artifacts.json index/by-type.json index/by-facet.json --ignore-unknown

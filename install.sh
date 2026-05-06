@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Env overrides
-DOTCLAUDE_VERSION="${DOTCLAUDE_VERSION:-latest}"
-DOTCLAUDE_SKIP_BOOTSTRAP="${DOTCLAUDE_SKIP_BOOTSTRAP:-}"
+# Env overrides — canonical DOTBABEL_* with legacy DOTCLAUDE_* fallback
+# (deprecated, removal in 3.0.0). The deprecation warning fires only when the
+# canonical var is ABSENT and the legacy var is present — not when both are
+# set (canonical wins) and not when only canonical is set. Decide first,
+# assign second; otherwise the post-assignment value would always look set
+# and suppress the warning.
+if [[ -z "${DOTBABEL_VERSION:-}" && -n "${DOTCLAUDE_VERSION:-}" ]]; then
+  printf 'warning: DOTCLAUDE_VERSION is deprecated; use DOTBABEL_VERSION (removal in 3.0.0)\n' >&2
+fi
+if [[ -z "${DOTBABEL_SKIP_BOOTSTRAP:-}" && -n "${DOTCLAUDE_SKIP_BOOTSTRAP:-}" ]]; then
+  printf 'warning: DOTCLAUDE_SKIP_BOOTSTRAP is deprecated; use DOTBABEL_SKIP_BOOTSTRAP (removal in 3.0.0)\n' >&2
+fi
+DOTBABEL_VERSION="${DOTBABEL_VERSION:-${DOTCLAUDE_VERSION:-latest}}"
+DOTBABEL_SKIP_BOOTSTRAP="${DOTBABEL_SKIP_BOOTSTRAP:-${DOTCLAUDE_SKIP_BOOTSTRAP:-}}"
 
 # Color helpers (suppressed when NO_COLOR is set or stdout is not a TTY)
 if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then
@@ -35,8 +46,8 @@ fi
 
 # ── 2. Install ────────────────────────────────────────────────────────────────
 
-info "Installing @dotclaude/dotclaude@${DOTCLAUDE_VERSION} ..."
-npm install -g "@dotclaude/dotclaude@${DOTCLAUDE_VERSION}"
+info "Installing @dotbabel/dotbabel@${DOTBABEL_VERSION} ..."
+npm install -g "@dotbabel/dotbabel@${DOTBABEL_VERSION}"
 
 npm_prefix="$(npm prefix -g 2>/dev/null || true)"
 npm_bin_dir=""
@@ -44,30 +55,30 @@ if [[ -n "$npm_prefix" ]]; then
   npm_bin_dir="${npm_prefix%/}/bin"
 fi
 
-if ! command -v dotclaude >/dev/null 2>&1; then
+if ! command -v dotbabel >/dev/null 2>&1; then
   if [[ -n "$npm_bin_dir" ]]; then
-    error "'dotclaude' was installed but is not on your PATH. Add '${npm_bin_dir}' to PATH and re-run. For example: export PATH=\"${npm_bin_dir}:\$PATH\""
+    error "'dotbabel' was installed but is not on your PATH. Add '${npm_bin_dir}' to PATH and re-run. For example: export PATH=\"${npm_bin_dir}:\$PATH\""
   else
-    error "'dotclaude' was installed but is not on your PATH. Add npm's global bin directory to PATH and re-run."
+    error "'dotbabel' was installed but is not on your PATH. Add npm's global bin directory to PATH and re-run."
   fi
 fi
 
 # ── 3. Bootstrap ~/.claude/ ───────────────────────────────────────────────────
 
-if [[ -z "$DOTCLAUDE_SKIP_BOOTSTRAP" ]]; then
-  info "Running dotclaude bootstrap ..."
-  if ! dotclaude bootstrap; then
-    warn "bootstrap step failed — run 'dotclaude doctor' to diagnose"
+if [[ -z "$DOTBABEL_SKIP_BOOTSTRAP" ]]; then
+  info "Running dotbabel bootstrap ..."
+  if ! dotbabel bootstrap; then
+    warn "bootstrap step failed — run 'dotbabel doctor' to diagnose"
   fi
 fi
 
 # ── 4. Doctor ─────────────────────────────────────────────────────────────────
 
-info "Running dotclaude doctor ..."
-dotclaude doctor || true   # non-zero is informational, not fatal
+info "Running dotbabel doctor ..."
+dotbabel doctor || true   # non-zero is informational, not fatal
 
 # ── 5. Done ───────────────────────────────────────────────────────────────────
 
-printf '\n%bdotclaude installed successfully.%b\n' "$BOLD" "$RESET"
-printf '  %bdotclaude --help%b   see all commands\n' "$GREEN" "$RESET"
-printf '  %bdotclaude doctor%b   re-run diagnostics any time\n\n' "$GREEN" "$RESET"
+printf '\n%bdotbabel installed successfully.%b\n' "$BOLD" "$RESET"
+printf '  %bdotbabel --help%b   see all commands\n' "$GREEN" "$RESET"
+printf '  %bdotbabel doctor%b   re-run diagnostics any time\n\n' "$GREEN" "$RESET"
