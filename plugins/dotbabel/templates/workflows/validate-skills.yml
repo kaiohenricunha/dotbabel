@@ -22,9 +22,9 @@ jobs:
           node-version: "22"
           cache: "npm"
       - run: npm ci
-      - run: npx dotclaude-validate-skills
-      - run: npx dotclaude-validate-specs
-      - run: npx dotclaude-check-instruction-drift
+      - run: npx dotbabel-validate-skills
+      - run: npx dotbabel-validate-specs
+      - run: npx dotbabel-check-instruction-drift
       - name: Check for stale skills (30-day window)
         run: |
           node -e "
