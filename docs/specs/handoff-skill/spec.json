@@ -23,7 +23,7 @@
     "bats plugins/dotbabel/tests/bats/handoff-*.bats"
   ],
   "depends_on_specs": ["dotbabel-core"],
-  "active_prs": [108],
+  "active_prs": [],
   "_label_history": {
     "note": "During spec drafting, chat-time NFR labels were renumbered to sequential order in §7. Mapping preserved here for chat-history-to-spec reconciliation. Spec body uses the sequential labels exclusively.",
     "mappings": [
