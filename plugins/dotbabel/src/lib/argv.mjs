@@ -81,8 +81,8 @@ export function parse(argv, spec = {}) {
  * Render a conventional `--help` message.
  *
  * @param {object} meta
- * @param {string} meta.name         e.g. "dotclaude-validate-specs"
- * @param {string} meta.synopsis     e.g. "dotclaude-validate-specs [OPTIONS]"
+ * @param {string} meta.name         e.g. "dotbabel-validate-specs"
+ * @param {string} meta.synopsis     e.g. "dotbabel-validate-specs [OPTIONS]"
  * @param {string} meta.description  1-2 sentence summary.
  * @param {FlagsSpec} [meta.flags]   Bin-specific flags to document (harness-wide flags are always appended).
  * @returns {string}

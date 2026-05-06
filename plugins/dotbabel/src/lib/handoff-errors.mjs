@@ -49,7 +49,7 @@ const PATTERNS = [
     re: /repository not found|project.*could not be found|does not appear to be a git repository/i,
     stage: "preflight",
     cause: "transport repo not found",
-    fix: "Reconfigure DOTCLAUDE_HANDOFF_REPO or run `dotclaude handoff push` to re-bootstrap",
+    fix: "Reconfigure DOTCLAUDE_HANDOFF_REPO or run `dotbabel handoff push` to re-bootstrap",
   },
   {
     re: /Could not resolve host/i,
@@ -73,31 +73,31 @@ const PATTERNS = [
     re: /scrub not applied/i,
     stage: "scrub",
     cause: "scrubber unavailable",
-    fix: "Reinstall dotclaude: `npm install -g @dotclaude/dotclaude`",
+    fix: "Reinstall dotbabel: `npm install -g @dotbabel/dotbabel`",
   },
   {
     re: /DOTCLAUDE_HANDOFF_REPO is not set/i,
     stage: "preflight",
     cause: "transport not configured",
-    fix: "Run `dotclaude handoff push` to auto-bootstrap, or set DOTCLAUDE_HANDOFF_REPO manually",
+    fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTCLAUDE_HANDOFF_REPO manually",
   },
   {
     re: /ls-remote failed/i,
     stage: "preflight",
     cause: "repo unreachable",
-    fix: "Run `dotclaude handoff doctor` to diagnose",
+    fix: "Run `dotbabel handoff doctor` to diagnose",
   },
   {
     re: /no handoffs? found/i,
     stage: "resolve",
     cause: "no handoffs on transport",
-    fix: "Push a session first: `dotclaude handoff push`",
+    fix: "Push a session first: `dotbabel handoff push`",
   },
   {
     re: /no .+ handoffs? match:|no handoffs? match:/i,
     stage: "resolve",
     cause: "query matched nothing on transport",
-    fix: "Run `dotclaude handoff remote-list` to see what's available",
+    fix: "Run `dotbabel handoff remote-list` to see what's available",
   },
 ];
 
@@ -114,8 +114,8 @@ export function classifyGitError(rawMsg, verb, context = {}) {
   const { query, shortId } = context;
   const retryArg = query ?? shortId ?? null;
   const retryLine = retryArg
-    ? `dotclaude handoff ${verb} ${retryArg}`
-    : `dotclaude handoff ${verb}`;
+    ? `dotbabel handoff ${verb} ${retryArg}`
+    : `dotbabel handoff ${verb}`;
 
   for (const { re, stage, cause, fix } of PATTERNS) {
     if (re.test(rawMsg)) {
@@ -127,7 +127,7 @@ export function classifyGitError(rawMsg, verb, context = {}) {
   return new HandoffError({
     stage: "upload",
     cause: rawMsg,
-    fix: "Run `dotclaude handoff doctor` to diagnose",
+    fix: "Run `dotbabel handoff doctor` to diagnose",
     retry: retryLine,
   });
 }
@@ -144,7 +144,7 @@ export function classifyGitError(rawMsg, verb, context = {}) {
 export function formatHandoffError(err, verb) {
   const clean = (s) => (s ?? "").replace(/\r?\n/g, " ").trim();
   return [
-    `dotclaude-handoff: ${verb} failed`,
+    `dotbabel-handoff: ${verb} failed`,
     `  stage:  ${clean(err.stage)}`,
     `  cause:  ${clean(err.cause)}`,
     `  fix:    ${clean(err.fix)}`,

@@ -1,6 +1,6 @@
 /**
  * Shared remote handoff library — the transport-side surface used by both
- * `bin/dotclaude-handoff.mjs` and future callers (skill/agent dispatchers,
+ * `bin/dotbabel-handoff.mjs` and future callers (skill/agent dispatchers,
  * other CLIs). Owns session-data extraction (via the shell scripts),
  * digest rendering, scrubbing, bootstrap / doctor orchestration, branch
  * naming, metadata encoding, and the git transport operations themselves.
@@ -56,7 +56,7 @@ export function parseHandoffBranch(branch) {
 // at library-init time and is kept only for the diagnostic display
 // in `doctor` + the test-contract `typeof mod.CONFIG_FILE === "string"`.
 function currentConfigDir() {
-  return join(process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"), "dotclaude");
+  return join(process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config"), "dotbabel");
 }
 function currentConfigFile() {
   return join(currentConfigDir(), "handoff.env");
@@ -74,7 +74,7 @@ const DESCRIPTION_SH = join(SCRIPTS, "handoff-description.sh");
 // back into the bin (which would create a circular import).
 
 function fail(code, msg) {
-  if (msg) process.stderr.write(`dotclaude-handoff: ${msg}\n`);
+  if (msg) process.stderr.write(`dotbabel-handoff: ${msg}\n`);
   process.exit(code);
 }
 
@@ -129,7 +129,7 @@ export function extractMeta(cli, file) {
 export function extractLines(sub, cli, file, extra = []) {
   const r = runScript(EXTRACT_SH, [sub, cli, file, ...extra]);
   if (r.status !== 0) {
-    if (r.stderr.trim()) process.stderr.write(`dotclaude-handoff: ${sub}: ${r.stderr.trim()}\n`);
+    if (r.stderr.trim()) process.stderr.write(`dotbabel-handoff: ${sub}: ${r.stderr.trim()}\n`);
     return [];
   }
   const out = [];
@@ -389,7 +389,7 @@ export function decodeDescription(desc) {
 // ---- persisted env / bootstrap helpers --------------------------------
 
 /**
- * Source ~/.config/dotclaude/handoff.env if present, seeding any missing env var.
+ * Source ~/.config/dotbabel/handoff.env if present, seeding any missing env var.
  * Shell rc users can `source` the same file; bypass via an explicit env var.
  */
 export function loadPersistedEnv() {
@@ -450,9 +450,9 @@ export function printManualSetupBlock(reason) {
     `Can't auto-bootstrap the handoff store: ${reason}`,
     "",
     "Set it up manually:",
-    "  1. gh repo create <you>/dotclaude-handoff-store --private",
-    "  2. export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotclaude-handoff-store.git",
-    "  3. dotclaude handoff push   # retries",
+    "  1. gh repo create <you>/dotbabel-handoff-store --private",
+    "  2. export DOTCLAUDE_HANDOFF_REPO=git@github.com:<you>/dotbabel-handoff-store.git",
+    "  3. dotbabel handoff push   # retries",
     "",
     "Alternative providers (GitLab, Gitea, self-hosted) work too — set",
     "DOTCLAUDE_HANDOFF_REPO to any ssh://, git@, https://, file://, or absolute path.",
@@ -496,7 +496,7 @@ export async function promptLine(message) {
  * default-branch flip would silently target a missing ref.
  *
  * @param {string} login    GitHub username from `gh api user`
- * @param {string} name     repo name (e.g. "dotclaude-handoff-store")
+ * @param {string} name     repo name (e.g. "dotbabel-handoff-store")
  * @param {string} repoUrl  ssh URL from `gh repo view`
  * @returns {{ seeded: boolean, defaultBranchPatched: boolean, warning?: string }}
  */
@@ -509,15 +509,15 @@ export function seedTransportDefaultBranch(login, name, repoUrl) {
       runGitOrThrow(["init", "-q", "-b", "main"], tmp);
       writeFileSync(
         join(tmp, "README.md"),
-        "# dotclaude handoff transport store\n\nManaged by `dotclaude handoff`. Do not edit by hand.\n",
+        "# dotbabel handoff transport store\n\nManaged by `dotbabel handoff`. Do not edit by hand.\n",
       );
       runGitOrThrow(["add", "README.md"], tmp);
       runGitOrThrow(
         [
           "-c",
-          "user.email=dotclaude@local",
+          "user.email=dotbabel@local",
           "-c",
-          "user.name=dotclaude",
+          "user.name=dotbabel",
           "-c",
           "commit.gpgsign=false",
           "commit",
@@ -579,7 +579,7 @@ export async function bootstrapTransportRepo() {
   process.stderr.write(
     [
       "",
-      "DOTCLAUDE_HANDOFF_REPO is not set — dotclaude can set this up for you.",
+      "DOTCLAUDE_HANDOFF_REPO is not set — dotbabel can set this up for you.",
       "",
       `  Detected: gh CLI authenticated as @${login}.`,
       `  Plan: create private repo  ${login}/<name>`,
@@ -590,8 +590,8 @@ export async function bootstrapTransportRepo() {
 
   let name = "";
   for (let attempt = 0; attempt < 3; attempt++) {
-    const input = await promptLine("  Repo name? [dotclaude-handoff-store] ");
-    const candidate = input === "" ? "dotclaude-handoff-store" : slugifyRepoName(input);
+    const input = await promptLine("  Repo name? [dotbabel-handoff-store] ");
+    const candidate = input === "" ? "dotbabel-handoff-store" : slugifyRepoName(input);
     if (/^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$|^[a-z0-9]$/.test(candidate)) {
       name = candidate;
       break;
@@ -613,7 +613,7 @@ export async function bootstrapTransportRepo() {
 
   const create = spawnSync(
     "gh",
-    ["repo", "create", `${login}/${name}`, "--private", "--description", "dotclaude handoff store"],
+    ["repo", "create", `${login}/${name}`, "--private", "--description", "dotbabel handoff store"],
     { encoding: "utf8" },
   );
   if (create.status !== 0) {
@@ -658,7 +658,7 @@ export async function bootstrapTransportRepo() {
   mkdirSync(currentConfigDir(), { recursive: true, mode: 0o700 });
   writeFileSync(
     configFile,
-    `# Written by dotclaude handoff on ${new Date().toISOString()}\n` +
+    `# Written by dotbabel handoff on ${new Date().toISOString()}\n` +
       `# Sourceable from your shell rc:  source ${configFile}\n` +
       `export DOTCLAUDE_HANDOFF_REPO=${url}\n`,
     { mode: 0o600 },
@@ -693,8 +693,8 @@ export function requireTransportRepoStrict() {
     throw new HandoffError({
       stage: "preflight",
       cause: "transport not configured",
-      fix: "Run `dotclaude handoff push` to auto-bootstrap, or set DOTCLAUDE_HANDOFF_REPO manually",
-      retry: "dotclaude handoff push",
+      fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTCLAUDE_HANDOFF_REPO manually",
+      retry: "dotbabel handoff push",
     });
   return validateTransportUrl(url);
 }
@@ -778,7 +778,7 @@ export function fetchRemoteMetadata(branch, repoUrl) {
 export function probeCollision(repoUrl, branch, localSessionId, { force = false } = {}) {
   const forceOrFail = (closedMsg, warnMsg = closedMsg) => {
     if (!force) fail(2, closedMsg);
-    process.stderr.write(`dotclaude-handoff: ${warnMsg}; forcing\n`);
+    process.stderr.write(`dotbabel-handoff: ${warnMsg}; forcing\n`);
     return { mode: /** @type {const} */ ("force") };
   };
   if (!localSessionId) {
@@ -905,8 +905,8 @@ export async function pushRemote({
     try {
       runGitOrThrow(["init", "-q"], tmp);
       runGitOrThrow(["remote", "add", "origin", url], tmp);
-      runGitOrThrow(["config", "user.email", "handoff@dotclaude.local"], tmp);
-      runGitOrThrow(["config", "user.name", "dotclaude-handoff"], tmp);
+      runGitOrThrow(["config", "user.email", "handoff@dotbabel.local"], tmp);
+      runGitOrThrow(["config", "user.name", "dotbabel-handoff"], tmp);
       runGitOrThrow(["checkout", "-q", "-b", branch], tmp);
       writeFileSync(join(tmp, "handoff.md"), scrubbed + "\n");
       writeFileSync(join(tmp, "metadata.json"), JSON.stringify(metadata, null, 2) + "\n");
@@ -1000,7 +1000,7 @@ function sortByCommitterDate(candidates, repoUrl) {
   const warnAndFallback = (reason) => {
     const msg = String(reason).trim().replace(/\s+/gu, " ") || "unknown error";
     process.stderr.write(
-      `dotclaude-handoff: committer-date sort skipped (${msg}); using ls-remote order\n`,
+      `dotbabel-handoff: committer-date sort skipped (${msg}); using ls-remote order\n`,
     );
     return null;
   };
@@ -1048,8 +1048,8 @@ export function listRemoteCandidates() {
     throw new HandoffError({
       stage: "preflight",
       cause: "repo unreachable",
-      fix: `Run \`dotclaude handoff doctor\` to diagnose — ls-remote failed: ${r.stderr.trim()}`,
-      retry: "dotclaude handoff doctor",
+      fix: `Run \`dotbabel handoff doctor\` to diagnose — ls-remote failed: ${r.stderr.trim()}`,
+      retry: "dotbabel handoff doctor",
     });
   const rows = [];
   for (const line of r.stdout.split("\n")) {
@@ -1446,8 +1446,8 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
     throw new HandoffError({
       stage: "resolve",
       cause: "no handoffs on transport",
-      fix: "Push a session first: `dotclaude handoff push`",
-      retry: "dotclaude handoff push",
+      fix: "Push a session first: `dotbabel handoff push`",
+      retry: "dotbabel handoff push",
     });
 
   // v2 carries the CLI in segment 2 (handoff/<project>/<cli>/...);
@@ -1461,8 +1461,8 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
       throw new HandoffError({
         stage: "resolve",
         cause: `no ${fromCli} handoffs on transport`,
-        fix: `Push a ${fromCli} session first: \`dotclaude handoff push\``,
-        retry: `dotclaude handoff fetch --from ${fromCli}`,
+        fix: `Push a ${fromCli} session first: \`dotbabel handoff push\``,
+        retry: `dotbabel handoff fetch --from ${fromCli}`,
       });
   }
 
@@ -1511,15 +1511,15 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
     throw new HandoffError({
       stage: "resolve",
       cause: fromCli ? `no ${fromCli} handoffs match: ${query}` : `no handoffs match: ${query}`,
-      fix: "Run `dotclaude handoff remote-list` to see what's available",
-      retry: `dotclaude handoff fetch ${query}`,
+      fix: "Run `dotbabel handoff remote-list` to see what's available",
+      retry: `dotbabel handoff fetch ${query}`,
     });
   }
   if (hits.length === 1) return hits[0];
 
   // Collision.
   if (process.stdin.isTTY) {
-    process.stderr.write(`dotclaude-handoff: multiple handoffs match "${query}":\n`);
+    process.stderr.write(`dotbabel-handoff: multiple handoffs match "${query}":\n`);
     hits.forEach((h, i) => {
       process.stderr.write(`  [${i + 1}] ${h.branch}  ${h.description}\n`);
     });
@@ -1532,7 +1532,7 @@ export async function pullRemote(query, fromCli = null, { verify = false, verbos
     if (!Number.isInteger(n) || n < 1 || n > hits.length) process.exit(2);
     return hits[n - 1];
   }
-  process.stderr.write(`dotclaude-handoff: multiple handoffs match "${query}":\n`);
+  process.stderr.write(`dotbabel-handoff: multiple handoffs match "${query}":\n`);
   for (const h of hits) process.stderr.write(`  ${h.branch}\t${h.description}\n`);
   process.exit(2);
 }

@@ -1,7 +1,7 @@
 /**
  * bootstrap-global.mjs — JS port of bootstrap.sh
  *
- * Symlinks dotclaude's CLAUDE.md, commands/, and skills/ into a target
+ * Symlinks dotbabel's CLAUDE.md, commands/, and skills/ into a target
  * directory (default: ~/.claude/), and copies agent templates on first install.
  *
  * Exported API:
@@ -17,10 +17,10 @@ import { createOutput } from "./lib/output.mjs";
 
 // ---------------------------------------------------------------------------
 // pkgRoot() — walk up from this file until we find a directory containing
-// bootstrap.sh. That is the dotclaude repo root. Works in a git checkout
+// bootstrap.sh. That is the dotbabel repo root. Works in a git checkout
 // where bootstrap.sh lives at the repo root. In a published npm install
 // bootstrap.sh is not shipped, so the loop hits the filesystem root and
-// falls back to two levels up from this file (src/ → plugins/dotclaude/ →
+// falls back to two levels up from this file (src/ → plugins/dotbabel/ →
 // repo root), which is correct for the npm package layout.
 // ---------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ function pkgRoot() {
     const parent = path.dirname(cur);
     if (parent === cur) {
       // Reached filesystem root without finding bootstrap.sh.
-      // Fall back to two levels up from this file (plugins/dotclaude/src →
+      // Fall back to two levels up from this file (plugins/dotbabel/src →
       // repo root) as a best-effort.
       return path.resolve(start, "..", "..", "..");
     }
@@ -48,7 +48,7 @@ function pkgRoot() {
 // ---------------------------------------------------------------------------
 
 /**
- * Determine the dotclaude source directory.
+ * Determine the dotbabel source directory.
  *
  * Priority:
  *   1. `sourceOpt` (explicit --source flag)
@@ -136,7 +136,7 @@ function linkOne(src, dst, out, ts) {
  */
 
 /**
- * Bootstrap dotclaude into the target directory.
+ * Bootstrap dotbabel into the target directory.
  *
  * @param {BootstrapOpts} [opts]
  * @returns {Promise<BootstrapResult>}
@@ -222,7 +222,7 @@ export async function bootstrapGlobal(opts = {}) {
   }
 
   // --- hooks/*.sh ---
-  const hooksSrc = path.join(source, "plugins", "dotclaude", "hooks");
+  const hooksSrc = path.join(source, "plugins", "dotbabel", "hooks");
   if (fs.existsSync(hooksSrc)) {
     const hooksDst = path.join(target, "hooks");
     fs.mkdirSync(hooksDst, { recursive: true });
@@ -235,7 +235,7 @@ export async function bootstrapGlobal(opts = {}) {
   }
 
   // --- agents (copy, not symlink) ---
-  const agentsSrc = path.join(source, "plugins", "dotclaude", "templates", "claude", "agents");
+  const agentsSrc = path.join(source, "plugins", "dotbabel", "templates", "claude", "agents");
   const agentsDst = path.join(target, "agents");
   if (fs.existsSync(agentsSrc)) {
     fs.mkdirSync(agentsDst, { recursive: true });

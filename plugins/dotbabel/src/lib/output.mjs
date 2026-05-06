@@ -1,6 +1,6 @@
 /**
  * Shared CLI output primitives — the JS parity of
- * `plugins/dotclaude/scripts/validate-settings.sh:43-45`.
+ * `plugins/dotbabel/scripts/validate-settings.sh:43-45`.
  *
  * Provides the same ✓/✗/⚠ format with ANSI coloring when the stream is a TTY,
  * plus a `--json` buffer-and-flush mode so CI pipelines can consume a single

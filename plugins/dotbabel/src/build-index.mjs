@@ -2,7 +2,7 @@
  * build-index — taxonomy artifact discovery, frontmatter parsing, schema
  * validation, and three-way index construction.
  *
- * Phase 1 of the dotclaude taxonomy plan: non-breaking. Produces warnings
+ * Phase 1 of the dotbabel taxonomy plan: non-breaking. Produces warnings
  * only; artifacts with legacy or missing metadata are still indexed (with
  * reduced detail) so downstream consumers can rely on a stable shape.
  *
@@ -40,7 +40,7 @@ import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 
 // js-yaml is loaded lazily so importers that never touch the index path
-// (e.g. dotclaude-handoff via src/index.mjs re-exports) don't pay the load
+// (e.g. dotbabel-handoff via src/index.mjs re-exports) don't pay the load
 // cost or break in environments where js-yaml is unavailable (#130).
 const require = createRequire(import.meta.url);
 let _yamlMod;

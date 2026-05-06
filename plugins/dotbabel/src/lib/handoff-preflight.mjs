@@ -1,13 +1,13 @@
 /**
  * Auto-preflight caching for handoff push/pull.
  *
- * Wraps the existing `plugins/dotclaude/scripts/handoff-doctor.sh` script with
+ * Wraps the existing `plugins/dotbabel/scripts/handoff-doctor.sh` script with
  * a 5-minute TTL cache so users don't pay the preflight cost on every push and
  * so `push`/`pull` fail early with the doctor's structured remediation block
  * on misconfiguration, instead of emitting a cryptic `gh` / `git` error.
  *
- * Cache file: `$XDG_CACHE_HOME/dotclaude/handoff-doctor.json` (fallback
- * `$HOME/.cache/dotclaude/handoff-doctor.json`). Invalidated when the recorded
+ * Cache file: `$XDG_CACHE_HOME/dotbabel/handoff-doctor.json` (fallback
+ * `$HOME/.cache/dotbabel/handoff-doctor.json`). Invalidated when the recorded
  * `repo` no longer matches `process.env.DOTCLAUDE_HANDOFF_REPO`, when the TTL
  * has expired, when the cache schema version differs, when the file is
  * corrupt or missing, or when the caller passes `verify: true`.
@@ -50,7 +50,7 @@ function resolveDoctorScript() {
 
 /** Returns the directory that holds the preflight cache, honoring XDG_CACHE_HOME. */
 export function currentCacheDir() {
-  return join(process.env.XDG_CACHE_HOME || join(process.env.HOME || "", ".cache"), "dotclaude");
+  return join(process.env.XDG_CACHE_HOME || join(process.env.HOME || "", ".cache"), "dotbabel");
 }
 
 /** Returns the absolute path to the preflight cache file. */

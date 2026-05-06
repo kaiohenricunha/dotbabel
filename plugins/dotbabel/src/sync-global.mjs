@@ -1,7 +1,7 @@
 /**
  * sync-global.mjs — JS port of sync.sh
  *
- * Handles pull/push/status for dotclaude in both npm and clone modes.
+ * Handles pull/push/status for dotbabel in both npm and clone modes.
  *
  * Exported API:
  *   resolveMode(sourceOpt)        — 'clone' | 'npm'
@@ -66,7 +66,7 @@ function trim(s) {
 // ---------------------------------------------------------------------------
 
 async function pullNpm(out, opts) {
-  const res = run("npm", ["view", "@dotclaude/dotclaude", "version"]);
+  const res = run("npm", ["view", "@dotbabel/dotbabel", "version"]);
   if (res.status !== 0) {
     out.fail(`npm view failed: ${trim(res.stderr || res.stdout)}`);
     return { ok: false, mode: "npm", summary: "npm view failed" };
@@ -76,7 +76,7 @@ async function pullNpm(out, opts) {
   if (currentVersion === latest) {
     out.info(`already up to date (v${currentVersion})`);
   } else {
-    const updateRes = run("npm", ["update", "-g", "@dotclaude/dotclaude"]);
+    const updateRes = run("npm", ["update", "-g", "@dotbabel/dotbabel"]);
     if (updateRes.status !== 0) {
       out.fail(`npm update failed: ${trim(updateRes.stderr)}`);
       return { ok: false, mode: "npm", summary: "npm update failed" };
@@ -105,7 +105,7 @@ async function pullClone(out, source, opts) {
 }
 
 async function statusNpm(out) {
-  const res = run("npm", ["view", "@dotclaude/dotclaude", "version"]);
+  const res = run("npm", ["view", "@dotbabel/dotbabel", "version"]);
   const latest = trim(res.stdout);
 
   const msg = `installed: v${currentVersion}  latest: v${latest}`;
@@ -186,7 +186,7 @@ async function pushClone(out, source) {
 
   // Commit
   const date = new Date().toISOString().slice(0, 10);
-  const commitRes = run("git", ["-C", source, "commit", "-m", `dotclaude: sync ${date}`]);
+  const commitRes = run("git", ["-C", source, "commit", "-m", `dotbabel: sync ${date}`]);
   if (commitRes.status !== 0) {
     out.fail(`git commit failed: ${trim(commitRes.stderr)}`);
     return { ok: false, mode: "clone", summary: "git commit failed" };
@@ -199,7 +199,7 @@ async function pushClone(out, source) {
     return { ok: false, mode: "clone", summary: "git push failed" };
   }
 
-  return { ok: true, mode: "clone", summary: `pushed dotclaude: sync ${date}` };
+  return { ok: true, mode: "clone", summary: `pushed dotbabel: sync ${date}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +208,7 @@ async function pushClone(out, source) {
 
 /**
  * @typedef {object} SyncOpts
- * @property {string} [source]   Path to dotclaude clone (triggers clone mode).
+ * @property {string} [source]   Path to dotbabel clone (triggers clone mode).
  * @property {boolean} [quiet]
  * @property {boolean} [json]
  * @property {boolean} [noColor]

@@ -129,7 +129,7 @@ export class ValidationError extends Error {
 
 /**
  * Render a single error for human-readable CLI output. Mirrors the
- * `✗ <message>` prefix style used by `plugins/dotclaude/scripts/validate-settings.sh:43-45`.
+ * `✗ <message>` prefix style used by `plugins/dotbabel/scripts/validate-settings.sh:43-45`.
  *
  * @param {ValidationError | StructuredError | Error} err
  * @param {{ verbose?: boolean }} [opts]

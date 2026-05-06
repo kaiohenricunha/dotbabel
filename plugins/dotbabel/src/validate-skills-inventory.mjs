@@ -156,7 +156,7 @@ export function validateManifest(ctx) {
         expected: skill.checksum,
         got: actual,
         message: `Checksum mismatch for ${skill.name}: expected ${skill.checksum}, got ${actual}`,
-        hint: "run `node plugins/dotclaude/scripts/auto-update-manifest.mjs` to refresh checksums",
+        hint: "run `node plugins/dotbabel/scripts/auto-update-manifest.mjs` to refresh checksums",
       }));
     }
   }
