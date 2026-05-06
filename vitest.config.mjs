@@ -2,15 +2,15 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["plugins/dotclaude/tests/**/*.test.mjs"],
+    include: ["plugins/dotbabel/tests/**/*.test.mjs"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "lcov"],
       include: [
-        "plugins/dotclaude/src/**/*.mjs",
+        "plugins/dotbabel/src/**/*.mjs",
       ],
       exclude: [
-        "plugins/dotclaude/src/index.mjs",
+        "plugins/dotbabel/src/index.mjs",
       ],
       thresholds: {
         lines: 85,

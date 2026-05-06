@@ -149,8 +149,8 @@ The one-liner installs the package globally and runs `dotbabel bootstrap` to
 wire `~/.claude/` automatically. To pin a version or skip the bootstrap step:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | DOTCLAUDE_VERSION=0.4.0 bash
-curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | DOTCLAUDE_SKIP_BOOTSTRAP=1 bash
+curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | DOTBABEL_VERSION=0.4.0 bash
+curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | DOTBABEL_SKIP_BOOTSTRAP=1 bash
 ```
 
 Then use the umbrella dispatcher or standalone bins interchangeably:
