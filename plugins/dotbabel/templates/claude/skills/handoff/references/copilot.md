@@ -76,7 +76,7 @@ awk -F': ' '$1 == "cwd" { sub(/^[^:]*: */, ""); print; exit }' \
 ```
 
 Same pattern for `model`. Reference implementation:
-`plugins/dotclaude/scripts/handoff-extract.sh meta copilot <file>`.
+`plugins/dotbabel/scripts/handoff-extract.sh meta copilot <file>`.
 
 ### User prompts
 

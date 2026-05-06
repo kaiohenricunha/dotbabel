@@ -34,7 +34,7 @@ provider's native rollback primitive.
    elif [ -f "skills/deploy-status/scripts/deploy-ops.mjs" ]; then
      DEPLOY_OPS="skills/deploy-status/scripts/deploy-ops.mjs"
    else
-     echo "rollback-prod helper not found; re-run dotclaude bootstrap or dotclaude init" >&2
+     echo "rollback-prod helper not found; re-run dotbabel bootstrap or dotbabel init" >&2
      exit 2
    fi
    ```

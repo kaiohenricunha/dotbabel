@@ -4,7 +4,7 @@ Remote transport operations (`push`, `fetch`, `list --remote`, `prune`)
 require a working git transport. `/handoff doctor` runs the checklist
 below and prints a remediation block on failure. (`pull` is a local
 render verb and does not need git transport.) The reusable implementation
-lives at `plugins/dotclaude/scripts/handoff-doctor.sh`.
+lives at `plugins/dotbabel/scripts/handoff-doctor.sh`.
 
 ## Output contract
 
@@ -37,8 +37,8 @@ come from the table below.
 | #   | Check                       | Command                                                    | Failure reason             |
 | --- | --------------------------- | ---------------------------------------------------------- | -------------------------- |
 | 1   | `git` on PATH               | `command -v git`                                           | `git-missing`              |
-| 2   | Handoff repo URL configured | `[[ -n "$DOTCLAUDE_HANDOFF_REPO" ]]`                       | `handoff-repo-unset`       |
-| 3   | Repo reachable              | `git ls-remote "$DOTCLAUDE_HANDOFF_REPO" HEAD`             | `handoff-repo-unreachable` |
+| 2   | Handoff repo URL configured | `[[ -n "$DOTBABEL_HANDOFF_REPO" ]]`                       | `handoff-repo-unset`       |
+| 3   | Repo reachable              | `git ls-remote "$DOTBABEL_HANDOFF_REPO" HEAD`             | `handoff-repo-unreachable` |
 | 4   | Clock sanity (soft)         | `[[ $(date -u +%Y) -ge 2024 && $(date -u +%Y) -le 2100 ]]` | `clock-skew` (warn only)   |
 
 ## Remediation
@@ -57,13 +57,13 @@ Install, by platform:
 
 `git` is required — there is no alternative remote transport.
 
-**`handoff-repo-unset`** — diagnose: `DOTCLAUDE_HANDOFF_REPO` is not
+**`handoff-repo-unset`** — diagnose: `DOTBABEL_HANDOFF_REPO` is not
 in the environment.
 Fix:
 
 1. Create a private repo once (any provider works):
    `gh repo create handoff-store --private`.
-2. `export DOTCLAUDE_HANDOFF_REPO=git@github.com:<user>/handoff-store.git`
+2. `export DOTBABEL_HANDOFF_REPO=git@github.com:<user>/handoff-store.git`
    (add to your shell rc for persistence).
 
 The URL accepts `ssh://`, `git@`, `https://`, an absolute local path, or a
@@ -86,7 +86,7 @@ warn: system clock reports year <YYYY>; git auth may fail with signature errors 
 
 ## Air-gapped / offline path
 
-Run `dotclaude handoff pull <uuid> -o <path>` on the source machine to write
+Run `dotbabel handoff pull <uuid> -o <path>` on the source machine to write
 a local markdown file. Move it via any out-of-band channel (USB stick, secure
 copy, encrypted email), then paste the file's markdown content into the target
 session. No network or binary required on the destination.

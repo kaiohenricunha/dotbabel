@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /**
- * build-plugin — sync authored artifacts into plugins/dotclaude/templates/claude/
- * and regenerate plugins/dotclaude/templates/claude/skills-manifest.json.
+ * build-plugin — sync authored artifacts into plugins/dotbabel/templates/claude/
+ * and regenerate plugins/dotbabel/templates/claude/skills-manifest.json.
  *
  * For each skill in skills/<slug>/SKILL.md:
- *   → plugins/dotclaude/templates/claude/skills/<slug>/SKILL.md
+ *   → plugins/dotbabel/templates/claude/skills/<slug>/SKILL.md
  *     (frontmatter stripped of owner, created, updated)
  *   → supporting references/, examples/, and scripts/ files copied verbatim
  *
  * For each command in commands/<slug>.md:
- *   → plugins/dotclaude/templates/claude/commands/<slug>.md
+ *   → plugins/dotbabel/templates/claude/commands/<slug>.md
  *     (frontmatter stripped of owner, created, updated)
  *
  * For each agent in agents/<slug>.md:
- *   → plugins/dotclaude/templates/claude/agents/<slug>.md
+ *   → plugins/dotbabel/templates/claude/agents/<slug>.md
  *     (frontmatter stripped of owner, created, updated)
  *
  * The generated skills-manifest.json uses {{today}} as the generatedAt
@@ -31,9 +31,9 @@
  * Exits: 0 ok, 1 stale (--check mode), 2 env error, 64 usage error.
  */
 
-import { parse, helpText } from "../plugins/dotclaude/src/lib/argv.mjs";
-import { EXIT_CODES } from "../plugins/dotclaude/src/lib/exit-codes.mjs";
-import { createOutput } from "../plugins/dotclaude/src/lib/output.mjs";
+import { parse, helpText } from "../plugins/dotbabel/src/lib/argv.mjs";
+import { EXIT_CODES } from "../plugins/dotbabel/src/lib/exit-codes.mjs";
+import { createOutput } from "../plugins/dotbabel/src/lib/output.mjs";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -47,7 +47,7 @@ const META = {
   name: "build-plugin",
   synopsis: "build-plugin [OPTIONS]",
   description:
-    "Sync authored artifacts into plugins/dotclaude/templates/claude/ and regenerate skills-manifest.json. Use --check to verify freshness without writing.",
+    "Sync authored artifacts into plugins/dotbabel/templates/claude/ and regenerate skills-manifest.json. Use --check to verify freshness without writing.",
   flags: {
     "repo-root": { type: "string" },
     check: { type: "boolean" },
@@ -85,11 +85,11 @@ function resolveRepoRoot() {
 
 const repoRoot = resolveRepoRoot();
 const indexPath = join(repoRoot, "index", "artifacts.json");
-const templateRoot = join(repoRoot, "plugins", "dotclaude", "templates", "claude");
+const templateRoot = join(repoRoot, "plugins", "dotbabel", "templates", "claude");
 const manifestPath = join(templateRoot, "skills-manifest.json");
 
 if (!existsSync(indexPath)) {
-  process.stderr.write("index not found — run dotclaude-index to build it\n");
+  process.stderr.write("index not found — run dotbabel-index to build it\n");
   process.exit(EXIT_CODES.ENV);
 }
 

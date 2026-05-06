@@ -7,7 +7,7 @@
  * Usage:
  *   node scripts/check-jsdoc-coverage.mjs [dir ...]
  *
- * Defaults to `plugins/dotclaude/src/` when no argument is passed. Exits 0 on
+ * Defaults to `plugins/dotbabel/src/` when no argument is passed. Exits 0 on
  * full coverage, 1 on any uncovered export.
  *
  * Intentionally dependency-free — mirrors the zero-runtime-deps promise in
@@ -18,7 +18,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve, join, relative, sep } from "node:path";
 
 const argv = process.argv.slice(2);
-const roots = argv.length > 0 ? argv : ["plugins/dotclaude/src"];
+const roots = argv.length > 0 ? argv : ["plugins/dotbabel/src"];
 
 /**
  * Walk a directory recursively, yielding every `.mjs` file.

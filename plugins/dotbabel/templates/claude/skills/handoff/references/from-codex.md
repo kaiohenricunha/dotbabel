@@ -7,11 +7,11 @@ Codex's bash tool instead. Same binary, same five-form shape.
 ## The five forms
 
 ```
-!dotclaude handoff                              push host's latest session
-!dotclaude handoff <query>                      local cross-agent: emit <handoff>
-!dotclaude handoff push [<query>] [--tag LBL]   upload to transport
-!dotclaude handoff pull [<query>]               fetch from transport
-!dotclaude handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit N|--all]
+!dotbabel handoff                              push host's latest session
+!dotbabel handoff <query>                      local cross-agent: emit <handoff>
+!dotbabel handoff push [<query>] [--tag LBL]   upload to transport
+!dotbabel handoff pull [<query>]               fetch from transport
+!dotbabel handoff list [--local|--remote] [--from <cli>] [--since <ISO>] [--limit N|--all]
 ```
 
 `<query>` auto-detects the source CLI across all three roots. It
@@ -31,19 +31,19 @@ claude --resume b8d2dd0a-1cb6-4cfb-b166-e0a94f20512e
 In a fresh Codex session:
 
 ```
-!dotclaude handoff b8d2dd0a
+!dotbabel handoff b8d2dd0a
 ```
 
 Same works with a full UUID or a Claude `customTitle`:
 
 ```
-!dotclaude handoff "test-handoff"
+!dotbabel handoff "test-handoff"
 ```
 
 ### Resume a Codex thread renamed via `codex resume <name>`
 
 ```
-!dotclaude handoff my-feature
+!dotbabel handoff my-feature
 ```
 
 ### Move a Codex session to the other machine
@@ -51,28 +51,28 @@ Same works with a full UUID or a Claude `customTitle`:
 On machine A (before closing):
 
 ```
-!dotclaude handoff push my-feature --tag end-of-day
+!dotbabel handoff push my-feature --tag end-of-day
 ```
 
 On machine B:
 
 ```
-!dotclaude handoff pull end-of-day
+!dotbabel handoff pull end-of-day
 ```
 
-or bare `!dotclaude handoff pull` to pick up the latest handoff.
+or bare `!dotbabel handoff pull` to pick up the latest handoff.
 
 ## Prerequisite
 
-`npm install -g @dotclaude/dotclaude` (installs the `dotclaude` CLI on
-PATH). Or `npx dotclaude handoff …` for ad-hoc use.
+`npm install -g @dotbabel/dotbabel` (installs the `dotbabel` CLI on
+PATH). Or `npx dotbabel handoff …` for ad-hoc use.
 
-For cross-machine transport, set `DOTCLAUDE_HANDOFF_REPO` to a bare git
+For cross-machine transport, set `DOTBABEL_HANDOFF_REPO` to a bare git
 repo URL (HTTPS, SSH, `file://`, or absolute path) before running
 `push`/`pull`. Example:
 
 ```bash
-export DOTCLAUDE_HANDOFF_REPO=git@github.com:you/handoffs.git
+export DOTBABEL_HANDOFF_REPO=git@github.com:you/handoffs.git
 ```
 
 ## Collision handling
@@ -85,7 +85,7 @@ binary:
 - Non-TTY (scripts/CI): exits 2 with a TSV candidate list on stderr so
   the caller can parse and retry with a more specific query.
 
-See `dotclaude handoff --help` for the full sub-command and flag reference.
+See `dotbabel handoff --help` for the full sub-command and flag reference.
 
 ## Why the binary and not the skill file?
 
