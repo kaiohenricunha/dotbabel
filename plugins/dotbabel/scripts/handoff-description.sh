@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # handoff-description.sh — encode/decode the remote handoff store
-# description schema. Used by `dotclaude handoff push` to build the
+# description schema. Used by `dotbabel handoff push` to build the
 # branch commit message + the description.txt file, and by
 # `remote-list` to render the table.
 #

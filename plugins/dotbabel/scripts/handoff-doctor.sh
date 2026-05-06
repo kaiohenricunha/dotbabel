@@ -35,7 +35,7 @@ fi
 # `--via` was removed in v0.9.0 along with the gist transport. Reject any
 # stray positional so the user gets a crisp pointer instead of silent acceptance.
 if [[ $# -gt 0 ]]; then
-  printf 'handoff-doctor: takes no arguments (gist transport removed in v0.9.0; the only remote transport is the private git repo named by DOTCLAUDE_HANDOFF_REPO).\n' >&2
+  printf 'handoff-doctor: takes no arguments (gist transport removed in v0.9.0; the only remote transport is the private git repo named by DOTBABEL_HANDOFF_REPO).\n' >&2
   exit 2
 fi
 
@@ -77,12 +77,18 @@ if ! command -v git >/dev/null 2>&1; then
     "git is required — there is no alternative remote transport"
 fi
 
-repo="${DOTCLAUDE_HANDOFF_REPO:-}"
+# Canonical DOTBABEL_HANDOFF_REPO with legacy DOTCLAUDE_HANDOFF_REPO fallback.
+# Emits a one-shot deprecation warning if only the legacy var is set
+# (compat shim removed in 3.0.0).
+if [[ -z "${DOTBABEL_HANDOFF_REPO:-}" && -n "${DOTCLAUDE_HANDOFF_REPO:-}" ]]; then
+  printf 'warning: DOTCLAUDE_HANDOFF_REPO is deprecated; use DOTBABEL_HANDOFF_REPO (removal in 3.0.0)\n' >&2
+fi
+repo="${DOTBABEL_HANDOFF_REPO:-${DOTCLAUDE_HANDOFF_REPO:-}}"
 if [[ -z "$repo" ]]; then
   # Not a hard failure: the binary auto-bootstraps on `push` when stdin is
   # a TTY and `gh` is authenticated. Surface that so running `doctor`
   # before the first push doesn't read as alarming.
-  printf 'info: DOTCLAUDE_HANDOFF_REPO is not set — first `dotclaude handoff push` will offer to create a private repo interactively.\n'
+  printf 'info: DOTBABEL_HANDOFF_REPO is not set — first `dotbabel handoff push` will offer to create a private repo interactively.\n'
   check_clock
   printf 'ok (unconfigured)\n'
   exit 0
@@ -95,7 +101,7 @@ if ! git ls-remote "$repo" HEAD >/dev/null 2>&1; then
   host="$(printf '%s' "$repo" | sed -nE 's#^(ssh://|git@|https?://)?([^/:]+).*#\2#p')"
   [[ -z "$host" ]] && host="<host>"
   fail "handoff-repo-unreachable" \
-    "git ls-remote on \$DOTCLAUDE_HANDOFF_REPO failed" \
+    "git ls-remote on \$DOTBABEL_HANDOFF_REPO failed" \
     "verify SSH auth to your provider (e.g. ssh -T git@$host)" \
     "or switch to HTTPS + credential helper: git config --global credential.helper cache" \
     "confirm the repo exists and your account has push access"

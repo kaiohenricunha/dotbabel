@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bootstrap.sh — symlink dotclaude contents into ~/.claude/
+# bootstrap.sh — symlink dotbabel contents into ~/.claude/
 #
 # Idempotent: safe to re-run after pulling new commits.
 # Backs up pre-existing real files (not symlinks) to <name>.bak-<timestamp>.
@@ -25,7 +25,7 @@ for arg in "$@"; do
   esac
 done
 
-DOTCLAUDE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTBABEL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET="$HOME/.claude"
 TS=$(date +%Y%m%d-%H%M%S)
 
@@ -61,18 +61,18 @@ link_one() {
 }
 
 say "==> linking CLAUDE.md"
-[ -f "$DOTCLAUDE/CLAUDE.md" ] && link_one "$DOTCLAUDE/CLAUDE.md" "$TARGET/CLAUDE.md"
+[ -f "$DOTBABEL/CLAUDE.md" ] && link_one "$DOTBABEL/CLAUDE.md" "$TARGET/CLAUDE.md"
 
 say "==> linking commands/"
 mkdir -p "$TARGET/commands"
-for f in "$DOTCLAUDE/commands"/*.md; do
+for f in "$DOTBABEL/commands"/*.md; do
   [ -e "$f" ] || continue
   link_one "$f" "$TARGET/commands/$(basename "$f")"
 done
 
 say "==> linking skills/"
 mkdir -p "$TARGET/skills"
-for d in "$DOTCLAUDE/skills"/*/; do
+for d in "$DOTBABEL/skills"/*/; do
   [ -e "$d" ] || continue
   name=$(basename "$d")
   link_one "${d%/}" "$TARGET/skills/$name"
@@ -80,13 +80,13 @@ done
 
 say "==> linking hooks/"
 mkdir -p "$TARGET/hooks"
-for f in "$DOTCLAUDE/plugins/dotclaude/hooks"/*.sh; do
+for f in "$DOTBABEL/plugins/dotbabel/hooks"/*.sh; do
   [ -e "$f" ] || continue
   link_one "$f" "$TARGET/hooks/$(basename "$f")"
 done
 
 say "==> installing agents/"
-AGENTS_SRC="$DOTCLAUDE/plugins/dotclaude/templates/claude/agents"
+AGENTS_SRC="$DOTBABEL/plugins/dotbabel/templates/claude/agents"
 AGENTS_DST="$TARGET/agents"
 mkdir -p "$AGENTS_DST"
 if [ -d "$AGENTS_SRC" ]; then
@@ -108,13 +108,13 @@ if [ "$QUIET" = "1" ]; then
 else
   echo ""
   echo "bootstrap complete."
-  echo "dotclaude: $DOTCLAUDE"
+  echo "dotbabel: $DOTBABEL"
   echo "target:    $TARGET"
 fi
 
-# Tail hint — only when dotclaude-doctor is discoverable on PATH so first-time
+# Tail hint — only when dotbabel-doctor is discoverable on PATH so first-time
 # bootstrappers are not confused by a broken reference.
-if command -v dotclaude-doctor >/dev/null 2>&1 && [ "$QUIET" != "1" ]; then
+if command -v dotbabel-doctor >/dev/null 2>&1 && [ "$QUIET" != "1" ]; then
   echo ""
-  echo "next: run 'dotclaude-doctor' to verify install."
+  echo "next: run 'dotbabel-doctor' to verify install."
 fi

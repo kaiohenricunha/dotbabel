@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // auto-update-manifest.mjs — thin pre-commit wrapper.
-// Invokes dotclaude-validate-skills --update from the package bin,
+// Invokes dotbabel-validate-skills --update from the package bin,
 // using the current working directory as repo root.
 
 import { execFileSync } from 'child_process';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import { join, dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const bin = join(__dirname, '..', 'bin', 'dotclaude-validate-skills.mjs');
+const bin = join(__dirname, '..', 'bin', 'dotbabel-validate-skills.mjs');
 
 try {
   execFileSync(process.execPath, [bin, '--update'], {

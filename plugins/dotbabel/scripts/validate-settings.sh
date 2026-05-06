@@ -27,14 +27,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=plugins/dotclaude/scripts/lib/output.sh
+# shellcheck source=plugins/dotbabel/scripts/lib/output.sh
 source "$SCRIPT_DIR/lib/output.sh"
 
 # Argv: --json flag is order-independent but must precede the positional path.
-DOTCLAUDE_JSON=0
+DOTBABEL_JSON=0
 while [ $# -gt 0 ]; do
   case "$1" in
-    --json)  DOTCLAUDE_JSON=1; shift ;;
+    --json)  DOTBABEL_JSON=1; shift ;;
     --help|-h)
       grep -E '^# ' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
@@ -42,7 +42,7 @@ while [ $# -gt 0 ]; do
     *) break ;;
   esac
 done
-export DOTCLAUDE_JSON
+export DOTBABEL_JSON
 
 SETTINGS="${1:-$HOME/.claude/settings.json}"
 PLUGINS_REG="$HOME/.claude/plugins/installed_plugins.json"
@@ -52,7 +52,7 @@ FILE_HISTORY_DIR="$HOME/.claude/file-history"
 
 out_init
 
-if [ "$DOTCLAUDE_JSON" != "1" ]; then
+if [ "$DOTBABEL_JSON" != "1" ]; then
   echo "Validating $SETTINGS"
   echo
 fi
