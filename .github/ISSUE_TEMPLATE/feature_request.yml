@@ -35,7 +35,7 @@ body:
         - CLI bin
         - Node API (src/lib)
         - Validator (src/*.mjs)
-        - Template (plugins/dotclaude/templates)
+        - Template (plugins/dotbabel/templates)
         - Shell (bootstrap/sync/hooks/scripts)
         - Docs only
         - CI workflow
