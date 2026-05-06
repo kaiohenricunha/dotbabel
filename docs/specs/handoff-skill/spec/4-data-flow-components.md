@@ -27,10 +27,10 @@ those lines.
 
 | State                                                                    | Lifetime              | Read by                                     | Written by                |
 | ------------------------------------------------------------------------ | --------------------- | ------------------------------------------- | ------------------------- |
-| `$DOTBABEL_HANDOFF_REPO` (env)                                          | shell process         | every `push` / `fetch` / `list -r`          | self-bootstrap            |
-| `$XDG_CONFIG_HOME/dotbabel/handoff.env`                                 | persistent, mode 0600 | binary startup (sourced)                    | self-bootstrap (one-time) |
+| `$DOTBABEL_HANDOFF_REPO` (env)                                           | shell process         | every `push` / `fetch` / `list -r`          | self-bootstrap            |
+| `$XDG_CONFIG_HOME/dotbabel/handoff.env`                                  | persistent, mode 0600 | binary startup (sourced)                    | self-bootstrap (one-time) |
 | `~/.claude/projects/`, `~/.copilot/session-state/`, `~/.codex/sessions/` | persistent            | `pull`, `push --query`, `search`, `list -l` | the host CLIs themselves  |
-| `$DOTBABEL_HANDOFF_REPO`'s `handoff/...` branches                       | persistent            | `fetch`, `list -r`                          | `push`                    |
+| `$DOTBABEL_HANDOFF_REPO`'s `handoff/...` branches                        | persistent            | `fetch`, `list -r`                          | `push`                    |
 
 No in-process caches, no daemons, no inter-invocation state on the local
 filesystem beyond the persisted env file.

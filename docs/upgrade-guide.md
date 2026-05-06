@@ -8,31 +8,31 @@ Strategic rebrand to position the toolkit as model-agnostic. **Every reference t
 
 ### What changed
 
-| Surface | v1.x | v2.0.0 |
-|---|---|---|
-| npm package | `@dotclaude/dotclaude` | `@dotbabel/dotbabel` |
+| Surface      | v1.x                                             | v2.0.0                              |
+| ------------ | ------------------------------------------------ | ----------------------------------- |
+| npm package  | `@dotclaude/dotclaude`                           | `@dotbabel/dotbabel`                |
 | CLI binaries | `dotclaude`, `dotclaude-bootstrap`, … (15 total) | `dotbabel`, `dotbabel-bootstrap`, … |
-| Config dir | `~/.config/dotclaude/` | `~/.config/dotbabel/` |
-| Cache dir | `~/.cache/dotclaude/` | `~/.cache/dotbabel/` |
-| Schema host | `https://dotclaude.dev/schemas/*` | `https://dotbabel.dev/schemas/*` |
-| Source dir | `plugins/dotclaude/` | `plugins/dotbabel/` |
-| Spec IDs | `dotclaude-core`, `dotclaude-agents` | `dotbabel-core`, `dotbabel-agents` |
+| Config dir   | `~/.config/dotclaude/`                           | `~/.config/dotbabel/`               |
+| Cache dir    | `~/.cache/dotclaude/`                            | `~/.cache/dotbabel/`                |
+| Schema host  | `https://dotclaude.dev/schemas/*`                | `https://dotbabel.dev/schemas/*`    |
+| Source dir   | `plugins/dotclaude/`                             | `plugins/dotbabel/`                 |
+| Spec IDs     | `dotclaude-core`, `dotclaude-agents`             | `dotbabel-core`, `dotbabel-agents`  |
 
 ### Env var mapping (12 vars)
 
-| Legacy (deprecated) | Canonical |
-|---|---|
-| `DOTCLAUDE_HANDOFF_REPO` | `DOTBABEL_HANDOFF_REPO` |
-| `DOTCLAUDE_DIR` | `DOTBABEL_DIR` |
-| `DOTCLAUDE_DEBUG` | `DOTBABEL_DEBUG` |
-| `DOTCLAUDE_QUIET` | `DOTBABEL_QUIET` |
-| `DOTCLAUDE_REPO_ROOT` | `DOTBABEL_REPO_ROOT` |
-| `DOTCLAUDE_JSON` | `DOTBABEL_JSON` |
-| `DOTCLAUDE_DOCTOR_SH` | `DOTBABEL_DOCTOR_SH` |
-| `DOTCLAUDE_JSON_BUFFER` | `DOTBABEL_JSON_BUFFER` |
-| `DOTCLAUDE_VERSION` | `DOTBABEL_VERSION` |
+| Legacy (deprecated)        | Canonical                 |
+| -------------------------- | ------------------------- |
+| `DOTCLAUDE_HANDOFF_REPO`   | `DOTBABEL_HANDOFF_REPO`   |
+| `DOTCLAUDE_DIR`            | `DOTBABEL_DIR`            |
+| `DOTCLAUDE_DEBUG`          | `DOTBABEL_DEBUG`          |
+| `DOTCLAUDE_QUIET`          | `DOTBABEL_QUIET`          |
+| `DOTCLAUDE_REPO_ROOT`      | `DOTBABEL_REPO_ROOT`      |
+| `DOTCLAUDE_JSON`           | `DOTBABEL_JSON`           |
+| `DOTCLAUDE_DOCTOR_SH`      | `DOTBABEL_DOCTOR_SH`      |
+| `DOTCLAUDE_JSON_BUFFER`    | `DOTBABEL_JSON_BUFFER`    |
+| `DOTCLAUDE_VERSION`        | `DOTBABEL_VERSION`        |
 | `DOTCLAUDE_SKIP_BOOTSTRAP` | `DOTBABEL_SKIP_BOOTSTRAP` |
-| `DOTCLAUDE_HANDOFF_DEBUG` | `DOTBABEL_HANDOFF_DEBUG` |
+| `DOTCLAUDE_HANDOFF_DEBUG`  | `DOTBABEL_HANDOFF_DEBUG`  |
 
 ### Compatibility window (2.x only)
 

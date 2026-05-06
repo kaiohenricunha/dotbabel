@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Env overrides — canonical DOTBABEL_* with legacy DOTCLAUDE_* fallback (deprecated, removal in 3.0.0)
-DOTBABEL_VERSION="${DOTBABEL_VERSION:-${DOTCLAUDE_VERSION:-latest}}"
-DOTBABEL_SKIP_BOOTSTRAP="${DOTBABEL_SKIP_BOOTSTRAP:-${DOTCLAUDE_SKIP_BOOTSTRAP:-}}"
-
-if [[ -z "${DOTBABEL_VERSION:-}" || "${DOTBABEL_VERSION}" == "latest" ]] && [[ -n "${DOTCLAUDE_VERSION:-}" ]]; then
+# Env overrides — canonical DOTBABEL_* with legacy DOTCLAUDE_* fallback
+# (deprecated, removal in 3.0.0). The deprecation warning fires only when the
+# canonical var is ABSENT and the legacy var is present — not when both are
+# set (canonical wins) and not when only canonical is set. Decide first,
+# assign second; otherwise the post-assignment value would always look set
+# and suppress the warning.
+if [[ -z "${DOTBABEL_VERSION:-}" && -n "${DOTCLAUDE_VERSION:-}" ]]; then
   printf 'warning: DOTCLAUDE_VERSION is deprecated; use DOTBABEL_VERSION (removal in 3.0.0)\n' >&2
 fi
-if [[ -n "${DOTCLAUDE_SKIP_BOOTSTRAP:-}" && -z "${DOTBABEL_SKIP_BOOTSTRAP:-}" ]]; then
+if [[ -z "${DOTBABEL_SKIP_BOOTSTRAP:-}" && -n "${DOTCLAUDE_SKIP_BOOTSTRAP:-}" ]]; then
   printf 'warning: DOTCLAUDE_SKIP_BOOTSTRAP is deprecated; use DOTBABEL_SKIP_BOOTSTRAP (removal in 3.0.0)\n' >&2
 fi
+DOTBABEL_VERSION="${DOTBABEL_VERSION:-${DOTCLAUDE_VERSION:-latest}}"
+DOTBABEL_SKIP_BOOTSTRAP="${DOTBABEL_SKIP_BOOTSTRAP:-${DOTCLAUDE_SKIP_BOOTSTRAP:-}}"
 
 # Color helpers (suppressed when NO_COLOR is set or stdout is not a TTY)
 if [[ -z "${NO_COLOR:-}" ]] && [[ -t 1 ]]; then

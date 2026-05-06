@@ -29,10 +29,10 @@ plugins/dotbabel/
 
 ## Shared State
 
-| State            | Location                            | Consumers                   |
-| ---------------- | ----------------------------------- | --------------------------- |
-| Installed agents | `~/.claude/agents/*.md`             | Claude Code runtime         |
-| Catalog cache    | `~/.claude/cache/agents-catalog.md` | `/agents:search` skill      |
+| State            | Location                            | Consumers                  |
+| ---------------- | ----------------------------------- | -------------------------- |
+| Installed agents | `~/.claude/agents/*.md`             | Claude Code runtime        |
+| Catalog cache    | `~/.claude/cache/agents-catalog.md` | `/agents:search` skill     |
 | Skills manifest  | `~/.claude/skills-manifest.json`    | `dotbabel-validate-skills` |
 
 No shared mutable state between agents at runtime — each agent is stateless and scoped to its invocation.

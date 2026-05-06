@@ -39,8 +39,8 @@ the right invocation.
 
 ## Auto-trigger phrase mapping
 
-| Trigger phrase                                                         | Invocation                                           |
-| ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| Trigger phrase                                                         | Invocation                                          |
+| ---------------------------------------------------------------------- | --------------------------------------------------- |
 | `handoff <id>` / resume-command fragments                              | `dotbabel handoff pull <id>`                        |
 | `continue in <cli>` / `switch to <cli>` / `pull from <cli>`            | `dotbabel handoff pull <id> --from <cli>`           |
 | `what was that session about` + identifier                             | `dotbabel handoff pull <id> --summary`              |

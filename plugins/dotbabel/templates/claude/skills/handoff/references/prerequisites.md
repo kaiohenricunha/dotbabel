@@ -37,8 +37,8 @@ come from the table below.
 | #   | Check                       | Command                                                    | Failure reason             |
 | --- | --------------------------- | ---------------------------------------------------------- | -------------------------- |
 | 1   | `git` on PATH               | `command -v git`                                           | `git-missing`              |
-| 2   | Handoff repo URL configured | `[[ -n "$DOTBABEL_HANDOFF_REPO" ]]`                       | `handoff-repo-unset`       |
-| 3   | Repo reachable              | `git ls-remote "$DOTBABEL_HANDOFF_REPO" HEAD`             | `handoff-repo-unreachable` |
+| 2   | Handoff repo URL configured | `[[ -n "$DOTBABEL_HANDOFF_REPO" ]]`                        | `handoff-repo-unset`       |
+| 3   | Repo reachable              | `git ls-remote "$DOTBABEL_HANDOFF_REPO" HEAD`              | `handoff-repo-unreachable` |
 | 4   | Clock sanity (soft)         | `[[ $(date -u +%Y) -ge 2024 && $(date -u +%Y) -le 2100 ]]` | `clock-skew` (warn only)   |
 
 ## Remediation

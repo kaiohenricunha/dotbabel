@@ -42,6 +42,7 @@ A read-fallback compatibility layer keeps v1.x setups working through the
   with `export DOTBABEL_HANDOFF_REPO=...`.
 
 To migrate cleanly:
+
 1. `npm install -g @dotbabel/dotbabel` (uninstall `@dotclaude/dotclaude` if needed).
 2. `dotbabel bootstrap` to update `~/.claude/` symlinks.
 3. Rename `DOTCLAUDE_*` env vars in your shell rc files to `DOTBABEL_*`.

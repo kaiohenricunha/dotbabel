@@ -16,8 +16,8 @@ is at
 
 | Token              | Source                                                 | Default         |
 | ------------------ | ------------------------------------------------------ | --------------- |
-| `{{project_name}}` | `dotbabel-init --project-name`                        | `basename(cwd)` |
-| `{{project_type}}` | `dotbabel-init --project-type`                        | `"unknown"`     |
+| `{{project_name}}` | `dotbabel-init --project-name`                         | `basename(cwd)` |
+| `{{project_type}}` | `dotbabel-init --project-type`                         | `"unknown"`     |
 | `{{today}}`        | `new Date().toISOString().slice(0,10)` (scaffold time) | —               |
 
 Tokens not listed above pass through unchanged. That's intentional — a

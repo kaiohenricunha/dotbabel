@@ -4,13 +4,13 @@
 
 ## 6.1 Phased Rollout
 
-| Phase | Work                                                         | Depends On                        |
-| ----- | ------------------------------------------------------------ | --------------------------------- |
-| 1     | Add `model:` frontmatter to all existing skills              | Nothing — fully independent       |
-| 2     | Author starter agents in `templates/claude/agents/`          | Nothing — independent of Phase 1  |
-| 3     | Update `plugin.json` with `agents` array                     | Phase 2 (agents must exist first) |
-| 4     | Update `bootstrap.sh` to copy agents                         | Phase 2                           |
-| 5     | Add `/agents:search` skill                                   | Phase 2 (needs agents to search)  |
+| Phase | Work                                                        | Depends On                        |
+| ----- | ----------------------------------------------------------- | --------------------------------- |
+| 1     | Add `model:` frontmatter to all existing skills             | Nothing — fully independent       |
+| 2     | Author starter agents in `templates/claude/agents/`         | Nothing — independent of Phase 1  |
+| 3     | Update `plugin.json` with `agents` array                    | Phase 2 (agents must exist first) |
+| 4     | Update `bootstrap.sh` to copy agents                        | Phase 2                           |
+| 5     | Add `/agents:search` skill                                  | Phase 2 (needs agents to search)  |
 | 6     | Update `dotbabel-validate-skills` to lint agent frontmatter | Phase 2                           |
 
 Phases 1 and 2 are fully parallelizable.
@@ -146,14 +146,14 @@ Failing test first:
 
 ## 6.4 Testing Strategy
 
-| Unit                       | UNIT                                         | INTEGRATION                                      | POST-DEPLOY                                |
-| -------------------------- | -------------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
+| Unit                       | UNIT                                         | INTEGRATION                                     | POST-DEPLOY                                |
+| -------------------------- | -------------------------------------------- | ----------------------------------------------- | ------------------------------------------ |
 | Model routing frontmatter  | Validate all skills have valid model: value  | `dotbabel-validate-skills` exits 0 on full repo | Spot-check one skill invocation per tier   |
 | Starter agents             | Each agent has required fields + valid model | `dotbabel-validate-skills` passes on agents/    | Claude Code surfaces agents in UI          |
-| `plugin.json` agents array | JSON schema check                            | `claude plugin install` picks up agents          | Agents appear in fresh install             |
-| `bootstrap.sh` agent copy  | Bats: installs agents; skips existing        | End-to-end bootstrap on clean $HOME              | `ls ~/.claude/agents/` post-bootstrap      |
-| `/agents:search` skill     | Cache TTL logic; fallback on network failure | Search returns installed agents                  | `search security` returns security-auditor |
-| Validator extension        | Missing/invalid fields → non-zero exit       | CI validate-skills step catches bad agents       | PR with bad agent file fails CI            |
+| `plugin.json` agents array | JSON schema check                            | `claude plugin install` picks up agents         | Agents appear in fresh install             |
+| `bootstrap.sh` agent copy  | Bats: installs agents; skips existing        | End-to-end bootstrap on clean $HOME             | `ls ~/.claude/agents/` post-bootstrap      |
+| `/agents:search` skill     | Cache TTL logic; fallback on network failure | Search returns installed agents                 | `search security` returns security-auditor |
+| Validator extension        | Missing/invalid fields → non-zero exit       | CI validate-skills step catches bad agents      | PR with bad agent file fails CI            |
 
 ## 6.5 Migration Sequence
 

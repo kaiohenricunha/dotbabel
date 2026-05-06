@@ -29,13 +29,13 @@
 
 ## Boundaries
 
-| Touches                                                        | Does Not Touch                                        |
-| -------------------------------------------------------------- | ----------------------------------------------------- |
-| `plugins/dotbabel/bin/` — two new bins                        | `bootstrap.sh`, `sync.sh`                             |
-| `plugins/dotbabel/src/` — two new modules                     | `validate-specs.mjs`, `check-spec-coverage.mjs`       |
-| `plugins/dotbabel/src/index.mjs` — two new exports            | `spec-harness-lib.mjs`                                |
+| Touches                                                      | Does Not Touch                                        |
+| ------------------------------------------------------------ | ----------------------------------------------------- |
+| `plugins/dotbabel/bin/` — two new bins                       | `bootstrap.sh`, `sync.sh`                             |
+| `plugins/dotbabel/src/` — two new modules                    | `validate-specs.mjs`, `check-spec-coverage.mjs`       |
+| `plugins/dotbabel/src/index.mjs` — two new exports           | `spec-harness-lib.mjs`                                |
 | `plugins/dotbabel/bin/dotbabel.mjs` — SUBCOMMANDS array      | Per-repo `.claude/` scaffold logic                    |
-| `package.json` — `files`, `bin`                                | `docs/repo-facts.json` protected paths (no new paths) |
+| `package.json` — `files`, `bin`                              | `docs/repo-facts.json` protected paths (no new paths) |
 | `plugins/dotbabel/bin/dotbabel-doctor.mjs` — bootstrap check | Any downstream consumer repos                         |
 
 ## Urgency

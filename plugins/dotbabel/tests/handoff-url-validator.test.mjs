@@ -68,9 +68,15 @@ describe("requireTransportRepoStrict", () => {
   let exitSpy;
   let stderrSpy;
   let savedEnv;
+  let savedLegacy;
 
   beforeEach(() => {
+    // requireTransportRepoStrict reads through legacy-compat (HANDOFF_REPO),
+    // which falls back to DOTCLAUDE_HANDOFF_REPO when DOTBABEL_HANDOFF_REPO
+    // is unset. Tests asserting "unset" must clear BOTH or the legacy value
+    // silently satisfies the check.
     savedEnv = process.env.DOTBABEL_HANDOFF_REPO;
+    savedLegacy = process.env.DOTCLAUDE_HANDOFF_REPO;
     exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`__exit__${code}`);
     });
@@ -82,6 +88,8 @@ describe("requireTransportRepoStrict", () => {
     stderrSpy.mockRestore();
     if (savedEnv === undefined) delete process.env.DOTBABEL_HANDOFF_REPO;
     else process.env.DOTBABEL_HANDOFF_REPO = savedEnv;
+    if (savedLegacy === undefined) delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    else process.env.DOTCLAUDE_HANDOFF_REPO = savedLegacy;
   });
 
   it("returns the URL when set and well-formed", () => {
@@ -92,6 +100,7 @@ describe("requireTransportRepoStrict", () => {
 
   it("rejects unset env with a clear pointer at push auto-bootstrap", () => {
     delete process.env.DOTBABEL_HANDOFF_REPO;
+    delete process.env.DOTCLAUDE_HANDOFF_REPO;
     let err;
     try {
       requireTransportRepoStrict();
@@ -105,6 +114,7 @@ describe("requireTransportRepoStrict", () => {
 
   it("rejects empty string env", () => {
     process.env.DOTBABEL_HANDOFF_REPO = "";
+    delete process.env.DOTCLAUDE_HANDOFF_REPO;
     expect(() => requireTransportRepoStrict()).toThrow(HandoffError);
   });
 });

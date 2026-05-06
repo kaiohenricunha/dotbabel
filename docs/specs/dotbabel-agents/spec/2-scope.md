@@ -21,11 +21,11 @@
 
 | Touches                        | Does Not Touch                        |
 | ------------------------------ | ------------------------------------- |
-| `plugins/dotbabel/templates/` | Agent runtime / Claude Code internals |
-| `plugins/dotbabel/src/`       | Existing skills content               |
+| `plugins/dotbabel/templates/`  | Agent runtime / Claude Code internals |
+| `plugins/dotbabel/src/`        | Existing skills content               |
 | `.claude/skills-manifest.json` | CI pipelines                          |
 | `bootstrap.sh`                 | External agent catalogs               |
-| `docs/specs/dotbabel-agents/` | Other spec domains                    |
+| `docs/specs/dotbabel-agents/`  | Other spec domains                    |
 
 ## Urgency
 

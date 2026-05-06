@@ -40,19 +40,19 @@
 
 ## Boundaries
 
-| Touches                                                  | Does Not Touch                                                       |
-| -------------------------------------------------------- | -------------------------------------------------------------------- |
-| `skills/handoff/SKILL.md`                                | Other skill SKILL.md files                                           |
-| `skills/handoff/references/*.md`                         | Skills outside `skills/handoff/`                                     |
-| `plugins/dotbabel/bin/dotbabel-handoff.mjs`            | Other `plugins/dotbabel/bin/*.mjs` entrypoints                      |
-| `plugins/dotbabel/src/lib/handoff-remote.mjs`           | `plugins/dotbabel/src/lib/argv.mjs`, `exit-codes.mjs`               |
-| `plugins/dotbabel/src/lib/handoff-scrub.mjs`            | Scrub patterns in `plugins/dotbabel/scripts/handoff-scrub.sh`       |
-| `plugins/dotbabel/scripts/handoff-doctor.sh`            | `handoff-extract.sh` (substrate, frozen)                             |
-| `plugins/dotbabel/scripts/handoff-description.sh`       | `handoff-resolve.sh` internals (substrate, frozen)                   |
-| `plugins/dotbabel/tests/bats/handoff-*.bats`            | `plugins/dotbabel/tests/bats/dotbabel-*.bats` for non-handoff bins |
-| `plugins/dotbabel/tests/handoff-*.test.mjs`             | Other vitest suites in `plugins/dotbabel/tests/`                    |
-| `docs/handoff-guide.md`                                  | Other `docs/*.md` files                                              |
-| `docs/specs/handoff-skill/spec.json` (added at finalize) | Other `docs/specs/*/spec.json` files                                 |
+| Touches                                                  | Does Not Touch                                                     |
+| -------------------------------------------------------- | ------------------------------------------------------------------ |
+| `skills/handoff/SKILL.md`                                | Other skill SKILL.md files                                         |
+| `skills/handoff/references/*.md`                         | Skills outside `skills/handoff/`                                   |
+| `plugins/dotbabel/bin/dotbabel-handoff.mjs`              | Other `plugins/dotbabel/bin/*.mjs` entrypoints                     |
+| `plugins/dotbabel/src/lib/handoff-remote.mjs`            | `plugins/dotbabel/src/lib/argv.mjs`, `exit-codes.mjs`              |
+| `plugins/dotbabel/src/lib/handoff-scrub.mjs`             | Scrub patterns in `plugins/dotbabel/scripts/handoff-scrub.sh`      |
+| `plugins/dotbabel/scripts/handoff-doctor.sh`             | `handoff-extract.sh` (substrate, frozen)                           |
+| `plugins/dotbabel/scripts/handoff-description.sh`        | `handoff-resolve.sh` internals (substrate, frozen)                 |
+| `plugins/dotbabel/tests/bats/handoff-*.bats`             | `plugins/dotbabel/tests/bats/dotbabel-*.bats` for non-handoff bins |
+| `plugins/dotbabel/tests/handoff-*.test.mjs`              | Other vitest suites in `plugins/dotbabel/tests/`                   |
+| `docs/handoff-guide.md`                                  | Other `docs/*.md` files                                            |
+| `docs/specs/handoff-skill/spec.json` (added at finalize) | Other `docs/specs/*/spec.json` files                               |
 
 ## Urgency
 

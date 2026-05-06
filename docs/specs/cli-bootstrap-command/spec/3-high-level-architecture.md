@@ -60,11 +60,11 @@ identical.
 
 ## External APIs / Dependencies
 
-| Service              | Purpose                                                                                     | Rate Limits / Constraints                                                              |
-| -------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Service              | Purpose                                                                                   | Rate Limits / Constraints                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `registry.npmjs.org` | `npm view @dotbabel/dotbabel version` for `sync status` + `npm update -g` for `sync pull` | npm rate-limits unauthenticated fetches to ~1 req/sec; trivial for interactive CLI use |
-| `git` binary         | Clone-mode `sync pull` / `push` / `status`                                                  | Must be present in PATH; absence is an ENV error (exit 2)                              |
-| `npm` binary         | npm-mode `sync pull`                                                                        | Must be present in PATH; absence is an ENV error (exit 2)                              |
+| `git` binary         | Clone-mode `sync pull` / `push` / `status`                                                | Must be present in PATH; absence is an ENV error (exit 2)                              |
+| `npm` binary         | npm-mode `sync pull`                                                                      | Must be present in PATH; absence is an ENV error (exit 2)                              |
 
 ## Deployment
 

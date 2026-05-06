@@ -4,14 +4,14 @@ _Last updated: v1.3.0_
 
 Every bin honors the **dotbabel-wide flag set** in addition to its own:
 
-| Flag                    | Shape | Behavior                                                                           |
-| ----------------------- | ----- | ---------------------------------------------------------------------------------- |
-| `--help`, `-h`          | bool  | Print usage and exit 0                                                             |
-| `--version`, `-V`       | bool  | Print package version and exit 0                                                   |
-| `--json`                | bool  | Emit `{events:[…], counts:{pass,fail,warn}}` on stdout; suppress ANSI              |
-| `--verbose`, `-v`       | bool  | Print every `StructuredError` field (code, pointer, expected, got, hint, category) |
-| `--no-color`            | bool  | Suppress ANSI escapes regardless of TTY detection                                  |
-| `NO_COLOR=` env         | env   | Same as `--no-color`, honors the cross-tool convention                             |
+| Flag                   | Shape | Behavior                                                                           |
+| ---------------------- | ----- | ---------------------------------------------------------------------------------- |
+| `--help`, `-h`         | bool  | Print usage and exit 0                                                             |
+| `--version`, `-V`      | bool  | Print package version and exit 0                                                   |
+| `--json`               | bool  | Emit `{events:[…], counts:{pass,fail,warn}}` on stdout; suppress ANSI              |
+| `--verbose`, `-v`      | bool  | Print every `StructuredError` field (code, pointer, expected, got, hint, category) |
+| `--no-color`           | bool  | Suppress ANSI escapes regardless of TTY detection                                  |
+| `NO_COLOR=` env        | env   | Same as `--no-color`, honors the cross-tool convention                             |
 | `DOTBABEL_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
 
 **Exit codes** follow a single convention across every bin:
@@ -206,11 +206,11 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 > **Platform note:** Windows is not supported (symlinks require elevated
 > permissions). Use WSL or run `bootstrap.sh` from Git Bash instead.
 
-| Flag              | Default     |                                                  |
-| ----------------- | ----------- | ------------------------------------------------ |
+| Flag              | Default     |                                                 |
+| ----------------- | ----------- | ----------------------------------------------- |
 | `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode) |
-| `--target <dir>`  | `~/.claude` | Override destination directory                   |
-| `--quiet`         | false       | Suppress per-file progress; print summary only   |
+| `--target <dir>`  | `~/.claude` | Override destination directory                  |
+| `--quiet`         | false       | Suppress per-file progress; print summary only  |
 
 **Typical invocations:**
 
@@ -230,10 +230,10 @@ Pull, push, or check status for a dotbabel installation. Works in two modes:
 **npm mode** (default — installed globally via npm) or **clone mode** (local
 git checkout, activated with `--source`).
 
-| Flag              | Default     |                                     |
-| ----------------- | ----------- | ----------------------------------- |
+| Flag              | Default     |                                    |
+| ----------------- | ----------- | ---------------------------------- |
 | `--source <path>` | npm install | Path to a local dotbabel git clone |
-| `--quiet`         | false       | Suppress per-file progress          |
+| `--quiet`         | false       | Suppress per-file progress         |
 
 **Subcommands:**
 

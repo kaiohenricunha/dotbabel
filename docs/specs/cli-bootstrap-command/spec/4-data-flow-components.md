@@ -29,12 +29,12 @@ The npm CLI has no awareness of these operations.
 
 ## Component Boundaries
 
-| Component                 | File   | Responsibility                                                           |
-| ------------------------- | ------ | ------------------------------------------------------------------------ |
+| Component                | File   | Responsibility                                                           |
+| ------------------------ | ------ | ------------------------------------------------------------------------ |
 | `dotbabel-bootstrap.mjs` | `bin/` | CLI entry-point: arg parsing, help text, exit codes                      |
 | `dotbabel-sync.mjs`      | `bin/` | CLI entry-point for `sync <subcommand>`; routes to sync-global           |
-| `bootstrap-global.mjs`    | `src/` | Core symlinking logic: source resolution, backup, link-one, agents copy  |
-| `sync-global.mjs`         | `src/` | Pull (npm update / git rebase) + status + push; delegates bootstrap step |
+| `bootstrap-global.mjs`   | `src/` | Core symlinking logic: source resolution, backup, link-one, agents copy  |
+| `sync-global.mjs`        | `src/` | Pull (npm update / git rebase) + status + push; delegates bootstrap step |
 | `dotbabel.mjs`           | `bin/` | Umbrella dispatcher; adds `bootstrap` + `sync` to SUBCOMMANDS            |
 | `dotbabel-doctor.mjs`    | `bin/` | Existing diagnostic; extended to check bootstrap state                   |
 

@@ -270,13 +270,13 @@ command and locks the **prefix** of the stderr template.
 | ---- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | 0    | success                                                                 | (none)                                                                                                               |
 | 1    | preflight check failed (recoverable)                                    | `Preflight failed: <reason>` followed by `What's wrong:` / `How to fix:` block (existing `handoff-doctor.sh` format) |
-| 2    | runtime error (resolution miss, transport failure, scrub failure, etc.) | `dotbabel-handoff: <reason>`                                                                                        |
-| 64   | usage error (unknown flag, missing positional, conflicting flags)       | `dotbabel-handoff: <reason>` followed by `Usage: …` block                                                           |
+| 2    | runtime error (resolution miss, transport failure, scrub failure, etc.) | `dotbabel-handoff: <reason>`                                                                                         |
+| 64   | usage error (unknown flag, missing positional, conflicting flags)       | `dotbabel-handoff: <reason>` followed by `Usage: …` block                                                            |
 
 ### 5.3.2 `pull`-specific exits
 
-| Code | Condition                                | Stderr template                                                                                                                                                             |
-| ---- | ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Code | Condition                                | Stderr template                                                                                                                                                            |
+| ---- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2    | no session matches (no `--from`)         | `dotbabel-handoff: no session matches: <query>`                                                                                                                            |
 | 2    | no session matches (with `--from <cli>`) | `dotbabel-handoff: no <cli> session matches: <query>`                                                                                                                      |
 | 2    | multiple sessions match (non-TTY)        | header `dotbabel-handoff: multiple sessions match "<query>":` + TSV lines (5.3.5) + trailing hint line `hint: pass --from <cli> to narrow, or use UUID/short-UUID prefix.` |
@@ -290,8 +290,8 @@ lookups (no `--from`). Both forms are stable public output (#136).
 
 ### 5.3.3 `push`-specific exits
 
-| Code | Condition                                                                  | Stderr template                                                                                                                                    |
-| ---- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Code | Condition                                                                  | Stderr template                                                                                                                                   |
+| ---- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2    | transport not configured (env unset, non-TTY)                              | `dotbabel-handoff: transport not configured` + manual-setup block (5.5.2)                                                                         |
 | 2    | scrub fail-closed                                                          | `dotbabel-handoff: scrub not applied: <reason>`                                                                                                   |
 | 2    | short-id collision, different session_id                                   | `dotbabel-handoff: short-id collision on <branch>: local-session=<X> remote-session=<Y>; rerun with --force-collision to override`                |
@@ -301,8 +301,8 @@ lookups (no `--from`). Both forms are stable public output (#136).
 
 ### 5.3.4 `fetch`-specific exits
 
-| Code | Condition                                 | Stderr template                                                                    |
-| ---- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| Code | Condition                                 | Stderr template                                                                   |
+| ---- | ----------------------------------------- | --------------------------------------------------------------------------------- |
 | 2    | transport not configured                  | `dotbabel-handoff: transport not configured` + "run push first" hint              |
 | 2    | no remote handoffs match                  | `dotbabel-handoff: no remote handoffs match: <query>`                             |
 | 2    | multiple handoffs match (non-TTY)         | header `dotbabel-handoff: multiple handoffs match "<query>":` + TSV lines (5.3.5) |
@@ -360,8 +360,8 @@ phrase → invocation mapping below. ARCH-10's drift-test asserts:
 
 ### 5.5.1 Phrase-pattern → binary-form mapping (frozen)
 
-| Trigger phrase pattern                                                 | Binary invocation                                          |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Trigger phrase pattern                                                 | Binary invocation                                         |
+| ---------------------------------------------------------------------- | --------------------------------------------------------- |
 | `handoff` + identifier (UUID / short / `latest` / alias)               | `dotbabel handoff pull <id>`                              |
 | `continue in <cli>` / `switch to <cli>` / `pull from <cli>` + id       | `dotbabel handoff pull <id> --from <cli>`                 |
 | `claude --resume <id>` / `codex resume <id>` / `copilot --resume=<id>` | `dotbabel handoff pull <id>`                              |

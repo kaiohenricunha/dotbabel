@@ -4,6 +4,12 @@
  * Asserts: canonical wins over legacy; absent canonical falls back; warnings
  * fire exactly once per (code, var-name) pair with the stable code from the
  * public contract; writes always target canonical.
+ *
+ * Warning capture: spies directly on `process.emitWarning` rather than
+ * subscribing to the `warning` event. The event listener fires asynchronously
+ * (and Node may suppress duplicate-code emissions at the listener level),
+ * which makes the listener approach flaky for assertion. The spy records
+ * every synchronous call, which is what these tests actually verify.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,6 +27,7 @@ async function freshModule() {
 
 let HOME;
 let originalEnv;
+let warnSpy;
 
 beforeEach(() => {
   originalEnv = { ...process.env };
@@ -33,46 +40,66 @@ beforeEach(() => {
       delete process.env[k];
     }
   }
+  // Spy on emitWarning for synchronous capture. mockImplementation prevents
+  // the warning from being printed to stderr during the test run.
+  warnSpy = vi.spyOn(process, "emitWarning").mockImplementation(() => {});
 });
 
 afterEach(() => {
+  warnSpy.mockRestore();
   rmSync(HOME, { recursive: true, force: true });
   process.env = originalEnv;
 });
+
+/**
+ * Inspect every captured emitWarning call. Each spy call has shape
+ * `[message, optionsObject]`. Returns parallel arrays for codes and messages.
+ */
+function captured() {
+  const codes = [];
+  const messages = [];
+  for (const call of warnSpy.mock.calls) {
+    const [message, opts] = call;
+    messages.push(typeof message === "string" ? message : String(message));
+    codes.push(opts && typeof opts === "object" ? opts.code : undefined);
+  }
+  return { codes, messages, callCount: warnSpy.mock.calls.length };
+}
 
 describe("configDir()", () => {
   it("returns canonical when only canonical exists", async () => {
     mkdirSync(join(HOME, ".config", "dotbabel"), { recursive: true });
     const { configDir } = await freshModule();
-    const warnings = captureWarnings();
     expect(configDir()).toBe(join(HOME, ".config", "dotbabel"));
-    expect(warnings.codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
   });
 
   it("falls back to legacy and warns once when only legacy exists", async () => {
     mkdirSync(join(HOME, ".config", "dotclaude"), { recursive: true });
     const { configDir } = await freshModule();
-    const warnings = captureWarnings();
     expect(configDir()).toBe(join(HOME, ".config", "dotclaude"));
     configDir(); // second call must not emit
     configDir();
-    expect(warnings.codes.filter((c) => c === "DOTBABEL_LEGACY_CONFIG")).toHaveLength(1);
+    const c = captured();
+    expect(c.codes.filter((code) => code === "DOTBABEL_LEGACY_CONFIG")).toHaveLength(1);
+    // Message must mention both old and new paths so users can migrate
+    const warnMsg = c.messages.find((m) => /\.config\/dotclaude/.test(m));
+    expect(warnMsg).toBeDefined();
+    expect(warnMsg).toMatch(/dotbabel/);
   });
 
   it("returns canonical when both exist (no warning)", async () => {
     mkdirSync(join(HOME, ".config", "dotbabel"), { recursive: true });
     mkdirSync(join(HOME, ".config", "dotclaude"), { recursive: true });
     const { configDir } = await freshModule();
-    const warnings = captureWarnings();
     expect(configDir()).toBe(join(HOME, ".config", "dotbabel"));
-    expect(warnings.codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
   });
 
   it("returns canonical (as first-write target) when neither exists", async () => {
     const { configDir } = await freshModule();
-    const warnings = captureWarnings();
     expect(configDir()).toBe(join(HOME, ".config", "dotbabel"));
-    expect(warnings.codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CONFIG");
   });
 });
 
@@ -80,10 +107,9 @@ describe("cacheDir()", () => {
   it("falls back to legacy and warns once when only legacy exists", async () => {
     mkdirSync(join(HOME, ".cache", "dotclaude"), { recursive: true });
     const { cacheDir } = await freshModule();
-    const warnings = captureWarnings();
     expect(cacheDir()).toBe(join(HOME, ".cache", "dotclaude"));
     cacheDir();
-    expect(warnings.codes.filter((c) => c === "DOTBABEL_LEGACY_CACHE")).toHaveLength(1);
+    expect(captured().codes.filter((c) => c === "DOTBABEL_LEGACY_CACHE")).toHaveLength(1);
   });
 
   it("canonical wins when both exist", async () => {
@@ -91,6 +117,7 @@ describe("cacheDir()", () => {
     mkdirSync(join(HOME, ".cache", "dotclaude"), { recursive: true });
     const { cacheDir } = await freshModule();
     expect(cacheDir()).toBe(join(HOME, ".cache", "dotbabel"));
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_CACHE");
   });
 });
 
@@ -100,35 +127,37 @@ describe("env()", () => {
     process.env.DOTCLAUDE_HANDOFF_REPO = "legacy";
     const { env } = await freshModule();
     expect(env("HANDOFF_REPO")).toBe("canonical");
+    expect(captured().codes).not.toContain("DOTBABEL_LEGACY_ENV");
   });
 
   it("falls back to legacy and warns with bare DOTBABEL_LEGACY_ENV code", async () => {
     process.env.DOTCLAUDE_HANDOFF_REPO = "legacy-only";
     const { env } = await freshModule();
-    const warnings = captureWarnings();
     expect(env("HANDOFF_REPO")).toBe("legacy-only");
-    const envWarnings = warnings.codes.filter((c) => c === "DOTBABEL_LEGACY_ENV");
+    const c = captured();
+    const envWarnings = c.codes.filter((code) => code === "DOTBABEL_LEGACY_ENV");
     expect(envWarnings).toHaveLength(1);
-    // Message must name the var so users know which to migrate
-    expect(warnings.messages[0]).toContain("DOTCLAUDE_HANDOFF_REPO");
-    expect(warnings.messages[0]).toContain("DOTBABEL_HANDOFF_REPO");
+    // Message must name both legacy and canonical so users know which to migrate
+    const m = c.messages.find((msg) => /DOTCLAUDE_HANDOFF_REPO/.test(msg));
+    expect(m).toBeDefined();
+    expect(m).toContain("DOTBABEL_HANDOFF_REPO");
   });
 
   it("dedupe key is per-variable: HANDOFF_REPO and DIR fire independently", async () => {
     process.env.DOTCLAUDE_HANDOFF_REPO = "x";
     process.env.DOTCLAUDE_DIR = "y";
     const { env } = await freshModule();
-    const warnings = captureWarnings();
     env("HANDOFF_REPO");
     env("DIR");
     env("HANDOFF_REPO"); // dedupe — should NOT emit a third
     env("DIR");
-    expect(warnings.codes.filter((c) => c === "DOTBABEL_LEGACY_ENV")).toHaveLength(2);
+    expect(captured().codes.filter((c) => c === "DOTBABEL_LEGACY_ENV")).toHaveLength(2);
   });
 
   it("returns undefined when neither set", async () => {
     const { env } = await freshModule();
     expect(env("NOT_SET")).toBeUndefined();
+    expect(captured().callCount).toBe(0);
   });
 
   it("all 12 mapped env vars fall back correctly", async () => {
@@ -153,6 +182,8 @@ describe("env()", () => {
     for (const v of vars) {
       expect(env(v)).toBe(`legacy-${v}`);
     }
+    // Each distinct variable should fire its own warning
+    expect(captured().codes.filter((c) => c === "DOTBABEL_LEGACY_ENV")).toHaveLength(vars.length);
   });
 });
 
@@ -173,22 +204,3 @@ describe("setEnv() / unsetEnv()", () => {
     expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBeUndefined();
   });
 });
-
-function captureWarnings() {
-  const codes = [];
-  const messages = [];
-  const original = process.listeners("warning");
-  process.removeAllListeners("warning");
-  process.on("warning", (w) => {
-    codes.push(w.code);
-    messages.push(w.message);
-  });
-  return {
-    get codes() {
-      return codes;
-    },
-    get messages() {
-      return messages;
-    },
-  };
-}

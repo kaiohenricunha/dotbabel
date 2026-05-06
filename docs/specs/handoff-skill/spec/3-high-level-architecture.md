@@ -120,10 +120,10 @@ that SKILL.md, `--help`, and `docs/handoff-guide.md` all reference
 
 ## Components
 
-| Component                                          | Role                                                    | Fate in this spec                               |
-| -------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
-| `skills/handoff/SKILL.md`                          | Natural-language trigger surface for Claude/Copilot     | Shrinks to ~45 lines; points at binary `--help` |
-| `plugins/dotbabel/bin/dotbabel-handoff.mjs`      | Public CLI: argv parse, dispatch, render `--help`       | Reshaped to three primaries + four supporting   |
+| Component                                         | Role                                                    | Fate in this spec                               |
+| ------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+| `skills/handoff/SKILL.md`                         | Natural-language trigger surface for Claude/Copilot     | Shrinks to ~45 lines; points at binary `--help` |
+| `plugins/dotbabel/bin/dotbabel-handoff.mjs`       | Public CLI: argv parse, dispatch, render `--help`       | Reshaped to three primaries + four supporting   |
 | `plugins/dotbabel/src/lib/handoff-remote.mjs`     | Shared lib: render, encode/decode, transport, bootstrap | Restructured around the three-verb partition    |
 | `plugins/dotbabel/src/lib/handoff-scrub.mjs`      | Fail-closed scrub wrapper                               | Unchanged                                       |
 | `plugins/dotbabel/scripts/handoff-resolve.sh`     | Per-CLI session resolution (UUID/alias/latest)          | Frozen substrate (§2)                           |
@@ -131,18 +131,18 @@ that SKILL.md, `--help`, and `docs/handoff-guide.md` all reference
 | `plugins/dotbabel/scripts/handoff-scrub.sh`       | Eight-pattern perl scrubber                             | Patterns frozen (§2)                            |
 | `plugins/dotbabel/scripts/handoff-description.sh` | Encode/decode `handoff:v2:…` description                | Schema reviewed in §5                           |
 | `plugins/dotbabel/scripts/handoff-doctor.sh`      | Preflight checks for the git transport                  | Reduced to current single transport             |
-| `docs/handoff-guide.md`                            | Long-form user guide                                    | Reconciled with binary surface, drift-tested    |
-| `skills/handoff/references/*.md`                   | Per-CLI reference docs + redaction + transport          | Pruned of removed transports / flags            |
+| `docs/handoff-guide.md`                           | Long-form user guide                                    | Reconciled with binary surface, drift-tested    |
+| `skills/handoff/references/*.md`                  | Per-CLI reference docs + redaction + transport          | Pruned of removed transports / flags            |
 
 ## Data Stores
 
-| Store                                    | Role                                               | Access Pattern                                             |
-| ---------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| `~/.claude/projects/`                    | Claude Code session JSONLs                         | Read on `pull`, `push` (current), `search`, `list --local` |
-| `~/.copilot/session-state/`              | Copilot CLI session JSONL + `workspace.yaml`       | Read on `pull`, `push` (current), `search`, `list --local` |
-| `~/.codex/sessions/`                     | Codex CLI rollout JSONLs (deep date-bucketed tree) | Read on `pull`, `push` (current), `search`, `list --local` |
+| Store                                   | Role                                               | Access Pattern                                             |
+| --------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
+| `~/.claude/projects/`                   | Claude Code session JSONLs                         | Read on `pull`, `push` (current), `search`, `list --local` |
+| `~/.copilot/session-state/`             | Copilot CLI session JSONL + `workspace.yaml`       | Read on `pull`, `push` (current), `search`, `list --local` |
+| `~/.codex/sessions/`                    | Codex CLI rollout JSONLs (deep date-bucketed tree) | Read on `pull`, `push` (current), `search`, `list --local` |
 | `$DOTBABEL_HANDOFF_REPO`                | Private GitHub repo, single transport              | Write on `push`; read on `fetch`, `list --remote`          |
-| `$XDG_CONFIG_HOME/dotbabel/handoff.env` | Persisted env (`DOTBABEL_HANDOFF_REPO=…`)         | Sourced at binary start; written by self-bootstrap         |
+| `$XDG_CONFIG_HOME/dotbabel/handoff.env` | Persisted env (`DOTBABEL_HANDOFF_REPO=…`)          | Sourced at binary start; written by self-bootstrap         |
 
 Tagged **ARCH-4**: there is exactly **one** remote per user, named by
 `$DOTBABEL_HANDOFF_REPO`. Multi-remote / multi-store is out of scope (§2).
@@ -223,7 +223,7 @@ Tagged **ARCH-9** (scalability targets):
 | Tool   | Purpose                                          | Required for                         | Fallback                                 |
 | ------ | ------------------------------------------------ | ------------------------------------ | ---------------------------------------- |
 | `git`  | All remote transport operations                  | `push`, `fetch`, `list --remote`     | None — required                          |
-| `gh`   | Auto-bootstrap of the private repo on first push | First `push` only (interactive)      | Manual `export DOTBABEL_HANDOFF_REPO=…` |
+| `gh`   | Auto-bootstrap of the private repo on first push | First `push` only (interactive)      | Manual `export DOTBABEL_HANDOFF_REPO=…`  |
 | `jq`   | Per-CLI JSONL extraction                         | `pull`, `push`, `search`, `describe` | None — required                          |
 | `perl` | Scrub-pattern engine                             | `push` (fail-closed)                 | None — required (push aborts if missing) |
 | `bash` | Substrate runtime                                | All shell scripts                    | None — required                          |

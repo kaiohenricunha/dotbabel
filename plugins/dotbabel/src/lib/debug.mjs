@@ -1,3 +1,5 @@
+import { env } from "./legacy-compat.mjs";
+
 /**
  * Debug logger gated on `DOTBABEL_DEBUG=1` (legacy `DOTCLAUDE_DEBUG=1` honored
  * via legacy-compat fallback through 2.x).
@@ -16,22 +18,20 @@
  * @param {...unknown} args
  * @returns {void}
  */
-import { env } from './legacy-compat.mjs';
-
 export function debug(tag, ...args) {
-  if (env('DEBUG') !== '1') return;
-  process.stderr.write(`[harness:${tag}] ${args.map(stringify).join(' ')}\n`);
+  if (env("DEBUG") !== "1") return;
+  process.stderr.write(`[harness:${tag}] ${args.map(stringify).join(" ")}\n`);
 }
 
 /** @returns {boolean} */
 export function isDebug() {
-  return env('DEBUG') === '1';
+  return env("DEBUG") === "1";
 }
 
 /** @param {unknown} v */
 function stringify(v) {
   if (v instanceof Error) return v.stack ?? v.message;
-  if (typeof v === 'string') return v;
+  if (typeof v === "string") return v;
   try {
     return JSON.stringify(v);
   } catch {
