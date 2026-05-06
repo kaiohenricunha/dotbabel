@@ -56,6 +56,7 @@ describe("export shape", () => {
     "runGit",
     "runGitOrThrow",
     "runScript",
+    "seedTransportDefaultBranch",
     "slugify",
     "slugifyRepoName",
     "tagsFromMeta",

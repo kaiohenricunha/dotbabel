@@ -477,6 +477,81 @@ export async function promptLine(message) {
 }
 
 /**
+ * Ensure the transport repo has `main` as its default branch so the first
+ * handoff push doesn't get pinned as HEAD (issue #180). Idempotent: safe
+ * to run on a fresh repo, an already-seeded repo, or a buggy repo whose
+ * current default is a `handoff/*` ref.
+ *
+ * Steps:
+ *   1. Probe `git ls-remote --heads <url> refs/heads/main`. If absent,
+ *      build an inert `main` in a tmp repo (init -b main, README, commit,
+ *      push) so the next step has a valid target.
+ *   2. PATCH the GitHub repo's default_branch to `main` unconditionally.
+ *      The PATCH is the remediation hook for already-bootstrapped buggy
+ *      repos that already have `main` but still default to a handoff ref.
+ *
+ * The PATCH is non-fatal: a failed flip leaves the repo functional but
+ * still bug-prone, so we surface a one-line warning and let the caller
+ * print remediation steps. Push failure is fatal — without `main` the
+ * default-branch flip would silently target a missing ref.
+ *
+ * @param {string} login    GitHub username from `gh api user`
+ * @param {string} name     repo name (e.g. "dotclaude-handoff-store")
+ * @param {string} repoUrl  ssh URL from `gh repo view`
+ * @returns {{ seeded: boolean, defaultBranchPatched: boolean, warning?: string }}
+ */
+export function seedTransportDefaultBranch(login, name, repoUrl) {
+  let seeded = false;
+  const probe = runGit(["ls-remote", "--heads", repoUrl, "refs/heads/main"], process.cwd());
+  if (probe.status !== 0 || !probe.stdout.trim()) {
+    const tmp = mkdtempSync(join(tmpdir(), "handoff-bootstrap-seed-"));
+    try {
+      runGitOrThrow(["init", "-q", "-b", "main"], tmp);
+      writeFileSync(
+        join(tmp, "README.md"),
+        "# dotclaude handoff transport store\n\nManaged by `dotclaude handoff`. Do not edit by hand.\n",
+      );
+      runGitOrThrow(["add", "README.md"], tmp);
+      runGitOrThrow(
+        [
+          "-c",
+          "user.email=dotclaude@local",
+          "-c",
+          "user.name=dotclaude",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "-m",
+          "chore: seed default branch",
+          "-q",
+        ],
+        tmp,
+      );
+      runGitOrThrow(["push", "-q", repoUrl, "main"], tmp);
+      seeded = true;
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+  const patch = spawnSync(
+    "gh",
+    ["api", "-X", "PATCH", `repos/${login}/${name}`, "-f", "default_branch=main"],
+    { encoding: "utf8" },
+  );
+  if (patch.status !== 0) {
+    const detail =
+      (patch.stderr || patch.stdout || "").trim().split("\n")[0] ||
+      `gh exited ${patch.status ?? "?"}`;
+    return {
+      seeded,
+      defaultBranchPatched: false,
+      warning: `could not set default branch to main (${detail}); run \`gh api -X PATCH repos/${login}/${name} -f default_branch=main\` to remediate`,
+    };
+  }
+  return { seeded, defaultBranchPatched: true };
+}
+
+/**
  * Interactively create a private GitHub repo for handoff storage via `gh`.
  * Writes the URL to the persisted env file and sets DOTCLAUDE_HANDOFF_REPO.
  * Exits 2 with a manual-setup block when non-TTY, gh missing, or user aborts.
@@ -565,6 +640,20 @@ export async function bootstrapTransportRepo() {
     view.status === 0 && view.stdout.trim()
       ? view.stdout.trim()
       : `git@github.com:${login}/${name}.git`;
+
+  // Seed `main` as the default branch BEFORE any handoff push lands, so
+  // GitHub doesn't pin the first handoff ref as HEAD (issue #180).
+  // Idempotent — re-running bootstrap on a buggy already-bootstrapped
+  // repo also remediates it.
+  const seed = seedTransportDefaultBranch(login, name, url);
+  if (seed.seeded) {
+    process.stderr.write("  ✓ seeded `main` as default branch\n");
+  } else {
+    process.stderr.write("  ✓ default branch already initialized\n");
+  }
+  if (seed.warning) {
+    process.stderr.write(`  ⚠ ${seed.warning}\n`);
+  }
 
   mkdirSync(currentConfigDir(), { recursive: true, mode: 0o700 });
   writeFileSync(
