@@ -48,10 +48,11 @@ the right invocation.
 | `pull handoff` / `fetch handoff` / `continue from yesterday's machine` | `dotclaude handoff fetch [<query>]`                  |
 
 Extract `<id>` from the user message (UUID, short UUID, or a deliberate-label
-alias: claude `customTitle`/`aiTitle`, codex `thread_name`, or copilot
-`workspace.yaml:name`). Aliases match case-insensitively. Resolution
-precedence: UUID > short-UUID > `latest` > alias (no fall-through on miss).
-The resolver probes Claude / Copilot / Codex roots automatically. If the
+alias: claude `customTitle`/`aiTitle`, codex `thread_name`, copilot
+`workspace.yaml:name`, or gemini `checkpoint`). Aliases match
+case-insensitively. Resolution precedence: UUID > short-UUID > `latest` >
+alias (no fall-through on miss).
+The resolver probes Claude / Copilot / Codex / Gemini roots automatically. If the
 query is missing or ambiguous, ask one clarifying question before proceeding.
 
 ## The `--from` filling rule
@@ -88,7 +89,7 @@ distinguish a hand-rolled block from a real one.
 Brief reference. `dotclaude handoff --help` is authoritative.
 
 - `--from <cli>` narrows source-CLI auto-detection on `push`, `fetch`, `pull`; filters `list`, `search`, and `prune`.
-  For `pull latest`, omitting `--from` triggers host auto-detection: `CLAUDECODE=1` / `COPILOT_*` / `CODEX` env signals → narrowed to that CLI's root; host undetectable → cross-root union (newest mtime across all three roots).
+  For `pull latest`, omitting `--from` triggers host auto-detection: `CLAUDECODE=1` / `COPILOT_*` / `CODEX_*` / `GEMINI_CLI*` env signals → narrowed to that CLI's root; host undetectable → cross-root union (newest mtime across all four roots).
 - `--summary` is `pull`-only; `fetch --summary` exits 64 because `fetch` retrieves the rendered remote `handoff.md`.
 - `-o <path>` (on `pull`) controls output: `-` forces stdout; `auto` writes to `<repo>/docs/handoffs/<date>-<cli>-<short>.md`; any other string is a literal path.
 - `--since <ISO>` cuts off `list` and `search` (default 30 days for `search`).

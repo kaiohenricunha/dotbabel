@@ -3,7 +3,8 @@
 # Resolves <cli> <identifier> to an absolute JSONL file path.
 # Supports: claude (uuid|short-uuid|latest|customTitle|aiTitle),
 #           copilot (uuid|short-uuid|latest|workspace.yaml:name),
-#           codex (uuid|short-uuid|latest|thread_name).
+#           codex (uuid|short-uuid|latest|thread_name),
+#           gemini (uuid|short-uuid|latest|checkpoint).
 
 bats_require_minimum_version 1.5.0
 
@@ -11,7 +12,7 @@ load helpers
 
 RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
 
-# Build a hermetic $HOME with fake session trees for the three CLIs.
+# Build a hermetic $HOME with fake session trees for the four CLIs.
 # Fixtures are minimal: just enough for path resolution and alias scan.
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"
@@ -57,6 +58,19 @@ setup() {
   printf '{"type":"session_meta","payload":{"id":"ffff6666-6666-6666-6666-666666666666","cwd":"/work"}}\n' \
     > "$CODEX_TWO"
   export CODEX_ONE CODEX_TWO
+
+  # Gemini: ~/.gemini/tmp/<project>/chats/session-<timestamp>-<short>.jsonl
+  mkdir -p "$TEST_HOME/.gemini/tmp/demo/chats"
+  printf '/home/user/projects/demo\n' > "$TEST_HOME/.gemini/tmp/demo/.project_root"
+  GEMINI_ONE="$TEST_HOME/.gemini/tmp/demo/chats/session-2026-05-06T14-11-9999aaaa.jsonl"
+  printf '{"sessionId":"9999aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","projectHash":"h","startTime":"2026-05-06T14:11:01.000Z","lastUpdated":"2026-05-06T14:11:01.000Z","kind":"main"}\n{"type":"user","content":[{"text":"Start Gemini handoff"}]}\n{"type":"info","content":"Conversation checkpoint saved with tag: my-feature."}\n{"type":"gemini","content":"Gemini answer","model":"gemini-2.5-pro"}\n' \
+    > "$GEMINI_ONE"
+  printf '{"authType":"oauth","history":[]}\n' > "$TEST_HOME/.gemini/tmp/demo/checkpoint-my-feature.json"
+  sleep 0.01
+  GEMINI_TWO="$TEST_HOME/.gemini/tmp/demo/chats/session-2026-05-06T15-11-abcd9999.jsonl"
+  printf '{"sessionId":"abcd9999-9999-9999-9999-999999999999","projectHash":"h","startTime":"2026-05-06T15:11:01.000Z","lastUpdated":"2026-05-06T15:11:01.000Z","kind":"main"}\n' \
+    > "$GEMINI_TWO"
+  export GEMINI_ONE GEMINI_TWO
 }
 
 teardown() {
@@ -350,6 +364,64 @@ teardown() {
   [[ "$output" == *"not found"* ]]
 }
 
+# -- gemini ---------------------------------------------------------------
+
+@test "resolve gemini by full UUID" {
+  run --separate-stderr "$RESOLVE" gemini 9999aaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa
+  [ "$status" -eq 0 ]
+  [ "$output" = "$GEMINI_ONE" ]
+  [[ "$stderr" == *"matched-field=uuid"* ]]
+}
+
+@test "resolve gemini by short UUID" {
+  run --separate-stderr "$RESOLVE" gemini 9999aaaa
+  [ "$status" -eq 0 ]
+  [ "$output" = "$GEMINI_ONE" ]
+  [[ "$stderr" == *"matched-field=short-uuid"* ]]
+}
+
+@test "resolve gemini latest picks newest mtime" {
+  run --separate-stderr "$RESOLVE" gemini latest
+  [ "$status" -eq 0 ]
+  [ "$output" = "$GEMINI_TWO" ]
+  [[ "$stderr" == *"matched-field=latest"* ]]
+}
+
+@test "resolve gemini by checkpoint alias" {
+  run --separate-stderr "$RESOLVE" gemini my-feature
+  [ "$status" -eq 0 ]
+  [ "$output" = "$GEMINI_ONE" ]
+  [[ "$stderr" == *"matched-field=checkpoint"* ]]
+  [[ "$stderr" == *"matched-value=my-feature"* ]]
+}
+
+@test "intra-CLI collision: gemini checkpoint shared by 2 projects emits 5-col TSV" {
+  local uuid="bbbb9999-9999-9999-9999-999999999999"
+  local dir="$TEST_HOME/.gemini/tmp/other"
+  mkdir -p "$dir/chats"
+  local path="$dir/chats/session-2026-05-06T16-11-bbbb9999.jsonl"
+  printf '{"sessionId":"%s","projectHash":"h","startTime":"2026-05-06T16:11:01.000Z","kind":"main"}\n{"type":"info","content":"Conversation checkpoint saved with tag: my-feature."}\n' "$uuid" > "$path"
+  printf '{"authType":"oauth","history":[]}\n' > "$dir/checkpoint-my-feature.json"
+
+  run --separate-stderr "$RESOLVE" gemini my-feature
+  [ "$status" -eq 2 ]
+  [ -z "$output" ]
+  [[ "$stderr" == *"multiple sessions match"* ]]
+  [[ "$stderr" == *"$GEMINI_ONE"* ]]
+  [[ "$stderr" == *"$path"* ]]
+  local row_count
+  row_count=$(echo "$stderr" | grep -c $'\t'"checkpoint"$)
+  [ "$row_count" -eq 2 ]
+}
+
+@test "resolve gemini checkpoint without matching session info exits 2" {
+  printf '{"authType":"oauth","history":[]}\n' > "$TEST_HOME/.gemini/tmp/demo/checkpoint-orphan.json"
+
+  run "$RESOLVE" gemini orphan
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"not found"* ]]
+}
+
 # -- usage / error paths --------------------------------------------------
 
 @test "missing cli exits 64 with usage" {
@@ -430,4 +502,12 @@ teardown() {
   [ "$output" = "$TEST_HOME/.copilot/session-state/$uuid/events.jsonl" ]
   [[ "$stderr" == *"matched-field=name"* ]]
   [[ "$stderr" == *"matched-value=Pull Latest Changes"* ]]
+}
+
+@test "case-insensitive: gemini checkpoint resolves on uppercase query" {
+  run --separate-stderr "$RESOLVE" gemini "MY-FEATURE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$GEMINI_ONE" ]
+  [[ "$stderr" == *"matched-field=checkpoint"* ]]
+  [[ "$stderr" == *"matched-value=my-feature"* ]]
 }

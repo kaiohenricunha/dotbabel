@@ -35,7 +35,7 @@ error message is unclear, they bounce.
 
 **Mitigation.** Exit-64 stderr template (per §5.3.3) reads:
 `dotclaude-handoff: push: --from required when no <query> is given` +
-usage block listing `--from claude|copilot|codex`. `docs/handoff-guide.md`
+usage block listing `--from claude|copilot|codex|gemini`. `docs/handoff-guide.md`
 calls this out as the #1 gotcha in the migration section. CHANGELOG entry
 for the major bump (per §6.5) lists `--from` mandatory as its own line.
 

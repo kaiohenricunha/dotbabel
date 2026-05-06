@@ -11,7 +11,7 @@
 #
 # Usage:
 #   handoff-description.sh encode \
-#     --cli <claude|copilot|codex> \
+#     --cli <claude|copilot|codex|gemini> \
 #     --short-id <8 hex chars> \
 #     --project <slug> \
 #     --hostname <slug> \
@@ -97,8 +97,8 @@ cmd_encode() {
   [[ -z "$month" ]] && die "encode requires --month"
 
   case "$cli" in
-    claude|copilot|codex) ;;
-    *) die "--cli must be one of: claude, copilot, codex";;
+    claude|copilot|codex|gemini) ;;
+    *) die "--cli must be one of: claude, copilot, codex, gemini";;
   esac
 
   [[ "$short_id" =~ ^[0-9a-f]{8}$ ]] || die "--short-id must be exactly 8 hex chars"
@@ -142,8 +142,8 @@ decode_v2() {
     && die "malformed v2: missing required segment"
 
   case "$cli" in
-    claude|copilot|codex) ;;
-    *) die "malformed v2: cli not one of claude|copilot|codex ($cli)";;
+    claude|copilot|codex|gemini) ;;
+    *) die "malformed v2: cli not one of claude|copilot|codex|gemini ($cli)";;
   esac
   valid_month "$month" || die "malformed v2: month not YYYY-MM ($month)"
   [[ "$short_id" =~ ^[0-9a-f]{8}$ ]] || die "malformed v2: short-id not 8 hex chars"
@@ -168,8 +168,8 @@ decode_v1() {
     && die "malformed v1: missing required segment"
 
   case "$cli" in
-    claude|copilot|codex) ;;
-    *) die "malformed v1: cli not one of claude|copilot|codex ($cli)";;
+    claude|copilot|codex|gemini) ;;
+    *) die "malformed v1: cli not one of claude|copilot|codex|gemini ($cli)";;
   esac
   [[ "$short_id" =~ ^[0-9a-f]{8}$ ]] || die "malformed v1: short-id not 8 hex chars"
   valid_segment "$project" || die "malformed v1: project slug fails charset"

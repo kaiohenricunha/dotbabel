@@ -6,7 +6,7 @@
 #   handoff-extract.sh prompts <cli> <file>
 #   handoff-extract.sh turns   <cli> <file> [N]
 #
-# cli:   claude | copilot | codex
+# cli:   claude | copilot | codex | gemini
 # file:  absolute path to the session JSONL (from handoff-resolve.sh)
 # N:     optional limit for `turns` (default: 20)
 #
@@ -32,7 +32,7 @@ die_runtime() { printf 'handoff-extract: %s\n' "$1" >&2; exit 2; }
 
 usage() {
   cat <<'EOF' >&2
-usage: handoff-extract.sh <meta|prompts|turns> <claude|copilot|codex> <file> [N]
+usage: handoff-extract.sh <meta|prompts|turns> <claude|copilot|codex|gemini> <file> [N]
 EOF
   exit 64
 }
@@ -296,6 +296,77 @@ turns_codex() {
   ' "$file" 2>/dev/null | tail -n "$tail_arg"
 }
 
+# -- gemini ---------------------------------------------------------------
+
+gemini_short_from_filename() {
+  local file="$1"
+  local base
+  base=$(basename "$file" .jsonl)
+  printf '%s' "$base" | grep -oE '[0-9a-f]{8}$' || true
+}
+
+meta_gemini() {
+  local file="$1"
+  local project_dir cwd="" model="" started_at fallback_short header
+  project_dir=$(dirname "$(dirname "$file")")
+  if [[ -f "${project_dir}/.project_root" ]]; then
+    cwd=$(sed -n '1p' "${project_dir}/.project_root" 2>/dev/null || true)
+  fi
+  model="$(jq -r 'select(.type == "gemini" and (.model // "") != "") | .model' "$file" 2>/dev/null | sed -n '1p' || true)"
+  started_at=$(file_iso_mtime "$file")
+  fallback_short="$(gemini_short_from_filename "$file")"
+  header=$(sed -n '1p' "$file" 2>/dev/null || true)
+
+  printf '%s\n' "$header" | jq -c \
+    --arg cli "gemini" \
+    --arg cwd "$cwd" \
+    --arg model "$model" \
+    --arg started_at "$started_at" \
+    --arg fallback_short "$fallback_short" \
+    '
+    def nn(x): if (x // "") == "" then null else x end;
+    . as $r
+    | ($r.sessionId // "") as $sid
+    | (if ($sid[:8] // "") == "" then $fallback_short else $sid[:8] end) as $short
+    | {
+        cli: $cli,
+        session_id: nn($sid),
+        short_id: nn($short),
+        cwd: nn($cwd),
+        model: nn($model),
+        started_at: nn($r.startTime // $r.lastUpdated // $started_at)
+      }
+    ' 2>/dev/null
+}
+
+prompts_gemini() {
+  local file="$1"
+  jq -c '
+    def content_text:
+      if (.content | type) == "string" then .content
+      elif (.content | type) == "array" then
+        [.content[] | if type == "string" then . elif (.text // "") != "" then .text else empty end]
+        | join("\n")
+      else ""
+      end;
+    select(.type == "user")
+    | content_text
+    | select(length > 0)
+  ' "$file" 2>/dev/null
+}
+
+turns_gemini() {
+  local file="$1"
+  local limit="${2:-20}"
+  local tail_arg="$limit"
+  [[ "$limit" == "0" ]] && tail_arg="+1"
+  jq -c '
+    select(.type == "gemini")
+    | (.content // "")
+    | select(length > 0)
+  ' "$file" 2>/dev/null | awk 'prev != $0 { print; prev = $0 }' | tail -n "$tail_arg"
+}
+
 # -- dispatch -------------------------------------------------------------
 
 main() {
@@ -304,8 +375,8 @@ main() {
   [[ $# -ge 2 ]] || usage
   local cli="$2"
   case "$cli" in
-    claude|copilot|codex) ;;
-    *) die_usage "cli must be one of: claude, copilot, codex (got: $cli)" ;;
+    claude|copilot|codex|gemini) ;;
+    *) die_usage "cli must be one of: claude, copilot, codex, gemini (got: $cli)" ;;
   esac
 
   [[ $# -ge 3 ]] || usage
@@ -319,6 +390,7 @@ main() {
         claude)  meta_claude "$file" ;;
         copilot) meta_copilot "$file" ;;
         codex)   meta_codex "$file" ;;
+        gemini)  meta_gemini "$file" ;;
       esac
       ;;
     prompts)
@@ -326,6 +398,7 @@ main() {
         claude)  prompts_claude "$file" ;;
         copilot) prompts_copilot "$file" ;;
         codex)   prompts_codex "$file" ;;
+        gemini)  prompts_gemini "$file" ;;
       esac
       ;;
     turns)
@@ -333,6 +406,7 @@ main() {
         claude)  turns_claude "$file" "$limit" ;;
         copilot) turns_copilot "$file" "$limit" ;;
         codex)   turns_codex "$file" "$limit" ;;
+        gemini)  turns_gemini "$file" "$limit" ;;
       esac
       ;;
     *)

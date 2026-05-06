@@ -110,7 +110,7 @@ handoff-description: malformed v2: <reason>
 ```
 
 where `<reason>` is one of: `too many colon segments`, `missing required
-segment`, `cli not one of claude|copilot|codex (<got>)`, `month not YYYY-MM
+segment`, `cli not one of claude|copilot|codex|gemini (<got>)`, `month not YYYY-MM
 (<got>)`, `short-id not 8 hex chars`, `<segment> slug fails charset`,
 `tag segment fails charset`. The decoder also accepts v1 legacy input
 (`handoff:v1:<cli>:<short>:<project>:<host>[:<tag>]`) for read-only paths
@@ -186,11 +186,11 @@ per-target variants exist.
 
 ### 5.2.1 `pull <query> [flags]`
 
-| Flag           | Type       | Default | Mandatory when | Notes                                                                                                  |
-| -------------- | ---------- | ------- | -------------- | ------------------------------------------------------------------------------------------------------ |
-| `<query>`      | positional | n/a     | always         | UUID / 8-hex short / `latest` / Claude customTitle / Claude aiTitle / Codex thread_name / Copilot name |
-| `--from <cli>` | string     | (none)  | optional       | narrow to one root; values: `claude` \| `copilot` \| `codex`                                           |
-| `--limit <N>`  | integer    | 20      | optional       | turns extraction tail length                                                                           |
+| Flag           | Type       | Default | Mandatory when | Notes                                                                                                                      |
+| -------------- | ---------- | ------- | -------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `<query>`      | positional | n/a     | always         | UUID / 8-hex short / `latest` / Claude customTitle / Claude aiTitle / Codex thread_name / Copilot name / Gemini checkpoint |
+| `--from <cli>` | string     | (none)  | optional       | narrow to one root; values: `claude` \| `copilot` \| `codex` \| `gemini`                                                   |
+| `--limit <N>`  | integer    | 20      | optional       | turns extraction tail length                                                                                               |
 
 No `--to`. No `--json`. No `--out-dir`. No environment-variable detection.
 
@@ -210,11 +210,11 @@ No `--to`. No env-var detection.
 
 ### 5.2.3 `fetch <query> [flags]`
 
-| Flag           | Type       | Default | Mandatory when | Notes                                                                                     |
-| -------------- | ---------- | ------- | -------------- | ----------------------------------------------------------------------------------------- |
-| `<query>`      | positional | n/a     | always         | tag / 8-hex short / branch-suffix / commit prefix / description substring                 |
-| `--from <cli>` | string     | (none)  | optional       | filter candidates whose `<cli>` segment matches; values: `claude` \| `copilot` \| `codex` |
-| `--limit <N>`  | integer    | 20      | optional       | candidate cap before bailing with "too many candidates, narrow the query"                 |
+| Flag           | Type       | Default | Mandatory when | Notes                                                                                                 |
+| -------------- | ---------- | ------- | -------------- | ----------------------------------------------------------------------------------------------------- |
+| `<query>`      | positional | n/a     | always         | tag / 8-hex short / branch-suffix / commit prefix / description substring                             |
+| `--from <cli>` | string     | (none)  | optional       | filter candidates whose `<cli>` segment matches; values: `claude` \| `copilot` \| `codex` \| `gemini` |
+| `--limit <N>`  | integer    | 20      | optional       | candidate cap before bailing with "too many candidates, narrow the query"                             |
 
 No `--to`. No `--json` (output is the `<handoff>` block, already a structured contract per 5.1.3).
 
@@ -330,22 +330,23 @@ controlled). Alias-form `<matched-value>` is sanitized at emit
 
 Frozen across `pull`, `push`, `fetch`, `describe`:
 
-| Form                       | Lexical                                                        | Notes                                                                                              |
-| -------------------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Full UUID                  | `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` | exact match on session id                                                                          |
-| Short UUID                 | `[0-9a-f]{8}`                                                  | first 8 hex of session id                                                                          |
-| Literal `latest`           | exactly the string `latest`, case-insensitive                  | newest by mtime in target root(s); `latest`/`Latest`/`LATEST` all match                            |
-| Claude `customTitle` alias | non-hex string ≤ 256 chars                                     | scanned via `customTitle` JSONL records (case-insensitive exact match; collisions → 5-col TSV)     |
-| Claude `aiTitle` alias     | non-hex string ≤ 256 chars                                     | scanned via `ai-title` JSONL records (case-insensitive exact match; collisions → 5-col TSV)        |
-| Codex `thread_name` alias  | non-hex string ≤ 256 chars                                     | scanned via `event_msg.thread_name` records (case-insensitive exact match; collisions → 5-col TSV) |
-| Copilot `name` alias       | non-hex string ≤ 256 chars                                     | scanned via `workspace.yaml:name` key (case-insensitive exact match; collisions → 5-col TSV)       |
-| Tag (fetch only)           | `[a-z0-9-]{1,40}`                                              | matches description tag segment                                                                    |
-| Branch suffix (fetch only) | partial branch path                                            | trailing-`/<short>` match against ls-remote                                                        |
-| Commit prefix (fetch only) | `[0-9a-f]{4,40}`                                               | matches commit hash prefix in ls-remote                                                            |
+| Form                       | Lexical                                                        | Notes                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Full UUID                  | `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` | exact match on session id                                                                                                    |
+| Short UUID                 | `[0-9a-f]{8}`                                                  | first 8 hex of session id                                                                                                    |
+| Literal `latest`           | exactly the string `latest`, case-insensitive                  | newest by mtime in target root(s); `latest`/`Latest`/`LATEST` all match                                                      |
+| Claude `customTitle` alias | non-hex string ≤ 256 chars                                     | scanned via `customTitle` JSONL records (case-insensitive exact match; collisions → 5-col TSV)                               |
+| Claude `aiTitle` alias     | non-hex string ≤ 256 chars                                     | scanned via `ai-title` JSONL records (case-insensitive exact match; collisions → 5-col TSV)                                  |
+| Codex `thread_name` alias  | non-hex string ≤ 256 chars                                     | scanned via `event_msg.thread_name` records (case-insensitive exact match; collisions → 5-col TSV)                           |
+| Copilot `name` alias       | non-hex string ≤ 256 chars                                     | scanned via `workspace.yaml:name` key (case-insensitive exact match; collisions → 5-col TSV)                                 |
+| Gemini `checkpoint` alias  | non-hex string ≤ 256 chars                                     | scanned via `checkpoint-<tag>.json` plus matching session info record (case-insensitive exact match; collisions → 5-col TSV) |
+| Tag (fetch only)           | `[a-z0-9-]{1,40}`                                              | matches description tag segment                                                                                              |
+| Branch suffix (fetch only) | partial branch path                                            | trailing-`/<short>` match against ls-remote                                                                                  |
+| Commit prefix (fetch only) | `[0-9a-f]{4,40}`                                               | matches commit hash prefix in ls-remote                                                                                      |
 
 **Resolution precedence** (input-shape-driven): when a query lexically matches multiple forms, precedence is UUID > short-UUID > `latest` > alias. UUID-shaped queries are not consulted as aliases (no fall-through on miss). The `latest` keyword check is case-insensitive (`latest`/`Latest`/`LATEST` all preempt alias matching); a session whose alias case-folds to `latest` remains reachable via UUID or short-UUID.
 
-**`latest` resolution precedence** (`--from` > detected host > cross-root union): when `--from` is omitted, the binary checks environment signals (`CLAUDECODE=1`, any `COPILOT_*`, `CODEX`) to detect the host CLI and narrows to that root. When the host is undetectable, it falls back to cross-root union — the newest session by mtime across all three roots.
+**`latest` resolution precedence** (`--from` > detected host > cross-root union): when `--from` is omitted, the binary checks environment signals (`CLAUDECODE=1`, any `COPILOT_*`, `CODEX_*`, `GEMINI_CLI*`) to detect the host CLI and narrows to that root. When the host is undetectable, it falls back to cross-root union — the newest session by mtime across all four roots.
 
 ## 5.5 SKILL.md auto-trigger contract (testable)
 

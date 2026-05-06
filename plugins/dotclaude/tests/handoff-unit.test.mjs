@@ -45,6 +45,12 @@ describe("cliFromPath", () => {
     expect(cliFromPath("/home/u/.codex/sessions/2026/04/18/rollout-x.jsonl")).toBe("codex");
   });
 
+  it("recognises gemini paths", () => {
+    expect(
+      cliFromPath("/home/u/.gemini/tmp/proj/chats/session-2026-05-06T14-11-9999aaaa.jsonl"),
+    ).toBe("gemini");
+  });
+
   it("falls back to claude for unrecognised paths (documented default)", () => {
     // The function returns "claude" for anything it can't identify. Locked in
     // here so a future refactor does not silently change the default.
@@ -165,7 +171,7 @@ describe("mechanicalSummary", () => {
 
 describe("CLI_LAYOUTS", () => {
   it("exposes root/walk/match triples for each CLI", () => {
-    for (const cli of ["claude", "copilot", "codex"]) {
+    for (const cli of ["claude", "copilot", "codex", "gemini"]) {
       expect(CLI_LAYOUTS[cli]).toBeDefined();
       expect(typeof CLI_LAYOUTS[cli].root).toBe("function");
       expect(typeof CLI_LAYOUTS[cli].walk).toBe("number");
@@ -186,6 +192,13 @@ describe("CLI_LAYOUTS", () => {
     expect(CLI_LAYOUTS.codex.match("rollout-2026-04-18-abc.jsonl")).toBe(true);
     expect(CLI_LAYOUTS.codex.match("events.jsonl")).toBe(false);
     expect(CLI_LAYOUTS.codex.match("rollout.json")).toBe(false);
+  });
+
+  it("gemini.match requires session-*.jsonl", () => {
+    expect(CLI_LAYOUTS.gemini.root("/h")).toBe("/h/.gemini/tmp");
+    expect(CLI_LAYOUTS.gemini.match("session-2026-05-06T14-11-9999aaaa.jsonl")).toBe(true);
+    expect(CLI_LAYOUTS.gemini.match("logs.json")).toBe(false);
+    expect(CLI_LAYOUTS.gemini.match("checkpoint-test.json")).toBe(false);
   });
 });
 
@@ -220,13 +233,24 @@ describe("detectHost", () => {
     expect(detectHost({ COPILOT_SESSION: "1" })).toBe("copilot");
   });
 
-  it("prioritises claude > codex > copilot when multiple signals fire", () => {
+  it("returns 'gemini' on GEMINI_CLI signals", () => {
+    expect(detectHost({ GEMINI_CLI: "1" })).toBe("gemini");
+    expect(detectHost({ GEMINI_CLI_SESSION: "1" })).toBe("gemini");
+  });
+
+  it("prioritises claude > codex > copilot > gemini when multiple signals fire", () => {
     // Probe order is load-bearing: it determines which host "wins"
     // when an operator has env vars for multiple CLIs exported.
     expect(
-      detectHost({ CLAUDECODE: "1", CODEX_HOME: "/x", COPILOT_SESSION: "1" })
+      detectHost({
+        CLAUDECODE: "1",
+        CODEX_HOME: "/x",
+        COPILOT_SESSION: "1",
+        GEMINI_CLI: "1",
+      }),
     ).toBe("claude");
-    expect(detectHost({ CODEX_HOME: "/x", COPILOT_SESSION: "1" })).toBe("codex");
+    expect(detectHost({ CODEX_HOME: "/x", COPILOT_SESSION: "1", GEMINI_CLI: "1" })).toBe("codex");
+    expect(detectHost({ COPILOT_SESSION: "1", GEMINI_CLI: "1" })).toBe("copilot");
   });
 
   it("does not match unrelated env vars starting with CLAUDE", () => {
@@ -242,5 +266,6 @@ describe("detectHost", () => {
     expect(detectHost({ CODEX: "1" })).toBe("unknown");
     expect(detectHost({ CODEXHOME: "/tmp" })).toBe("unknown");
     expect(detectHost({ COPILOT: "1" })).toBe("unknown");
+    expect(detectHost({ GEMINI: "1" })).toBe("unknown");
   });
 });

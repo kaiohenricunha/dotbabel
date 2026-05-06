@@ -33,6 +33,15 @@ setup() {
   [ "$output" = "handoff:v2:example-app:codex:2026-04:1be89762:win-desktop:evening" ]
 }
 
+@test "encode v2: accepts gemini cli" {
+  run "$DESC" encode \
+    --cli gemini --short-id 9999aaaa \
+    --project dotclaude --hostname thinkpad-pop \
+    --month 2026-05 --tag test
+  [ "$status" -eq 0 ]
+  [ "$output" = "handoff:v2:dotclaude:gemini:2026-05:9999aaaa:thinkpad-pop:test" ]
+}
+
 @test "encode v2: slugifies mixed-case project with spaces and punctuation" {
   run "$DESC" encode \
     --cli claude --short-id 3564b8c0 \
@@ -110,6 +119,15 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *'"schema":"v2"'* ]]
   [[ "$output" == *'"tag":"evening"'* ]]
+}
+
+@test "decode v2: accepts gemini cli" {
+  run "$DESC" decode "handoff:v2:dotclaude:gemini:2026-05:9999aaaa:thinkpad-pop:test"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'"schema":"v2"'* ]]
+  [[ "$output" == *'"cli":"gemini"'* ]]
+  [[ "$output" == *'"short_id":"9999aaaa"'* ]]
+  [[ "$output" == *'"tag":"test"'* ]]
 }
 
 @test "decode v2: rejects too few segments" {
