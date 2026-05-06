@@ -1,6 +1,6 @@
-# `@dotclaude/dotclaude`
+# `@dotbabel/dotbabel`
 
-[![npm](https://img.shields.io/npm/v/@dotclaude/dotclaude.svg)](https://www.npmjs.com/package/@dotclaude/dotclaude)
+[![npm](https://img.shields.io/npm/v/@dotbabel/dotbabel.svg)](https://www.npmjs.com/package/@dotbabel/dotbabel)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![changelog](https://img.shields.io/badge/changelog-keep--a--changelog-orange.svg)](./CHANGELOG.md)
 
@@ -38,8 +38,8 @@ Both paths are independent. You can use one or both.
 Just want the skills library, commands, and a global CLAUDE.md? Three lines:
 
 ```bash
-git clone https://github.com/kaiohenricunha/dotclaude.git ~/projects/dotclaude
-cd ~/projects/dotclaude
+git clone https://github.com/kaiohenricunha/dotbabel.git ~/projects/dotbabel
+cd ~/projects/dotbabel
 ./bootstrap.sh          # symlinks commands/ + skills/ + CLAUDE.md into ~/.claude/
 ```
 
@@ -54,15 +54,15 @@ Claude Code session. To stay current:
 If you have the CLI installed, you can use it instead of the shell scripts:
 
 ```bash
-dotclaude bootstrap             # same as ./bootstrap.sh
-dotclaude sync pull             # same as ./sync.sh pull
-dotclaude sync push             # same as ./sync.sh push
-dotclaude sync status           # show installed vs latest version
+dotbabel bootstrap             # same as ./bootstrap.sh
+dotbabel sync pull             # same as ./sync.sh pull
+dotbabel sync push             # same as ./sync.sh push
+dotbabel sync status           # show installed vs latest version
 ```
 
 Both `bootstrap` and `sync` support `--source <path>` (clone mode) or default
-to the npm package installation (npm mode). Run `dotclaude bootstrap --help`
-or `dotclaude sync --help` for full options.
+to the npm package installation (npm mode). Run `dotbabel bootstrap --help`
+or `dotbabel sync --help` for full options.
 
 ### What you get
 
@@ -78,15 +78,15 @@ The bootstrap wires the authored library into every Claude Code session:
 
 Do not treat this README as the catalog. The source-of-truth inventory is
 generated from artifact frontmatter under [`index/`](index/), checked in CI
-with `dotclaude index --check`, and explained in
+with `dotbabel index --check`, and explained in
 [`docs/taxonomy.md`](docs/taxonomy.md).
 
 ```bash
-dotclaude list --type skill
-dotclaude list --type command
-dotclaude search handoff
-dotclaude show handoff --type skill
-dotclaude index --check
+dotbabel list --type skill
+dotbabel list --type command
+dotbabel search handoff
+dotbabel show handoff --type skill
+dotbabel index --check
 ```
 
 See [CLAUDE.md](./CLAUDE.md) for the global rules this installs.
@@ -132,45 +132,45 @@ programmatic validation, and optional spec-governance gates? Install it:
 
 ```bash
 # One-liner (requires Node ≥ 20)
-curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotclaude/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | bash
 ```
 
 Or install manually:
 
 ```bash
-# Global — use dotclaude anywhere
-npm install -g @dotclaude/dotclaude
+# Global — use dotbabel anywhere
+npm install -g @dotbabel/dotbabel
 
 # Per-project — pin it to a repo (useful for CI)
-npm install -D @dotclaude/dotclaude
+npm install -D @dotbabel/dotbabel
 ```
 
-The one-liner installs the package globally and runs `dotclaude bootstrap` to
+The one-liner installs the package globally and runs `dotbabel bootstrap` to
 wire `~/.claude/` automatically. To pin a version or skip the bootstrap step:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotclaude/main/install.sh | DOTCLAUDE_VERSION=0.4.0 bash
-curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotclaude/main/install.sh | DOTCLAUDE_SKIP_BOOTSTRAP=1 bash
+curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | DOTCLAUDE_VERSION=0.4.0 bash
+curl -fsSL https://raw.githubusercontent.com/kaiohenricunha/dotbabel/main/install.sh | DOTCLAUDE_SKIP_BOOTSTRAP=1 bash
 ```
 
 Then use the umbrella dispatcher or standalone bins interchangeably:
 
 ```bash
-dotclaude bootstrap                # set up (or refresh) ~/.claude/ — symlinks commands, skills, CLAUDE.md
-dotclaude sync pull                # pull latest dotclaude version and re-bootstrap
-dotclaude sync push                # secret-scan staged files, commit, and push (clone mode)
-dotclaude sync status              # show installed vs latest version / git status
-dotclaude doctor                   # self-diagnostic: env, facts, manifest, specs, bootstrap
-dotclaude validate-skills          # verify skills manifest checksums + DAG
-dotclaude validate-specs           # audit spec contracts + dependency cycles
-dotclaude check-spec-coverage      # PR gate: protected paths must be spec-backed
-dotclaude check-instruction-drift  # detect stale CLAUDE.md / README entries
-dotclaude detect-drift             # flag commands diverged from origin/main 14+ days
-dotclaude init                     # scaffold specs, hooks, manifest into a repo
+dotbabel bootstrap                # set up (or refresh) ~/.claude/ — symlinks commands, skills, CLAUDE.md
+dotbabel sync pull                # pull latest dotbabel version and re-bootstrap
+dotbabel sync push                # secret-scan staged files, commit, and push (clone mode)
+dotbabel sync status              # show installed vs latest version / git status
+dotbabel doctor                   # self-diagnostic: env, facts, manifest, specs, bootstrap
+dotbabel validate-skills          # verify skills manifest checksums + DAG
+dotbabel validate-specs           # audit spec contracts + dependency cycles
+dotbabel check-spec-coverage      # PR gate: protected paths must be spec-backed
+dotbabel check-instruction-drift  # detect stale CLAUDE.md / README entries
+dotbabel detect-drift             # flag commands diverged from origin/main 14+ days
+dotbabel init                     # scaffold specs, hooks, manifest into a repo
 ```
 
-Every subcommand also works as a standalone bin — `npx dotclaude-doctor`,
-`npx dotclaude-validate-specs`, etc. All support `--help`, `--version`,
+Every subcommand also works as a standalone bin — `npx dotbabel-doctor`,
+`npx dotbabel-validate-specs`, etc. All support `--help`, `--version`,
 `--json`, `--verbose`, `--no-color`.
 
 Five-minute walkthrough: [docs/quickstart.md](./docs/quickstart.md).
@@ -178,9 +178,9 @@ Five-minute walkthrough: [docs/quickstart.md](./docs/quickstart.md).
 ### Scaffold a repo
 
 ```bash
-npx dotclaude-init --project-name my-project --project-type node
-npx dotclaude-doctor          # verify everything wired up
-npx dotclaude-validate-specs  # run first governance check
+npx dotbabel-init --project-name my-project --project-type node
+npx dotbabel-doctor          # verify everything wired up
+npx dotbabel-validate-specs  # run first governance check
 ```
 
 ### Node API
@@ -196,7 +196,7 @@ import {
   ValidationError,
   ERROR_CODES,
   EXIT_CODES,
-} from "@dotclaude/dotclaude";
+} from "@dotbabel/dotbabel";
 
 const ctx = createHarnessContext(); // resolves repo root via git
 const { ok, errors } = validateSpecs(ctx); // errors are ValidationError instances
@@ -240,9 +240,9 @@ Each row links to its ADR (see [docs/adr/](./docs/adr/)):
 | CLI ✓/✗/⚠ output format                  | [0014](./docs/adr/0014-cli-tick-cross-warn-format.md)   |
 
 Shell-level hardening ([SEC-1..4, OPS-1..2](./docs/cli-reference.md#hardening-contract)) is enforced at
-[`plugins/dotclaude/scripts/validate-settings.sh`](./plugins/dotclaude/scripts/validate-settings.sh);
+[`plugins/dotbabel/scripts/validate-settings.sh`](./plugins/dotbabel/scripts/validate-settings.sh);
 its 12-case behavioral suite at
-[`plugins/dotclaude/tests/test_validate_settings.sh`](./plugins/dotclaude/tests/test_validate_settings.sh)
+[`plugins/dotbabel/tests/test_validate_settings.sh`](./plugins/dotbabel/tests/test_validate_settings.sh)
 pins every contract.
 
 ---
