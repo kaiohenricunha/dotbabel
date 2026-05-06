@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# End-to-end: `dotclaude handoff push` must refuse to clobber a remote
+# End-to-end: `dotbabel handoff push` must refuse to clobber a remote
 # branch whose `metadata.session_id` does not match the local session's.
 # Issue #90 Gap 3 — force-push collision guardrail.
 #
@@ -11,7 +11,7 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 # Emits the short-ref name of the session's pushed branch, or empty if none.
 handoff_branch_for() {
@@ -46,7 +46,7 @@ setup() {
   seed_claude_session "$UUID_B" >/dev/null
 
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
   export TEST_HOME CLAUDE_DIR TRANSPORT_REPO UUID_A UUID_B
 }
 

@@ -1,20 +1,20 @@
 #!/usr/bin/env bats
-# Behavior tests for the public surface of dotclaude-handoff.mjs (#87):
+# Behavior tests for the public surface of dotbabel-handoff.mjs (#87):
 #
-#   dotclaude handoff pull  [<id>] [--summary] [-o <path>] [--from <cli>]
-#   dotclaude handoff fetch [<query>] [--from <cli>] [--verify]
-#   dotclaude handoff push  [<query>] [--tag]
-#   dotclaude handoff list
+#   dotbabel handoff pull  [<id>] [--summary] [-o <path>] [--from <cli>]
+#   dotbabel handoff fetch [<query>] [--from <cli>] [--verify]
+#   dotbabel handoff push  [<query>] [--tag]
+#   dotbabel handoff list
 #
 # Transport for push/fetch tests: a local bare repo named by
-# DOTCLAUDE_HANDOFF_REPO. The git transport is the only remote
+# DOTBABEL_HANDOFF_REPO. The git transport is the only remote
 # transport since v0.9.0; no GitHub auth required.
 
 load helpers
 
 bats_require_minimum_version 1.5.0
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
@@ -54,7 +54,7 @@ EOF
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   export CLAUDE_FILE COPILOT_FILE CODEX_FILE TRANSPORT_REPO
 }
@@ -264,14 +264,14 @@ teardown() {
 
 # -- pull: no-match hint for remote handoffs (#87) ------------------------
 
-@test "pull <unmatched> with DOTCLAUDE_HANDOFF_REPO set appends fetch hint" {
+@test "pull <unmatched> with DOTBABEL_HANDOFF_REPO set appends fetch hint" {
   run --separate-stderr node "$BIN" pull nonexistent-tag
   [ "$status" -eq 2 ]
-  # DOTCLAUDE_HANDOFF_REPO is set in setup(); hint must surface.
+  # DOTBABEL_HANDOFF_REPO is set in setup(); hint must surface.
   [[ "$stderr" == *"fetch"* ]]
 }
 
-@test "pull <unmatched> without DOTCLAUDE_HANDOFF_REPO emits no fetch hint" {
+@test "pull <unmatched> without DOTBABEL_HANDOFF_REPO emits no fetch hint" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     node "$BIN" pull nonexistent-tag
   [ "$status" -eq 2 ]
@@ -387,7 +387,7 @@ teardown() {
 # -- --from flag ----------------------------------------------------------
 
 @test "push --from codex (no query) narrows the fallback to the codex root" {
-  run env -i HOME="$TEST_HOME" PATH="$PATH" DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
+  run env -i HOME="$TEST_HOME" PATH="$PATH" DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO" \
     node "$BIN" push --from codex
   [ "$status" -eq 0 ]
   run git --git-dir="$TRANSPORT_REPO" branch -a
@@ -431,7 +431,7 @@ teardown() {
 
 @test "push --from codex beats CLAUDECODE=1 (override precedence)" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
-    DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
+    DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
     node "$BIN" push --from codex
   [ "$status" -eq 0 ]
   [[ "$stderr" == *"using --from codex override"* ]]
@@ -443,7 +443,7 @@ teardown() {
 
 @test "push (no args, no host signal) exits 64 — §5.5.2 mandatory --from" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
-    DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" \
+    DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO" \
     node "$BIN" push
   [ "$status" -eq 64 ]
   [[ "$stderr" == *"requires --from"* ]]
@@ -451,7 +451,7 @@ teardown() {
 
 @test "push (no args, CLAUDECODE=1) exits 64 — §5.5.2 mandatory --from" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
-    DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
+    DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO" CLAUDECODE=1 \
     node "$BIN" push
   [ "$status" -eq 64 ]
   [[ "$stderr" == *"requires --from"* ]]

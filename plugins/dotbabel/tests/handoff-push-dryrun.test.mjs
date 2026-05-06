@@ -57,16 +57,16 @@ function queueDryRunSpawns({ sessionId = "abc12345-aaaa-bbbb-cccc-000000000001" 
 describe("pushRemote({ dryRun: true })", () => {
   let origRepo;
   beforeEach(() => {
-    origRepo = process.env.DOTCLAUDE_HANDOFF_REPO;
+    origRepo = process.env.DOTBABEL_HANDOFF_REPO;
     spawnSync.mockReset();
   });
   afterEach(() => {
-    if (origRepo === undefined) delete process.env.DOTCLAUDE_HANDOFF_REPO;
-    else process.env.DOTCLAUDE_HANDOFF_REPO = origRepo;
+    if (origRepo === undefined) delete process.env.DOTBABEL_HANDOFF_REPO;
+    else process.env.DOTBABEL_HANDOFF_REPO = origRepo;
   });
 
   it("returns the dry-run result shape without any git push", async () => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "git@example.com:me/store.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "git@example.com:me/store.git";
     queueDryRunSpawns();
 
     const result = await lib.pushRemote({
@@ -92,8 +92,8 @@ describe("pushRemote({ dryRun: true })", () => {
     expect(pushCalls).toHaveLength(0);
   });
 
-  it("throws HandoffError (stage=preflight) when DOTCLAUDE_HANDOFF_REPO is unset", async () => {
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+  it("throws HandoffError (stage=preflight) when DOTBABEL_HANDOFF_REPO is unset", async () => {
+    delete process.env.DOTBABEL_HANDOFF_REPO;
 
     await expect(
       lib.pushRemote({ cli: "claude", path: "/fake/session.jsonl", dryRun: true }),

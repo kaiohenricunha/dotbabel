@@ -30,7 +30,7 @@ function git(args, cwd) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-describe("end-to-end: dotclaude-init + every validator green", () => {
+describe("end-to-end: dotbabel-init + every validator green", () => {
   it("scaffolds a fresh repo and runs each validator to exit 0", () => {
     const target = mkdtempSync(path.join(tmpdir(), "e2e-scaffold-"));
 
@@ -59,8 +59,8 @@ describe("end-to-end: dotclaude-init + every validator green", () => {
     git(["add", "."], target);
     git(["commit", "-q", "-m", "seed"], target);
 
-    // 2. dotclaude-init
-    const init = runBin("dotclaude-init", [
+    // 2. dotbabel-init
+    const init = runBin("dotbabel-init", [
       "--project-name",
       "e2e",
       "--project-type",
@@ -75,14 +75,14 @@ describe("end-to-end: dotclaude-init + every validator green", () => {
     expect(existsSync(path.join(target, "docs/specs/README.md"))).toBe(true);
     expect(existsSync(path.join(target, "docs/repo-facts.json"))).toBe(true);
 
-    const env = { ...process.env, DOTCLAUDE_REPO_ROOT: target };
+    const env = { ...process.env, DOTBABEL_REPO_ROOT: target };
 
     // 3. Every validator exits 0 (skills, specs — drift depends on facts
     // content matching CLAUDE.md, skipped here to keep the test hermetic).
-    const skills = runBin("dotclaude-validate-skills", [], { env });
+    const skills = runBin("dotbabel-validate-skills", [], { env });
     expect(skills.rc, skills.stderr ?? "").toBe(0);
 
-    const specs = runBin("dotclaude-validate-specs", [], { env });
+    const specs = runBin("dotbabel-validate-specs", [], { env });
     // The scaffolder commits no specs — validateSpecs returns ok for an empty
     // docs/specs/ (listSpecDirs iterates whatever sub-dirs exist, and the
     // template only ships a README).

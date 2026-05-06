@@ -33,7 +33,7 @@ describe("pushRemote wires autoPreflight", () => {
     autoPreflight.mockImplementation(() => {
       throw new Error("__preflight_short_circuit__");
     });
-    process.env.DOTCLAUDE_HANDOFF_REPO = REPO_URL;
+    process.env.DOTBABEL_HANDOFF_REPO = REPO_URL;
     exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`__exit__${code}`);
     });
@@ -43,7 +43,7 @@ describe("pushRemote wires autoPreflight", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("calls autoPreflight with the resolved repo URL before any transport I/O", async () => {
@@ -83,7 +83,7 @@ describe("pullRemote wires autoPreflight", () => {
     autoPreflight.mockImplementation(() => {
       throw new Error("__preflight_short_circuit__");
     });
-    process.env.DOTCLAUDE_HANDOFF_REPO = REPO_URL;
+    process.env.DOTBABEL_HANDOFF_REPO = REPO_URL;
     exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`__exit__${code}`);
     });
@@ -93,7 +93,7 @@ describe("pullRemote wires autoPreflight", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("calls autoPreflight with the resolved repo URL before listing candidates", async () => {

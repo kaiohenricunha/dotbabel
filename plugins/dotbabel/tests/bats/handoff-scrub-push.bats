@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# End-to-end: `dotclaude handoff push` must scrub the digest before writing
+# End-to-end: `dotbabel handoff push` must scrub the digest before writing
 # it to the remote. Ensures parity with the skill-driven github path, which
 # has always scrubbed via handoff-scrub.sh. Issue #90 Gap 1.
 #
@@ -7,8 +7,8 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
-SCRUB="$REPO_ROOT/plugins/dotclaude/scripts/handoff-scrub.sh"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
+SCRUB="$REPO_ROOT/plugins/dotbabel/scripts/handoff-scrub.sh"
 BAIT_GH_TOKEN="ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456"
 
 # Emits the short-ref name of the session's pushed branch, or empty if none.
@@ -45,7 +45,7 @@ setup() {
 EOF
 
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
   export CLAUDE_UUID CLAUDE_FILE TRANSPORT_REPO BAIT_GH_TOKEN
 }
 

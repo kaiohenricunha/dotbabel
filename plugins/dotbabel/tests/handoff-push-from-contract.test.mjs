@@ -6,7 +6,7 @@
 //   - `push <query>` without --from is accepted (explicit query exempts the rule)
 //   - unknown flag exits 64 (§5.3.1)
 //
-// Hermetic env: DOTCLAUDE_HANDOFF_REPO pointing at a non-existent path.
+// Hermetic env: DOTBABEL_HANDOFF_REPO pointing at a non-existent path.
 // The argv rejection (exit 64) happens before any transport touch; positive
 // cases exit non-64 on a transport/session-lookup error, which is a different
 // path from argv rejection.
@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
-const HANDOFF_BIN = resolve(repoRoot, "plugins/dotclaude/bin/dotclaude-handoff.mjs");
+const HANDOFF_BIN = resolve(repoRoot, "plugins/dotbabel/bin/dotbabel-handoff.mjs");
 
 function runHandoff(args, hermeticHome) {
   const result = spawnSync(process.execPath, [HANDOFF_BIN, ...args], {
@@ -29,8 +29,8 @@ function runHandoff(args, hermeticHome) {
       ...process.env,
       HOME: hermeticHome,
       XDG_CONFIG_HOME: hermeticHome,
-      DOTCLAUDE_HANDOFF_REPO: "/nonexistent/handoff-push-from-contract",
-      DOTCLAUDE_QUIET: "1",
+      DOTBABEL_HANDOFF_REPO: "/nonexistent/handoff-push-from-contract",
+      DOTBABEL_QUIET: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

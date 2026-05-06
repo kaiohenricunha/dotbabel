@@ -1,6 +1,6 @@
 #!/usr/bin/env bats
 # vocabulary-denylist.bats — ensure no project-specific vocabulary from
-# the dotclaude maintainer's private projects leaks into the generic
+# the dotbabel maintainer's private projects leaks into the generic
 # bootstrap surface or scaffolding templates.
 #
 # Denylist — strings with zero legitimate generic use here:
@@ -54,27 +54,27 @@ DENYLIST_OPTS=(
 @test "scaffolding templates contain no project-specific vocabulary" {
   run grep -rni "${DENYLIST_OPTS[@]}" \
     --include="*.md" --include="*.json" --include="*.sh" \
-    "$REPO_ROOT/plugins/dotclaude/templates/"
+    "$REPO_ROOT/plugins/dotbabel/templates/"
   [ "$status" -eq 1 ]
 }
 
 @test "plugin source mjs files contain no project-specific vocabulary" {
   run grep -rni "${DENYLIST_OPTS[@]}" \
     --include="*.mjs" \
-    "$REPO_ROOT/plugins/dotclaude/src/"
+    "$REPO_ROOT/plugins/dotbabel/src/"
   [ "$status" -eq 1 ]
 }
 
 @test "plugin bin files contain no project-specific vocabulary" {
   run grep -rni "${DENYLIST_OPTS[@]}" \
     --include="*.mjs" --include="*.sh" \
-    "$REPO_ROOT/plugins/dotclaude/bin/"
+    "$REPO_ROOT/plugins/dotbabel/bin/"
   [ "$status" -eq 1 ]
 }
 
 @test "plugin scripts contain no project-specific vocabulary" {
   run grep -rni "${DENYLIST_OPTS[@]}" \
     --include="*.sh" --include="*.mjs" \
-    "$REPO_ROOT/plugins/dotclaude/scripts/"
+    "$REPO_ROOT/plugins/dotbabel/scripts/"
   [ "$status" -eq 1 ]
 }

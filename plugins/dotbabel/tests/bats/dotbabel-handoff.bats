@@ -1,14 +1,14 @@
 #!/usr/bin/env bats
-# Tests for dotclaude-handoff.mjs: the canonical `pull` verb (--summary, -o,
+# Tests for dotbabel-handoff.mjs: the canonical `pull` verb (--summary, -o,
 # --json). `pull` collapses the old four-form local surface under one verb (#87).
 #
-# Remote transport tests (push/fetch/list) live in dotclaude-handoff-five-form.bats.
+# Remote transport tests (push/fetch/list) live in dotbabel-handoff-five-form.bats.
 
 load helpers
 
 bats_require_minimum_version 1.5.0
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
@@ -49,7 +49,7 @@ teardown() {
   [[ "$output" == *"list"* ]]
 }
 
-@test "bare dotclaude-handoff prints usage and exits 0 (no push)" {
+@test "bare dotbabel-handoff prints usage and exits 0 (no push)" {
   run node "$BIN"
   [ "$status" -eq 0 ]
   [[ "$output" == *"push"* ]]
@@ -58,7 +58,7 @@ teardown() {
   # Guardrail: a successful push would emit `[scrubbed N secrets]` and
   # a `handoff/<cli>/...` branch name. Neither may appear.
   [[ "$output" != *"scrubbed"* ]]
-  [[ "$output" != *"handoff/dotclaude/"* ]]
+  [[ "$output" != *"handoff/dotbabel/"* ]]
 }
 
 # -- canonical `pull` verb --------------------------------------------------
@@ -124,14 +124,14 @@ teardown() {
   grep -q 'Fix the retry loop' "$output"
 }
 
-@test "pull <unmatched> with DOTCLAUDE_HANDOFF_REPO set appends fetch hint" {
-  run --separate-stderr env HOME="$TEST_HOME" DOTCLAUDE_HANDOFF_REPO="/tmp/fake-repo" \
+@test "pull <unmatched> with DOTBABEL_HANDOFF_REPO set appends fetch hint" {
+  run --separate-stderr env HOME="$TEST_HOME" DOTBABEL_HANDOFF_REPO="/tmp/fake-repo" \
     node "$BIN" pull nonexistent-xyz
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"fetch"* ]]
 }
 
-@test "pull <unmatched> without DOTCLAUDE_HANDOFF_REPO emits no fetch hint" {
+@test "pull <unmatched> without DOTBABEL_HANDOFF_REPO emits no fetch hint" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" \
     node "$BIN" pull nonexistent-xyz
   [ "$status" -eq 2 ]

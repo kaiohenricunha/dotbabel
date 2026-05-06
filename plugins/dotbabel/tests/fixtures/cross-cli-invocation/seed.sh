@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Seed deterministic per-CLI session trees for the cross-CLI invocation
 # symmetry harness. Mirrors the F-2 fixture pattern from
-# plugins/dotclaude/tests/bats/handoff-pull-local-emit.bats but locks every
+# plugins/dotbabel/tests/bats/handoff-pull-local-emit.bats but locks every
 # input that influences the rendered <handoff> / --summary output:
 #
 #   - JSONL contents (cwd, sessionId)
@@ -10,9 +10,9 @@
 # Usage:
 #   seed.sh <target-home>
 #
-# Seeding only requires <target-home>. For the LATER `dotclaude handoff pull`
+# Seeding only requires <target-home>. For the LATER `dotbabel handoff pull`
 # invocation against the seeded tree, the caller should export
-# DOTCLAUDE_HANDOFF_REPO=/nonexistent and DOTCLAUDE_QUIET=1 so pull stays
+# DOTBABEL_HANDOFF_REPO=/nonexistent and DOTBABEL_QUIET=1 so pull stays
 # local-only and quiet — but those vars are not consumed by this script.
 set -euo pipefail
 

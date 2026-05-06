@@ -88,7 +88,7 @@ describe("classifyGitError", () => {
   });
 
   it("transport not configured → stage preflight", () => {
-    const e = classifyGitError("DOTCLAUDE_HANDOFF_REPO is not set — run ...", "push", {});
+    const e = classifyGitError("DOTBABEL_HANDOFF_REPO is not set — run ...", "push", {});
     expect(e.stage).toBe("preflight");
     expect(e.cause).toMatch(/transport not configured/i);
   });
@@ -138,14 +138,14 @@ describe("formatHandoffError", () => {
       stage: "upload",
       cause: "SSH key not configured",
       fix: "Add your SSH key",
-      retry: "dotclaude handoff push",
+      retry: "dotbabel handoff push",
     });
     const out = formatHandoffError(e, "push");
-    expect(out).toContain("dotclaude-handoff: push failed");
+    expect(out).toContain("dotbabel-handoff: push failed");
     expect(out).toContain("stage:  upload");
     expect(out).toContain("cause:  SSH key not configured");
     expect(out).toContain("fix:    Add your SSH key");
-    expect(out).toContain("retry:  dotclaude handoff push");
+    expect(out).toContain("retry:  dotbabel handoff push");
   });
 
   it("collapses embedded newlines in cause to a single space", () => {
@@ -153,7 +153,7 @@ describe("formatHandoffError", () => {
       stage: "upload",
       cause: "line1\nline2\nline3",
       fix: "check it",
-      retry: "dotclaude handoff push",
+      retry: "dotbabel handoff push",
     });
     const out = formatHandoffError(e, "push");
     expect(out).toContain("cause:  line1 line2 line3");

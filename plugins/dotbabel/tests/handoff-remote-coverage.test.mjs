@@ -420,7 +420,7 @@ describe("printManualSetupBlock", () => {
     lib.printManualSetupBlock("no tty");
     const out = spy.mock.calls.map((c) => c[0]).join("");
     expect(out).toContain("no tty");
-    expect(out).toContain("DOTCLAUDE_HANDOFF_REPO");
+    expect(out).toContain("DOTBABEL_HANDOFF_REPO");
     spy.mockRestore();
   });
 });
@@ -429,7 +429,7 @@ describe("printManualSetupBlock", () => {
 
 describe("loadPersistedEnv", () => {
   afterEach(() => {
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("does nothing when config file does not exist", () => {
@@ -439,43 +439,43 @@ describe("loadPersistedEnv", () => {
 
   it("sets env vars from file content (quoted)", () => {
     existsSync.mockReturnValueOnce(true);
-    readFileSync.mockReturnValueOnce('export DOTCLAUDE_HANDOFF_REPO="git@github.com:x/y.git"\n');
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    readFileSync.mockReturnValueOnce('export DOTBABEL_HANDOFF_REPO="git@github.com:x/y.git"\n');
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("git@github.com:x/y.git");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("git@github.com:x/y.git");
   });
 
   it("sets env vars from file content (bare value)", () => {
     existsSync.mockReturnValueOnce(true);
-    readFileSync.mockReturnValueOnce("DOTCLAUDE_HANDOFF_REPO=https://example.com/x.git\n");
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    readFileSync.mockReturnValueOnce("DOTBABEL_HANDOFF_REPO=https://example.com/x.git\n");
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("https://example.com/x.git");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("https://example.com/x.git");
   });
 
   it("skips comment lines and blank lines", () => {
     existsSync.mockReturnValueOnce(true);
-    readFileSync.mockReturnValueOnce("# comment\n\nDOTCLAUDE_HANDOFF_REPO=val\n");
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    readFileSync.mockReturnValueOnce("# comment\n\nDOTBABEL_HANDOFF_REPO=val\n");
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("val");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("val");
   });
 
   it("does not overwrite an already-set env var", () => {
     existsSync.mockReturnValueOnce(true);
-    readFileSync.mockReturnValueOnce("DOTCLAUDE_HANDOFF_REPO=new-val\n");
-    process.env.DOTCLAUDE_HANDOFF_REPO = "existing";
+    readFileSync.mockReturnValueOnce("DOTBABEL_HANDOFF_REPO=new-val\n");
+    process.env.DOTBABEL_HANDOFF_REPO = "existing";
     lib.loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("existing");
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("existing");
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("strips single-quoted values", () => {
     existsSync.mockReturnValueOnce(true);
-    readFileSync.mockReturnValueOnce("DOTCLAUDE_HANDOFF_REPO='git@github.com:x/y.git'\n");
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    readFileSync.mockReturnValueOnce("DOTBABEL_HANDOFF_REPO='git@github.com:x/y.git'\n");
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("git@github.com:x/y.git");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("git@github.com:x/y.git");
   });
 
   it("swallows a readFileSync error silently", () => {
@@ -488,10 +488,10 @@ describe("loadPersistedEnv", () => {
 
   it("skips lines that do not match the VAR=VAL pattern", () => {
     existsSync.mockReturnValueOnce(true);
-    readFileSync.mockReturnValueOnce("not-valid-line\nDOTCLAUDE_HANDOFF_REPO=good-val\n");
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    readFileSync.mockReturnValueOnce("not-valid-line\nDOTBABEL_HANDOFF_REPO=good-val\n");
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("good-val");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("good-val");
   });
 
   it("uses XDG_CONFIG_HOME when set", () => {
@@ -545,16 +545,16 @@ describe("requireTransportRepoStrict", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("returns the URL when env var is set", () => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "https://github.com/x/y.git";
     expect(lib.requireTransportRepoStrict()).toBe("https://github.com/x/y.git");
   });
 
   it("throws HandoffError when env var is absent", () => {
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     expect(() => lib.requireTransportRepoStrict()).toThrow(HandoffError);
   });
 });
@@ -591,14 +591,14 @@ describe("listRemoteCandidates", () => {
   let stderrSpy;
 
   beforeEach(() => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "https://github.com/x/y.git";
     exitSpy = mockExit();
     stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
   });
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("returns parsed candidates from ls-remote output", () => {
@@ -642,14 +642,14 @@ describe("fetchRemoteBranch", () => {
   let stderrSpy;
 
   beforeEach(() => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "https://github.com/x/y.git";
     exitSpy = mockExit();
     stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
   });
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     vi.clearAllMocks();
   });
 
@@ -700,7 +700,7 @@ describe("enrichWithDescriptions", () => {
   let stderrSpy;
 
   beforeEach(() => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "https://github.com/x/y.git";
     exitSpy = mockExit();
     stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     vi.clearAllMocks();
@@ -708,7 +708,7 @@ describe("enrichWithDescriptions", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("enriches candidates with descriptions from fetchRemoteBranch", () => {
@@ -785,7 +785,7 @@ describe("pullRemote", () => {
 
   beforeEach(() => {
     resetMockQueues();
-    process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "https://github.com/x/y.git";
     exitSpy = mockExit();
     stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
     primePreflightCacheHit();
@@ -793,7 +793,7 @@ describe("pullRemote", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("returns the single candidate when query is null (sort short-circuits on N=1)", async () => {
@@ -1122,14 +1122,14 @@ describe("listPruneCandidates", () => {
   const REPO = "git@example.test:me/store.git";
   let origRepo;
   beforeEach(() => {
-    origRepo = process.env.DOTCLAUDE_HANDOFF_REPO;
-    process.env.DOTCLAUDE_HANDOFF_REPO = REPO;
+    origRepo = process.env.DOTBABEL_HANDOFF_REPO;
+    process.env.DOTBABEL_HANDOFF_REPO = REPO;
     spawnSync.mockReset();
     mkdtempSync.mockReset().mockReturnValue("/tmp/mock-prune");
   });
   afterEach(() => {
-    if (origRepo === undefined) delete process.env.DOTCLAUDE_HANDOFF_REPO;
-    else process.env.DOTCLAUDE_HANDOFF_REPO = origRepo;
+    if (origRepo === undefined) delete process.env.DOTBABEL_HANDOFF_REPO;
+    else process.env.DOTBABEL_HANDOFF_REPO = origRepo;
   });
 
   // Drive the spawnSync mock through:
@@ -1340,10 +1340,10 @@ describe("deleteRemoteBranches", () => {
     spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // init
     const stdout = [
       "To github.com:owner/repo.git",
-      "-\t:refs/heads/handoff/dotclaude/claude/2026-04/98d26b79\t[deleted]",
-      "-\t:refs/heads/handoff/dotclaude/claude/2026-05/00837a18\t[deleted]",
+      "-\t:refs/heads/handoff/dotbabel/claude/2026-04/98d26b79\t[deleted]",
+      "-\t:refs/heads/handoff/dotbabel/claude/2026-05/00837a18\t[deleted]",
       "-\t:refs/heads/handoff/squadranks/claude/2026-05/d6243fc6\t[deleted]",
-      "!\t:refs/heads/handoff/dotclaude/claude/2026-04/3668f1d7\t[remote rejected] (refusing to delete the current branch: refs/heads/handoff/dotclaude/claude/2026-04/3668f1d7)",
+      "!\t:refs/heads/handoff/dotbabel/claude/2026-04/3668f1d7\t[remote rejected] (refusing to delete the current branch: refs/heads/handoff/dotbabel/claude/2026-04/3668f1d7)",
       "Done",
     ].join("\n");
     spawnSync.mockReturnValueOnce({
@@ -1352,18 +1352,18 @@ describe("deleteRemoteBranches", () => {
       stderr: "error: failed to push some refs to 'github.com:owner/repo.git'",
     });
     const r = lib.deleteRemoteBranches("https://x.test/repo.git", [
-      "handoff/dotclaude/claude/2026-04/3668f1d7",
-      "handoff/dotclaude/claude/2026-04/98d26b79",
-      "handoff/dotclaude/claude/2026-05/00837a18",
+      "handoff/dotbabel/claude/2026-04/3668f1d7",
+      "handoff/dotbabel/claude/2026-04/98d26b79",
+      "handoff/dotbabel/claude/2026-05/00837a18",
       "handoff/squadranks/claude/2026-05/d6243fc6",
     ]);
     expect(r.deleted.sort()).toEqual([
-      "handoff/dotclaude/claude/2026-04/98d26b79",
-      "handoff/dotclaude/claude/2026-05/00837a18",
+      "handoff/dotbabel/claude/2026-04/98d26b79",
+      "handoff/dotbabel/claude/2026-05/00837a18",
       "handoff/squadranks/claude/2026-05/d6243fc6",
     ]);
     expect(r.failures).toHaveLength(1);
-    expect(r.failures[0].branch).toBe("handoff/dotclaude/claude/2026-04/3668f1d7");
+    expect(r.failures[0].branch).toBe("handoff/dotbabel/claude/2026-04/3668f1d7");
     expect(r.failures[0].reason).toMatch(/refusing to delete the current branch/);
   });
 

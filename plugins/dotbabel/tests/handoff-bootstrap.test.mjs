@@ -1,11 +1,11 @@
-// Tests for the self-bootstrap path in dotclaude-handoff:
-//   - loadPersistedEnv parses ~/.config/dotclaude/handoff.env correctly
+// Tests for the self-bootstrap path in dotbabel-handoff:
+//   - loadPersistedEnv parses ~/.config/dotbabel/handoff.env correctly
 //   - isRepoMissingError classifies the "remote is gone" stderr variants
 //   - the public SCHEMA_VERSION / readRemoteSchema exports are gone
 //
 // The interactive `bootstrapTransportRepo` itself isn't unit-tested here
 // because it shells out to `gh` and `git` and expects a TTY; end-to-end
-// coverage lives in plugins/dotclaude/tests/bats/handoff-binary-subs.bats.
+// coverage lives in plugins/dotbabel/tests/bats/handoff-binary-subs.bats.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -15,7 +15,7 @@ import { join } from "node:path";
 async function importFreshBinary() {
   // Clear the module cache so each test sees a fresh load — the binary
   // computes CONFIG_DIR/CONFIG_FILE at module scope from process.env.HOME.
-  const url = new URL("../bin/dotclaude-handoff.mjs", import.meta.url);
+  const url = new URL("../bin/dotbabel-handoff.mjs", import.meta.url);
   const busted = `${url.href}?t=${Date.now()}-${Math.random()}`;
   return await import(busted);
 }
@@ -48,10 +48,10 @@ describe("loadPersistedEnv", () => {
     home = mkdtempSync(join(tmpdir(), "handoff-bootstrap-"));
     savedHome = process.env.HOME;
     savedXdg = process.env.XDG_CONFIG_HOME;
-    savedRepo = process.env.DOTCLAUDE_HANDOFF_REPO;
+    savedRepo = process.env.DOTBABEL_HANDOFF_REPO;
     process.env.HOME = home;
     delete process.env.XDG_CONFIG_HOME;
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   afterEach(() => {
@@ -60,52 +60,52 @@ describe("loadPersistedEnv", () => {
     else process.env.HOME = savedHome;
     if (savedXdg === undefined) delete process.env.XDG_CONFIG_HOME;
     else process.env.XDG_CONFIG_HOME = savedXdg;
-    if (savedRepo === undefined) delete process.env.DOTCLAUDE_HANDOFF_REPO;
-    else process.env.DOTCLAUDE_HANDOFF_REPO = savedRepo;
+    if (savedRepo === undefined) delete process.env.DOTBABEL_HANDOFF_REPO;
+    else process.env.DOTBABEL_HANDOFF_REPO = savedRepo;
   });
 
   it("no-op when the config file is absent", async () => {
     const { loadPersistedEnv } = await importFreshBinary();
     loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBeUndefined();
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBeUndefined();
   });
 
   it("sources KEY=VALUE lines when the var is unset", async () => {
-    mkdirSync(join(home, ".config", "dotclaude"), { recursive: true });
+    mkdirSync(join(home, ".config", "dotbabel"), { recursive: true });
     writeFileSync(
-      join(home, ".config", "dotclaude", "handoff.env"),
+      join(home, ".config", "dotbabel", "handoff.env"),
       [
         "# a comment",
         "",
-        "export DOTCLAUDE_HANDOFF_REPO=git@github.com:me/store.git",
+        "export DOTBABEL_HANDOFF_REPO=git@github.com:me/store.git",
       ].join("\n")
     );
     const { loadPersistedEnv } = await importFreshBinary();
     loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("git@github.com:me/store.git");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("git@github.com:me/store.git");
   });
 
   it("does NOT overwrite an already-set env var", async () => {
-    mkdirSync(join(home, ".config", "dotclaude"), { recursive: true });
+    mkdirSync(join(home, ".config", "dotbabel"), { recursive: true });
     writeFileSync(
-      join(home, ".config", "dotclaude", "handoff.env"),
-      "DOTCLAUDE_HANDOFF_REPO=git@github.com:from-file/store.git\n"
+      join(home, ".config", "dotbabel", "handoff.env"),
+      "DOTBABEL_HANDOFF_REPO=git@github.com:from-file/store.git\n"
     );
-    process.env.DOTCLAUDE_HANDOFF_REPO = "git@github.com:from-env/store.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "git@github.com:from-env/store.git";
     const { loadPersistedEnv } = await importFreshBinary();
     loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("git@github.com:from-env/store.git");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("git@github.com:from-env/store.git");
   });
 
   it("strips matching surrounding quotes on values", async () => {
-    mkdirSync(join(home, ".config", "dotclaude"), { recursive: true });
+    mkdirSync(join(home, ".config", "dotbabel"), { recursive: true });
     writeFileSync(
-      join(home, ".config", "dotclaude", "handoff.env"),
-      `DOTCLAUDE_HANDOFF_REPO="git@github.com:me/store.git"\n`
+      join(home, ".config", "dotbabel", "handoff.env"),
+      `DOTBABEL_HANDOFF_REPO="git@github.com:me/store.git"\n`
     );
     const { loadPersistedEnv } = await importFreshBinary();
     loadPersistedEnv();
-    expect(process.env.DOTCLAUDE_HANDOFF_REPO).toBe("git@github.com:me/store.git");
+    expect(process.env.DOTBABEL_HANDOFF_REPO).toBe("git@github.com:me/store.git");
   });
 });
 

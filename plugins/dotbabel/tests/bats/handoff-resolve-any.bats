@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavior tests for the `any` mode of plugins/dotclaude/scripts/handoff-resolve.sh.
+# Behavior tests for the `any` mode of plugins/dotbabel/scripts/handoff-resolve.sh.
 #
 # The `any` mode probes all four session roots (claude, copilot, codex, gemini)
 # and:
@@ -14,7 +14,7 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"

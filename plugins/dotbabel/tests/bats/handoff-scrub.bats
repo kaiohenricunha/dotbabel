@@ -1,12 +1,12 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/dotclaude/scripts/handoff-scrub.sh.
+# Behavior tests for plugins/dotbabel/scripts/handoff-scrub.sh.
 # The script's pattern table is authoritatively documented in
 # skills/handoff/references/redaction.md — this suite cross-checks
 # each documented pattern with at least one positive test case.
 
 load helpers
 
-SCRUB="$REPO_ROOT/plugins/dotclaude/scripts/handoff-scrub.sh"
+SCRUB="$REPO_ROOT/plugins/dotbabel/scripts/handoff-scrub.sh"
 
 setup() {
   [ -x "$SCRUB" ] || chmod +x "$SCRUB"
@@ -110,7 +110,7 @@ setup() {
   # The reference table lists 8 patterns; the script must implement all 8.
   local table_count script_count
   table_count="$(awk -F'|' '/^\| `[a-z0-9-]+`/{print $2}' "$REPO_ROOT/skills/handoff/references/redaction.md" | wc -l)"
-  script_count="$(grep -c '<redacted:[a-z0-9-]\+>' "$REPO_ROOT/plugins/dotclaude/scripts/handoff-scrub.sh")"
+  script_count="$(grep -c '<redacted:[a-z0-9-]\+>' "$REPO_ROOT/plugins/dotbabel/scripts/handoff-scrub.sh")"
   # Script has one substitution per pattern, so counts should match.
   [ "$table_count" -eq 8 ]
   [ "$script_count" -eq 8 ]

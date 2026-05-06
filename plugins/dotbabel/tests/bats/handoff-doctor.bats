@@ -1,15 +1,15 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/dotclaude/scripts/handoff-doctor.sh.
+# Behavior tests for plugins/dotbabel/scripts/handoff-doctor.sh.
 # Uses fake shims for `git` to simulate each failure state without
 # touching real auth.
 #
 # v0.9.0 collapsed the doctor to a single code path — the script
 # takes no arguments and only validates the git transport
-# (DOTCLAUDE_HANDOFF_REPO).
+# (DOTBABEL_HANDOFF_REPO).
 
 load helpers
 
-DOCTOR="$REPO_ROOT/plugins/dotclaude/scripts/handoff-doctor.sh"
+DOCTOR="$REPO_ROOT/plugins/dotbabel/scripts/handoff-doctor.sh"
 
 setup() {
   [ -x "$DOCTOR" ] || chmod +x "$DOCTOR"
@@ -94,10 +94,10 @@ hermetic_path_without() {
 @test "doctor: prints an info line (exit 0) when env var is empty — auto-bootstrap is the recovery path" {
   shim git 'exit 0'
   hermetic_path
-  unset DOTCLAUDE_HANDOFF_REPO
+  unset DOTBABEL_HANDOFF_REPO
   run "$DOCTOR"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"info: DOTCLAUDE_HANDOFF_REPO is not set"* ]]
+  [[ "$output" == *"info: DOTBABEL_HANDOFF_REPO is not set"* ]]
   [[ "$output" == *"will offer to create"* ]]
 }
 
@@ -110,8 +110,8 @@ fi
 exit 0
 '
   hermetic_path
-  DOTCLAUDE_HANDOFF_REPO=git@example.com:fake/repo.git
-  export DOTCLAUDE_HANDOFF_REPO
+  DOTBABEL_HANDOFF_REPO=git@example.com:fake/repo.git
+  export DOTBABEL_HANDOFF_REPO
   run "$DOCTOR"
   [ "$status" -eq 1 ]
   [[ "$output" == *"Preflight failed: handoff-repo-unreachable"* ]]
@@ -120,8 +120,8 @@ exit 0
 @test "doctor: ok when git present and repo reachable" {
   shim git 'exit 0'
   hermetic_path
-  DOTCLAUDE_HANDOFF_REPO=git@example.com:fake/repo.git
-  export DOTCLAUDE_HANDOFF_REPO
+  DOTBABEL_HANDOFF_REPO=git@example.com:fake/repo.git
+  export DOTBABEL_HANDOFF_REPO
   run "$DOCTOR"
   [ "$status" -eq 0 ]
   [ "$output" = "ok" ]

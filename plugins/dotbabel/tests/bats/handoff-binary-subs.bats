@@ -8,7 +8,7 @@ load helpers
 
 bats_require_minimum_version 1.5.0
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
@@ -39,7 +39,7 @@ EOF
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   export CLAUDE_FILE CODEX_FILE TRANSPORT_REPO
 }
@@ -50,16 +50,16 @@ teardown() {
 
 # ---- doctor (binary wrapper around handoff-doctor.sh) ------------------
 
-@test "doctor: exit 0 when DOTCLAUDE_HANDOFF_REPO points at a reachable repo" {
+@test "doctor: exit 0 when DOTBABEL_HANDOFF_REPO points at a reachable repo" {
   run node "$BIN" doctor
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
 }
 
-@test "doctor: exit 0 with an info line when DOTCLAUDE_HANDOFF_REPO is unset (auto-bootstrap is the recovery path)" {
+@test "doctor: exit 0 with an info line when DOTBABEL_HANDOFF_REPO is unset (auto-bootstrap is the recovery path)" {
   run --separate-stderr env -i HOME="$TEST_HOME" PATH="$PATH" node "$BIN" doctor
   [ "$status" -eq 0 ]
-  [[ "$output" == *"info: DOTCLAUDE_HANDOFF_REPO is not set"* ]]
+  [[ "$output" == *"info: DOTBABEL_HANDOFF_REPO is not set"* ]]
   [[ "$output" == *"auto-bootstrap"* ]] || [[ "$output" == *"will offer to create"* ]]
 }
 
@@ -201,13 +201,13 @@ EOF
 
 # ---- self-bootstrap ----------------------------------------------------
 # Replaces the old `init` sub-command: `push` auto-resolves a missing
-# transport interactively, persists the URL to ~/.config/dotclaude, and
+# transport interactively, persists the URL to ~/.config/dotbabel, and
 # falls back to a clear manual-setup block when non-interactive.
 
 @test "push against an empty bare repo succeeds — no init required" {
   local fresh
   fresh=$(mktemp -d); rm -rf "$fresh"; git init -q --bare "$fresh"
-  DOTCLAUDE_HANDOFF_REPO="$fresh" run node "$BIN" push aaaa1111
+  DOTBABEL_HANDOFF_REPO="$fresh" run node "$BIN" push aaaa1111
   [ "$status" -eq 0 ]
   # Branch landed; no schema-pin complaints on stdout/stderr.
   run git --git-dir="$fresh" ls-remote --heads "$fresh"
@@ -220,7 +220,7 @@ EOF
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"Can't auto-bootstrap"* ]]
   [[ "$stderr" == *"gh repo create"* ]]
-  [[ "$stderr" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [[ "$stderr" == *"DOTBABEL_HANDOFF_REPO"* ]]
 }
 
 @test "push with env unset + config file present auto-sources the URL" {
@@ -229,10 +229,10 @@ EOF
   # Pin CONFIG_DIR via XDG_CONFIG_HOME so the test works regardless of the
   # developer's real XDG_CONFIG_HOME value (defaulting HOME-derivation
   # isn't enough when a caller has XDG_CONFIG_HOME exported).
-  configdir="$TEST_HOME/xdg/dotclaude"
+  configdir="$TEST_HOME/xdg/dotbabel"
   mkdir -p "$configdir"
-  printf 'export DOTCLAUDE_HANDOFF_REPO=%s\n' "$fresh" > "$configdir/handoff.env"
-  run env HOME="$TEST_HOME" XDG_CONFIG_HOME="$TEST_HOME/xdg" DOTCLAUDE_HANDOFF_REPO= \
+  printf 'export DOTBABEL_HANDOFF_REPO=%s\n' "$fresh" > "$configdir/handoff.env"
+  run env HOME="$TEST_HOME" XDG_CONFIG_HOME="$TEST_HOME/xdg" DOTBABEL_HANDOFF_REPO= \
     node "$BIN" push aaaa1111
   [ "$status" -eq 0 ]
   run git --git-dir="$fresh" ls-remote --heads "$fresh"

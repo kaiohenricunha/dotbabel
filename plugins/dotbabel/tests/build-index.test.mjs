@@ -26,9 +26,9 @@ const REPO_ROOT = resolve(__filename, "..", "..", "..", "..");
 const BIN_PATH = join(
   REPO_ROOT,
   "plugins",
-  "dotclaude",
+  "dotbabel",
   "bin",
-  "dotclaude-index.mjs",
+  "dotbabel-index.mjs",
 );
 
 function mkRepo() {
@@ -358,7 +358,7 @@ describe("isIndexStale", () => {
   });
 });
 
-describe("CLI: dotclaude-index --check", () => {
+describe("CLI: dotbabel-index --check", () => {
   it("exits 0 on a fresh index and non-zero on a stale one", () => {
     const root = mkRepo();
     writeFile(root, "skills/test-skill/SKILL.md", NEW_STYLE_SKILL);
@@ -422,7 +422,7 @@ describe("schema round-trip", () => {
     }
     for (const s of schemas) {
       const fn = ajv.getSchema(
-        `https://dotclaude.dev/schemas/${s}.schema.json`,
+        `https://dotbabel.dev/schemas/${s}.schema.json`,
       );
       expect(fn).toBeTypeOf("function");
     }
@@ -448,7 +448,7 @@ describe("schema round-trip", () => {
       );
     }
     const skillValidate = ajv.getSchema(
-      "https://dotclaude.dev/schemas/skill.schema.json",
+      "https://dotbabel.dev/schemas/skill.schema.json",
     );
     expect(
       skillValidate({
@@ -495,7 +495,7 @@ describe("schema round-trip", () => {
       );
     }
     const validate = ajv.getSchema(
-      "https://dotclaude.dev/schemas/index-entry.schema.json",
+      "https://dotbabel.dev/schemas/index-entry.schema.json",
     );
     expect(
       validate({

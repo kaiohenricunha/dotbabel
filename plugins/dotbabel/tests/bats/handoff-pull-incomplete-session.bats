@@ -13,7 +13,7 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 # Lay down a copilot dir with the structural files copilot writes around
 # the event log (workspace config, checkpoints/, files/, research/) but
@@ -29,8 +29,8 @@ setup() {
   TEST_HOME=$(mktemp -d)
   export HOME="$TEST_HOME"
   export XDG_CONFIG_HOME="$TEST_HOME"
-  export DOTCLAUDE_HANDOFF_REPO="/nonexistent/incomplete-session-$$"
-  export DOTCLAUDE_QUIET=1
+  export DOTBABEL_HANDOFF_REPO="/nonexistent/incomplete-session-$$"
+  export DOTBABEL_QUIET=1
 
   INCOMPLETE_UUID="aaaaaaaa-1111-1111-1111-111111111111"
   VALID_UUID="bbbbbbbb-2222-2222-2222-222222222222"

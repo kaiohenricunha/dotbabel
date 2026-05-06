@@ -6,7 +6,7 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 # Seed a Claude session at $TEST_HOME/.claude/projects/<slug>/<uuid>.jsonl
 # whose first user prompt carries the marker string $2. Per-uuid slug keeps
@@ -26,7 +26,7 @@ setup() {
   TEST_HOME=$(mktemp -d)
   export HOME="$TEST_HOME"
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   # Short UUIDs chosen so that lexical order of branches is the OPPOSITE
   # of push order. With this setup, the pre-fix code's

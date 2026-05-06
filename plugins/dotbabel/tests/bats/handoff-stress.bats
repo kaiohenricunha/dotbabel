@@ -5,8 +5,8 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
-EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
+EXTRACT="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
 
 setup() {
   [ -x "$EXTRACT" ] || chmod +x "$EXTRACT"
@@ -44,7 +44,7 @@ teardown() {
 
 @test "fetch <short-uuid> against 10k transport branches completes under 30s" {
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
   make_many_transport_branches "$TRANSPORT_REPO" 10000
 
   # index 5000 → 00001388 (seeded by make_many_transport_branches as %08x).

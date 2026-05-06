@@ -28,15 +28,15 @@ describe("createHarnessContext", () => {
     expect(ctx.factsPath).toBe(path.join(FIXTURE, "docs", "repo-facts.json"));
   });
 
-  it("resolves repoRoot from DOTCLAUDE_REPO_ROOT env when no arg passed", () => {
-    const prev = process.env.DOTCLAUDE_REPO_ROOT;
-    process.env.DOTCLAUDE_REPO_ROOT = FIXTURE;
+  it("resolves repoRoot from DOTBABEL_REPO_ROOT env when no arg passed", () => {
+    const prev = process.env.DOTBABEL_REPO_ROOT;
+    process.env.DOTBABEL_REPO_ROOT = FIXTURE;
     try {
       const ctx = createHarnessContext();
       expect(ctx.repoRoot).toBe(FIXTURE);
     } finally {
-      if (prev === undefined) delete process.env.DOTCLAUDE_REPO_ROOT;
-      else process.env.DOTCLAUDE_REPO_ROOT = prev;
+      if (prev === undefined) delete process.env.DOTBABEL_REPO_ROOT;
+      else process.env.DOTBABEL_REPO_ROOT = prev;
     }
   });
 });
@@ -113,7 +113,7 @@ describe("isMeaningfulSection — HTML comment stripping", () => {
 describe("silent-catch replacement (debug-gated)", () => {
   // These tests exercise the post-fix behavior of the two former `catch {}` blocks
   // in spec-harness-lib.mjs. Previously they swallowed errors unconditionally;
-  // now they route through `debug()` (DOTCLAUDE_DEBUG=1) while preserving the
+  // now they route through `debug()` (DOTBABEL_DEBUG=1) while preserving the
   // same fallback return value so behavior is backwards-compatible.
 
   it("getChangedFiles short-circuits to HARNESS_CHANGED_FILES csv (no git probe required)", () => {
@@ -134,7 +134,7 @@ describe("silent-catch replacement (debug-gated)", () => {
     const probe = `import('${libUrl}').then(m => { try { m.createHarnessContext(); console.log('NO_THROW'); } catch (e) { console.log('THROWN:' + e.message); } });`;
     const out = execFileSync(process.execPath, ["-e", probe], {
       cwd: nonGitDir,
-      env: { ...process.env, DOTCLAUDE_REPO_ROOT: "" },
+      env: { ...process.env, DOTBABEL_REPO_ROOT: "" },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/dotclaude/scripts/handoff-description.sh.
+# Behavior tests for plugins/dotbabel/scripts/handoff-description.sh.
 # Encode produces the v2 schema:
 #   handoff:v2:<project>:<cli>:<YYYY-MM>:<short>:<host>[:<tag>]
 # Decode accepts v1 (legacy) and v2; the returned JSON includes a
@@ -7,7 +7,7 @@
 
 load helpers
 
-DESC="$REPO_ROOT/plugins/dotclaude/scripts/handoff-description.sh"
+DESC="$REPO_ROOT/plugins/dotbabel/scripts/handoff-description.sh"
 
 setup() {
   [ -x "$DESC" ] || chmod +x "$DESC"
@@ -18,10 +18,10 @@ setup() {
 @test "encode v2: minimal args (no tag) produces expected string" {
   run "$DESC" encode \
     --cli claude --short-id 3564b8c0 \
-    --project dotclaude --hostname thinkpad-pop \
+    --project dotbabel --hostname thinkpad-pop \
     --month 2026-04
   [ "$status" -eq 0 ]
-  [ "$output" = "handoff:v2:dotclaude:claude:2026-04:3564b8c0:thinkpad-pop" ]
+  [ "$output" = "handoff:v2:dotbabel:claude:2026-04:3564b8c0:thinkpad-pop" ]
 }
 
 @test "encode v2: with tag produces 8-segment string" {
@@ -36,10 +36,10 @@ setup() {
 @test "encode v2: accepts gemini cli" {
   run "$DESC" encode \
     --cli gemini --short-id 9999aaaa \
-    --project dotclaude --hostname thinkpad-pop \
+    --project dotbabel --hostname thinkpad-pop \
     --month 2026-05 --tag test
   [ "$status" -eq 0 ]
-  [ "$output" = "handoff:v2:dotclaude:gemini:2026-05:9999aaaa:thinkpad-pop:test" ]
+  [ "$output" = "handoff:v2:dotbabel:gemini:2026-05:9999aaaa:thinkpad-pop:test" ]
 }
 
 @test "encode v2: slugifies mixed-case project with spaces and punctuation" {
@@ -54,10 +54,10 @@ setup() {
 @test "encode v2: slugifies tag the same way as project/hostname" {
   run "$DESC" encode \
     --cli claude --short-id 3564b8c0 \
-    --project dotclaude --hostname pop --tag "Evening Run!" \
+    --project dotbabel --hostname pop --tag "Evening Run!" \
     --month 2026-04
   [ "$status" -eq 0 ]
-  [ "$output" = "handoff:v2:dotclaude:claude:2026-04:3564b8c0:pop:evening-run" ]
+  [ "$output" = "handoff:v2:dotbabel:claude:2026-04:3564b8c0:pop:evening-run" ]
 }
 
 @test "encode v2: rejects unknown --cli" {
@@ -103,12 +103,12 @@ setup() {
 # ---- v2 decode ---------------------------------------------------------
 
 @test "decode v2: round-trips a 7-segment string" {
-  run "$DESC" decode "handoff:v2:dotclaude:claude:2026-04:3564b8c0:thinkpad-pop"
+  run "$DESC" decode "handoff:v2:dotbabel:claude:2026-04:3564b8c0:thinkpad-pop"
   [ "$status" -eq 0 ]
   [[ "$output" == *'"schema":"v2"'* ]]
   [[ "$output" == *'"cli":"claude"'* ]]
   [[ "$output" == *'"short_id":"3564b8c0"'* ]]
-  [[ "$output" == *'"project":"dotclaude"'* ]]
+  [[ "$output" == *'"project":"dotbabel"'* ]]
   [[ "$output" == *'"month":"2026-04"'* ]]
   [[ "$output" == *'"hostname":"thinkpad-pop"'* ]]
   [[ "$output" == *'"tag":null'* ]]
@@ -122,7 +122,7 @@ setup() {
 }
 
 @test "decode v2: accepts gemini cli" {
-  run "$DESC" decode "handoff:v2:dotclaude:gemini:2026-05:9999aaaa:thinkpad-pop:test"
+  run "$DESC" decode "handoff:v2:dotbabel:gemini:2026-05:9999aaaa:thinkpad-pop:test"
   [ "$status" -eq 0 ]
   [[ "$output" == *'"schema":"v2"'* ]]
   [[ "$output" == *'"cli":"gemini"'* ]]
@@ -131,7 +131,7 @@ setup() {
 }
 
 @test "decode v2: rejects too few segments" {
-  run "$DESC" decode "handoff:v2:dotclaude:claude:2026-04:3564b8c0"
+  run "$DESC" decode "handoff:v2:dotbabel:claude:2026-04:3564b8c0"
   [ "$status" -eq 2 ]
   [[ "$output" == *"malformed v2"* ]]
 }
@@ -151,12 +151,12 @@ setup() {
 # ---- v1 decode (legacy back-compat) -----------------------------------
 
 @test "decode v1: round-trips a 6-segment legacy string with schema=v1 marker" {
-  run "$DESC" decode "handoff:v1:claude:3564b8c0:dotclaude:thinkpad-pop"
+  run "$DESC" decode "handoff:v1:claude:3564b8c0:dotbabel:thinkpad-pop"
   [ "$status" -eq 0 ]
   [[ "$output" == *'"schema":"v1"'* ]]
   [[ "$output" == *'"cli":"claude"'* ]]
   [[ "$output" == *'"short_id":"3564b8c0"'* ]]
-  [[ "$output" == *'"project":"dotclaude"'* ]]
+  [[ "$output" == *'"project":"dotbabel"'* ]]
   [[ "$output" == *'"month":null'* ]]
   [[ "$output" == *'"tag":null'* ]]
 }
@@ -193,8 +193,8 @@ setup() {
 @test "roundtrip v2: encode then decode yields same fields" {
   local encoded
   encoded="$("$DESC" encode --cli claude --short-id 3564b8c0 \
-    --project dotclaude --hostname pop --month 2026-04 --tag morning)"
-  [ "$encoded" = "handoff:v2:dotclaude:claude:2026-04:3564b8c0:pop:morning" ]
+    --project dotbabel --hostname pop --month 2026-04 --tag morning)"
+  [ "$encoded" = "handoff:v2:dotbabel:claude:2026-04:3564b8c0:pop:morning" ]
 
   run "$DESC" decode "$encoded"
   [ "$status" -eq 0 ]

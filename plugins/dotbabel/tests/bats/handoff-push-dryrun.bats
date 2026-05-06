@@ -5,15 +5,15 @@
 # Each test confirms (a) exit 0, (b) expected preview on stdout, (c) zero
 # branches written to the bare transport repo.
 #
-# Transport: local bare repo (DOTCLAUDE_HANDOFF_REPO).
-# Doctor: overridden via DOTCLAUDE_DOCTOR_SH — but dry-run skips preflight,
+# Transport: local bare repo (DOTBABEL_HANDOFF_REPO).
+# Doctor: overridden via DOTBABEL_DOCTOR_SH — but dry-run skips preflight,
 # so the stub exists only to catch regressions if that changes.
 
 bats_require_minimum_version 1.5.0
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 STUB_DOCTOR=""
 
@@ -26,14 +26,14 @@ setup() {
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   # Dry-run should never invoke this. Kept as a trip-wire: if the stub
   # is ever called we'll know preflight leaked into the dry-run path.
   STUB_DOCTOR=$(mktemp)
   printf '#!/usr/bin/env bash\necho ok\nexit 0\n' > "$STUB_DOCTOR"
   chmod +x "$STUB_DOCTOR"
-  export DOTCLAUDE_DOCTOR_SH="$STUB_DOCTOR"
+  export DOTBABEL_DOCTOR_SH="$STUB_DOCTOR"
 
   export TRANSPORT_REPO STUB_DOCTOR
 }
@@ -73,12 +73,12 @@ teardown() {
   echo "$output" | jq -e '.scrubbedCount | type == "number"' >/dev/null
 }
 
-# ---- test 3: unset DOTCLAUDE_HANDOFF_REPO → structured preflight error ----
+# ---- test 3: unset DOTBABEL_HANDOFF_REPO → structured preflight error ----
 
-@test "push --dry-run: unset DOTCLAUDE_HANDOFF_REPO → stage preflight" {
-  unset DOTCLAUDE_HANDOFF_REPO
+@test "push --dry-run: unset DOTBABEL_HANDOFF_REPO → stage preflight" {
+  unset DOTBABEL_HANDOFF_REPO
   # Also clear the persisted config file path in case a prior test wrote one.
-  rm -f "$TEST_HOME/.config/dotclaude/handoff.env" 2>/dev/null || true
+  rm -f "$TEST_HOME/.config/dotbabel/handoff.env" 2>/dev/null || true
   run --separate-stderr node "$BIN" push --from claude --dry-run
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"stage:  preflight"* ]]

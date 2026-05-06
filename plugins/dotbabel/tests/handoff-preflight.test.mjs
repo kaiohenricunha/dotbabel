@@ -1,4 +1,4 @@
-// Unit tests for plugins/dotclaude/src/lib/handoff-preflight.mjs.
+// Unit tests for plugins/dotbabel/src/lib/handoff-preflight.mjs.
 //
 // Strategy: use a real hermetic tempdir for cache file I/O (the point of the
 // module) and mock only `spawnSync` so we don't actually spawn the doctor
@@ -70,13 +70,13 @@ describe("constants and path helpers", () => {
   });
 
   it("currentCacheDir honors XDG_CACHE_HOME", () => {
-    expect(currentCacheDir()).toBe(join(tempRoot, "dotclaude"));
+    expect(currentCacheDir()).toBe(join(tempRoot, "dotbabel"));
   });
 
   it("currentCacheDir falls back to $HOME/.cache when XDG is unset", () => {
     delete process.env.XDG_CACHE_HOME;
     process.env.HOME = "/tmp/fakehome";
-    expect(currentCacheDir()).toBe("/tmp/fakehome/.cache/dotclaude");
+    expect(currentCacheDir()).toBe("/tmp/fakehome/.cache/dotbabel");
   });
 
   it("currentCacheDir tolerates both env vars being unset", () => {
@@ -88,7 +88,7 @@ describe("constants and path helpers", () => {
   });
 
   it("currentCacheFile appends handoff-doctor.json", () => {
-    expect(currentCacheFile()).toBe(join(tempRoot, "dotclaude", "handoff-doctor.json"));
+    expect(currentCacheFile()).toBe(join(tempRoot, "dotbabel", "handoff-doctor.json"));
   });
 });
 

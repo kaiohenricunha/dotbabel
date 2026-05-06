@@ -3,7 +3,7 @@
 #
 # Captures stdout from the four pin-stable Phase 2.5 invocations under direct
 # bash, sectioned by row marker, and writes the result to
-# plugins/dotclaude/tests/fixtures/cross-cli-invocation-baseline.txt.
+# plugins/dotbabel/tests/fixtures/cross-cli-invocation-baseline.txt.
 #
 # This is the single source of truth that the cross-cli-invocation workflow
 # diffs every shell invocation context against. Regenerate after any
@@ -21,7 +21,7 @@ fixture_dir="$(cd "$here/.." && pwd)"
 repo_root="$(cd "$fixture_dir/../../../.." && pwd)"
 baseline_path="$fixture_dir/cross-cli-invocation-baseline.txt"
 seed_script="$here/seed.sh"
-bin="$repo_root/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+bin="$repo_root/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 mode="${1:-write}"
 case "$mode" in
@@ -35,17 +35,17 @@ trap 'rm -rf "$work"' EXIT
 eval "$(bash "$seed_script" "$work")"
 
 # Force the same env every run so the baseline never picks up host noise.
-# DOTCLAUDE_HANDOFF_REPO must point somewhere that does not exist, so any
+# DOTBABEL_HANDOFF_REPO must point somewhere that does not exist, so any
 # accidental remote-transport codepath surfaces as an immediate failure
 # instead of silently mutating output.
 export HOME="$work"
 export XDG_CONFIG_HOME="$work"
-export DOTCLAUDE_HANDOFF_REPO="$work/nonexistent-handoff-repo"
-export DOTCLAUDE_QUIET=1
+export DOTBABEL_HANDOFF_REPO="$work/nonexistent-handoff-repo"
+export DOTBABEL_QUIET=1
 export TZ=UTC
-unset DOTCLAUDE_HANDOFF_DEBUG || true
+unset DOTBABEL_HANDOFF_DEBUG || true
 
-# Scrub host-CLI detection env vars (see dotclaude-handoff.mjs:detectHost).
+# Scrub host-CLI detection env vars (see dotbabel-handoff.mjs:detectHost).
 # Without this, local regeneration inside Claude Code / Codex / Copilot picks
 # up the host's marker, sets target=<host>, and emits the host-flavored "Next
 # step" hint — producing a baseline that does not match the host-agnostic

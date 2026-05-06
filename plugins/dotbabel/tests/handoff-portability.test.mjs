@@ -9,7 +9,7 @@ import {
   collectSessionFiles,
   projectSlugFromCwd,
   UUID_HEAD_RE,
-} from "../bin/dotclaude-handoff.mjs";
+} from "../bin/dotbabel-handoff.mjs";
 
 describe("collectSessionFiles (symlink safety)", () => {
   it("does not recurse into a symlink that points back up the walk", () => {

@@ -40,15 +40,15 @@ function buildFakeSource(dir) {
   fs.writeFileSync(path.join(dir, "skills", "beta", "skill.md"), "# beta\n");
 
   // agents template
-  fs.mkdirSync(path.join(dir, "plugins", "dotclaude", "templates", "claude", "agents"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "plugins", "dotbabel", "templates", "claude", "agents"), { recursive: true });
   fs.writeFileSync(
-    path.join(dir, "plugins", "dotclaude", "templates", "claude", "agents", "my-agent.md"),
+    path.join(dir, "plugins", "dotbabel", "templates", "claude", "agents", "my-agent.md"),
     "---\nname: my-agent\n---\n"
   );
 
   // hooks/*.sh
-  fs.mkdirSync(path.join(dir, "plugins", "dotclaude", "hooks"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "plugins", "dotclaude", "hooks", "guard.sh"), "#!/usr/bin/env bash\n");
+  fs.mkdirSync(path.join(dir, "plugins", "dotbabel", "hooks"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "plugins", "dotbabel", "hooks", "guard.sh"), "#!/usr/bin/env bash\n");
 
   // bootstrap.sh marker (needed for pkgRoot() detection)
   fs.writeFileSync(path.join(dir, "bootstrap.sh"), "#!/usr/bin/env bash\n");
@@ -214,7 +214,7 @@ describe("bootstrapGlobal", () => {
     const hookDst = path.join(tgt, "hooks", "guard.sh");
     expect(fs.lstatSync(hookDst).isSymbolicLink()).toBe(true);
     expect(fs.readlinkSync(hookDst)).toBe(
-      path.join(src, "plugins", "dotclaude", "hooks", "guard.sh")
+      path.join(src, "plugins", "dotbabel", "hooks", "guard.sh")
     );
   });
 
@@ -237,14 +237,14 @@ describe("bootstrapGlobal", () => {
 // ---------------------------------------------------------------------------
 
 describe("resolveSource", () => {
-  it("uses DOTCLAUDE_DIR env var when no --source given", () => {
-    const fakeDir = "/tmp/fake-dotclaude";
-    const resolved = resolveSource(undefined, { DOTCLAUDE_DIR: fakeDir });
+  it("uses DOTBABEL_DIR env var when no --source given", () => {
+    const fakeDir = "/tmp/fake-dotbabel";
+    const resolved = resolveSource(undefined, { DOTBABEL_DIR: fakeDir });
     expect(resolved).toBe(fakeDir);
   });
 
-  it("falls back to pkgRoot() when DOTCLAUDE_DIR is unset", () => {
-    // When neither sourceOpt nor DOTCLAUDE_DIR is given, resolveSource must
+  it("falls back to pkgRoot() when DOTBABEL_DIR is unset", () => {
+    // When neither sourceOpt nor DOTBABEL_DIR is given, resolveSource must
     // return a path that actually contains bootstrap.sh (the repo root).
     const resolved = resolveSource(undefined, {});
     expect(fs.existsSync(path.join(resolved, "bootstrap.sh"))).toBe(true);

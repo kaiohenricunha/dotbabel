@@ -12,15 +12,15 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
   export HOME="$TEST_HOME"
   export XDG_CONFIG_HOME="$TEST_HOME"
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
-  export DOTCLAUDE_QUIET=1
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_QUIET=1
 
   CLAUDE_UUID="dddd4444-9999-9999-9999-999999999999"
   make_claude_session_tree "$TEST_HOME" "$CLAUDE_UUID"

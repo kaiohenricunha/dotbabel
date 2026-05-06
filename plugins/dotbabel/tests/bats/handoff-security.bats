@@ -7,9 +7,9 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
-EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
-HANDOFF_BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
+EXTRACT="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
+HANDOFF_BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"
@@ -81,21 +81,21 @@ teardown() {
   [[ "$output" == *"not found"* ]]
 }
 
-# -- DOTCLAUDE_HANDOFF_REPO: ext:: rejection -----------------------------
+# -- DOTBABEL_HANDOFF_REPO: ext:: rejection -----------------------------
 
 @test "push rejects ext:: transport URL" {
-  DOTCLAUDE_HANDOFF_REPO='ext::sh -c evil' \
+  DOTBABEL_HANDOFF_REPO='ext::sh -c evil' \
     run node "$HANDOFF_BIN" push latest
   [ "$status" -eq 2 ]
-  [[ "$output" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [[ "$output" == *"DOTBABEL_HANDOFF_REPO"* ]]
   [[ "$output" == *"ext::"* ]]
 }
 
 @test "push rejects data: transport URL" {
-  DOTCLAUDE_HANDOFF_REPO='data:text/plain,x' \
+  DOTBABEL_HANDOFF_REPO='data:text/plain,x' \
     run node "$HANDOFF_BIN" push latest
   [ "$status" -eq 2 ]
-  [[ "$output" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [[ "$output" == *"DOTBABEL_HANDOFF_REPO"* ]]
 }
 
 # -- symlink containment ------------------------------------------------

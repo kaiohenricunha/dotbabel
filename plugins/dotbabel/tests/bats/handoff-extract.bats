@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/dotclaude/scripts/handoff-extract.sh.
+# Behavior tests for plugins/dotbabel/scripts/handoff-extract.sh.
 # Subcommands:
 #   meta    <cli> <file>   JSON on stdout: {cli, session_id, short_id, cwd, model, started_at}
 #   prompts <cli> <file>   Clean user prompts, newline-separated, order preserved
@@ -7,7 +7,7 @@
 
 load helpers
 
-EX="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
+EX="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
 
 setup() {
   [ -x "$EX" ] || chmod +x "$EX"

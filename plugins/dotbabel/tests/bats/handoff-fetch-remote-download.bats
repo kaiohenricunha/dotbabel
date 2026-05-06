@@ -9,7 +9,7 @@
 # Pinned contract:
 #   1. `fetch <query>` returns the matched branch's handoff.md content
 #      to stdout (§4.3 step 7).
-#   2. `fetch` requires DOTCLAUDE_HANDOFF_REPO; unset → non-zero exit
+#   2. `fetch` requires DOTBABEL_HANDOFF_REPO; unset → non-zero exit
 #      (§4.3 step 2 requireTransportRepoStrict, no auto-bootstrap).
 #   3. `fetch <query>` with no remote match exits non-zero (§5.3.4
 #      "no remote handoffs match").
@@ -21,15 +21,15 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
   export HOME="$TEST_HOME"
   export XDG_CONFIG_HOME="$TEST_HOME"
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
-  export DOTCLAUDE_QUIET=1
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_QUIET=1
 
   CLAUDE_UUID="bbbb2222-7777-7777-7777-777777777777"
   make_claude_session_tree "$TEST_HOME" "$CLAUDE_UUID"
@@ -54,8 +54,8 @@ teardown() {
   [[ "$output" == *"origin=\"claude\""* ]]
 }
 
-@test "fetch with DOTCLAUDE_HANDOFF_REPO unset: exits non-zero (§4.3 step 2)" {
-  unset DOTCLAUDE_HANDOFF_REPO
+@test "fetch with DOTBABEL_HANDOFF_REPO unset: exits non-zero (§4.3 step 2)" {
+  unset DOTBABEL_HANDOFF_REPO
   run node "$BIN" fetch "$CLAUDE_SHORT"
   [ "$status" -ne 0 ]
 }

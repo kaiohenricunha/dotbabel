@@ -11,7 +11,7 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 STUB_DOCTOR=""
 
@@ -34,12 +34,12 @@ setup() {
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   STUB_DOCTOR=$(mktemp)
   printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_DOCTOR"
   chmod +x "$STUB_DOCTOR"
-  export DOTCLAUDE_DOCTOR_SH="$STUB_DOCTOR"
+  export DOTBABEL_DOCTOR_SH="$STUB_DOCTOR"
 
   THIS_HOST=$(this_host_slug)
   export TRANSPORT_REPO STUB_DOCTOR THIS_HOST

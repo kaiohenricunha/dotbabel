@@ -4,7 +4,7 @@
 #   load helpers
 #
 # Provides:
-#   REPO_ROOT             absolute path to the dotclaude checkout (export).
+#   REPO_ROOT             absolute path to the dotbabel checkout (export).
 #   make_tmp_home         mktemp a hermetic $HOME for bootstrap tests.
 #   make_tmp_git_repo     mktemp an initialized git repo with an origin remote.
 #   with_fake_git_bin     prepend a shim dir to PATH providing a fake `git`.
@@ -274,7 +274,7 @@ HEREDOC
 # requires any schema pin or init step — push writes directly to
 # `handoff/...` branches — so this helper is just a thin wrapper
 # around `git init --bare`. Use the returned path as
-# DOTCLAUDE_HANDOFF_REPO. Caller is responsible for cleanup.
+# DOTBABEL_HANDOFF_REPO. Caller is responsible for cleanup.
 make_transport_repo() {
   local dir="$1"
   git init -q --bare "$dir"
@@ -293,8 +293,8 @@ make_aged_handoff_branch() {
   (
     cd "$tmp"
     git init -q
-    git config user.email handoff@dotclaude.local
-    git config user.name dotclaude-handoff
+    git config user.email handoff@dotbabel.local
+    git config user.name dotbabel-handoff
     git checkout -q -b "$branch"
     printf 'stub handoff body for %s\n' "$branch" > handoff.md
     printf '{"cli":"%s","hostname":"%s","short_id":"%s"}\n' \

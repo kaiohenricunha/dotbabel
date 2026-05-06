@@ -16,7 +16,7 @@ function iso() {
 }
 
 describe("auto-update-manifest.mjs", () => {
-  it("invokes dotclaude-validate-skills --update in the current working directory", () => {
+  it("invokes dotbabel-validate-skills --update in the current working directory", () => {
     const root = iso();
     // Mutate a command so checksums are stale.
     writeFileSync(path.join(root, ".claude/commands/example.md"), "# mutated\n");
@@ -25,7 +25,7 @@ describe("auto-update-manifest.mjs", () => {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, DOTCLAUDE_REPO_ROOT: root },
+      env: { ...process.env, DOTBABEL_REPO_ROOT: root },
     });
 
     const manifest = JSON.parse(

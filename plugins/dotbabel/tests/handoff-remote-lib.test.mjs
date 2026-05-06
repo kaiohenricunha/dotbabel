@@ -1,5 +1,5 @@
 // Pins the public surface of handoff-remote.mjs — the shared transport
-// library extracted from bin/dotclaude-handoff.mjs in #91 Gap 1. These
+// library extracted from bin/dotbabel-handoff.mjs in #91 Gap 1. These
 // tests are redundant with handoff-unit / handoff-url-validator /
 // handoff-bootstrap (which go through the bin re-exports), but they
 // lock the library *directly* so a future gap can't silently narrow or
@@ -98,18 +98,18 @@ describe("v2BranchName", () => {
   it("allows gemini as the cli segment", () => {
     expect(
       lib.v2BranchName({
-        project: "dotclaude",
+        project: "dotbabel",
         cli: "gemini",
         month: "2026-05",
         shortId: "9999aaaa",
       }),
-    ).toBe("handoff/dotclaude/gemini/2026-05/9999aaaa");
+    ).toBe("handoff/dotbabel/gemini/2026-05/9999aaaa");
   });
 });
 
 describe("parseHandoffBranch", () => {
   it("parses gemini v2 and legacy v1 branch names", () => {
-    expect(lib.parseHandoffBranch("handoff/dotclaude/gemini/2026-05/9999aaaa")).toEqual({
+    expect(lib.parseHandoffBranch("handoff/dotbabel/gemini/2026-05/9999aaaa")).toEqual({
       version: 2,
       cli: "gemini",
       shortId: "9999aaaa",
@@ -366,7 +366,7 @@ describe("printManualSetupBlock", () => {
     lib.printManualSetupBlock("test-reason-xyz");
     const out = spy.mock.calls.map((c) => c[0]).join("");
     expect(out).toContain("test-reason-xyz");
-    expect(out).toContain("DOTCLAUDE_HANDOFF_REPO");
+    expect(out).toContain("DOTBABEL_HANDOFF_REPO");
     spy.mockRestore();
   });
 });
@@ -384,16 +384,16 @@ describe("requireTransportRepoStrict", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("returns the validated URL when env var is set", () => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "https://github.com/x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "https://github.com/x/y.git";
     expect(lib.requireTransportRepoStrict()).toBe("https://github.com/x/y.git");
   });
 
-  it("throws HandoffError when DOTCLAUDE_HANDOFF_REPO is not set", () => {
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+  it("throws HandoffError when DOTBABEL_HANDOFF_REPO is not set", () => {
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     expect(() => lib.requireTransportRepoStrict()).toThrow(lib.HandoffError);
   });
 });
@@ -411,17 +411,17 @@ describe("requireTransportRepo (env-var-set fast path)", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
   });
 
   it("returns the validated URL without bootstrapping when env var is already set", async () => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "git@github.com:x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "git@github.com:x/y.git";
     const url = await lib.requireTransportRepo();
     expect(url).toBe("git@github.com:x/y.git");
   });
 
   it("calls bootstrapTransportRepo and exits 2 when env var is absent in a non-TTY context", async () => {
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     // bootstrapTransportRepo detects non-TTY (isTty() returns false in vitest), prints
     // a manual-setup block to stderr, then calls process.exit(2).
     await expect(lib.requireTransportRepo()).rejects.toThrow(/__exit__2/);

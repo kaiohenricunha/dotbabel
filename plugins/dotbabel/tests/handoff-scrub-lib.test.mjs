@@ -1,6 +1,6 @@
 // Unit tests for the scrubDigest helper that wraps handoff-scrub.sh.
 // The sibling bats suite
-// (plugins/dotclaude/tests/bats/handoff-scrub.bats) exercises the shell
+// (plugins/dotbabel/tests/bats/handoff-scrub.bats) exercises the shell
 // script itself; this file pins the Node-side contract: full-input scrubbed
 // output, the `scrubbed:N` stderr-count parse, and the fail-closed behavior
 // that pushRemote() relies on to avoid uploading unscrubbed content.

@@ -1,5 +1,5 @@
 // Helpers for standing up a bare git repo inside a tmpdir, suitable for
-// DOTCLAUDE_HANDOFF_REPO tests. Each helper returns an absolute path.
+// DOTBABEL_HANDOFF_REPO tests. Each helper returns an absolute path.
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

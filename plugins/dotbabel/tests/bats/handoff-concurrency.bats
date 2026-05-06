@@ -6,8 +6,8 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"
@@ -26,7 +26,7 @@ setup() {
 EOF
 
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
   export CLAUDE_UUID CLAUDE_FILE TRANSPORT_REPO
 }
 

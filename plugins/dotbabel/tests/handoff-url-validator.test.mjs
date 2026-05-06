@@ -12,7 +12,7 @@ import {
   validateTransportUrl,
   requireTransportRepoStrict,
   HandoffError,
-} from "../bin/dotclaude-handoff.mjs";
+} from "../bin/dotbabel-handoff.mjs";
 
 describe("validateTransportUrl", () => {
   let exitSpy;
@@ -70,7 +70,7 @@ describe("requireTransportRepoStrict", () => {
   let savedEnv;
 
   beforeEach(() => {
-    savedEnv = process.env.DOTCLAUDE_HANDOFF_REPO;
+    savedEnv = process.env.DOTBABEL_HANDOFF_REPO;
     exitSpy = vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new Error(`__exit__${code}`);
     });
@@ -80,18 +80,18 @@ describe("requireTransportRepoStrict", () => {
   afterEach(() => {
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
-    if (savedEnv === undefined) delete process.env.DOTCLAUDE_HANDOFF_REPO;
-    else process.env.DOTCLAUDE_HANDOFF_REPO = savedEnv;
+    if (savedEnv === undefined) delete process.env.DOTBABEL_HANDOFF_REPO;
+    else process.env.DOTBABEL_HANDOFF_REPO = savedEnv;
   });
 
   it("returns the URL when set and well-formed", () => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "git@github.com:x/y.git";
+    process.env.DOTBABEL_HANDOFF_REPO = "git@github.com:x/y.git";
     expect(requireTransportRepoStrict()).toBe("git@github.com:x/y.git");
     expect(exitSpy).not.toHaveBeenCalled();
   });
 
   it("rejects unset env with a clear pointer at push auto-bootstrap", () => {
-    delete process.env.DOTCLAUDE_HANDOFF_REPO;
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     let err;
     try {
       requireTransportRepoStrict();
@@ -99,12 +99,12 @@ describe("requireTransportRepoStrict", () => {
       err = e;
     }
     expect(err).toBeInstanceOf(HandoffError);
-    expect(err.fix).toContain("DOTCLAUDE_HANDOFF_REPO");
+    expect(err.fix).toContain("DOTBABEL_HANDOFF_REPO");
     expect(err.fix).toContain("push");
   });
 
   it("rejects empty string env", () => {
-    process.env.DOTCLAUDE_HANDOFF_REPO = "";
+    process.env.DOTBABEL_HANDOFF_REPO = "";
     expect(() => requireTransportRepoStrict()).toThrow(HandoffError);
   });
 });

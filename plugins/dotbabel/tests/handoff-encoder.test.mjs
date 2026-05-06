@@ -6,7 +6,7 @@
 //   handoff:v2:<project>:<cli>:<YYYY-MM>:<short>:<host>[:<tag>]
 
 import { describe, it, expect } from "vitest";
-import { encodeDescription } from "../bin/dotclaude-handoff.mjs";
+import { encodeDescription } from "../bin/dotbabel-handoff.mjs";
 
 // Parse a v2 description back into named segments. Matches the segment
 // order defined in handoff-description.sh's encode path.

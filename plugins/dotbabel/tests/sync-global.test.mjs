@@ -33,7 +33,7 @@ import { resolveMode, syncGlobal } from "../src/sync-global.mjs";
 
 describe("resolveMode", () => {
   it("returns 'clone' when source option is provided", () => {
-    expect(resolveMode("/home/user/dotclaude")).toBe("clone");
+    expect(resolveMode("/home/user/dotbabel")).toBe("clone");
   });
 
   it("returns 'npm' when no source is provided", () => {
@@ -66,12 +66,12 @@ describe("syncGlobal", () => {
 
     expect(spawnSync).toHaveBeenCalledWith(
       "npm",
-      ["view", "@dotclaude/dotclaude", "version"],
+      ["view", "@dotbabel/dotbabel", "version"],
       expect.objectContaining({ encoding: "utf8" })
     );
     expect(spawnSync).toHaveBeenCalledWith(
       "npm",
-      ["update", "-g", "@dotclaude/dotclaude"],
+      ["update", "-g", "@dotbabel/dotbabel"],
       expect.objectContaining({ encoding: "utf8" })
     );
     expect(bootstrapGlobal).toHaveBeenCalled();
@@ -109,7 +109,7 @@ describe("syncGlobal", () => {
       .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 })  // git fetch
       .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });  // git rebase
 
-    const source = "/home/user/dotclaude";
+    const source = "/home/user/dotbabel";
     const result = await syncGlobal("pull", { source });
 
     expect(spawnSync).toHaveBeenCalledWith(
@@ -140,7 +140,7 @@ describe("syncGlobal", () => {
 
     expect(spawnSync).toHaveBeenCalledWith(
       "npm",
-      ["view", "@dotclaude/dotclaude", "version"],
+      ["view", "@dotbabel/dotbabel", "version"],
       expect.objectContaining({ encoding: "utf8" })
     );
     expect(result.ok).toBe(true);
@@ -158,7 +158,7 @@ describe("syncGlobal", () => {
     const gitStatusOutput = " M CLAUDE.md\n";
     spawnSync.mockReturnValueOnce({ stdout: gitStatusOutput, stderr: "", status: 0 });
 
-    const source = "/home/user/dotclaude";
+    const source = "/home/user/dotbabel";
     const result = await syncGlobal("status", { source });
 
     expect(spawnSync).toHaveBeenCalledWith(
@@ -189,7 +189,7 @@ describe("syncGlobal", () => {
   // -------------------------------------------------------------------------
 
   it("push (clone mode) commits and pushes when no secrets detected", async () => {
-    const source = "/home/user/dotclaude";
+    const source = "/home/user/dotbabel";
     // git add -A
     spawnSync.mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
     // git diff --cached --quiet → non-zero means there ARE staged changes
@@ -214,7 +214,7 @@ describe("syncGlobal", () => {
   // -------------------------------------------------------------------------
 
   it("push (clone mode) aborts when a secret is detected in staged files", async () => {
-    const source = "/home/user/dotclaude";
+    const source = "/home/user/dotbabel";
     // git add -A
     spawnSync.mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
     // git diff --cached --quiet → non-zero means staged changes exist
@@ -262,7 +262,7 @@ describe("syncGlobal", () => {
   // -------------------------------------------------------------------------
 
   it("push (clone mode) aborts when git show fails during secret scan", async () => {
-    const source = "/home/user/dotclaude";
+    const source = "/home/user/dotbabel";
     // git add -A
     spawnSync.mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
     // git diff --cached --quiet → staged changes

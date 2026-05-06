@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Integration tests — cross-script end-to-end flows.
 #
-# Complements dotclaude-handoff-five-form.bats, which covers the user-facing
+# Complements dotbabel-handoff-five-form.bats, which covers the user-facing
 # five-form surface. These tests chain multiple handoff scripts together
 # (resolve → extract → pull / push → fetch → list → pull) to verify
 # the boundaries between them hold.
@@ -10,9 +10,9 @@ load helpers
 
 bats_require_minimum_version 1.5.0
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
-EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
+EXTRACT="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"
@@ -47,7 +47,7 @@ EOF
 EOF
 
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   export CLAUDE_UUID CLAUDE_FILE CODEX_UUID CODEX_FILE TRANSPORT_REPO
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Behavior tests for plugins/dotclaude/scripts/handoff-resolve.sh.
+# Behavior tests for plugins/dotbabel/scripts/handoff-resolve.sh.
 # Resolves <cli> <identifier> to an absolute JSONL file path.
 # Supports: claude (uuid|short-uuid|latest|customTitle|aiTitle),
 #           copilot (uuid|short-uuid|latest|workspace.yaml:name),
@@ -10,7 +10,7 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
 
 # Build a hermetic $HOME with fake session trees for the four CLIs.
 # Fixtures are minimal: just enough for path resolution and alias scan.
@@ -214,7 +214,7 @@ teardown() {
 
 @test "resolve claude by aiTitle alias" {
   # Seed an extra claude session with an ai-title record. Claude Code emits
-  # ai-title as the auto-generated TUI summary (4/24 sessions in the dotclaude
+  # ai-title as the auto-generated TUI summary (4/24 sessions in the dotbabel
   # project per Phase 1) — distinct from user-set customTitle.
   local uuid="dddd2222-2222-2222-2222-222222222222"
   local dir="$TEST_HOME/.claude/projects/-home-user-projects-aititle"

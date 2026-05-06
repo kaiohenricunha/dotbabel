@@ -5,14 +5,14 @@
 #   (a) the process exits 2
 #   (b) stderr contains the four-field structured block
 #
-# Transport: local bare repo (DOTCLAUDE_HANDOFF_REPO) for most tests.
-# Doctor: overridden via DOTCLAUDE_DOCTOR_SH to bypass real preflight.
+# Transport: local bare repo (DOTBABEL_HANDOFF_REPO) for most tests.
+# Doctor: overridden via DOTBABEL_DOCTOR_SH to bypass real preflight.
 
 bats_require_minimum_version 1.5.0
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 # Minimal passing doctor stub — exits 0 so autoPreflight doesn't block tests.
 STUB_DOCTOR=""
@@ -28,14 +28,14 @@ setup() {
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   # Doctor stub: always succeeds so preflight doesn't block the tests
   # we're actually trying to run.
   STUB_DOCTOR=$(mktemp)
   printf '#!/usr/bin/env bash\necho ok\nexit 0\n' > "$STUB_DOCTOR"
   chmod +x "$STUB_DOCTOR"
-  export DOTCLAUDE_DOCTOR_SH="$STUB_DOCTOR"
+  export DOTBABEL_DOCTOR_SH="$STUB_DOCTOR"
 
   export TRANSPORT_REPO STUB_DOCTOR
 }
@@ -47,8 +47,8 @@ teardown() {
 
 # ---- test 1: missing transport env var (fetch) ----------------------------
 
-@test "error: fetch with no DOTCLAUDE_HANDOFF_REPO → stage: preflight" {
-  unset DOTCLAUDE_HANDOFF_REPO
+@test "error: fetch with no DOTBABEL_HANDOFF_REPO → stage: preflight" {
+  unset DOTBABEL_HANDOFF_REPO
   run --separate-stderr node "$BIN" fetch
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"stage:  preflight"* ]]
@@ -93,7 +93,7 @@ exec /usr/bin/git "$@"
 
 @test "error: fetch when ls-remote fails → stage: preflight" {
   # Shim git to fail on ls-remote with a network-style error.
-  # The preflight is already bypassed via DOTCLAUDE_DOCTOR_SH.
+  # The preflight is already bypassed via DOTBABEL_DOCTOR_SH.
   with_fake_tool_bin git '
 if [[ "$1" == "ls-remote" ]]; then
   echo "fatal: Could not read from remote repository." >&2
@@ -101,8 +101,8 @@ if [[ "$1" == "ls-remote" ]]; then
 fi
 exec /usr/bin/git "$@"
 '
-  DOTCLAUDE_HANDOFF_REPO="git@example.com:fake/store.git"
-  export DOTCLAUDE_HANDOFF_REPO
+  DOTBABEL_HANDOFF_REPO="git@example.com:fake/store.git"
+  export DOTBABEL_HANDOFF_REPO
   run --separate-stderr node "$BIN" fetch
   [ "$status" -eq 2 ]
   [[ "$stderr" == *"stage:  preflight"* ]]

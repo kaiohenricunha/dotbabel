@@ -53,7 +53,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
 
 const SKILL_MD_PATH = resolve(repoRoot, "skills/handoff/SKILL.md");
-const HANDOFF_BIN = resolve(repoRoot, "plugins/dotclaude/bin/dotclaude-handoff.mjs");
+const HANDOFF_BIN = resolve(repoRoot, "plugins/dotbabel/bin/dotbabel-handoff.mjs");
 const GUIDE_MD_PATH = resolve(repoRoot, "docs/handoff-guide.md");
 
 /**
@@ -203,7 +203,7 @@ export function extractFromSkillMd(text) {
 export function extractFromHelp(text) {
   // Anchor only on the verb group; spec §5.0 keeps `--help` wording editable
   // (`[args...]` may be rephrased as `[arguments]`, `<args>`, or omitted).
-  const synopsisGroup = text.match(/dotclaude handoff\s+\[([^\]]+)\]/);
+  const synopsisGroup = text.match(/dotbabel handoff\s+\[([^\]]+)\]/);
   if (!synopsisGroup) {
     throw new Error("--help: synopsis line missing `[verb1|verb2|...]` group");
   }
@@ -310,7 +310,7 @@ export function extractFromRule(text) {
  * Heuristic: a paragraph that mentions all four clauses simultaneously,
  * the same approach as extractFromRule. Loose enough to survive wording
  * changes per spec §5.0; strict enough that incidental mentions of
- * "fabricate" or "dotclaude" alone don't false-positive.
+ * "fabricate" or "dotbabel" alone don't false-positive.
  *
  * @param {string} text
  * @returns {{ present: boolean }}
@@ -331,7 +331,7 @@ export function extractFabricationRule(text) {
       /\bcannot\s+(?:be\s+)?(?:execute|run|invoke)/.test(lower) ||
       /\bsandbox\b/.test(lower) ||
       /\bbinary\s+(?:not\s+found|missing)\b/.test(lower);
-    const mentionsBinary = /\bdotclaude\b/.test(lower);
+    const mentionsBinary = /\bdotbabel\b/.test(lower);
     const mentionsForbidden =
       /\bfabricat/.test(lower) ||
       /\breconstruct/.test(lower) ||
@@ -461,7 +461,7 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     const skillText = readFileSync(SKILL_MD_PATH, "utf8");
     skillSurface = extractFromSkillMd(skillText);
 
-    // The bin sources `$XDG_CONFIG_HOME/dotclaude/handoff.env` at startup
+    // The bin sources `$XDG_CONFIG_HOME/dotbabel/handoff.env` at startup
     // (default `$HOME/.config/...`). Point both HOME and XDG_CONFIG_HOME at
     // a fresh temp dir so a user's persisted handoff.env can't leak into the
     // test, and parallel vitest workers can't collide on the same path.

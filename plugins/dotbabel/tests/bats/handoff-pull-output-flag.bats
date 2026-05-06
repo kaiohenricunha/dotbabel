@@ -16,14 +16,14 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
   export HOME="$TEST_HOME"
   export XDG_CONFIG_HOME="$TEST_HOME"
-  export DOTCLAUDE_HANDOFF_REPO="/nonexistent/pull-output-flag-$$"
-  export DOTCLAUDE_QUIET=1
+  export DOTBABEL_HANDOFF_REPO="/nonexistent/pull-output-flag-$$"
+  export DOTBABEL_QUIET=1
 
   CLAUDE_UUID="bbbb2222-3333-3333-3333-333333333333"
   make_claude_session_tree "$TEST_HOME" "$CLAUDE_UUID"
@@ -113,8 +113,8 @@ teardown() {
   # Use a hermetic temp git repo so the auto-path writes to its docs/handoffs/
   # rather than polluting the real repo checkout.
   local tmp_repo; tmp_repo=$(make_tmp_git_repo)
-  run bash -c "cd '$tmp_repo' && HOME='$TEST_HOME' DOTCLAUDE_QUIET=1 \
-    DOTCLAUDE_HANDOFF_REPO='/nonexistent' \
+  run bash -c "cd '$tmp_repo' && HOME='$TEST_HOME' DOTBABEL_QUIET=1 \
+    DOTBABEL_HANDOFF_REPO='/nonexistent' \
     node '$BIN' pull '$CLAUDE_SHORT' -o auto 2>'$STDERR_FILE'"
   rm -rf "$tmp_repo" "${tmp_repo}-bare.git"
   [ "$status" -eq 0 ]
@@ -123,8 +123,8 @@ teardown() {
 
 @test "pull -o auto: stderr contains the auto-placed path" {
   local tmp_repo; tmp_repo=$(make_tmp_git_repo)
-  run bash -c "cd '$tmp_repo' && HOME='$TEST_HOME' DOTCLAUDE_QUIET=1 \
-    DOTCLAUDE_HANDOFF_REPO='/nonexistent' \
+  run bash -c "cd '$tmp_repo' && HOME='$TEST_HOME' DOTBABEL_QUIET=1 \
+    DOTBABEL_HANDOFF_REPO='/nonexistent' \
     node '$BIN' pull '$CLAUDE_SHORT' -o auto 2>'$STDERR_FILE'"
   rm -rf "$tmp_repo" "${tmp_repo}-bare.git"
   [ "$status" -eq 0 ]

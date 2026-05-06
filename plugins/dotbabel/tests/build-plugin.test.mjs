@@ -1,6 +1,6 @@
 /**
  * Tests for scripts/build-plugin.mjs — syncs authored artifacts into
- * plugins/dotclaude/templates/claude/ and generates skills-manifest.json.
+ * plugins/dotbabel/templates/claude/ and generates skills-manifest.json.
  */
 
 import { describe, it, expect } from "vitest";
@@ -13,16 +13,16 @@ import { spawnSync } from "node:child_process";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
 const BUILD_PLUGIN_BIN = join(REPO_ROOT, "scripts", "build-plugin.mjs");
-const INDEX_BIN = join(REPO_ROOT, "plugins", "dotclaude", "bin", "dotclaude-index.mjs");
+const INDEX_BIN = join(REPO_ROOT, "plugins", "dotbabel", "bin", "dotbabel-index.mjs");
 
 function mkRepo() {
   const root = mkdtempSync(join(tmpdir(), "dc-phase4-"));
   mkdirSync(join(root, "commands"), { recursive: true });
   mkdirSync(join(root, "skills"), { recursive: true });
   mkdirSync(join(root, "agents"), { recursive: true });
-  mkdirSync(join(root, "plugins", "dotclaude", "templates", "claude"), { recursive: true });
+  mkdirSync(join(root, "plugins", "dotbabel", "templates", "claude"), { recursive: true });
   writeFileSync(
-    join(root, "plugins", "dotclaude", "templates", "claude", "skills-manifest.json"),
+    join(root, "plugins", "dotbabel", "templates", "claude", "skills-manifest.json"),
     JSON.stringify({ version: 1, generatedAt: "{{today}}", skills: [] }, null, 2) + "\n",
   );
   return root;
@@ -124,7 +124,7 @@ function runBuild(root, extraArgs = []) {
 function readManifest(root) {
   return JSON.parse(
     readFileSync(
-      join(root, "plugins", "dotclaude", "templates", "claude", "skills-manifest.json"),
+      join(root, "plugins", "dotbabel", "templates", "claude", "skills-manifest.json"),
       "utf8",
     ),
   );
@@ -182,7 +182,7 @@ describe("build-plugin", () => {
     const destPath = join(
       root,
       "plugins",
-      "dotclaude",
+      "dotbabel",
       "templates",
       "claude",
       "skills",
@@ -228,7 +228,7 @@ describe("build-plugin", () => {
     const skillRoot = join(
       root,
       "plugins",
-      "dotclaude",
+      "dotbabel",
       "templates",
       "claude",
       "skills",
@@ -254,7 +254,7 @@ describe("build-plugin", () => {
     const destPath = join(
       root,
       "plugins",
-      "dotclaude",
+      "dotbabel",
       "templates",
       "claude",
       "commands",
@@ -272,7 +272,7 @@ describe("build-plugin", () => {
     runBuild(root);
 
     const raw = readFileSync(
-      join(root, "plugins", "dotclaude", "templates", "claude", "skills-manifest.json"),
+      join(root, "plugins", "dotbabel", "templates", "claude", "skills-manifest.json"),
       "utf8",
     );
     expect(raw).toContain('"{{today}}"');
@@ -287,7 +287,7 @@ describe("build-plugin", () => {
     const manifestPath = join(
       root,
       "plugins",
-      "dotclaude",
+      "dotbabel",
       "templates",
       "claude",
       "skills-manifest.json",
@@ -338,7 +338,7 @@ describe("build-plugin", () => {
     const agentPath = join(
       root,
       "plugins",
-      "dotclaude",
+      "dotbabel",
       "templates",
       "claude",
       "agents",
@@ -357,7 +357,7 @@ describe("build-plugin", () => {
     const agentPath = join(
       root,
       "plugins",
-      "dotclaude",
+      "dotbabel",
       "templates",
       "claude",
       "agents",

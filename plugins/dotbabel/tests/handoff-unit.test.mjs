@@ -1,4 +1,4 @@
-// Pure-function unit tests for dotclaude-handoff internals.
+// Pure-function unit tests for dotbabel-handoff internals.
 // Covers: UUID_HEAD_RE, cliFromPath, projectSlugFromCwd, matchesQuery,
 // nextStepFor, mechanicalSummary, CLI_LAYOUTS, detectHost.
 
@@ -12,7 +12,7 @@ import {
   matchesQuery,
   nextStepFor,
   mechanicalSummary,
-} from "../bin/dotclaude-handoff.mjs";
+} from "../bin/dotbabel-handoff.mjs";
 
 describe("UUID_HEAD_RE", () => {
   it("captures the first 8 hex of a UUID embedded in a path", () => {

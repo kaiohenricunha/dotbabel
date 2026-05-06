@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as barrel from "../src/index.mjs";
 
-describe("package barrel — @dotclaude/dotclaude", () => {
+describe("package barrel — @dotbabel/dotbabel", () => {
   it("exports at least 24 named symbols (public API surface guard)", () => {
     expect(Object.keys(barrel).length).toBeGreaterThanOrEqual(24);
   });

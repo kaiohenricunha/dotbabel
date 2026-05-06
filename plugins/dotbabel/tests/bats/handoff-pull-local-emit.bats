@@ -8,7 +8,7 @@
 #
 # Pinned contract:
 #   1. `pull <query>` renders the <handoff> block to stdout (§4.1 step 5/6).
-#   2. `pull` is local-only — DOTCLAUDE_HANDOFF_REPO pointing at a non-existent
+#   2. `pull` is local-only — DOTBABEL_HANDOFF_REPO pointing at a non-existent
 #      path must not break it; nothing reaches the remote (§4.1 "No transport").
 #   3. `pull --from <cli>` narrows resolution to that CLI's root (§4.1 step 2a,
 #      ARCH-3 priority order).
@@ -20,7 +20,7 @@
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
@@ -28,10 +28,10 @@ setup() {
   export XDG_CONFIG_HOME="$TEST_HOME"
   # Repo path that does not exist. If any pull codepath touches git, the
   # path-not-found error surfaces immediately. Pull must succeed regardless.
-  export DOTCLAUDE_HANDOFF_REPO="/nonexistent/dotclaude-pull-contract-$$"
+  export DOTBABEL_HANDOFF_REPO="/nonexistent/dotbabel-pull-contract-$$"
   # `pull` itself does not deprecate-warn; this guards against an incidental
   # collapse-to-bare-positional regression from leaking stderr noise.
-  export DOTCLAUDE_QUIET=1
+  export DOTBABEL_QUIET=1
 
   CLAUDE_UUID="aaaa1111-2222-2222-2222-222222222222"
   CODEX_UUID="eeee5555-6666-6666-6666-666666666666"
@@ -56,7 +56,7 @@ teardown() {
   [[ "$output" == *"cwd="* ]]
 }
 
-@test "pull <query>: never touches \$DOTCLAUDE_HANDOFF_REPO (§4.1 'no transport')" {
+@test "pull <query>: never touches \$DOTBABEL_HANDOFF_REPO (§4.1 'no transport')" {
   # The repo path is bogus. If any pull codepath reaches git, we'd see a
   # path-not-found error in stderr or a non-zero exit. Neither must happen.
   run node "$BIN" pull "$CLAUDE_SHORT"

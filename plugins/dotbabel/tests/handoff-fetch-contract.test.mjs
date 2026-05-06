@@ -7,11 +7,11 @@
 //   - --summary exits 64 because it is pull-only
 //   - unknown flag exits 64 (§4.3 step 1, §5.3.1)
 //
-// Companion to plugins/dotclaude/tests/bats/handoff-fetch-remote-download.bats
+// Companion to plugins/dotbabel/tests/bats/handoff-fetch-remote-download.bats
 // which covers the §4.3 data-flow path (push then fetch, transport required,
 // --from filtering). This file scopes to argv-shape only and does NOT need a
 // real transport repo — argv parsing happens before the transport check, so
-// negative cases that exit 64 work even with DOTCLAUDE_HANDOFF_REPO pointing
+// negative cases that exit 64 work even with DOTBABEL_HANDOFF_REPO pointing
 // at a non-existent path (as runHandoff() sets it to /nonexistent/...).
 //
 // Deliberately NOT pinned (extra-spec but tolerated):
@@ -26,14 +26,14 @@ import { tmpdir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
-const HANDOFF_BIN = resolve(repoRoot, "plugins/dotclaude/bin/dotclaude-handoff.mjs");
+const HANDOFF_BIN = resolve(repoRoot, "plugins/dotbabel/bin/dotbabel-handoff.mjs");
 
 /**
  * Run the handoff bin with the given args under a hermetic env. Returns
  * `{ status, stdout, stderr }` regardless of exit code (does not throw).
  *
  * Hermetic env: HOME + XDG_CONFIG_HOME point at a fresh temp dir so persisted
- * handoff.env cannot leak in. DOTCLAUDE_HANDOFF_REPO is deliberately set to a
+ * handoff.env cannot leak in. DOTBABEL_HANDOFF_REPO is deliberately set to a
  * non-existent path — for argv-rejection tests the parser exits before any
  * transport touch, and for argv-acceptance tests we use queries that never
  * resolve so exit-2-on-no-remote-match comes after argv parsing.
@@ -46,8 +46,8 @@ function runHandoff(args, hermeticHome) {
         ...process.env,
         HOME: hermeticHome,
         XDG_CONFIG_HOME: hermeticHome,
-        DOTCLAUDE_HANDOFF_REPO: "/nonexistent/handoff-fetch-contract",
-        DOTCLAUDE_QUIET: "1",
+        DOTBABEL_HANDOFF_REPO: "/nonexistent/handoff-fetch-contract",
+        DOTBABEL_QUIET: "1",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

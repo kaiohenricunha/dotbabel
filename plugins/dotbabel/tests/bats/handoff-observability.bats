@@ -7,10 +7,10 @@ load helpers
 
 bats_require_minimum_version 1.5.0
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
-EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
-DESCRIPTION="$REPO_ROOT/plugins/dotclaude/scripts/handoff-description.sh"
-HANDOFF_BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
+EXTRACT="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
+DESCRIPTION="$REPO_ROOT/plugins/dotbabel/scripts/handoff-description.sh"
+HANDOFF_BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"
@@ -52,10 +52,10 @@ teardown() {
   [[ "$output" == *"handoff-description:"* ]]
 }
 
-@test "dotclaude-handoff Node runtime errors carry 'dotclaude-handoff:' prefix" {
+@test "dotbabel-handoff Node runtime errors carry 'dotbabel-handoff:' prefix" {
   run node "$HANDOFF_BIN" pull nonexistent-query-xyz
   [ "$status" -eq 2 ]
-  [[ "$output" == *"dotclaude-handoff:"* ]]
+  [[ "$output" == *"dotbabel-handoff:"* ]]
 }
 
 # -- exit-code matrix ----------------------------------------------------
@@ -93,15 +93,15 @@ teardown() {
 
 # -- --help / --version contracts ---------------------------------------
 
-@test "dotclaude-handoff --version exits 0 and prints to stdout" {
+@test "dotbabel-handoff --version exits 0 and prints to stdout" {
   run node "$HANDOFF_BIN" --version
   [ "$status" -eq 0 ]
   # Semantic version line should be first; no "usage:" or error prefix.
   [[ "${lines[0]}" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]
 }
 
-@test "dotclaude-handoff --help exits 0 and names itself in output" {
+@test "dotbabel-handoff --help exits 0 and names itself in output" {
   run node "$HANDOFF_BIN" --help
   [ "$status" -eq 0 ]
-  [[ "$output" == *"dotclaude handoff"* ]]
+  [[ "$output" == *"dotbabel handoff"* ]]
 }

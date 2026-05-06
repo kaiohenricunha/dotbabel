@@ -6,9 +6,9 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
-EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
-HANDOFF_BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
+EXTRACT="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
+HANDOFF_BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"
@@ -80,9 +80,9 @@ teardown() {
   [[ "$output" == *"dddd4444-4444-4444-4444-444444444444.jsonl" ]]
 }
 
-# -- DOTCLAUDE_HANDOFF_REPO absolute path regression --------------------
+# -- DOTBABEL_HANDOFF_REPO absolute path regression --------------------
 
-@test "push accepts absolute-path DOTCLAUDE_HANDOFF_REPO (bare repo)" {
+@test "push accepts absolute-path DOTBABEL_HANDOFF_REPO (bare repo)" {
   # Bug: the URL allowlist originally required an explicit URL scheme
   # (https/git@/ssh://), rejecting local bare-repo paths used by tests
   # and by air-gapped setups. Fix added `/` and `file://` to the regex.
@@ -90,7 +90,7 @@ teardown() {
   make_transport_repo "$bare"
   # Seed a session so push has something to extract.
   make_claude_session_tree "$TEST_HOME" "eeee5555-5555-5555-5555-555555555555"
-  DOTCLAUDE_HANDOFF_REPO="$bare" \
+  DOTBABEL_HANDOFF_REPO="$bare" \
     run node "$HANDOFF_BIN" push eeee5555
   # The push path may fail later for unrelated reasons in a hermetic env
   # (no git user config etc.) — what we care about is that the URL

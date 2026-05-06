@@ -7,8 +7,8 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-RESOLVE="$REPO_ROOT/plugins/dotclaude/scripts/handoff-resolve.sh"
-EXTRACT="$REPO_ROOT/plugins/dotclaude/scripts/handoff-extract.sh"
+RESOLVE="$REPO_ROOT/plugins/dotbabel/scripts/handoff-resolve.sh"
+EXTRACT="$REPO_ROOT/plugins/dotbabel/scripts/handoff-extract.sh"
 
 setup() {
   [ -x "$RESOLVE" ] || chmod +x "$RESOLVE"

@@ -1,6 +1,6 @@
 /**
  * Tests for the taxonomy search / list / show CLI subcommands and
- * the --strict flag on dotclaude-index.
+ * the --strict flag on dotbabel-index.
  */
 
 import { describe, it, expect } from "vitest";
@@ -16,10 +16,10 @@ import { spawnSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIN_DIR = join(__dirname, "..", "bin");
-const SEARCH_BIN = join(BIN_DIR, "dotclaude-search.mjs");
-const LIST_BIN = join(BIN_DIR, "dotclaude-list.mjs");
-const SHOW_BIN = join(BIN_DIR, "dotclaude-show.mjs");
-const INDEX_BIN = join(BIN_DIR, "dotclaude-index.mjs");
+const SEARCH_BIN = join(BIN_DIR, "dotbabel-search.mjs");
+const LIST_BIN = join(BIN_DIR, "dotbabel-list.mjs");
+const SHOW_BIN = join(BIN_DIR, "dotbabel-show.mjs");
+const INDEX_BIN = join(BIN_DIR, "dotbabel-index.mjs");
 
 function mkRepo() {
   const root = mkdtempSync(join(tmpdir(), "dc-phase3-"));
@@ -108,7 +108,7 @@ function buildIndex(root) {
   return root;
 }
 
-describe("dotclaude-search", () => {
+describe("dotbabel-search", () => {
   it("exits 0 and returns a matching artifact by name", () => {
     const root = mkRepo();
     writeSkill(root, "kube-debugger");
@@ -210,7 +210,7 @@ describe("dotclaude-search", () => {
   });
 });
 
-describe("dotclaude-list", () => {
+describe("dotbabel-list", () => {
   it("lists all artifacts when no filters given", () => {
     const root = mkRepo();
     writeSkill(root, "kube-tool");
@@ -302,7 +302,7 @@ describe("dotclaude-list", () => {
   });
 });
 
-describe("dotclaude-show", () => {
+describe("dotbabel-show", () => {
   it("exits 0 and displays an artifact by id", () => {
     const root = mkRepo();
     writeSkill(root, "kube-debugger", {
@@ -422,7 +422,7 @@ describe("dotclaude-show", () => {
   });
 });
 
-describe("dotclaude-index --strict", () => {
+describe("dotbabel-index --strict", () => {
   it("exits 0 in strict mode when all artifacts are valid", () => {
     const root = mkRepo();
     writeSkill(root, "valid-skill");

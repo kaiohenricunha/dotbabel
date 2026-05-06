@@ -11,7 +11,7 @@ bats_require_minimum_version 1.5.0
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 STUB_DOCTOR=""
 
@@ -21,7 +21,7 @@ this_host_slug() {
 }
 
 # Push a stub branch directly, encoding tags into description + metadata.json.
-# Used to simulate branches written by older dotclaude installs (legacy
+# Used to simulate branches written by older dotbabel installs (legacy
 # single-tag) and to seed the histogram + filter tests deterministically.
 seed_handoff_branch() {
   local transport="$1" branch="$2" host="$3" cli="$4" desc_tag_seg="$5" meta_json="$6"
@@ -29,8 +29,8 @@ seed_handoff_branch() {
   (
     cd "$tmp"
     git init -q
-    git config user.email handoff@dotclaude.local
-    git config user.name dotclaude-handoff
+    git config user.email handoff@dotbabel.local
+    git config user.name dotbabel-handoff
     git checkout -q -b "$branch"
     printf 'stub handoff body\n' > handoff.md
     if [ -n "$desc_tag_seg" ]; then
@@ -56,12 +56,12 @@ setup() {
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   STUB_DOCTOR=$(mktemp)
   printf '#!/usr/bin/env bash\nexit 0\n' > "$STUB_DOCTOR"
   chmod +x "$STUB_DOCTOR"
-  export DOTCLAUDE_DOCTOR_SH="$STUB_DOCTOR"
+  export DOTBABEL_DOCTOR_SH="$STUB_DOCTOR"
 
   THIS_HOST=$(this_host_slug)
   export TRANSPORT_REPO STUB_DOCTOR THIS_HOST

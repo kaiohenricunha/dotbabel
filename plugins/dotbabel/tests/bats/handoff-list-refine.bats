@@ -4,14 +4,14 @@
 # - --from <cli> filter
 # - --since <ISO> filter
 # - --limit <N> / --all
-# - stderr warning when --remote + missing DOTCLAUDE_HANDOFF_REPO
+# - stderr warning when --remote + missing DOTBABEL_HANDOFF_REPO
 # - --json shape preserved with new fields
 
 load helpers
 
 bats_require_minimum_version 1.5.0
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 
 setup() {
   TEST_HOME=$(mktemp -d)
@@ -37,7 +37,7 @@ EOF
   TRANSPORT_REPO=$(mktemp -d)
   rm -rf "$TRANSPORT_REPO"
   git init -q --bare "$TRANSPORT_REPO"
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   export CLAUDE_FILE CODEX_FILE TRANSPORT_REPO
 }
@@ -123,21 +123,21 @@ teardown() {
 
 # -- Gap 5: stderr warning on missing transport env -----------------------
 
-@test "list --remote with missing DOTCLAUDE_HANDOFF_REPO warns on stderr" {
-  unset DOTCLAUDE_HANDOFF_REPO
+@test "list --remote with missing DOTBABEL_HANDOFF_REPO warns on stderr" {
+  unset DOTBABEL_HANDOFF_REPO
   run --separate-stderr node "$BIN" list --remote </dev/null
   # exit 2 when only --remote requested and nothing to show
   [ "$status" -eq 2 ]
-  [[ "$stderr" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [[ "$stderr" == *"DOTBABEL_HANDOFF_REPO"* ]]
 }
 
-@test "list (default) with missing DOTCLAUDE_HANDOFF_REPO still succeeds via local rows" {
-  unset DOTCLAUDE_HANDOFF_REPO
+@test "list (default) with missing DOTBABEL_HANDOFF_REPO still succeeds via local rows" {
+  unset DOTBABEL_HANDOFF_REPO
   run --separate-stderr node "$BIN" list </dev/null
   [ "$status" -eq 0 ]
   [[ "$output" == *"aaaa1111"* ]]
   # Warning still emitted so users know remote was skipped
-  [[ "$stderr" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [[ "$stderr" == *"DOTBABEL_HANDOFF_REPO"* ]]
 }
 
 # -- --json preserves new fields ------------------------------------------

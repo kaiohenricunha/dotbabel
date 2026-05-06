@@ -6,7 +6,7 @@
 //   - --limit <N> accepted
 //   - unknown flag exits 64 (§4.1 step 1, §5.3.1)
 //
-// Companion to plugins/dotclaude/tests/bats/handoff-pull-local-emit.bats which
+// Companion to plugins/dotbabel/tests/bats/handoff-pull-local-emit.bats which
 // covers the §4.1 data-flow path. This file scopes to argv-shape only and
 // spawns the bin to exercise it end-to-end through the parser.
 //
@@ -25,7 +25,7 @@ import { makeClaudeSession } from "./fixtures/handoff-sessions.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
-const HANDOFF_BIN = resolve(repoRoot, "plugins/dotclaude/bin/dotclaude-handoff.mjs");
+const HANDOFF_BIN = resolve(repoRoot, "plugins/dotbabel/bin/dotbabel-handoff.mjs");
 
 const CLAUDE_UUID = "aaaa1111-3333-3333-3333-333333333333";
 const CLAUDE_SHORT = CLAUDE_UUID.slice(0, 8);
@@ -35,7 +35,7 @@ const CLAUDE_SHORT = CLAUDE_UUID.slice(0, 8);
  * `{ status, stdout, stderr }` regardless of exit code (does not throw).
  *
  * Hermetic env covers HOME + XDG_CONFIG_HOME so persisted handoff.env
- * cannot leak in, plus DOTCLAUDE_HANDOFF_REPO set to a non-existent path
+ * cannot leak in, plus DOTBABEL_HANDOFF_REPO set to a non-existent path
  * so any inadvertent remote call surfaces as a non-zero exit.
  */
 function runHandoff(args, hermeticHome) {
@@ -46,8 +46,8 @@ function runHandoff(args, hermeticHome) {
         ...process.env,
         HOME: hermeticHome,
         XDG_CONFIG_HOME: hermeticHome,
-        DOTCLAUDE_HANDOFF_REPO: "/nonexistent/handoff-pull-contract",
-        DOTCLAUDE_QUIET: "1",
+        DOTBABEL_HANDOFF_REPO: "/nonexistent/handoff-pull-contract",
+        DOTBABEL_QUIET: "1",
       },
       stdio: ["ignore", "pipe", "pipe"],
     });

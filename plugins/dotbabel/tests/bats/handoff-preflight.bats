@@ -4,16 +4,16 @@
 #   - First push on a cold cache runs preflight.
 #   - Subsequent pushes within 5 min skip it (cache hit).
 #   - `--verify` forces a re-run.
-#   - Changing DOTCLAUDE_HANDOFF_REPO invalidates the cache.
+#   - Changing DOTBABEL_HANDOFF_REPO invalidates the cache.
 #   - `doctor` verb remains on-demand (never consults the cache).
 #
-# Uses DOTCLAUDE_DOCTOR_SH to swap in a counter-shim so we can measure the
+# Uses DOTBABEL_DOCTOR_SH to swap in a counter-shim so we can measure the
 # number of doctor invocations without patching the shipped script.
 
 load helpers
 
-BIN="$REPO_ROOT/plugins/dotclaude/bin/dotclaude-handoff.mjs"
-REAL_DOCTOR="$REPO_ROOT/plugins/dotclaude/scripts/handoff-doctor.sh"
+BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-handoff.mjs"
+REAL_DOCTOR="$REPO_ROOT/plugins/dotbabel/scripts/handoff-doctor.sh"
 
 setup() {
   TEST_HOME=$(make_tmp_home)
@@ -33,7 +33,7 @@ setup() {
 EOF
 
   TRANSPORT_REPO=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$TRANSPORT_REPO"
+  export DOTBABEL_HANDOFF_REPO="$TRANSPORT_REPO"
 
   # Counter-shim that delegates to the real doctor and increments a file.
   COUNTER_FILE="$TEST_HOME/doctor-calls"
@@ -45,14 +45,14 @@ echo \$((n + 1)) > "$COUNTER_FILE"
 exec "$REAL_DOCTOR" "\$@"
 EOF
   chmod +x "$SHIM_DOCTOR"
-  export DOTCLAUDE_DOCTOR_SH="$SHIM_DOCTOR"
+  export DOTBABEL_DOCTOR_SH="$SHIM_DOCTOR"
   printf 0 > "$COUNTER_FILE"
 
   export CLAUDE_UUID TRANSPORT_REPO COUNTER_FILE SHIM_DOCTOR
 }
 
 teardown() {
-  unset DOTCLAUDE_DOCTOR_SH
+  unset DOTBABEL_DOCTOR_SH
   rm -rf "$TEST_HOME" "$TRANSPORT_REPO"
 }
 
@@ -90,7 +90,7 @@ counter() { cat "$COUNTER_FILE"; }
 
 # --- transport-config change invalidates the cache ----------------------
 
-@test "push: switching DOTCLAUDE_HANDOFF_REPO re-runs preflight" {
+@test "push: switching DOTBABEL_HANDOFF_REPO re-runs preflight" {
   run node "$BIN" push --from claude "$CLAUDE_UUID"
   [ "$status" -eq 0 ]
   [ "$(counter)" -eq 1 ]
@@ -99,7 +99,7 @@ counter() { cat "$COUNTER_FILE"; }
   # mismatches → isFresh() must refuse the entry and re-run doctor.
   local second_repo
   second_repo=$(make_transport_repo "$(mktemp -d)")
-  export DOTCLAUDE_HANDOFF_REPO="$second_repo"
+  export DOTBABEL_HANDOFF_REPO="$second_repo"
 
   run node "$BIN" push --from claude "$CLAUDE_UUID"
   [ "$status" -eq 0 ]
@@ -124,7 +124,7 @@ counter() { cat "$COUNTER_FILE"; }
   run node "$BIN" doctor
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
-  [[ "$output" == *"DOTCLAUDE_HANDOFF_REPO"* ]]
+  [[ "$output" == *"DOTBABEL_HANDOFF_REPO"* ]]
 
   # Counter is unchanged: the doctor verb shells to the real script via
   # absolute path and never consults the shim.
