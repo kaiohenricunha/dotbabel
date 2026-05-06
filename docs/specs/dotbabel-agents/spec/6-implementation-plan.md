@@ -11,7 +11,7 @@
 | 3     | Update `plugin.json` with `agents` array                     | Phase 2 (agents must exist first) |
 | 4     | Update `bootstrap.sh` to copy agents                         | Phase 2                           |
 | 5     | Add `/agents:search` skill                                   | Phase 2 (needs agents to search)  |
-| 6     | Update `dotclaude-validate-skills` to lint agent frontmatter | Phase 2                           |
+| 6     | Update `dotbabel-validate-skills` to lint agent frontmatter | Phase 2                           |
 
 Phases 1 and 2 are fully parallelizable.
 
@@ -26,13 +26,13 @@ Phases 1 and 2 are fully parallelizable.
 
 ### Workstream B — Starter agents (Phase 2)
 
-- Create `plugins/dotclaude/templates/claude/agents/`
+- Create `plugins/dotbabel/templates/claude/agents/`
 - Author 8 starter agents (see §5 for list and tier assignments)
 - Each must pass frontmatter validation: `name`, `description`, `tools`, `model`
 
 ### Workstream C — Plugin manifest + bootstrap (Phases 3–4, depends on B)
 
-- Add `agents` array to `plugins/dotclaude/.claude-plugin/plugin.json`
+- Add `agents` array to `plugins/dotbabel/.claude-plugin/plugin.json`
 - Update `bootstrap.sh` to copy `templates/claude/agents/` → `~/.claude/agents/` (skip if file exists — OPS-1)
 
 ### Workstream D — Discovery skill (Phase 5, depends on B)
@@ -43,7 +43,7 @@ Phases 1 and 2 are fully parallelizable.
 
 ### Workstream E — Validator update (Phase 6, depends on B)
 
-- Extend `dotclaude-validate-skills` to also lint `~/.claude/agents/*.md`
+- Extend `dotbabel-validate-skills` to also lint `~/.claude/agents/*.md`
 - Required fields: `name`, `description`, `tools`, `model`
 - Valid model values: `opus`, `sonnet`, `haiku`, `inherit`
 
@@ -53,9 +53,9 @@ Phases 1 and 2 are fully parallelizable.
 
 ```
 Read first:
-- plugins/dotclaude/templates/claude/skills-manifest.json
+- plugins/dotbabel/templates/claude/skills-manifest.json
 - skills/ (glob all .md files, read frontmatter)
-- docs/specs/dotclaude-agents/spec/5-interfaces-apis.md (model routing table)
+- docs/specs/dotbabel-agents/spec/5-interfaces-apis.md (model routing table)
 
 Task: Add `model:` frontmatter to every skill .md file under skills/.
 Use the tier assignment table in §5 as guidance:
@@ -65,15 +65,15 @@ Use the tier assignment table in §5 as guidance:
 - inherit: skills that orchestrate other skills (dispatching-parallel-agents, executing-plans)
 
 Failing test first:
-- test: skills missing model: frontmatter → dotclaude-validate-skills exits non-zero
+- test: skills missing model: frontmatter → dotbabel-validate-skills exits non-zero
 ```
 
 ### Prompt 2 — Starter agents (Workstream B)
 
 ```
 Read first:
-- plugins/dotclaude/templates/claude/agents/ (create this directory)
-- docs/specs/dotclaude-agents/spec/5-interfaces-apis.md (agent file format + tier table)
+- plugins/dotbabel/templates/claude/agents/ (create this directory)
+- docs/specs/dotbabel-agents/spec/5-interfaces-apis.md (agent file format + tier table)
 - /home/kaiocunha/Projects/VoltAgent/awesome-claude-code-subagents/categories/01-core-development/ (reference)
 - /home/kaiocunha/Projects/VoltAgent/awesome-claude-code-subagents/categories/04-quality-security/ (reference)
 
@@ -90,10 +90,10 @@ Failing test first:
 
 ```
 Read first:
-- plugins/dotclaude/.claude-plugin/plugin.json
+- plugins/dotbabel/.claude-plugin/plugin.json
 - bootstrap.sh
-- plugins/dotclaude/templates/claude/agents/ (must exist from Prompt 2)
-- plugins/dotclaude/tests/bats/bootstrap.bats
+- plugins/dotbabel/templates/claude/agents/ (must exist from Prompt 2)
+- plugins/dotbabel/tests/bats/bootstrap.bats
 
 Task:
 1. Add "agents" array to plugin.json pointing to all 8 agent files
@@ -112,7 +112,7 @@ Failing test first:
 Read first:
 - skills/dependabot-sweep.md (reference for skill structure)
 - skills/changelog.md (reference for haiku-tier skill)
-- docs/specs/dotclaude-agents/spec/5-interfaces-apis.md (command interface)
+- docs/specs/dotbabel-agents/spec/5-interfaces-apis.md (command interface)
 - /home/kaiocunha/Projects/VoltAgent/awesome-claude-code-subagents/tools/subagent-catalog/ (reference)
 
 Task: Author skills/agents-search.md implementing the four sub-commands from §5.
@@ -128,10 +128,10 @@ Failing test first:
 
 ```
 Read first:
-- plugins/dotclaude/src/validate-skills-inventory.mjs
-- plugins/dotclaude/tests/validate-skills-inventory.test.mjs
-- plugins/dotclaude/bin/dotclaude-validate-skills.mjs
-- docs/specs/dotclaude-agents/spec/5-interfaces-apis.md (required fields + valid model values)
+- plugins/dotbabel/src/validate-skills-inventory.mjs
+- plugins/dotbabel/tests/validate-skills-inventory.test.mjs
+- plugins/dotbabel/bin/dotbabel-validate-skills.mjs
+- docs/specs/dotbabel-agents/spec/5-interfaces-apis.md (required fields + valid model values)
 
 Task: Extend validate-skills-inventory to also validate agent files under .claude/agents/.
 Required fields: name, description, tools, model.
@@ -148,8 +148,8 @@ Failing test first:
 
 | Unit                       | UNIT                                         | INTEGRATION                                      | POST-DEPLOY                                |
 | -------------------------- | -------------------------------------------- | ------------------------------------------------ | ------------------------------------------ |
-| Model routing frontmatter  | Validate all skills have valid model: value  | `dotclaude-validate-skills` exits 0 on full repo | Spot-check one skill invocation per tier   |
-| Starter agents             | Each agent has required fields + valid model | `dotclaude-validate-skills` passes on agents/    | Claude Code surfaces agents in UI          |
+| Model routing frontmatter  | Validate all skills have valid model: value  | `dotbabel-validate-skills` exits 0 on full repo | Spot-check one skill invocation per tier   |
+| Starter agents             | Each agent has required fields + valid model | `dotbabel-validate-skills` passes on agents/    | Claude Code surfaces agents in UI          |
 | `plugin.json` agents array | JSON schema check                            | `claude plugin install` picks up agents          | Agents appear in fresh install             |
 | `bootstrap.sh` agent copy  | Bats: installs agents; skips existing        | End-to-end bootstrap on clean $HOME              | `ls ~/.claude/agents/` post-bootstrap      |
 | `/agents:search` skill     | Cache TTL logic; fallback on network failure | Search returns installed agents                  | `search security` returns security-auditor |

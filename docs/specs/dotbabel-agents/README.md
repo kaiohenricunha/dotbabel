@@ -1,4 +1,4 @@
-# dotclaude-agents — Engineering Spec
+# dotbabel-agents — Engineering Spec
 
 > Created: 2026-04-15
 

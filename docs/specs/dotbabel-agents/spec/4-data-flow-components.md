@@ -4,10 +4,10 @@
 
 ## Current State
 
-`plugins/dotclaude/templates/claude/` holds settings, hooks, and `skills-manifest.json`. `bootstrap.sh` copies these into `~/.claude/`. The `plugin.json` is flat with no `agents` field. No `agents/` directory exists anywhere in the template tree. Skills have no `model:` frontmatter — all run on whatever model the user has active.
+`plugins/dotbabel/templates/claude/` holds settings, hooks, and `skills-manifest.json`. `bootstrap.sh` copies these into `~/.claude/`. The `plugin.json` is flat with no `agents` field. No `agents/` directory exists anywhere in the template tree. Skills have no `model:` frontmatter — all run on whatever model the user has active.
 
 ```
-plugins/dotclaude/
+plugins/dotbabel/
 ├── .claude-plugin/plugin.json      ← no agents field
 ├── templates/
 │   └── claude/
@@ -33,14 +33,14 @@ plugins/dotclaude/
 | ---------------- | ----------------------------------- | --------------------------- |
 | Installed agents | `~/.claude/agents/*.md`             | Claude Code runtime         |
 | Catalog cache    | `~/.claude/cache/agents-catalog.md` | `/agents:search` skill      |
-| Skills manifest  | `~/.claude/skills-manifest.json`    | `dotclaude-validate-skills` |
+| Skills manifest  | `~/.claude/skills-manifest.json`    | `dotbabel-validate-skills` |
 
 No shared mutable state between agents at runtime — each agent is stateless and scoped to its invocation.
 
 ## Target Architecture
 
 ```
-plugins/dotclaude/
+plugins/dotbabel/
 ├── .claude-plugin/plugin.json      ← gains "agents" array
 ├── templates/
 │   └── claude/
@@ -67,5 +67,5 @@ bootstrap.sh
 ### Key Decisions
 
 - **KD-1**: Agents land in `templates/claude/agents/` — matches existing `templates/claude/` convention (not `templates/.claude/`). See §6 for migration note.
-- **KD-2**: `plugin.json` gains an `agents` array — Claude Code reads this natively, no dotclaude runtime changes needed.
+- **KD-2**: `plugin.json` gains an `agents` array — Claude Code reads this natively, no dotbabel runtime changes needed.
 - **KD-3**: `/agents:search` is a skill, not an agent — it's a user-invoked command, not a persistent specialist. Feeds into §5.

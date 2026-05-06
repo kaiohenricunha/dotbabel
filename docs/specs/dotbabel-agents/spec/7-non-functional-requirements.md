@@ -18,7 +18,7 @@
 
 - **OPS-1**: Bootstrap must never overwrite a user-modified agent file. Copy only if the destination does not exist. Users who want updates must delete and re-run. See §6 Prompt 3.
 - **OPS-2**: The `agents` array in `plugin.json` must use relative paths so the plugin works regardless of where the repo is cloned.
-- **OPS-3**: All starter agents must pass `dotclaude-validate-skills` on every CI run. The validate-skills workflow is the enforcement gate.
+- **OPS-3**: All starter agents must pass `dotbabel-validate-skills` on every CI run. The validate-skills workflow is the enforcement gate.
 - **OPS-4**: Cache file at `~/.claude/cache/agents-catalog.md` must not be committed. The file lives under `~/.claude/`, which is outside the repo directory and therefore cannot be tracked by this repo's git history.
 
 ## Security

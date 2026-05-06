@@ -41,13 +41,13 @@ exit 0 with it.
 
 ### REL-3 — Bootstrap is idempotent
 
-Running `dotclaude handoff push` repeatedly when bootstrap is needed:
+Running `dotbabel handoff push` repeatedly when bootstrap is needed:
 
 - If `gh repo create` reports the repo already exists, the binary
   treats it as a re-use, not an error.
 - If the persisted env file already contains a valid URL,
   `loadPersistedEnv()` does not overwrite a caller-set
-  `DOTCLAUDE_HANDOFF_REPO`.
+  `DOTBABEL_HANDOFF_REPO`.
 - Re-running with the same `--from <cli>` and same source session
   produces the same branch path; the second push hits the
   same-session-id update path of REL-2, not the collision path.
@@ -77,7 +77,7 @@ per pattern; the suite is the authoritative pattern inventory.
 
 ### SEC-2 — Transport URL validator rejects exec-triggering schemes
 
-`validateTransportUrl()` (in `plugins/dotclaude/src/lib/handoff-remote.mjs`)
+`validateTransportUrl()` (in `plugins/dotbabel/src/lib/handoff-remote.mjs`)
 must accept only:
 
 - `https://`
@@ -93,13 +93,13 @@ is rejected with exit 2. This is the CVE-2017-1000117 class of attack
 operations).
 
 **Test:** unit test on the validator with a fixture of known-bad
-schemes; bats integration on `push` with `DOTCLAUDE_HANDOFF_REPO=ext::…`
+schemes; bats integration on `push` with `DOTBABEL_HANDOFF_REPO=ext::…`
 asserting exit 2 before any git op fires.
 
 ### SEC-3 — Persisted env file is mode 0600
 
-`$XDG_CONFIG_HOME/dotclaude/handoff.env` (default
-`~/.config/dotclaude/handoff.env`) is written with mode `0600` and
+`$XDG_CONFIG_HOME/dotbabel/handoff.env` (default
+`~/.config/dotbabel/handoff.env`) is written with mode `0600` and
 its parent directory with `0700`. The file may contain a path that
 embeds an SSH credential helper hint or a token in a `git@` URL with
 embedded auth; world-readable mode is unacceptable.
@@ -160,12 +160,12 @@ a smell detector before the user notices.
 
 ### OPS-1 — Drift test runs as a CI gate on every PR
 
-ARCH-10's drift test (`plugins/dotclaude/tests/handoff-drift.test.mjs`)
+ARCH-10's drift test (`plugins/dotbabel/tests/handoff-drift.test.mjs`)
 runs in CI on every PR that touches:
 
 - `skills/handoff/**`
-- `plugins/dotclaude/bin/dotclaude-handoff.mjs`
-- `plugins/dotclaude/src/lib/handoff-remote.mjs`
+- `plugins/dotbabel/bin/dotbabel-handoff.mjs`
+- `plugins/dotbabel/src/lib/handoff-remote.mjs`
 - `docs/handoff-guide.md`
 
 Failing drift = failing PR. No "drift will be cleaned up later" PRs;

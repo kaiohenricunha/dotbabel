@@ -4,11 +4,11 @@
 
 ## System Overview
 
-The agent layer sits alongside the existing skills layer. Agents are `.md` files with YAML frontmatter placed under `.claude/agents/`. dotclaude ships a curated set via its plugin template; `bootstrap.sh` copies them into the user's environment. A `/agents:search` skill provides discovery. Model routing (`model:` frontmatter) is a convention read natively by Claude Code — no new runtime tooling required.
+The agent layer sits alongside the existing skills layer. Agents are `.md` files with YAML frontmatter placed under `.claude/agents/`. dotbabel ships a curated set via its plugin template; `bootstrap.sh` copies them into the user's environment. A `/agents:search` skill provides discovery. Model routing (`model:` frontmatter) is a convention read natively by Claude Code — no new runtime tooling required.
 
 ```
-dotclaude repo
-└── plugins/dotclaude/templates/
+dotbabel repo
+└── plugins/dotbabel/templates/
     └── .claude/
         ├── agents/          ← new: bundled starter agents
         └── skills/          ← existing

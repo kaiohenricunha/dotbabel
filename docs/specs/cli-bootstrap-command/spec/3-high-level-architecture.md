@@ -12,7 +12,7 @@ developer's home directory (`~/.claude/`).
 Developer machine
 ┌─────────────────────────────────────────────────────────┐
 │                                                         │
-│  dotclaude bootstrap / sync                             │
+│  dotbabel bootstrap / sync                             │
 │         │                                               │
 │         ▼                                               │
 │  bootstrap-global.mjs ◄── source resolver               │
@@ -20,7 +20,7 @@ Developer machine
 │         │                  │   import.meta.url → pkg    │
 │         │                  │   root → commands/ skills/ │
 │         │                  └─ clone mode:               │
-│         │                      DOTCLAUDE_DIR / --source │
+│         │                      DOTBABEL_DIR / --source │
 │         │                                               │
 │         ▼                                               │
 │  ~/.claude/                                             │
@@ -36,14 +36,14 @@ Developer machine
 └─────────────────────────────────────────────────────────┘
 ```
 
-ARCH-1: All writes are idempotent. Re-running `dotclaude bootstrap` on an
+ARCH-1: All writes are idempotent. Re-running `dotbabel bootstrap` on an
 already-bootstrapped machine must produce the same state without data loss.
 Existing symlinks are updated if they point elsewhere; real files are backed
 up with a `.bak-<timestamp>` suffix before overwriting (identical to
 `bootstrap.sh` behavior).
 
 ARCH-2: Source resolution is deterministic and explicit. The resolution order
-is: `--source` flag → `DOTCLAUDE_DIR` env var → npm package root (derived
+is: `--source` flag → `DOTBABEL_DIR` env var → npm package root (derived
 from `import.meta.url`). No silent fallbacks.
 
 ARCH-3: The two modes (npm / clone) share the same `bootstrap-global.mjs`
@@ -62,13 +62,13 @@ identical.
 
 | Service              | Purpose                                                                                     | Rate Limits / Constraints                                                              |
 | -------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `registry.npmjs.org` | `npm view @dotclaude/dotclaude version` for `sync status` + `npm update -g` for `sync pull` | npm rate-limits unauthenticated fetches to ~1 req/sec; trivial for interactive CLI use |
+| `registry.npmjs.org` | `npm view @dotbabel/dotbabel version` for `sync status` + `npm update -g` for `sync pull` | npm rate-limits unauthenticated fetches to ~1 req/sec; trivial for interactive CLI use |
 | `git` binary         | Clone-mode `sync pull` / `push` / `status`                                                  | Must be present in PATH; absence is an ENV error (exit 2)                              |
 | `npm` binary         | npm-mode `sync pull`                                                                        | Must be present in PATH; absence is an ENV error (exit 2)                              |
 
 ## Deployment
 
-Shipped as part of the `@dotclaude/dotclaude` npm package. No additional
+Shipped as part of the `@dotbabel/dotbabel` npm package. No additional
 infrastructure. The two new source files are bundled in the same package;
 `commands/`, `skills/`, and `CLAUDE.md` are added to the `files` array so
 they are included in the published tarball.

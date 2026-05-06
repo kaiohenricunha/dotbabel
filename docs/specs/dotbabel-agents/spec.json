@@ -1,22 +1,22 @@
 {
-  "id": "dotclaude-agents",
-  "title": "First-class agent support in dotclaude",
+  "id": "dotbabel-agents",
+  "title": "First-class agent support in dotbabel",
   "status": "done",
-  "owners": ["dotclaude maintainers"],
+  "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "bootstrap.sh",
     ".claude/skills-manifest.json",
     "commands/**",
     "skills/**",
-    "plugins/dotclaude/.claude-plugin/plugin.json",
-    "plugins/dotclaude/templates/claude/agents/**",
-    "plugins/dotclaude/src/validate-skills-inventory.mjs",
-    "plugins/dotclaude/src/lib/errors.mjs",
-    "plugins/dotclaude/src/index.mjs",
-    "plugins/dotclaude/bin/dotclaude-validate-skills.mjs",
-    "plugins/dotclaude/tests/validate-skills-inventory.test.mjs"
+    "plugins/dotbabel/.claude-plugin/plugin.json",
+    "plugins/dotbabel/templates/claude/agents/**",
+    "plugins/dotbabel/src/validate-skills-inventory.mjs",
+    "plugins/dotbabel/src/lib/errors.mjs",
+    "plugins/dotbabel/src/index.mjs",
+    "plugins/dotbabel/bin/dotbabel-validate-skills.mjs",
+    "plugins/dotbabel/tests/validate-skills-inventory.test.mjs"
   ],
-  "acceptance_commands": ["npm test", "node plugins/dotclaude/bin/dotclaude-validate-skills.mjs ."],
-  "depends_on_specs": ["dotclaude-core"],
+  "acceptance_commands": ["npm test", "node plugins/dotbabel/bin/dotbabel-validate-skills.mjs ."],
+  "depends_on_specs": ["dotbabel-core"],
   "active_prs": []
 }

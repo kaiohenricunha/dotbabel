@@ -9,8 +9,8 @@ Bootstrap flow today:
 ```
 Developer
   │
-  ├─ clone dotclaude repo
-  ├─ cd ~/projects/dotclaude
+  ├─ clone dotbabel repo
+  ├─ cd ~/projects/dotbabel
   └─ ./bootstrap.sh
        ├─ symlink CLAUDE.md → ~/.claude/CLAUDE.md
        ├─ symlink commands/*.md → ~/.claude/commands/
@@ -24,25 +24,25 @@ Sync flow today:
        └─ ./bootstrap.sh   (re-run)
 ```
 
-Both flows require the developer to be inside the dotclaude clone directory.
+Both flows require the developer to be inside the dotbabel clone directory.
 The npm CLI has no awareness of these operations.
 
 ## Component Boundaries
 
 | Component                 | File   | Responsibility                                                           |
 | ------------------------- | ------ | ------------------------------------------------------------------------ |
-| `dotclaude-bootstrap.mjs` | `bin/` | CLI entry-point: arg parsing, help text, exit codes                      |
-| `dotclaude-sync.mjs`      | `bin/` | CLI entry-point for `sync <subcommand>`; routes to sync-global           |
+| `dotbabel-bootstrap.mjs` | `bin/` | CLI entry-point: arg parsing, help text, exit codes                      |
+| `dotbabel-sync.mjs`      | `bin/` | CLI entry-point for `sync <subcommand>`; routes to sync-global           |
 | `bootstrap-global.mjs`    | `src/` | Core symlinking logic: source resolution, backup, link-one, agents copy  |
 | `sync-global.mjs`         | `src/` | Pull (npm update / git rebase) + status + push; delegates bootstrap step |
-| `dotclaude.mjs`           | `bin/` | Umbrella dispatcher; adds `bootstrap` + `sync` to SUBCOMMANDS            |
-| `dotclaude-doctor.mjs`    | `bin/` | Existing diagnostic; extended to check bootstrap state                   |
+| `dotbabel.mjs`           | `bin/` | Umbrella dispatcher; adds `bootstrap` + `sync` to SUBCOMMANDS            |
+| `dotbabel-doctor.mjs`    | `bin/` | Existing diagnostic; extended to check bootstrap state                   |
 
 ## Shared State
 
 - `~/.claude/` — written by bootstrap, read by doctor. No locking needed;
   the CLI is not designed for concurrent invocations.
-- `DOTCLAUDE_DIR` environment variable — read by both `bootstrap-global.mjs`
+- `DOTBABEL_DIR` environment variable — read by both `bootstrap-global.mjs`
   and `sync-global.mjs` to locate the clone in clone mode.
 
 ## Target Architecture
@@ -54,7 +54,7 @@ bootstrapGlobal(opts)
   opts: { source?, target?, quiet?, json?, noColor? }
 
 1. resolveSource(opts.source)
-   └─ --source → DOTCLAUDE_DIR → pkgRoot()     [ARCH-2]
+   └─ --source → DOTBABEL_DIR → pkgRoot()     [ARCH-2]
 2. resolveTarget(opts.target)
    └─ opts.target ?? $HOME/.claude
 3. mkdir -p target
@@ -63,7 +63,7 @@ bootstrapGlobal(opts)
      linkOne(f, target/commands/<name>)
 6. for d in source/skills/*/:
      linkOne(d, target/skills/<name>)
-7. for f in source/plugins/dotclaude/templates/claude/agents/*.md:
+7. for f in source/plugins/dotbabel/templates/claude/agents/*.md:
      copyAgent(f, target/agents/<name>)   ← skip if exists [KD-1]
 8. out.pass/fail/warn per step            [ARCH-1]
 
@@ -84,9 +84,9 @@ syncGlobal(subcommand, opts)
 mode = resolveMode(opts.source)   ← 'npm' | 'clone'
 
 pull (npm mode):
-  1. npm view @dotclaude/dotclaude version → latestVer
+  1. npm view @dotbabel/dotbabel version → latestVer
   2. if latestVer === currentVer → out.info "already up to date"
-  3. else: spawnSync('npm', ['update', '-g', '@dotclaude/dotclaude'])
+  3. else: spawnSync('npm', ['update', '-g', '@dotbabel/dotbabel'])
   4. bootstrapGlobal(opts)
 
 pull (clone mode):
@@ -96,7 +96,7 @@ pull (clone mode):
 
 status (npm mode):
   1. currentVer = version (from index.mjs)
-  2. latestVer = npm view @dotclaude/dotclaude version
+  2. latestVer = npm view @dotbabel/dotbabel version
   3. out.info "installed: <currentVer>  latest: <latestVer>"
 
 status (clone mode):
@@ -105,7 +105,7 @@ status (clone mode):
 push (clone mode only):
   1. secretScan(source)   [KD-2]
   2. git add -A
-  3. git commit -m "dotclaude: sync <date>"
+  3. git commit -m "dotbabel: sync <date>"
   4. git push
 push (npm mode): out.fail "sync push is only available in clone mode (--source)"
 ```

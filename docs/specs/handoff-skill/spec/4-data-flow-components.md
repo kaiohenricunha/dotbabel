@@ -27,10 +27,10 @@ those lines.
 
 | State                                                                    | Lifetime              | Read by                                     | Written by                |
 | ------------------------------------------------------------------------ | --------------------- | ------------------------------------------- | ------------------------- |
-| `$DOTCLAUDE_HANDOFF_REPO` (env)                                          | shell process         | every `push` / `fetch` / `list -r`          | self-bootstrap            |
-| `$XDG_CONFIG_HOME/dotclaude/handoff.env`                                 | persistent, mode 0600 | binary startup (sourced)                    | self-bootstrap (one-time) |
+| `$DOTBABEL_HANDOFF_REPO` (env)                                          | shell process         | every `push` / `fetch` / `list -r`          | self-bootstrap            |
+| `$XDG_CONFIG_HOME/dotbabel/handoff.env`                                 | persistent, mode 0600 | binary startup (sourced)                    | self-bootstrap (one-time) |
 | `~/.claude/projects/`, `~/.copilot/session-state/`, `~/.codex/sessions/` | persistent            | `pull`, `push --query`, `search`, `list -l` | the host CLIs themselves  |
-| `$DOTCLAUDE_HANDOFF_REPO`'s `handoff/...` branches                       | persistent            | `fetch`, `list -r`                          | `push`                    |
+| `$DOTBABEL_HANDOFF_REPO`'s `handoff/...` branches                       | persistent            | `fetch`, `list -r`                          | `push`                    |
 
 No in-process caches, no daemons, no inter-invocation state on the local
 filesystem beyond the persisted env file.
@@ -45,7 +45,7 @@ The user is in agent T (target), wants to pull session `<query>` from
 agent S (source) on the same machine. T is implicit; S is resolved.
 
 ```
-INPUT:  dotclaude handoff pull <query> [--from <cli>]
+INPUT:  dotbabel handoff pull <query> [--from <cli>]
 
  1. Argv parse. <query> is the only positional. --from is optional.
     No --to. Exit 64 if any unknown flag.
@@ -114,7 +114,7 @@ Implications:
 ### 4.2 `push [<query>] [--tag <label>...] [--from <cli>]` — upload to remote
 
 ```
-INPUT: dotclaude handoff push [<query>] [--tag a [--tag b ...]] [--from <cli>]
+INPUT: dotbabel handoff push [<query>] [--tag a [--tag b ...]] [--from <cli>]
 
  1. Argv parse.
     - <query> optional positional.
@@ -129,7 +129,7 @@ INPUT: dotclaude handoff push [<query>] [--tag a [--tag b ...]] [--from <cli>]
 
  3. Transport ready-check:
        requireTransportRepo()
-         - If $DOTCLAUDE_HANDOFF_REPO set → validate URL, return.
+         - If $DOTBABEL_HANDOFF_REPO set → validate URL, return.
          - Else if TTY + gh authenticated → bootstrap interactively
            (gh repo create --private, persist URL, set env).
          - Else → exit 2 with manual-setup block.
@@ -178,7 +178,7 @@ INPUT: dotclaude handoff push [<query>] [--tag a [--tag b ...]] [--from <cli>]
 
 12. Operation:
        mkdtemp; git init -q
-       git remote add origin $DOTCLAUDE_HANDOFF_REPO
+       git remote add origin $DOTBABEL_HANDOFF_REPO
        git checkout -q -b handoff/<project>/<cli>/<month>/<short>
        write handoff.md (scrubbed block)
        write metadata.json
@@ -200,7 +200,7 @@ OUTPUT: branch + url + description + scrub count, one per line.
 ### 4.3 `fetch <query> [--from <cli>]` — download from remote
 
 ```
-INPUT: dotclaude handoff fetch <query> [--from <cli>]
+INPUT: dotbabel handoff fetch <query> [--from <cli>]
 
  1. Argv parse. <query> mandatory; matches against tag, branch suffix,
     commit prefix, or description substring. --from optional, narrows
@@ -208,12 +208,12 @@ INPUT: dotclaude handoff fetch <query> [--from <cli>]
 
  2. Read-only transport check:
        requireTransportRepoStrict()
-         - $DOTCLAUDE_HANDOFF_REPO must be set; no bootstrap. Exit 2 if
+         - $DOTBABEL_HANDOFF_REPO must be set; no bootstrap. Exit 2 if
            unset (fetch on a fresh machine: user runs `push` first or
            sets the env var).
 
  3. List remote refs:
-       git ls-remote $DOTCLAUDE_HANDOFF_REPO refs/heads/handoff/* refs/tags/*
+       git ls-remote $DOTBABEL_HANDOFF_REPO refs/heads/handoff/* refs/tags/*
 
  4. Match priority (KD-4: same prompt-or-exit-2 model as `pull`):
     a. Exact tag: refs/tags/<query>.
@@ -233,7 +233,7 @@ INPUT: dotclaude handoff fetch <query> [--from <cli>]
 
  6. Shallow clone:
        mkdtemp
-       git clone -q --depth 1 --branch <branch> $DOTCLAUDE_HANDOFF_REPO .
+       git clone -q --depth 1 --branch <branch> $DOTBABEL_HANDOFF_REPO .
        read tmp/handoff.md verbatim.
 
  7. Stdout: handoff.md content (already a complete <handoff>…</handoff>
@@ -254,8 +254,8 @@ INITIAL STATE: empty private repo.
     store (small, idempotent, gives the GitHub UI a non-empty default).
     `main` is never written to again by push/fetch/list.
 
-FIRST PUSH (project=dotclaude, cli=claude, month=2026-04, short=aaaa1111):
-    refs/heads/handoff/dotclaude/claude/2026-04/aaaa1111
+FIRST PUSH (project=dotbabel, cli=claude, month=2026-04, short=aaaa1111):
+    refs/heads/handoff/dotbabel/claude/2026-04/aaaa1111
     └── handoff.md, metadata.json, description.txt
     Optional refs/tags/<label> if --tag was passed.
 
@@ -270,9 +270,9 @@ RE-PUSH OF SAME SESSION, NEXT MONTH:
     user GCs it). This bounds any single ls-remote prefix.
 
 MULTIPLE SESSIONS, SAME PROJECT/CLI/MONTH:
-    refs/heads/handoff/dotclaude/claude/2026-04/aaaa1111
-    refs/heads/handoff/dotclaude/claude/2026-04/bbbb2222
-    refs/heads/handoff/dotclaude/claude/2026-04/cccc3333
+    refs/heads/handoff/dotbabel/claude/2026-04/aaaa1111
+    refs/heads/handoff/dotbabel/claude/2026-04/bbbb2222
+    refs/heads/handoff/dotbabel/claude/2026-04/cccc3333
     Each ls-remote returns all three; user filters via search/list/fetch.
 
 TAG LIFECYCLE:
@@ -420,7 +420,7 @@ in their own probe code. Eliminating env-detection eliminates the
 ### KD-6 — SKILL.md auto-trigger contract pre-fills `--from`
 
 The skill markdown explicitly instructs Claude / Copilot host LLMs to
-include `--from <its-own-cli-name>` when invoking `dotclaude handoff
+include `--from <its-own-cli-name>` when invoking `dotbabel handoff
 push` without a query. The host LLM trivially knows its own identity;
 this turns the binary's mandatory `--from` into invisible-to-the-user
 plumbing for the slash-command surface, while keeping the binary's
@@ -434,7 +434,7 @@ component that always knows the answer with certainty.
 ### KD-7 — SKILL.md auto-trigger contract forbids fabrication when the binary cannot run
 
 The skill markdown explicitly instructs host LLMs (Claude / Copilot /
-Codex) that when the `dotclaude handoff` binary cannot be executed —
+Codex) that when the `dotbabel handoff` binary cannot be executed —
 for any reason: permission denied, sandbox restriction, binary
 missing, network failure — they MUST NOT reconstruct a `<handoff>`
 block from raw session JSONL files. The required behavior is a

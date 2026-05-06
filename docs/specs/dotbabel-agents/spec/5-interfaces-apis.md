@@ -4,7 +4,7 @@
 
 ## Agent File Format
 
-Every agent is a `.md` file with YAML frontmatter. This is the contract between dotclaude and Claude Code:
+Every agent is a `.md` file with YAML frontmatter. This is the contract between dotbabel and Claude Code:
 
 ```yaml
 ---

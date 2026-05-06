@@ -20,7 +20,7 @@ different mitigation.
 | Sub-mode | Failure                                                                                                                                                                                                    | Mitigation                                                                                                                                                                                                                                                                 |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R-1a     | **Doc drift.** Binary surface changes; SKILL.md / `docs/handoff-guide.md` / `--help` not updated. Phrase mapping invokes a removed flag or stale verb.                                                     | ARCH-10 drift test (CI gate per OPS-1). Tests the symbol list, not prose; updates ride in the same PR as the binary change.                                                                                                                                                |
-| R-1b     | **Runtime misinterpretation within one LLM.** SKILL.md is current, but the host LLM reads ambiguous trigger language and produces the wrong invocation (e.g. drops `--from`, picks the wrong sub-command). | SKILL.md trigger language is **imperative and example-anchored**: "when the user says X, run exactly `dotclaude handoff push --from <your-cli>`." No free-form "when the user wants to push…" phrasing. §5.5.1's mapping table is what gets quoted into SKILL.md verbatim. |
+| R-1b     | **Runtime misinterpretation within one LLM.** SKILL.md is current, but the host LLM reads ambiguous trigger language and produces the wrong invocation (e.g. drops `--from`, picks the wrong sub-command). | SKILL.md trigger language is **imperative and example-anchored**: "when the user says X, run exactly `dotbabel handoff push --from <your-cli>`." No free-form "when the user wants to push…" phrasing. §5.5.1's mapping table is what gets quoted into SKILL.md verbatim. |
 
 | Likelihood | Impact                                                                                                      |
 | ---------- | ----------------------------------------------------------------------------------------------------------- |
@@ -28,13 +28,13 @@ different mitigation.
 
 ### R-2 — Direct-shell user trips on `--from` mandatory
 
-A user invoking `dotclaude handoff push` from a shell (not via slash
+A user invoking `dotbabel handoff push` from a shell (not via slash
 command) without `<query>` and without `--from` gets exit 64. They
 hit it on the first major-version run after the migration; if the
 error message is unclear, they bounce.
 
 **Mitigation.** Exit-64 stderr template (per §5.3.3) reads:
-`dotclaude-handoff: push: --from required when no <query> is given` +
+`dotbabel-handoff: push: --from required when no <query> is given` +
 usage block listing `--from claude|copilot|codex|gemini`. `docs/handoff-guide.md`
 calls this out as the #1 gotcha in the migration section. CHANGELOG entry
 for the major bump (per §6.5) lists `--from` mandatory as its own line.
@@ -57,7 +57,7 @@ the private remote unscrubbed.
   additions.
 - **Inherent limits, accepted by spec assumption.** Scrub is
   best-effort. The remote is private. The user is the **sole owner**
-  of `$DOTCLAUDE_HANDOFF_REPO` by spec assumption (§3 ARCH-4 — one
+  of `$DOTBABEL_HANDOFF_REPO` by spec assumption (§3 ARCH-4 — one
   remote per user). If the user ever shares repo access (collaborator,
   org transfer, fork), the threat model changes — that's their call,
   not the spec's. The skill cannot defend against secrets in shared
@@ -80,7 +80,7 @@ on the same source.
 **Mitigation.**
 
 - SKILL.md uses literal command examples in §5.5.1's mapping
-  (`dotclaude handoff push --from <your-cli> [--tag <label>]`) rather
+  (`dotbabel handoff push --from <your-cli> [--tag <label>]`) rather
   than free-form descriptions of intent. Less interpretive surface
   area.
 - Binary-side `--from` mandatory (per ARCH-3) means a misinterpretation
@@ -120,7 +120,7 @@ translation (rather than typing the binary call directly).
 
 **Mitigation.** `skills/handoff/references/from-codex.md` documents
 the **direct-shell pattern explicitly**: users on Codex run
-`!dotclaude handoff <verb> --from codex …`, not "ask Codex to push
+`!dotbabel handoff <verb> --from codex …`, not "ask Codex to push
 this for me." The skill markdown is not loaded by Codex, so there's
 no SKILL.md-mediated translation path that could double-quote.
 Codex users are pushed onto the unambiguous direct-binary surface
@@ -188,7 +188,7 @@ requiring `--from`.
 
 **Rejected.** The probes admit `UNCONFIRMED` status in their own
 implementation comments (legacy `detectHost()` in
-`plugins/dotclaude/bin/dotclaude-handoff.mjs`).
+`plugins/dotbabel/bin/dotbabel-handoff.mjs`).
 An unreliable signal that silently picks the wrong source is exactly
 the failure mode §1 was written to stop. KD-6 + ARCH-3 settle this:
 SKILL.md fills `--from` for slash-command users (the host LLM

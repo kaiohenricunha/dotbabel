@@ -1,8 +1,8 @@
 {
-  "id": "dotclaude-core",
-  "title": "@dotclaude/dotclaude — core library + plugin",
+  "id": "dotbabel-core",
+  "title": "@dotbabel/dotbabel — core library + plugin",
   "status": "done",
-  "owners": ["dotclaude maintainers"],
+  "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "package.json",
     "bootstrap.sh",
@@ -12,13 +12,13 @@
     ".claude/**",
     "docs/repo-facts.json",
     "docs/specs/**/spec.json",
-    "plugins/dotclaude/src/**",
-    "plugins/dotclaude/bin/**",
-    "plugins/dotclaude/scripts/**",
-    "plugins/dotclaude/hooks/**",
-    "plugins/dotclaude/templates/**",
-    "plugins/dotclaude/tests/**",
-    "plugins/dotclaude/.claude-plugin/**",
+    "plugins/dotbabel/src/**",
+    "plugins/dotbabel/bin/**",
+    "plugins/dotbabel/scripts/**",
+    "plugins/dotbabel/hooks/**",
+    "plugins/dotbabel/templates/**",
+    "plugins/dotbabel/tests/**",
+    "plugins/dotbabel/.claude-plugin/**",
     ".github/workflows/**",
     ".github/CODEOWNERS",
     ".github/dependabot.yml",
@@ -27,10 +27,10 @@
   ],
   "acceptance_commands": [
     "npm test",
-    "npx dotclaude-validate-skills",
-    "npx dotclaude-validate-specs",
-    "npx dotclaude-check-instruction-drift",
-    "node -e \"import('@dotclaude/dotclaude').then(m => process.exit(Object.keys(m).length >= 24 ? 0 : 1))\""
+    "npx dotbabel-validate-skills",
+    "npx dotbabel-validate-specs",
+    "npx dotbabel-check-instruction-drift",
+    "node -e \"import('@dotbabel/dotbabel').then(m => process.exit(Object.keys(m).length >= 24 ? 0 : 1))\""
   ],
   "depends_on_specs": [],
   "active_prs": []

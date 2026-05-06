@@ -4,7 +4,7 @@
 
 ## In Scope
 
-- Bundled starter agents shipped with dotclaude (curated small set, not exhaustive)
+- Bundled starter agents shipped with dotbabel (curated small set, not exhaustive)
 - Bootstrap template updates so agents are installed alongside skills on `bootstrap.sh`
 - `model:` frontmatter routing on skills and agents (opus/sonnet/haiku/inherit)
 - A `/agents:search` discovery skill for finding and fetching agents from the catalog
@@ -21,12 +21,12 @@
 
 | Touches                        | Does Not Touch                        |
 | ------------------------------ | ------------------------------------- |
-| `plugins/dotclaude/templates/` | Agent runtime / Claude Code internals |
-| `plugins/dotclaude/src/`       | Existing skills content               |
+| `plugins/dotbabel/templates/` | Agent runtime / Claude Code internals |
+| `plugins/dotbabel/src/`       | Existing skills content               |
 | `.claude/skills-manifest.json` | CI pipelines                          |
 | `bootstrap.sh`                 | External agent catalogs               |
-| `docs/specs/dotclaude-agents/` | Other spec domains                    |
+| `docs/specs/dotbabel-agents/` | Other spec domains                    |
 
 ## Urgency
 
-No hard deadline. Ecosystem is moving in this direction now — shipping before dotclaude-core stabilizes keeps the agent layer composable from the start.
+No hard deadline. Ecosystem is moving in this direction now — shipping before dotbabel-core stabilizes keeps the agent layer composable from the start.

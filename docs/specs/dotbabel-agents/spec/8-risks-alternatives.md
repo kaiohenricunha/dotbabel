@@ -18,7 +18,7 @@
   Rejected because the maintenance burden would be enormous and the value is unclear — most agents would go unused by most users. A curated starter set of 8 high-value agents is the right scope. Users who want the full catalog can install awesome-claude-code-subagents directly via `/agents:search fetch`.
 
 - **A-2: Build a custom interactive installer script (like awesome-claude-code-subagents' `install-agents.sh`)**
-  Rejected because `bootstrap.sh` is already the installation vehicle for dotclaude. Adding a second installer creates a confusing split. The right answer is to extend bootstrap, not add a parallel path.
+  Rejected because `bootstrap.sh` is already the installation vehicle for dotbabel. Adding a second installer creates a confusing split. The right answer is to extend bootstrap, not add a parallel path.
 
 - **A-3: Store agents under `templates/.claude/agents/` (with the dot)**
   Rejected in favor of `templates/claude/agents/` (without the dot) to match the existing convention in this repo — `templates/claude/` already holds `settings.json`, `hooks/`, and `skills-manifest.json`. Consistency beats pedantry. See KD-1.
