@@ -518,6 +518,8 @@ export function seedTransportDefaultBranch(login, name, repoUrl) {
           "user.email=dotclaude@local",
           "-c",
           "user.name=dotclaude",
+          "-c",
+          "commit.gpgsign=false",
           "commit",
           "-m",
           "chore: seed default branch",
