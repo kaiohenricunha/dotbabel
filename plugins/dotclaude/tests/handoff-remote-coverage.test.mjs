@@ -1601,6 +1601,45 @@ describe("seedTransportDefaultBranch", () => {
       lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git"),
     ).toThrow(/git push.*main.*failed/);
   });
+
+  it("treats ls-remote non-zero exit as 'no main' and seeds (covers probe.status !== 0 branch)", () => {
+    // ls-remote: failed (e.g. transient transport error before HEAD probe).
+    spawnSync.mockReturnValueOnce({ status: 128, stdout: "", stderr: "remote helper hiccup" });
+    // Full seed sequence then PATCH success.
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git init
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git add
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git commit
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // git push
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" }); // gh PATCH
+    const r = lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git");
+    expect(r).toEqual({ seeded: true, defaultBranchPatched: true });
+  });
+
+  it("falls back to stdout then to 'gh exited <status>' when PATCH stderr is empty", () => {
+    // Case A: stderr empty, stdout has the message.
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abcdef0123456789abcdef0123456789abcdef01\trefs/heads/main\n",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({
+      status: 1,
+      stdout: "could not change repo settings\n",
+      stderr: "",
+    });
+    const a = lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git");
+    expect(a.warning).toMatch(/could not change repo settings/);
+
+    // Case B: both empty — falls through to "gh exited <status>".
+    spawnSync.mockReturnValueOnce({
+      status: 0,
+      stdout: "abcdef0123456789abcdef0123456789abcdef01\trefs/heads/main\n",
+      stderr: "",
+    });
+    spawnSync.mockReturnValueOnce({ status: 7, stdout: "", stderr: "" });
+    const b = lib.seedTransportDefaultBranch("alice", "store", "git@github.com:alice/store.git");
+    expect(b.warning).toMatch(/gh exited 7/);
+  });
 });
 
 // ---- probeCollision ----------------------------------------------------
