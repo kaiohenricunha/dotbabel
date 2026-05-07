@@ -1,5 +1,6 @@
 # CLAUDE.md — Global Claude Code Rules
 
+<!-- dotbabel:cli claude -->
 > **Two ways to use dotbabel:**
 >
 > - **TL;DR — just want skills & commands:** Clone this repo and run `./bootstrap.sh`.
@@ -15,8 +16,11 @@
 > **Consumers of `@dotbabel/dotbabel` do NOT inherit it** — the plugin's behavior
 > lives in `plugins/dotbabel/` and [docs/](./docs/). Contributors should read
 > [CONTRIBUTING.md](./CONTRIBUTING.md) first.
+<!-- dotbabel:end -->
 
 Universal behavior for every Claude Code session in every repo. Project-level `CLAUDE.md` files extend and may override these, but should not repeat them.
+
+<!-- dotbabel:rule-floor:begin -->
 
 ## Local filesystem conventions
 
@@ -122,14 +126,16 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 
 ## Headless Mode
 
-For recurring sweeps (Dependabot, cron, CI-triggered agents), use headless mode to skip tool-approval prompts:
+For recurring sweeps (Dependabot, cron, CI-triggered agents), use headless mode to skip tool-approval prompts.
 
+<!-- dotbabel:cli claude -->
 ```bash
 claude -p "Check rebase status of all open Dependabot PRs and report CI status" \
   --allowedTools "Bash(gh:*),Read,Grep"
 ```
 
 Scope `--allowedTools` tightly — prefer `Bash(gh:*)` over `Bash(*)`. Combine with cron or GitHub Actions for unattended runs.
+<!-- dotbabel:end -->
 
 ## Communication
 
@@ -158,6 +164,7 @@ or a `## No-spec rationale` section in its body.
 
 ## Skills, Commands, and Discovery
 
+<!-- dotbabel:cli claude -->
 Claude Code now treats skills and custom commands as the same slash-invoked
 family: `commands/foo.md` and `skills/foo/SKILL.md` both expose `/foo`.
 Skills are the preferred shape for new reusable workflows because they support
@@ -186,8 +193,10 @@ invocation.
 
 Loading model: skill descriptions are available for discovery, full `SKILL.md`
 content loads only when invoked, and supporting files load only when referenced.
-Do not maintain static command or skill tables in this file. When editing this
-dotbabel repository, the authoritative inventory is generated from artifact
+<!-- dotbabel:end -->
+
+Do not maintain static command or skill tables in instruction files. When editing
+this dotbabel repository, the authoritative inventory is generated from artifact
 frontmatter:
 
 ```bash
@@ -197,3 +206,5 @@ node plugins/dotbabel/bin/dotbabel-list.mjs --type command
 node plugins/dotbabel/bin/dotbabel-search.mjs <query>
 node plugins/dotbabel/bin/dotbabel-show.mjs <id> --type skill
 ```
+
+<!-- dotbabel:rule-floor:end -->

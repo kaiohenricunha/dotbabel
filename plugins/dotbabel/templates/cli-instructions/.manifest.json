@@ -1,0 +1,49 @@
+{
+  "source": "CLAUDE.md",
+  "generator": "dotbabel-generate-instructions",
+  "targets": {
+    "AGENTS.md": {
+      "cliSet": [
+        "copilot",
+        "codex"
+      ],
+      "mode": "inject",
+      "omittedHeadings": []
+    },
+    "GEMINI.md": {
+      "cliSet": [
+        "gemini"
+      ],
+      "mode": "inject",
+      "omittedHeadings": []
+    },
+    ".github/copilot-instructions.md": {
+      "cliSet": [
+        "copilot"
+      ],
+      "mode": "inject",
+      "omittedHeadings": []
+    },
+    "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md": {
+      "cliSet": [
+        "copilot"
+      ],
+      "mode": "synthesize",
+      "omittedHeadings": []
+    },
+    "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md": {
+      "cliSet": [
+        "codex"
+      ],
+      "mode": "synthesize",
+      "omittedHeadings": []
+    },
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md": {
+      "cliSet": [
+        "gemini"
+      ],
+      "mode": "synthesize",
+      "omittedHeadings": []
+    }
+  }
+}

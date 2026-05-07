@@ -19,6 +19,7 @@
     "dotbabel-check-spec-coverage": "./plugins/dotbabel/bin/dotbabel-check-spec-coverage.mjs",
     "dotbabel-validate-specs": "./plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
     "dotbabel-check-instruction-drift": "./plugins/dotbabel/bin/dotbabel-check-instruction-drift.mjs",
+    "dotbabel-generate-instructions": "./plugins/dotbabel/bin/dotbabel-generate-instructions.mjs",
     "dotbabel-init": "./plugins/dotbabel/bin/dotbabel-init.mjs",
     "dotbabel-sync": "./plugins/dotbabel/bin/dotbabel-sync.mjs",
     "dotbabel-index": "./plugins/dotbabel/bin/dotbabel-index.mjs",

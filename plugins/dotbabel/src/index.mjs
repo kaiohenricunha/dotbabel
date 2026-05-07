@@ -44,6 +44,17 @@ export {
   validateAgentTriggerOverlap,
 } from "./validate-skills-inventory.mjs";
 export { checkInstructionDrift } from "./check-instruction-drift.mjs";
+export {
+  generateInstructions,
+  renderTarget,
+  extractRuleFloor,
+  stripRuleFloorMarkers,
+  DEFAULT_TARGETS,
+  MANIFEST_RELATIVE_PATH,
+  BANNER,
+  RULE_FLOOR_BEGIN,
+  RULE_FLOOR_END,
+} from "./generate-instructions.mjs";
 export { checkSpecCoverage } from "./check-spec-coverage.mjs";
 export { scaffoldHarness } from "./init-harness-scaffold.mjs";
 
