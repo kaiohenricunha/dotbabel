@@ -150,6 +150,13 @@
       "lastValidated": null
     },
     {
+      "name": "plan-grader",
+      "path": ".claude/skills/plan-grader/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
       "checksum": "",

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-06T19:31:11.332Z",
+  "generatedAt": "2026-05-07T00:00:00.000Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -211,6 +211,13 @@
       "checksum": "sha256:32a58bb0feb413e7f44148347d62283332ba259273a6c8f6d4a514876cc484dd",
       "dependencies": ["deploy-status"],
       "lastValidated": "2026-05-06"
+    },
+    {
+      "name": "plan-grader",
+      "path": ".claude/skills/plan-grader/SKILL.md",
+      "checksum": "sha256:803d919381f876d5c29c28e1ab19d74a55cd54d74bb5ee6158ca10e8481af2a0",
+      "dependencies": [],
+      "lastValidated": "2026-05-07"
     },
     {
       "name": "pre-pr",

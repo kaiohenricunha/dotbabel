@@ -43,6 +43,7 @@
     "ground-first",
     "handoff",
     "kubernetes-specialist",
+    "plan-grader",
     "pulumi-specialist",
     "review-pr",
     "review-prs",
