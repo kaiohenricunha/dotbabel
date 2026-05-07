@@ -8,6 +8,7 @@
  * Flags:
  *   --source <path>      Path to a local dotbabel git clone. Overrides DOTBABEL_DIR.
  *   --target <dir>       Override destination directory. Default: ~/.claude
+ *   --all                Link all supported CLI instruction targets.
  *   --quiet              Suppress per-file progress; print summary only.
  *   --json               Emit a JSON array of events on stdout.
  *   --no-color           Suppress ANSI colour.
@@ -30,6 +31,7 @@ const META = {
   flags: {
     source: { type: "string" },
     target: { type: "string" },
+    all: { type: "boolean" },
     quiet: { type: "boolean" },
   },
 };
@@ -69,6 +71,7 @@ try {
   const result = await bootstrapGlobal({
     source,
     target,
+    allCli: Boolean(argv.flags.all),
     quiet,
     json: argv.json,
     noColor: argv.noColor,

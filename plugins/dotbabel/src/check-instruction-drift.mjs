@@ -5,9 +5,9 @@ import {
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 import {
-  generateInstructions,
   MANIFEST_RELATIVE_PATH,
 } from "./generate-instructions.mjs";
+import { checkInstructionsFresh } from "./check-instructions-fresh.mjs";
 
 /**
  * Cross-reference docs/repo-facts.json against instruction files
@@ -154,7 +154,7 @@ export function checkInstructionDrift(ctx) {
   }
 
   if (pathExists(ctx, MANIFEST_RELATIVE_PATH)) {
-    checkGeneratedInstructionFreshness(ctx, errors);
+    errors.push(...checkInstructionsFresh(ctx).errors);
   }
 
   return { ok: errors.length === 0, errors };
@@ -187,41 +187,4 @@ function resolveRuleFloorFiles(facts, errors) {
   }
 
   return facts.rule_floor_files;
-}
-
-function checkGeneratedInstructionFreshness(ctx, errors) {
-  let generated;
-  try {
-    generated = generateInstructions(ctx, { dryRun: true });
-  } catch (err) {
-    if (err instanceof ValidationError) {
-      errors.push(err);
-      return;
-    }
-    throw err;
-  }
-
-  for (const file of generated.files) {
-    if (!pathExists(ctx, file.path)) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.DRIFT_GENERATED_STALE,
-        category: "drift",
-        file: file.path,
-        message: `generated instruction file is missing -> ${file.path}`,
-        hint: "run `npx dotbabel-generate-instructions` and commit the generated output",
-      }));
-      continue;
-    }
-
-    const current = readText(ctx, file.path);
-    if (current !== file.content) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.DRIFT_GENERATED_STALE,
-        category: "drift",
-        file: file.path,
-        message: `generated instruction file is stale -> ${file.path}`,
-        hint: "run `npx dotbabel-generate-instructions` and commit the generated output",
-      }));
-    }
-  }
 }

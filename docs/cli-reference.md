@@ -31,8 +31,10 @@ dotbabel validate-specs [OPTIONS]
 dotbabel validate-skills [OPTIONS]
 dotbabel check-spec-coverage [OPTIONS]
 dotbabel check-instruction-drift [OPTIONS]
+dotbabel check-instructions-fresh [OPTIONS]
+dotbabel check-instruction-parity [OPTIONS]
 dotbabel detect-drift [OPTIONS]
-dotbabel doctor [OPTIONS]
+dotbabel doctor [OPTIONS] [--install-hooks]
 dotbabel init [OPTIONS]
 
 # Installation lifecycle (added v0.4.0)
@@ -103,6 +105,36 @@ stale generated rule-floor outputs, and broken instruction-file references.
 **Emitted codes**: `DRIFT_TEAM_COUNT`, `DRIFT_PROTECTED_PATH`,
 `DRIFT_INSTRUCTION_FILES`, `DRIFT_INSTRUCTION_FILE_MISSING`,
 `DRIFT_GENERATED_STALE`.
+
+---
+
+## `dotbabel-check-instructions-fresh`
+
+Re-render cross-CLI instruction outputs from `CLAUDE.md` and fail when any
+generated target or manifest differs from the committed file.
+
+| Flag                 | Default          |          |
+| -------------------- | ---------------- | -------- |
+| `--repo-root <path>` | resolved via git | Override |
+
+**Emitted codes**: `DRIFT_GENERATED_STALE`, plus span/marker drift codes from
+the generator when `CLAUDE.md` is malformed.
+
+---
+
+## `dotbabel-check-instruction-parity`
+
+Verify each generated CLI instruction target preserves every `#` / `##`
+heading that applies to that target after CLI-conditional spans are rendered.
+Headings intentionally omitted by `<!-- dotbabel:cli ... -->` spans are not
+treated as parity failures.
+
+| Flag                 | Default          |          |
+| -------------------- | ---------------- | -------- |
+| `--repo-root <path>` | resolved via git | Override |
+
+**Emitted codes**: `DRIFT_PARITY_MISSING_HEADING`,
+`DRIFT_INSTRUCTION_FILE_MISSING`.
 
 ---
 
@@ -212,6 +244,7 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 | ----------------- | ----------- | ----------------------------------------------- |
 | `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode) |
 | `--target <dir>`  | `~/.claude` | Override destination directory                  |
+| `--all`           | false       | Link Copilot/Codex/Gemini instructions too      |
 | `--quiet`         | false       | Suppress per-file progress; print summary only  |
 
 **Typical invocations:**
@@ -219,6 +252,7 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 ```bash
 dotbabel bootstrap
 dotbabel bootstrap --source ~/projects/dotbabel   # clone mode
+dotbabel bootstrap --all                          # force all CLI instruction symlinks
 dotbabel bootstrap --quiet
 ```
 
@@ -239,11 +273,11 @@ git checkout, activated with `--source`).
 
 **Subcommands:**
 
-| Subcommand | Description                                                                                                                      |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `pull`     | npm mode: fetch latest from registry and re-bootstrap. Clone mode: `git fetch` + `git rebase origin/main` + re-bootstrap.        |
-| `push`     | Clone mode only: secret-scan staged files, commit, and push to origin. Set `HARNESS_SYNC_SKIP_SECRET_SCAN=1` to bypass the scan. |
-| `status`   | npm mode: print current version. Clone mode: `git status --short`.                                                               |
+| Subcommand | Description                                                                                                                                                                     |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pull`     | npm mode: fetch latest from registry and re-bootstrap. Clone mode: `git fetch` + `git rebase origin/main`, regenerate cross-CLI instructions, run freshness, then re-bootstrap. |
+| `push`     | Clone mode only: secret-scan staged files, commit, and push to origin. Set `HARNESS_SYNC_SKIP_SECRET_SCAN=1` to bypass the scan.                                                |
+| `status`   | npm mode: print current version. Clone mode: `git status --short`.                                                                                                              |
 
 **Typical invocations:**
 

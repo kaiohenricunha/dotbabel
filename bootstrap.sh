@@ -7,13 +7,17 @@
 # Flags:
 #   --quiet   suppress per-file progress output; only warnings + the final
 #             one-line summary are printed.
+#   --all     link all supported CLI instruction targets even when the
+#             corresponding CLI binary is not currently on PATH.
 
 set -euo pipefail
 
 QUIET=0
+ALL=0
 for arg in "$@"; do
   case "$arg" in
     --quiet) QUIET=1 ;;
+    --all) ALL=1 ;;
     --help|-h)
       grep -E '^# ' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
@@ -32,24 +36,26 @@ TS=$(date +%Y%m%d-%H%M%S)
 mkdir -p "$TARGET"
 
 say() {
-  [ "$QUIET" = "1" ] && return 0
+  [[ "$QUIET" = "1" ]] && return 0
   echo "$@"
 }
 
 link_one() {
   local src="$1"
   local dst="$2"
+  local current_dst
 
-  if [ -L "$dst" ]; then
+  if [[ -L "$dst" ]]; then
     # Already a symlink — update if pointing elsewhere.
-    if [ "$(readlink "$dst")" != "$src" ]; then
+    current_dst="$(readlink "$dst")"
+    if [[ "$current_dst" != "$src" ]]; then
       rm "$dst"
       ln -s "$src" "$dst"
       say "  updated: $dst -> $src"
     else
       say "  ok:      $dst"
     fi
-  elif [ -e "$dst" ]; then
+  elif [[ -e "$dst" ]]; then
     # Real file/dir — back it up before linking.
     mv "$dst" "${dst}.bak-${TS}"
     ln -s "$src" "$dst"
@@ -60,20 +66,40 @@ link_one() {
   fi
 }
 
+link_cli_instruction() {
+  local cli="$1"
+  local src="$2"
+  local dst="$3"
+
+  if [[ "$ALL" != "1" ]] && ! command -v "$cli" >/dev/null 2>&1; then
+    say "==> skipping $cli instructions (command not found; use --all to force)"
+    return 0
+  fi
+
+  if [[ ! -f "$src" ]]; then
+    say "==> skipping $cli instructions (missing source: $src)"
+    return 0
+  fi
+
+  say "==> linking $cli instructions"
+  mkdir -p "$(dirname "$dst")"
+  link_one "$src" "$dst"
+}
+
 say "==> linking CLAUDE.md"
-[ -f "$DOTBABEL/CLAUDE.md" ] && link_one "$DOTBABEL/CLAUDE.md" "$TARGET/CLAUDE.md"
+[[ -f "$DOTBABEL/CLAUDE.md" ]] && link_one "$DOTBABEL/CLAUDE.md" "$TARGET/CLAUDE.md"
 
 say "==> linking commands/"
 mkdir -p "$TARGET/commands"
 for f in "$DOTBABEL/commands"/*.md; do
-  [ -e "$f" ] || continue
+  [[ -e "$f" ]] || continue
   link_one "$f" "$TARGET/commands/$(basename "$f")"
 done
 
 say "==> linking skills/"
 mkdir -p "$TARGET/skills"
 for d in "$DOTBABEL/skills"/*/; do
-  [ -e "$d" ] || continue
+  [[ -e "$d" ]] || continue
   name=$(basename "$d")
   link_one "${d%/}" "$TARGET/skills/$name"
 done
@@ -81,7 +107,7 @@ done
 say "==> linking hooks/"
 mkdir -p "$TARGET/hooks"
 for f in "$DOTBABEL/plugins/dotbabel/hooks"/*.sh; do
-  [ -e "$f" ] || continue
+  [[ -e "$f" ]] || continue
   link_one "$f" "$TARGET/hooks/$(basename "$f")"
 done
 
@@ -89,12 +115,12 @@ say "==> installing agents/"
 AGENTS_SRC="$DOTBABEL/plugins/dotbabel/templates/claude/agents"
 AGENTS_DST="$TARGET/agents"
 mkdir -p "$AGENTS_DST"
-if [ -d "$AGENTS_SRC" ]; then
+if [[ -d "$AGENTS_SRC" ]]; then
   for agent_file in "$AGENTS_SRC"/*.md; do
-    [ -e "$agent_file" ] || continue
+    [[ -e "$agent_file" ]] || continue
     agent_name=$(basename "$agent_file")
     dst_file="$AGENTS_DST/$agent_name"
-    if [ -e "$dst_file" ]; then
+    if [[ -e "$dst_file" ]]; then
       say "  skipped (exists): $agent_name — delete to reinstall on next bootstrap"
     else
       cp "$agent_file" "$dst_file"
@@ -103,7 +129,21 @@ if [ -d "$AGENTS_SRC" ]; then
   done
 fi
 
-if [ "$QUIET" = "1" ]; then
+CLI_INSTRUCTIONS_SRC="$DOTBABEL/plugins/dotbabel/templates/cli-instructions"
+link_cli_instruction \
+  copilot \
+  "$CLI_INSTRUCTIONS_SRC/copilot-instructions.md" \
+  "$HOME/.github/copilot-instructions.md"
+link_cli_instruction \
+  codex \
+  "$CLI_INSTRUCTIONS_SRC/codex-AGENTS.md" \
+  "$HOME/.codex/AGENTS.md"
+link_cli_instruction \
+  gemini \
+  "$CLI_INSTRUCTIONS_SRC/gemini-GEMINI.md" \
+  "$HOME/.gemini/GEMINI.md"
+
+if [[ "$QUIET" = "1" ]]; then
   echo "bootstrap complete — target: $TARGET"
 else
   echo ""
@@ -114,7 +154,7 @@ fi
 
 # Tail hint — only when dotbabel-doctor is discoverable on PATH so first-time
 # bootstrappers are not confused by a broken reference.
-if command -v dotbabel-doctor >/dev/null 2>&1 && [ "$QUIET" != "1" ]; then
+if command -v dotbabel-doctor >/dev/null 2>&1 && [[ "$QUIET" != "1" ]]; then
   echo ""
   echo "next: run 'dotbabel-doctor' to verify install."
 fi

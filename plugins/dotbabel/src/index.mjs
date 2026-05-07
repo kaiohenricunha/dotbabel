@@ -44,6 +44,8 @@ export {
   validateAgentTriggerOverlap,
 } from "./validate-skills-inventory.mjs";
 export { checkInstructionDrift } from "./check-instruction-drift.mjs";
+export { checkInstructionsFresh } from "./check-instructions-fresh.mjs";
+export { checkInstructionParity } from "./check-instruction-parity.mjs";
 export {
   generateInstructions,
   renderTarget,

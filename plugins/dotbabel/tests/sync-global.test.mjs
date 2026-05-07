@@ -18,6 +18,18 @@ vi.mock("../src/bootstrap-global.mjs", () => ({
   bootstrapGlobal: vi.fn().mockResolvedValue({ ok: true, linked: 3, skipped: 0, backed_up: 0 }),
 }));
 
+vi.mock("../src/generate-instructions.mjs", () => ({
+  generateInstructions: vi.fn().mockReturnValue({ ok: true, files: [] }),
+}));
+
+vi.mock("../src/check-instructions-fresh.mjs", () => ({
+  checkInstructionsFresh: vi.fn().mockReturnValue({ ok: true, errors: [] }),
+}));
+
+vi.mock("../src/spec-harness-lib.mjs", () => ({
+  createHarnessContext: vi.fn(({ repoRoot }) => ({ repoRoot })),
+}));
+
 // Mock index.mjs version export
 vi.mock("../src/index.mjs", () => ({
   version: "1.2.3",
@@ -25,6 +37,8 @@ vi.mock("../src/index.mjs", () => ({
 
 import { spawnSync } from "node:child_process";
 import { bootstrapGlobal } from "../src/bootstrap-global.mjs";
+import { generateInstructions } from "../src/generate-instructions.mjs";
+import { checkInstructionsFresh } from "../src/check-instructions-fresh.mjs";
 import { resolveMode, syncGlobal } from "../src/sync-global.mjs";
 
 // ---------------------------------------------------------------------------
@@ -122,6 +136,8 @@ describe("syncGlobal", () => {
       ["-C", source, "rebase", "origin/main"],
       expect.objectContaining({ encoding: "utf8" })
     );
+    expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source });
+    expect(checkInstructionsFresh).toHaveBeenCalledWith({ repoRoot: source });
     expect(bootstrapGlobal).toHaveBeenCalledWith(
       expect.objectContaining({ source })
     );
