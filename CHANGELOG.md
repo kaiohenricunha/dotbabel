@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.0.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.0.0...v2.0.1) (2026-05-07)
+
+
+### Fixed
+
+* **readme:** align lead description with model-agnostic positioning ([#192](https://github.com/kaiohenricunha/dotbabel/issues/192)) ([270a394](https://github.com/kaiohenricunha/dotbabel/commit/270a39400b08fa92a49c5d763d38aa7bed8915d0))
+
 ## [2.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v1.3.0...v2.0.0) (2026-05-06)
 
 
