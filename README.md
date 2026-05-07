@@ -6,9 +6,10 @@
 
 > Maintained by [@kaiohenricunha](https://github.com/kaiohenricunha) · [Changelog](./CHANGELOG.md) · [Security](./SECURITY.md)
 
-An opinionated Claude Code toolkit. Ships a curated library of skills,
-slash commands, and cloud/IaC specialists plus a global rule floor that
-hardens every Claude Code session — and an optional spec-driven-development
+An opinionated, model-agnostic governance toolkit for Claude Code, Codex,
+Gemini CLI, Copilot CLI, and other agentic CLIs. Ships a curated library of
+skills, slash commands, and cloud/IaC specialists plus a global rule floor
+that hardens every agent session — and an optional spec-driven-development
 governance CLI on top, for repos that want PR-time gates.
 
 **Who is this for?**
