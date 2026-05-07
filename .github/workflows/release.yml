@@ -35,7 +35,9 @@ jobs:
       - run: npm test
       - run: bash plugins/dotbabel/tests/test_validate_settings.sh
 
-      - name: Publish to npm with provenance
+      # Trusted Publishing: npm CLI auto-detects the GitHub Actions OIDC env
+      # and exchanges it for a short-lived publish token. No NPM_TOKEN secret
+      # is required as long as the @dotbabel org (or this package) has a
+      # Trusted Publisher configured for kaiohenricunha/dotbabel + release.yml.
+      - name: Publish to npm with provenance (Trusted Publishing / OIDC)
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
