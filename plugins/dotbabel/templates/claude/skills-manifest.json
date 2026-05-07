@@ -157,6 +157,13 @@
       "lastValidated": null
     },
     {
+      "name": "post-pr-review",
+      "path": ".claude/skills/post-pr-review/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
       "checksum": "",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-07T17:18:39.539Z",
+  "generatedAt": "2026-05-07T18:56:19.765Z",
   "version": "2.1.0",
   "artifacts": [
     {
@@ -603,6 +603,21 @@
         "maturity": "draft"
       },
       "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "post-pr-review",
+      "type": "skill",
+      "path": "skills/post-pr-review/SKILL.md",
+      "name": "post-pr-review",
+      "description": "Post AI-generated review findings on a GitHub PR as inline review comments via the gh CLI — the bot-style review-comment workflow GitHub Copilot used to provide before it got rate-limited. Idempotent (hidden marker dedup), rate-limit conscious (respects GitHub's 80/min secondary limit), and dry-run by default in interactive mode. Pairs with `review-pr`, which consumes the comments this skill produces and applies fixes. Triggers on: \"post PR review\", \"leave inline comments on PR\", \"AI review and comment on PR\", \"Copilot-style PR review\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "draft"
+      },
+      "version": "0.1.0",
       "owner": "@kaiohenricunha"
     },
     {
