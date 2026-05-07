@@ -12,42 +12,37 @@ preserved verbatim because they describe state at the time of release.
 
 ## [2.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.0.1...v2.1.0) (2026-05-07)
 
-
 ### Added
 
-* **plan-grader:** add reusable plan grader skill ([#194](https://github.com/kaiohenricunha/dotbabel/issues/194)) ([78bd8cc](https://github.com/kaiohenricunha/dotbabel/commit/78bd8cc76286eb731bf4c44b8f82088c8c48ddc2))
+- **plan-grader:** add reusable plan grader skill ([#194](https://github.com/kaiohenricunha/dotbabel/issues/194)) ([78bd8cc](https://github.com/kaiohenricunha/dotbabel/commit/78bd8cc76286eb731bf4c44b8f82088c8c48ddc2))
 
 ## [2.0.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.0.0...v2.0.1) (2026-05-07)
 
-
 ### Fixed
 
-* **readme:** align lead description with model-agnostic positioning ([#192](https://github.com/kaiohenricunha/dotbabel/issues/192)) ([270a394](https://github.com/kaiohenricunha/dotbabel/commit/270a39400b08fa92a49c5d763d38aa7bed8915d0))
+- **readme:** align lead description with model-agnostic positioning ([#192](https://github.com/kaiohenricunha/dotbabel/issues/192)) ([270a394](https://github.com/kaiohenricunha/dotbabel/commit/270a39400b08fa92a49c5d763d38aa7bed8915d0))
 
 ## [2.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v1.3.0...v2.0.0) (2026-05-06)
 
-
 ### ⚠ BREAKING CHANGES
 
-* rename project from dotclaude to dotbabel ([#186](https://github.com/kaiohenricunha/dotbabel/issues/186))
+- rename project from dotclaude to dotbabel ([#186](https://github.com/kaiohenricunha/dotbabel/issues/186))
 
 ### Added
 
-* **core:** migrate complex commands to skills ([#177](https://github.com/kaiohenricunha/dotbabel/issues/177)) ([13c105e](https://github.com/kaiohenricunha/dotbabel/commit/13c105e644be6f20bb446c0cd37a857dfaa2f7a9))
-* **handoff:** implement Gemini support ([#185](https://github.com/kaiohenricunha/dotbabel/issues/185)) ([1234b60](https://github.com/kaiohenricunha/dotbabel/commit/1234b6013109deba2075c6c8ff830e9cd44c1cff))
-* rename project from dotclaude to dotbabel ([#186](https://github.com/kaiohenricunha/dotbabel/issues/186)) ([5136140](https://github.com/kaiohenricunha/dotbabel/commit/51361409e3c75628c1cf54b8a8624ce79fdb44f3))
-* **skills:** add deploy status and rollback workflows ([#182](https://github.com/kaiohenricunha/dotbabel/issues/182)) ([28120b4](https://github.com/kaiohenricunha/dotbabel/commit/28120b40c2d90f58aff19b20ef2684df8ddf8fc2))
-
+- **core:** migrate complex commands to skills ([#177](https://github.com/kaiohenricunha/dotbabel/issues/177)) ([13c105e](https://github.com/kaiohenricunha/dotbabel/commit/13c105e644be6f20bb446c0cd37a857dfaa2f7a9))
+- **handoff:** implement Gemini support ([#185](https://github.com/kaiohenricunha/dotbabel/issues/185)) ([1234b60](https://github.com/kaiohenricunha/dotbabel/commit/1234b6013109deba2075c6c8ff830e9cd44c1cff))
+- rename project from dotclaude to dotbabel ([#186](https://github.com/kaiohenricunha/dotbabel/issues/186)) ([5136140](https://github.com/kaiohenricunha/dotbabel/commit/51361409e3c75628c1cf54b8a8624ce79fdb44f3))
+- **skills:** add deploy status and rollback workflows ([#182](https://github.com/kaiohenricunha/dotbabel/issues/182)) ([28120b4](https://github.com/kaiohenricunha/dotbabel/commit/28120b40c2d90f58aff19b20ef2684df8ddf8fc2))
 
 ### Fixed
 
-* **handoff:** partition push --delete stderr for accurate prune reporting ([#183](https://github.com/kaiohenricunha/dotbabel/issues/183)) ([7fa6b7f](https://github.com/kaiohenricunha/dotbabel/commit/7fa6b7f16c99d3477a26d23c63823d8652f01139))
-* **handoff:** seed main as transport repo default during bootstrap ([#184](https://github.com/kaiohenricunha/dotbabel/issues/184)) ([6c3dabf](https://github.com/kaiohenricunha/dotbabel/commit/6c3dabffd974df94035306f9630dbb8bb368fcd5))
-
+- **handoff:** partition push --delete stderr for accurate prune reporting ([#183](https://github.com/kaiohenricunha/dotbabel/issues/183)) ([7fa6b7f](https://github.com/kaiohenricunha/dotbabel/commit/7fa6b7f16c99d3477a26d23c63823d8652f01139))
+- **handoff:** seed main as transport repo default during bootstrap ([#184](https://github.com/kaiohenricunha/dotbabel/issues/184)) ([6c3dabf](https://github.com/kaiohenricunha/dotbabel/commit/6c3dabffd974df94035306f9630dbb8bb368fcd5))
 
 ### Documentation
 
-* clarify skills and command inventory ([#175](https://github.com/kaiohenricunha/dotbabel/issues/175)) ([42e1b5f](https://github.com/kaiohenricunha/dotbabel/commit/42e1b5f465d95462b9c684e24c172b058759b8bb))
+- clarify skills and command inventory ([#175](https://github.com/kaiohenricunha/dotbabel/issues/175)) ([42e1b5f](https://github.com/kaiohenricunha/dotbabel/commit/42e1b5f465d95462b9c684e24c172b058759b8bb))
 
 ## [2.0.0] - YYYY-MM-DD
 
