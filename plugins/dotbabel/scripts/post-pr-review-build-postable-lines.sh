@@ -54,8 +54,13 @@ BEGIN {
   next
 }
 /^@@ / {
-  if (match($0, /\+([0-9]+)/, arr)) {
-    line=arr[1]-1
+  # Use RSTART/RLENGTH + substr instead of the 3-arg match(s, re, arr)
+  # form: BSD awk (macOS default) does not support array capture, so the
+  # portable path is to extract the matched substring after match() sets
+  # RSTART/RLENGTH.
+  if (match($0, /\+[0-9]+/)) {
+    num = substr($0, RSTART + 1, RLENGTH - 1)
+    line = num - 1
   }
   next
 }

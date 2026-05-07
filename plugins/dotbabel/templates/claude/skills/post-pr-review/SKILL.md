@@ -47,6 +47,7 @@ Before any step, bind args:
 ```bash
 NUMBER="$ARGUMENTS"           # may be empty if autodetecting from branch
 SCRIPTS="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}/plugins/dotbabel/scripts"
+SCRATCH="${TMPDIR:-/tmp}"     # honors sandboxes that block /tmp; private to orchestrator
 ```
 
 ### 1. Resolve PR
@@ -56,7 +57,15 @@ SCRIPTS="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}/plugins/dotbabe
 ```
 
 Output: JSON `{number, headRefOid, state, isDraft, headRepository, baseRepository, isCrossRepository, url}`.
-Bind `PR=$(... | jq -r .number)` and `HEAD_SHA=$(... | jq -r .headRefOid)`.
+
+Bind from the resolve output and **thread `--repo` through every subsequent script** so they don't each pay the `gh repo view` lookup cost (~100ms per script):
+
+```bash
+PR=$(... | jq -r .number)
+HEAD_SHA=$(... | jq -r .headRefOid)
+REPO=$(... | jq -r '"\(.baseRepository.owner.login)/\(.baseRepository.name)"')
+GH_REPO_ARGS=(--repo "$REPO")    # pass to every downstream script
+```
 
 If autodetection fails, abort with: `No PR found. Pass PR# explicitly: /post-pr-review 123`.
 
@@ -71,17 +80,21 @@ If autodetection fails, abort with: `No PR found. Pass PR# explicitly: /post-pr-
 ### 3. Fetch context
 
 ```bash
-"$SCRIPTS/post-pr-review-fetch-context.sh" "$PR" > /tmp/post-pr-review-${PR}.ctx.json
+"$SCRIPTS/post-pr-review-fetch-context.sh" "$PR" "${GH_REPO_ARGS[@]}" \
+  > "$SCRATCH/post-pr-review-${PR}.ctx.json"
 ```
 
-Reads PR diff (`gh pr diff`) into `/tmp/post-pr-review-${PR}.diff` and emits
-JSON with `headSHA`, `diffPath`, `files`, `title`, `body`.
+Reads PR diff (`gh pr diff`) into `$SCRATCH/post-pr-review-${PR}.diff` (where
+`$SCRATCH=${TMPDIR:-/tmp}`) and emits JSON with `headSHA`, `diffPath`,
+`files`, `title`, `body`. The exact paths are private to the orchestrator;
+downstream scripts read them by absolute path passed in as args.
 
 ### 4. Build postable line set
 
 ```bash
-"$SCRIPTS/post-pr-review-build-postable-lines.sh" "/tmp/post-pr-review-${PR}.diff" \
-  > /tmp/post-pr-review-${PR}.lines.json
+"$SCRIPTS/post-pr-review-build-postable-lines.sh" \
+  "$SCRATCH/post-pr-review-${PR}.diff" \
+  > "$SCRATCH/post-pr-review-${PR}.lines.json"
 ```
 
 Output: `{path: [line, line, ...]}` — NEW-side line numbers per file that
@@ -120,8 +133,8 @@ receives:
 3. Drop findings with `confidence < 80`.
 4. Compute the marker for each finding (see Idempotency below).
 5. Fetch existing markers via
-   `"$SCRIPTS/post-pr-review-list-markers.sh" "$PR"` and drop any finding
-   whose marker is already present.
+   `"$SCRIPTS/post-pr-review-list-markers.sh" "$PR" "${GH_REPO_ARGS[@]}"` and
+   drop any finding whose marker is already present.
 6. Within this run, dedup by marker (different agents can converge on the
    same line).
 7. Sort: severity DESC (critical → important → suggestion), path ASC, line ASC.
@@ -157,17 +170,20 @@ editor does the write; the skill reads the result back).
   Counts as one rate-limit event regardless of comment count. Use:
   ```bash
   "$SCRIPTS/post-pr-review-post-batch.sh" "$PR" \
-    --comments-json /tmp/post-pr-review-${PR}.comments.json \
+    --comments-json "$SCRATCH/post-pr-review-${PR}.comments.json" \
     --event "$EVENT" \
-    --body-file /tmp/post-pr-review-${PR}.body.md
+    --body-file "$SCRATCH/post-pr-review-${PR}.body.md" \
+    "${GH_REPO_ARGS[@]}"
   ```
 - `--mode inline` or count == 1: loop `POST /pulls/{n}/comments`, sleeping
-  750ms between calls. Use `post-pr-review-post-single.sh`.
+  750ms between calls. Use `post-pr-review-post-single.sh` with
+  `"${GH_REPO_ARGS[@]}"`.
 
 After each POST, parse rate-limit headers:
 
 ```bash
-REMAINING=$("$SCRIPTS/post-pr-review-ratelimit.sh" /tmp/post-pr-review-${PR}.headers | jq -r .remaining)
+REMAINING=$("$SCRIPTS/post-pr-review-ratelimit.sh" \
+  "$SCRATCH/post-pr-review-batch-${PR}.headers" | jq -r .remaining)
 ```
 
 If `REMAINING < 50` → bump sleep to 1s. If `REMAINING < 10` → stop, report
@@ -231,6 +247,18 @@ The atomic `POST /reviews` endpoint counts as ONE content-creation regardless
 of how many inline comments it bundles — this is why `--mode review` is the
 default. `--mode inline` should only be used when posting a single comment
 or when the user wants per-comment posting for some reason.
+
+## Concurrency
+
+The dedup story (step 6.5: list existing markers → filter findings → POST)
+is **not safe under concurrent invocations**. Between `list-markers.sh`
+returning and `post-batch.sh` posting, another `/post-pr-review` run (or a
+human reviewer adding bot-style markers) could insert markers we never saw,
+producing duplicate posts on the next run.
+
+Run the skill serially per PR. If you need automation, gate it behind a
+GitHub Actions concurrency group or a repo-level lock — the skill itself
+intentionally does not implement locking (out of scope for v0.1).
 
 ## Failure modes
 

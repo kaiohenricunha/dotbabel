@@ -10,7 +10,7 @@
 # `--mode inline` (per-comment loop) or when count == 1.
 #
 # Side effect: writes response headers to
-#   /tmp/post-pr-review-single-<PR>-<line>.headers
+#   ${TMPDIR:-/tmp}/post-pr-review-single-<PR>-<line>.headers
 # so the orchestrator can read x-ratelimit-* between calls.
 #
 # Exit codes:
@@ -74,7 +74,7 @@ else
     '{commit_id: $commit_id, path: $path, line: $line, side: $side, body: $body}' >"$PAYLOAD"
 fi
 
-HEADERS="/tmp/post-pr-review-single-${PR}-${LINE}.headers"
+HEADERS="${TMPDIR:-/tmp}/post-pr-review-single-${PR}-${LINE}.headers"
 
 if ! gh api "repos/$REPO/pulls/$PR/comments" \
   --method POST \

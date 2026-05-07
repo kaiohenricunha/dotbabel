@@ -17,7 +17,7 @@
 # limit, regardless of how many inline comments are bundled.
 #
 # Side effect: writes raw response headers (`gh api --include`) to
-#   /tmp/post-pr-review-batch-<PR>.headers
+#   ${TMPDIR:-/tmp}/post-pr-review-batch-<PR>.headers
 # so the orchestrator can read x-ratelimit-* via post-pr-review-ratelimit.sh.
 #
 # Output: response JSON from gh api (created review id, url, etc.).
@@ -74,7 +74,7 @@ else
     '{event: $event, comments: $comments[0]}' >"$PAYLOAD"
 fi
 
-HEADERS="/tmp/post-pr-review-batch-${PR}.headers"
+HEADERS="${TMPDIR:-/tmp}/post-pr-review-batch-${PR}.headers"
 
 if ! gh api "repos/$REPO/pulls/$PR/reviews" \
   --method POST \

@@ -4,7 +4,9 @@
 # Usage:
 #   post-pr-review-fetch-context.sh <PR#> [--repo OWNER/REPO]
 #
-# Side effect: writes the unified diff to /tmp/post-pr-review-<PR>.diff.
+# Side effect: writes the unified diff to
+#   ${TMPDIR:-/tmp}/post-pr-review-<PR>.diff
+# so that sandboxed environments (where /tmp may be read-only) honor TMPDIR.
 #
 # Output: JSON with fields:
 #   headSHA, diffPath, files (array), title, body
@@ -36,7 +38,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-DIFFPATH="/tmp/post-pr-review-${PR}.diff"
+DIFFPATH="${TMPDIR:-/tmp}/post-pr-review-${PR}.diff"
 
 if ! gh pr diff "$PR" "${REPO_FLAG[@]}" >"$DIFFPATH" 2>/dev/null; then
   echo '{"error":"failed to fetch diff"}' >&2
