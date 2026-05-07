@@ -95,9 +95,10 @@ export const RULE_FLOOR_BEGIN = "<!-- dotbabel:rule-floor:begin -->";
 export const RULE_FLOOR_END = "<!-- dotbabel:rule-floor:end -->";
 const INJECT_FALLBACK_HEADING = "## Universal rule floor";
 
-const SPAN_OPEN_RE = /^<!--\s*dotbabel:cli\s+([a-z0-9 \t,]+?)\s*-->\s*$/;
+const SPAN_OPEN_RE =
+  /^<!--\s*dotbabel:cli\s+([a-z0-9,]+(?:\s+[a-z0-9,]+)*)\s*-->\s*$/;
 const SPAN_END_RE = /^<!--\s*dotbabel:end\s*-->\s*$/;
-const HEADING_RE = /^(#{1,2})\s+(.+?)\s*$/;
+const HEADING_RE = /^(#{1,2})\s+(.+)$/;
 const FENCE_RE = /^([`~]{3,})/;
 
 /**
@@ -222,7 +223,7 @@ export function renderTarget(sourceText, target, substitutions) {
       out.push(line);
     } else {
       const hm = line.match(HEADING_RE);
-      if (hm) omittedHeadings.push(hm[2]);
+      if (hm) omittedHeadings.push(hm[2].trim());
     }
   }
 
