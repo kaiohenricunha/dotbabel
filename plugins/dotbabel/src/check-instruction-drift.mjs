@@ -4,10 +4,6 @@ import {
   readText,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
-import {
-  MANIFEST_RELATIVE_PATH,
-} from "./generate-instructions.mjs";
-import { checkInstructionsFresh } from "./check-instructions-fresh.mjs";
 
 /**
  * Cross-reference docs/repo-facts.json against instruction files
@@ -25,12 +21,13 @@ import { checkInstructionsFresh } from "./check-instructions-fresh.mjs";
  *    user-facing README) should be team-count-checked but NOT held to the
  *    protected_paths cross-CLI parity invariant.
  *  - protected_paths entries are non-empty strings
- *  - generated rule-floor outputs are fresh when the generator manifest exists
  *
  * The harness treats repo-facts.json as the authoritative source and checks that every
  * instruction file stays in sync with it. Validating protected_paths against every
  * rule-floor file is what makes cross-CLI parity enforceable: a protected_path that
- * lands in CLAUDE.md but not in AGENTS.md/GEMINI.md is detected here.
+ * lands in CLAUDE.md but not in AGENTS.md/GEMINI.md is detected here. Generated-output
+ * freshness is a separate concern enforced by `checkInstructionsFresh`; callers that
+ * want both should run them in sequence (see `dotbabel doctor`).
  *
  * @param {object} ctx  Harness context from createHarnessContext().
  * @returns {{ ok: boolean, errors: ValidationError[] }}
@@ -151,10 +148,6 @@ export function checkInstructionDrift(ctx) {
         }
       }
     }
-  }
-
-  if (pathExists(ctx, MANIFEST_RELATIVE_PATH)) {
-    errors.push(...checkInstructionsFresh(ctx).errors);
   }
 
   return { ok: errors.length === 0, errors };

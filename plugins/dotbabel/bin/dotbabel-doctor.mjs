@@ -40,6 +40,8 @@ import {
   validateSpecs,
   checkInstructionDrift,
   checkInstructionsFresh,
+  checkInstructionParity,
+  generateInstructions,
   pathExists,
 } from "../src/index.mjs";
 
@@ -134,7 +136,6 @@ if (pathExists(ctx, "docs/specs")) {
   out.warn("docs/specs/ missing — no specs to validate");
 }
 
-// drift
 try {
   const r = checkInstructionDrift(ctx);
   if (r.ok) out.pass("instruction drift clean");
@@ -143,12 +144,21 @@ try {
   out.warn(`drift check skipped: ${err.message}`);
 }
 
+let generated;
 try {
-  const r = checkInstructionsFresh(ctx);
+  generated = generateInstructions(ctx, { dryRun: true });
+} catch (err) {
+  out.warn(`instruction render skipped: ${err.message}`);
+}
+
+if (generated) {
+  const r = checkInstructionsFresh(ctx, generated);
   if (r.ok) out.pass("generated instruction files fresh");
   else out.fail(`generated instruction freshness: ${r.errors.length} issue(s)`, { errors: r.errors });
-} catch (err) {
-  out.warn(`instruction freshness check skipped: ${err.message}`);
+
+  const p = checkInstructionParity(ctx, generated);
+  if (p.ok) out.pass("generated instruction headings have parity");
+  else out.fail(`generated instruction parity: ${p.errors.length} issue(s)`, { errors: p.errors });
 }
 
 // hook

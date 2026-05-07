@@ -51,6 +51,7 @@ export {
   renderTarget,
   extractRuleFloor,
   stripRuleFloorMarkers,
+  extractHeadings,
   DEFAULT_TARGETS,
   MANIFEST_RELATIVE_PATH,
   BANNER,

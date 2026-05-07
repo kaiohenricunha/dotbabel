@@ -112,14 +112,15 @@ async function pullClone(out, source, opts) {
 
 function refreshInstructions(out, source) {
   const ctx = createHarnessContext({ repoRoot: source });
+  let generated;
   try {
-    generateInstructions(ctx);
+    generated = generateInstructions(ctx);
   } catch (err) {
     out.fail(`instruction generation failed: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, mode: "clone", summary: "instruction generation failed" };
   }
 
-  const freshness = checkInstructionsFresh(ctx);
+  const freshness = checkInstructionsFresh(ctx, generated);
   if (!freshness.ok) {
     out.fail(`instruction freshness failed: ${freshness.errors.length} issue(s)`, {
       errors: freshness.errors,

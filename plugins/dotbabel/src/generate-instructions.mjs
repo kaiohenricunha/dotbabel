@@ -162,7 +162,7 @@ export function renderTarget(sourceText, target, substitutions) {
   /** @type {string[]} */
   const omittedHeadings = [];
 
-  /** @type {{ tags: Set<string>, included: boolean, lineNumber: number } | null} */
+  /** @type {{ included: boolean, lineNumber: number } | null} */
   let activeSpan = null;
   /** @type {string | null} */
   let openFence = null;
@@ -196,7 +196,6 @@ export function renderTarget(sourceText, target, substitutions) {
       }
       const tags = parseTagSet(openMatch[1]);
       activeSpan = {
-        tags,
         included: isSuperset(tags, target.cliSet),
         lineNumber: i + 1,
       };
@@ -369,10 +368,7 @@ function composeInject(existingHostText, ruleFloor, relativeOutputPath) {
 export function generateInstructions(ctx, opts = {}) {
   const targets = opts.targets ?? DEFAULT_TARGETS;
   const facts = loadFacts(ctx);
-  const substitutions =
-    facts.cli_substitutions && typeof facts.cli_substitutions === "object"
-      ? facts.cli_substitutions
-      : {};
+  const substitutions = validateSubstitutions(facts.cli_substitutions);
   const sourceText = readText(ctx, "CLAUDE.md");
 
   /** @type {{ path: string, content: string, mode: TargetMode, omittedHeadings: string[] }[]} */
@@ -417,7 +413,7 @@ export function generateInstructions(ctx, opts = {}) {
     generator: "dotbabel-generate-instructions",
     targets: manifestEntries,
   };
-  const manifestContent = stringifyManifest(manifest);
+  const manifestContent = `${JSON.stringify(manifest, null, 2)}\n`;
 
   if (!opts.dryRun) {
     for (const file of files) {
@@ -456,31 +452,71 @@ function normalizeGeneratedMarkdown(content) {
     .replace(/\n+$/g, "")}\n`;
 }
 
-function stringifyArray(values) {
-  return `[${values.map((v) => JSON.stringify(v)).join(", ")}]`;
+/**
+ * Walk a markdown body and return its `#`/`##` headings, ignoring lines inside
+ * fenced code blocks. Reused by Gate C so the generator and the parity gate
+ * share one regex / fence-tracking implementation.
+ *
+ * @param {string} markdown
+ * @returns {string[]}
+ */
+export function extractHeadings(markdown) {
+  const headings = [];
+  let openFence = null;
+  for (const line of markdown.split("\n")) {
+    const fenceMatch = line.match(FENCE_RE);
+    if (openFence === null) {
+      if (fenceMatch) openFence = fenceMatch[1];
+    } else {
+      if (
+        fenceMatch &&
+        fenceMatch[1].length >= openFence.length &&
+        fenceMatch[1][0] === openFence[0]
+      ) {
+        openFence = null;
+      }
+      continue;
+    }
+    const hm = line.match(HEADING_RE);
+    if (hm) headings.push(hm[2].trim());
+  }
+  return headings;
 }
 
-function stringifyManifest(manifest) {
-  const lines = [
-    "{",
-    `  "source": ${JSON.stringify(manifest.source)},`,
-    `  "generator": ${JSON.stringify(manifest.generator)},`,
-    '  "targets": {',
-  ];
-
-  const entries = Object.entries(manifest.targets);
-  for (let i = 0; i < entries.length; i++) {
-    const [targetPath, entry] = entries[i];
-    lines.push(`    ${JSON.stringify(targetPath)}: {`);
-    lines.push(`      "cliSet": ${stringifyArray(entry.cliSet)},`);
-    lines.push(`      "mode": ${JSON.stringify(entry.mode)},`);
-    lines.push(`      "omittedHeadings": ${stringifyArray(entry.omittedHeadings)}`);
-    lines.push(`    }${i === entries.length - 1 ? "" : ","}`);
+function validateSubstitutions(raw) {
+  if (raw === undefined || raw === null) return {};
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ValidationError({
+      code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
+      category: "drift",
+      file: "docs/repo-facts.json",
+      pointer: "cli_substitutions",
+      message: "cli_substitutions must be an object mapping target keys to substitution maps",
+    });
   }
-
-  lines.push("  }");
-  lines.push("}");
-  return `${lines.join("\n")}\n`;
+  for (const [key, map] of Object.entries(raw)) {
+    if (typeof map !== "object" || map === null || Array.isArray(map)) {
+      throw new ValidationError({
+        code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
+        category: "drift",
+        file: "docs/repo-facts.json",
+        pointer: `cli_substitutions.${key}`,
+        message: `cli_substitutions.${key} must be a string→string map`,
+      });
+    }
+    for (const [needle, replacement] of Object.entries(map)) {
+      if (typeof replacement !== "string") {
+        throw new ValidationError({
+          code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
+          category: "drift",
+          file: "docs/repo-facts.json",
+          pointer: `cli_substitutions.${key}.${needle}`,
+          message: `cli_substitutions.${key}.${JSON.stringify(needle)} must be a string`,
+        });
+      }
+    }
+  }
+  return raw;
 }
 
 export { ERROR_CODES };

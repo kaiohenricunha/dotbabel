@@ -19,7 +19,9 @@ vi.mock("../src/bootstrap-global.mjs", () => ({
 }));
 
 vi.mock("../src/generate-instructions.mjs", () => ({
-  generateInstructions: vi.fn().mockReturnValue({ ok: true, files: [] }),
+  generateInstructions: vi
+    .fn()
+    .mockReturnValue({ ok: true, files: [], manifest: { targets: {} } }),
 }));
 
 vi.mock("../src/check-instructions-fresh.mjs", () => ({
@@ -137,7 +139,10 @@ describe("syncGlobal", () => {
       expect.objectContaining({ encoding: "utf8" })
     );
     expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source });
-    expect(checkInstructionsFresh).toHaveBeenCalledWith({ repoRoot: source });
+    expect(checkInstructionsFresh).toHaveBeenCalledWith(
+      { repoRoot: source },
+      expect.objectContaining({ ok: true }),
+    );
     expect(bootstrapGlobal).toHaveBeenCalledWith(
       expect.objectContaining({ source })
     );

@@ -10,20 +10,25 @@ import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
  * CLAUDE.md.
  *
  * @param {object} ctx  Harness context from createHarnessContext().
+ * @param {ReturnType<typeof generateInstructions>} [precomputed]
+ *   Optional generator output to reuse — pass when the caller has already
+ *   rendered the targets to avoid a second full render.
  * @returns {{ ok: boolean, errors: ValidationError[] }}
  */
-export function checkInstructionsFresh(ctx) {
+export function checkInstructionsFresh(ctx, precomputed) {
   const errors = [];
-  let generated;
+  let generated = precomputed;
 
-  try {
-    generated = generateInstructions(ctx, { dryRun: true });
-  } catch (err) {
-    if (err instanceof ValidationError) {
-      errors.push(err);
-      return { ok: false, errors };
+  if (!generated) {
+    try {
+      generated = generateInstructions(ctx, { dryRun: true });
+    } catch (err) {
+      if (err instanceof ValidationError) {
+        errors.push(err);
+        return { ok: false, errors };
+      }
+      throw err;
     }
-    throw err;
   }
 
   for (const file of generated.files) {

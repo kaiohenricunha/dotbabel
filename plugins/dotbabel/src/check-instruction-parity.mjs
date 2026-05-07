@@ -1,32 +1,37 @@
-import { generateInstructions } from "./generate-instructions.mjs";
+import {
+  extractHeadings,
+  generateInstructions,
+} from "./generate-instructions.mjs";
 import {
   pathExists,
   readText,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
-const HEADING_RE = /^(#{1,2})\s+(.+?)\s*$/;
-const FENCE_RE = /^([`~]{3,})/;
-
 /**
  * Verify generated cross-CLI instruction outputs preserve every heading that
  * should apply to that CLI target.
  *
  * @param {object} ctx  Harness context from createHarnessContext().
+ * @param {ReturnType<typeof generateInstructions>} [precomputed]
+ *   Optional generator output to reuse — pass when the caller has already
+ *   rendered the targets to avoid a second full render.
  * @returns {{ ok: boolean, errors: ValidationError[] }}
  */
-export function checkInstructionParity(ctx) {
+export function checkInstructionParity(ctx, precomputed) {
   const errors = [];
-  let generated;
+  let generated = precomputed;
 
-  try {
-    generated = generateInstructions(ctx, { dryRun: true });
-  } catch (err) {
-    if (err instanceof ValidationError) {
-      errors.push(err);
-      return { ok: false, errors };
+  if (!generated) {
+    try {
+      generated = generateInstructions(ctx, { dryRun: true });
+    } catch (err) {
+      if (err instanceof ValidationError) {
+        errors.push(err);
+        return { ok: false, errors };
+      }
+      throw err;
     }
-    throw err;
   }
 
   for (const file of generated.files) {
@@ -43,8 +48,9 @@ export function checkInstructionParity(ctx) {
       continue;
     }
 
-    const currentHeadings = extractHeadings(readText(ctx, file.path));
-    const currentSet = new Set(currentHeadings.map(normalizeHeading));
+    const currentSet = new Set(
+      extractHeadings(readText(ctx, file.path)).map(normalizeHeading),
+    );
     for (const heading of extractHeadings(file.content)) {
       if (currentSet.has(normalizeHeading(heading))) continue;
       errors.push(new ValidationError({
@@ -63,34 +69,6 @@ export function checkInstructionParity(ctx) {
 
 function normalizeHeading(heading) {
   return heading.trim().replace(/\s+/g, " ");
-}
-
-function extractHeadings(markdown) {
-  const headings = [];
-  let openFence = null;
-
-  for (const line of markdown.split("\n")) {
-    const fenceMatch = line.match(FENCE_RE);
-    if (openFence === null && fenceMatch) {
-      openFence = fenceMatch[1];
-      continue;
-    }
-    if (openFence !== null) {
-      if (
-        fenceMatch &&
-        fenceMatch[1].length >= openFence.length &&
-        fenceMatch[1][0] === openFence[0]
-      ) {
-        openFence = null;
-      }
-      continue;
-    }
-
-    const headingMatch = line.match(HEADING_RE);
-    if (headingMatch) headings.push(headingMatch[2]);
-  }
-
-  return headings;
 }
 
 export { ERROR_CODES };
