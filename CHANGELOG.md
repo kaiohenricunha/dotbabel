@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.0.1...v2.1.0) (2026-05-07)
+
+
+### Added
+
+* **plan-grader:** add reusable plan grader skill ([#194](https://github.com/kaiohenricunha/dotbabel/issues/194)) ([78bd8cc](https://github.com/kaiohenricunha/dotbabel/commit/78bd8cc76286eb731bf4c44b8f82088c8c48ddc2))
+
 ## [2.0.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.0.0...v2.0.1) (2026-05-07)
 
 
