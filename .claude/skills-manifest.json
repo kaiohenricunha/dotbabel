@@ -209,9 +209,7 @@
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
       "checksum": "sha256:32a58bb0feb413e7f44148347d62283332ba259273a6c8f6d4a514876cc484dd",
-      "dependencies": [
-        "deploy-status"
-      ],
+      "dependencies": ["deploy-status"],
       "lastValidated": "2026-05-07"
     },
     {
@@ -239,9 +237,7 @@
       "name": "post-pr-review",
       "path": ".claude/skills/post-pr-review/SKILL.md",
       "checksum": "sha256:354eaa8251dd52416fcc5442a90079f30f3cbd96cf5c1883a8c7078249e2dbab",
-      "dependencies": [
-        "review-pr"
-      ],
+      "dependencies": ["review-pr"],
       "lastValidated": "2026-05-07"
     }
   ]
