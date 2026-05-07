@@ -576,6 +576,21 @@
       "owner": "@kaiohenricunha"
     },
     {
+      "id": "plan-grader",
+      "type": "skill",
+      "path": "skills/plan-grader/SKILL.md",
+      "name": "plan-grader",
+      "description": "Grade implementation plans on a 0-10 scale without mutating the workspace. Accepts plan files, quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "draft"
+      },
+      "version": "2.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
       "id": "platform-engineer",
       "type": "agent",
       "path": "agents/platform-engineer.md",
