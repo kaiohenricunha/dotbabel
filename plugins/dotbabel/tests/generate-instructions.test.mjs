@@ -363,6 +363,46 @@ describe("generateInstructions — inject mode", () => {
     expect(after.match(new RegExp(RULE_FLOOR_END, "g")).length).toBe(1);
   });
 
+  it("matches rule-floor markers only on marker lines during replacement", () => {
+    const root = isolateFixture();
+    writeClaude(
+      root,
+      [
+        "# CLAUDE.md",
+        "",
+        RULE_FLOOR_BEGIN,
+        `The closing marker \`${RULE_FLOOR_END}\` can be mentioned in prose.`,
+        "fresh body",
+        RULE_FLOOR_END,
+      ].join("\n"),
+    );
+    writeFacts(root, { ...readFacts(root), cli_substitutions: {} });
+    writeFile(
+      root,
+      "AGENTS.md",
+      [
+        "# Repository Guidelines",
+        "",
+        RULE_FLOOR_BEGIN,
+        `The closing marker \`${RULE_FLOOR_END}\` can be mentioned in prose.`,
+        "STALE",
+        RULE_FLOOR_END,
+        "",
+        "Hand-authored tail.",
+        "",
+      ].join("\n"),
+    );
+    const ctx = createHarnessContext({ repoRoot: root });
+    generateInstructions(ctx, { targets: [INJECT_AGENTS] });
+    const after = readFile(root, "AGENTS.md");
+    expect(after).toContain("fresh body");
+    expect(after).toContain("Hand-authored tail.");
+    expect(after).not.toContain("STALE");
+    expect(
+      after.split("\n").filter((line) => line.trim() === RULE_FLOOR_END),
+    ).toHaveLength(1);
+  });
+
   it("is idempotent — running twice produces the same content", () => {
     const root = isolateFixture();
     setupCanonical(root);

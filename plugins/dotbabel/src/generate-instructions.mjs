@@ -304,7 +304,7 @@ export function extractRuleFloor(body) {
  * @returns {string}
  */
 function composeSynthesize(renderedBody) {
-  return `${BANNER}\n${stripRuleFloorMarkers(renderedBody)}`;
+  return normalizeGeneratedMarkdown(`${BANNER}\n\n${stripRuleFloorMarkers(renderedBody)}`);
 }
 
 /**
@@ -318,19 +318,25 @@ function composeSynthesize(renderedBody) {
  * @returns {string}
  */
 function composeInject(existingHostText, ruleFloor, relativeOutputPath) {
-  const blockBody = `${BANNER}\n${ruleFloor}`;
-  const block = `${RULE_FLOOR_BEGIN}\n${blockBody}\n${RULE_FLOOR_END}`;
+  const blockBody = `${BANNER}\n\n${normalizeGeneratedMarkdown(ruleFloor).trimEnd()}`;
+  const block = `${RULE_FLOOR_BEGIN}\n${blockBody}\n\n${RULE_FLOOR_END}`;
 
-  const beginIdx = existingHostText.indexOf(RULE_FLOOR_BEGIN);
-  const endIdx = existingHostText.indexOf(RULE_FLOOR_END);
+  const lines = existingHostText.split("\n");
+  const beginLine = lines.findIndex((l) => l.trim() === RULE_FLOOR_BEGIN);
+  const endLine = lines.findIndex(
+    (l, idx) => idx > beginLine && l.trim() === RULE_FLOOR_END,
+  );
 
-  if (beginIdx !== -1 && endIdx !== -1 && endIdx > beginIdx) {
-    const before = existingHostText.slice(0, beginIdx);
-    const after = existingHostText.slice(endIdx + RULE_FLOOR_END.length);
-    return `${before}${block}${after}`;
+  if (beginLine !== -1 && endLine !== -1) {
+    const before = lines.slice(0, beginLine).join("\n");
+    const after = lines.slice(endLine + 1).join("\n");
+    const updated = `${before}${before ? "\n" : ""}${block}${after ? `\n${after}` : ""}`;
+    return existingHostText.endsWith("\n") && !updated.endsWith("\n")
+      ? `${updated}\n`
+      : updated;
   }
 
-  if (beginIdx === -1 && endIdx === -1) {
+  if (beginLine === -1 && endLine === -1) {
     // First-run bootstrap: append a section.
     const trimmed = existingHostText.replace(/\s+$/, "");
     const sep = trimmed.length === 0 ? "" : "\n\n";
@@ -410,7 +416,7 @@ export function generateInstructions(ctx, opts = {}) {
     generator: "dotbabel-generate-instructions",
     targets: manifestEntries,
   };
-  const manifestContent = `${JSON.stringify(manifest, null, 2)}\n`;
+  const manifestContent = stringifyManifest(manifest);
 
   if (!opts.dryRun) {
     for (const file of files) {
@@ -440,6 +446,40 @@ export function generateInstructions(ctx, opts = {}) {
 
 function ensureParentDir(absPath) {
   mkdirSync(path.dirname(absPath), { recursive: true });
+}
+
+function normalizeGeneratedMarkdown(content) {
+  return `${content
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n+$/g, "")}\n`;
+}
+
+function stringifyArray(values) {
+  return `[${values.map((v) => JSON.stringify(v)).join(", ")}]`;
+}
+
+function stringifyManifest(manifest) {
+  const lines = [
+    "{",
+    `  "source": ${JSON.stringify(manifest.source)},`,
+    `  "generator": ${JSON.stringify(manifest.generator)},`,
+    '  "targets": {',
+  ];
+
+  const entries = Object.entries(manifest.targets);
+  for (let i = 0; i < entries.length; i++) {
+    const [targetPath, entry] = entries[i];
+    lines.push(`    ${JSON.stringify(targetPath)}: {`);
+    lines.push(`      "cliSet": ${stringifyArray(entry.cliSet)},`);
+    lines.push(`      "mode": ${JSON.stringify(entry.mode)},`);
+    lines.push(`      "omittedHeadings": ${stringifyArray(entry.omittedHeadings)}`);
+    lines.push(`    }${i === entries.length - 1 ? "" : ","}`);
+  }
+
+  lines.push("  }");
+  lines.push("}");
+  return `${lines.join("\n")}\n`;
 }
 
 export { ERROR_CODES };

@@ -92,15 +92,17 @@ and the `dependencies[]` DAG.
 ## `dotbabel-check-instruction-drift`
 
 Cross-reference `docs/repo-facts.json` against instruction files (CLAUDE.md,
-README.md). Flags stale `team_count` claims, undocumented `protected_paths`,
-and broken `instruction_files` references.
+README.md, AGENTS.md, GEMINI.md, generated CLI templates). Flags stale
+`team_count` claims, undocumented `protected_paths` in `rule_floor_files`,
+stale generated rule-floor outputs, and broken instruction-file references.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
 | `--repo-root <path>` | resolved via git | Override |
 
 **Emitted codes**: `DRIFT_TEAM_COUNT`, `DRIFT_PROTECTED_PATH`,
-`DRIFT_INSTRUCTION_FILES`, `DRIFT_INSTRUCTION_FILE_MISSING`.
+`DRIFT_INSTRUCTION_FILES`, `DRIFT_INSTRUCTION_FILE_MISSING`,
+`DRIFT_GENERATED_STALE`.
 
 ---
 

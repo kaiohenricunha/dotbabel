@@ -5,6 +5,11 @@ import { readFileSync, writeFileSync, mkdtempSync, cpSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkInstructionDrift } from "../src/check-instruction-drift.mjs";
+import {
+  generateInstructions,
+  RULE_FLOOR_BEGIN,
+  RULE_FLOOR_END,
+} from "../src/generate-instructions.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -26,6 +31,10 @@ function readFacts(root) {
 
 function writeFacts(root, obj) {
   writeFileSync(factsPath(root), JSON.stringify(obj, null, 2) + "\n");
+}
+
+function writeFile(root, rel, body) {
+  writeFileSync(path.join(root, rel), body);
 }
 
 describe("checkInstructionDrift", () => {
@@ -76,6 +85,80 @@ describe("checkInstructionDrift", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.code === ERROR_CODES.DRIFT_PROTECTED_PATH)).toBe(true);
     expect(result.errors.some((e) => /protected_paths|protected path|docs\/secrets/.test(e))).toBe(true);
+  });
+
+  it("defaults rule_floor_files to instruction_files for backward compatibility", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const facts = readFacts(root);
+    delete facts.rule_floor_files;
+    writeFacts(root, facts);
+    const result = checkInstructionDrift(ctx);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_PROTECTED_PATH &&
+          e.file === "README.md",
+      ),
+    ).toBe(true);
+  });
+
+  it("emits DRIFT_INSTRUCTION_FILES when rule_floor_files is invalid", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const facts = readFacts(root);
+    facts.rule_floor_files = [];
+    writeFacts(root, facts);
+    const result = checkInstructionDrift(ctx);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_INSTRUCTION_FILES &&
+          e.pointer === "rule_floor_files",
+      ),
+    ).toBe(true);
+  });
+
+  it("emits DRIFT_GENERATED_STALE when generated instruction files drift", () => {
+    const root = isolateFixture();
+    const facts = readFacts(root);
+    facts.protected_paths = ["CLAUDE.md"];
+    facts.instruction_files = ["CLAUDE.md", "README.md"];
+    facts.rule_floor_files = ["CLAUDE.md", "AGENTS.md"];
+    facts.cli_substitutions = {};
+    writeFacts(root, facts);
+    writeFile(
+      root,
+      "CLAUDE.md",
+      [
+        "# CLAUDE.md",
+        "",
+        "This project has 2 teams.",
+        "",
+        RULE_FLOOR_BEGIN,
+        "## Protected paths",
+        "",
+        "- `CLAUDE.md`",
+        RULE_FLOOR_END,
+        "",
+      ].join("\n"),
+    );
+
+    const ctx = createHarnessContext({ repoRoot: root });
+    generateInstructions(ctx);
+    writeFile(root, "AGENTS.md", "hand-edited stale content\n");
+
+    const result = checkInstructionDrift(ctx);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_GENERATED_STALE &&
+          e.file === "AGENTS.md",
+      ),
+    ).toBe(true);
   });
 
   it("emits DRIFT_PROTECTED_PATH when protected_paths contains a non-string entry", () => {

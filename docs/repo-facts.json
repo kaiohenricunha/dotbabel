@@ -5,7 +5,10 @@
   "protected_paths": [
     "CLAUDE.md",
     "README.md",
+    "AGENTS.md",
+    "GEMINI.md",
     ".github/workflows/**",
+    ".github/copilot-instructions.md",
     ".claude/**",
     "docs/repo-facts.json",
     "docs/specs/**/spec.json",
@@ -13,7 +16,25 @@
     "plugins/dotbabel/bin/**",
     "plugins/dotbabel/templates/**"
   ],
-  "instruction_files": ["CLAUDE.md", "README.md"],
+  "instruction_files": [
+    "CLAUDE.md",
+    "README.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
+  ],
+  "rule_floor_files": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
+  ],
   "regression_paths": [],
   "cli_substitutions": {
     "_default_": {},
