@@ -122,4 +122,21 @@ describe("checkInstructionsFresh", () => {
       ),
     ).toBe(true);
   });
+
+  it("reuses a precomputed generator result and skips re-rendering", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const generated = generateInstructions(ctx);
+    writeFile(root, "AGENTS.md", "hand edit\n");
+
+    const result = checkInstructionsFresh(ctx, generated);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_GENERATED_STALE &&
+          e.file === "AGENTS.md",
+      ),
+    ).toBe(true);
+  });
 });

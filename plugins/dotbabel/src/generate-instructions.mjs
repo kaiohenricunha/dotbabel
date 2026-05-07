@@ -413,7 +413,7 @@ export function generateInstructions(ctx, opts = {}) {
     generator: "dotbabel-generate-instructions",
     targets: manifestEntries,
   };
-  const manifestContent = `${JSON.stringify(manifest, null, 2)}\n`;
+  const manifestContent = stringifyManifest(manifest);
 
   if (!opts.dryRun) {
     for (const file of files) {
@@ -481,6 +481,35 @@ export function extractHeadings(markdown) {
     if (hm) headings.push(hm[2].trim());
   }
   return headings;
+}
+
+function stringifyArray(values) {
+  return `[${values.map((v) => JSON.stringify(v)).join(", ")}]`;
+}
+
+// Hand-rolled to match prettier's compact-array heuristic; `JSON.stringify`
+// would expand short arrays across lines and fail the prettier gate.
+function stringifyManifest(manifest) {
+  const lines = [
+    "{",
+    `  "source": ${JSON.stringify(manifest.source)},`,
+    `  "generator": ${JSON.stringify(manifest.generator)},`,
+    '  "targets": {',
+  ];
+
+  const entries = Object.entries(manifest.targets);
+  for (let i = 0; i < entries.length; i++) {
+    const [targetPath, entry] = entries[i];
+    lines.push(`    ${JSON.stringify(targetPath)}: {`);
+    lines.push(`      "cliSet": ${stringifyArray(entry.cliSet)},`);
+    lines.push(`      "mode": ${JSON.stringify(entry.mode)},`);
+    lines.push(`      "omittedHeadings": ${stringifyArray(entry.omittedHeadings)}`);
+    lines.push(`    }${i === entries.length - 1 ? "" : ","}`);
+  }
+
+  lines.push("  }");
+  lines.push("}");
+  return `${lines.join("\n")}\n`;
 }
 
 function validateSubstitutions(raw) {

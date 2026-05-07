@@ -496,3 +496,45 @@ describe("generateInstructions — manifest", () => {
     expect(existsSync(path.join(root, MANIFEST_RELATIVE_PATH))).toBe(true);
   });
 });
+
+describe("generateInstructions — cli_substitutions validation", () => {
+  function setup(value) {
+    const root = isolateFixture();
+    const facts = readFacts(root);
+    facts.cli_substitutions = value;
+    writeFacts(root, facts);
+    writeClaude(
+      root,
+      [`# Doc`, "", RULE_FLOOR_BEGIN, "## Rule", RULE_FLOOR_END, ""].join("\n"),
+    );
+    return createHarnessContext({ repoRoot: root });
+  }
+
+  it("rejects an array as cli_substitutions", () => {
+    const ctx = setup(["copilot"]);
+    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(
+      ValidationError,
+    );
+  });
+
+  it("rejects a non-object substitution map per CLI key", () => {
+    const ctx = setup({ copilot: "not an object" });
+    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(
+      /string→string map/,
+    );
+  });
+
+  it("rejects a non-string replacement value", () => {
+    const ctx = setup({ copilot: { foo: 42 } });
+    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(
+      /must be a string/,
+    );
+  });
+
+  it("accepts undefined / null without raising", () => {
+    const ctxA = setup(undefined);
+    const ctxB = setup(null);
+    expect(() => generateInstructions(ctxA, { dryRun: true })).not.toThrow();
+    expect(() => generateInstructions(ctxB, { dryRun: true })).not.toThrow();
+  });
+});

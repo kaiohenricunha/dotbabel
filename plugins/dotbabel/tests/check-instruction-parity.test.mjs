@@ -118,4 +118,19 @@ describe("checkInstructionParity", () => {
     const result = checkInstructionParity(ctx);
     expect(result.ok).toBe(true);
   });
+
+  it("reuses a precomputed generator result", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const generated = generateInstructions(ctx);
+    writeFile(root, "AGENTS.md", "no headings here\n");
+
+    const result = checkInstructionParity(ctx, generated);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.DRIFT_PARITY_MISSING_HEADING,
+      ),
+    ).toBe(true);
+  });
 });
