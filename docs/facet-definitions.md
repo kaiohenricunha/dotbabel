@@ -1,6 +1,6 @@
 # Facet Definitions
 
-_Last updated: v2.0.1_
+_Last updated: v2.1.0_
 
 Canonical definitions for every enum value in `schemas/facets.schema.json`.
 When adding a new value, update this file in the same PR and include one
