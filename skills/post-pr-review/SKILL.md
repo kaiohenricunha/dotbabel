@@ -30,18 +30,18 @@ of a producer/consumer pair — `review-pr` is the consumer.
 
 ## Argument grammar
 
-| Flag | Default | Notes |
-|---|---|---|
-| `<PR#>` positional | autodetect from current branch | optional |
-| `--repo OWNER/REPO` | autodetect | needed for fork PRs |
-| `--agents <csv>` | `default-set` | dotbabel agents to dispatch (see step 5) |
-| `--max-comments N` | `25` | hard cap; >25 requires explicit override |
-| `--event` | `COMMENT` | `COMMENT` / `REQUEST_CHANGES` / `APPROVE` |
-| `--mode` | `review` | `review` (atomic batch) or `inline` (per-comment loop) |
-| `--summary-only` | off | skip inline comments, post one top-level body |
-| `--auto` | off | skip confirmation prompt |
-| `--dry-run` | **on** in interactive; off only with `--auto --confirm-post` | prints what would be posted |
-| `--confirm-post` | off | required alongside `--auto` to actually POST |
+| Flag                | Default                                                      | Notes                                                  |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
+| `<PR#>` positional  | autodetect from current branch                               | optional                                               |
+| `--repo OWNER/REPO` | autodetect                                                   | needed for fork PRs                                    |
+| `--agents <csv>`    | `default-set`                                                | dotbabel agents to dispatch (see step 5)               |
+| `--max-comments N`  | `25`                                                         | hard cap; >25 requires explicit override               |
+| `--event`           | `COMMENT`                                                    | `COMMENT` / `REQUEST_CHANGES` / `APPROVE`              |
+| `--mode`            | `review`                                                     | `review` (atomic batch) or `inline` (per-comment loop) |
+| `--summary-only`    | off                                                          | skip inline comments, post one top-level body          |
+| `--auto`            | off                                                          | skip confirmation prompt                               |
+| `--dry-run`         | **on** in interactive; off only with `--auto --confirm-post` | prints what would be posted                            |
+| `--confirm-post`    | off                                                          | required alongside `--auto` to actually POST           |
 
 ## Workflow
 
@@ -112,7 +112,7 @@ receives:
 - The head SHA.
 - The exact JSON contract from
   [`references/agent-contract.md`](references/agent-contract.md) — verbatim,
-  no paraphrasing. Each agent MUST return ONE fenced ```json block with the
+  no paraphrasing. Each agent MUST return ONE fenced JSON block per the
   documented schema.
 
 ### 6. Aggregate, validate, dedup, sort, truncate
@@ -237,18 +237,18 @@ or when the user wants per-comment posting for some reason.
 
 ## Failure modes
 
-| Mode | Detection | Behavior |
-|---|---|---|
-| No PR for branch | `gh pr view` exits non-zero | Fail with: "No PR found. Pass PR# explicitly: `/post-pr-review 123`." |
-| PR closed/merged | `state != OPEN` | Refuse. No `--force` for merged. |
-| PR is draft | `isDraft == true` | Warn + prompt; `--auto` proceeds. |
-| Fork PR | `isCrossRepository == true` | Warn that posting may 403. |
-| Agent returns no findings | empty `findings[]` | Note in report, continue. |
-| Agent returns malformed JSON | parse fails | Retry once with stricter prompt; on second fail, skip that agent. |
-| `gh auth missing` | `gh auth status` non-zero | Fail at preflight with remediation. |
-| Secondary rate limit hit | 403 with `secondary rate limit` in body | Stop batch, report deferred, hint at `x-ratelimit-reset`. |
-| Line not in diff | pre-validated against postable line set; if it slips and GitHub returns 422 | Skip that comment, log, continue. |
-| Network/transient | non-2xx, non-422, non-403 | Retry up to 2x with backoff (1s, 3s). |
+| Mode                         | Detection                                                                   | Behavior                                                              |
+| ---------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| No PR for branch             | `gh pr view` exits non-zero                                                 | Fail with: "No PR found. Pass PR# explicitly: `/post-pr-review 123`." |
+| PR closed/merged             | `state != OPEN`                                                             | Refuse. No `--force` for merged.                                      |
+| PR is draft                  | `isDraft == true`                                                           | Warn + prompt; `--auto` proceeds.                                     |
+| Fork PR                      | `isCrossRepository == true`                                                 | Warn that posting may 403.                                            |
+| Agent returns no findings    | empty `findings[]`                                                          | Note in report, continue.                                             |
+| Agent returns malformed JSON | parse fails                                                                 | Retry once with stricter prompt; on second fail, skip that agent.     |
+| `gh auth missing`            | `gh auth status` non-zero                                                   | Fail at preflight with remediation.                                   |
+| Secondary rate limit hit     | 403 with `secondary rate limit` in body                                     | Stop batch, report deferred, hint at `x-ratelimit-reset`.             |
+| Line not in diff             | pre-validated against postable line set; if it slips and GitHub returns 422 | Skip that comment, log, continue.                                     |
+| Network/transient            | non-2xx, non-422, non-403                                                   | Retry up to 2x with backoff (1s, 3s).                                 |
 
 ## See also
 

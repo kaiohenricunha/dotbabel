@@ -59,6 +59,7 @@ Per the GitHub docs:
 
 > Requests that create content count toward the secondary rate limit. This
 > includes:
+>
 > - Creating issues
 > - Creating issue comments
 > - Creating pull request reviews

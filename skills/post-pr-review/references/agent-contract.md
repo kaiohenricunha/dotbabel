@@ -1,12 +1,13 @@
 # Agent contract — JSON return shape for review agents
 
-Each agent dispatched by `post-pr-review` MUST return EXACTLY ONE fenced
-```json block. No prose before or after. Findings outside this contract are
-silently dropped by the orchestrator.
+Each agent dispatched by `post-pr-review` MUST return exactly one fenced
+JSON block (an opening fence followed by `json`, the JSON payload, then a
+closing fence — see the schema below). No prose before or after the block.
+Findings outside this contract are silently dropped by the orchestrator.
 
 ## Schema
 
-````json
+```json
 {
   "agent": "security-auditor",
   "findings": [
@@ -24,24 +25,24 @@ silently dropped by the orchestrator.
   ],
   "general_notes": "string or null — posted as the review body, not inline"
 }
-````
+```
 
 ## Field semantics
 
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| `agent` | string | yes | Agent name. Echo your own name verbatim. |
-| `findings` | array | yes | May be empty. |
-| `findings[].path` | string | yes | Repo-relative path. Must match a file in the diff. |
-| `findings[].line` | int | yes | NEW-side line number (the line in the new version). |
-| `findings[].side` | enum | yes | `RIGHT` for additions/context (default), `LEFT` for old version. |
-| `findings[].start_line` | int or null | no | For multi-line comments; otherwise null. |
-| `findings[].severity` | enum | yes | `critical` (must fix before merge), `important` (should fix), `suggestion` (nit). |
-| `findings[].category` | enum | yes | One of: `bug`, `style`, `test`, `comment`, `type`, `simplify`, `error-handling`, `security`, `design`. |
-| `findings[].title` | string | yes | <= 80 chars, no markdown. |
-| `findings[].body` | string | yes | Markdown. Suggestion blocks (` ```suggestion ` ... ` ``` `) are encouraged. |
-| `findings[].confidence` | int | yes | 0–100. Findings with `< 80` are dropped by the orchestrator. |
-| `general_notes` | string or null | yes | If non-null, posted as the top-level review body. Use for cross-cutting observations. |
+| Field                   | Type           | Required | Notes                                                                                                  |
+| ----------------------- | -------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `agent`                 | string         | yes      | Agent name. Echo your own name verbatim.                                                               |
+| `findings`              | array          | yes      | May be empty.                                                                                          |
+| `findings[].path`       | string         | yes      | Repo-relative path. Must match a file in the diff.                                                     |
+| `findings[].line`       | int            | yes      | NEW-side line number (the line in the new version).                                                    |
+| `findings[].side`       | enum           | yes      | `RIGHT` for additions/context (default), `LEFT` for old version.                                       |
+| `findings[].start_line` | int or null    | no       | For multi-line comments; otherwise null.                                                               |
+| `findings[].severity`   | enum           | yes      | `critical` (must fix before merge), `important` (should fix), `suggestion` (nit).                      |
+| `findings[].category`   | enum           | yes      | One of: `bug`, `style`, `test`, `comment`, `type`, `simplify`, `error-handling`, `security`, `design`. |
+| `findings[].title`      | string         | yes      | <= 80 chars, no markdown.                                                                              |
+| `findings[].body`       | string         | yes      | Markdown. Suggestion blocks (` ```suggestion ` ... ` ``` `) are encouraged.                            |
+| `findings[].confidence` | int            | yes      | 0–100. Findings with `< 80` are dropped by the orchestrator.                                           |
+| `general_notes`         | string or null | yes      | If non-null, posted as the top-level review body. Use for cross-cutting observations.                  |
 
 ## Why JSON, not markdown table
 

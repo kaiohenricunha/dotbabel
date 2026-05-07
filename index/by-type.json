@@ -44,6 +44,7 @@
     "handoff",
     "kubernetes-specialist",
     "plan-grader",
+    "post-pr-review",
     "pulumi-specialist",
     "review-pr",
     "review-prs",
