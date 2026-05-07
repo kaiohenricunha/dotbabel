@@ -98,7 +98,7 @@ const INJECT_FALLBACK_HEADING = "## Universal rule floor";
 const SPAN_OPEN_RE =
   /^<!--\s*dotbabel:cli\s+([a-z0-9,]+(?:\s+[a-z0-9,]+)*)\s*-->\s*$/;
 const SPAN_END_RE = /^<!--\s*dotbabel:end\s*-->\s*$/;
-const HEADING_RE = /^(#{1,2})\s+(.+)$/;
+const HEADING_RE = /^(#{1,2})\s+(\S.*)$/;
 const FENCE_RE = /^([`~]{3,})/;
 
 /**
