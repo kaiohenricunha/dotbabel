@@ -138,7 +138,7 @@ describe("syncGlobal", () => {
       ["-C", source, "rebase", "origin/main"],
       expect.objectContaining({ encoding: "utf8" })
     );
-    expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source });
+    expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source }, { dryRun: true });
     expect(checkInstructionsFresh).toHaveBeenCalledWith(
       { repoRoot: source },
       expect.objectContaining({ ok: true }),
@@ -276,6 +276,29 @@ describe("syncGlobal", () => {
     );
     expect(updateCalls).toHaveLength(0);
     expect(bootstrapGlobal).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 13 — pull (clone mode) aborts before bootstrapGlobal when freshness fails
+  // -------------------------------------------------------------------------
+
+  it("pull (clone mode) aborts before bootstrapGlobal when instruction freshness fails", async () => {
+    checkInstructionsFresh.mockReturnValueOnce({
+      ok: false,
+      errors: [{ message: "stale: AGENTS.md" }],
+    });
+
+    spawnSync
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 })  // git fetch
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });  // git rebase
+
+    const source = "/home/user/dotbabel";
+    const result = await syncGlobal("pull", { source });
+
+    expect(result.ok).toBe(false);
+    expect(result.mode).toBe("clone");
+    expect(bootstrapGlobal).not.toHaveBeenCalled();
+    expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source }, { dryRun: true });
   });
 
   // -------------------------------------------------------------------------

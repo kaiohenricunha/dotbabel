@@ -114,7 +114,7 @@ function refreshInstructions(out, source) {
   const ctx = createHarnessContext({ repoRoot: source });
   let generated;
   try {
-    generated = generateInstructions(ctx);
+    generated = generateInstructions(ctx, { dryRun: true });
   } catch (err) {
     out.fail(`instruction generation failed: ${err instanceof Error ? err.message : String(err)}`);
     return { ok: false, mode: "clone", summary: "instruction generation failed" };

@@ -70,10 +70,18 @@ link_cli_instruction() {
   local cli="$1"
   local src="$2"
   local dst="$3"
+  local alt_probe="${4:-}"
 
-  if [[ "$ALL" != "1" ]] && ! command -v "$cli" >/dev/null 2>&1; then
-    say "==> skipping $cli instructions (command not found; use --all to force)"
-    return 0
+  if [[ "$ALL" != "1" ]]; then
+    local found=0
+    command -v "$cli" >/dev/null 2>&1 && found=1
+    if [[ "$found" = "0" && -n "$alt_probe" ]]; then
+      eval "$alt_probe" >/dev/null 2>&1 && found=1
+    fi
+    if [[ "$found" = "0" ]]; then
+      say "==> skipping $cli instructions (command not found; use --all to force)"
+      return 0
+    fi
   fi
 
   if [[ ! -f "$src" ]]; then
@@ -133,7 +141,8 @@ CLI_INSTRUCTIONS_SRC="$DOTBABEL/plugins/dotbabel/templates/cli-instructions"
 link_cli_instruction \
   copilot \
   "$CLI_INSTRUCTIONS_SRC/copilot-instructions.md" \
-  "$HOME/.github/copilot-instructions.md"
+  "$HOME/.github/copilot-instructions.md" \
+  "gh copilot --version"
 link_cli_instruction \
   codex \
   "$CLI_INSTRUCTIONS_SRC/codex-AGENTS.md" \
