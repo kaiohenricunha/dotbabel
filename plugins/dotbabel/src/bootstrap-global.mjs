@@ -202,6 +202,26 @@ export async function bootstrapGlobal(opts = {}) {
     }
   }
 
+  function ensureRealDir(dst) {
+    let lstat;
+    try {
+      lstat = fs.lstatSync(dst);
+    } catch {
+      fs.mkdirSync(dst, { recursive: true });
+      return;
+    }
+
+    if (lstat.isDirectory() && !lstat.isSymbolicLink()) {
+      return;
+    }
+
+    const bakPath = `${dst}.bak-${timestamp}`;
+    fs.renameSync(dst, bakPath);
+    backed_up++;
+    out.warn(`backed up: ${dst} (old at ${bakPath})`);
+    fs.mkdirSync(dst, { recursive: true });
+  }
+
   // --- CLAUDE.md ---
   const claudeMdSrc = path.join(source, "CLAUDE.md");
   if (fs.existsSync(claudeMdSrc)) {
@@ -348,7 +368,7 @@ export async function bootstrapGlobal(opts = {}) {
         if (name === ".system") continue;
         const src = path.join(commandsSrc, entry);
         const wrapDir = path.join(dstDir, name);
-        fs.mkdirSync(wrapDir, { recursive: true });
+        ensureRealDir(wrapDir);
         const dst = path.join(wrapDir, "SKILL.md");
         doLink(src, dst);
       }

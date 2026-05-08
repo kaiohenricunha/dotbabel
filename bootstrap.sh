@@ -66,6 +66,17 @@ link_one() {
   fi
 }
 
+ensure_real_dir() {
+  local dst="$1"
+
+  if [[ -L "$dst" || -e "$dst" ]] && [[ ! -d "$dst" || -L "$dst" ]]; then
+    mv "$dst" "${dst}.bak-${TS}"
+    say "  backed up: $dst (old at ${dst}.bak-${TS})"
+  fi
+
+  mkdir -p "$dst"
+}
+
 link_cli_instruction() {
   local cli="$1"
   local src="$2"
@@ -129,7 +140,7 @@ fan_out_skills_to_dir() {
     base=$(basename "$f")
     name="${base%.md}"
     [[ "$name" = ".system" ]] && continue
-    mkdir -p "$dst_dir/$name"
+    ensure_real_dir "$dst_dir/$name"
     link_one "$f" "$dst_dir/$name/SKILL.md"
   done
 }
