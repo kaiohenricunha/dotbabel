@@ -78,3 +78,18 @@ teardown() {
   run "$BOOT" --bogus
   [ "$status" -eq 64 ]
 }
+
+@test "codex command fan-out backs up existing wrapper file" {
+  mkdir -p "$HOME/.codex/skills"
+  echo "old wrapper" > "$HOME/.codex/skills/changelog"
+
+  run "$BOOT" --all --quiet
+  [ "$status" -eq 0 ]
+  [ -d "$HOME/.codex/skills/changelog" ]
+  [ -L "$HOME/.codex/skills/changelog/SKILL.md" ]
+  target=$(readlink "$HOME/.codex/skills/changelog/SKILL.md")
+  [ "$target" = "$REPO_ROOT/commands/changelog.md" ]
+
+  run bash -c "ls '$HOME/.codex/skills/'changelog.bak-*"
+  [ "$status" -eq 0 ]
+}
