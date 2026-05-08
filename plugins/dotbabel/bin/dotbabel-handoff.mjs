@@ -127,6 +127,11 @@ const META = {
     "dry-run": { type: "boolean" },
     "older-than": { type: "string" },
     yes: { type: "boolean" },
+    // Approach A opt-in (handoff-hardening 2026-05-08): read a local
+    // markdown file (typically a `<handoff-state>` YAML block authored by
+    // the source agent) and prepend its content above the mechanical
+    // <handoff> block on push. Flows through the same scrubber.
+    "state-file": { type: "string" },
   },
 };
 
@@ -991,6 +996,15 @@ async function main() {
     const force = Boolean(argv.flags["force-collision"]);
     const dryRun = Boolean(argv.flags["dry-run"]);
     try {
+      const stateFilePath = argv.flags["state-file"] != null ? String(argv.flags["state-file"]) : null;
+      let stateBlock = null;
+      if (stateFilePath) {
+        try {
+          stateBlock = readFileSync(stateFilePath, "utf8");
+        } catch (e) {
+          throw new Error(`--state-file: cannot read ${stateFilePath}: ${e.message}`);
+        }
+      }
       const result = await pushRemote({
         cli: sessionHit.cli,
         path: sessionHit.path,
@@ -999,6 +1013,7 @@ async function main() {
         verbose,
         force,
         dryRun,
+        stateBlock,
       });
       if (dryRun) {
         process.stdout.write(

@@ -244,11 +244,11 @@ describe("renderHandoffBlock", () => {
     expect(block).toContain("_(session contained no assistant turns)_");
   });
 
-  it("caps prompts at last 10", () => {
+  it("renders all prompts when below the 50-prompt cap", () => {
     const prompts = Array.from({ length: 15 }, (_, i) => `p${i}`);
     const block = lib.renderHandoffBlock(meta, prompts, [], "claude");
-    expect(block).toContain("10. p14");
-    expect(block).not.toContain("11. ");
+    expect(block).toContain("1. p0");
+    expect(block).toContain("15. p14");
   });
 
   it("truncates long prompts at 300 chars", () => {

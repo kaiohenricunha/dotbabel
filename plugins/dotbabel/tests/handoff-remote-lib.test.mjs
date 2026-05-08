@@ -21,7 +21,9 @@ describe("export shape", () => {
     "enrichWithDescriptions",
     "extractLines",
     "extractMeta",
+    "extractMirror",
     "extractPrompts",
+    "extractTodos",
     "extractTurns",
     "fetchRemoteBranch",
     "fetchRemoteMetadata",
@@ -57,6 +59,8 @@ describe("export shape", () => {
     "runGitOrThrow",
     "runScript",
     "seedTransportDefaultBranch",
+    "selectPromptsForRender",
+    "selectTurnsForRender",
     "slugify",
     "slugifyRepoName",
     "tagsFromMeta",
@@ -334,11 +338,24 @@ describe("renderHandoffBlock", () => {
     expect(block).toContain("assistant turn");
   });
 
-  it("caps prompts at the last 10 and numbers them 1..10", () => {
+  it("renders all prompts when below the 50-prompt cap (handoff-hardening 2026-05-08)", () => {
     const prompts = Array.from({ length: 15 }, (_, i) => `p${i}`);
     const block = lib.renderHandoffBlock(meta, prompts, [], "claude");
-    expect(block).toContain("10. p14");
-    expect(block).not.toContain("11. ");
+    expect(block).toContain("1. p0");
+    expect(block).toContain("15. p14");
+    expect(block).toContain("**User prompts (full log, 15).**");
+  });
+
+  it("pins prompt 1 and caps the rest at 49 when prompts exceed 50", () => {
+    const prompts = Array.from({ length: 75 }, (_, i) => `p${i}`);
+    const block = lib.renderHandoffBlock(meta, prompts, [], "claude");
+    // p0 is pinned at position 1, then the last 49 (p26..p74) follow.
+    expect(block).toContain("1. p0");
+    expect(block).toContain("**User prompts (capped: 50 of 75, prompt 1 pinned).**");
+    expect(block).toContain("50. p74");
+    // p1..p25 are dropped (the ring-buffer head).
+    expect(block).not.toContain("\n2. p1\n");
+    expect(block).not.toContain("p25");
   });
 
   it("truncates prompts longer than 300 chars", () => {
@@ -351,6 +368,92 @@ describe("renderHandoffBlock", () => {
     const long = "y".repeat(600);
     const block = lib.renderHandoffBlock(meta, [], [long], "claude");
     expect(block).toContain("…");
+  });
+
+  it("includes the first turn alongside last 3 when more than 4 turns exist", () => {
+    const turns = Array.from({ length: 10 }, (_, i) => `turn${i}`);
+    const block = lib.renderHandoffBlock(meta, [], turns, "claude");
+    // first turn (turn0) + last 3 (turn7, turn8, turn9) — turn1..turn6 dropped.
+    expect(block).toContain("turn0");
+    expect(block).toContain("turn7");
+    expect(block).toContain("turn8");
+    expect(block).toContain("turn9");
+    expect(block).not.toContain("turn3");
+    expect(block).toContain("**Assistant turns (first + last 3 of 10).**");
+  });
+
+  it("prepends a state block when opts.stateBlock is provided (Approach A opt-in)", () => {
+    const stateBlock = '<handoff-state version="1">\ngoals: []\n</handoff-state>';
+    const block = lib.renderHandoffBlock(meta, ["hi"], ["yo"], "claude", { stateBlock });
+    expect(block.startsWith("<handoff-state")).toBe(true);
+    expect(block).toContain('<handoff origin="claude"');
+    // State block precedes the mechanical block in source order.
+    expect(block.indexOf("<handoff-state")).toBeLessThan(block.indexOf("<handoff "));
+  });
+
+  it("renders Tracked TODOs section when opts.todos is non-empty", () => {
+    const todos = [
+      { content: "GOAL-MIGRATE-AUTH", status: "in_progress", activeForm: "" },
+      { content: "GOAL-ROTATE-KEYS", status: "pending", activeForm: "" },
+    ];
+    const block = lib.renderHandoffBlock(meta, ["p"], ["t"], "claude", { todos });
+    expect(block).toContain("**Tracked TODOs.**");
+    expect(block).toContain("[in_progress] GOAL-MIGRATE-AUTH");
+    expect(block).toContain("[pending] GOAL-ROTATE-KEYS");
+  });
+
+  it("renders Codex agent_message mirror only for entries NOT in the rendered turn selection (regression: handoff-hardening 2026-05-08 risk #2)", () => {
+    // 10 turns; turn 7 contains a critical decision that lives in the mirror.
+    // First+last-3 selection = [turn0, turn7-DROPPED, turn8, turn9]; correct
+    // dedupe must compare against THE RENDERED SELECTION, not the full extract.
+    // An incorrect dedupe filters the mirror entry out because turn 7's content
+    // *is* in the full turns array — the user-reported failure mode.
+    const turns = Array.from({ length: 10 }, (_, i) => `turn${i} content`);
+    const decisionInMidSessionTurn = turns[6]; // dropped by first+last-3
+    const mirror = [decisionInMidSessionTurn, "turn0 content"]; // turn0 IS rendered → dedupe out
+    const block = lib.renderHandoffBlock(meta, [], turns, "claude", { mirror });
+    expect(block).toContain("**Codex agent message mirror (not duplicated above).**");
+    // The mid-session decision (NOT rendered under first+last-3) surfaces.
+    expect(block).toContain(decisionInMidSessionTurn);
+    // turn0 IS rendered above, so the mirror entry for turn0 is filtered.
+    const mirrorSectionIdx = block.indexOf("**Codex agent message mirror");
+    const mirrorTail = block.slice(mirrorSectionIdx);
+    expect(mirrorTail.match(/turn0 content/g)?.length ?? 0).toBe(0);
+  });
+
+  it("omits Codex mirror section when every entry is in the rendered turn selection", () => {
+    const turns = ["a", "b", "c"]; // all 3 rendered (≤4)
+    const mirror = ["a", "b"]; // both already rendered above
+    const block = lib.renderHandoffBlock(meta, [], turns, "claude", { mirror });
+    expect(block).not.toContain("**Codex agent message mirror");
+  });
+});
+
+describe("selectPromptsForRender", () => {
+  it("returns the full list when at or below the cap", () => {
+    expect(lib.selectPromptsForRender([])).toEqual([]);
+    expect(lib.selectPromptsForRender(["a", "b", "c"])).toEqual(["a", "b", "c"]);
+    const at = Array.from({ length: 50 }, (_, i) => `p${i}`);
+    expect(lib.selectPromptsForRender(at)).toHaveLength(50);
+  });
+  it("pins prompt 0 and ring-buffers the last 49 when above 50", () => {
+    const over = Array.from({ length: 75 }, (_, i) => `p${i}`);
+    const sel = lib.selectPromptsForRender(over);
+    expect(sel).toHaveLength(50);
+    expect(sel[0]).toBe("p0");
+    expect(sel[1]).toBe("p26");
+    expect(sel[49]).toBe("p74");
+  });
+});
+
+describe("selectTurnsForRender", () => {
+  it("returns the full list when at or below 4 turns", () => {
+    expect(lib.selectTurnsForRender([])).toEqual([]);
+    expect(lib.selectTurnsForRender(["a", "b", "c", "d"])).toEqual(["a", "b", "c", "d"]);
+  });
+  it("returns first + last 3 when above 4 turns", () => {
+    const turns = ["a", "b", "c", "d", "e", "f", "g", "h"];
+    expect(lib.selectTurnsForRender(turns)).toEqual(["a", "f", "g", "h"]);
   });
 });
 
