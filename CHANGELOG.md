@@ -10,6 +10,14 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.1.0...v2.2.0) (2026-05-08)
+
+
+### Added
+
+* **instructions:** cross-CLI rule-floor parity gates ([#200](https://github.com/kaiohenricunha/dotbabel/issues/200)) ([21b5a29](https://github.com/kaiohenricunha/dotbabel/commit/21b5a2900cc6ad51de7f1285558e18c74c586835))
+* **skills:** add post-pr-review for Copilot-style PR commenting ([#198](https://github.com/kaiohenricunha/dotbabel/issues/198)) ([94646db](https://github.com/kaiohenricunha/dotbabel/commit/94646db38f8a079452e2334fbd93ed830143bf05))
+
 ## [2.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.0.1...v2.1.0) (2026-05-07)
 
 ### Added
