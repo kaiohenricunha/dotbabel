@@ -286,6 +286,10 @@ export async function bootstrapGlobal(opts = {}) {
     src: path.join(cliInstructionsSrc, "gemini-GEMINI.md"),
     dst: path.join(homeRoot, ".gemini", "GEMINI.md"),
   });
+  fanOutSkillsToDir({
+    cli: "gemini",
+    dstDir: path.join(homeRoot, ".gemini", "skills"),
+  });
 
   out.flush();
   return { ok: true, linked, skipped, backed_up };
