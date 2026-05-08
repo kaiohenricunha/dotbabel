@@ -63,6 +63,33 @@ next_step_suggestion: |
 The `<handoff>` tag is intentional: target agents can detect it
 reliably and distinguish digest content from surrounding commentary.
 
+## Approach A: agent-authored state block (`push --state-file`)
+
+When `--state-file <path>` is passed to `dotbabel handoff push`, the
+file's raw content (typically a `<handoff-state>` YAML block authored by
+the source agent) is **prepended above** the `<handoff ...>` opening
+tag — not inside it. This is intentional:
+
+- Target agents that only want the mechanical block can detect the `<handoff>`
+  boundary without parsing agent-authored content outside it.
+- The state block flows through the same secret scrubber as the rest of the
+  digest before leaving the machine.
+
+Example shape when `--state-file` is used:
+
+```markdown
+<handoff-state version="1">
+goals:
+  - migrate auth middleware
+decisions:
+  - keep JWT expiry at 15 min
+</handoff-state>
+
+<handoff origin="claude" session="abc123ef" cwd="/repo" target="codex">
+...
+</handoff>
+```
+
 ## Rendering: `pull --summary` output (terse inline summary)
 
 ```markdown
@@ -114,9 +141,10 @@ a `docs/` directory exists at the repo root, else
 - `summary`: ≤ 400 characters.
 - `key_findings`: ≤ 5 bullets.
 - `user_prompts`: cap at 50 prompts (prompt 1 always pinned + last 49)
-  per the handoff-hardening 2026-05-08 experiment; note the truncation
-  in `summary`. The cap engages only when the session has > 50 prompts;
-  shorter sessions render the full log unchanged.
+  per the handoff-hardening 2026-05-08 experiment (results at
+  `docs/experiments/handoff-hardening-2026-05-08.md`); note the
+  truncation in `summary`. The cap engages only when the session has
+  > 50 prompts; shorter sessions render the full log unchanged.
 - `assistant_turns`: first turn (initial framing) + last 3 (recent
   context). Mid-session turns surface via Approach B's TodoWrite
   extraction (Claude) or `event_msg.agent_message` mirror (Codex).

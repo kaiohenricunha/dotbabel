@@ -952,7 +952,7 @@ export async function pushRemote({
   verbose = false,
   force = false,
   dryRun = false,
-  stateFile = null,
+  stateBlock = null,
 }) {
   // #91 Gap 7: accept either `tags: string[]` (new, multi-tag) or the legacy
   // `tag: string` (single). Internally everything below works on `tagList`.
@@ -978,14 +978,6 @@ export async function pushRemote({
     if (m && typeof m.message === "string") return m.message;
     return "";
   }).filter((s) => s.length > 0);
-  let stateBlock = null;
-  if (stateFile) {
-    try {
-      stateBlock = readFileSync(stateFile, "utf8");
-    } catch (e) {
-      throw new Error(`--state-file: cannot read ${stateFile}: ${e.message}`);
-    }
-  }
   const toCli = meta.cli;
   const handoffBlock = renderHandoffBlock(meta, prompts, turns, toCli, {
     stateBlock,
