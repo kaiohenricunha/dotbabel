@@ -277,6 +277,10 @@ export async function bootstrapGlobal(opts = {}) {
     src: path.join(cliInstructionsSrc, "codex-AGENTS.md"),
     dst: path.join(homeRoot, ".codex", "AGENTS.md"),
   });
+  fanOutSkillsToDir({
+    cli: "codex",
+    dstDir: path.join(process.env.CODEX_HOME || path.join(homeRoot, ".codex"), "skills"),
+  });
   linkCliInstruction({
     cli: "gemini",
     src: path.join(cliInstructionsSrc, "gemini-GEMINI.md"),
@@ -302,6 +306,49 @@ export async function bootstrapGlobal(opts = {}) {
     }
     fs.mkdirSync(path.dirname(dst), { recursive: true });
     doLink(src, dst);
+  }
+
+  /**
+   * Fan out skills/ + commands/ into a CLI-specific skills directory.
+   *
+   * Each skills/<id>/ becomes <dstDir>/<id>/ (whole-dir symlink). Each
+   * commands/<name>.md becomes <dstDir>/<name>/SKILL.md so the host CLI sees
+   * the canonical skill shape. Skips entries named ".system" defensively —
+   * Codex reserves that namespace for its bundled built-in skills.
+   *
+   * @param {{ cli: string, dstDir: string }} cfg
+   */
+  function fanOutSkillsToDir({ cli, dstDir }) {
+    if (!opts.allCli && !commandExists(cli)) {
+      out.info(`skipped ${cli} skills (command not found; use --all to force)`);
+      skipped++;
+      return;
+    }
+    fs.mkdirSync(dstDir, { recursive: true });
+
+    if (fs.existsSync(skillsSrc)) {
+      const entries = fs.readdirSync(skillsSrc, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name === ".system") continue;
+        const src = path.join(skillsSrc, entry.name);
+        const dst = path.join(dstDir, entry.name);
+        doLink(src, dst);
+      }
+    }
+
+    if (fs.existsSync(commandsSrc)) {
+      for (const entry of fs.readdirSync(commandsSrc)) {
+        if (!entry.endsWith(".md")) continue;
+        const name = entry.replace(/\.md$/, "");
+        if (name === ".system") continue;
+        const src = path.join(commandsSrc, entry);
+        const wrapDir = path.join(dstDir, name);
+        fs.mkdirSync(wrapDir, { recursive: true });
+        const dst = path.join(wrapDir, "SKILL.md");
+        doLink(src, dst);
+      }
+    }
   }
 }
 

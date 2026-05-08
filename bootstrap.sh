@@ -94,6 +94,46 @@ link_cli_instruction() {
   link_one "$src" "$dst"
 }
 
+# fan_out_skills_to_dir CLI DST_SKILLS_DIR
+#
+# Mirrors the dotbabel skills/ + commands/ surface into a CLI-specific skills
+# directory. Each skills/<id>/ becomes <dst>/<id>/ (whole-dir symlink). Each
+# commands/<name>.md becomes <dst>/<name>/SKILL.md (single-file symlink wrapped
+# in a fresh directory so the CLI sees the canonical skill shape).
+#
+# Idempotent. Skips entries named ".system" defensively, in case a host CLI
+# reserves that namespace for built-in skills (Codex does).
+fan_out_skills_to_dir() {
+  local cli="$1"
+  local dst_dir="$2"
+
+  if [[ "$ALL" != "1" ]] && ! command -v "$cli" >/dev/null 2>&1; then
+    say "==> skipping $cli skills (command not found; use --all to force)"
+    return 0
+  fi
+
+  say "==> fanning out skills/ + commands/ to $cli ($dst_dir)"
+  mkdir -p "$dst_dir"
+
+  for d in "$DOTBABEL/skills"/*/; do
+    [[ -e "$d" ]] || continue
+    local name
+    name=$(basename "$d")
+    [[ "$name" = ".system" ]] && continue
+    link_one "${d%/}" "$dst_dir/$name"
+  done
+
+  for f in "$DOTBABEL/commands"/*.md; do
+    [[ -e "$f" ]] || continue
+    local base name
+    base=$(basename "$f")
+    name="${base%.md}"
+    [[ "$name" = ".system" ]] && continue
+    mkdir -p "$dst_dir/$name"
+    link_one "$f" "$dst_dir/$name/SKILL.md"
+  done
+}
+
 say "==> linking CLAUDE.md"
 [[ -f "$DOTBABEL/CLAUDE.md" ]] && link_one "$DOTBABEL/CLAUDE.md" "$TARGET/CLAUDE.md"
 
@@ -147,6 +187,7 @@ link_cli_instruction \
   codex \
   "$CLI_INSTRUCTIONS_SRC/codex-AGENTS.md" \
   "$HOME/.codex/AGENTS.md"
+fan_out_skills_to_dir codex "${CODEX_HOME:-$HOME/.codex}/skills"
 link_cli_instruction \
   gemini \
   "$CLI_INSTRUCTIONS_SRC/gemini-GEMINI.md" \
