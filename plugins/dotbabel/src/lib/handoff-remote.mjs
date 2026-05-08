@@ -172,6 +172,14 @@ export const extractPrompts = (cli, file) => extractLines("prompts", cli, file);
 /** Extract assistant turn lines from a session file (optionally capped; 0 = unbounded). */
 export const extractTurns = (cli, file, limit) =>
   extractLines("turns", cli, file, limit == null ? [] : [String(limit)]);
+/** Extract Claude TodoWrite tool_use payloads. Returns [] for non-Claude
+ *  sessions. Each element: {content, status, activeForm}. */
+export const extractTodos = (cli, file) =>
+  cli === "claude" ? extractLines("todos", cli, file) : [];
+/** Extract Codex `event_msg.agent_message` mirror text. Returns [] for
+ *  non-Codex sessions. Each element is a plain string. */
+export const extractMirror = (cli, file) =>
+  cli === "codex" ? extractLines("mirror", cli, file) : [];
 
 // ---- rendering ---------------------------------------------------------
 
@@ -194,20 +202,72 @@ export function mechanicalSummary(prompts, turns) {
   return `Session opened with: "${clip(first, 160)}". Last assistant output (truncated): "${clip(last, 160)}". Full prompt log and assistant tail follow for context.`;
 }
 
-/** Render the full <handoff> block for push or standalone describe. */
-export function renderHandoffBlock(meta, prompts, turns, toCli) {
+/** Cap on the prompt window. Pin prompt 1 (task framing usually lives here)
+ *  plus the most recent (PROMPT_CAP - 1). 50 was validated against the
+ *  2026-05-08 handoff-hardening experiment — stays ≤1.5× baseline bytes
+ *  on every CLI fixture. */
+const PROMPT_CAP = 50;
+
+/** Apply the B-floor prompt selection: pin prompt 1 + ring-buffer last
+ *  (PROMPT_CAP - 1). When there are fewer than PROMPT_CAP prompts, return
+ *  the full list unchanged. */
+export function selectPromptsForRender(prompts) {
+  if (prompts.length <= PROMPT_CAP) return prompts.slice();
+  const pinned = [prompts[0]];
+  return [...pinned, ...prompts.slice(1).slice(-(PROMPT_CAP - 1))];
+}
+
+/** Apply the B-floor turn selection: first turn (initial framing) + last 3.
+ *  When there are 4 or fewer turns, return the full list unchanged. */
+export function selectTurnsForRender(turns) {
+  if (turns.length <= 4) return turns.slice();
+  return [turns[0], ...turns.slice(-3)];
+}
+
+/** Render the full <handoff> block for push or standalone describe.
+ *
+ *  Optional opts:
+ *    stateBlock — raw markdown (typically a `<handoff-state>...</handoff-state>`
+ *      YAML block authored by the source agent) to prepend above the
+ *      mechanical block. Flows through the same scrubber as the rest of
+ *      the digest at push time. Approach A opt-in.
+ *    todos — array of TodoWrite payloads `{content, status, activeForm}`
+ *      extracted from the source session. Currently Claude-only via
+ *      `extract todos claude <file>`. Renders as a `**Tracked TODOs.**` section.
+ *    mirror — array of strings (codex `event_msg.agent_message` content)
+ *      that surfaces mid-session messages dropped by the first+last-3 turn
+ *      window. Filtered against the RENDERED turn selection (NOT the full
+ *      extract) so a mid-session decision still surfaces.
+ */
+export function renderHandoffBlock(meta, prompts, turns, toCli, opts = {}) {
+  const { stateBlock = null, todos = [], mirror = [] } = opts;
   const summary = mechanicalSummary(prompts, turns);
-  const promptsCapped = prompts.slice(-10);
-  const turnsTail = turns.slice(-3);
+  const promptsCapped = selectPromptsForRender(prompts);
+  const turnsTail = selectTurnsForRender(turns);
   const next = nextStepFor(toCli);
   const lines = [];
+  if (stateBlock && stateBlock.trim().length > 0) {
+    lines.push(stateBlock.trim());
+    lines.push("");
+  }
   lines.push(
     `<handoff origin="${meta.cli}" session="${meta.short_id ?? ""}" cwd="${meta.cwd ?? ""}" target="${toCli}">`,
   );
   lines.push("");
   lines.push(`**Summary.** ${summary}`);
   lines.push("");
-  lines.push("**User prompts (last 10, in order).**");
+  // Header reflects what's visible: full log when nothing was dropped,
+  // explicit "capped" callout with prompt-1 pin annotation when the
+  // ring-buffer engaged.
+  if (prompts.length === 0) {
+    lines.push("**User prompts.**");
+  } else if (prompts.length <= PROMPT_CAP) {
+    lines.push(`**User prompts (full log, ${prompts.length}).**`);
+  } else {
+    lines.push(
+      `**User prompts (capped: ${promptsCapped.length} of ${prompts.length}, prompt 1 pinned).**`,
+    );
+  }
   lines.push("");
   if (promptsCapped.length === 0) lines.push("1. (session contained no user prompts)");
   else
@@ -216,7 +276,13 @@ export function renderHandoffBlock(meta, prompts, turns, toCli) {
       lines.push(`${i + 1}. ${trimmed}`);
     });
   lines.push("");
-  lines.push("**Last assistant turns (tail).**");
+  if (turns.length === 0) {
+    lines.push("**Assistant turns.**");
+  } else if (turns.length <= 4) {
+    lines.push(`**Assistant turns (full, ${turns.length}).**`);
+  } else {
+    lines.push(`**Assistant turns (first + last 3 of ${turns.length}).**`);
+  }
   lines.push("");
   if (turnsTail.length === 0) lines.push("_(session contained no assistant turns)_");
   else
@@ -225,6 +291,39 @@ export function renderHandoffBlock(meta, prompts, turns, toCli) {
       lines.push(`> ${trimmed.replace(/\n/g, "\n> ")}`);
       lines.push("");
     }
+
+  if (Array.isArray(todos) && todos.length > 0) {
+    lines.push("**Tracked TODOs.**");
+    lines.push("");
+    for (const t of todos) {
+      const status = t && typeof t.status === "string" ? `[${t.status}]` : "[?]";
+      const content = t && typeof t.content === "string" ? t.content : "";
+      lines.push(`- ${status} ${content}`);
+    }
+    lines.push("");
+  }
+
+  // Compare against the RENDERED turns (turnsTail), not the full extract.
+  // Initial implementation deduped against turns.map(t => t.trim()) which
+  // silently filtered out mid-session messages whose content was extracted
+  // but not rendered under first+last-3 — defeating the whole point of the
+  // mirror. See handoff-hardening experiment 2026-05-08, residual risk #2.
+  if (Array.isArray(mirror) && mirror.length > 0) {
+    const renderedTurnSet = new Set(turnsTail.map((t) => (t ?? "").trim()));
+    const mirrorExtra = mirror.filter(
+      (m) => typeof m === "string" && m.length > 0 && !renderedTurnSet.has(m.trim()),
+    );
+    if (mirrorExtra.length > 0) {
+      lines.push("**Codex agent message mirror (not duplicated above).**");
+      lines.push("");
+      for (const m of mirrorExtra) {
+        const trimmed = m.length > 400 ? `${m.slice(0, 400).trim()}…` : m;
+        lines.push(`> ${trimmed.replace(/\n/g, "\n> ")}`);
+        lines.push("");
+      }
+    }
+  }
+
   lines.push("**Next step.** " + next);
   lines.push("");
   lines.push("</handoff>");
@@ -853,6 +952,7 @@ export async function pushRemote({
   verbose = false,
   force = false,
   dryRun = false,
+  stateFile = null,
 }) {
   // #91 Gap 7: accept either `tags: string[]` (new, multi-tag) or the legacy
   // `tag: string` (single). Internally everything below works on `tagList`.
@@ -869,8 +969,29 @@ export async function pushRemote({
   const meta = extractMeta(cli, sessionFile);
   const prompts = extractPrompts(cli, sessionFile);
   const turns = extractTurns(cli, sessionFile);
+  const todos = extractTodos(cli, sessionFile);
+  const mirror = extractMirror(cli, sessionFile);
+  // Mirror records may arrive as bare strings or wrapped JSON {message: "..."};
+  // normalize to plain strings before handing to the renderer.
+  const mirrorStrings = mirror.map((m) => {
+    if (typeof m === "string") return m;
+    if (m && typeof m.message === "string") return m.message;
+    return "";
+  }).filter((s) => s.length > 0);
+  let stateBlock = null;
+  if (stateFile) {
+    try {
+      stateBlock = readFileSync(stateFile, "utf8");
+    } catch (e) {
+      throw new Error(`--state-file: cannot read ${stateFile}: ${e.message}`);
+    }
+  }
   const toCli = meta.cli;
-  const handoffBlock = renderHandoffBlock(meta, prompts, turns, toCli);
+  const handoffBlock = renderHandoffBlock(meta, prompts, turns, toCli, {
+    stateBlock,
+    todos,
+    mirror: mirrorStrings,
+  });
 
   // Scrub before the digest ever leaves the machine. Thrown errors
   // propagate out of pushRemote — the outer try/catch in main() maps

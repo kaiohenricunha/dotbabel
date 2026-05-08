@@ -167,6 +167,23 @@ turns_claude() {
   ' "$file" 2>/dev/null | tail -n "$tail_arg"
 }
 
+# Approach B addition (handoff-hardening 2026-05-08): extract Claude
+# TodoWrite tool_use payloads. Each emitted line is one todo item:
+# {"content","status","activeForm"}. Closes the gap where mid-session
+# decisions live in tool_use blocks rather than .text and would otherwise
+# fall outside the rendered turn selection.
+todos_claude() {
+  local file="$1"
+  jq -c '
+    select(.type == "assistant")
+    | (.message.content // []) as $c
+    | $c[]
+    | select(.type == "tool_use" and .name == "TodoWrite")
+    | (.input.todos // [])[]
+    | {content: (.content // ""), status: (.status // "unknown"), activeForm: (.activeForm // "")}
+  ' "$file" 2>/dev/null
+}
+
 # -- copilot --------------------------------------------------------------
 
 # Parse a single key from workspace.yaml. YAML here is flat key:value, no
@@ -296,6 +313,20 @@ turns_codex() {
   ' "$file" 2>/dev/null | tail -n "$tail_arg"
 }
 
+# Approach B addition (handoff-hardening 2026-05-08): the un-tapped
+# event_msg.agent_message mirror. Each emitted line is the bare message
+# string. Caller dedupes against the RENDERED turn selection (NOT the full
+# turns extract) so a mid-session decision dropped by first+last-3 still
+# surfaces. See renderHandoffBlock + experiment residual risk #2.
+mirror_codex() {
+  local file="$1"
+  jq -c '
+    select(.type == "event_msg" and .payload.type == "agent_message")
+    | (.payload.message // "")
+    | select(type == "string" and length > 0)
+  ' "$file" 2>/dev/null
+}
+
 # -- gemini ---------------------------------------------------------------
 
 gemini_short_from_filename() {
@@ -407,6 +438,20 @@ main() {
         copilot) turns_copilot "$file" "$limit" ;;
         codex)   turns_codex "$file" "$limit" ;;
         gemini)  turns_gemini "$file" "$limit" ;;
+      esac
+      ;;
+    todos)
+      case "$cli" in
+        claude) todos_claude "$file" ;;
+        # Other CLIs have no structured TodoWrite carrier today; emit nothing.
+        copilot|codex|gemini) ;;
+      esac
+      ;;
+    mirror)
+      case "$cli" in
+        codex) mirror_codex "$file" ;;
+        # Other CLIs have no event_msg.agent_message equivalent; emit nothing.
+        claude|copilot|gemini) ;;
       esac
       ;;
     *)

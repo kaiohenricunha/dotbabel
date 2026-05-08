@@ -48,6 +48,10 @@ function queueDryRunSpawns({ sessionId = "abc12345-aaaa-bbbb-cccc-000000000001" 
     .mockReturnValueOnce({ status: 0, stdout: '"hi"\n', stderr: "" })
     // extractTurns — handoff-extract.sh turns
     .mockReturnValueOnce({ status: 0, stdout: '"hello"\n', stderr: "" })
+    // extractTodos — handoff-extract.sh todos (claude only; non-claude
+    // shortcuts to [] without spawning, see extractTodos export).
+    .mockReturnValueOnce({ status: 0, stdout: "", stderr: "" })
+    // extractMirror is codex-only and shortcuts to [] for claude — no spawn here.
     // scrubDigest — handoff-scrub.sh (stdout = scrubbed body; stderr line ends with "scrubbed:0")
     .mockReturnValueOnce({ status: 0, stdout: "scrubbed body\n", stderr: "scrubbed:0\n" })
     // encodeDescription — handoff-description.sh encode

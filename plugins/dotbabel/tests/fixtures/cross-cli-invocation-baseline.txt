@@ -3,11 +3,11 @@
 
 **Summary.** Session opened with: "(session contained no user prompts)". Last assistant output (truncated): "(session contained no assistant turns)". Full prompt log and assistant tail follow for context.
 
-**User prompts (last 10, in order).**
+**User prompts.**
 
 1. (session contained no user prompts)
 
-**Last assistant turns (tail).**
+**Assistant turns.**
 
 _(session contained no assistant turns)_
 **Next step.** Continue from the last assistant turn using the same file scope and goals summarized above.
@@ -19,11 +19,11 @@ _(session contained no assistant turns)_
 
 **Summary.** Session opened with: "(session contained no user prompts)". Last assistant output (truncated): "(session contained no assistant turns)". Full prompt log and assistant tail follow for context.
 
-**User prompts (last 10, in order).**
+**User prompts.**
 
 1. (session contained no user prompts)
 
-**Last assistant turns (tail).**
+**Assistant turns.**
 
 _(session contained no assistant turns)_
 **Next step.** Continue from the last assistant turn using the same file scope and goals summarized above.
@@ -44,11 +44,11 @@ _(session contained no assistant turns)_
 
 **Summary.** Session opened with: "(session contained no user prompts)". Last assistant output (truncated): "(session contained no assistant turns)". Full prompt log and assistant tail follow for context.
 
-**User prompts (last 10, in order).**
+**User prompts.**
 
 1. (session contained no user prompts)
 
-**Last assistant turns (tail).**
+**Assistant turns.**
 
 _(session contained no assistant turns)_
 **Next step.** Continue from the last assistant turn using the same file scope and goals summarized above.

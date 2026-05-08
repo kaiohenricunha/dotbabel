@@ -113,7 +113,12 @@ a `docs/` directory exists at the repo root, else
 
 - `summary`: ≤ 400 characters.
 - `key_findings`: ≤ 5 bullets.
-- `user_prompts`: cap at the last 10 prompts if the session has more;
-  note the truncation in `summary`.
+- `user_prompts`: cap at 50 prompts (prompt 1 always pinned + last 49)
+  per the handoff-hardening 2026-05-08 experiment; note the truncation
+  in `summary`. The cap engages only when the session has > 50 prompts;
+  shorter sessions render the full log unchanged.
+- `assistant_turns`: first turn (initial framing) + last 3 (recent
+  context). Mid-session turns surface via Approach B's TodoWrite
+  extraction (Claude) or `event_msg.agent_message` mirror (Codex).
 - `files_touched`: ≤ 20 paths; dedupe; prefer ones the assistant
   wrote/edited over ones it merely read.

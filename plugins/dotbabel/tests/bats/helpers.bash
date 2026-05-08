@@ -233,11 +233,11 @@ make_many_transport_branches() {
 
 **Summary.** Bulk-seeded handoff.
 
-**User prompts (last 10, in order).**
+**User prompts (full log, 1).**
 
 1. bulk prompt
 
-**Last assistant turns (tail).**
+**Assistant turns (full, 1).**
 
 > bulk reply
 
