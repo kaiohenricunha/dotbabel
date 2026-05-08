@@ -203,6 +203,7 @@ link_cli_instruction \
   gemini \
   "$CLI_INSTRUCTIONS_SRC/gemini-GEMINI.md" \
   "$HOME/.gemini/GEMINI.md"
+fan_out_skills_to_dir gemini "$HOME/.gemini/skills"
 
 if [[ "$QUIET" = "1" ]]; then
   echo "bootstrap complete — target: $TARGET"
