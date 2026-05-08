@@ -8,8 +8,8 @@
  *
  * Known subcommands mirror the bin/* entries shipped by the package:
  *   validate-skills, validate-specs, check-spec-coverage,
- *   check-instruction-drift, detect-drift, doctor, init,
- *   bootstrap, sync.
+ *   check-instruction-drift, check-instructions-fresh,
+ *   check-instruction-parity, detect-drift, doctor, init, bootstrap, sync.
  *
  * Exits: 0 ok, 1 delegated failure, 2 env error, 64 usage error.
  */
@@ -26,6 +26,8 @@ const SUBCOMMANDS = [
   "validate-specs",
   "check-spec-coverage",
   "check-instruction-drift",
+  "check-instructions-fresh",
+  "check-instruction-parity",
   "detect-drift",
   "doctor",
   "init",

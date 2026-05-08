@@ -18,6 +18,20 @@ vi.mock("../src/bootstrap-global.mjs", () => ({
   bootstrapGlobal: vi.fn().mockResolvedValue({ ok: true, linked: 3, skipped: 0, backed_up: 0 }),
 }));
 
+vi.mock("../src/generate-instructions.mjs", () => ({
+  generateInstructions: vi
+    .fn()
+    .mockReturnValue({ ok: true, files: [], manifest: { targets: {} } }),
+}));
+
+vi.mock("../src/check-instructions-fresh.mjs", () => ({
+  checkInstructionsFresh: vi.fn().mockReturnValue({ ok: true, errors: [] }),
+}));
+
+vi.mock("../src/spec-harness-lib.mjs", () => ({
+  createHarnessContext: vi.fn(({ repoRoot }) => ({ repoRoot })),
+}));
+
 // Mock index.mjs version export
 vi.mock("../src/index.mjs", () => ({
   version: "1.2.3",
@@ -25,6 +39,8 @@ vi.mock("../src/index.mjs", () => ({
 
 import { spawnSync } from "node:child_process";
 import { bootstrapGlobal } from "../src/bootstrap-global.mjs";
+import { generateInstructions } from "../src/generate-instructions.mjs";
+import { checkInstructionsFresh } from "../src/check-instructions-fresh.mjs";
 import { resolveMode, syncGlobal } from "../src/sync-global.mjs";
 
 // ---------------------------------------------------------------------------
@@ -121,6 +137,11 @@ describe("syncGlobal", () => {
       "git",
       ["-C", source, "rebase", "origin/main"],
       expect.objectContaining({ encoding: "utf8" })
+    );
+    expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source }, { dryRun: true });
+    expect(checkInstructionsFresh).toHaveBeenCalledWith(
+      { repoRoot: source },
+      expect.objectContaining({ ok: true }),
     );
     expect(bootstrapGlobal).toHaveBeenCalledWith(
       expect.objectContaining({ source })
@@ -255,6 +276,29 @@ describe("syncGlobal", () => {
     );
     expect(updateCalls).toHaveLength(0);
     expect(bootstrapGlobal).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // Test 13 — pull (clone mode) aborts before bootstrapGlobal when freshness fails
+  // -------------------------------------------------------------------------
+
+  it("pull (clone mode) aborts before bootstrapGlobal when instruction freshness fails", async () => {
+    checkInstructionsFresh.mockReturnValueOnce({
+      ok: false,
+      errors: [{ message: "stale: AGENTS.md" }],
+    });
+
+    spawnSync
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 })  // git fetch
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });  // git rebase
+
+    const source = "/home/user/dotbabel";
+    const result = await syncGlobal("pull", { source });
+
+    expect(result.ok).toBe(false);
+    expect(result.mode).toBe("clone");
+    expect(bootstrapGlobal).not.toHaveBeenCalled();
+    expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source }, { dryRun: true });
   });
 
   // -------------------------------------------------------------------------

@@ -19,6 +19,9 @@
     "dotbabel-check-spec-coverage": "./plugins/dotbabel/bin/dotbabel-check-spec-coverage.mjs",
     "dotbabel-validate-specs": "./plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
     "dotbabel-check-instruction-drift": "./plugins/dotbabel/bin/dotbabel-check-instruction-drift.mjs",
+    "dotbabel-check-instructions-fresh": "./plugins/dotbabel/bin/dotbabel-check-instructions-fresh.mjs",
+    "dotbabel-check-instruction-parity": "./plugins/dotbabel/bin/dotbabel-check-instruction-parity.mjs",
+    "dotbabel-generate-instructions": "./plugins/dotbabel/bin/dotbabel-generate-instructions.mjs",
     "dotbabel-init": "./plugins/dotbabel/bin/dotbabel-init.mjs",
     "dotbabel-sync": "./plugins/dotbabel/bin/dotbabel-sync.mjs",
     "dotbabel-index": "./plugins/dotbabel/bin/dotbabel-index.mjs",
@@ -35,7 +38,7 @@
     "lint": "prettier --check \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown && markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.claude/worktrees\" && node scripts/check-jsdoc-coverage.mjs plugins/dotbabel/src",
     "format": "prettier --write \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-unknown",
     "shellcheck": "shellcheck -x bootstrap.sh sync.sh plugins/dotbabel/scripts/*.sh plugins/dotbabel/hooks/*.sh plugins/dotbabel/tests/*.sh plugins/dotbabel/templates/claude/hooks/*.sh plugins/dotbabel/templates/githooks/pre-commit",
-    "dogfood": "npx dotbabel-validate-skills && npx dotbabel-validate-specs && npx dotbabel-check-instruction-drift && npx dotbabel-check-spec-coverage",
+    "dogfood": "npx dotbabel-validate-skills && npx dotbabel-validate-specs && npx dotbabel-check-instruction-drift && npx dotbabel-check-instructions-fresh && npx dotbabel-check-instruction-parity && npx dotbabel-check-spec-coverage",
     "docs:stamp": "node scripts/stamp-doc-versions.mjs",
     "docs:stamp-check": "node scripts/stamp-doc-versions.mjs --check"
   },

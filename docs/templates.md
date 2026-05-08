@@ -58,8 +58,8 @@ templates/
 - **`claude/settings.headless.json`** — same surface but with CI-friendly
   permissions (no interactive prompts).
 - **`docs/repo-facts.json`** — the facts source of truth.
-  `dotbabel-check-instruction-drift` cross-references it with `CLAUDE.md`
-  and `README.md`.
+  `dotbabel-check-instruction-drift` cross-references it with
+  `instruction_files` and, when present, `rule_floor_files`.
 - **`docs/specs/README.md`** — onboarding doc for the spec workflow.
 - **`githooks/pre-commit`** — auto-refreshes the manifest when a skill
   file changes.

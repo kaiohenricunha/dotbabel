@@ -52,7 +52,8 @@ for the full surface.
 - `dotbabel-doctor` — self-diagnostic
 - `dotbabel-init` — scaffold governance tree
 - `dotbabel-validate-specs`, `dotbabel-validate-skills`
-- `dotbabel-check-spec-coverage`, `dotbabel-check-instruction-drift`
+- `dotbabel-check-spec-coverage`, `dotbabel-check-instruction-drift`,
+  `dotbabel-check-instructions-fresh`, `dotbabel-check-instruction-parity`
 - `dotbabel-detect-drift`
 
 Every bin supports `--help`, `--version`, `--json`, `--verbose`, `--no-color`.

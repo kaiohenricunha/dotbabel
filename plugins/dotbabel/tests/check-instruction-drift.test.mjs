@@ -78,6 +78,40 @@ describe("checkInstructionDrift", () => {
     expect(result.errors.some((e) => /protected_paths|protected path|docs\/secrets/.test(e))).toBe(true);
   });
 
+  it("defaults rule_floor_files to instruction_files for backward compatibility", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const facts = readFacts(root);
+    delete facts.rule_floor_files;
+    writeFacts(root, facts);
+    const result = checkInstructionDrift(ctx);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_PROTECTED_PATH &&
+          e.file === "README.md",
+      ),
+    ).toBe(true);
+  });
+
+  it("emits DRIFT_INSTRUCTION_FILES when rule_floor_files is invalid", () => {
+    const root = isolateFixture();
+    const ctx = createHarnessContext({ repoRoot: root });
+    const facts = readFacts(root);
+    facts.rule_floor_files = [];
+    writeFacts(root, facts);
+    const result = checkInstructionDrift(ctx);
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_INSTRUCTION_FILES &&
+          e.pointer === "rule_floor_files",
+      ),
+    ).toBe(true);
+  });
+
   it("emits DRIFT_PROTECTED_PATH when protected_paths contains a non-string entry", () => {
     const root = isolateFixture();
     const ctx = createHarnessContext({ repoRoot: root });

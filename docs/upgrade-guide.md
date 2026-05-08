@@ -130,7 +130,9 @@ and want to start using dotbabel:
    between treating each existing file as indexed (keep the entry) or
    removed (delete it + rerun `--update`).
 2. **Draft `docs/repo-facts.json`** with your `team_count`,
-   `protected_paths`, and `instruction_files`.
+   `protected_paths`, `instruction_files`, and optional `rule_floor_files`
+   when protected-path rules must be mirrored across multiple instruction
+   files.
 3. **Draft at least one spec** (`docs/specs/<id>/spec.json`). It can be
    `status: draft` initially — gating only kicks in at
    `approved|implementing|done`.

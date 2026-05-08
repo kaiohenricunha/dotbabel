@@ -11,6 +11,9 @@
 import { spawnSync } from "node:child_process";
 import { createOutput } from "./lib/output.mjs";
 import { bootstrapGlobal } from "./bootstrap-global.mjs";
+import { generateInstructions } from "./generate-instructions.mjs";
+import { checkInstructionsFresh } from "./check-instructions-fresh.mjs";
+import { createHarnessContext } from "./spec-harness-lib.mjs";
 import { version as currentVersion } from "./index.mjs";
 
 // ---------------------------------------------------------------------------
@@ -100,8 +103,33 @@ async function pullClone(out, source, opts) {
     return { ok: false, mode: "clone", summary: "git rebase failed" };
   }
 
+  const generated = refreshInstructions(out, source);
+  if (!generated.ok) return generated;
+
   await bootstrapGlobal({ source, quiet: opts.quiet, json: opts.json, noColor: opts.noColor });
   return { ok: true, mode: "clone", summary: "pulled and re-bootstrapped from clone" };
+}
+
+function refreshInstructions(out, source) {
+  const ctx = createHarnessContext({ repoRoot: source });
+  let generated;
+  try {
+    generated = generateInstructions(ctx, { dryRun: true });
+  } catch (err) {
+    out.fail(`instruction generation failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { ok: false, mode: "clone", summary: "instruction generation failed" };
+  }
+
+  const freshness = checkInstructionsFresh(ctx, generated);
+  if (!freshness.ok) {
+    out.fail(`instruction freshness failed: ${freshness.errors.length} issue(s)`, {
+      errors: freshness.errors,
+    });
+    return { ok: false, mode: "clone", summary: "instruction freshness failed" };
+  }
+
+  out.pass("generated instruction files are fresh");
+  return { ok: true, mode: "clone", summary: "instruction generation fresh" };
 }
 
 async function statusNpm(out) {

@@ -102,18 +102,31 @@ An instruction file (CLAUDE.md, README.md) mentions `N team(s)` with N ≠ `docs
 
 ### `DRIFT_PROTECTED_PATH`
 
-A `docs/repo-facts.json` `protected_paths` entry is either non-string or absent from `CLAUDE.md`.
-**Fix**: add the entry to `CLAUDE.md` §Protected paths, or remove it from the facts file.
+A `docs/repo-facts.json` `protected_paths` entry is either non-string or
+absent from a file listed in `rule_floor_files`.
+**Fix**: add the entry to `CLAUDE.md` §Protected paths, regenerate generated
+instruction files with `dotbabel-generate-instructions`, or remove it from
+the facts file.
 
 ### `DRIFT_INSTRUCTION_FILES`
 
-`instruction_files` is missing or non-array in `docs/repo-facts.json`.
-**Fix**: add it as a non-empty array, e.g. `["CLAUDE.md", "README.md"]`.
+`instruction_files` is missing/non-array, or `rule_floor_files` is present but
+invalid in `docs/repo-facts.json`.
+**Fix**: add `instruction_files` as a non-empty array, e.g.
+`["CLAUDE.md", "README.md"]`. If `rule_floor_files` is present, make it a
+non-empty array of files that must mirror protected-path rules.
 
 ### `DRIFT_INSTRUCTION_FILE_MISSING`
 
 An `instruction_files` entry points at a path that does not exist.
 **Fix**: create the file or drop the entry.
+
+### `DRIFT_GENERATED_STALE`
+
+A generated rule-floor output differs from what
+`dotbabel-generate-instructions` would write.
+**Fix**: run `npx dotbabel-generate-instructions` and commit the generated
+outputs.
 
 ---
 

@@ -9,6 +9,8 @@
     "sync.sh",
     "CLAUDE.md",
     "README.md",
+    "AGENTS.md",
+    "GEMINI.md",
     ".claude/**",
     "docs/repo-facts.json",
     "docs/specs/**/spec.json",
@@ -21,6 +23,7 @@
     "plugins/dotbabel/.claude-plugin/**",
     ".github/workflows/**",
     ".github/CODEOWNERS",
+    ".github/copilot-instructions.md",
     ".github/dependabot.yml",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/ISSUE_TEMPLATE/**"
@@ -30,6 +33,7 @@
     "npx dotbabel-validate-skills",
     "npx dotbabel-validate-specs",
     "npx dotbabel-check-instruction-drift",
+    "npx dotbabel-generate-instructions --dry-run",
     "node -e \"import('@dotbabel/dotbabel').then(m => process.exit(Object.keys(m).length >= 24 ? 0 : 1))\""
   ],
   "depends_on_specs": [],

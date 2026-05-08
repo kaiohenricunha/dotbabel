@@ -5,7 +5,10 @@
   "protected_paths": [
     "CLAUDE.md",
     "README.md",
+    "AGENTS.md",
+    "GEMINI.md",
     ".github/workflows/**",
+    ".github/copilot-instructions.md",
     ".claude/**",
     "docs/repo-facts.json",
     "docs/specs/**/spec.json",
@@ -13,6 +16,59 @@
     "plugins/dotbabel/bin/**",
     "plugins/dotbabel/templates/**"
   ],
-  "instruction_files": ["CLAUDE.md", "README.md"],
-  "regression_paths": []
+  "instruction_files": [
+    "CLAUDE.md",
+    "README.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
+  ],
+  "rule_floor_files": [
+    "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
+    "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
+  ],
+  "regression_paths": [],
+  "cli_substitutions": {
+    "_default_": {},
+    "agents": {
+      "# CLAUDE.md — Global Claude Code Rules": "# AGENTS.md — Global agent CLI rules",
+      "every Claude Code session": "every agent CLI session",
+      "Global Claude config": "Global dotbabel config",
+      "~/.claude/CLAUDE.md": "your CLI's user-scope rules file",
+      "~/.claude/": "your CLI's user-scope config dir",
+      "~/.claude": "your CLI's user-scope config dir"
+    },
+    "copilot": {
+      "# CLAUDE.md — Global Claude Code Rules": "# Global Copilot CLI rules",
+      "every Claude Code session": "every Copilot CLI session",
+      "Global Claude config": "Global Copilot config",
+      "~/.claude/CLAUDE.md": "~/.copilot/copilot-instructions.md",
+      "~/.claude/": "~/.copilot/",
+      "~/.claude": "~/.copilot"
+    },
+    "codex": {
+      "# CLAUDE.md — Global Claude Code Rules": "# Global Codex CLI rules",
+      "every Claude Code session": "every Codex CLI session",
+      "Global Claude config": "Global Codex config",
+      "~/.claude/CLAUDE.md": "~/.codex/AGENTS.md",
+      "~/.claude/": "~/.codex/",
+      "~/.claude": "~/.codex"
+    },
+    "gemini": {
+      "# CLAUDE.md — Global Claude Code Rules": "# Global Gemini CLI rules",
+      "every Claude Code session": "every Gemini CLI session",
+      "Global Claude config": "Global Gemini config",
+      "~/.claude/CLAUDE.md": "~/.gemini/GEMINI.md",
+      "~/.claude/": "~/.gemini/",
+      "~/.claude": "~/.gemini"
+    }
+  }
 }

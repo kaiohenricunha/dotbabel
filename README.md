@@ -158,14 +158,18 @@ Then use the umbrella dispatcher or standalone bins interchangeably:
 
 ```bash
 dotbabel bootstrap                # set up (or refresh) ~/.claude/ — symlinks commands, skills, CLAUDE.md
+dotbabel bootstrap --all          # also force Copilot/Codex/Gemini instruction symlinks
 dotbabel sync pull                # pull latest dotbabel version and re-bootstrap
 dotbabel sync push                # secret-scan staged files, commit, and push (clone mode)
 dotbabel sync status              # show installed vs latest version / git status
 dotbabel doctor                   # self-diagnostic: env, facts, manifest, specs, bootstrap
+dotbabel doctor --install-hooks   # install pre-commit freshness check for generated instructions
 dotbabel validate-skills          # verify skills manifest checksums + DAG
 dotbabel validate-specs           # audit spec contracts + dependency cycles
 dotbabel check-spec-coverage      # PR gate: protected paths must be spec-backed
 dotbabel check-instruction-drift  # detect stale CLAUDE.md / README entries
+dotbabel check-instructions-fresh # verify generated cross-CLI instruction files are fresh
+dotbabel check-instruction-parity # verify applicable headings are preserved per CLI
 dotbabel detect-drift             # flag commands diverged from origin/main 14+ days
 dotbabel init                     # scaffold specs, hooks, manifest into a repo
 ```

@@ -12,6 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createOutput } from "./lib/output.mjs";
 
@@ -136,6 +137,8 @@ function linkOne(src, dst, out, ts) {
  * @property {boolean} [quiet]   Suppress per-file output.
  * @property {boolean} [json]    Buffer output as JSON.
  * @property {boolean} [noColor] Suppress ANSI colors.
+ * @property {boolean} [allCli]  Link all supported CLI instructions even when
+ *                               the CLI binary is not on PATH.
  *
  * @typedef {object} BootstrapResult
  * @property {boolean} ok
@@ -153,6 +156,7 @@ function linkOne(src, dst, out, ts) {
 export async function bootstrapGlobal(opts = {}) {
   const source = resolveSource(opts.source, process.env);
   const target = opts.target ?? path.join(os.homedir(), ".claude");
+  const homeRoot = opts.target ? target : os.homedir();
 
   const out = createOutput({
     noColor: opts.noColor ?? false,
@@ -262,6 +266,52 @@ export async function bootstrapGlobal(opts = {}) {
     }
   }
 
+  const cliInstructionsSrc = path.join(source, "plugins", "dotbabel", "templates", "cli-instructions");
+  linkCliInstruction({
+    cli: "copilot",
+    src: path.join(cliInstructionsSrc, "copilot-instructions.md"),
+    dst: path.join(homeRoot, ".github", "copilot-instructions.md"),
+  });
+  linkCliInstruction({
+    cli: "codex",
+    src: path.join(cliInstructionsSrc, "codex-AGENTS.md"),
+    dst: path.join(homeRoot, ".codex", "AGENTS.md"),
+  });
+  linkCliInstruction({
+    cli: "gemini",
+    src: path.join(cliInstructionsSrc, "gemini-GEMINI.md"),
+    dst: path.join(homeRoot, ".gemini", "GEMINI.md"),
+  });
+
   out.flush();
   return { ok: true, linked, skipped, backed_up };
+
+  /**
+   * @param {{ cli: string, src: string, dst: string }} cfg
+   */
+  function linkCliInstruction({ cli, src, dst }) {
+    if (!opts.allCli && !commandExists(cli)) {
+      out.info(`skipped ${cli} instructions (command not found; use --all to force)`);
+      skipped++;
+      return;
+    }
+    if (!fs.existsSync(src)) {
+      out.info(`skipped ${cli} instructions (missing source: ${src})`);
+      skipped++;
+      return;
+    }
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    doLink(src, dst);
+  }
+}
+
+function commandExists(command) {
+  const result = spawnSync("sh", ["-c", `command -v ${quoteShellWord(command)} >/dev/null 2>&1`], {
+    stdio: "ignore",
+  });
+  return result.status === 0;
+}
+
+function quoteShellWord(word) {
+  return `'${word.replace(/'/g, "'\\''")}'`;
 }
