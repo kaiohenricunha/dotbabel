@@ -218,6 +218,32 @@ describe("bootstrapGlobal", () => {
     );
   });
 
+  it("backs up an existing Codex command wrapper file before fanning out commands", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+
+    const codexSkills = path.join(tgt, ".codex", "skills");
+    fs.mkdirSync(codexSkills, { recursive: true });
+    fs.writeFileSync(path.join(codexSkills, "foo"), "# existing wrapper\n");
+
+    const result = await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+
+    expect(result.ok).toBe(true);
+    expect(result.backed_up).toBeGreaterThan(0);
+
+    const wrapper = path.join(codexSkills, "foo");
+    expect(fs.lstatSync(wrapper).isDirectory()).toBe(true);
+
+    const skillMd = path.join(wrapper, "SKILL.md");
+    expect(fs.lstatSync(skillMd).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(skillMd)).toBe(path.join(src, "commands", "foo.md"));
+
+    const backups = fs.readdirSync(codexSkills).filter((entry) => entry.startsWith("foo.bak-"));
+    expect(backups).toHaveLength(1);
+    expect(fs.readFileSync(path.join(codexSkills, backups[0]), "utf8")).toBe("# existing wrapper\n");
+  });
+
   // -------------------------------------------------------------------------
   // Test 7 — returns { ok: false } when source directory does not exist
   // -------------------------------------------------------------------------
