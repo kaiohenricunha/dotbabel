@@ -1,6 +1,6 @@
 # Dotfile quickstart — skills & commands in every Claude Code session
 
-_Last updated: v2.5.0_
+_Last updated: v2.6.0_
 
 Bootstrap dotbabel into `~/.claude/` in under 30 seconds. No npm, no Node required.
 
