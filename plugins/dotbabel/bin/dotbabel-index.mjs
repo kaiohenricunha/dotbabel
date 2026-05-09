@@ -31,6 +31,7 @@ import {
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { format as prettierFormat, resolveConfig as prettierResolveConfig } from "prettier";
 
 const META = {
   name: "dotbabel-index",
@@ -156,18 +157,21 @@ if (existsSync(artifactsPath)) {
 bundle.artifactsJson.generatedAt =
   preservedGeneratedAt ?? new Date().toISOString();
 
-writeFileSync(
-  artifactsPath,
-  JSON.stringify(bundle.artifactsJson, null, 2) + "\n",
-);
-writeFileSync(
-  join(indexDir, "by-type.json"),
-  JSON.stringify(bundle.byType, null, 2) + "\n",
-);
-writeFileSync(
-  join(indexDir, "by-facet.json"),
-  JSON.stringify(bundle.byFacet, null, 2) + "\n",
-);
+// Format each index file via prettier (same gate `npm run lint` runs) so
+// the regenerator output is lint-clean by construction. Closes #224 — the
+// previous JSON.stringify(..., null, 2) path always-expanded arrays,
+// fighting prettier's "inline short, expand long" heuristic and forcing a
+// manual `prettier --write` after every taxonomy change.
+//
+// resolveConfig is required so prettier honors the repo's .prettierrc
+// (notably `printWidth: 100`); without it prettier falls back to its
+// built-in 80-char default and the output diverges from `npm run lint`.
+const prettierConfig = (await prettierResolveConfig(artifactsPath)) ?? {};
+const formatJson = (value) =>
+  prettierFormat(JSON.stringify(value), { ...prettierConfig, parser: "json" });
+writeFileSync(artifactsPath, await formatJson(bundle.artifactsJson));
+writeFileSync(join(indexDir, "by-type.json"), await formatJson(bundle.byType));
+writeFileSync(join(indexDir, "by-facet.json"), await formatJson(bundle.byFacet));
 
 // Write a README once if absent; never overwrite user edits.
 const readmePath = join(indexDir, "README.md");
