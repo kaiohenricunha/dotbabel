@@ -1,0 +1,1 @@
+../../.claude/skills/kubernetes-specialist/SKILL.md

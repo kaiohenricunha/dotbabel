@@ -1,0 +1,1 @@
+../../.claude/skills/detect-flaky/SKILL.md

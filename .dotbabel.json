@@ -1,0 +1,9 @@
+{
+  "rule_floor_source": "CLAUDE.md",
+  "commands_dir": ".claude/commands",
+  "skills_dir": ".claude/skills",
+  "fan_out": ["codex", "gemini", "copilot"],
+  "gate_on_cli_presence": true,
+  "cli_substitutions": {},
+  "targets": []
+}

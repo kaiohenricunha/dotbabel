@@ -1,0 +1,1 @@
+../../.claude/skills/create-inspection/SKILL.md
