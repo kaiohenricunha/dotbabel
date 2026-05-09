@@ -20,6 +20,23 @@ PATTERNS=(
   "test/handoff-*"
 )
 
+print_help() {
+  cat <<'EOF'
+prune-merged-branches.sh — local-only pruner for empty-diff or merged-PR
+branches matching the handoff cleanup patterns. Default is --dry-run; nothing
+is deleted without an explicit --confirm.
+
+Usage:
+  bash scripts/prune-merged-branches.sh                 # alias for --dry-run
+  bash scripts/prune-merged-branches.sh --dry-run
+  bash scripts/prune-merged-branches.sh --confirm
+
+Local-only by design — the script refuses any flag mentioning push or
+delete-remote. Cleaning up published branches must be a separate, explicit
+operation (no scope creep).
+EOF
+}
+
 mode="dry-run"
 
 for arg in "$@"; do
@@ -27,7 +44,7 @@ for arg in "$@"; do
     --dry-run) mode="dry-run" ;;
     --confirm) mode="confirm" ;;
     --help | -h)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      print_help
       exit 0
       ;;
     *push* | *delete-remote*)
@@ -41,12 +58,13 @@ for arg in "$@"; do
   esac
 done
 
-# Resolve the local "main" tip; tolerate detached HEAD by falling back to the
-# branch ref directly.
+# Require a local 'main' to anchor empty-diff comparisons.
 if ! git rev-parse --verify --quiet main >/dev/null; then
   echo "error: no local 'main' branch — refusing to evaluate empty-diff against an unknown base" >&2
   exit 64
 fi
+
+current=$(git branch --show-current 2>/dev/null || true)
 
 deletable=()
 kept=()
@@ -61,7 +79,6 @@ mapfile -t branches < <(
 for branch in "${branches[@]}"; do
   [[ -z "$branch" ]] && continue
   # Skip the currently checked-out branch — it's never safe to delete.
-  current=$(git branch --show-current 2>/dev/null || true)
   if [[ "$branch" = "$current" ]]; then
     kept+=("$branch (current branch)")
     continue
