@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-09T01:53:11.032Z",
+  "generatedAt": "2026-05-09T11:26:14.750Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -194,7 +194,7 @@
     {
       "name": "handoff",
       "path": ".claude/skills/handoff/SKILL.md",
-      "checksum": "sha256:88cc19c675d6e2e71375a1c7f4bb289fcf8dec818396904cc7c0e1df74cd6937",
+      "checksum": "sha256:46f285ac145e974932198d3651931d46f7299e42a7bf4c93e79d3acf27ba190e",
       "dependencies": [],
       "lastValidated": "2026-05-09"
     },
@@ -209,9 +209,7 @@
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
       "checksum": "sha256:32a58bb0feb413e7f44148347d62283332ba259273a6c8f6d4a514876cc484dd",
-      "dependencies": [
-        "deploy-status"
-      ],
+      "dependencies": ["deploy-status"],
       "lastValidated": "2026-05-09"
     },
     {
@@ -239,9 +237,7 @@
       "name": "post-pr-review",
       "path": ".claude/skills/post-pr-review/SKILL.md",
       "checksum": "sha256:0565fc80dba6872c5da9569cff5e53d112fc3ea3a16b4905fdf38255754ec628",
-      "dependencies": [
-        "review-pr"
-      ],
+      "dependencies": ["review-pr"],
       "lastValidated": "2026-05-09"
     }
   ]

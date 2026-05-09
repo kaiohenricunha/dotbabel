@@ -65,9 +65,7 @@ is running in (`claude` for Claude Code, `copilot` for GitHub Copilot CLI,
 
 ## Layered fidelity (Approach A and Approach B)
 
-The digest combines two layers of context fidelity. The justification
-and tradeoffs are captured in
-`docs/experiments/handoff-hardening-2026-05-08.md`.
+The digest combines two layers of context fidelity:
 
 - **B-floor (always on).** Mechanical extraction the binary performs
   unconditionally: TodoWrite mining in claude/codex transcripts,
