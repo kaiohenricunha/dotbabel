@@ -254,12 +254,17 @@ export async function projectSync(opts) {
   }
 
   function doLink(src, dst) {
+    // Store the symlink target as a path relative to the link's own
+    // directory. fs.symlinkSync persists the string verbatim, so a relative
+    // target keeps the link portable across clones and survives a parent-repo
+    // rename or worktree cleanup. See #218.
+    const linkSrc = path.relative(path.dirname(dst), src);
     if (opts.dryRun) {
-      out.info(`would link: ${dst} -> ${src}`);
+      out.info(`would link: ${dst} -> ${linkSrc}`);
       linked++;
       return;
     }
-    const r = linkOne(src, dst, out, timestamp);
+    const r = linkOne(linkSrc, dst, out, timestamp);
     if (r.action === "backed_up") backed_up++;
     if (
       r.action === "linked" ||
