@@ -10,6 +10,20 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.3.0...v2.4.0) (2026-05-09)
+
+
+### Added
+
+* **bootstrap:** honor GEMINI_HOME for parity with CODEX_HOME ([#207](https://github.com/kaiohenricunha/dotbabel/issues/207)) ([0f1efbf](https://github.com/kaiohenricunha/dotbabel/commit/0f1efbf3ce2db861c478a94aee7cf8f6ce114864))
+* **doctor:** validate codex/gemini skill fan-out symlinks ([#210](https://github.com/kaiohenricunha/dotbabel/issues/210)) ([27b1302](https://github.com/kaiohenricunha/dotbabel/commit/27b13023c3efa8cc364473033d0d18d7f4822d50))
+
+
+### Documentation
+
+* **bootstrap:** document codex/gemini skill fan-out paths ([#211](https://github.com/kaiohenricunha/dotbabel/issues/211)) ([52df8a7](https://github.com/kaiohenricunha/dotbabel/commit/52df8a759b5b1e1519d3a9123093fa14d469af16))
+* **handoff:** SKILL.md flags + layered-fidelity section + cli enum ([#208](https://github.com/kaiohenricunha/dotbabel/issues/208)) ([b481995](https://github.com/kaiohenricunha/dotbabel/commit/b481995241935b704d8c55a96f6b47f6518b8975))
+
 ## [2.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.2.0...v2.3.0) (2026-05-08)
 
 
