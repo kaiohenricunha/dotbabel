@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach, beforeAll } from "vitest";
-import { execFileSync, spawnSync } from "node:child_process";
+import { describe, it, expect, afterEach } from "vitest";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -88,28 +88,12 @@ describe("dotbabel-doctor fan-out check", () => {
 
   it("skips codex fan-out check when codex is NOT on PATH", () => {
     const home = makeTmpDir("home-");
+    // Empty stub dir on PATH — neither codex nor gemini resolve.
     const emptyStub = makeTmpDir("empty-stub-");
 
-    // Build a PATH that excludes any real codex/gemini install. We invoke node
-    // by absolute path (process.execPath) so node doesn't need to be on PATH.
-    // Keep /usr/bin + /bin for git only.
-    const env = {
-      ...process.env,
-      HOME: home,
-      PATH: `${emptyStub}:/usr/bin:/bin`,
-    };
-    delete env.CODEX_HOME;
-    delete env.GEMINI_HOME;
+    const result = runDoctor({ home, extraPath: emptyStub });
 
-    const result = spawnSync(process.execPath, [DOCTOR, "--repo-root", REPO_ROOT], {
-      env,
-      encoding: "utf8",
-    });
-
-    // Sanity: doctor produced output.
     expect(typeof result.stdout).toBe("string");
-
-    // The fan-out lines should NOT appear because both gates are closed.
     expect(result.stdout).not.toMatch(/Codex skills fan-out/);
     expect(result.stdout).not.toMatch(/Gemini skills fan-out/);
   });
