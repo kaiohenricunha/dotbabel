@@ -240,15 +240,14 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 > **Platform note:** Windows is not supported (symlinks require elevated
 > permissions). Use WSL or run `bootstrap.sh` from Git Bash instead.
 
-| Flag              | Default     |                                                                                          |
-| ----------------- | ----------- | ---------------------------------------------------------------------------------------- |
-| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode)                                          |
-| `--target <dir>`  | `~/.claude` | Override destination directory                                                           |
-| `--all`           | false       | Link Copilot/Codex/Gemini instructions and fan out skills to `~/.codex/`, `~/.gemini/`.¹ |
-| `--quiet`         | false       | Suppress per-file progress; print summary only                                           |
+| Flag              | Default     |                                                                                             |
+| ----------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode)                                             |
+| `--target <dir>`  | `~/.claude` | Override destination directory                                                              |
+| `--all`           | false       | Link Copilot/Codex/Gemini instructions and fan out skills to `~/.codex/`, `~/.gemini/`.[^1] |
+| `--quiet`         | false       | Suppress per-file progress; print summary only                                              |
 
-¹ Skills fan out to `~/.codex/skills/` and `~/.gemini/skills/`. Copilot has no
-skill auto-discovery directory, so only its instruction file is linked.
+[^1]: Skills fan out to `~/.codex/skills/` and `~/.gemini/skills/`. Copilot has no skill auto-discovery directory, so only its instruction file is linked.
 
 **Typical invocations:**
 
