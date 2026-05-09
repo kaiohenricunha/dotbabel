@@ -189,6 +189,8 @@ if [[ -d "$AGENTS_SRC" ]]; then
 fi
 
 CLI_INSTRUCTIONS_SRC="$DOTBABEL/plugins/dotbabel/templates/cli-instructions"
+# Copilot CLI has no skill auto-discovery dir (~/.copilot/), so we link only
+# the instruction file, not skills.
 link_cli_instruction \
   copilot \
   "$CLI_INSTRUCTIONS_SRC/copilot-instructions.md" \
@@ -203,7 +205,7 @@ link_cli_instruction \
   gemini \
   "$CLI_INSTRUCTIONS_SRC/gemini-GEMINI.md" \
   "$HOME/.gemini/GEMINI.md"
-fan_out_skills_to_dir gemini "$HOME/.gemini/skills"
+fan_out_skills_to_dir gemini "${GEMINI_HOME:-$HOME/.gemini}/skills"
 
 if [[ "$QUIET" = "1" ]]; then
   echo "bootstrap complete — target: $TARGET"
