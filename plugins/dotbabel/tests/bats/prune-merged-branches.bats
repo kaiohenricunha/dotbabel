@@ -84,8 +84,31 @@ teardown() {
 }
 
 @test "refuses --delete-remote" {
-  
+
   run "$SCRIPT" --delete-remote
   [ "$status" -ne 0 ]
   [[ "$output" == *"local-only"* ]] || [[ "$output" == *"refuse"* ]] || [[ "$output" == *"not supported"* ]]
+}
+
+@test "--help exits 0 and prints usage" {
+
+  run "$SCRIPT" --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage:"* ]]
+  [[ "$output" == *"--dry-run"* ]]
+  [[ "$output" == *"--confirm"* ]]
+}
+
+@test "-h exits 0 and prints usage" {
+
+  run "$SCRIPT" -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage:"* ]]
+}
+
+@test "unknown argument exits 64 with usage error" {
+
+  run "$SCRIPT" --not-a-real-flag
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"unknown argument"* ]]
 }

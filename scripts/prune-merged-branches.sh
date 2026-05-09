@@ -84,16 +84,21 @@ for branch in "${branches[@]}"; do
     continue
   fi
 
-  # Empty-diff against main → deletable.
-  if [[ -z "$(git diff "main..$branch" --stat 2>/dev/null || true)" ]]; then
+  # Branch tip already reachable from main (fully merged or empty) → deletable.
+  # Use `merge-base --is-ancestor` rather than a two-dot diff stat: it's the
+  # exact primitive for "this branch contains nothing main doesn't already
+  # have", and stays correct even after main advances past the fork point.
+  if git merge-base --is-ancestor "$branch" main 2>/dev/null; then
     deletable+=("$branch")
     continue
   fi
 
   # Otherwise, check if the corresponding remote PR is merged. This requires
   # `gh` and a remote; tolerate absence by treating it as "kept".
+  # Use `--head` (exact branch-name match) rather than `--search "head:..."`
+  # so partial-name matches across forks/states can't inflate the count.
   if command -v gh >/dev/null 2>&1; then
-    merged_count=$(gh pr list --search "head:$branch" --state merged --json number --jq 'length' 2>/dev/null || echo 0)
+    merged_count=$(gh pr list --head "$branch" --state merged --json number --jq 'length' 2>/dev/null || echo 0)
     if [[ "${merged_count:-0}" -gt 0 ]]; then
       deletable+=("$branch")
       continue
