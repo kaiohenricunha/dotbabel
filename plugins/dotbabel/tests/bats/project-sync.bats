@@ -61,8 +61,8 @@ teardown() {
   [ "$status" -eq 0 ]
   [ -L "$REPO/.codex/skills/deploy" ]
   [ -L "$REPO/.codex/skills/commit/SKILL.md" ]
-  target=$(readlink "$REPO/.codex/skills/commit/SKILL.md")
-  [ "$target" = "$REPO/.claude/commands/commit.md" ]
+  resolved=$(readlink -f "$REPO/.codex/skills/commit/SKILL.md")
+  [ "$resolved" = "$REPO/.claude/commands/commit.md" ]
 }
 
 @test "project-sync creates Gemini symlinks at .gemini/skills" {
@@ -77,8 +77,8 @@ teardown() {
   [ "$status" -eq 0 ]
   [ -L "$REPO/.github/prompts/commit.prompt.md" ]
   [ -L "$REPO/.github/instructions/deploy.instructions.md" ]
-  target=$(readlink "$REPO/.github/prompts/commit.prompt.md")
-  [ "$target" = "$REPO/.claude/commands/commit.md" ]
+  resolved=$(readlink -f "$REPO/.github/prompts/commit.prompt.md")
+  [ "$resolved" = "$REPO/.claude/commands/commit.md" ]
 }
 
 @test "project-sync --dry-run does not mutate the filesystem" {
