@@ -60,6 +60,28 @@ is running in (`claude` for Claude Code, `copilot` for GitHub Copilot CLI,
 `codex` for Codex). The flag is required in that mode; the binary exits
 64 without it.
 
+## Layered fidelity (Approach A and Approach B)
+
+The digest combines two layers of context fidelity. Justification and
+tradeoffs are captured in
+`docs/experiments/handoff-hardening-2026-05-08.md` (added in PR #206;
+this PR must merge after #206 for the link to resolve).
+
+- **B-floor (always on).** Mechanical extraction the binary performs
+  unconditionally: TodoWrite mining in claude/codex transcripts,
+  user-prompt cap of 50 (prompt 1 pinned + last 49), and assistant
+  turn sampling (first turn + last 3). This is what every `push` and
+  `pull` produces with no extra flags. See
+  `references/digest-schema.md` for the schema and size bounds.
+- **Approach A (opt-in via `--state-file`).** When
+  `dotbabel handoff push --state-file <path>` is passed, the file's
+  raw content (typically a `<handoff-state>` YAML block authored by
+  the source agent) is prepended above the mechanical `<handoff>`
+  block. This lets the agent author intent, decisions, and goals
+  verbatim instead of relying on extraction heuristics. The block
+  flows through the same secret scrubber. See
+  `references/digest-schema.md` for the rendered shape.
+
 ## Tool execution failures
 
 When the `dotbabel` binary cannot be executed for any reason —
@@ -94,6 +116,7 @@ Brief reference. `dotbabel handoff --help` is authoritative.
 - `--tag <label>` annotates a `push` (repeatable). On `fetch <tag>`, exact-tag matches are preferred over description substring fallback.
 - `--fixed` / `-F` treats the `search` query as a literal string instead of a regex.
 - `--json` is honoured by `list`, `pull`, `search`.
+- `--state-file <path>` (on `push`) prepends a free-form state block (Approach A) to the digest before the mechanical extraction. The block is scrubbed for secrets like any other content.
 
 ## Out of scope
 
