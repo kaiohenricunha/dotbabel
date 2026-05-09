@@ -531,10 +531,12 @@ function listAllLocalSessions() {
  * Best-effort identification of the agentic CLI the binary is running
  * inside. Returns "claude" | "copilot" | "codex" | "gemini" | "unknown".
  *
- * All four signals below are UNCONFIRMED in the dotbabel codebase:
- * neither the repo nor the upstream CLIs document stable env-var
- * contracts. The probes are intentionally cheap — a false positive
- * only steers `bare push` into a narrower root than `resolveAny`,
+ * The claude, codex, and copilot probes below remain heuristic — neither
+ * the repo nor the upstream CLIs document stable env-var contracts for
+ * them, so each probe is annotated inline with its provenance. The gemini
+ * probe is confirmed against @google/gemini-cli@0.41.2 (see comment block
+ * on the gemini branch). The probes are intentionally cheap — a false
+ * positive only steers `bare push` into a narrower root than `resolveAny`,
  * which still succeeds when sessions exist there. A false negative
  * falls back to "unknown" and the union resolver.
  *
