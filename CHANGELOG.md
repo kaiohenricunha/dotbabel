@@ -10,6 +10,18 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.5.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.4.0...v2.5.0) (2026-05-09)
+
+
+### Added
+
+* **project-sync:** add cross-CLI repo-local fan-out (closes [#205](https://github.com/kaiohenricunha/dotbabel/issues/205)) ([#216](https://github.com/kaiohenricunha/dotbabel/issues/216)) ([9c24184](https://github.com/kaiohenricunha/dotbabel/commit/9c2418497c77d895927c5863a79e3fbba070bbea))
+
+
+### Fixed
+
+* **project-sync:** write relative symlink targets (closes [#218](https://github.com/kaiohenricunha/dotbabel/issues/218)) ([#220](https://github.com/kaiohenricunha/dotbabel/issues/220)) ([f8bcb75](https://github.com/kaiohenricunha/dotbabel/commit/f8bcb75a438d3a260be95f8ab696ac35dcaef0d8))
+
 ## [2.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.3.0...v2.4.0) (2026-05-09)
 
 
