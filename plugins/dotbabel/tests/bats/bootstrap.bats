@@ -113,7 +113,9 @@ teardown() {
   # Strip nvm bin (which carries `codex`) and any other dirs that might
   # leak the binary; keep only the system minimums git/jq/bash need.
   local sanitized_path="/usr/bin:/bin"
-  ! PATH="$sanitized_path" command -v codex >/dev/null 2>&1
+  if PATH="$sanitized_path" command -v codex >/dev/null 2>&1; then
+    skip "codex unexpectedly on sanitized PATH ($sanitized_path); cannot exercise the absent-binary path"
+  fi
 
   run env -i HOME="$HOME" PATH="$sanitized_path" "$BOOT"
   [ "$status" -eq 0 ]
@@ -124,9 +126,18 @@ teardown() {
 }
 
 @test "fan-out is idempotent — second run produces no new .bak-* files" {
+  # Pre-seed a real wrapper file so the first run actually creates a backup.
+  # Without this, both counts are 0 and the equality is trivially satisfied —
+  # a regression that spawned a stray .bak-* on the second run could still
+  # slip through.
+  mkdir -p "$HOME/.codex/skills"
+  echo "old wrapper" > "$HOME/.codex/skills/changelog"
+
   "$BOOT" --all --quiet
   local count_after_first
   count_after_first=$(find "$HOME/.codex/skills" -name '*.bak-*' 2>/dev/null | wc -l)
+  [ "$count_after_first" -gt 0 ]
+
   "$BOOT" --all --quiet
   local count_after_second
   count_after_second=$(find "$HOME/.codex/skills" -name '*.bak-*' 2>/dev/null | wc -l)
