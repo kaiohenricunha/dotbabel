@@ -141,11 +141,17 @@ describe("projectSync", () => {
 
     const skillLink = path.join(repo, ".codex", "skills", "deploy");
     expect(fs.lstatSync(skillLink).isSymbolicLink()).toBe(true);
-    expect(fs.readlinkSync(skillLink)).toBe(path.join(repo, ".claude", "skills", "deploy"));
+    expect(path.isAbsolute(fs.readlinkSync(skillLink))).toBe(false);
+    expect(fs.realpathSync(skillLink)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "skills", "deploy")),
+    );
 
     const cmdLink = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
     expect(fs.lstatSync(cmdLink).isSymbolicLink()).toBe(true);
-    expect(fs.readlinkSync(cmdLink)).toBe(path.join(repo, ".claude", "commands", "commit.md"));
+    expect(path.isAbsolute(fs.readlinkSync(cmdLink))).toBe(false);
+    expect(fs.realpathSync(cmdLink)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "commands", "commit.md")),
+    );
   });
 
   it("creates Gemini symlinks with the same shape as Codex", async () => {
@@ -155,7 +161,10 @@ describe("projectSync", () => {
     const skillLink = path.join(repo, ".gemini", "skills", "deploy");
     expect(fs.lstatSync(skillLink).isSymbolicLink()).toBe(true);
     const cmdLink = path.join(repo, ".gemini", "skills", "review", "SKILL.md");
-    expect(fs.readlinkSync(cmdLink)).toBe(path.join(repo, ".claude", "commands", "review.md"));
+    expect(path.isAbsolute(fs.readlinkSync(cmdLink))).toBe(false);
+    expect(fs.realpathSync(cmdLink)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "commands", "review.md")),
+    );
   });
 
   it("creates Copilot artifacts at .github/prompts/<name>.prompt.md and .github/instructions/<id>.instructions.md", async () => {
@@ -165,11 +174,17 @@ describe("projectSync", () => {
 
     const prompt = path.join(repo, ".github", "prompts", "commit.prompt.md");
     expect(fs.lstatSync(prompt).isSymbolicLink()).toBe(true);
-    expect(fs.readlinkSync(prompt)).toBe(path.join(repo, ".claude", "commands", "commit.md"));
+    expect(path.isAbsolute(fs.readlinkSync(prompt))).toBe(false);
+    expect(fs.realpathSync(prompt)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "commands", "commit.md")),
+    );
 
     const instr = path.join(repo, ".github", "instructions", "deploy.instructions.md");
     expect(fs.lstatSync(instr).isSymbolicLink()).toBe(true);
-    expect(fs.readlinkSync(instr)).toBe(path.join(repo, ".claude", "skills", "deploy", "SKILL.md"));
+    expect(path.isAbsolute(fs.readlinkSync(instr))).toBe(false);
+    expect(fs.realpathSync(instr)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "skills", "deploy", "SKILL.md")),
+    );
   });
 
   it("is idempotent: second run produces no additional backups", async () => {
@@ -204,7 +219,10 @@ describe("projectSync", () => {
     fs.symlinkSync("/nonexistent-target", path.join(repo, ".codex", "skills", "commit", "SKILL.md"));
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     const link = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
-    expect(fs.readlinkSync(link)).toBe(path.join(repo, ".claude", "commands", "commit.md"));
+    expect(path.isAbsolute(fs.readlinkSync(link))).toBe(false);
+    expect(fs.realpathSync(link)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "commands", "commit.md")),
+    );
   });
 
   it("skips .system namespace defensively", async () => {
@@ -366,5 +384,73 @@ describe("projectSync", () => {
     });
     expect(r.ok).toBe(true);
     expect(fs.existsSync(path.join(repo, ".codex"))).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Issue #218 — symlink targets must be relative for repo portability.
+  // The original v2.4.0 implementation wrote absolute targets, which broke
+  // every clone and even the original machine after worktree cleanup.
+  // -------------------------------------------------------------------------
+
+  it("symlink targets are stored as relative paths (issue #218)", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    for (const link of [
+      path.join(repo, ".codex", "skills", "commit", "SKILL.md"),
+      path.join(repo, ".codex", "skills", "deploy"),
+      path.join(repo, ".gemini", "skills", "commit", "SKILL.md"),
+      path.join(repo, ".github", "prompts", "commit.prompt.md"),
+      path.join(repo, ".github", "instructions", "deploy.instructions.md"),
+    ]) {
+      const target = fs.readlinkSync(link);
+      expect(path.isAbsolute(target)).toBe(false);
+      // The link must still resolve to the canonical source.
+      expect(fs.existsSync(link)).toBe(true);
+    }
+  });
+
+  it("symlinks survive a repo rename (the regression #218 caught)", async () => {
+    const original = makeTmpDir();
+    buildFakeRepo(original);
+    await projectSync({ repoRoot: original, allCli: true, quiet: true });
+
+    // Rename the entire repo to simulate a fresh clone at a different path
+    // (or, in the real-world scenario, a worktree cleanup followed by main
+    // checkout exercising the same tree).
+    const renamed = `${original}-renamed`;
+    fs.renameSync(original, renamed);
+    tmpDirs.push(renamed);
+    tmpDirs = tmpDirs.filter((d) => d !== original);
+
+    for (const [link, expectedRel] of [
+      [".codex/skills/commit/SKILL.md", ".claude/commands/commit.md"],
+      [".gemini/skills/commit/SKILL.md", ".claude/commands/commit.md"],
+      [".github/prompts/commit.prompt.md", ".claude/commands/commit.md"],
+      [".codex/skills/deploy", ".claude/skills/deploy"],
+      [".github/instructions/deploy.instructions.md", ".claude/skills/deploy/SKILL.md"],
+    ]) {
+      const linkPath = path.join(renamed, link);
+      const expectedAbs = path.join(renamed, expectedRel);
+      expect(fs.realpathSync(linkPath)).toBe(fs.realpathSync(expectedAbs));
+    }
+  });
+
+  it("upgrades absolute symlinks (from v2.4.0) to relative on next sync", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    // Manually create a v2.4.0-style absolute symlink and run sync.
+    // linkOne's stale-symlink branch should detect the encoding change and
+    // re-link with the relative form.
+    const absSrc = path.join(repo, ".claude", "commands", "commit.md");
+    const linkPath = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
+    fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+    fs.symlinkSync(absSrc, linkPath);
+    expect(path.isAbsolute(fs.readlinkSync(linkPath))).toBe(true);
+
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(path.isAbsolute(fs.readlinkSync(linkPath))).toBe(false);
+    // And it still resolves to the canonical source.
+    expect(fs.realpathSync(linkPath)).toBe(fs.realpathSync(absSrc));
   });
 });

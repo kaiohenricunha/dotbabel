@@ -61,8 +61,8 @@ teardown() {
   [ "$status" -eq 0 ]
   [ -L "$REPO/.codex/skills/deploy" ]
   [ -L "$REPO/.codex/skills/commit/SKILL.md" ]
-  target=$(readlink "$REPO/.codex/skills/commit/SKILL.md")
-  [ "$target" = "$REPO/.claude/commands/commit.md" ]
+  resolved=$(readlink -f "$REPO/.codex/skills/commit/SKILL.md")
+  [ "$resolved" = "$REPO/.claude/commands/commit.md" ]
 }
 
 @test "project-sync creates Gemini symlinks at .gemini/skills" {
@@ -77,8 +77,8 @@ teardown() {
   [ "$status" -eq 0 ]
   [ -L "$REPO/.github/prompts/commit.prompt.md" ]
   [ -L "$REPO/.github/instructions/deploy.instructions.md" ]
-  target=$(readlink "$REPO/.github/prompts/commit.prompt.md")
-  [ "$target" = "$REPO/.claude/commands/commit.md" ]
+  resolved=$(readlink -f "$REPO/.github/prompts/commit.prompt.md")
+  [ "$resolved" = "$REPO/.claude/commands/commit.md" ]
 }
 
 @test "project-sync --dry-run does not mutate the filesystem" {
@@ -151,4 +151,36 @@ teardown() {
   grep -q "be kind" "$PLAIN/AGENTS.md"
   [ -L "$PLAIN/.codex/skills/bar/SKILL.md" ]
   rm -rf "$PLAIN"
+}
+
+@test "symlink targets stored as relative paths, not absolute (issue #218)" {
+  $PSYNC --repo "$REPO" --all >/dev/null
+  target=$(readlink "$REPO/.codex/skills/commit/SKILL.md")
+  case "$target" in
+    /*) echo "BUG: target is absolute: $target" >&2; return 1 ;;
+    *)  : ;;
+  esac
+  prompt_target=$(readlink "$REPO/.github/prompts/commit.prompt.md")
+  case "$prompt_target" in
+    /*) echo "BUG: copilot prompt target is absolute: $prompt_target" >&2; return 1 ;;
+    *)  : ;;
+  esac
+}
+
+@test "symlinks survive a repo rename (regression #218)" {
+  $PSYNC --repo "$REPO" --all >/dev/null
+  RENAMED="${REPO}-renamed"
+  mv "$REPO" "$RENAMED"
+  REPO="$RENAMED"  # so teardown removes the renamed dir
+
+  [ -L "$RENAMED/.codex/skills/commit/SKILL.md" ]
+  resolved=$(readlink -f "$RENAMED/.codex/skills/commit/SKILL.md")
+  [ "$resolved" = "$RENAMED/.claude/commands/commit.md" ]
+
+  [ -L "$RENAMED/.github/prompts/commit.prompt.md" ]
+  resolved=$(readlink -f "$RENAMED/.github/prompts/commit.prompt.md")
+  [ "$resolved" = "$RENAMED/.claude/commands/commit.md" ]
+
+  run $PCHECK --repo "$RENAMED"
+  [ "$status" -eq 0 ]
 }

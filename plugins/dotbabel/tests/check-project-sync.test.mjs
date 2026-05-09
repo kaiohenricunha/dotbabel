@@ -80,7 +80,7 @@ describe("checkProjectSync", () => {
     expect(r.stale.some((e) => e.actual === "not a symlink")).toBe(true);
   });
 
-  it("reports stale when a symlink points at the wrong source", async () => {
+  it("reports stale (dangling) when a symlink points at a non-existent source", async () => {
     const repo = buildSyncedRepo();
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     const linkPath = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
@@ -90,9 +90,20 @@ describe("checkProjectSync", () => {
     expect(r.ok).toBe(false);
     expect(
       r.stale.some(
-        (e) => e.path.endsWith("commit/SKILL.md") && e.actual === "/some/other/place/foo.md",
+        (e) =>
+          e.path.endsWith("commit/SKILL.md") &&
+          /^dangling: /.test(e.actual ?? ""),
       ),
     ).toBe(true);
+  });
+
+  it("ok when the symlink points at the canonical source via a relative path (issue #218)", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const linkPath = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
+    expect(path.isAbsolute(fs.readlinkSync(linkPath))).toBe(false);
+    const r = await checkProjectSync({ repoRoot: repo, quiet: true });
+    expect(r.ok).toBe(true);
   });
 
   it("reports missing instruction file when AGENTS.md is deleted", async () => {

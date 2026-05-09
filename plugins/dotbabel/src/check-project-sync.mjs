@@ -121,9 +121,10 @@ export async function checkProjectSync(opts) {
   const skillsAbs = path.join(repoRoot, cfg.skills_dir);
 
   /**
-   * Compare the symlink at `dstAbs` against the expected source `srcAbs`.
-   * `linkOne` writes the absolute source as the link target, so equality is
-   * absolute-path string equality.
+   * Compare the symlink at `dstAbs` against the expected source `srcAbs` by
+   * resolving both with `fs.realpathSync` and comparing canonical paths. This
+   * is robust against the link-target encoding (relative vs absolute) and
+   * naturally surfaces dangling symlinks when realpath throws.
    */
   function checkLink(dstAbs, srcAbs, kind = "symlink") {
     const relDst = path.relative(repoRoot, dstAbs);
@@ -145,10 +146,30 @@ export async function checkProjectSync(opts) {
       out.fail(`stale (not a symlink): ${relDst}`);
       return;
     }
-    const actual = fs.readlinkSync(dstAbs);
-    if (actual !== srcAbs) {
-      stale.push({ kind, path: relDst, expected: srcAbs, actual });
-      out.fail(`stale: ${relDst} -> ${actual} (expected ${srcAbs})`);
+    let resolved;
+    try {
+      resolved = fs.realpathSync(dstAbs);
+    } catch {
+      // Dangling symlink — readlink succeeds, but the target doesn't exist.
+      const target = fs.readlinkSync(dstAbs);
+      stale.push({
+        kind,
+        path: relDst,
+        expected: srcAbs,
+        actual: `dangling: ${target}`,
+      });
+      out.fail(`stale (dangling): ${relDst} -> ${target}`);
+      return;
+    }
+    const expectedResolved = fs.realpathSync(srcAbs);
+    if (resolved !== expectedResolved) {
+      stale.push({
+        kind,
+        path: relDst,
+        expected: expectedResolved,
+        actual: resolved,
+      });
+      out.fail(`stale: ${relDst} -> ${resolved} (expected ${expectedResolved})`);
       return;
     }
     okEntries.push({ kind, path: relDst });
