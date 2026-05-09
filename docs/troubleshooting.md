@@ -218,7 +218,7 @@ If missing: re-run `./bootstrap.sh`. If present: restart the Claude Code session
 
 Skills are fanned out to `~/.codex/skills/<id>/SKILL.md` and `~/.gemini/skills/<id>/SKILL.md` during `dotbabel bootstrap`. Two reasons a skill might be missing there:
 
-- **Fan-out was skipped because the host CLI wasn't on `$PATH`.** The bootstrap only fans out to a CLI it can find. Re-run with `dotbabel bootstrap --all` (or `./bootstrap.sh --all`) to force fan-out regardless of `$PATH`.
+- **Fan-out was skipped because the host CLI wasn't on `$PATH`.** Bootstrap only fans out to a CLI it can find. Re-run with `dotbabel bootstrap --all` (or `./bootstrap.sh --all`) to force fan-out even when the CLI isn't installed yet.
 - **Custom config dir.** Both `$CODEX_HOME` and `$GEMINI_HOME` override the default `~/.codex` and `~/.gemini` parents. Check the active values:
 
 ```bash
