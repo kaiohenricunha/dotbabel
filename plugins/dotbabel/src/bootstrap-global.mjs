@@ -12,9 +12,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { createOutput } from "./lib/output.mjs";
+import {
+  buildTimestamp,
+  commandExists,
+  ensureRealDir,
+  linkOne,
+} from "./lib/symlink.mjs";
 
 // ---------------------------------------------------------------------------
 // pkgRoot() — walk up from this file until we find a directory containing
@@ -76,57 +81,6 @@ export function resolveSource(sourceOpt, env) {
 }
 
 // ---------------------------------------------------------------------------
-// linkOne — mirrors bootstrap.sh link_one()
-// ---------------------------------------------------------------------------
-
-/**
- * @typedef {object} LinkResult
- * @property {'ok'|'updated'|'linked'|'backed_up'} action
- */
-
-/**
- * Create or update a symlink at `dst` pointing to `src`.
- * Backs up a real file/dir at `dst` before replacing it.
- *
- * @param {string} src
- * @param {string} dst
- * @param {import('./lib/output.mjs').Output} out
- * @param {string} ts  Timestamp string for backup suffix
- * @returns {LinkResult}
- */
-function linkOne(src, dst, out, ts) {
-  let lstat;
-  try {
-    lstat = fs.lstatSync(dst);
-  } catch {
-    // dst does not exist
-    fs.symlinkSync(src, dst);
-    out.pass(`linked: ${dst} -> ${src}`);
-    return { action: "linked" };
-  }
-
-  if (lstat.isSymbolicLink()) {
-    const current = fs.readlinkSync(dst);
-    if (current === src) {
-      out.pass(`ok: ${dst}`);
-      return { action: "ok" };
-    }
-    // Stale symlink — update it
-    fs.unlinkSync(dst);
-    fs.symlinkSync(src, dst);
-    out.pass(`updated: ${dst} -> ${src}`);
-    return { action: "updated" };
-  }
-
-  // Real file or directory — back up then link
-  const bakPath = `${dst}.bak-${ts}`;
-  fs.renameSync(dst, bakPath);
-  fs.symlinkSync(src, dst);
-  out.warn(`backed up + linked: ${dst} (old at ${bakPath})`);
-  return { action: "backed_up" };
-}
-
-// ---------------------------------------------------------------------------
 // bootstrapGlobal — main entry point
 // ---------------------------------------------------------------------------
 
@@ -171,14 +125,7 @@ export async function bootstrapGlobal(opts = {}) {
     return { ok: false, linked: 0, skipped: 0, backed_up: 0 };
   }
 
-  // Build YYYYMMDD-HHmmss timestamp matching bootstrap.sh's date +%Y%m%d-%H%M%S.
-  // After replace(/[-:T]/g, "") the ISO string becomes "YYYYMMDDHHmmss.mmmZ",
-  // so datePart is slice(0,8) and timePart is slice(8,14) — no T separator remains.
-  const ts = new Date()
-    .toISOString()
-    .replace(/[-:T]/g, "")
-    .replace(/\..+$/, ""); // → "YYYYMMDDHHmmss"
-  const timestamp = `${ts.slice(0, 8)}-${ts.slice(8, 14)}`;
+  const timestamp = buildTimestamp();
 
   fs.mkdirSync(target, { recursive: true });
 
@@ -202,24 +149,9 @@ export async function bootstrapGlobal(opts = {}) {
     }
   }
 
-  function ensureRealDir(dst) {
-    let lstat;
-    try {
-      lstat = fs.lstatSync(dst);
-    } catch {
-      fs.mkdirSync(dst, { recursive: true });
-      return;
-    }
-
-    if (lstat.isDirectory() && !lstat.isSymbolicLink()) {
-      return;
-    }
-
-    const bakPath = `${dst}.bak-${timestamp}`;
-    fs.renameSync(dst, bakPath);
-    backed_up++;
-    out.warn(`backed up: ${dst} (old at ${bakPath})`);
-    fs.mkdirSync(dst, { recursive: true });
+  function doEnsureRealDir(dst) {
+    const r = ensureRealDir(dst, out, timestamp);
+    if (r.action === "backed_up") backed_up++;
   }
 
   // --- CLAUDE.md ---
@@ -370,21 +302,10 @@ export async function bootstrapGlobal(opts = {}) {
         if (name === ".system") continue;
         const src = path.join(commandsSrc, entry);
         const wrapDir = path.join(dstDir, name);
-        ensureRealDir(wrapDir);
+        doEnsureRealDir(wrapDir);
         const dst = path.join(wrapDir, "SKILL.md");
         doLink(src, dst);
       }
     }
   }
-}
-
-function commandExists(command) {
-  const result = spawnSync("sh", ["-c", `command -v ${quoteShellWord(command)} >/dev/null 2>&1`], {
-    stdio: "ignore",
-  });
-  return result.status === 0;
-}
-
-function quoteShellWord(word) {
-  return `'${word.replace(/'/g, "'\\''")}'`;
 }

@@ -238,6 +238,36 @@ for (const fanout of [
   }
 }
 
+// project-scope sync — only when the cwd opts in via .dotbabel.json.
+// Mirrors the bootstrap fan-out sentinel above but for repo-local artifacts.
+const projectConfigPath = join(ctx.repoRoot, ".dotbabel.json");
+if (existsSync(projectConfigPath)) {
+  try {
+    const { checkProjectSync } = await import("../src/check-project-sync.mjs");
+    const psResult = await checkProjectSync({
+      repoRoot: ctx.repoRoot,
+      json: argv.json,
+      noColor: argv.noColor,
+      quiet: true,
+    });
+    if (psResult.ok) {
+      out.pass(
+        `project-sync wiring ok (${psResult.okEntries.length} entries verified)`,
+      );
+    } else if (psResult.missing.length > 0) {
+      out.fail(
+        `project-sync wiring incomplete: ${psResult.missing.length} missing — run 'dotbabel project-sync' to fix`,
+      );
+    } else {
+      out.warn(
+        `project-sync wiring stale: ${psResult.stale.length} stale — run 'dotbabel project-sync' to refresh`,
+      );
+    }
+  } catch (err) {
+    out.warn(`project-sync check skipped: ${err.message}`);
+  }
+}
+
 out.flush();
 const { fail } = out.counts();
 process.exit(fail > 0 ? EXIT_CODES.VALIDATION : EXIT_CODES.OK);

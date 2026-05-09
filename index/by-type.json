@@ -45,6 +45,7 @@
     "kubernetes-specialist",
     "plan-grader",
     "post-pr-review",
+    "project-sync",
     "pulumi-specialist",
     "review-pr",
     "review-prs",

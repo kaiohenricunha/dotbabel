@@ -26,6 +26,7 @@
       "platform-engineer",
       "post-pr-review",
       "pre-pr",
+      "project-sync",
       "review-pr",
       "review-prs",
       "rollback-prod",
@@ -98,6 +99,7 @@
       "plan-grader",
       "platform-engineer",
       "pre-pr",
+      "project-sync",
       "security-auditor",
       "security-review",
       "spec",
@@ -218,6 +220,7 @@
       "devops-engineer",
       "frontend-developer",
       "platform-engineer",
+      "project-sync",
       "workflow-orchestrator"
     ],
     "documentation": [
@@ -310,6 +313,7 @@
       "platform-engineer",
       "post-pr-review",
       "pre-pr",
+      "project-sync",
       "pulumi-engineer",
       "review-prs",
       "rollback-prod",

@@ -312,12 +312,17 @@ function composeSynthesize(renderedBody) {
  * delimited rule-floor block. Throws when the host file has only one of the
  * two markers (mismatched / corrupted state).
  *
+ * Exported so project-sync (and other consumer-repo flows) can compose
+ * instruction files without going through `generateInstructions`, which
+ * couples to `docs/repo-facts.json` and the dotbabel-private template
+ * manifest.
+ *
  * @param {string} existingHostText
  * @param {string} ruleFloor   The body to place inside the markers (no banner).
  * @param {string} relativeOutputPath
  * @returns {string}
  */
-function composeInject(existingHostText, ruleFloor, relativeOutputPath) {
+export function composeInject(existingHostText, ruleFloor, relativeOutputPath) {
   const blockBody = `${BANNER}\n\n${normalizeGeneratedMarkdown(ruleFloor).trimEnd()}`;
   const block = `${RULE_FLOOR_BEGIN}\n${blockBody}\n\n${RULE_FLOOR_END}`;
 
@@ -512,13 +517,23 @@ function stringifyManifest(manifest) {
   return `${lines.join("\n")}\n`;
 }
 
-function validateSubstitutions(raw) {
+/**
+ * Validate a `cli_substitutions` map. The optional `sourceFile` controls the
+ * `file` field on any ValidationError thrown — set to `.dotbabel.json` from
+ * project-sync so consumer-repo errors point at the right config; defaults to
+ * `docs/repo-facts.json` for the harness path.
+ *
+ * @param {unknown} raw
+ * @param {string} [sourceFile="docs/repo-facts.json"]
+ * @returns {Record<string, Record<string, string>>}
+ */
+export function validateSubstitutions(raw, sourceFile = "docs/repo-facts.json") {
   if (raw === undefined || raw === null) return {};
   if (typeof raw !== "object" || Array.isArray(raw)) {
     throw new ValidationError({
       code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
       category: "drift",
-      file: "docs/repo-facts.json",
+      file: sourceFile,
       pointer: "cli_substitutions",
       message: "cli_substitutions must be an object mapping target keys to substitution maps",
     });
@@ -528,7 +543,7 @@ function validateSubstitutions(raw) {
       throw new ValidationError({
         code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
         category: "drift",
-        file: "docs/repo-facts.json",
+        file: sourceFile,
         pointer: `cli_substitutions.${key}`,
         message: `cli_substitutions.${key} must be a string→string map`,
       });
@@ -538,7 +553,7 @@ function validateSubstitutions(raw) {
         throw new ValidationError({
           code: ERROR_CODES.DRIFT_INSTRUCTION_FILES,
           category: "drift",
-          file: "docs/repo-facts.json",
+          file: sourceFile,
           pointer: `cli_substitutions.${key}.${needle}`,
           message: `cli_substitutions.${key}.${JSON.stringify(needle)} must be a string`,
         });

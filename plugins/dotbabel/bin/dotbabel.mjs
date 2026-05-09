@@ -9,7 +9,8 @@
  * Known subcommands mirror the bin/* entries shipped by the package:
  *   validate-skills, validate-specs, check-spec-coverage,
  *   check-instruction-drift, check-instructions-fresh,
- *   check-instruction-parity, detect-drift, doctor, init, bootstrap, sync.
+ *   check-instruction-parity, check-project-sync, detect-drift, doctor,
+ *   init, project-init, bootstrap, sync, project-sync.
  *
  * Exits: 0 ok, 1 delegated failure, 2 env error, 64 usage error.
  */
@@ -28,11 +29,14 @@ const SUBCOMMANDS = [
   "check-instruction-drift",
   "check-instructions-fresh",
   "check-instruction-parity",
+  "check-project-sync",
   "detect-drift",
   "doctor",
   "init",
+  "project-init",
   "bootstrap",
   "sync",
+  "project-sync",
   "index",
   "search",
   "list",
@@ -43,7 +47,7 @@ const SUBCOMMANDS = [
 function printUsage() {
   process.stdout.write(
     [
-      "dotbabel — Claude Code toolkit CLI (bootstrap, doctor, validators, governance)",
+      "dotbabel — Claude Code toolkit CLI (bootstrap, project-sync, doctor, validators, governance)",
       "",
       "Usage:",
       "  dotbabel <subcommand> [options]",
