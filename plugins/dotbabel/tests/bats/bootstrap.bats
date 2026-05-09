@@ -109,6 +109,22 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+@test "gemini fan-out honors GEMINI_HOME" {
+  GEMINI_HOME="$HOME/custom-gemini"
+  export GEMINI_HOME
+
+  run "$BOOT" --all --quiet
+  [ "$status" -eq 0 ]
+  [ -L "$GEMINI_HOME/skills/changelog/SKILL.md" ]
+  target=$(readlink "$GEMINI_HOME/skills/changelog/SKILL.md")
+  [ "$target" = "$REPO_ROOT/commands/changelog.md" ]
+
+  # Default $HOME/.gemini/skills must NOT be populated when override is set.
+  [ ! -e "$HOME/.gemini/skills/changelog/SKILL.md" ]
+
+  unset GEMINI_HOME
+}
+
 @test "codex fan-out skipped when codex not on PATH and --all not passed" {
   # Strip nvm bin (which carries `codex`) and any other dirs that might
   # leak the binary; keep only the system minimums git/jq/bash need.

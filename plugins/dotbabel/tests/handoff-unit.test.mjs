@@ -238,6 +238,18 @@ describe("detectHost", () => {
     expect(detectHost({ GEMINI_CLI_SESSION: "1" })).toBe("gemini");
   });
 
+  it("returns 'gemini' on the upstream-confirmed GEMINI_CLI_* vars", () => {
+    // Upstream sources from @google/gemini-cli@0.41.2 (bundle/chunk-FWECAYR3.js):
+    //   :286540  GEMINI_CLI_IDENTIFICATION_ENV_VAR = "GEMINI_CLI"
+    //   :286541  GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = "1"
+    // Plus the IDE server vars at chunk:6452 (GEMINI_CLI_IDE_SERVER_PORT,
+    // GEMINI_CLI_IDE_WORKSPACE_PATH) and the activity log at chunk:771
+    // (GEMINI_CLI_ACTIVITY_LOG_TARGET). All match the GEMINI_CLI_ prefix.
+    expect(detectHost({ GEMINI_CLI_IDE_SERVER_PORT: "9123" })).toBe("gemini");
+    expect(detectHost({ GEMINI_CLI_ACTIVITY_LOG_TARGET: "stdout" })).toBe("gemini");
+    expect(detectHost({ GEMINI_CLI_SYSTEM_SETTINGS_PATH: "/etc/gemini" })).toBe("gemini");
+  });
+
   it("prioritises claude > codex > copilot > gemini when multiple signals fire", () => {
     // Probe order is load-bearing: it determines which host "wins"
     // when an operator has env vars for multiple CLIs exported.

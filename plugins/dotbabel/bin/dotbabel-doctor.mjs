@@ -27,7 +27,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parse, helpText } from "../src/lib/argv.mjs";
@@ -211,9 +211,45 @@ for (const link of [
   }
 }
 
+// Codex / Gemini skill fan-out — only when the host CLI is on PATH (matches
+// the bootstrap on-PATH gate at bootstrap.sh:121 / bootstrap-global.mjs:346).
+// Sentinel: <fanout-dir>/changelog/SKILL.md, which mirrors the wrapped commands/
+// fan-out from bootstrap.sh:137-145 and bootstrap-global.mjs:364-375.
+for (const fanout of [
+  ["Codex", join(process.env.CODEX_HOME || join(homedir(), ".codex"), "skills"), "codex"],
+  ["Gemini", join(process.env.GEMINI_HOME || join(homedir(), ".gemini"), "skills"), "gemini"],
+]) {
+  const [label, fanoutDir, gateCmd] = fanout;
+  if (!commandExists(gateCmd)) continue;
+  const sentinel = join(fanoutDir, "changelog", "SKILL.md");
+  try {
+    const l = lstatSync(sentinel);
+    if (l.isSymbolicLink()) {
+      out.pass(`${label} skills fan-out sentinel present`);
+    } else {
+      out.warn(
+        `${label} skills fan-out sentinel exists but is not a symlink — run 'dotbabel bootstrap --all' to wire it up`,
+      );
+    }
+  } catch {
+    out.warn(
+      `${label} skills fan-out missing — run 'dotbabel bootstrap --all' to wire it up`,
+    );
+  }
+}
+
 out.flush();
 const { fail } = out.counts();
 process.exit(fail > 0 ? EXIT_CODES.VALIDATION : EXIT_CODES.OK);
+
+function commandExists(command) {
+  const result = spawnSync(
+    "sh",
+    ["-c", `command -v '${command.replace(/'/g, "'\\''")}' >/dev/null 2>&1`],
+    { stdio: "ignore" },
+  );
+  return result.status === 0;
+}
 
 function installPreCommitHook(repoRoot) {
   const relativeHookPath = execFileSync(

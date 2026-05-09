@@ -287,6 +287,8 @@ export async function bootstrapGlobal(opts = {}) {
   }
 
   const cliInstructionsSrc = path.join(source, "plugins", "dotbabel", "templates", "cli-instructions");
+  // Copilot CLI has no skill auto-discovery dir (~/.copilot/), so we link only
+  // the instruction file, not skills.
   linkCliInstruction({
     cli: "copilot",
     src: path.join(cliInstructionsSrc, "copilot-instructions.md"),
@@ -308,7 +310,7 @@ export async function bootstrapGlobal(opts = {}) {
   });
   fanOutSkillsToDir({
     cli: "gemini",
-    dstDir: path.join(homeRoot, ".gemini", "skills"),
+    dstDir: path.join(process.env.GEMINI_HOME || path.join(homeRoot, ".gemini"), "skills"),
   });
 
   out.flush();
