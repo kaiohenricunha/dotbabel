@@ -8,7 +8,7 @@ should produce the same shape.
 
 ```yaml
 origin:
-  cli: claude | copilot | codex
+  cli: claude | copilot | codex | gemini
   session_id: <full-uuid>
   short_id: <first-8-chars-of-uuid>
   cwd: <absolute-path>
