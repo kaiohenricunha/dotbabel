@@ -391,6 +391,23 @@ describe("renderHandoffBlock", () => {
     expect(block.indexOf("<handoff-state")).toBeLessThan(block.indexOf("<handoff "));
   });
 
+  it("places opts.stateBlock above the mechanical Summary line (CLI --state-file contract)", () => {
+    // Pin the exact source-ordering contract used by `dotbabel handoff push
+    // --state-file <file>`: the user-authored state block must appear before
+    // the mechanical `**Summary.**` line so an agent reading the digest sees
+    // active goals first, not the mechanical first-prompt/last-turn pair.
+    // Heading text is `**Summary.**` (markdown bold), not `### Summary`.
+    const stateBlock =
+      '<handoff-state version="1">\ngoals:\n  - finish gateway refactor\n</handoff-state>';
+    const block = lib.renderHandoffBlock(meta, ["p"], ["t"], "claude", { stateBlock });
+    const stateIdx = block.indexOf("<handoff-state");
+    const summaryIdx = block.indexOf("**Summary.**");
+    expect(stateIdx).toBeGreaterThanOrEqual(0);
+    expect(summaryIdx).toBeGreaterThan(0);
+    expect(stateIdx).toBeLessThan(summaryIdx);
+    expect(block).toContain("finish gateway refactor");
+  });
+
   it("renders Tracked TODOs section when opts.todos is non-empty", () => {
     const todos = [
       { content: "GOAL-MIGRATE-AUTH", status: "in_progress", activeForm: "" },

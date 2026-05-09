@@ -32,6 +32,7 @@ setup() {
 {"type":"user","promptId":"p-slash","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"Review a pull request: fetch comments, apply fixes.\nARGUMENTS: #80"}}
 {"type":"user","promptId":"p-bare","cwd":"/home/u/proj","sessionId":"aaaa1111-1111-1111-1111-111111111111","message":{"content":"<command-name>/clear</command-name>"}}
 {"type":"assistant","message":{"content":[{"type":"text","text":"Sure, running tests now."}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"TodoWrite","input":{"todos":[{"content":"GOAL-FINISH-RETRY-LOOP","status":"in_progress","activeForm":"Finishing retry loop fix"},{"content":"GOAL-WRITE-REGRESSION-TEST","status":"pending","activeForm":"Writing regression test"}]}}]}}
 {"type":"assistant","message":{"content":[{"type":"text","text":"All 205 tests passed."}]}}
 EOF
 
@@ -287,6 +288,44 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *'"session_id":"ffff6666-6666-6666-6666-666666666666"'* ]]
   [[ "$output" == *'"cwd":"/work/empty"'* ]]
+}
+
+# -- todos / mirror (Approach B layered fidelity) -------------------------
+
+@test "todos claude emits one JSON line per TodoWrite entry" {
+  run "$EX" todos claude "$CLAUDE_FILE"
+  [ "$status" -eq 0 ]
+  # Two todos in the fixture's TodoWrite tool_use record.
+  local count
+  count=$(printf '%s\n' "$output" | grep -c .)
+  [ "$count" -eq 2 ]
+  [[ "$output" == *'"content":"GOAL-FINISH-RETRY-LOOP"'* ]]
+  [[ "$output" == *'"status":"in_progress"'* ]]
+  [[ "$output" == *'"content":"GOAL-WRITE-REGRESSION-TEST"'* ]]
+  [[ "$output" == *'"status":"pending"'* ]]
+}
+
+@test "todos non-claude cli emits empty (no carrier today)" {
+  run "$EX" todos codex "$CODEX_FILE"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "mirror codex emits each event_msg agent_message in order" {
+  run "$EX" mirror codex "$CODEX_FILE"
+  [ "$status" -eq 0 ]
+  # Two agent_message events in the fixture: "I'll read README.md first." and "Done.".
+  local count
+  count=$(printf '%s\n' "$output" | grep -c .)
+  [ "$count" -eq 2 ]
+  [[ "$output" == *"I'll read README.md first."* ]]
+  [[ "$output" == *"Done."* ]]
+}
+
+@test "mirror non-codex cli emits empty (no event_msg equivalent)" {
+  run "$EX" mirror claude "$CLAUDE_FILE"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
 }
 
 # -- usage / errors -------------------------------------------------------

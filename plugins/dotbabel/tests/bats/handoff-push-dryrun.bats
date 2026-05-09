@@ -87,6 +87,45 @@ teardown() {
 
 # ---- test 4: dry-run does NOT invoke the doctor script --------------------
 
+@test "push --state-file accepted; dry-run JSON reflects digestBytes delta" {
+  # CLI-contract test for --state-file. The dry-run JSON only exposes metadata
+  # (dryRun, branch, digestBytes, ...), not the rendered <handoff-state> text
+  # — content visibility is asserted at the lib layer (handoff-remote-lib.test.mjs
+  # `places opts.stateBlock above the mechanical Summary line`). Here we lock
+  # the bin contract: --state-file is accepted, value flows through pushRemote,
+  # and a 16 KB state file inflates digestBytes by at least ~15 KB vs an empty
+  # state file. This catches a regression where the flag is parsed but dropped
+  # before reaching pushRemote (e.g. lost in argv refactor).
+  local empty_state="$TEST_HOME/state-empty.txt"
+  local big_state="$TEST_HOME/state-big.txt"
+  : > "$empty_state"
+  # Realistic-shape state block: ~16 KB of content within a wrapper element
+  # so the renderHandoffBlock trim() guard treats it as non-empty content.
+  printf '<handoff-state version="1">\n' > "$big_state"
+  yes "active-goal-line padding for digest size delta assertion" \
+    | head -c 16000 >> "$big_state"
+  printf '\n</handoff-state>\n' >> "$big_state"
+
+  run --separate-stderr node "$BIN" push --from claude --state-file "$empty_state" \
+    --dry-run --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.dryRun == true' >/dev/null
+  local empty_bytes
+  empty_bytes=$(echo "$output" | jq -r '.digestBytes')
+
+  run --separate-stderr node "$BIN" push --from claude --state-file "$big_state" \
+    --dry-run --json
+  [ "$status" -eq 0 ]
+  echo "$output" | jq -e '.dryRun == true' >/dev/null
+  local big_bytes
+  big_bytes=$(echo "$output" | jq -r '.digestBytes')
+
+  # Sanity: both are integers and big_bytes is at least empty + 15 000.
+  [[ "$empty_bytes" =~ ^[0-9]+$ ]]
+  [[ "$big_bytes" =~ ^[0-9]+$ ]]
+  [ "$big_bytes" -ge "$((empty_bytes + 15000))" ]
+}
+
 @test "push --dry-run: autoPreflight is skipped (doctor stub never runs)" {
   # Replace the passing stub with one that writes a sentinel file and
   # exits non-zero. If dry-run invokes preflight, the sentinel appears
