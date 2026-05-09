@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated: v2.5.0_
+_Last updated: v2.6.0_
 
 ## Layers
 
