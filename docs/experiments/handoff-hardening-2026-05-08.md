@@ -28,7 +28,7 @@ Compare on a planted-fact session designed to defeat the current extractor: 14 u
 
 ## Environment Setup
 
-Sandbox: `.claude/worktrees/experiment-handoff-hardening/` (worktree off `origin/main` at commit `57799ad`).
+Sandbox: `.claude/worktrees/experiment-handoff-hardening/` (worktree off `origin/main` as of 2026-05-08, commit `57799ad`; `origin/main` has since advanced — the hunks below may need a rebase before applying cleanly).
 
 ```bash
 git fetch origin main
@@ -399,4 +399,4 @@ The hint A/B and the LLM-eval pass should be a follow-up; both are blocked on An
 git worktree remove .claude/worktrees/experiment-handoff-hardening
 ```
 
-This document stays untracked in the main worktree at `docs/experiments/handoff-hardening-2026-05-08.md`.
+This document is tracked at `docs/experiments/handoff-hardening-2026-05-08.md` so the citation at `skills/handoff/references/digest-schema.md:144-145` resolves; sandbox copies under `.claude/worktrees/experiment-handoff-hardening/` remain ephemeral.
