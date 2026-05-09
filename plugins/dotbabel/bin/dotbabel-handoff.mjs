@@ -567,8 +567,13 @@ function detectHost(env = process.env) {
   for (const k in env) {
     if (k.startsWith("GITHUB_COPILOT_") || k.startsWith("COPILOT_")) return "copilot";
   }
-  // UNCONFIRMED: Gemini CLI sets GEMINI_CLI=1 and GEMINI_CLI_* vars for IDE
-  // detection. Check the exact var first, then the prefix as a fallback.
+  // Gemini CLI sets GEMINI_CLI=1 and GEMINI_CLI_* vars for child-process
+  // identification. Confirmed against @google/gemini-cli@0.41.2:
+  //   bundle/chunk-FWECAYR3.js:286540  GEMINI_CLI_IDENTIFICATION_ENV_VAR = "GEMINI_CLI"
+  //   bundle/chunk-FWECAYR3.js:286541  GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE = "1"
+  // GEMINI_CLI_* prefix vars (IDE server, activity log, system settings) are
+  // also propagated by the CLI; the prefix scan catches them as a fallback.
+  // Check the exact var first, then the prefix as a fallback.
   if (env.GEMINI_CLI === "1") return "gemini";
   for (const k in env) {
     if (k.startsWith("GEMINI_CLI_")) return "gemini";
