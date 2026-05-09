@@ -245,6 +245,39 @@ describe("bootstrapGlobal", () => {
   });
 
   // -------------------------------------------------------------------------
+  // GEMINI_HOME parity with CODEX_HOME — the gemini fan-out target must honor
+  // process.env.GEMINI_HOME when set, falling back to <homeRoot>/.gemini.
+  // -------------------------------------------------------------------------
+
+  it("honors GEMINI_HOME when fanning out gemini skills", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    const customGemini = makeTmpDir("custom-gemini-");
+    buildFakeSource(src);
+
+    const prev = process.env.GEMINI_HOME;
+    process.env.GEMINI_HOME = customGemini;
+    try {
+      const result = await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+      expect(result.ok).toBe(true);
+
+      // Skill should land in the override path.
+      const overrideSkill = path.join(customGemini, "skills", "alpha");
+      expect(fs.lstatSync(overrideSkill).isSymbolicLink()).toBe(true);
+      expect(fs.readlinkSync(overrideSkill)).toBe(path.join(src, "skills", "alpha"));
+
+      // Default path must NOT be populated when override is set.
+      const defaultSkillsDir = path.join(tgt, ".gemini", "skills");
+      const defaultExists =
+        fs.existsSync(defaultSkillsDir) && fs.readdirSync(defaultSkillsDir).length > 0;
+      expect(defaultExists).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.GEMINI_HOME;
+      else process.env.GEMINI_HOME = prev;
+    }
+  });
+
+  // -------------------------------------------------------------------------
   // Test 7 — returns { ok: false } when source directory does not exist
   // -------------------------------------------------------------------------
 
