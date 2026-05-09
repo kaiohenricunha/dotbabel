@@ -1,7 +1,7 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-09T15:11:14.013Z",
-  "version": "2.4.0",
+  "generatedAt": "2026-05-09T20:05:12.281Z",
+  "version": "2.5.0",
   "artifacts": [
     {
       "id": "agents-search",
