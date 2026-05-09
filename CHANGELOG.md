@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.6.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.5.0...v2.6.0) (2026-05-09)
+
+
+### Added
+
+* **project-sync:** dogfood per-repo cross-CLI fan-out on dotbabel itself ([#221](https://github.com/kaiohenricunha/dotbabel/issues/221)) ([252f475](https://github.com/kaiohenricunha/dotbabel/commit/252f475041510d360c693968c5eb635c864f11e7))
+
 ## [2.5.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.4.0...v2.5.0) (2026-05-09)
 
 
