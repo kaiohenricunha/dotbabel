@@ -10,6 +10,15 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.2.0...v2.3.0) (2026-05-08)
+
+
+### Added
+
+* **bootstrap:** fan out skills/ + commands/ into ~/.codex/skills ([0dddedf](https://github.com/kaiohenricunha/dotbabel/commit/0dddedf81a96eac3f3f3512aedeeed2173d26f3f))
+* **bootstrap:** fan out skills/ + commands/ into ~/.gemini/skills ([6590709](https://github.com/kaiohenricunha/dotbabel/commit/6590709b225ad2685700f0cafa4583d4deffb228))
+* **handoff:** layered fidelity — B-floor extraction + A state-block opt-in ([#203](https://github.com/kaiohenricunha/dotbabel/issues/203)) ([ebee76d](https://github.com/kaiohenricunha/dotbabel/commit/ebee76dc929e18b1089f3368b7538355377c510b))
+
 ## [2.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.1.0...v2.2.0) (2026-05-08)
 
 
