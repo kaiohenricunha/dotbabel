@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-09T11:58:09.302Z",
+  "generatedAt": "2026-05-09T15:11:14.013Z",
   "version": "2.4.0",
   "artifacts": [
     {
@@ -633,6 +633,21 @@
         "maturity": "draft"
       },
       "version": "1.0.1",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "project-sync",
+      "type": "skill",
+      "path": "skills/project-sync/SKILL.md",
+      "name": "project-sync",
+      "description": "Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex, Gemini, and Copilot project-scope analogues (.codex/skills, .gemini/skills, .github/prompts, .github/instructions) plus refresh AGENTS.md, GEMINI.md, and .github/copilot-instructions.md from the project's rule floor. Wraps `dotbabel project-sync`. Use when adopting cross-CLI workflows in a repo for the first time, or when adding a new command/skill that needs to be visible to Codex/Gemini/Copilot. Triggers on: \"sync this repo\", \"project sync\", \"fan out commands\", \"wire up gemini for this project\", \"add this command to codex\", \"make this skill available in copilot\", \"regenerate AGENTS.md for this project\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["scaffolding"],
+        "maturity": "draft"
+      },
+      "version": "0.1.0",
       "owner": "@kaiohenricunha"
     },
     {

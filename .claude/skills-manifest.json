@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-09T11:45:46.391Z",
+  "generatedAt": "2026-05-09T15:20:05.349Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -238,6 +238,13 @@
       "path": ".claude/skills/post-pr-review/SKILL.md",
       "checksum": "sha256:0565fc80dba6872c5da9569cff5e53d112fc3ea3a16b4905fdf38255754ec628",
       "dependencies": ["review-pr"],
+      "lastValidated": "2026-05-09"
+    },
+    {
+      "name": "project-sync",
+      "path": ".claude/skills/project-sync/SKILL.md",
+      "checksum": "sha256:822e1509cf0ed4d0260c8bada35cd0e815a9b6529d637eb9baf3a430f8803104",
+      "dependencies": [],
       "lastValidated": "2026-05-09"
     }
   ]

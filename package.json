@@ -28,7 +28,10 @@
     "dotbabel-search": "./plugins/dotbabel/bin/dotbabel-search.mjs",
     "dotbabel-list": "./plugins/dotbabel/bin/dotbabel-list.mjs",
     "dotbabel-show": "./plugins/dotbabel/bin/dotbabel-show.mjs",
-    "dotbabel-handoff": "./plugins/dotbabel/bin/dotbabel-handoff.mjs"
+    "dotbabel-handoff": "./plugins/dotbabel/bin/dotbabel-handoff.mjs",
+    "dotbabel-project-sync": "./plugins/dotbabel/bin/dotbabel-project-sync.mjs",
+    "dotbabel-project-init": "./plugins/dotbabel/bin/dotbabel-project-init.mjs",
+    "dotbabel-check-project-sync": "./plugins/dotbabel/bin/dotbabel-check-project-sync.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",

@@ -107,6 +107,43 @@ Any PR touching a protected path (see `docs/repo-facts.json`) must now carry
 a `Spec ID:` or `## No-spec rationale` section. `dotbabel-check-spec-coverage`
 enforces it.
 
+### 6. Project-scope cross-CLI sync (optional)
+
+If your repo has `.claude/commands/*.md` and `.claude/skills/*` that you want
+visible to Codex, Gemini, and Copilot — not just Claude Code — wire them up
+with `project-sync`. This is repo-local; user-scope artifacts stay in
+`~/.claude/` etc. via `dotbabel bootstrap`.
+
+```bash
+cd ~/projects/my-app
+
+# 6a. One-time scaffold (writes .dotbabel.json + a starter CLAUDE.md if missing)
+npx dotbabel project-init
+
+# 6b. Preview, then apply
+npx dotbabel project-sync --dry-run
+npx dotbabel project-sync
+
+# 6c. Verify (CI-safe, read-only)
+npx dotbabel check-project-sync
+```
+
+What lands where:
+
+| Source                         | Codex / Gemini destination                | Copilot destination                                   |
+| ------------------------------ | ----------------------------------------- | ----------------------------------------------------- |
+| `.claude/commands/<name>.md`   | `.codex/skills/<name>/SKILL.md` (symlink) | `.github/prompts/<name>.prompt.md` (symlink)          |
+| `.claude/skills/<id>/SKILL.md` | `.codex/skills/<id>/` (whole-dir symlink) | `.github/instructions/<id>.instructions.md` (symlink) |
+| `CLAUDE.md` (rule-floor block) | rendered into `AGENTS.md` + `GEMINI.md`   | rendered into `.github/copilot-instructions.md`       |
+
+`.dotbabel.json` is optional — without one, project-sync uses defaults
+(`fan_out: ["codex", "gemini", "copilot"]`, the standard target list, no
+`cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
+markers, the whole file becomes the rule floor.
+
+A repo with `.dotbabel.json` will also be picked up by `dotbabel doctor` —
+the diagnostic adds a project-sync wiring check.
+
 ### Next
 
 - [cli-reference.md](./cli-reference.md) — every flag, exit code, `--json` schema.

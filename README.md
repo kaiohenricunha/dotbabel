@@ -188,6 +188,28 @@ npx dotbabel-doctor          # verify everything wired up
 npx dotbabel-validate-specs  # run first governance check
 ```
 
+### Project-scope sync (cross-CLI per-repo wiring)
+
+`dotbabel bootstrap` covers your **user scope** (`~/.claude/`, `~/.codex/`,
+`~/.gemini/`). For **per-repo** artifacts — a project's own `CLAUDE.md`,
+`.claude/commands/*.md`, and `.claude/skills/*` — use `project-sync` to fan
+them out to Codex (`.codex/skills/`), Gemini (`.gemini/skills/`), and Copilot
+(`.github/prompts/*.prompt.md` + `.github/instructions/*.instructions.md`):
+
+```bash
+cd ~/projects/my-app
+dotbabel project-init                 # one-time: writes .dotbabel.json and a starter CLAUDE.md
+dotbabel project-sync --dry-run       # preview planned actions
+dotbabel project-sync                 # symlink everything in place
+dotbabel check-project-sync           # CI-safe drift check (read-only)
+```
+
+The fan-out uses symlinks — your `.claude/` tree stays the single source of
+truth. A `.dotbabel.json` is optional; without one, project-sync uses
+sensible defaults and treats the entire `CLAUDE.md` as the project rule
+floor (or the slice between `<!-- dotbabel:rule-floor:begin -->` /
+`<!-- dotbabel:rule-floor:end -->` markers when present).
+
 ### Node API
 
 ```js

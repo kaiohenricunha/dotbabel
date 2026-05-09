@@ -52,6 +52,8 @@ export {
   extractRuleFloor,
   stripRuleFloorMarkers,
   extractHeadings,
+  composeInject,
+  validateSubstitutions,
   DEFAULT_TARGETS,
   MANIFEST_RELATIVE_PATH,
   BANNER,
@@ -64,6 +66,19 @@ export { scaffoldHarness } from "./init-harness-scaffold.mjs";
 // --- bootstrap + sync (global ~/.claude/ lifecycle) ---
 export { bootstrapGlobal, resolveSource } from "./bootstrap-global.mjs";
 export { syncGlobal, resolveMode } from "./sync-global.mjs";
+
+// --- project-scope sync (per-repo ./.codex, ./.gemini, ./.github fan-out) ---
+export {
+  projectSync,
+  loadProjectConfig,
+  extractRuleFloorOrWhole,
+  DEFAULT_PROJECT_CONFIG,
+} from "./project-sync.mjs";
+export { checkProjectSync } from "./check-project-sync.mjs";
+export {
+  scaffoldProjectInit,
+  DEFAULT_DOTBABEL_JSON,
+} from "./project-init-scaffold.mjs";
 
 // --- taxonomy index (Phase 1: non-breaking) ---
 export {

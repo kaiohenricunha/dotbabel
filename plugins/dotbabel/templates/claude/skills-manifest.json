@@ -171,6 +171,13 @@
       "lastValidated": null
     },
     {
+      "name": "project-sync",
+      "path": ".claude/skills/project-sync/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "pulumi-specialist",
       "path": ".claude/skills/pulumi-specialist/SKILL.md",
       "checksum": "",
