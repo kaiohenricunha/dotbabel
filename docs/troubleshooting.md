@@ -214,6 +214,21 @@ ls -la ~/.claude/skills/aws-specialist/SKILL.md
 If missing: re-run `./bootstrap.sh`. If present: restart the Claude Code session
 (`/clear` or quit and reopen) — the session may have cached the pre-bootstrap state.
 
+### A skill isn't available in Codex / Gemini CLI
+
+Skills are fanned out to `~/.codex/skills/<id>/SKILL.md` and `~/.gemini/skills/<id>/SKILL.md` during `dotbabel bootstrap`. Two reasons a skill might be missing there:
+
+- **Fan-out was skipped because the host CLI wasn't on `$PATH`.** The bootstrap only fans out to a CLI it can find. Re-run with `dotbabel bootstrap --all` (or `./bootstrap.sh --all`) to force fan-out regardless of `$PATH`.
+- **Custom config dir.** Both `$CODEX_HOME` and `$GEMINI_HOME` override the default `~/.codex` and `~/.gemini` parents. Check the active values:
+
+```bash
+echo "$CODEX_HOME" "$GEMINI_HOME"
+ls -la "${CODEX_HOME:-$HOME/.codex}/skills/<id>/SKILL.md"
+ls -la "${GEMINI_HOME:-$HOME/.gemini}/skills/<id>/SKILL.md"
+```
+
+`dotbabel doctor` validates these symlinks resolve when the matching CLI is on `$PATH`.
+
 ### A skill runs but uses outdated behavior
 
 The session cached an older version. Run `./sync.sh pull` (or `dotbabel sync pull`)

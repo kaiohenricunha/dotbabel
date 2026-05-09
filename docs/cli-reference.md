@@ -240,12 +240,12 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 > **Platform note:** Windows is not supported (symlinks require elevated
 > permissions). Use WSL or run `bootstrap.sh` from Git Bash instead.
 
-| Flag              | Default     |                                                 |
-| ----------------- | ----------- | ----------------------------------------------- |
-| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode) |
-| `--target <dir>`  | `~/.claude` | Override destination directory                  |
-| `--all`           | false       | Link Copilot/Codex/Gemini instructions too      |
-| `--quiet`         | false       | Suppress per-file progress; print summary only  |
+| Flag              | Default     |                                                                                                                                               |
+| ----------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode)                                                                                               |
+| `--target <dir>`  | `~/.claude` | Override destination directory                                                                                                                |
+| `--all`           | false       | Link Copilot/Codex/Gemini instructions and fan out skills to `~/.codex/skills`, `~/.gemini/skills` (Copilot has no skill auto-discovery dir). |
+| `--quiet`         | false       | Suppress per-file progress; print summary only                                                                                                |
 
 **Typical invocations:**
 
