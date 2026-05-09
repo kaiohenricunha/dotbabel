@@ -1,0 +1,1 @@
+../../.claude/skills/crossplane-specialist/SKILL.md

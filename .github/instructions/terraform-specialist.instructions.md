@@ -1,0 +1,1 @@
+../../.claude/skills/terraform-specialist/SKILL.md

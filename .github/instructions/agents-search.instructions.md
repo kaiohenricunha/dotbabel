@@ -1,0 +1,1 @@
+../../.claude/skills/agents-search/SKILL.md
