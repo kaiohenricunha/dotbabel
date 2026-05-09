@@ -342,8 +342,10 @@ export function composeInject(existingHostText, ruleFloor, relativeOutputPath) {
   }
 
   if (beginLine === -1 && endLine === -1) {
-    // First-run bootstrap: append a section.
-    const trimmed = existingHostText.replace(/\s+$/, "");
+    // First-run bootstrap: append a section. Use String.prototype.trimEnd
+    // instead of /\s+$/ to avoid polynomial backtracking on huge whitespace
+    // tails (CodeQL js/polynomial-redos).
+    const trimmed = existingHostText.trimEnd();
     const sep = trimmed.length === 0 ? "" : "\n\n";
     return `${trimmed}${sep}${INJECT_FALLBACK_HEADING}\n\n${block}\n`;
   }
@@ -451,10 +453,21 @@ function ensureParentDir(absPath) {
 }
 
 function normalizeGeneratedMarkdown(content) {
-  return `${content
-    .replace(/[ \t]+$/gm, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/\n+$/g, "")}\n`;
+  // Per-line trimEnd avoids the polynomial-backtracking shape of
+  // /[ \t]+$/gm flagged by CodeQL js/polynomial-redos. Only ASCII space
+  // and tab are stripped, matching the original regex's semantics.
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let end = line.length;
+    while (end > 0) {
+      const ch = line.charCodeAt(end - 1);
+      if (ch === 0x20 /* space */ || ch === 0x09 /* tab */) end--;
+      else break;
+    }
+    if (end !== line.length) lines[i] = line.slice(0, end);
+  }
+  return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/g, "")}\n`;
 }
 
 /**

@@ -253,4 +253,118 @@ describe("projectSync", () => {
     expect(fs.existsSync(path.join(repo, ".codex"))).toBe(false);
     expect(r.skipped).toBeGreaterThan(0);
   });
+
+  // -------------------------------------------------------------------------
+  // Branch coverage: error paths, empty fan-out, dry-run wrapper-dir, etc.
+  // -------------------------------------------------------------------------
+
+  it("returns ok=false when repoRoot does not exist", async () => {
+    const r = await projectSync({
+      repoRoot: "/nonexistent/path/that/should/never/exist-xyz",
+      allCli: true,
+      quiet: true,
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("returns ok=false when CLAUDE.md is missing", async () => {
+    const repo = makeTmpDir();
+    // No CLAUDE.md, but .claude/ tree present.
+    fs.mkdirSync(path.join(repo, ".claude", "commands"), { recursive: true });
+    fs.writeFileSync(path.join(repo, ".claude", "commands", "foo.md"), "# foo\n");
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+  });
+
+  it("warns and skips an unknown fan_out CLI name", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["mystery-cli-foo"],
+      },
+    });
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(r.skipped).toBeGreaterThan(0);
+  });
+
+  it("idempotent instruction-file write: no rewrite when content unchanged", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    const r1 = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const beforeMtime = fs.statSync(path.join(repo, "AGENTS.md")).mtimeMs;
+    // Wait a hair so any rewrite would bump mtime.
+    await new Promise((res) => setTimeout(res, 5));
+    const r2 = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const afterMtime = fs.statSync(path.join(repo, "AGENTS.md")).mtimeMs;
+    expect(r1.written).toBeGreaterThan(0);
+    expect(r2.written).toBe(0); // second run: no instruction-file rewrites
+    expect(afterMtime).toBe(beforeMtime);
+  });
+
+  it("dry-run reports 'would back up + create dir' when wrapper path is a real file", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    fs.mkdirSync(path.join(repo, ".codex", "skills"), { recursive: true });
+    // Pre-create a real file at the wrapper directory path.
+    fs.writeFileSync(path.join(repo, ".codex", "skills", "commit"), "real\n");
+    const r = await projectSync({ repoRoot: repo, allCli: true, dryRun: true, quiet: true });
+    expect(r.ok).toBe(true);
+    // Real file is still there (dry-run shouldn't have moved it).
+    expect(
+      fs.lstatSync(path.join(repo, ".codex", "skills", "commit")).isFile(),
+    ).toBe(true);
+    expect(r.backed_up).toBe(0);
+  });
+
+  it("Copilot fan-out: skill without SKILL.md is silently skipped", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    // Add a skill dir with no SKILL.md inside.
+    fs.mkdirSync(path.join(repo, ".claude", "skills", "headless-skill"), {
+      recursive: true,
+    });
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    // No instructions file should have been emitted for headless-skill.
+    expect(
+      fs.existsSync(
+        path.join(repo, ".github", "instructions", "headless-skill.instructions.md"),
+      ),
+    ).toBe(false);
+    // Real skill (deploy) DID get one.
+    expect(
+      fs.lstatSync(
+        path.join(repo, ".github", "instructions", "deploy.instructions.md"),
+      ).isSymbolicLink(),
+    ).toBe(true);
+  });
+
+  it("config: rejects non-object .dotbabel.json (e.g. JSON array)", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(path.join(repo, ".dotbabel.json"), JSON.stringify([1, 2, 3]));
+    expect(() => loadProjectConfig(repo)).toThrow(/must be a JSON object/);
+  });
+
+  it("--dry-run honored on the symlink fan-out path (no .codex created when only fan-out runs)", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [], // no instruction targets — exercise only fan-out
+        fan_out: ["codex"],
+        gate_on_cli_presence: false,
+      },
+    });
+    const r = await projectSync({
+      repoRoot: repo,
+      allCli: true,
+      dryRun: true,
+      quiet: true,
+    });
+    expect(r.ok).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".codex"))).toBe(false);
+  });
 });

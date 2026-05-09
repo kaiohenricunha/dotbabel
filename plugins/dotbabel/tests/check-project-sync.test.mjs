@@ -79,4 +79,44 @@ describe("checkProjectSync", () => {
     expect(r.ok).toBe(false);
     expect(r.stale.some((e) => e.actual === "not a symlink")).toBe(true);
   });
+
+  it("reports stale when a symlink points at the wrong source", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const linkPath = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
+    fs.unlinkSync(linkPath);
+    fs.symlinkSync("/some/other/place/foo.md", linkPath);
+    const r = await checkProjectSync({ repoRoot: repo, quiet: true });
+    expect(r.ok).toBe(false);
+    expect(
+      r.stale.some(
+        (e) => e.path.endsWith("commit/SKILL.md") && e.actual === "/some/other/place/foo.md",
+      ),
+    ).toBe(true);
+  });
+
+  it("reports missing instruction file when AGENTS.md is deleted", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.unlinkSync(path.join(repo, "AGENTS.md"));
+    const r = await checkProjectSync({ repoRoot: repo, quiet: true });
+    expect(r.ok).toBe(false);
+    expect(r.missing.some((e) => e.path === "AGENTS.md")).toBe(true);
+  });
+
+  it("returns ok=false when repoRoot does not exist", async () => {
+    const r = await checkProjectSync({
+      repoRoot: "/totally-nonexistent-path-xyz-12345",
+      quiet: true,
+    });
+    expect(r.ok).toBe(false);
+  });
+
+  it("returns ok=false when CLAUDE.md is missing", async () => {
+    const repo = makeTmpDir();
+    // No CLAUDE.md.
+    fs.mkdirSync(path.join(repo, ".claude", "commands"), { recursive: true });
+    const r = await checkProjectSync({ repoRoot: repo, quiet: true });
+    expect(r.ok).toBe(false);
+  });
 });
