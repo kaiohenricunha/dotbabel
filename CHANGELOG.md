@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.6.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.6.0...v2.6.1) (2026-05-09)
+
+
+### Fixed
+
+* **index:** emit prettier-compatible JSON from writer (closes [#224](https://github.com/kaiohenricunha/dotbabel/issues/224)) ([#226](https://github.com/kaiohenricunha/dotbabel/issues/226)) ([2121f7d](https://github.com/kaiohenricunha/dotbabel/commit/2121f7df435ff5c0fd9bc2b5183a5c3a5dbb536c))
+
 ## [2.6.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.5.0...v2.6.0) (2026-05-09)
 
 
