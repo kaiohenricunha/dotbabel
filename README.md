@@ -188,6 +188,36 @@ npx dotbabel-doctor          # verify everything wired up
 npx dotbabel-validate-specs  # run first governance check
 ```
 
+### User-scope rule-floor overlay (`~/.config/dotbabel/local-rules.md`)
+
+`dotbabel bootstrap` (npm CLI, 2.7.0+) generates `~/.claude/CLAUDE.md` as a
+real file containing the canonical dotbabel rule floor followed by a
+marker-delimited overlay block. To layer your own personal rules on top
+without forking dotbabel's source, drop them into
+`~/.config/dotbabel/local-rules.md`:
+
+```bash
+mkdir -p ~/.config/dotbabel
+cat > ~/.config/dotbabel/local-rules.md <<'EOF'
+## My personal rules
+
+- Default to drafts when opening PRs.
+- Always link the Linear ticket in the PR body.
+EOF
+dotbabel bootstrap   # regenerates ~/.claude/CLAUDE.md with your overlay merged in
+```
+
+The overlay sits AFTER the canonical content (Claude Code's top-to-bottom
+read order means your rules trump dotbabel defaults). Future `dotbabel
+bootstrap` and `dotbabel sync` runs preserve the overlay, regenerating the
+merged file on every invocation. Direct edits to `~/.claude/CLAUDE.md` are
+backed up to `~/.claude/CLAUDE.md.bak-<timestamp>` before regen — always
+edit `local-rules.md`, not the generated file.
+
+The shell-only `./bootstrap.sh` quickstart still uses the legacy symlink
+shape and does not support overlays. Install the npm package for overlay
+support.
+
 ### Project-scope sync (cross-CLI per-repo wiring)
 
 `dotbabel bootstrap` covers your **user scope** (`~/.claude/`, `~/.codex/`,
