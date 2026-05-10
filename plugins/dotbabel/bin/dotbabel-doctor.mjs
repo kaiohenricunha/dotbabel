@@ -44,6 +44,7 @@ import {
   generateInstructions,
   pathExists,
 } from "../src/index.mjs";
+import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
 
 const META = {
   name: "dotbabel-doctor",
@@ -181,16 +182,25 @@ if (argv.flags["install-hooks"]) {
 }
 
 // bootstrap: is ~/.claude/ wired up? (informational — warn only)
+// As of 2.7.0 (#228), ~/.claude/CLAUDE.md is a generated file with
+// dotbabel:user-overlay markers, not a symlink. Migrate legacy symlinks on
+// next bootstrap.
 const globalClaudeMd = join(homedir(), ".claude", "CLAUDE.md");
+let globalLstat = null;
 try {
-  const l = lstatSync(globalClaudeMd);
-  if (l.isSymbolicLink()) {
-    out.pass(`~/.claude/CLAUDE.md is a symlink (bootstrap active)`);
-  } else {
-    out.warn(`~/.claude/CLAUDE.md exists but is not a symlink — run 'dotbabel bootstrap' to wire it up`);
-  }
+  globalLstat = lstatSync(globalClaudeMd);
 } catch {
+  // not present — handled below
+}
+
+if (globalLstat === null) {
   out.warn(`~/.claude/CLAUDE.md missing — run 'dotbabel bootstrap' to install global config`);
+} else if (globalLstat.isSymbolicLink()) {
+  out.warn(`~/.claude/CLAUDE.md is a symlink (legacy ≤2.6.x layout) — run 'dotbabel bootstrap' to migrate to a generated file with overlay support (#228)`);
+} else if (!readFileSync(globalClaudeMd, "utf8").includes(USER_OVERLAY_BEGIN)) {
+  out.warn(`~/.claude/CLAUDE.md is a regular file but lacks the user-overlay markers — run 'dotbabel bootstrap' to regenerate`);
+} else {
+  out.pass(`~/.claude/CLAUDE.md is a generated file with overlay support (bootstrap active)`);
 }
 
 for (const link of [

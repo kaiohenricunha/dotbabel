@@ -20,6 +20,10 @@ import {
   ensureRealDir,
   linkOne,
 } from "./lib/symlink.mjs";
+import {
+  resolveLocalRulesPath,
+  writeUserScopeClaudeMd,
+} from "./lib/user-overlay.mjs";
 
 // ---------------------------------------------------------------------------
 // pkgRoot() — walk up from this file until we find a directory containing
@@ -154,10 +158,23 @@ export async function bootstrapGlobal(opts = {}) {
     if (r.action === "backed_up") backed_up++;
   }
 
-  // --- CLAUDE.md ---
+  // --- CLAUDE.md (user-scope: canonical + optional user overlay; #228) ---
+  // Pre-2.7.0 this was a plain symlink to the canonical source. Now it's a
+  // generated file: <canonical> + a marker-delimited overlay block populated
+  // from ~/.config/dotbabel/local-rules.md (when present). Bootstrap
+  // regenerates the merged file every run, backing up direct edits or the
+  // legacy symlink before overwriting.
   const claudeMdSrc = path.join(source, "CLAUDE.md");
   if (fs.existsSync(claudeMdSrc)) {
-    doLink(claudeMdSrc, path.join(target, "CLAUDE.md"));
+    const r = writeUserScopeClaudeMd({
+      canonicalSrc: claudeMdSrc,
+      target: path.join(target, "CLAUDE.md"),
+      overlaySrc: resolveLocalRulesPath(process.env),
+      out,
+      timestamp,
+    });
+    if (r.action === "migrated" || r.action === "regenerated") backed_up++;
+    linked++;
   }
 
   // --- commands/*.md ---
