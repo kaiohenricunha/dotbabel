@@ -1,6 +1,6 @@
 {
   "name": "@dotbabel/dotbabel",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "description": "An opinionated, model-agnostic governance toolkit for Claude Code, Codex, Gemini, and other agentic CLIs: skills, slash commands, cloud/IaC specialists, and an optional spec-governance CLI.",
   "type": "module",
   "main": "plugins/dotbabel/src/index.mjs",

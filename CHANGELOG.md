@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.7.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.6.1...v2.7.0) (2026-05-10)
+
+
+### Added
+
+* **bootstrap:** add user-scope rule-floor overlay (closes [#228](https://github.com/kaiohenricunha/dotbabel/issues/228)) ([#229](https://github.com/kaiohenricunha/dotbabel/issues/229)) ([0efe030](https://github.com/kaiohenricunha/dotbabel/commit/0efe030057ec108d4c9c557b9fba074b8e4e84a4))
+
 ## [2.6.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.6.0...v2.6.1) (2026-05-09)
 
 

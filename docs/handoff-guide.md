@@ -1,6 +1,6 @@
 # Handoff guide — cross-CLI, cross-machine session transfer
 
-_Last updated: v2.6.1_
+_Last updated: v2.7.0_
 
 > **Added in v0.5.0; later reworked** to drop the `init` ceremony —
 > `push` now auto-bootstraps the remote store on first run.
