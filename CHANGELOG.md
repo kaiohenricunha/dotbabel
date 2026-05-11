@@ -10,6 +10,19 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.8.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.7.0...v2.8.0) (2026-05-11)
+
+
+### Added
+
+* add code-simplifier skill (cross-agent portable) ([#232](https://github.com/kaiohenricunha/dotbabel/issues/232)) ([6541e6e](https://github.com/kaiohenricunha/dotbabel/commit/6541e6eaaf70d22b88a2655f02ca062cbc0ddbb3))
+* **skills:** add portable /flyctl skill for fly.io ops ([#231](https://github.com/kaiohenricunha/dotbabel/issues/231)) ([89a29a7](https://github.com/kaiohenricunha/dotbabel/commit/89a29a7bf9fef02dfcfefa0c7842af41cc6ea981))
+
+
+### Documentation
+
+* **contributing:** add skill-scaffolding section using /flyctl as worked example ([#234](https://github.com/kaiohenricunha/dotbabel/issues/234)) ([776db89](https://github.com/kaiohenricunha/dotbabel/commit/776db89e7f8e0430aedcffada362a5fb8dc7ebe4))
+
 ## [2.7.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.6.1...v2.7.0) (2026-05-10)
 
 
