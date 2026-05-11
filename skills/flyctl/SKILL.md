@@ -17,8 +17,8 @@ description: >
   the app from fly.toml in the current directory. Side-effectful ops on
   prod-flavored apps require typed confirmation matching the app name.
   Rollback is delegated to /rollback-prod; cross-provider SHA reporting is
-  delegated to /deploy-status. For any subcommand not enumerated in
-  references/, run `flyctl <subcommand> --help` for canonical reference.
+  delegated to /deploy-status. Unlisted subcommands require
+  `flyctl <subcommand> --help` first.
 argument-hint: "<subcommand> [-a <app>] [--no-confirm] [...]"
 tools: Bash, Read, Grep, Glob
 model: sonnet
@@ -33,16 +33,13 @@ Portable Fly.io operations wrapper. Invoke as `/flyctl <subcommand>`.
 
 ## When to Use
 
-This skill is **explicit-invocation only** (`disable-model-invocation: true`). The
-model will not auto-route phrases like "tail fly logs" or "fly deploy" to this
-skill — the operator must type `/flyctl <subcommand>` directly. This is the
-safe contract for a side-effectful skill (deploy, secrets-set, scale, machines
-destroy).
+This skill is **explicit-invocation only** (`disable-model-invocation: true`).
+The operator must type `/flyctl <subcommand>` directly; the model must not
+auto-route phrases like "tail fly logs" or "fly deploy" to this side-effectful
+skill.
 
-Use `/flyctl` when you have an existing Fly.io app (its `fly.toml` is in the
-current directory) and you want to perform any of the operations enumerated in
-the Subcommands table below. The skill auto-discovers the app from `fly.toml`;
-all subcommands accept `-a <app>` to override.
+Use `/flyctl` from a Fly.io app directory containing `fly.toml`, or pass
+`-a <app>` to override auto-discovery.
 
 ## Out of Scope
 
@@ -51,13 +48,14 @@ This skill does **not** perform rollback or cross-provider release reporting.
 - For rollback to the previous release, use `/rollback-prod`.
 - For deployed git-SHA reporting across Vercel/Fly/AWS, use `/deploy-status`.
 - For app provisioning (`fly launch`, region setup), use the Fly UI or your IaC layer.
-- For any subcommand not enumerated above, run `flyctl <subcommand> --help` for
-  canonical reference. Read-only verbs (list, show, status, info, history,
-  version) may proceed without confirmation; mutating verbs (create, destroy,
-  delete, scale, restart, update, set, unset, deploy, suspend, resume,
-  regions add/remove, and any verb whose `--help` text mentions "destructive",
-  "irreversible", or "will redeploy") MUST be presented to the operator with
-  the exact command and require explicit y/N approval before executing.
+- For any subcommand not listed in the table or reference files, run
+  `flyctl <subcommand> --help` for canonical reference. Read-only verbs (list,
+  show, status, info, history, version) may proceed without confirmation;
+  mutating verbs (create, destroy, delete, scale, restart, update, set, unset,
+  deploy, suspend, resume, regions add/remove, and any verb whose `--help` text
+  mentions "destructive", "irreversible", or "will redeploy") MUST be presented
+  to the operator with the exact command and require explicit y/N approval before
+  executing.
 
 ## Auto-Discovery
 
@@ -69,8 +67,11 @@ guess across nested `fly.toml` files.
 
 ```bash
 # CLI: prefer flyctl, fall back to fly
-FLY="$(command -v flyctl || command -v fly)" \
-  || { echo "flyctl/fly not on PATH; see https://fly.io/docs/flyctl/install/" >&2; exit 2; }
+FLY="$(command -v flyctl || command -v fly || true)"
+if [ -z "$FLY" ]; then
+  echo "flyctl/fly not on PATH; see https://fly.io/docs/flyctl/install/" >&2
+  exit 2
+fi
 
 # App: -a flag wins; otherwise parse root fly.toml only.
 # Mirrors parseFlyApp() in deploy-ops.mjs — supports leading whitespace
@@ -82,11 +83,7 @@ if [ -z "$APP" ]; then
     echo "no fly.toml in $(pwd); pass -a <app> or cd into the app directory" >&2
     exit 2
   fi
-  # Try double-quoted form first, then single-quoted as fallback.
-  APP="$(awk -F'"' '/^[[:space:]]*app[[:space:]]*=[[:space:]]*"/{print $2; exit}' fly.toml)"
-  if [ -z "$APP" ]; then
-    APP="$(awk -F"'" '/^[[:space:]]*app[[:space:]]*=[[:space:]]*'"'"'/{print $2; exit}' fly.toml)"
-  fi
+  APP="$(sed -nE "s/^[[:space:]]*app[[:space:]]*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/p" fly.toml | head -n 1)"
 fi
 [ -z "$APP" ] && { echo "could not resolve app name from fly.toml; pass -a <app>" >&2; exit 2; }
 

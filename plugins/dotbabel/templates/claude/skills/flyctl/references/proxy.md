@@ -37,8 +37,8 @@ flyctl proxy 8080 -a $APP &
 PROXY_PID=$!
 sleep 2
 curl -sf http://localhost:8080/healthz
-kill $PROXY_PID 2>/dev/null
-wait $PROXY_PID 2>/dev/null || true
+kill "$PROXY_PID" 2>/dev/null
+wait "$PROXY_PID" 2>/dev/null || true
 ```
 
 Always clean up the proxy PID — leaving it running blocks the port for the next

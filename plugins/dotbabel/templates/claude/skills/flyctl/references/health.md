@@ -23,7 +23,7 @@ hardcodes paths; it discovers them from `fly.toml` or asks the operator.
    Extract paths:
 
    ```bash
-   paths=$(grep -E '^[[:space:]]*path[[:space:]]*=' fly.toml | sed -E 's/.*path[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')
+   paths=$(sed -nE "s/^[[:space:]]*path[[:space:]]*=[[:space:]]*['\"]([^'\"]+)['\"].*/\1/p" fly.toml)
    ```
 
 2. **Override via `--path`** if the operator passes a specific endpoint:
@@ -52,13 +52,14 @@ flyctl proxy "$LOCAL_PORT:$INTERNAL_PORT" -a "$APP" &
 PROXY_PID=$!
 sleep 2
 
-for p in $paths; do
-  echo "=== $p ==="
-  curl -sf -w 'HTTP %{http_code} in %{time_total}s\n' "http://localhost:$LOCAL_PORT$p" || echo "FAILED: $p"
+for health_path in $paths; do
+  echo "=== $health_path ==="
+  curl -sf -w 'HTTP %{http_code} in %{time_total}s\n' "http://localhost:$LOCAL_PORT$health_path" \
+    || echo "FAILED: $health_path"
 done
 
-kill $PROXY_PID 2>/dev/null
-wait $PROXY_PID 2>/dev/null || true
+kill "$PROXY_PID" 2>/dev/null
+wait "$PROXY_PID" 2>/dev/null || true
 ```
 
 ## Authenticated endpoints

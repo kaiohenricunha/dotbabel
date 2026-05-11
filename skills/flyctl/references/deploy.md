@@ -9,7 +9,7 @@ expected format. Reject anything that doesn't match:
 
 ```bash
 IMAGE_RE='^[a-z0-9._/-]+(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$'
-if ! echo "$IMAGE" | grep -Eq "$IMAGE_RE"; then
+if ! printf '%s\n' "$IMAGE" | grep -Eq "$IMAGE_RE"; then
   echo "invalid image ref: $IMAGE" >&2
   echo "expected: <registry>/<repo>[:tag][@sha256:<digest>]" >&2
   exit 2
@@ -57,7 +57,9 @@ Repeatable. Form: `--build-arg KEY=VALUE`. Build secrets are not persisted in
 the image (Docker buildkit secret-mount semantics):
 
 ```bash
-flyctl deploy -a $APP --build-arg NODE_ENV=production --build-secret npmrc="$(cat .npmrc)"
+flyctl deploy -a $APP \
+  --build-arg NODE_ENV=production \
+  --build-secret npmrc="$(cat .npmrc)"
 ```
 
 Never paste secret values into chat. If a build secret is needed, prompt the
@@ -78,10 +80,10 @@ Recovery: roll back via `/rollback-prod` (this skill does NOT do rollback).
 
 ## Confirmation rail
 
-For prod-flavored apps, always run `confirm_if_prod "$APP" deploy "$no_confirm_flag"`
-before invoking `flyctl deploy`. The operator must type the exact app name to
-proceed. `--no-confirm` is only honored when passed explicitly on the command
-line.
+For prod-flavored apps, run
+`confirm_if_prod "$APP" deploy "$no_confirm_flag"` before invoking
+`flyctl deploy`; the shared confirmation contract handles app-name confirmation
+and CLI-only `--no-confirm`.
 
 ## Post-deploy verification
 

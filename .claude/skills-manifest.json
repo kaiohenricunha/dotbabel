@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-11T00:07:32.987Z",
+  "generatedAt": "2026-05-11T10:58:24.002Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -103,7 +103,7 @@
     {
       "name": "flyctl",
       "path": ".claude/skills/flyctl/SKILL.md",
-      "checksum": "sha256:40de8f58d66bfb8b3ff5f8ca843f3f349c7ae4c67eeefbc52e13b0d704c30979",
+      "checksum": "sha256:360f2cd7b13c0ac53988ee7de4eb99704860a331c3f9c0b73b4837e05a0fa453",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
