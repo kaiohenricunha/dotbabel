@@ -57,7 +57,7 @@ artifact and as a templated copy under `plugins/dotbabel/templates/claude/skills
 for npm-package consumers. The two trees must stay byte-identical except for
 frontmatter fields stripped at build time; never hand-edit the templates copy.
 
-The end-to-end flow uses `/flyctl` (added in PR #231) as the worked example.
+The end-to-end flow uses `/flyctl` (see `skills/flyctl/`) as the worked example.
 
 1. **Author the skill** under `skills/<id>/`:
 
@@ -117,12 +117,14 @@ The end-to-end flow uses `/flyctl` (added in PR #231) as the worked example.
      skills/<id>/SKILL.md \
      --ignore-unknown
    node scripts/build-plugin.mjs                    # re-sync after prettier
-   node plugins/dotbabel/bin/dotbabel-project-sync.mjs   # creates .codex/, .gemini/, .github/instructions/ symlinks
+   node plugins/dotbabel/bin/dotbabel-project-sync.mjs   # fans out to .codex/, .gemini/, .github/ (mix of symlinks and generated files)
    ```
 
    If prettier reformats `SKILL.md`, the templates copy will drift — re-run
-   `build-plugin.mjs` so they match. `project-sync` is required for the doctor
-   gate to pass.
+   `build-plugin.mjs` so they match. `project-sync` is required because
+   `dotbabel-doctor` transitively verifies the `.codex/`, `.gemini/`, and
+   `.github/instructions/` wiring via `checkProjectSync` and fails if it is
+   missing or stale.
 
 5. **Run the local validator gate** (mirrors CI: `dogfood.yml` + `test.yml`):
 
@@ -153,8 +155,9 @@ Common pitfalls:
 - **Hand-editing the templates copy.** `build-plugin.mjs` wipes the tree on
   every run; edits will be silently reverted. Always edit `skills/<id>/`.
 - **Forgetting the manifest entry.** `validate-skills` will warn about an
-  orphan `skills/<id>/SKILL.md` not declared in the manifest; `--update`
-  won't fix it.
+  orphan `skills/<id>/SKILL.md` not declared in the manifest (a skill file
+  that exists on disk but has no manifest entry — invisible to the build
+  process); `--update` won't fix it.
 - **Stripping owner/created/updated in `skills/<id>/SKILL.md`.** The schema
   requires them; `build-plugin.mjs` strips them only for the templates copy.
 - **Running `build-plugin.mjs` before `dotbabel-index.mjs`.** The plugin
