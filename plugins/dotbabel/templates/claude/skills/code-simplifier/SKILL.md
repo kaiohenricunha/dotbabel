@@ -7,9 +7,6 @@ domain: [devex]
 platform: [none]
 task: [review]
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-05-11
-updated: 2026-05-11
 description: >
   Simplify and refine changed code for clarity, consistency, and maintainability
   while preserving all functionality. PR-scoped by default.

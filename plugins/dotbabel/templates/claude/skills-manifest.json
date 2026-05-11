@@ -31,15 +31,15 @@
       "lastValidated": null
     },
     {
-      "name": "code-simplifier",
-      "path": ".claude/skills/code-simplifier/SKILL.md",
+      "name": "changelog",
+      "path": ".claude/commands/changelog.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
     },
     {
-      "name": "changelog",
-      "path": ".claude/commands/changelog.md",
+      "name": "code-simplifier",
+      "path": ".claude/skills/code-simplifier/SKILL.md",
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
