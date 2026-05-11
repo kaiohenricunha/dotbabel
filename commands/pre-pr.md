@@ -61,13 +61,13 @@ If zero files changed vs base, stop: "No changes detected vs $BASE — nothing t
 
 ### 2. Simplify changed code
 
-`/simplify` is a native Claude Code command — always available.
+`/code-simplifier` is a dotbabel skill — available in all agents after bootstrap.
 
 ```
-/simplify
+/code-simplifier
 ```
 
-It focuses on recently modified code by default, which aligns with the changed-file scope from step 1.
+It is PR-scoped by default, operating only on files changed in the current branch vs base.
 
 After it completes, check for unstaged changes:
 
