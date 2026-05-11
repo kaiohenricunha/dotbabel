@@ -38,6 +38,13 @@
       "lastValidated": null
     },
     {
+      "name": "code-simplifier",
+      "path": ".claude/skills/code-simplifier/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "create-assessment",
       "path": ".claude/skills/create-assessment/SKILL.md",
       "checksum": "",
