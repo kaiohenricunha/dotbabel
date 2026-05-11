@@ -59,8 +59,13 @@ the image (Docker buildkit secret-mount semantics):
 ```bash
 flyctl deploy -a $APP \
   --build-arg NODE_ENV=production \
-  --build-secret npmrc="$(cat .npmrc)"
+  --build-secret npmrc=@.npmrc
 ```
+
+Use `name=@path` (file reference) rather than `name="$(cat ...)"` — the
+`$(cat ...)` substitution inlines the secret into argv, exposing it in `ps`
+output and the skill's audit print. Docker buildkit's secret-mount keeps the
+file contents out of the process argument list when the `@path` form is used.
 
 Never paste secret values into chat. If a build secret is needed, prompt the
 operator for the source.

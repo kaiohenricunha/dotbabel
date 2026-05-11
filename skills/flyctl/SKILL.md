@@ -94,30 +94,42 @@ fi
 
 ## Subcommands
 
-| Sub                                      | Args                                     | Invocation                                                                                                                          | Confirm?                        | Reference                               |
-| ---------------------------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------------------------------------- |
-| `status`                                 | `[-a $APP]`                              | `flyctl status -a $APP`                                                                                                             | no                              | –                                       |
-| `logs`                                   | `[-a $APP] [-i ID] [--region R]`         | `flyctl logs -a $APP $EXTRA`                                                                                                        | no                              | [`logs.md`](references/logs.md)         |
-| `releases`                               | `[-a $APP] [--image]`                    | `flyctl releases -a $APP --json`                                                                                                    | no                              | [`releases.md`](references/releases.md) |
-| `deploy`                                 | `[-a $APP] [--image REF] [--strategy S]` | `flyctl deploy -a $APP --image $REF`                                                                                                | **YES if prod**                 | [`deploy.md`](references/deploy.md)     |
-| `secrets list`                           | `[-a $APP]`                              | `flyctl secrets list -a $APP`                                                                                                       | no                              | [`secrets.md`](references/secrets.md)   |
-| `secrets set`                            | `[-a $APP] [--stage] K=V...`             | `flyctl secrets set -a $APP $KV`                                                                                                    | **YES if prod**                 | [`secrets.md`](references/secrets.md)   |
-| `secrets unset`                          | `[-a $APP] K...`                         | `flyctl secrets unset -a $APP $K`                                                                                                   | **YES if prod**                 | [`secrets.md`](references/secrets.md)   |
-| `machines list`                          | `[-a $APP]`                              | `flyctl machines list -a $APP --json`                                                                                               | no                              | [`machines.md`](references/machines.md) |
-| `machines restart\|stop\|start\|destroy` | `<id> [-a $APP]`                         | `flyctl machines <op> $ID -a $APP`                                                                                                  | **YES if stop/destroy on prod** | [`machines.md`](references/machines.md) |
-| `scale show`                             | `[-a $APP]`                              | `flyctl scale show -a $APP`                                                                                                         | no                              | [`scale.md`](references/scale.md)       |
-| `scale count <n>`                        | `[-a $APP]`                              | `flyctl scale count $N -a $APP`                                                                                                     | **YES if prod or n=0**          | [`scale.md`](references/scale.md)       |
-| `scale vm <preset>`                      | `[-a $APP] [--memory MB]`                | `flyctl scale vm $P -a $APP`                                                                                                        | **YES if prod**                 | [`scale.md`](references/scale.md)       |
-| `ssh`                                    | `[console\|sftp] [-a $APP] [-s ID]`      | `flyctl ssh $SUB -a $APP`                                                                                                           | no                              | [`ssh.md`](references/ssh.md)           |
-| `proxy`                                  | `<local:remote> [-a $APP]`               | `flyctl proxy $P -a $APP`                                                                                                           | no                              | [`proxy.md`](references/proxy.md)       |
-| `health`                                 | `[-a $APP] [--path P]`                   | discover endpoints from `fly.toml`, proxy + curl                                                                                    | no                              | [`health.md`](references/health.md)     |
-| _any other_                              | –                                        | run `flyctl <cmd> --help`, classify the verb, **stop and prompt for explicit operator approval before executing any mutating verb** | per-op                          | –                                       |
+| Sub                     | Args                                     | Invocation                                                                                                                          | Confirm?               | Reference                               |
+| ----------------------- | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | --------------------------------------- |
+| `status`                | `[-a $APP]`                              | `flyctl status -a $APP`                                                                                                             | no                     | –                                       |
+| `logs`                  | `[-a $APP] [-i ID] [--region R]`         | `flyctl logs -a $APP $EXTRA`                                                                                                        | no                     | [`logs.md`](references/logs.md)         |
+| `releases`              | `[-a $APP] [--image]`                    | `flyctl releases -a $APP --json`                                                                                                    | no                     | [`releases.md`](references/releases.md) |
+| `deploy`                | `[-a $APP] [--image REF] [--strategy S]` | `flyctl deploy -a $APP --image $REF`                                                                                                | **YES if prod**        | [`deploy.md`](references/deploy.md)     |
+| `secrets list`          | `[-a $APP]`                              | `flyctl secrets list -a $APP`                                                                                                       | no                     | [`secrets.md`](references/secrets.md)   |
+| `secrets set`           | `[-a $APP] [--stage] K=V...`             | `flyctl secrets set -a $APP $KV`                                                                                                    | **YES if prod**        | [`secrets.md`](references/secrets.md)   |
+| `secrets unset`         | `[-a $APP] K...`                         | `flyctl secrets unset -a $APP $K`                                                                                                   | **YES if prod**        | [`secrets.md`](references/secrets.md)   |
+| `machines list`         | `[-a $APP]`                              | `flyctl machines list -a $APP --json`                                                                                               | no                     | [`machines.md`](references/machines.md) |
+| `machines restart <id>` | `[-a $APP]`                              | `flyctl machines restart $ID -a $APP`                                                                                               | no                     | [`machines.md`](references/machines.md) |
+| `machines stop <id>`    | `[-a $APP]`                              | `flyctl machines stop $ID -a $APP`                                                                                                  | **YES if prod**        | [`machines.md`](references/machines.md) |
+| `machines start <id>`   | `[-a $APP]`                              | `flyctl machines start $ID -a $APP`                                                                                                 | no                     | [`machines.md`](references/machines.md) |
+| `machines destroy <id>` | `[-a $APP]`                              | `flyctl machines destroy $ID --force -a $APP`                                                                                       | **YES if prod**        | [`machines.md`](references/machines.md) |
+| `scale show`            | `[-a $APP]`                              | `flyctl scale show -a $APP`                                                                                                         | no                     | [`scale.md`](references/scale.md)       |
+| `scale count <n>`       | `[-a $APP]`                              | `flyctl scale count $N -a $APP`                                                                                                     | **YES if prod or n=0** | [`scale.md`](references/scale.md)       |
+| `scale vm <preset>`     | `[-a $APP] [--memory MB]`                | `flyctl scale vm $P -a $APP`                                                                                                        | **YES if prod**        | [`scale.md`](references/scale.md)       |
+| `scale memory <mb>`     | `[-a $APP]`                              | `flyctl scale memory $MB -a $APP`                                                                                                   | **YES if prod**        | [`scale.md`](references/scale.md)       |
+| `ssh console`           | `[-a $APP] [-s ID]`                      | `flyctl ssh console -a $APP`                                                                                                        | no (interactive)       | [`ssh.md`](references/ssh.md)           |
+| `ssh console -C <cmd>`  | `[-a $APP] [-s ID]`                      | `flyctl ssh console -C "$CMD" -a $APP`                                                                                              | **YES if prod**        | [`ssh.md`](references/ssh.md)           |
+| `ssh sftp`              | `[-a $APP]`                              | `flyctl ssh sftp shell -a $APP`                                                                                                     | no                     | [`ssh.md`](references/ssh.md)           |
+| `proxy`                 | `<local:remote> [-a $APP]`               | `flyctl proxy $P -a $APP`                                                                                                           | no                     | [`proxy.md`](references/proxy.md)       |
+| `health`                | `[-a $APP] [--path P]`                   | discover endpoints from `fly.toml`, proxy + curl                                                                                    | no                     | [`health.md`](references/health.md)     |
+| _any other_             | –                                        | run `flyctl <cmd> --help`, classify the verb, **stop and prompt for explicit operator approval before executing any mutating verb** | per-op                 | –                                       |
 
 ## Confirmation Contract
 
 Destructive ops on prod-flavored apps require the operator to type the exact app
 name. The heuristic for "prod-flavored" is: app name does NOT match
 `*-staging*`, `*-preview*`, `*-pr-*`, `*-dev*`, or `*-test*`.
+
+> **Heuristic is best-effort.** App names that _contain_ these substrings but
+> are nonetheless prod (e.g. `my-developer-portal`, `payments-test-of-record`)
+> will silently skip the confirmation gate. Until v1.1 ships `confirm_always`
+> config, use `--no-confirm` deliberately for known non-prod apps with unusual
+> names, and add a comment in your runbook for prod apps that would false-match.
 
 ```bash
 # no_confirm_flag MUST be derived ONLY from an explicitly parsed --no-confirm
@@ -130,7 +142,7 @@ confirm_if_prod() {
     *-staging*|*-preview*|*-pr-*|*-dev*|*-test*) return 0 ;;
   esac
   printf 'About to run %s on PROD app %s.\nType the app name to confirm: ' "$op" "$app" >&2
-  read -r reply
+  read -r reply < /dev/tty || { echo "no interactive TTY; pass --no-confirm explicitly or run interactively" >&2; exit 2; }
   [ "$reply" = "$app" ] || { echo "confirmation failed" >&2; exit 1; }
 }
 
@@ -157,8 +169,8 @@ parsed CLI flag only — env vars cannot grant it.
 - Resolve CLI as `flyctl` first, `fly` second; never re-install.
 - Use existing CLI auth (`flyctl auth whoami`); never prompt for tokens.
 - Destructive ops on prod-flavored apps require typed confirmation matching the app name.
-- `--no-confirm` is honored only when passed explicitly; never via env or autonomous routing.
-- Print the exact `flyctl ...` command before executing (audit trail).
+- `--no-confirm` is honored only when passed explicitly as a deliberate operator flag; never via env, templates, or instructions that may reach automated invocations.
+- Print the exact `flyctl ...` command before executing (audit trail — terminal scrollback only, not durable).
 - Preserve flyctl native exit codes; remap only discovery/auth failures to `2`.
 - Multi-app monorepos: refuse to guess — operator must `cd` into the app dir or pass `-a <app>`.
 - Never echo secret values to chat — only names.
@@ -178,13 +190,24 @@ parsed CLI flag only — env vars cannot grant it.
 
 ## Optional Config
 
-This file is **not consumed by v1.0.0** — it documents the v1.1 config surface
+**This file is NOT consumed by v1.0.0.** It documents the v1.1 config surface
 so contributors can preview it. Operators whose prod apps don't match
 `*-staging*` / `*-preview*` / `*-pr-*` / `*-dev*` / `*-test*` will get
 typed-confirmation prompts on every mutating op until v1.1 wires `confirm_never`
 to override the heuristic; pass `--no-confirm` per-invocation until then.
 
 See [`examples/fly-targets.example.json`](examples/fly-targets.example.json).
+
+Planned v1.1 config schema (not yet wired — for preview only):
+
+| Key                     | Type       | Semantics                                                                                        |
+| ----------------------- | ---------- | ------------------------------------------------------------------------------------------------ |
+| `confirm_always`        | `string[]` | App names that always require typed confirmation, regardless of the prod-name heuristic.         |
+| `confirm_never`         | `string[]` | App names that never require typed confirmation (overrides heuristic for known non-prod apps).   |
+| `deploy.strategy`       | `string`   | Default `--strategy` value for `flyctl deploy` (e.g. `bluegreen`). Overridable per-invocation.   |
+| `deploy.require_digest` | `boolean`  | If `true`, reject `--image` refs without a `@sha256:` digest suffix (enforce immutable deploys). |
+
+When v1.1 wires this file, it will be read via `jq` from `.claude/flyctl.json` at skill startup.
 
 ## See also
 

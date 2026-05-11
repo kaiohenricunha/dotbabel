@@ -11,6 +11,24 @@ Manage Fly.io app secrets.
 | `set --stage`   | `flyctl secrets set --stage K=V -a $APP` | no (applied on next deploy) | yes              |
 | `unset`         | `flyctl secrets unset K -a $APP`         | **yes**                     | yes              |
 
+## Avoid secret values in argv
+
+`flyctl secrets set K=V` places values in the process argument list, where they
+appear in `ps`, `/proc/<pid>/cmdline`, and the skill's audit print. For sensitive
+values, pipe via stdin using `flyctl secrets import`:
+
+```bash
+# Preferred — values never appear in argv
+printf 'DB_PASSWORD=%s\nAPI_TOKEN=%s\n' "$DB_PASS" "$API_TOK" \
+  | flyctl secrets import -a $APP
+
+# Acceptable for low-sensitivity values
+flyctl secrets set PUBLIC_KEY=abc123 -a $APP
+```
+
+`flyctl secrets import` reads `KEY=VALUE` lines from stdin, batches them into
+one restart, and never exposes values on the command line.
+
 ## Batch updates → one restart
 
 `flyctl secrets set` accepts multiple `KEY=VALUE` pairs in a single invocation

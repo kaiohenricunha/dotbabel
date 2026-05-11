@@ -103,7 +103,7 @@
     {
       "name": "flyctl",
       "path": ".claude/skills/flyctl/SKILL.md",
-      "checksum": "sha256:360f2cd7b13c0ac53988ee7de4eb99704860a331c3f9c0b73b4837e05a0fa453",
+      "checksum": "sha256:6a22f1494f62720df786919d8c563d20ecdf0f48c25b04f748c67535bef32318",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
