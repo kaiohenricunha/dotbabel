@@ -49,6 +49,113 @@ npx dotbabel-doctor         # self-diagnostic
    `## No-spec rationale` section in its body. If you're adding a new
    subsystem, run `/spec` first to produce the design doc in `docs/specs/`.
 
+## Adding a new skill
+
+A skill in dotbabel is a `skills/<id>/SKILL.md` file (plus optional `references/`,
+`examples/`, and `scripts/` subdirectories) that ships as both an in-repo
+artifact and as a templated copy under `plugins/dotbabel/templates/claude/skills/<id>/`
+for npm-package consumers. The two trees must stay byte-identical except for
+frontmatter fields stripped at build time; never hand-edit the templates copy.
+
+The end-to-end flow uses `/flyctl` (added in PR #231) as the worked example.
+
+1. **Author the skill** under `skills/<id>/`:
+
+   ```
+   skills/flyctl/
+   ├── SKILL.md
+   ├── examples/fly-targets.example.json
+   └── references/{deploy,logs,secrets,machines,scale,ssh,proxy,releases,health}.md
+   ```
+
+   `SKILL.md` frontmatter must satisfy `schemas/common.schema.json` (required
+   fields: `id`, `name`, `type`, `description`, `version`, `domain`, `platform`,
+   `task`, `maturity`, `owner`, `created`, `updated`) plus
+   `schemas/skill.schema.json` (`type: skill`, optional `tools`, `model`,
+   `effort`, `inputs`, `outputs`, `prerequisites`). Side-effectful skills MUST
+   set `disable-model-invocation: true` (CLAUDE.md §Skills, Commands, and
+   Discovery). New skills typically ship `maturity: draft`; promotion to
+   `validated` is a separate bump.
+
+2. **Register the skill in `.claude/skills-manifest.json`.** This is a manual
+   step — `dotbabel-validate-skills --update` only refreshes checksums for
+   entries that already exist (`plugins/dotbabel/src/validate-skills-inventory.mjs:213`),
+   it does not insert new ones. Add a block in alphabetical position with a
+   placeholder checksum:
+
+   ```json
+   {
+     "name": "flyctl",
+     "path": ".claude/skills/flyctl/SKILL.md",
+     "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+     "dependencies": [],
+     "lastValidated": "YYYY-MM-DD"
+   }
+   ```
+
+   Then `node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --update` fills
+   in the real checksum.
+
+3. **Rebuild the index, then sync templates** — order matters:
+
+   ```bash
+   node plugins/dotbabel/bin/dotbabel-index.mjs    # writes index/artifacts.json
+   node scripts/build-plugin.mjs                    # wipes & regenerates plugins/dotbabel/templates/claude/{skills,commands,agents}/ + skills-manifest.json
+   ```
+
+   `build-plugin.mjs` reads `index/artifacts.json` to drive the templates
+   regeneration, so the index must be rebuilt first. Frontmatter fields
+   `owner`, `created`, and `updated` are stripped from the templates copy
+   automatically; do not pre-strip them in `skills/`.
+
+4. **Format JSON outputs and fan out cross-CLI symlinks:**
+
+   ```bash
+   npx --yes prettier@3 --write \
+     index/artifacts.json index/by-type.json index/by-facet.json \
+     plugins/dotbabel/templates/claude/skills-manifest.json \
+     skills/<id>/SKILL.md \
+     --ignore-unknown
+   node scripts/build-plugin.mjs                    # re-sync after prettier
+   node plugins/dotbabel/bin/dotbabel-project-sync.mjs   # creates .codex/, .gemini/, .github/instructions/ symlinks
+   ```
+
+   If prettier reformats `SKILL.md`, the templates copy will drift — re-run
+   `build-plugin.mjs` so they match. `project-sync` is required for the doctor
+   gate to pass.
+
+5. **Run the local validator gate** (mirrors `.github/workflows/dogfood.yml`):
+
+   ```bash
+   node plugins/dotbabel/bin/dotbabel-validate-skills.mjs
+   node plugins/dotbabel/bin/dotbabel-validate-specs.mjs
+   node plugins/dotbabel/bin/dotbabel-check-instruction-drift.mjs
+   node plugins/dotbabel/bin/dotbabel-check-instructions-fresh.mjs
+   node plugins/dotbabel/bin/dotbabel-check-instruction-parity.mjs
+   node plugins/dotbabel/bin/dotbabel-check-spec-coverage.mjs
+   node plugins/dotbabel/bin/dotbabel-doctor.mjs
+   node plugins/dotbabel/bin/dotbabel-index.mjs --check
+   node scripts/build-plugin.mjs --check
+   npm run lint
+   npm test
+   npx bats plugins/dotbabel/tests/bats/
+   ```
+
+   Adding a new skill touches `plugins/dotbabel/templates/**`, a protected
+   path. The PR body must carry `## Spec ID` + `dotbabel-core` as an H2 block.
+
+Common pitfalls:
+
+- **Hand-editing the templates copy.** `build-plugin.mjs` wipes the tree on
+  every run; edits will be silently reverted. Always edit `skills/<id>/`.
+- **Forgetting the manifest entry.** `validate-skills` will warn about an
+  orphan `skills/<id>/SKILL.md` not declared in the manifest; `--update`
+  won't fix it.
+- **Stripping owner/created/updated in `skills/<id>/SKILL.md`.** The schema
+  requires them; `build-plugin.mjs` strips them only for the templates copy.
+- **Running `build-plugin.mjs` before `dotbabel-index.mjs`.** The plugin
+  build reads the index — a stale index produces a stale manifest.
+
 ## Releasing a new version
 
 1. Bump `version` in `package.json` (semver — patch/minor/major as appropriate).
