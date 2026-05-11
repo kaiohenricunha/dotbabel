@@ -38,3 +38,8 @@ target reports `unknown SHA` and exits `2` instead of guessing.
 - CLI not installed or not authenticated: target error, status exit `2`.
 - No successful releases: target error, status exit `2`.
 - Release metadata has no git SHA: target error, status exit `2`.
+
+## See also
+
+- `/flyctl` — fly-specific deploy, logs, secrets, scale, and machine ops outside the read-only status flow.
+- `/rollback-prod` — confirmation-gated rollback to the previous release.

@@ -1,0 +1,14 @@
+{
+  "default_app": "my-api",
+  "environments": {
+    "prod": "my-api",
+    "staging": "my-api-staging",
+    "preview": "my-api-pr-{N}"
+  },
+  "deploy": {
+    "strategy": "bluegreen",
+    "require_digest": true
+  },
+  "confirm_always": ["my-api", "my-api-db"],
+  "confirm_never": ["my-api-dev"]
+}
