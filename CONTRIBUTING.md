@@ -124,7 +124,7 @@ The end-to-end flow uses `/flyctl` (added in PR #231) as the worked example.
    `build-plugin.mjs` so they match. `project-sync` is required for the doctor
    gate to pass.
 
-5. **Run the local validator gate** (mirrors `.github/workflows/dogfood.yml`):
+5. **Run the local validator gate** (mirrors CI: `dogfood.yml` + `test.yml`):
 
    ```bash
    node plugins/dotbabel/bin/dotbabel-validate-skills.mjs
@@ -136,13 +136,17 @@ The end-to-end flow uses `/flyctl` (added in PR #231) as the worked example.
    node plugins/dotbabel/bin/dotbabel-doctor.mjs
    node plugins/dotbabel/bin/dotbabel-index.mjs --check
    node scripts/build-plugin.mjs --check
+   node scripts/stamp-doc-versions.mjs --check
    npm run lint
    npm test
    npx bats plugins/dotbabel/tests/bats/
    ```
 
    Adding a new skill touches `plugins/dotbabel/templates/**`, a protected
-   path. The PR body must carry `## Spec ID` + `dotbabel-core` as an H2 block.
+   path. The PR body must carry `## Spec ID: dotbabel-core` as an H2 block.
+   New skills always introduce a new subsystem; the `## No-spec rationale`
+   alternative applies only to minor protected-path changes (typos, config
+   tweaks) that don't add new subsystems.
 
 Common pitfalls:
 
