@@ -64,10 +64,10 @@ If zero files changed vs base, stop: "No changes detected vs $BASE — nothing t
 `/code-simplifier` is a dotbabel skill — available in all agents after bootstrap.
 
 ```
-/code-simplifier
+/code-simplifier $BASE
 ```
 
-It is PR-scoped by default, operating only on files changed in the current branch vs base.
+Pass `$BASE` explicitly so the skill uses the same base branch already resolved in step 1, rather than re-detecting it from scratch.
 
 After it completes, check for unstaged changes:
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-11T12:47:59.752Z",
+  "generatedAt": "2026-05-11T14:20:21.046Z",
   "skills": [
     {
       "name": "audit-and-fix",
@@ -12,7 +12,7 @@
     {
       "name": "code-simplifier",
       "path": ".claude/skills/code-simplifier/SKILL.md",
-      "checksum": "sha256:17ce8317145d57f01e8051efb032739ec746969bb587e46e33f171129ab6960b",
+      "checksum": "sha256:e24c64485f950d93815f492de5673aaa3ff65abb0df91fb41e41a40b68017cff",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
@@ -238,7 +238,7 @@
     {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
-      "checksum": "sha256:468656572778446e21de9f6004624bbc5b95ac9a387722d80499ba4c273fad77",
+      "checksum": "sha256:f920c63e4d70bd7490cc52ba07b9e4e01577631ef06025031d7d8404a39543e2",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
