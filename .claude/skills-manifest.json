@@ -1,11 +1,18 @@
 {
   "version": 1,
-  "generatedAt": "2026-05-11T10:58:24.002Z",
+  "generatedAt": "2026-05-11T12:47:59.752Z",
   "skills": [
     {
       "name": "audit-and-fix",
       "path": ".claude/skills/audit-and-fix/SKILL.md",
       "checksum": "sha256:ac8ee5735fa846a54da111bebcf2c9ef550d48d3cfcc7da75c070c527a29991a",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
+      "name": "code-simplifier",
+      "path": ".claude/skills/code-simplifier/SKILL.md",
+      "checksum": "sha256:17ce8317145d57f01e8051efb032739ec746969bb587e46e33f171129ab6960b",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
@@ -59,48 +66,6 @@
       "lastValidated": "2026-05-11"
     },
     {
-      "name": "create-inspection",
-      "path": ".claude/skills/create-inspection/SKILL.md",
-      "checksum": "sha256:421141b2c143acb094809f6e700d8562e6dcbade940df0edd8365de7671ecfb1",
-      "dependencies": [],
-      "lastValidated": "2026-05-11"
-    },
-    {
-      "name": "agents-search",
-      "path": ".claude/skills/agents-search/SKILL.md",
-      "checksum": "sha256:ed2f98dc0344f7c57f19b92c0f08a1bf02e517435175bc690b51fee2a78136b3",
-      "dependencies": [],
-      "lastValidated": "2026-05-11"
-    },
-    {
-      "name": "aws-specialist",
-      "path": ".claude/skills/aws-specialist/SKILL.md",
-      "checksum": "sha256:1901763a9ff020bd0df62a725c8767a91a4226a6ad3d3332e56b166c505f1b37",
-      "dependencies": [],
-      "lastValidated": "2026-05-11"
-    },
-    {
-      "name": "azure-specialist",
-      "path": ".claude/skills/azure-specialist/SKILL.md",
-      "checksum": "sha256:baf37a19380e4a5c69f736071a8810ac7dea05e4ed3ae4de31fcc5779f6f8eed",
-      "dependencies": [],
-      "lastValidated": "2026-05-11"
-    },
-    {
-      "name": "crossplane-specialist",
-      "path": ".claude/skills/crossplane-specialist/SKILL.md",
-      "checksum": "sha256:40d661b56e1633b4ffee611e8825bd610d0d1ad916ba33aafea7265ec571840d",
-      "dependencies": [],
-      "lastValidated": "2026-05-11"
-    },
-    {
-      "name": "create-experiment",
-      "path": ".claude/skills/create-experiment/SKILL.md",
-      "checksum": "sha256:0f304358b5ad1605e83c2cb60b37f166491088a74f7a274dbf61137c14e9b86f",
-      "dependencies": [],
-      "lastValidated": "2026-05-11"
-    },
-    {
       "name": "flyctl",
       "path": ".claude/skills/flyctl/SKILL.md",
       "checksum": "sha256:6a22f1494f62720df786919d8c563d20ecdf0f48c25b04f748c67535bef32318",
@@ -136,6 +101,13 @@
       "lastValidated": "2026-05-11"
     },
     {
+      "name": "create-inspection",
+      "path": ".claude/skills/create-inspection/SKILL.md",
+      "checksum": "sha256:421141b2c143acb094809f6e700d8562e6dcbade940df0edd8365de7671ecfb1",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
       "checksum": "sha256:ec5f4190ecd9284fb68f5281f83adfe031a895ed7aaa47767f43cab25f734960",
@@ -146,6 +118,13 @@
       "name": "security-review",
       "path": ".claude/skills/security-review/SKILL.md",
       "checksum": "sha256:ea03f5bc029de3182ef8ec286a9f3c12b635ad4d36631c024ec2f5c990f5a176",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
+      "name": "agents-search",
+      "path": ".claude/skills/agents-search/SKILL.md",
+      "checksum": "sha256:ed2f98dc0344f7c57f19b92c0f08a1bf02e517435175bc690b51fee2a78136b3",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
@@ -171,6 +150,20 @@
       "lastValidated": "2026-05-11"
     },
     {
+      "name": "aws-specialist",
+      "path": ".claude/skills/aws-specialist/SKILL.md",
+      "checksum": "sha256:1901763a9ff020bd0df62a725c8767a91a4226a6ad3d3332e56b166c505f1b37",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
+      "name": "azure-specialist",
+      "path": ".claude/skills/azure-specialist/SKILL.md",
+      "checksum": "sha256:baf37a19380e4a5c69f736071a8810ac7dea05e4ed3ae4de31fcc5779f6f8eed",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
       "name": "gcp-specialist",
       "path": ".claude/skills/gcp-specialist/SKILL.md",
       "checksum": "sha256:5718c343f9d88904a7d9f04f2aa41c99d7b318c736d477c9a23e924db7a8b1b1",
@@ -188,6 +181,13 @@
       "name": "terragrunt-specialist",
       "path": ".claude/skills/terragrunt-specialist/SKILL.md",
       "checksum": "sha256:e9500d385652c1986de2c53309ecaa54f7ff18d8cf4fa5a391f4791e668725bc",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
+      "name": "crossplane-specialist",
+      "path": ".claude/skills/crossplane-specialist/SKILL.md",
+      "checksum": "sha256:40d661b56e1633b4ffee611e8825bd610d0d1ad916ba33aafea7265ec571840d",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
@@ -223,7 +223,9 @@
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
       "checksum": "sha256:32a58bb0feb413e7f44148347d62283332ba259273a6c8f6d4a514876cc484dd",
-      "dependencies": ["deploy-status"],
+      "dependencies": [
+        "deploy-status"
+      ],
       "lastValidated": "2026-05-11"
     },
     {
@@ -236,7 +238,14 @@
     {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
-      "checksum": "sha256:fc1b81ff49b9ec010542172ce5dab42350b974bff08ab86c805fac5bedc78a1a",
+      "checksum": "sha256:468656572778446e21de9f6004624bbc5b95ac9a387722d80499ba4c273fad77",
+      "dependencies": [],
+      "lastValidated": "2026-05-11"
+    },
+    {
+      "name": "create-experiment",
+      "path": ".claude/skills/create-experiment/SKILL.md",
+      "checksum": "sha256:0f304358b5ad1605e83c2cb60b37f166491088a74f7a274dbf61137c14e9b86f",
       "dependencies": [],
       "lastValidated": "2026-05-11"
     },
@@ -244,7 +253,9 @@
       "name": "post-pr-review",
       "path": ".claude/skills/post-pr-review/SKILL.md",
       "checksum": "sha256:0565fc80dba6872c5da9569cff5e53d112fc3ea3a16b4905fdf38255754ec628",
-      "dependencies": ["review-pr"],
+      "dependencies": [
+        "review-pr"
+      ],
       "lastValidated": "2026-05-11"
     },
     {
