@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-11T12:46:56.703Z",
+  "generatedAt": "2026-05-11T14:25:10.859Z",
   "version": "2.7.0",
   "artifacts": [
     {
@@ -159,7 +159,7 @@
       "type": "skill",
       "path": "skills/code-simplifier/SKILL.md",
       "name": "code-simplifier",
-      "description": "Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default. Triggers on: \"simplify code\", \"code simplifier\", \"clean up the code\", \"simplify the PR\".\n",
+      "description": "Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default. Accepts an optional PR number, file glob, or base branch to narrow scope. Triggers on: \"simplify code\", \"code simplifier\", \"clean up the code\", \"simplify the PR\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -425,6 +425,21 @@
       "owner": "@kaiohenricunha"
     },
     {
+      "id": "flyctl",
+      "type": "skill",
+      "path": "skills/flyctl/SKILL.md",
+      "name": "flyctl",
+      "description": "Explicit-invocation Fly.io operations wrapper. Run `/flyctl <subcommand>` to deploy (with --image), tail logs, manage secrets, inspect machines, scale, SSH, proxy, check health, list releases, and show status. Auto-discovers the app from fly.toml in the current directory. Side-effectful ops on prod-flavored apps require typed confirmation matching the app name. Rollback is delegated to /rollback-prod; cross-provider SHA reporting is delegated to /deploy-status. Unlisted subcommands require `flyctl <subcommand> --help` first.\n",
+      "facets": {
+        "domain": ["infra", "devex", "observability"],
+        "platform": ["flyio"],
+        "task": ["runtime-ops", "diagnostics", "incident-response"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
       "id": "frontend-developer",
       "type": "agent",
       "path": "agents/frontend-developer.md",
@@ -465,21 +480,6 @@
         "platform": ["gcp"],
         "task": ["debugging", "review"],
         "maturity": "validated"
-      },
-      "version": "1.0.0",
-      "owner": "@kaiohenricunha"
-    },
-    {
-      "id": "flyctl",
-      "type": "skill",
-      "path": "skills/flyctl/SKILL.md",
-      "name": "flyctl",
-      "description": "Explicit-invocation Fly.io operations wrapper. Run `/flyctl <subcommand>` to deploy (with --image), tail logs, manage secrets, inspect machines, scale, SSH, proxy, check health, list releases, and show status. Auto-discovers the app from fly.toml in the current directory. Side-effectful ops on prod-flavored apps require typed confirmation matching the app name. Rollback is delegated to /rollback-prod; cross-provider SHA reporting is delegated to /deploy-status. Unlisted subcommands require `flyctl <subcommand> --help` first.\n",
-      "facets": {
-        "domain": ["infra", "devex", "observability"],
-        "platform": ["flyio"],
-        "task": ["runtime-ops", "diagnostics", "incident-response"],
-        "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"
