@@ -101,6 +101,13 @@
       "lastValidated": null
     },
     {
+      "name": "flyctl",
+      "path": ".claude/skills/flyctl/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "gcp-specialist",
       "path": ".claude/skills/gcp-specialist/SKILL.md",
       "checksum": "",

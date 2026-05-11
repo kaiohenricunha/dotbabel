@@ -17,6 +17,7 @@
       "devops-engineer",
       "documentation-writer",
       "fix-with-evidence",
+      "flyctl",
       "git",
       "ground-first",
       "handoff",
@@ -47,6 +48,7 @@
       "deploy-status",
       "deployment-engineer",
       "docker-engineer",
+      "flyctl",
       "gcp-engineer",
       "gcp-specialist",
       "iac-engineer",
@@ -71,6 +73,7 @@
       "security-review"
     ],
     "data": ["data-scientist"],
+    "observability": ["flyctl"],
     "frontend": ["frontend-developer", "test-engineer"]
   },
   "platform": {
@@ -128,7 +131,7 @@
       "review-prs"
     ],
     "vercel": ["deploy-status", "rollback-prod"],
-    "flyio": ["deploy-status", "rollback-prod"],
+    "flyio": ["deploy-status", "flyctl", "rollback-prod"],
     "gcp": ["gcp-engineer", "gcp-specialist"],
     "terraform": [
       "iac-engineer",
@@ -240,6 +243,7 @@
       "compliance-auditor",
       "data-scientist",
       "deploy-status",
+      "flyctl",
       "kubernetes-specialist",
       "security-auditor"
     ],
@@ -247,6 +251,7 @@
       "deploy-status",
       "deployment-engineer",
       "docker-engineer",
+      "flyctl",
       "kubernetes-specialist"
     ],
     "testing": [
@@ -258,7 +263,7 @@
       "validate-spec",
       "veracity-audit"
     ],
-    "incident-response": ["rollback-prod"]
+    "incident-response": ["flyctl", "rollback-prod"]
   },
   "maturity": {
     "validated": [
@@ -304,6 +309,7 @@
       "devops-engineer",
       "docker-engineer",
       "documentation-writer",
+      "flyctl",
       "frontend-developer",
       "gcp-engineer",
       "handoff",

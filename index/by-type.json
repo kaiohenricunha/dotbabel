@@ -38,6 +38,7 @@
     "deploy-status",
     "detect-flaky",
     "fix-with-evidence",
+    "flyctl",
     "gcp-specialist",
     "git",
     "ground-first",

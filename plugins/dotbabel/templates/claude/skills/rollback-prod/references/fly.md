@@ -30,3 +30,8 @@ arguments.
   back databases or undo migrations.
 - If Fly rollback fails after another target succeeded, the helper reports the
   partial state and leaves follow-up action to the operator.
+
+## See also
+
+- `/flyctl` — ad-hoc fly ops (deploy, secrets, scale) when you don't need a full multi-target rollback.
+- `/deploy-status` — read-only SHA reporting across all deploy targets.
