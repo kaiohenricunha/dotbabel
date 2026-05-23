@@ -22,6 +22,7 @@
       "git",
       "ground-first",
       "handoff",
+      "local-attest",
       "markdown",
       "merge-pr",
       "plan-grader",
@@ -74,7 +75,7 @@
       "security-review"
     ],
     "data": ["data-scientist"],
-    "observability": ["flyctl"],
+    "observability": ["flyctl", "local-attest"],
     "frontend": ["frontend-developer", "test-engineer"]
   },
   "platform": {
@@ -127,6 +128,7 @@
     "github-actions": [
       "dependabot-sweep",
       "devops-engineer",
+      "local-attest",
       "merge-pr",
       "post-pr-review",
       "review-pr",
@@ -255,11 +257,13 @@
       "deployment-engineer",
       "docker-engineer",
       "flyctl",
-      "kubernetes-specialist"
+      "kubernetes-specialist",
+      "local-attest"
     ],
     "testing": [
       "detect-flaky",
       "fix-with-evidence",
+      "local-attest",
       "merge-pr",
       "pre-pr",
       "test-engineer",
@@ -319,6 +323,7 @@
       "handoff",
       "iac-engineer",
       "kubernetes-specialist",
+      "local-attest",
       "plan-grader",
       "platform-engineer",
       "post-pr-review",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-11T14:25:10.859Z",
+  "generatedAt": "2026-05-23T18:53:16.983Z",
   "version": "2.7.0",
   "artifacts": [
     {
@@ -571,6 +571,21 @@
         "platform": ["kubernetes"],
         "task": ["debugging", "review"],
         "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "local-attest",
+      "type": "skill",
+      "path": "skills/local-attest/SKILL.md",
+      "name": "local-attest",
+      "description": "Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned OWNER-authored PR comment that gates downstream GitHub Actions jobs off for that exact commit. Skips the redundant remote run after a maintainer has already verified locally, saving runner minutes without weakening the gate. A new push changes the head SHA, the attestation stops matching, CI runs again. Side-effectful (posts a PR comment, applies a label, optionally pushes) and slow (10–15 min depending on matrix). Invoke only on explicit request.\n",
+      "facets": {
+        "domain": ["devex", "observability"],
+        "platform": ["github-actions"],
+        "task": ["testing", "runtime-ops"],
+        "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"

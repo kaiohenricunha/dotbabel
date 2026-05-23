@@ -150,6 +150,13 @@
       "lastValidated": null
     },
     {
+      "name": "local-attest",
+      "path": ".claude/skills/local-attest/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "markdown",
       "path": ".claude/commands/markdown.md",
       "checksum": "",
