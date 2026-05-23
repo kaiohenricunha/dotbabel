@@ -1,0 +1,66 @@
+# Local-attest workflow gate template
+#
+# Paste this into your `.github/workflows/test.yml` (and any other workflow
+# you want to gate, e.g. `preview.yml`) per the operator-guide.md walkthrough.
+#
+# Substitute `{{TRUSTED_SELECT}}` for the jq filter matching your config's
+# `trustedAssociations`. The default config (OWNER only) produces:
+#
+#   select(.author_association == "OWNER")
+#
+# A multi-trust config like `trustedAssociations: ["OWNER", "MEMBER"]` produces:
+#
+#   select(.author_association == "OWNER" or .author_association == "MEMBER")
+#
+# `dotbabel local-attest --print-gate` (planned, post-1.0) will emit the
+# already-substituted snippet for the current config.
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    outputs:
+      attested: ${{ steps.attest.outputs.attested }}
+    steps:
+      - name: Check for local attestation
+        id: attest
+        # A local-attestation comment lets a maintainer skip the redundant
+        # remote CI run after running the full check matrix locally. The
+        # gate is a PR comment authored by a trusted user (default OWNER)
+        # carrying the marker:
+        #   <!-- local-attest verified-sha=<HEAD_SHA> -->
+        # Only the first line of each comment is matched, so a quote-reply
+        # that happens to contain the marker in a quoted block cannot forge
+        # a skip. The head SHA is embedded in the marker, so a new push (new
+        # SHA) automatically invalidates a stale attestation.
+        # Fail-closed: if the gh api call fails, grep exits non-zero →
+        # attested=false → CI runs.
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          MARKER="<!-- local-attest verified-sha=${HEAD_SHA} -->"
+          if gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+               --jq '.[] | {{TRUSTED_SELECT}} | .body | split("\n")[0]' \
+             | grep -qF "$MARKER"; then
+            echo "Local attestation found for ${HEAD_SHA} — remote CI jobs will skip."
+            echo "attested=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No local attestation for ${HEAD_SHA} — remote CI jobs will run."
+            echo "attested=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Every downstream job gates off `classify.outputs.attested`. Example:
+  test:
+    needs: classify
+    if: needs.classify.outputs.attested != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      # ... your real test steps ...
+      - run: echo "running tests"
+
+  # The Secret-scan job is intentionally NOT gated. Run it on every push.
+  # Add other always-run jobs (license check, SBOM publish, etc.) without
+  # the `needs: classify` line.

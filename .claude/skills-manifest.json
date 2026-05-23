@@ -234,6 +234,13 @@
       "lastValidated": "2026-05-11"
     },
     {
+      "name": "local-attest",
+      "path": ".claude/skills/local-attest/SKILL.md",
+      "checksum": "sha256:86a499fcaa8958539361d464b33eca1ef97d2ce960100be459c169a26476b2ef",
+      "dependencies": [],
+      "lastValidated": "2026-05-23"
+    },
+    {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
       "checksum": "sha256:f920c63e4d70bd7490cc52ba07b9e4e01577631ef06025031d7d8404a39543e2",

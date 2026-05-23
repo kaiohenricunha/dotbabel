@@ -42,6 +42,7 @@ const SUBCOMMANDS = [
   "list",
   "show",
   "handoff",
+  "local-attest",
 ];
 
 function printUsage() {
