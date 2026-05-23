@@ -4,9 +4,9 @@ Every consuming project supplies its own CI matrix. The skill discovers config
 in this order (first match wins):
 
 1. `--config <path>` (CLI flag)
-2. `./.local-attest.config.mjs`
-3. `./.local-attest.config.json`
-4. `./package.json` → `local-attest` key
+2. `.local-attest.config.mjs`
+3. `.local-attest.config.json`
+4. `package.json` → `local-attest` key
 
 ## Schema
 

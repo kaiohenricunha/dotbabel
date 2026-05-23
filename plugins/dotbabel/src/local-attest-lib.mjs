@@ -224,10 +224,7 @@ export function buildGateSnippet(opts = {}) {
   if (!Array.isArray(trusted) || trusted.length === 0) {
     throw new Error("buildGateSnippet: trustedAssociations must be a non-empty array");
   }
-  const select =
-    trusted.length === 1
-      ? `select(.author_association == "${trusted[0]}")`
-      : `select(${trusted.map((t) => `.author_association == "${t}"`).join(" or ")})`;
+  const select = `select(${trusted.map((t) => `.author_association == "${t}"`).join(" or ")})`;
   return [
     `      - name: Check for local attestation`,
     `        if: github.event_name == 'pull_request'`,
@@ -240,7 +237,7 @@ export function buildGateSnippet(opts = {}) {
     `          MARKER="<!-- local-attest verified-sha=\${HEAD_SHA} -->"`,
     `          if gh api "repos/\${REPO}/issues/\${PR_NUMBER}/comments" --paginate \\`,
     `               --jq '.[] | ${select} | .body | split("\\n")[0]' \\`,
-    `             | grep -qF "$MARKER"; then`,
+    `             | grep -qFx "$MARKER"; then`,
     `            echo "attested=true" >> "$GITHUB_OUTPUT"`,
     `          else`,
     `            echo "attested=false" >> "$GITHUB_OUTPUT"`,

@@ -187,8 +187,16 @@ export function validateConfig(input) {
   if (typeof merged.label !== "string" || merged.label === "") {
     throw new ConfigError("config.label must be a non-empty string");
   }
+  if (!/^[A-Za-z0-9._/ -]+$/.test(merged.label)) {
+    throw new ConfigError(
+      "config.label must contain only letters, numbers, dots, underscores, hyphens, slashes, or spaces",
+    );
+  }
   if (typeof merged.auditLogPath !== "string" || merged.auditLogPath === "") {
     throw new ConfigError("config.auditLogPath must be a non-empty string");
+  }
+  if (isAbsolute(merged.auditLogPath)) {
+    throw new ConfigError("config.auditLogPath must be a relative path");
   }
   if (merged.auditLogPath.split("/").some((seg) => seg === "..")) {
     throw new ConfigError("config.auditLogPath must not contain '..' segments");
@@ -199,6 +207,17 @@ export function validateConfig(input) {
     !merged.trustedAssociations.every((t) => typeof t === "string" && t.length > 0)
   ) {
     throw new ConfigError("config.trustedAssociations must be a non-empty array of strings");
+  }
+  const VALID_ASSOCIATIONS = new Set([
+    "OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR",
+    "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE",
+  ]);
+  for (const assoc of merged.trustedAssociations) {
+    if (!VALID_ASSOCIATIONS.has(assoc)) {
+      throw new ConfigError(
+        `config.trustedAssociations contains unknown value "${assoc}" — must be one of: ${[...VALID_ASSOCIATIONS].join(", ")}`,
+      );
+    }
   }
   for (const flag of ["requireClean", "requireDocker", "pushAfterAttest"]) {
     if (typeof merged[flag] !== "boolean") {

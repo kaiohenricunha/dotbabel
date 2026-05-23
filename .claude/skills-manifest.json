@@ -236,7 +236,7 @@
     {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
-      "checksum": "sha256:86a499fcaa8958539361d464b33eca1ef97d2ce960100be459c169a26476b2ef",
+      "checksum": "sha256:a4fab149f1ea05770de853331d321fc2e8d4a745fcb52dcc1da1f76edbe4a995",
       "dependencies": [],
       "lastValidated": "2026-05-23"
     },

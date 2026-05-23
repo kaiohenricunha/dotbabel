@@ -19,7 +19,8 @@ repo OWNER) whose first line is exactly the marker:
 The workflow gate (template at
 [`workflow-gate.yml.tmpl`](workflow-gate.yml.tmpl)) reads the PR comments,
 filters by `author_association`, takes the first line of each, and
-`grep -qF`s for the marker matching `github.event.pull_request.head.sha`.
+`grep -qFx`s (exact-line match) for the marker matching
+`github.event.pull_request.head.sha`.
 
 When the marker matches, downstream jobs whose `if:` consumes
 `needs.classify.outputs.attested` skip at zero runner cost.
@@ -77,8 +78,11 @@ Multi-maintainer repos widen the trust list:
 trustedAssociations: ["OWNER", "MEMBER", "COLLABORATOR"];
 ```
 
-The workflow gate template uses `{{TRUSTED_SELECT}}` as a placeholder for
-the matching jq filter. Substitute it manually for now.
+The workflow gate template is pre-substituted for the default single-OWNER
+config. If you widen `trustedAssociations`, update the `select(...)` clause in
+your workflow gate file and commit both changes together — they must stay in sync
+or attestations from the newly-trusted association will be posted but never
+honored by CI.
 
 ## Caveats
 
@@ -90,7 +94,26 @@ will be reported as skipped, which counts as missing for protection.
 
 **Fix**: introduce an always-run summary job that aggregates the attested
 jobs' results and reports a single status check. Make that summary job the
-one required by branch protection.
+one required by branch protection. Example:
+
+```yaml
+attested-or-passed:
+  needs: [test, preview] # jobs gated by local-attest
+  if: always()
+  runs-on: ubuntu-latest
+  steps:
+    - run: |
+        if [[ "${{ needs.test.result }}" == "skipped" && \
+              "${{ needs.preview.result }}" == "skipped" ]]; then
+          echo "All CI jobs skipped via local attestation"
+        elif [[ "${{ needs.test.result }}" != "success" || \
+                "${{ needs.preview.result }}" != "success" ]]; then
+          exit 1
+        fi
+```
+
+Point branch protection's required status check at `attested-or-passed` instead
+of the individual jobs.
 
 ### Drift between local and remote matrix
 

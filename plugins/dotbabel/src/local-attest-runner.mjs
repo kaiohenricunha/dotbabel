@@ -190,11 +190,8 @@ export function checkPreconditions(deps, cfg, opts = {}) {
   try {
     const me = capture(deps, "gh api user --jq .login");
     const ownerAssoc = capture(deps, `gh api repos/${repo}/collaborators/${me}/permission --jq .permission`).toUpperCase();
-    const mapped =
-      ownerAssoc === "ADMIN" ? "OWNER" :
-      ownerAssoc === "WRITE" ? "MEMBER" :
-      ownerAssoc === "READ" ? "COLLABORATOR" :
-      ownerAssoc;
+    const PERM_TO_ASSOC = { ADMIN: "OWNER", WRITE: "MEMBER", READ: "COLLABORATOR", MAINTAIN: "MEMBER", TRIAGE: "COLLABORATOR" };
+    const mapped = PERM_TO_ASSOC[ownerAssoc] ?? ownerAssoc;
     if (!cfg.trustedAssociations.includes(mapped)) {
       deps.warn(
         `WARNING: you (${me}) have permission ${ownerAssoc} on ${repo}, which is not in the configured trust list (${cfg.trustedAssociations.join(", ")}). The CI gate will not honor this attestation.`,
@@ -235,23 +232,33 @@ export function runMatrix(deps, matrix) {
 /**
  * Insert or update the attestation comment. Always sends the body via stdin
  * (`gh api --input -`) so multiline markdown can't be mangled by shell quoting.
+ * Only PATCHes a comment whose original author is in `trustedAssociations` so
+ * the CI gate (which filters by author_association) sees the correct author.
  *
  * @param {Deps} deps
- * @param {{ repo: string, pr: string|number, body: string }} args
+ * @param {{ repo: string, pr: string|number, body: string, trustedAssociations?: string[] }} args
  * @returns {{ kind: "post"|"patch", commentId?: number|string }}
  */
-export function upsertComment(deps, { repo, pr, body }) {
+export function upsertComment(deps, { repo, pr, body, trustedAssociations }) {
   const raw = capture(deps, `gh api repos/${repo}/issues/${pr}/comments --paginate`);
   /** @type {Comment[]} */
   const comments = JSON.parse(raw || "[]");
-  const existing = findAttestComment(comments);
+  const trusted = trustedAssociations ? new Set(trustedAssociations) : null;
+  const candidates = trusted
+    ? comments.filter((c) => c && trusted.has(c.author_association))
+    : comments;
+  const existing = findAttestComment(candidates);
   if (existing) {
+    const id = Number(existing.id);
+    if (!Number.isFinite(id) || id <= 0) {
+      throw new Error(`unexpected comment id: ${existing.id}`);
+    }
     deps.ghApiWithInput(
-      `gh api --method PATCH repos/${repo}/issues/comments/${existing.id} --input -`,
+      `gh api --method PATCH repos/${repo}/issues/comments/${id} --input -`,
       { body },
     );
-    deps.log(`Updated existing attestation comment ${existing.id}.`);
-    return { kind: "patch", commentId: existing.id };
+    deps.log(`Updated existing attestation comment ${id}.`);
+    return { kind: "patch", commentId: id };
   }
   deps.ghApiWithInput(`gh api --method POST repos/${repo}/issues/${pr}/comments --input -`, {
     body,
@@ -292,8 +299,8 @@ export function appendAuditLog(deps, { auditLogPath, pr, sha, advisoryFails, hos
   try {
     const entry = buildAuditEntry({ pr, sha, hostname, advisoryFails });
     deps.appendLog(auditLogPath, JSON.stringify(entry) + "\n");
-  } catch {
-    // Best-effort audit log; never block the run.
+  } catch (err) {
+    deps.warn(`WARNING: audit log append failed (non-fatal): ${err.message || err}`);
   }
 }
 
@@ -316,7 +323,10 @@ export function execute(deps, cfg, flags) {
 
   deps.log("\n========== Summary ==========");
   for (const r of results) {
-    const m = r.passed ? "PASS" : r.mode === "advisory" ? "fail (advisory)" : "FAIL";
+    let m;
+    if (r.passed) m = "PASS";
+    else if (r.mode === "advisory") m = "fail (advisory)";
+    else m = "FAIL";
     deps.log(`  ${r.name.padEnd(28)} ${m} (${r.durationS}s)`);
   }
 
@@ -344,17 +354,24 @@ export function execute(deps, cfg, flags) {
     return { ok: true, body, results, pre, exitCode: 0 };
   }
 
+  // Post the attestation comment BEFORE pushing so it is visible when the
+  // push event fires GitHub Actions. The SHA embedded in the marker is the
+  // local HEAD, which is identical to what gets pushed.
+  upsertComment(deps, { repo: pre.repo, pr: pre.pr, body, trustedAssociations: cfg.trustedAssociations });
+
   if (flags.push && cfg.pushAfterAttest) {
     deps.log("\nPushing...");
     const pushResult = deps.run("git push");
     if (pushResult.status !== 0) {
-      deps.warn("git push failed — no attestation posted. Fix the push and retry.");
+      deps.warn(
+        "git push failed. The attestation comment was already posted but the branch was not pushed.\n" +
+          "Fix the push issue and retry — `git push` alone is enough; the comment is already in place.",
+      );
       return { ok: false, body, results, pre, exitCode: 1 };
     }
     deps.log("Pushed.");
   }
 
-  upsertComment(deps, { repo: pre.repo, pr: pre.pr, body });
   applyLabel(deps, { repo: pre.repo, pr: pre.pr, label: cfg.label });
   appendAuditLog(deps, {
     auditLogPath: cfg.auditLogPath,

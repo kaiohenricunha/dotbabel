@@ -49,7 +49,8 @@ dotbabel local-attest --pr 123 --no-push
 
 - **A `.local-attest` config** in the project root — see
   [references/config.md](references/config.md) for the schema and three example
-  configs (Node-only, Node + Go monorepo, Python).
+  configs (Node-only, Node + Go monorepo, Python). Discovery order:
+  `.local-attest.config.mjs` → `.local-attest.config.json` → `package.json#local-attest`.
 - **A workflow gate** wired into your `.github/workflows/test.yml` (and any
   other pipeline you want to skip). Paste the snippet from
   [references/workflow-gate.yml.tmpl](references/workflow-gate.yml.tmpl). This
@@ -74,8 +75,8 @@ OWNER) whose **first line** is exactly:
 ```
 
 The CI workflow reads PR comments, applies a `jq select(.author_association == "OWNER")`
-filter, takes the first line of each, and `grep -qF`s for the marker that
-matches `github.event.pull_request.head.sha`. When it matches, every downstream
+filter, takes the first line of each, and `grep -qFx`s (exact-line match)
+for the marker that matches `github.event.pull_request.head.sha`. When it matches, every downstream
 job's `if:` evaluates false and skips at zero runner cost.
 
 Freshness is automatic: a new push changes the head SHA, the old comment no
@@ -90,7 +91,9 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
 1. **Preconditions.** Branch exists, worktree clean (if `requireClean`), local
    HEAD == PR head, `gh` authed, Docker available (if `requireDocker`). Any
    failure aborts before a single test runs. The skill also warns (does not
-   fail) if your current user's permission level is not in the trust list.
+   fail) if your GitHub `author_association` on the repo (OWNER / MEMBER /
+   COLLABORATOR, etc.) is not in the config's `trustedAssociations` list — the
+   attestation will post but CI will ignore it.
 2. **Run matrix.** Each leg from the config runs sequentially. Hard legs must
    pass to attest; advisory legs are reported but never block. Stdout + stderr
    are tailed at 10 lines per leg so the result table stays readable.
