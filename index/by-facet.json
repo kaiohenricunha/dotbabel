@@ -30,6 +30,7 @@
       "post-pr-review",
       "pre-pr",
       "project-sync",
+      "release-conductor",
       "review-pr",
       "review-prs",
       "rollback-prod",
@@ -131,6 +132,7 @@
       "local-attest",
       "merge-pr",
       "post-pr-review",
+      "release-conductor",
       "review-pr",
       "review-prs"
     ],
@@ -201,6 +203,7 @@
       "post-pr-review",
       "pre-pr",
       "pulumi-specialist",
+      "release-conductor",
       "review-pr",
       "review-prs",
       "security-auditor",
@@ -258,7 +261,8 @@
       "docker-engineer",
       "flyctl",
       "kubernetes-specialist",
-      "local-attest"
+      "local-attest",
+      "release-conductor"
     ],
     "testing": [
       "detect-flaky",
@@ -330,6 +334,7 @@
       "pre-pr",
       "project-sync",
       "pulumi-engineer",
+      "release-conductor",
       "review-prs",
       "rollback-prod",
       "security-auditor",

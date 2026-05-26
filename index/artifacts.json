@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-05-23T19:36:52.899Z",
+  "generatedAt": "2026-05-26T14:40:25.841Z",
   "version": "2.8.0",
   "artifacts": [
     {
@@ -721,6 +721,21 @@
         "platform": ["pulumi"],
         "task": ["debugging", "review"],
         "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "release-conductor",
+      "type": "command",
+      "path": "commands/release-conductor.md",
+      "name": "release-conductor",
+      "description": "Gate the open release-please PR before merging: verify CI green, feature PRs landed, no release blockers, changelog reflects intent. One-word approval, then merge. Reports the resulting release.yml run URL. release-please owns the changelog/bump/tag; release.yml owns OIDC npm publish — this skill only gates the merge in between.\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "runtime-ops"],
+        "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"
