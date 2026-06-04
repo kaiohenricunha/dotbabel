@@ -18,6 +18,7 @@ description: >
   "boundary conditions", "statistical model audit", "rating algorithm review".
 tools: Read, Grep, Glob
 model: sonnet
+skills: [veracity-audit]
 source: https://github.com/VoltAgent/awesome-claude-code-subagents (MIT)
 ---
 

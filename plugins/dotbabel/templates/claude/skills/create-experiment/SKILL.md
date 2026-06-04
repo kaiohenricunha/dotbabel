@@ -12,6 +12,7 @@ description: >
   Triggers on: "let's try", "compare A vs B", "prototype", "explore".
 argument-hint: "[topic or hypothesis]"
 tools: Read, Grep, Glob, Bash, Write
+allowed-tools: Read Grep Glob Bash Write
 model: sonnet
 ---
 

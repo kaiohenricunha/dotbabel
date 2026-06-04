@@ -15,6 +15,7 @@ description: >
   Triggers on: "how should I fix", "what are my options", "investigate before I touch".
 argument-hint: "[problem]"
 tools: Read, Grep, Glob, Bash, Write
+allowed-tools: Read Grep Glob Bash Write
 model: opus
 ---
 

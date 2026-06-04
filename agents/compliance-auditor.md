@@ -19,6 +19,7 @@ description: >
   "declared vs enforced", "config vs code gaps", "quality gate completeness".
 tools: Read, Grep, Glob
 model: opus
+skills: [veracity-audit]
 source: https://github.com/VoltAgent/awesome-claude-code-subagents (MIT)
 ---
 

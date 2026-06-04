@@ -14,6 +14,7 @@ description: >
   "production drift", "is prod on main", "compare prod to main".
 argument-hint: "[--dry-run] [--no-fetch]"
 tools: Bash, Read, Grep, Glob
+allowed-tools: Read Grep Glob Bash
 model: sonnet
 effort: medium
 disable-model-invocation: false

@@ -15,6 +15,7 @@ description: >
   quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.
 argument-hint: '[--json] [--blind] <plan-path | file:<path> | text:"plan" | "plan" | latest <agent> plan>'
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 model: opus
 ---
 

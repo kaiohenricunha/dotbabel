@@ -15,6 +15,7 @@ description: >
   "ComponentResource design", "ESC audit", "Pulumi secrets", "Pulumi testing".
 argument-hint: "<stack name, project path, or problem description>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---

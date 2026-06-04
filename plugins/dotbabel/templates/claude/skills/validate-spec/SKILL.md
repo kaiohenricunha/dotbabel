@@ -19,6 +19,7 @@ description: >
 argument-hint: "[spec-id] [--no-run]"
 effort: max
 model: sonnet
+allowed-tools: Read Grep Glob Bash
 ---
 
 # Validate Spec — Implementation Audit

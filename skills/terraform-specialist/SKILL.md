@@ -18,6 +18,7 @@ description: >
   "workspace design", "provider config review", "Terraform testing".
 argument-hint: "<module path, workspace, or problem description>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---

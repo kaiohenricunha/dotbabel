@@ -12,6 +12,7 @@ description: >
   Triggers on: "security review", "check for secrets", "vulnerability scan".
 argument-hint: "[PR# | path | staged]"
 tools: Bash, Read, Grep
+allowed-tools: Read Grep Bash
 model: opus
 ---
 

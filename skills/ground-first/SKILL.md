@@ -15,6 +15,7 @@ description: >
   Triggers on: "analyze", "understand behavior", "how does this work".
 argument-hint: "[subject]"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 model: opus
 ---
 

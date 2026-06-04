@@ -15,6 +15,7 @@ description: >
   review", "env hierarchy audit", "mock_outputs", "terragrunt hooks".
 argument-hint: "<repo root or terragrunt.hcl path>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---
