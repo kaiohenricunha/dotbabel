@@ -87,6 +87,7 @@ const repoRoot = resolveRepoRoot();
 const indexPath = join(repoRoot, "index", "artifacts.json");
 const templateRoot = join(repoRoot, "plugins", "dotbabel", "templates", "claude");
 const manifestPath = join(templateRoot, "skills-manifest.json");
+const pluginJsonPath = join(repoRoot, "plugins", "dotbabel", ".claude-plugin", "plugin.json");
 
 if (!existsSync(indexPath)) {
   process.stderr.write("index not found — run dotbabel-index to build it\n");
@@ -220,7 +221,41 @@ function buildExpected() {
   return { files, manifestText };
 }
 
+/**
+ * Build the expected plugin.json content. Hand-authored metadata
+ * (name/description/author/…) is preserved; only the `agents` and `skills`
+ * arrays are regenerated from the index so they cannot drift from what ships
+ * under templates/claude/. Commands are intentionally excluded (the manifest
+ * tracks those). Returns null when no plugin.json exists (e.g. minimal repos).
+ *
+ * @returns {string | null}
+ */
+function buildExpectedPluginJson() {
+  if (!existsSync(pluginJsonPath)) return null;
+  let manifest;
+  try {
+    manifest = JSON.parse(readFileSync(pluginJsonPath, "utf8"));
+  } catch (err) {
+    out.fail(`failed to read plugin.json: ${err.message}`);
+    out.flush();
+    process.exit(EXIT_CODES.ENV);
+  }
+  const pathsFor = (type, toPath) =>
+    artifacts
+      .filter((a) => a.type === type)
+      .map((a) => a.id)
+      .sort((a, b) => a.localeCompare(b))
+      .map(toPath);
+  const updated = {
+    ...manifest,
+    agents: pathsFor("agent", (id) => `./templates/claude/agents/${id}.md`),
+    skills: pathsFor("skill", (id) => `./templates/claude/skills/${id}/SKILL.md`),
+  };
+  return JSON.stringify(updated, null, 2) + "\n";
+}
+
 const { files, manifestText } = buildExpected();
+const pluginJsonText = buildExpectedPluginJson();
 
 if (argv.flags.check) {
   let stale = false;
@@ -235,6 +270,12 @@ if (argv.flags.check) {
       out.fail("skills-manifest.json is stale — run `node scripts/build-plugin.mjs` to regenerate");
       stale = true;
     }
+  }
+
+  // Check plugin.json (agents + skills arrays) when present
+  if (pluginJsonText !== null && readFileSync(pluginJsonPath, "utf8") !== pluginJsonText) {
+    out.fail("plugin.json is stale — run `node scripts/build-plugin.mjs` to regenerate");
+    stale = true;
   }
 
   // Check each generated template file
@@ -281,6 +322,9 @@ for (const [destPath, content] of files) {
 }
 
 writeFileSync(manifestPath, manifestText);
+if (pluginJsonText !== null) {
+  writeFileSync(pluginJsonPath, pluginJsonText);
+}
 out.pass(`plugin templates written: ${written} file${written === 1 ? "" : "s"} + manifest`);
 out.flush();
 process.exit(EXIT_CODES.OK);

@@ -384,4 +384,70 @@ describe("build-plugin", () => {
     expect(ids).toContain("my-skill");
     expect(ids).not.toContain("my-agent");
   });
+
+  function writePluginJson(root, obj) {
+    mkdirSync(join(root, "plugins", "dotbabel", ".claude-plugin"), { recursive: true });
+    writeFileSync(
+      join(root, "plugins", "dotbabel", ".claude-plugin", "plugin.json"),
+      JSON.stringify(obj, null, 2) + "\n",
+    );
+  }
+  function readPluginJson(root) {
+    return JSON.parse(
+      readFileSync(join(root, "plugins", "dotbabel", ".claude-plugin", "plugin.json"), "utf8"),
+    );
+  }
+
+  it("regenerates plugin.json agents + skills arrays from the index, preserving metadata", () => {
+    const root = mkRepo();
+    writePluginJson(root, {
+      name: "harness",
+      description: "d",
+      author: { name: "x" },
+      agents: [],
+    });
+    writeAgent(root, "zeta-agent");
+    writeAgent(root, "alpha-agent");
+    writeSkill(root, "beta-skill");
+    writeCommand(root, "gamma-cmd");
+    buildIndex(root);
+    const r = runBuild(root);
+    expect(r.status).toBe(0);
+
+    const pj = readPluginJson(root);
+    // hand-authored metadata preserved
+    expect(pj.name).toBe("harness");
+    expect(pj.description).toBe("d");
+    expect(pj.author).toEqual({ name: "x" });
+    // agents: sorted, correct path format, commands excluded
+    expect(pj.agents).toEqual([
+      "./templates/claude/agents/alpha-agent.md",
+      "./templates/claude/agents/zeta-agent.md",
+    ]);
+    // skills: generated; commands are NOT skills
+    expect(pj.skills).toEqual(["./templates/claude/skills/beta-skill/SKILL.md"]);
+  });
+
+  it("--check exits 1 when plugin.json is stale", () => {
+    const root = mkRepo();
+    writePluginJson(root, { name: "harness", agents: [] });
+    writeSkill(root, "new-skill");
+    writeAgent(root, "new-agent");
+    buildIndex(root);
+    runBuild(root); // freshen everything including plugin.json
+    // mutate plugin.json so it no longer matches the generated arrays
+    writePluginJson(root, { name: "harness", agents: [], skills: [] });
+
+    const r = runBuild(root, ["--check"]);
+    expect(r.status).toBe(1);
+    expect(r.stdout + r.stderr).toMatch(/plugin\.json is stale/i);
+  });
+
+  it("skips plugin.json when none exists (backward compatible)", () => {
+    const root = mkRepo();
+    writeSkill(root, "lonely-skill");
+    buildIndex(root);
+    const r = runBuild(root);
+    expect(r.status).toBe(0); // absent plugin.json must not error
+  });
 });
