@@ -10,7 +10,41 @@ permissions:
   contents: read
 
 jobs:
+  # Local-attest gate: a SHA-pinned PR comment from a trusted user (OWNER) lets
+  # a maintainer skip the redundant remote test run after verifying locally.
+  # See skills/local-attest/references/operator-guide.md. Fail-closed: if the
+  # gh api call errors, grep exits non-zero -> attested=false -> tests run.
+  classify:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+    outputs:
+      attested: ${{ steps.attest.outputs.attested }}
+    steps:
+      - name: Check for local attestation
+        id: attest
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          MARKER="<!-- local-attest verified-sha=${HEAD_SHA} -->"
+          if gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+               --jq '.[] | select(.author_association == "OWNER") | .body | split("\n")[0]' \
+             | grep -qFx "$MARKER"; then
+            echo "Local attestation found for ${HEAD_SHA} — remote test job will skip."
+            echo "attested=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No local attestation for ${HEAD_SHA} — remote test job will run."
+            echo "attested=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: classify
+    if: needs.classify.outputs.attested != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
