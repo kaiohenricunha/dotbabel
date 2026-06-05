@@ -270,3 +270,52 @@ renaming artifacts.
 dotbabel index
 dotbabel search kubernetes
 ```
+
+---
+
+## Skill authoring & loading
+
+These apply to any Claude Code skill (`SKILL.md`), independent of the dotbabel
+bootstrap. They mirror the failure modes in Anthropic's Agent Skills guidance.
+
+### A skill isn't loading at all
+
+Claude Code only discovers a skill when its file is named **exactly** `SKILL.md`
+(uppercase `SKILL`, lowercase `.md`) and lives **inside its own named
+subdirectory** — `skills/<name>/SKILL.md`, never a bare file at the skills root.
+A mismatched filename or a `SKILL.md` sitting directly in the skills root is
+silently skipped. Surface loader errors with:
+
+```bash
+claude --debug
+```
+
+That is Claude Code's own loader debugging — distinct from dotbabel's
+`DOTBABEL_DEBUG=1` (documented at the top of this page), which only traces the
+CLI's git probes, not skill loading.
+
+### The wrong skill activates
+
+Skill selection is semantic, matched against each skill's `description`. When two
+skills have overlapping descriptions, Claude may pick the wrong one. Make each
+`description` distinct — narrow the scope and the trigger phrases so they don't
+collide. `dotbabel-validate-skills` warns when two artifacts claim the same
+trigger phrase, which is an early signal of this.
+
+### A skill is ignored even though it's installed
+
+A higher-priority skill with the same `name` shadows yours. Enterprise skills
+(pushed through managed settings) carry the highest priority and override
+personal, project, and plugin skills of the same name — and cannot be overridden
+locally. Rename your skill, or ask your administrator which managed skill is
+claiming the name.
+
+### A skill errors mid-run
+
+Runtime failures during execution usually trace to one of:
+
+- **Missing dependencies** — install them, and name the requirement in the
+  skill's `description` so it is visible before invocation.
+- **Non-executable scripts** — run `chmod +x` on any script the skill executes.
+- **Path separators** — use forward slashes (`/`) in every path, even on
+  Windows; backslashes break cross-platform resolution.
