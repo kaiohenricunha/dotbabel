@@ -18,6 +18,7 @@ description: >
   "Lambda deep-dive".
 argument-hint: "<account context, service, or problem description>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---

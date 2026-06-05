@@ -15,6 +15,7 @@ description: >
   Triggers on: "audit", "review", "assessment".
 argument-hint: "[subject]"
 tools: Read, Grep, Glob, Bash, Write
+allowed-tools: Read Grep Glob Bash Write
 model: opus
 ---
 

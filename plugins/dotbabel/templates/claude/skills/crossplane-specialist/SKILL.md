@@ -16,6 +16,7 @@ description: >
   review", "Crossplane GitOps".
 argument-hint: "<XRD name, Claim name, or problem description>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---

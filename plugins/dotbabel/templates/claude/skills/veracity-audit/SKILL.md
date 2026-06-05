@@ -20,6 +20,7 @@ argument-hint: "audit | score-check | gate-check | source-trace <label> --config
 effort: max
 model: opus
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash Agent
 ---
 
 # Veracity Audit

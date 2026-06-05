@@ -15,6 +15,7 @@ description: >
   "GCP troubleshooting", "Cloud Run deep-dive".
 argument-hint: "<project context, service, or problem description>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---

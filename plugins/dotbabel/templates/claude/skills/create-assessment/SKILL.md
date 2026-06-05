@@ -12,6 +12,7 @@ description: >
   Triggers on: "grade", "rate", "score", "evaluate", "assess".
 argument-hint: "[target]"
 tools: Read, Grep, Glob, Bash, Write
+allowed-tools: Read Grep Glob Bash Write
 model: opus
 ---
 

@@ -15,6 +15,7 @@ description: >
   "cluster health", "kubernetes design review", "k8s audit".
 argument-hint: "<cluster context, namespace, or problem description>"
 tools: Read, Grep, Glob, Bash
+allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
 ---
