@@ -10,6 +10,14 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.9.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.8.0...v2.9.0) (2026-06-05)
+
+
+### Added
+
+* **build-plugin:** generate plugin.json skills + agents from the index ([#239](https://github.com/kaiohenricunha/dotbabel/issues/239)) ([beeb44a](https://github.com/kaiohenricunha/dotbabel/commit/beeb44a9d011a7ce11066c54c33eeff387421897))
+* **skills,agents:** add allowed-tools guardrails and agent skill inheritance ([#238](https://github.com/kaiohenricunha/dotbabel/issues/238)) ([55b921c](https://github.com/kaiohenricunha/dotbabel/commit/55b921ce0da1692d55d987e2371ec9a21ff6785a))
+
 ## [2.8.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.7.0...v2.8.0) (2026-05-23)
 
 
