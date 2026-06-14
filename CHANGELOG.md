@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.10.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.9.0...v2.10.0) (2026-06-14)
+
+
+### Added
+
+* **skills:** add /reproduce-bug skill for isolated bug reproduction ([#243](https://github.com/kaiohenricunha/dotbabel/issues/243)) ([d0d487e](https://github.com/kaiohenricunha/dotbabel/commit/d0d487e75455ab9144f682925f3a9597ed607ea0))
+
 ## [2.9.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.8.0...v2.9.0) (2026-06-05)
 
 
