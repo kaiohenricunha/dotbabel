@@ -206,6 +206,13 @@
       "lastValidated": null
     },
     {
+      "name": "reproduce-bug",
+      "path": ".claude/skills/reproduce-bug/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
       "checksum": "",

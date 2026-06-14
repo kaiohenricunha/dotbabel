@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-06-05T23:47:13.668Z",
+  "generatedAt": "2026-06-14T14:27:11.332Z",
   "version": "2.9.0",
   "artifacts": [
     {
@@ -720,6 +720,21 @@
         "domain": ["infra"],
         "platform": ["pulumi"],
         "task": ["debugging", "review"],
+        "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "reproduce-bug",
+      "type": "skill",
+      "path": "skills/reproduce-bug/SKILL.md",
+      "name": "reproduce-bug",
+      "description": "Reproduce a bug in an isolated, production-mirroring sandbox and capture a failing regression test as the objective baseline to fix against. Saves a report to docs/reproductions/. Triggers on: \"reproduce this bug\", \"can't reproduce\", \"make it fail reliably\", \"repro\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "testing"],
         "maturity": "validated"
       },
       "version": "1.0.0",
