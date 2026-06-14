@@ -72,7 +72,7 @@ Arguments: `$ARGUMENTS` — a description of what to audit (e.g. "data quality f
 
 5. **Write the file** to `docs/audits/<filename>`. Create the `docs/audits/` directory if it doesn't exist.
 
-6. **Report to the user**: show the file path and a brief summary of findings (critical/warning/info counts). Do not dump the full document into chat.
+6. **Report to the user**: show the file path and a brief summary of findings (critical/warning/info counts). Do not dump the full document into chat. To turn a specific CRITICAL/WARNING finding into an isolated reproduction with a failing test, hand it to `/reproduce-bug <finding>`.
 
 ## Rules
 

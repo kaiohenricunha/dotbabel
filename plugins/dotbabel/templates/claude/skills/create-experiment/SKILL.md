@@ -141,6 +141,7 @@ assumptions or unresolved questions.>
 
 - Promote to `/spec <topic>` to formalize the chosen approach, OR
 - Run `/fix-with-evidence <topic>` to implement directly, OR
+- Run `/reproduce-bug <symptom>` to capture a surprising failure as a failing regression test, OR
 - Re-run `/create-experiment` with a refined hypothesis, OR
 - Drop it — this document is the negative-result record.
 

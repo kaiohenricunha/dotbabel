@@ -50,6 +50,7 @@
     "post-pr-review",
     "project-sync",
     "pulumi-specialist",
+    "reproduce-bug",
     "review-pr",
     "review-prs",
     "rollback-prod",
