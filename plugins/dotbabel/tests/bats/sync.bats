@@ -23,7 +23,7 @@ setup() {
 
 teardown() {
   [ -n "${REPO:-}" ] && [ -d "$REPO" ] && rm -rf "$REPO" "$REPO-bare.git"
-  [ -n "${HOME:-}" ] && [ -d "$HOME" ] && rm -rf "$HOME"
+  rm_tmp_home "${HOME:-}"
 }
 
 @test "status: reports working-tree changes" {

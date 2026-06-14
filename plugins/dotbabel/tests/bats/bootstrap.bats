@@ -14,7 +14,7 @@ setup() {
 }
 
 teardown() {
-  [ -n "${HOME:-}" ] && [ -d "$HOME" ] && rm -rf "$HOME"
+  rm_tmp_home "${HOME:-}"
 }
 
 @test "first run: links CLAUDE.md + commands/ + skills/" {

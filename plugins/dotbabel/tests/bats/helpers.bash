@@ -6,6 +6,7 @@
 # Provides:
 #   REPO_ROOT             absolute path to the dotbabel checkout (export).
 #   make_tmp_home         mktemp a hermetic $HOME for bootstrap tests.
+#   rm_tmp_home           remove a hermetic $HOME, resilient to async writers.
 #   make_tmp_git_repo     mktemp an initialized git repo with an origin remote.
 #   with_fake_git_bin     prepend a shim dir to PATH providing a fake `git`.
 #   with_fake_tool_bin    prepend a shim dir to PATH providing a fake <tool>.
@@ -31,6 +32,24 @@ make_tmp_home() {
   dir=$(mktemp -d)
   mkdir -p "$dir/.claude"
   echo "$dir"
+}
+
+# rm_tmp_home DIR
+#
+# Remove a hermetic $HOME created by make_tmp_home. A tool invoked under the
+# temp $HOME (e.g. the GitHub CLI's background update check) can write into it —
+# typically $HOME/.local — asynchronously and race the removal, leaving rm with
+# "Directory not empty". Retry a few times, then fall back to best-effort so a
+# cleanup race never fails an otherwise-passing test.
+rm_tmp_home() {
+  local dir="$1"
+  [ -n "$dir" ] && [ -d "$dir" ] || return 0
+  for _ in 1 2 3 4 5; do
+    chmod -R u+rwx "$dir" 2>/dev/null || true
+    rm -rf "$dir" 2>/dev/null && return 0
+    sleep 0.3
+  done
+  rm -rf "$dir" 2>/dev/null || true
 }
 
 make_tmp_git_repo() {

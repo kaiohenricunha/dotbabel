@@ -21,7 +21,7 @@ setup() {
 
 teardown() {
   unset DOTBABEL_LOCAL_RULES
-  [ -n "${HOME:-}" ] && [ -d "$HOME" ] && rm -rf "$HOME"
+  rm_tmp_home "${HOME:-}"
   [ -n "${OVERLAY_TMP:-}" ] && [ -d "$OVERLAY_TMP" ] && rm -rf "$OVERLAY_TMP"
 }
 
