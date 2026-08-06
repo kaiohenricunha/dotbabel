@@ -9,7 +9,7 @@ task: [documentation]
 maturity: validated
 owner: "@kaiohenricunha"
 created: 2025-01-01
-updated: 2026-04-17
+updated: 2026-08-06
 description: >
   Create structured engineering specs through interactive pairing.
   Use when the user wants to create a spec, design doc, technical specification,
@@ -118,10 +118,14 @@ When the user pastes back results, integrate findings into the appropriate secti
 
 When all sections are filled (or the user says "done" / "finalize"):
 
-1. Do a consistency pass — check cross-references are valid, constraint IDs are used, no orphaned references.
-2. Update README with final status: all sections marked `[x] done` or `[ ] skipped`.
-3. Add a "Quick Start" section to README pointing to the most important sections.
-4. Tell the user the spec is complete and where to find it.
+1. Do a **structural** consistency pass — cross-references valid, constraint IDs used, no orphaned references.
+2. Do a **content** consistency pass — three checks, each reported to the user:
+   - Every quality claim in §1/§2 has a matching constraint in §7.
+   - Every measurement in `research/` (DOC-N) became a §7 constraint, or was dropped with a stated reason.
+   - §6.4 covers every output §5 ships.
+3. Update README with final status: all sections marked `[x] done` or `[ ] skipped`.
+4. Add a "Quick Start" section to README pointing to the most important sections.
+5. Tell the user the spec is complete and where to find it.
 
 ---
 
@@ -135,6 +139,12 @@ Use these templates when creating each section file in Phase 1.
 # §1 — Problem / Motivation
 
 > Why does this exist? What's broken? Why now?
+
+## The Question
+
+<!-- The single question a user asks that this feature answers.
+     One sentence, in the user's words, not the system's.
+     If you cannot write it, the spec is not ready for §2. -->
 
 ## Why
 
@@ -285,11 +295,26 @@ Each prompt should include:
 
 ## 6.4 Testing Strategy
 
-<!-- Per-unit matrix -->
+<!--
+For each kind below: name where it applies, or write "N/A — <reason>".
+An unexplained blank is not an answer.
 
-| Unit | UNIT | INTEGRATION | POST-DEPLOY |
-| ---- | ---- | ----------- | ----------- |
-|      |      |             |             |
+  · unit            — per-function behavior
+  · contract        — payload/API invariants that must never silently break
+  · property        — invariants across the input space, not per-case
+  · golden/fixture  — locks behavior against a validated reference
+  · integration     — real dependencies; replay against historical data
+  · mutation        — proves the suite constrains the code; use wherever the
+                      code and its tests share an author, human or agent
+  · statistical     — REQUIRED when the output is probabilistic, ranked, or
+                      scored: name the metric, the baseline, and the sample size
+  · load/torture    — behavior at full scale
+  · post-deploy     — what reality reports back after shipping
+-->
+
+| Unit | Kinds applied | N/A + reason |
+| ---- | ------------- | ------------ |
+|      |               |              |
 
 ## 6.5 Migration Sequence
 
@@ -310,6 +335,10 @@ Each prompt should include:
 # §7 — Non-Functional Requirements
 
 > Performance, reliability, operational, security constraints.
+
+<!-- Every constraint names a metric, a threshold, and what happens on breach.
+     "Fast", "reliable", "a drift alarm" are not constraints — they are adjectives.
+     A measurement recorded in research/ is not a constraint until it lands here. -->
 
 ## Performance
 
