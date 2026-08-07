@@ -19,6 +19,7 @@
 - [ ] `bash plugins/dotbabel/tests/test_validate_settings.sh` — 12/12
 - [ ] `node scripts/check-jsdoc-coverage.mjs plugins/dotbabel/src` — ok
 - [ ] Root dogfood: `npm run dogfood` — all validators exit 0
+
 <!-- Add manual verification steps if relevant -->
 
 <!--

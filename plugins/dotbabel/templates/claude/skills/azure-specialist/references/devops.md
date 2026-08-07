@@ -48,7 +48,7 @@ stages:
 version: v1.1.0
 steps:
   - build: -t $Registry/my-app:{{.Run.ID}} .
-  - push: [$Registry/my-app:{{.Run.ID}}]
+  - push: [$Registry/my-app: { { .Run.ID } }]
 triggers:
   base:
     - image: mcr.microsoft.com/dotnet/aspnet:8.0
