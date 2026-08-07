@@ -9,7 +9,7 @@ task: [documentation]
 maturity: validated
 owner: "@kaiohenricunha"
 created: 2025-01-01
-updated: 2026-08-06
+updated: 2026-08-07
 description: >
   Create structured engineering specs through interactive pairing.
   Use when the user wants to create a spec, design doc, technical specification,
@@ -336,9 +336,13 @@ An unexplained blank is not an answer.
 
 > Performance, reliability, operational, security constraints.
 
-<!-- Every constraint names a metric, a threshold, and what happens on breach.
-     "Fast", "reliable", "a drift alarm" are not constraints — they are adjectives.
-     A measurement recorded in research/ is not a constraint until it lands here. -->
+<!-- A threshold constraint names its metric, its value, and what happens on breach.
+     "Fast", "reliable", "a drift alarm" are adjectives, not constraints.
+     An invariant needs no number — "all writes are atomic", "never overwrites a
+     user file" are binary and testable exactly as written. Reach for a number
+     only where you are promising a threshold.
+     A measurement recorded in research/ is not a constraint until it lands here.
+     `dotbabel-validate-specs` enforces this: a comparative with no value fails. -->
 
 ## Performance
 

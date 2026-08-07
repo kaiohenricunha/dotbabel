@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { readFileSync, writeFileSync, mkdtempSync, cpSync, unlinkSync } from "fs";
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, cpSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { validateSpecs } from "../src/validate-specs.mjs";
@@ -154,5 +154,58 @@ describe("validateSpecs", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_ACCEPTANCE_EMPTY)).toBe(true);
     expect(result.errors.some((e) => /acceptance_commands/.test(e))).toBe(true);
+  });
+
+  describe("§7 unquantified constraints", () => {
+    function writeNfr(root, body) {
+      const dir = path.join(root, "docs", "specs", "example-spec", "spec");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "7-non-functional-requirements.md"), body);
+    }
+
+    it("flags a constraint that promises a threshold without stating one", () => {
+      const root = isolateFixture();
+      writeNfr(root, "# §7\n\n- **PERF-1**: the read API must be fast under load.\n");
+      const result = validateSpecs(createHarnessContext({ repoRoot: root }));
+      expect(result.ok).toBe(false);
+      const err = result.errors.find((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED);
+      expect(err).toBeDefined();
+      expect(err.pointer).toBe("PERF-1");
+    });
+
+    it("flags the real-world case: an alarm with no metric or threshold", () => {
+      const root = isolateFixture();
+      writeNfr(root, "# §7\n\n- **REL-1**: a calibration drift alarm fires when accuracy is low.\n");
+      const result = validateSpecs(createHarnessContext({ repoRoot: root }));
+      expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toBe(true);
+    });
+
+    it("accepts a constraint that states its value", () => {
+      const root = isolateFixture();
+      writeNfr(root, "# §7\n\n- **PERF-1**: p99 read latency must stay under 200ms; breach pages on-call.\n");
+      const result = validateSpecs(createHarnessContext({ repoRoot: root }));
+      expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toEqual([]);
+    });
+
+    it("accepts an invariant that has no meaningful number", () => {
+      const root = isolateFixture();
+      writeNfr(root, "# §7\n\n- **REL-1**: All filesystem operations must be atomic at the individual file level.\n- **OPS-1**: Bootstrap must never overwrite a user-modified agent file.\n");
+      const result = validateSpecs(createHarnessContext({ repoRoot: root }));
+      expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toEqual([]);
+    });
+
+    it("ignores scaffold guidance inside HTML comments", () => {
+      const root = isolateFixture();
+      writeNfr(root, "# §7\n\n<!--\n- **PERF-1**: must be fast\n-->\n\n- **PERF-1**: cold start under 2s.\n");
+      const result = validateSpecs(createHarnessContext({ repoRoot: root }));
+      expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toEqual([]);
+    });
+
+    it("does not treat the constraint tag's own digit as the value", () => {
+      const root = isolateFixture();
+      writeNfr(root, "# §7\n\n- **PERF-9**: responses should be quick.\n");
+      const result = validateSpecs(createHarnessContext({ repoRoot: root }));
+      expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toBe(true);
+    });
   });
 });
