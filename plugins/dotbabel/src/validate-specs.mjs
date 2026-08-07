@@ -4,6 +4,7 @@ import {
   listRepoPaths,
   listSpecDirs,
   readJson,
+  readText,
   pathExists,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
@@ -15,6 +16,57 @@ const VALID_STATUSES = new Set([
   "done",
 ]);
 
+// §7 constraint lines look like "- **PERF-1**: ..." or "PERF-1: ...".
+const NFR_LINE = /^\s*(?:[-*]\s*)?\*{0,2}(PERF|REL|OPS|SEC)-(\d+)\*{0,2}\s*[:.]/i;
+
+// Words that promise a threshold without stating one. A constraint may legitimately
+// carry no number when it is an invariant ("all writes must be atomic", "must never
+// overwrite a user file") — those are binary and testable as written. It is only
+// unquantified when it leans on a comparative and then declines to give the value.
+const VAGUE_QUANTITY = /\b(fast|slow|quick(?:ly)?|responsive|performant|scalable|efficient|timely|prompt(?:ly)?|reasonable|acceptable|adequate|sufficient|minimal|negligible|low|high|large|small|soon|frequent(?:ly)?|rare(?:ly)?|often|periodic(?:ally)?|regularly|as needed|reliable|robust)\b/i;
+
+// Any digit, or a spelled-out small number, counts as quantified.
+const HAS_NUMBER = /\d|\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/i;
+
+/**
+ * Find §7 constraints that lean on a vague quantity word without giving a value.
+ *
+ * @param {string} body  Contents of spec/7-non-functional-requirements.md
+ * @returns {{ tag: string, line: number, text: string }[]}
+ */
+function findUnquantifiedConstraints(body) {
+  const found = [];
+  const lines = body.split("\n");
+  let inComment = false;
+
+  lines.forEach((raw, index) => {
+    // Scaffold guidance lives in HTML comments; never lint it.
+    if (inComment) {
+      if (raw.includes("-->")) inComment = false;
+      return;
+    }
+    if (raw.trimStart().startsWith("<!--")) {
+      if (!raw.includes("-->")) inComment = true;
+      return;
+    }
+
+    const match = raw.match(NFR_LINE);
+    if (!match) return;
+
+    // Strip the tag itself so "PERF-1" does not read as its own quantity.
+    const text = raw.slice(match[0].length);
+    if (VAGUE_QUANTITY.test(text) && !HAS_NUMBER.test(text)) {
+      found.push({
+        tag: `${match[1].toUpperCase()}-${match[2]}`,
+        line: index + 1,
+        text: text.trim(),
+      });
+    }
+  });
+
+  return found;
+}
+
 /**
  * Validate every spec.json under docs/specs/.
  *
@@ -25,6 +77,8 @@ const VALID_STATUSES = new Set([
  *  - id matches the directory name
  *  - linked_paths entries are non-empty strings
  *  - acceptance_commands entries are non-empty strings
+ *
+ *  - §7 constraints do not lean on a comparative without stating its value
  *
  * Cross-spec checks:
  *  - depends_on_specs references resolve to known spec ids
@@ -184,6 +238,31 @@ export function validateSpecs(ctx) {
         file: prefix,
         pointer: "active_prs",
         message: "active_prs must be an array",
+      }));
+    }
+  }
+
+  // §7 constraints must not promise a threshold without stating it.
+  for (const specDir of specDirs) {
+    const nfrRelative = `docs/specs/${specDir}/spec/7-non-functional-requirements.md`;
+    if (!pathExists(ctx, nfrRelative)) continue;
+
+    let body;
+    try {
+      body = readText(ctx, nfrRelative);
+    } catch {
+      continue;
+    }
+
+    for (const constraint of findUnquantifiedConstraints(body)) {
+      errors.push(new ValidationError({
+        code: ERROR_CODES.SPEC_NFR_UNQUANTIFIED,
+        category: "spec",
+        file: `${nfrRelative}:${constraint.line}`,
+        pointer: constraint.tag,
+        got: constraint.text,
+        message: `${constraint.tag} uses a comparative but states no value`,
+        hint: "give the metric, the threshold and what happens on breach — or reword as an invariant if no threshold applies",
       }));
     }
   }
