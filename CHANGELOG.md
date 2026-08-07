@@ -10,6 +10,18 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.12.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.11.1...v2.12.0) (2026-08-07)
+
+
+### Added
+
+* **validate-specs:** fail unquantified NFR constraints ([#274](https://github.com/kaiohenricunha/dotbabel/issues/274)) ([5c4e31b](https://github.com/kaiohenricunha/dotbabel/commit/5c4e31b0397345bf432fe26f72108d1121bad434))
+
+
+### Documentation
+
+* **rule-floor:** enforce hard caps on response length and shape ([#273](https://github.com/kaiohenricunha/dotbabel/issues/273)) ([8782497](https://github.com/kaiohenricunha/dotbabel/commit/8782497cac57f7ab2684aee2a35d23efee2998f1))
+
 ## [2.11.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.11.0...v2.11.1) (2026-08-07)
 
 
