@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.11.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.11.0...v2.11.1) (2026-08-07)
+
+
+### Fixed
+
+* **ci:** re-fire body-gated checks on edit, document the Spec ID rule ([#271](https://github.com/kaiohenricunha/dotbabel/issues/271)) ([cb67f33](https://github.com/kaiohenricunha/dotbabel/commit/cb67f33de4bf57118fdfd5b86d74d49b51d28185))
+
 ## [2.11.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.10.0...v2.11.0) (2026-08-07)
 
 

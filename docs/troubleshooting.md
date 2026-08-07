@@ -1,6 +1,6 @@
 # Troubleshooting
 
-_Last updated: v2.11.0_
+_Last updated: v2.11.1_
 
 Indexed by `ERROR_CODES`. When a validator fails, look up the `.code` value
 from its `ValidationError` here.
