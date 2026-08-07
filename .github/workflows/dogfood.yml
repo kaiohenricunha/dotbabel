@@ -3,7 +3,13 @@ name: dogfood
 on:
   push:
     branches: [main]
+  # `edited` matters: check-spec-coverage reads PR_BODY from the event payload
+  # (github.event.pull_request.body). Without it, a body-only failure — a missing
+  # or malformed Spec ID — cannot be fixed by editing the body, because no new
+  # event fires and a rerun replays the stale payload. The only recoveries were
+  # an empty commit or close/reopen.
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
 
 permissions:

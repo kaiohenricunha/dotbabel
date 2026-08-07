@@ -15,8 +15,12 @@ name: release-gate
 #     #133.
 
 on:
+  # `edited` for the same reason as dogfood.yml: PR_BODY comes from the event
+  # payload, and the `[skip-prev-release-check]` marker is something a reviewer
+  # adds by editing the body — which must re-fire the gate to take effect.
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, edited]
 
 permissions:
   contents: read

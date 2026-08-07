@@ -204,6 +204,7 @@ plugin with its own `scripts/lib/output.sh` + `src/lib/argv.mjs` conventions
   - `## Summary` — 1–3 bullets describing the change.
   - `## Test plan` — bulleted markdown checklist.
   - `## Spec ID` heading followed by the spec id — if the project uses spec IDs (check for `specs/` or `docs/specs/`). Must be an H2 heading; `dotbabel-check-spec-coverage` extracts it via H2 regex.
+- **The `## Spec ID` section must contain nothing but the id(s).** The extractor captures everything from that heading to the next H2 heading _or the end of the body_, then splits it on whitespace and treats every token as a spec id. Anything trailing — a generated-by footer, a sign-off, a link — is parsed as unknown spec ids and fails the gate. Put `## Spec ID` last with nothing after it, or follow it with another H2. `## No-spec rationale` is exempt — its body is only checked for non-emptiness, never tokenized — so prose and trailing content are safe there.
 - Never merge a PR with failing CI without explicit user approval.
 
 ## Shell & Scripting
