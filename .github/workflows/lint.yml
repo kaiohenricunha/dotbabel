@@ -47,9 +47,14 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with: { node-version: "22" }
+        with:
+          node-version: "22"
+          cache: "npm"
+      - run: npm ci
       # Check only JSON/YAML/MD — the .mjs source is deliberately lightly formatted
       # (see .prettierrc.json); running on .mjs today would churn a lot.
-      # Pin the exact version: `prettier@3` floats, so a new 3.x minor silently
-      # reformats the rules under an untouched repo and reddens main with no commit.
-      - run: npx --yes prettier@3.9.6 --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown
+      # Resolve prettier from the lockfile, never `npx prettier@<version>`: package.json
+      # is the single source of truth and Dependabot already tracks it there. A floating
+      # range reformats the rules under an untouched repo; a version literal in a `run:`
+      # step is tracked by nothing and rots silently. Both reddened main on 2026-08-07.
+      - run: npx prettier --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown
