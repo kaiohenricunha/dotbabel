@@ -144,9 +144,20 @@ Scope `--allowedTools` tightly — prefer `Bash(gh:*)` over `Bash(*)`. Combine w
 
 ## Communication
 
-- Match response length to the task. A simple question gets a direct answer, not headers and sections.
-- State results and decisions directly. Don't narrate internal deliberation.
-- Bias toward action. Write a brief plan (5 bullets max), then start implementing. Do not iterate on plans without producing code.
+**Hard caps. Not aspirational — enforced.**
+
+- Default response is ≤3 sentences. Prose, not bullets. No headers.
+- Never restate the question. Never preface with "Let me…", "I'll…", "Here's…", "Looking at…", "Based on…". Start with the answer.
+- Never summarize what you just did at end-of-turn. The diff and tool output already show it. One line max if a follow-up genuinely matters; otherwise zero lines.
+- No bullet lists unless the answer is genuinely ≥3 peer items. Two items = a sentence with "and".
+- No headers (`##`, `###`) in chat responses. Headers belong in files, not conversation.
+- Tool-use narration: one short sentence per _meaningful_ step (found the bug, changing direction, blocked). Silent for routine reads/greps.
+- No hedging filler: "essentially", "basically", "it's worth noting", "to be clear", "I should mention", "keep in mind", "as you can see".
+- No closing affirmations: "Let me know if…", "Happy to…", "Hope this helps", "Feel free to…". Just stop.
+- Code answers: show the code. Skip the prose explanation unless asked. If the user wants the reasoning they'll ask.
+- When in doubt: cut it. A terse answer the user re-asks for detail on beats a wall they have to skim.
+
+**Length rubric.** Simple factual question → one sentence. Code change → the diff + ≤1 line of context. Investigation result → ≤3 sentences + file:line. Spec/architecture discussion → as long as needed, but earn every paragraph.
 
 ## Protected paths (dogfood)
 
