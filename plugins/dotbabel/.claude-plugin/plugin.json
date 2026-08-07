@@ -56,6 +56,7 @@
     "./templates/claude/skills/post-pr-review/SKILL.md",
     "./templates/claude/skills/project-sync/SKILL.md",
     "./templates/claude/skills/pulumi-specialist/SKILL.md",
+    "./templates/claude/skills/release-conductor/SKILL.md",
     "./templates/claude/skills/reproduce-bug/SKILL.md",
     "./templates/claude/skills/review-pr/SKILL.md",
     "./templates/claude/skills/review-prs/SKILL.md",
