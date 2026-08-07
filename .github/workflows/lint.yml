@@ -50,4 +50,6 @@ jobs:
         with: { node-version: "22" }
       # Check only JSON/YAML/MD — the .mjs source is deliberately lightly formatted
       # (see .prettierrc.json); running on .mjs today would churn a lot.
-      - run: npx --yes prettier@3 --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown
+      # Pin the exact version: `prettier@3` floats, so a new 3.x minor silently
+      # reformats the rules under an untouched repo and reddens main with no commit.
+      - run: npx --yes prettier@3.9.6 --check "**/*.{json,yml,yaml,md}" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown
