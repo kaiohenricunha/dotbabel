@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.11.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.10.0...v2.11.0) (2026-08-07)
+
+
+### Added
+
+* **spec:** harden scaffolds against unverifiable specs ([#265](https://github.com/kaiohenricunha/dotbabel/issues/265)) ([c1f6853](https://github.com/kaiohenricunha/dotbabel/commit/c1f68532a58ddfb578c2fee2ba288b044ce29553))
+
 ## [2.10.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.9.0...v2.10.0) (2026-06-14)
 
 
