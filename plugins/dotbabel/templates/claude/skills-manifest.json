@@ -185,6 +185,13 @@
       "lastValidated": null
     },
     {
+      "name": "pr-conductor",
+      "path": ".claude/skills/pr-conductor/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
       "checksum": "",

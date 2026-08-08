@@ -1,0 +1,10 @@
+[
+  {
+    "number": 55,
+    "headRefName": "feat/stranded",
+    "baseRefName": "feat/deleted-parent",
+    "state": "OPEN",
+    "mergeStateStatus": "BLOCKED",
+    "headRefOid": "5518293a4b5c6d7e8f901234567890123456789a"
+  }
+]

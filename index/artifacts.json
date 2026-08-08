@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-08-07T21:32:15.882Z",
+  "generatedAt": "2026-08-08T18:56:31.221Z",
   "version": "2.12.0",
   "artifacts": [
     {
@@ -663,6 +663,21 @@
         "maturity": "draft"
       },
       "version": "0.1.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "pr-conductor",
+      "type": "skill",
+      "path": "skills/pr-conductor/SKILL.md",
+      "name": "pr-conductor",
+      "description": "Land one pull request end to end: pre-PR quality gate, open the PR, AI review, apply review fixes, local CI attestation — then STOP with a go/no-go summary. Never merges; merging stays an explicit human call handed to /merge-pr. Understands stacked PRs, where a child must retarget and rebase --onto after its parent squash-merges. Delegates every phase to an existing artifact rather than reimplementing it. Triggers on: \"land this PR\", \"run the PR pipeline\", \"take this branch to a PR\", \"ship this branch\", \"what's blocking my PR\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "testing"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
       "owner": "@kaiohenricunha"
     },
     {
