@@ -10,6 +10,19 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.13.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.12.0...v2.13.0) (2026-08-08)
+
+
+### Added
+
+* **skills:** add /pr-conductor with a tested stacked-PR core ([#278](https://github.com/kaiohenricunha/dotbabel/issues/278)) ([60304bd](https://github.com/kaiohenricunha/dotbabel/commit/60304bde040b0d7ac4082cce2ba3d9fac7db1f69))
+* **skills:** add /release-conductor as a skill ([#276](https://github.com/kaiohenricunha/dotbabel/issues/276)) ([1a14a56](https://github.com/kaiohenricunha/dotbabel/commit/1a14a56895fc8212c9c875699f9e630ded0873de))
+
+
+### Fixed
+
+* **post-pr-review:** resolve.sh requested a gh field that does not exist ([#279](https://github.com/kaiohenricunha/dotbabel/issues/279)) ([a53bb52](https://github.com/kaiohenricunha/dotbabel/commit/a53bb52701a09141053f96d5b49d6097766a7fee))
+
 ## [2.12.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.11.1...v2.12.0) (2026-08-07)
 
 
