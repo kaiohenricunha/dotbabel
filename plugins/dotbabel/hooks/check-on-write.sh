@@ -171,7 +171,14 @@ run_bounded() {
 chk_shell() {
   have shellcheck || return 127
   # -S error yields only SC1xxx parse errors; style (SC2086 et al) stays quiet.
-  run_bounded shellcheck -S error --format=gcc -- "$1" 2>&1
+  #
+  # SC2148 is excluded despite being error-severity: it means "I cannot tell
+  # which shell dialect this is", not "this code is broken". Sourced fragments
+  # legitimately have no shebang (/etc/profile.d/*.sh, activate.sh, scripts/lib
+  # helpers), and reporting those as syntax failures is a false positive on
+  # perfectly valid files. Note .bash files are unaffected — shellcheck infers
+  # the dialect from that extension.
+  run_bounded shellcheck -S error -e SC2148 --format=gcc -- "$1" 2>&1
 }
 
 chk_go() {

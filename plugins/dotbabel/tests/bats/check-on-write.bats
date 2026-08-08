@@ -393,6 +393,18 @@ STUB
 
 # ---------------- one real end-to-end ----------------
 
+@test "e2e: a shebang-less .sh file is not reported as broken" {
+  # SC2148 ("cannot determine the shell dialect") is error-severity, so a bare
+  # -S error would flag every sourced fragment that legitimately has no
+  # shebang. Regression guard for that false positive.
+  PATH="/usr/bin:/bin"
+  command -v shellcheck >/dev/null || skip "shellcheck not installed"
+  printf 'greet() {\n  echo hi\n}\n' > "$WORK/lib.sh"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/lib.sh"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "e2e: real shellcheck output reaches stderr with exit 2" {
   # The single non-stubbed test. Everything above proves plumbing; this proves
   # the wiring works against a genuine checker.
