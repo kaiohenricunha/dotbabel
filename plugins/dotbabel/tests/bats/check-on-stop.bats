@@ -24,6 +24,9 @@ setup() {
   git -C "$REPO" config user.email bats@example.test
   git -C "$REPO" config user.name bats
   printf 'seed\n' > "$REPO/README.md"
+  # These checkers run build tooling, so a repo must opt in. Committed rather
+  # than left untracked so it does not itself dirty the working tree.
+  touch "$REPO/.dotbabel-check-on-stop"
   git -C "$REPO" add -A
   git -C "$REPO" commit -q -m init
 }
@@ -178,14 +181,33 @@ seed_go() {
   [ -z "$(stub_calls go)" ]
 }
 
-@test ".dotbabel-nocheck opts a repo out entirely" {
+@test "a repo that has not opted in runs nothing" {
+  # The trust gate. cargo check runs build.rs, mvn runs plugins, dotnet runs
+  # MSBuild targets — all repo-controlled code. Confirmed: a build.rs payload
+  # executes under `cargo check`. So an untrusted repo must run no checker.
   seed_go
-  touch "$REPO/.dotbabel-nocheck"
+  rm -f "$REPO/.dotbabel-check-on-stop"
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "drop opt-in"
+  printf 'package main\n\nfunc main() {}\n' > "$REPO/main2.go"
   stub_checker go 1 "" "should not run"
   feed_stop_json "$HOOK" false "$REPO"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
   [ -z "$(stub_calls go)" ]
+}
+
+@test "CHECK_ON_STOP_TRUST_ALL=1 overrides the opt-in requirement" {
+  seed_go
+  rm -f "$REPO/.dotbabel-check-on-stop"
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "drop opt-in"
+  printf 'package main\n\nfunc main() {}\n' > "$REPO/main2.go"
+  stub_checker go 0
+  local payload
+  payload=$(jq -n --arg c "$REPO" \
+    '{session_id:"trust",hook_event_name:"Stop",cwd:$c,stop_hook_active:false}')
+  run env CHECK_ON_STOP_TRUST_ALL=1 bash -c "printf '%s' \"\$1\" | '$HOOK'" _ "$payload"
+  [ "$status" -eq 0 ]
+  [ -n "$(stub_calls go)" ]
 }
 
 # ---------------- gating ----------------

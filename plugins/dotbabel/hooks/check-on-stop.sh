@@ -36,8 +36,25 @@
 # the JSON contract. The ~30 lines shared with check-on-write.sh are
 # duplicated on purpose for the same reason.
 #
+# OPT-IN, NOT OPT-OUT — and that asymmetry with check-on-write.sh is
+# deliberate. Project-context checks run the project's BUILD tooling, and
+# build tooling executes repo-controlled code by design:
+#
+#   cargo check   runs build.rs           (confirmed: it wrote a marker file)
+#   mvn compile   runs Maven plugins
+#   dotnet build  runs MSBuild targets
+#   go vet        compiles, so cgo directives reach a C compiler
+#
+# A global Stop hook fires in whatever repo the session is in, so an opt-out
+# default would mean: clone a hostile repo, ask the model to edit one file,
+# and arbitrary code runs at turn end with the user's privileges. Unlike the
+# per-file checkers in check-on-write.sh, there is no flag that disables this
+# — executing build logic is the whole point of these tools.
+#
+# So each repo must be explicitly trusted by creating the marker file below.
+# Enable:  touch .dotbabel-check-on-stop   (at the project root)
+#          or set CHECK_ON_STOP_TRUST_ALL=1 to restore blanket behavior
 # Bypass:  BYPASS_CHECK_ON_STOP=1
-# Opt out: a .dotbabel-nocheck file at the project root
 # Tuning:  CHECK_ON_STOP_TIMEOUT (seconds per check, default 120)
 #          CHECK_ON_STOP_MAX_LINES (default 30)
 #          CHECK_ON_STOP_STATE_DIR (give-up counter location)
@@ -74,7 +91,11 @@ fi
 [ -n "$ROOT" ] || exit 0
 [ -d "$ROOT" ] || exit 0
 
-[ -e "$ROOT/.dotbabel-nocheck" ] && exit 0
+# Trust gate. See the header: these checkers execute repo-controlled build
+# code, so a repo must opt in before any of them runs.
+if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ] && [ ! -e "$ROOT/.dotbabel-check-on-stop" ]; then
+  exit 0
+fi
 
 # ------------------------------------------------------------- state ------
 
