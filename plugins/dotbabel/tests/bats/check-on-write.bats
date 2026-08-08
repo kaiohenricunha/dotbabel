@@ -146,20 +146,22 @@ teardown() {
   [[ "$(stub_calls node)" == *"$WORK/a.mjs"* ]]
 }
 
-@test "dispatches .c to gcc" {
-  printf 'int main(void){return 0;}\n' > "$WORK/a.c"
-  stub_checker gcc 0
-  feed_post_tooluse_json "$HOOK" Edit "$WORK/a.c"
-  [ "$status" -eq 0 ]
-  [[ "$(stub_calls gcc)" == *"$WORK/a.c"* ]]
-}
-
-@test "dispatches .cpp to g++" {
-  printf 'int main(){return 0;}\n' > "$WORK/a.cpp"
-  stub_checker g++ 0
-  feed_post_tooluse_json "$HOOK" Edit "$WORK/a.cpp"
-  [ "$status" -eq 0 ]
-  [[ "$(stub_calls g++)" == *"$WORK/a.cpp"* ]]
+@test "every CHECKERS extension dispatches to its checker" {
+  # Table-driven so a new dispatch key cannot land without coverage.
+  local -A expect=(
+    [sh]=shellcheck [bash]=shellcheck
+    [go]=gofmt
+    [py]=ruff [pyi]=ruff
+    [mjs]=node [cjs]=node
+  )
+  local ext
+  for ext in "${!expect[@]}"; do
+    stub_checker "${expect[$ext]}" 0
+    printf 'x\n' > "$WORK/a.$ext"
+    feed_post_tooluse_json "$HOOK" Edit "$WORK/a.$ext"
+    [ "$status" -eq 0 ]
+    [[ "$(stub_calls "${expect[$ext]}")" == *"$WORK/a.$ext"* ]]
+  done
 }
 
 @test "dispatches .R to Rscript" {
@@ -178,20 +180,118 @@ teardown() {
   # not honor --experimental-transform-types (verified on Node 22.22.2) and
   # reports a syntax error on the valid `const x: number = 1`. Half-checking
   # TypeScript would fire on nearly every TS file in the repo.
-  for ext in rs java cs ts mts cts tsx jsx js; do
+  # C/C++ are here too: gcc -fsyntax-only runs the preprocessor, so an
+  # absolute #include leaks file contents into the model transcript, and .h is
+  # ambiguous enough that valid C++ headers parse as broken C.
+  stub_checker gcc 1 "" "should not run"
+  stub_checker g++ 1 "" "should not run"
+  local ext
+  for ext in rs java cs ts mts cts tsx jsx js c h cc cpp cxx hpp hh; do
     printf 'garbage(((\n' > "$WORK/a.$ext"
     feed_post_tooluse_json "$HOOK" Edit "$WORK/a.$ext"
     [ "$status" -eq 0 ]
     [ -z "$output" ]
   done
+  [ -z "$(stub_calls gcc)" ]
+  [ -z "$(stub_calls g++)" ]
 }
 
 @test "regression: valid TypeScript is never reported as broken" {
-  # The specific false positive that got .ts deferred. Pin it: if a future
-  # change re-adds a TS checker, it must not fire on this file.
-  stub_checker node 0
+  # The specific false positive that got .ts deferred. The stub must REPRODUCE
+  # that failure and exit non-zero — a stub exiting 0 would let a re-added TS
+  # checker dispatch and still pass, protecting nothing.
+  stub_checker node 1 "" "SyntaxError: Missing initializer in const declaration"
   printf 'const x: number = 1\nexport {}\n' > "$WORK/valid.ts"
   feed_post_tooluse_json "$HOOK" Edit "$WORK/valid.ts"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls node)" ]
+}
+
+@test "hook never modifies the file it checks" {
+  # The load-bearing safety property: read-only by construction is what stops
+  # a PostToolUse hook from re-triggering itself into a write loop.
+  printf 'def f(\n' > "$WORK/broken.py"
+  local before after
+  before=$(cksum < "$WORK/broken.py")
+  stub_checker ruff 1 "" "broken.py:1:7: E999 SyntaxError"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/broken.py"
+  after=$(cksum < "$WORK/broken.py")
+  [ "$before" = "$after" ]
+}
+
+@test "falls back to python3 when ruff is absent" {
+  # The branch every non-Python-dev machine takes, and where the sys.path
+  # hijack lived. No ruff stub, so the fallback is forced.
+  printf 'def f(\n' > "$WORK/broken.py"
+  stub_checker python3 1 "" "SyntaxError: unexpected EOF while parsing"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/broken.py"
+  [ "$status" -eq 2 ]
+  [[ "$(stub_calls python3)" == *"$WORK/broken.py"* ]]
+}
+
+@test "python3 fallback runs isolated so a repo-local ast.py cannot execute" {
+  # Regression guard for the confirmed RCE: `python3 -c` prepends CWD to
+  # sys.path, so a repo-local ast.py wins the import and its module-level
+  # code runs. -I is what prevents that.
+  PATH="/usr/bin:/bin"
+  command -v python3 >/dev/null || skip "python3 not installed"
+  printf 'import os\nopen(os.environ["COW_MARKER"],"w").write("x")\ndef parse(*a,**k): pass\n' \
+    > "$WORK/ast.py"
+  printf 'x = 1\n' > "$WORK/sample.py"
+  local marker="$WORK/PWNED"
+  ( cd "$WORK" && COW_MARKER="$marker" bash -c \
+      "printf '%s' \"\$1\" | '$HOOK'" _ \
+      "$(jq -n --arg f "$WORK/sample.py" '{tool_name:"Edit",tool_input:{file_path:$f}}')" )
+  [ ! -e "$marker" ]
+}
+
+@test "gitignored files are skipped" {
+  git -C "$WORK" init -q
+  printf 'ignored/\n' > "$WORK/.gitignore"
+  mkdir -p "$WORK/ignored"
+  printf 'def f(\n' > "$WORK/ignored/a.py"
+  stub_checker ruff 1 "" "a.py:1:1: E999"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/ignored/a.py"
+  [ "$status" -eq 0 ]
+  [ -z "$(stub_calls ruff)" ]
+}
+
+@test "a tracked file in the same repo is still checked" {
+  # Negative twin: the ignore guard must not degrade into "skip every repo".
+  git -C "$WORK" init -q
+  printf 'ignored/\n' > "$WORK/.gitignore"
+  printf 'def f(\n' > "$WORK/tracked.py"
+  stub_checker ruff 1 "" "tracked.py:1:7: E999"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/tracked.py"
+  [ "$status" -eq 2 ]
+}
+
+@test "files under \$HOME/.claude are skipped" {
+  # Stops the hook checking the very tree it is symlinked into.
+  mkdir -p "$WORK/home/.claude/hooks"
+  printf 'def f(\n' > "$WORK/home/.claude/hooks/a.py"
+  stub_checker ruff 1 "" "a.py:1:1: E999"
+  local payload
+  payload=$(jq -n --arg f "$WORK/home/.claude/hooks/a.py" \
+    '{tool_name:"Edit",tool_input:{file_path:$f}}')
+  run env HOME="$WORK/home" bash -c "printf '%s' \"\$1\" | '$HOOK'" _ "$payload"
+  [ "$status" -eq 0 ]
+  [ -z "$(stub_calls ruff)" ]
+}
+
+@test "one noise line discards the entire output" {
+  # Pins the "discard the ENTIRE output" policy, not just per-line filtering:
+  # gcc aborts at the first missing include and the rest is downstream garbage.
+  printf 'x = 1\n' > "$WORK/a.py"
+  cat > "$STUB_BIN/ruff" <<'STUB'
+#!/usr/bin/env bash
+echo "a.py:1:1: E999 SyntaxError: looks like a real finding"
+echo "ruff: command not found"
+exit 1
+STUB
+  chmod +x "$STUB_BIN/ruff"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/a.py"
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
@@ -231,10 +331,11 @@ teardown() {
   [ -z "$(stub_calls ruff)" ]
 }
 
-@test "vendored and generated paths are skipped" {
-  mkdir -p "$WORK/node_modules/pkg" "$WORK/vendor" "$WORK/.venv/lib"
+@test "every denylisted path segment is skipped" {
   stub_checker ruff 1 "" "a.py:1:1: E999 SyntaxError"
-  for p in "node_modules/pkg" "vendor" ".venv/lib"; do
+  local p
+  for p in node_modules vendor .git dist build target .venv __pycache__ .next .cache; do
+    mkdir -p "$WORK/$p"
     printf 'def f(\n' > "$WORK/$p/a.py"
     feed_post_tooluse_json "$HOOK" Edit "$WORK/$p/a.py"
     [ "$status" -eq 0 ]

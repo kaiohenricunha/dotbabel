@@ -22,6 +22,7 @@
 # Bypass: BYPASS_CHECK_ON_WRITE=1 in the environment.
 # Tuning:  CHECK_ON_WRITE_TIMEOUT (seconds, default 5)
 #          CHECK_ON_WRITE_MAX_LINES (default 40)
+#          CHECK_ON_WRITE_MAX_CHARS (default 4000)
 #
 # Only per-file checks live here. Project-context checks that need the whole
 # build graph (tsc --noEmit, go vet, cargo check, javac, dotnet build) belong
@@ -44,6 +45,7 @@ have jq || exit 0
 
 readonly CHECK_TIMEOUT="${CHECK_ON_WRITE_TIMEOUT:-5}"
 readonly MAX_LINES="${CHECK_ON_WRITE_MAX_LINES:-40}"
+readonly MAX_CHARS="${CHECK_ON_WRITE_MAX_CHARS:-4000}"
 readonly MAX_BYTES=1000000
 
 # Output that means "the toolchain failed to run", not "the code is wrong".
@@ -57,8 +59,10 @@ readonly NOISE_RX='not installed for the toolchain|command not found|No such fil
 INPUT=$(cat)
 
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null) || exit 0
+# NotebookEdit is deliberately absent: its tool_input carries notebook_path,
+# not file_path, so it could never reach a checker anyway.
 case "$TOOL" in
-  Edit|Write|MultiEdit|NotebookEdit) ;;
+  Edit|Write|MultiEdit) ;;
   *) exit 0 ;;
 esac
 
@@ -110,14 +114,22 @@ EXT="${EXT,,}"
 #                  perfectly valid `const x: number = 1`. Running the file
 #                  instead would execute it, which a read-only hook must never
 #                  do. TS is covered properly by tsc --noEmit in the Stop hook.
+#   .c .h .cc .cpp .cxx .hpp .hh
+#                  `gcc -fsyntax-only` still runs the preprocessor, and GCC's
+#                  caret display quotes included source. An absolute
+#                  `#include "$HOME/.ssh/id_rsa"` bypasses -I and pipes the key
+#                  material straight into the model transcript (reproduced);
+#                  `#error` gives a hostile file an arbitrary-text channel.
+#                  No GCC flag disables #include. Separately, `.h` is ambiguous
+#                  by convention and a C++ header parsed as C reports hard
+#                  errors on valid code. Both are the same build-graph problem
+#                  as .rs/.java/.cs — the -I"${1%/*}" hack was an admission of
+#                  it — so C/C++ belongs in the Stop hook too.
 declare -A CHECKERS=(
   [sh]=chk_shell   [bash]=chk_shell
   [go]=chk_go
   [py]=chk_python  [pyi]=chk_python
   [mjs]=chk_node   [cjs]=chk_node
-  [c]=chk_c        [h]=chk_c
-  [cc]=chk_cxx     [cpp]=chk_cxx     [cxx]=chk_cxx
-  [hpp]=chk_cxx    [hh]=chk_cxx
   [r]=chk_r
 )
 
@@ -197,7 +209,12 @@ chk_python() {
     run_bounded ruff check --isolated --no-cache --quiet \
       --select E9 --output-format concise -- "$1" 2>&1
   elif have python3; then
-    run_bounded python3 -c \
+    # -I (isolated) is load-bearing, not cosmetic: `python3 -c` otherwise
+    # prepends the CWD to sys.path, and `ast` is pure-Python stdlib, so a
+    # repo-local ast.py wins the import and its module-level code executes.
+    # Reproduced: editing any .py in a repo containing ast.py, on a machine
+    # without ruff, ran an arbitrary payload. -I also drops PYTHON* env vars.
+    run_bounded python3 -I -c \
       'import ast,sys; ast.parse(open(sys.argv[1],"rb").read())' "$1" 2>&1
   else
     return 127
@@ -207,19 +224,6 @@ chk_python() {
 chk_node() {
   have node || return 127
   run_bounded node --check "$1" 2>&1
-}
-
-# gcc/g++ reject `--` as an unrecognized option, so it is deliberately absent
-# here. That is safe because $FILE is required to be absolute above, which
-# rules out a filename being mistaken for a flag.
-chk_c() {
-  have gcc || return 127
-  run_bounded gcc -fsyntax-only -I"${1%/*}" "$1" 2>&1
-}
-
-chk_cxx() {
-  have g++ || return 127
-  run_bounded g++ -fsyntax-only -std=c++17 -I"${1%/*}" "$1" 2>&1
 }
 
 chk_r() {
@@ -262,7 +266,12 @@ fi
 # these assignments must swallow the pipeline status explicitly.
 TOTAL=$(printf '%s\n' "$RAW" | wc -l || true)
 BODY=$(printf '%s\n' "$RAW" | head -n "$MAX_LINES" || true)
-BODY="${BODY:0:4000}"
+# Second, independent cap on total bytes. A single very long line (minified JS,
+# a g++ template instantiation) passes the line cap untouched, so without this
+# the payload could be arbitrarily large. Track the pre-cut length so the
+# truncation notice below fires on either limit, not just the line count.
+RAW_LEN=${#BODY}
+BODY="${BODY:0:$MAX_CHARS}"
 
 {
   printf 'check-on-write: %s failed syntax check (%s)\n' "$BASE" "$EXT"
@@ -274,6 +283,8 @@ BODY="${BODY:0:4000}"
   fi
   if [ "$TOTAL" -gt "$MAX_LINES" ]; then
     printf '  ... (truncated: %s of %s lines shown)\n' "$MAX_LINES" "$TOTAL"
+  elif [ "$RAW_LEN" -gt "$MAX_CHARS" ]; then
+    printf '  ... (truncated: %s of %s characters shown)\n' "$MAX_CHARS" "$RAW_LEN"
   fi
 } >&2
 

@@ -409,7 +409,12 @@ stub_checker() {
   local shim="$STUB_BIN/$name"
   {
     printf '#!/usr/bin/env bash\n'
-    printf 'printf "%%s\\t%%s\\n" %q "$*" >> %q\n' "$name" "$STUB_LOG"
+    # Log argv with "$@" and a TAB separator, NOT "$*". "$*" joins on spaces,
+    # which makes word boundaries unrecoverable — a path that got split by an
+    # unquoted expansion would rejoin into the original string and a substring
+    # assertion would still pass, silently defeating the path-with-spaces tests.
+    printf '{ printf "%%s" %q; printf "\\t%%s" "$@"; printf "\\n"; } >> %q\n' \
+      "$name" "$STUB_LOG"
     if [ -n "$out" ]; then
       printf 'printf "%%s\\n" %q\n' "$out"
     fi
