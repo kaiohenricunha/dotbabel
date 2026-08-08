@@ -13,6 +13,11 @@
 #   make_many_codex_sessions     bulk-seed N codex sessions, no sleep.
 #   make_many_transport_branches bulk-create N handoff/claude/<short> branches.
 #   feed_hook_json        send a PreToolUse JSON payload to a hook script.
+#   feed_post_tooluse_json  send a PostToolUse JSON payload to a hook script.
+#   isolate_path          REPLACE PATH with a hermetic stub dir (not prepend).
+#   stub_checker          write a fake checker binary into $STUB_BIN.
+#   stub_calls            echo the argv a stub recorded, empty if never called.
+#   rm_stub_path          remove the stub dir created by isolate_path.
 #   pass_assert / fail_assert  internal helpers (not for consumer use).
 
 # BATS_TEST_DIRNAME is the directory of the current .bats file.
@@ -346,4 +351,95 @@ feed_hook_json() {
   # JSON string so embedded quotes/backslashes round-trip safely.
   payload=$(jq -n --arg cmd "$cmd" '{tool_name:"Bash", tool_input:{command:$cmd}}')
   run bash -c "printf '%s' \"\$1\" | '$hook'" _ "$payload"
+}
+
+# Feed a PostToolUse JSON payload to a hook script.
+# Usage: feed_post_tooluse_json <path-to-hook> <tool-name> <file-path>
+#
+# The file path travels inside the JSON via --arg, so spaces, quotes and
+# unicode round-trip safely — that is what makes the path-edge-case tests
+# meaningful rather than testing the shell's quoting.
+# Sets ${status}, ${output}, ${lines[@]} as bats' standard `run` would.
+feed_post_tooluse_json() {
+  local hook="$1"
+  local tool="$2"
+  local file="$3"
+  local payload
+  payload=$(jq -n --arg t "$tool" --arg f "$file" \
+    '{tool_name:$t, hook_event_name:"PostToolUse",
+      tool_input:{file_path:$f}, tool_response:{filePath:$f, success:true}}')
+  run bash -c "printf '%s' \"\$1\" | '$hook'" _ "$payload"
+}
+
+# Replace PATH with a hermetic stub dir plus the minimal system dirs.
+#
+# Use this — NOT with_fake_tool_bin — whenever a test asserts "toolchain
+# absent" behavior. Prepending is not enough: ruff/go/cargo/node/gcc are
+# really installed on dev machines and would shadow-win, so the absent-path
+# tests would pass by accident locally and behave differently in CI.
+#
+# Exports STUB_BIN (shim dir) and STUB_LOG (call log written by stub shims).
+# Call from setup(); bats scopes each test to its own process, so the PATH
+# mutation does not leak between tests.
+isolate_path() {
+  STUB_BIN=$(mktemp -d)
+  export STUB_BIN
+  STUB_LOG="$STUB_BIN/.calls"
+  export STUB_LOG
+  : > "$STUB_LOG"
+  # Keep bats' own libexec reachable so the harness itself keeps working.
+  local keep=""
+  if [ -n "${BATS_LIBEXEC:-}" ]; then
+    keep=":$BATS_LIBEXEC"
+  fi
+  PATH="$STUB_BIN:/usr/bin:/bin${keep}"
+  export PATH
+}
+
+# stub_checker <name> <exit-code> [stdout-line] [stderr-line]
+#
+# Write a fake checker into $STUB_BIN that appends "<name>\t<argv>" to
+# $STUB_LOG, optionally emits a line on stdout and/or stderr, then exits with
+# <exit-code>. Requires isolate_path to have run first.
+stub_checker() {
+  local name="$1"
+  local rc="$2"
+  local out="${3:-}"
+  local err="${4:-}"
+  local shim="$STUB_BIN/$name"
+  {
+    printf '#!/usr/bin/env bash\n'
+    # Log argv with "$@" and a TAB separator, NOT "$*". "$*" joins on spaces,
+    # which makes word boundaries unrecoverable — a path that got split by an
+    # unquoted expansion would rejoin into the original string and a substring
+    # assertion would still pass, silently defeating the path-with-spaces tests.
+    printf '{ printf "%%s" %q; printf "\\t%%s" "$@"; printf "\\n"; } >> %q\n' \
+      "$name" "$STUB_LOG"
+    if [ -n "$out" ]; then
+      printf 'printf "%%s\\n" %q\n' "$out"
+    fi
+    if [ -n "$err" ]; then
+      printf 'printf "%%s\\n" %q >&2\n' "$err"
+    fi
+    printf 'exit %s\n' "$rc"
+  } > "$shim"
+  chmod +x "$shim"
+}
+
+# stub_calls <name> — echo the log lines recorded for <name>; empty if the
+# stub was never invoked. Use to assert both dispatch and non-dispatch.
+stub_calls() {
+  local name="$1"
+  if [ ! -f "${STUB_LOG:-/nonexistent}" ]; then
+    return 0
+  fi
+  grep -F "$(printf '%s\t' "$name")" "$STUB_LOG" 2>/dev/null || true
+}
+
+# Remove the stub dir created by isolate_path. Safe to call unconditionally.
+rm_stub_path() {
+  if [ -n "${STUB_BIN:-}" ] && [ -d "$STUB_BIN" ]; then
+    rm -rf "$STUB_BIN"
+  fi
+  return 0
 }
