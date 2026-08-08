@@ -36,8 +36,11 @@ set -euo pipefail
 
 [ "${BYPASS_CHECK_ON_WRITE:-0}" = "1" ] && exit 0
 
+# Always use this in a condition, never bare: `set -e` would abort on a miss.
+have() { command -v "$1" >/dev/null 2>&1; }
+
 # Fail open if jq is not installed — never break edits over a missing parser.
-command -v jq >/dev/null 2>&1 || exit 0
+have jq || exit 0
 
 readonly CHECK_TIMEOUT="${CHECK_ON_WRITE_TIMEOUT:-5}"
 readonly MAX_LINES="${CHECK_ON_WRITE_MAX_LINES:-40}"
@@ -139,18 +142,16 @@ fi
 
 # Respect the project's own ignore rules, but only after an extension match so
 # the ~13ms cost is paid on files that were going to be checked anyway.
-if command -v git >/dev/null 2>&1; then
-  if git -C "${FILE%/*}" check-ignore -q -- "$FILE" 2>/dev/null; then
-    exit 0
-  fi
+if have git && git -C "${FILE%/*}" check-ignore -q -- "$FILE" 2>/dev/null; then
+  exit 0
 fi
 
 # ---------------------------------------------------------------- runner ----
 
 TIMEOUT_BIN=""
-if command -v timeout >/dev/null 2>&1; then
+if have timeout; then
   TIMEOUT_BIN="timeout"
-elif command -v gtimeout >/dev/null 2>&1; then
+elif have gtimeout; then
   TIMEOUT_BIN="gtimeout"
 fi
 
@@ -163,8 +164,6 @@ run_bounded() {
     "$@"
   fi
 }
-
-have() { command -v "$1" >/dev/null 2>&1; }
 
 # Each chk_* prints diagnostics on stdout and returns the checker's exit code.
 # Returning 127 means "no usable toolchain" and is treated as silence.
