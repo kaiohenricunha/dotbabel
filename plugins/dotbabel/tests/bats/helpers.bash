@@ -14,6 +14,7 @@
 #   make_many_transport_branches bulk-create N handoff/claude/<short> branches.
 #   feed_hook_json        send a PreToolUse JSON payload to a hook script.
 #   feed_post_tooluse_json  send a PostToolUse JSON payload to a hook script.
+#   feed_stop_json        send a Stop JSON payload to a hook script.
 #   isolate_path          REPLACE PATH with a hermetic stub dir (not prepend).
 #   stub_checker          write a fake checker binary into $STUB_BIN.
 #   stub_calls            echo the argv a stub recorded, empty if never called.
@@ -368,6 +369,24 @@ feed_post_tooluse_json() {
   payload=$(jq -n --arg t "$tool" --arg f "$file" \
     '{tool_name:$t, hook_event_name:"PostToolUse",
       tool_input:{file_path:$f}, tool_response:{filePath:$f, success:true}}')
+  run bash -c "printf '%s' \"\$1\" | '$hook'" _ "$payload"
+}
+
+# Feed a Stop-event JSON payload to a hook script.
+# Usage: feed_stop_json <path-to-hook> <stop_hook_active:true|false> [cwd] [session-id]
+#
+# stop_hook_active is passed with --argjson so it lands as a real JSON boolean
+# rather than the string "true" — the recursion guard has to be tested against
+# the shape Claude Code actually sends.
+feed_stop_json() {
+  local hook="$1"
+  local active="$2"
+  local cwd="${3:-$PWD}"
+  local sid="${4:-bats-session}"
+  local payload
+  payload=$(jq -n --argjson a "$active" --arg c "$cwd" --arg s "$sid" \
+    '{session_id:$s, hook_event_name:"Stop", cwd:$c, stop_hook_active:$a,
+      transcript_path:"/dev/null", permission_mode:"default"}')
   run bash -c "printf '%s' \"\$1\" | '$hook'" _ "$payload"
 }
 
