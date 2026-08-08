@@ -1,0 +1,26 @@
+[
+  {
+    "number": 30,
+    "headRefName": "feat/gamma",
+    "baseRefName": "feat/beta",
+    "state": "OPEN",
+    "mergeStateStatus": "BLOCKED",
+    "headRefOid": "c3d4e5f60718293a4b5c6d7e8f90123456789012"
+  },
+  {
+    "number": 10,
+    "headRefName": "feat/alpha",
+    "baseRefName": "main",
+    "state": "OPEN",
+    "mergeStateStatus": "CLEAN",
+    "headRefOid": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+  },
+  {
+    "number": 20,
+    "headRefName": "feat/beta",
+    "baseRefName": "feat/alpha",
+    "state": "OPEN",
+    "mergeStateStatus": "BLOCKED",
+    "headRefOid": "b2c3d4e5f60718293a4b5c6d7e8f901234567890"
+  }
+]

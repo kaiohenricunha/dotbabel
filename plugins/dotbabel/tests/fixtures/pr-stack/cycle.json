@@ -1,0 +1,26 @@
+[
+  {
+    "number": 700,
+    "headRefName": "feat/healthy",
+    "baseRefName": "main",
+    "state": "OPEN",
+    "mergeStateStatus": "CLEAN",
+    "headRefOid": "70071829304a5b6c7d8e9f0011223344556677a8"
+  },
+  {
+    "number": 901,
+    "headRefName": "feat/loop-b",
+    "baseRefName": "feat/loop-a",
+    "state": "OPEN",
+    "mergeStateStatus": "BLOCKED",
+    "headRefOid": "90118293a4b5c6d7e8f90123456789012345678b"
+  },
+  {
+    "number": 900,
+    "headRefName": "feat/loop-a",
+    "baseRefName": "feat/loop-b",
+    "state": "OPEN",
+    "mergeStateStatus": "BLOCKED",
+    "headRefOid": "90018293a4b5c6d7e8f90123456789012345678a"
+  }
+]

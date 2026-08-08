@@ -43,6 +43,7 @@ const SUBCOMMANDS = [
   "show",
   "handoff",
   "local-attest",
+  "pr-stack",
 ];
 
 function printUsage() {

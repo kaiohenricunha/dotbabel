@@ -1,0 +1,18 @@
+[
+  {
+    "number": 9,
+    "headRefName": "feat/dupe",
+    "baseRefName": "main",
+    "state": "OPEN",
+    "mergeStateStatus": "CLEAN",
+    "headRefOid": "0918293a4b5c6d7e8f901234567890123456789c"
+  },
+  {
+    "number": 7,
+    "headRefName": "feat/dupe",
+    "baseRefName": "main",
+    "state": "OPEN",
+    "mergeStateStatus": "CLEAN",
+    "headRefOid": "0718293a4b5c6d7e8f901234567890123456789d"
+  }
+]

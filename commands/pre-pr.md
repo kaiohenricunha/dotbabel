@@ -27,8 +27,11 @@ Arguments: `$ARGUMENTS` — optional base branch. Defaults to `origin/main`.
 **Lifecycle:**
 
 ```
-/git (commit) → /pre-pr → /git pr (open PR) → /review-pr → /merge-pr
+/git (commit) → /pre-pr → /git pr (open PR) → /post-pr-review → /review-pr → /local-attest → /merge-pr
 ```
+
+`/pr-conductor` runs that whole sequence for one PR and stops before the merge; this command is
+phase 1 of it. Invoke `/pre-pr` directly when you only want the quality gate.
 
 ## Steps
 
