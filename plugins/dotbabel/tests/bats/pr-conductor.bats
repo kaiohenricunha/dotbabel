@@ -53,20 +53,41 @@ BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-pr-stack.mjs"
   done
 }
 
-@test "pr-conductor: prose names all six pipeline artifacts" {
-  for p in \
-    "commands/pre-pr.md" \
-    "skills/git/SKILL.md" \
-    "skills/post-pr-review/SKILL.md" \
-    "skills/review-pr/SKILL.md" \
-    "skills/local-attest/SKILL.md" \
-    "commands/merge-pr.md"; do
+@test "pr-conductor: prose names every artifact the module declares" {
+  # Derived from the module, not hardcoded — a hardcoded list is a second copy
+  # that drifts in lockstep with the code and out of reach of the prose.
+  while read -r p; do
     run grep -qF "$p" "$SKILL"
     [ "$status" -eq 0 ] || {
       echo "prose does not name pipeline artifact: $p"
       return 1
     }
-  done
+  done < <(node "$BIN" phases --json | jq -r '.result.phases[].artifact')
+}
+
+@test "pr-conductor: prose names every invocation the module declares" {
+  while read -r inv; do
+    run grep -qF "$inv" "$SKILL"
+    [ "$status" -eq 0 ] || {
+      echo "prose does not name pipeline invocation: $inv"
+      return 1
+    }
+  done < <(node "$BIN" phases --json | jq -r '.result.phases[].invocation')
+}
+
+@test "pr-conductor: the phase table rows match the module order" {
+  # The `## Phases` table is a third copy of the ordered list. Pin it.
+  module_artifacts="$(node "$BIN" phases --json | jq -r '.result.phases[].artifact')"
+  table_artifacts="$(grep -oE '^\| [0-9]+ +\| `[a-z-]+` +\| `[^`]+`' "$SKILL" \
+    | grep -oE '`[^`]+`$' | tr -d '`')"
+  [ "$module_artifacts" = "$table_artifacts" ]
+}
+
+@test "pr-conductor: the lifecycle string matches the module order" {
+  expected="$(node "$BIN" phases --json \
+    | jq -r '[.result.phases[] | select(.id != "stop") | .id] | join(" → ")')"
+  run grep -qF "$expected" "$SKILL"
+  [ "$status" -eq 0 ]
 }
 
 @test "pr-conductor: SKILL.md step order matches CONDUCTOR_PHASES" {

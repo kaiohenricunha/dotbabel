@@ -394,24 +394,67 @@ describe("planChildTransition", () => {
     expect(t.warnings.join(" ")).toMatch(/deleted/i);
   });
 
-  it("returns a plain rebase when the child already targets trunk but is BEHIND", () => {
+  // `merge-pr` squash-merges with --delete-branch, and GitHub then AUTO-RETARGETS
+  // any open child onto the deleted branch's base. So the child usually arrives
+  // ALREADY based on the trunk — a base-pointer comparison cannot tell us whether
+  // the parent's commits are still in its history. Keying off it emitted a bare
+  // rebase + force-push, the exact corruption this module exists to prevent.
+  it("still uses rebase --onto when GitHub already retargeted the child onto the trunk", () => {
     const t = planChildTransition({
       child: { ...child, baseRefName: "main", mergeStateStatus: "BEHIND" },
       parent: mergedParent,
     });
     expect(t.needsRetarget).toBe(false);
-    expect(t.rebaseKind).toBe("plain");
-    expect(t.steps.find((s) => s.id === "rebase").cmd).toBe("git rebase origin/main");
+    expect(t.rebaseKind).toBe("onto");
+    expect(t.steps.find((s) => s.id === "rebase").cmd).toBe(
+      `git rebase --onto origin/main ${ALPHA_SHA} feat/beta`,
+    );
   });
 
-  it("returns action land with zero steps when the child already targets trunk and is CLEAN", () => {
+  it("never emits a bare trunk rebase on any merged-parent path", () => {
+    for (const status of ["BEHIND", "DIRTY", "CLEAN", "BLOCKED"]) {
+      for (const base of ["main", "feat/alpha"]) {
+        const t = planChildTransition({
+          child: { ...child, baseRefName: base, mergeStateStatus: status },
+          parent: mergedParent,
+        });
+        for (const step of t.steps) {
+          expect(step.cmd).not.toBe("git rebase origin/main");
+        }
+      }
+    }
+  });
+
+  it("uses --onto even when the child is CLEAN, since cleanliness proves nothing", () => {
     const t = planChildTransition({
       child: { ...child, baseRefName: "main", mergeStateStatus: "CLEAN" },
       parent: mergedParent,
     });
+    expect(t.rebaseKind).toBe("onto");
+    expect(t.needsRebase).toBe(true);
+  });
+
+  it("returns land with zero steps only when told the parent commits are already gone", () => {
+    const t = planChildTransition({
+      child: { ...child, baseRefName: "main", mergeStateStatus: "CLEAN" },
+      parent: mergedParent,
+      parentCommitsInChild: false,
+    });
     expect(t.action).toBe(STACK_ACTION.LAND);
     expect(t.needsRebase).toBe(false);
     expect(t.steps).toEqual([]);
+  });
+
+  it("rejects a parent SHA that is not a hex object name", () => {
+    expect(() =>
+      planChildTransition({ child, parent: { ...mergedParent, headRefOid: "$(id)" } }),
+    ).toThrow(/sha/i);
+  });
+
+  it("rejects a parent SHA shorter than 7 characters", () => {
+    expect(() =>
+      planChildTransition({ child, parent: { ...mergedParent, headRefOid: "abc" } }),
+    ).toThrow(/sha/i);
   });
 
   it("returns action wait with zero steps when the parent is still OPEN", () => {

@@ -84,7 +84,7 @@
  * @property {string} oldBase
  * @property {string} newBase
  * @property {boolean} needsRebase
- * @property {"onto"|"plain"|null} rebaseKind
+ * @property {"onto"|null} rebaseKind
  * @property {string} reason
  * @property {TransitionStep[]} steps
  * @property {boolean} confirmationRequired
@@ -114,6 +114,9 @@ const DEFAULT_REMOTE = "origin";
 /** Git refs we are willing to interpolate into a command string. */
 const BRANCH_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
 
+/** Object names we are willing to interpolate into a command string. */
+const SHA_RE = /^[0-9a-f]{7,64}$/i;
+
 /** Statuses that mean the branch must be replayed on a moved base. */
 const STALE_STATUSES = new Set(["BEHIND", "DIRTY"]);
 
@@ -133,6 +136,23 @@ function assertBranch(name, label) {
     throw new Error(`invalid branch name for ${label}: ${JSON.stringify(name)}`);
   }
   return name;
+}
+
+/**
+ * Throw unless `value` is a git object name safe to embed in a command string.
+ * `--parent-sha` is caller-supplied and reaches an emitted `cmd`, so it needs
+ * the same guard as a branch name — the shorthand `7` floor matches git's own
+ * minimum unambiguous abbreviation.
+ *
+ * @param {unknown} value
+ * @param {string} label
+ * @returns {string}
+ */
+function assertSha(value, label) {
+  if (typeof value !== "string" || !SHA_RE.test(value)) {
+    throw new Error(`invalid sha for ${label}: ${JSON.stringify(value)}`);
+  }
+  return value;
 }
 
 /**
@@ -508,7 +528,11 @@ export function planStack(graph) {
  * which drops the parent's commits outright. Returns command strings only —
  * this function never executes anything.
  *
- * @param {{child: PrRecord, parent: PrRecord, trunk?: string, remote?: string}} input
+ * @param {{child: PrRecord, parent: PrRecord, trunk?: string, remote?: string,
+ *          parentCommitsInChild?: boolean}} input — pass
+ *   `parentCommitsInChild: false` (from `git merge-base --is-ancestor`) to
+ *   assert the branch was already replayed; omitted means "unknown", which is
+ *   treated conservatively as "still present".
  * @returns {ChildTransition}
  */
 export function planChildTransition(input) {
@@ -568,45 +592,44 @@ export function planChildTransition(input) {
     };
   }
 
-  const stale = child.mergeStateStatus !== undefined && STALE_STATUSES.has(String(child.mergeStateStatus));
-  if (!needsRetarget && !stale) {
+  // Only an explicit "the parent's commits are gone" fact retires the rebase.
+  // A base pointer cannot supply it: merge-pr squash-merges with
+  // --delete-branch, and GitHub auto-retargets open children onto the deleted
+  // branch's base, so the child normally arrives ALREADY pointing at the trunk
+  // while still carrying the parent's pre-squash commits. Keying off the base
+  // emitted a bare `git rebase <trunk>` followed by a force-push — precisely
+  // the history corruption this function exists to prevent. `mergeStateStatus`
+  // is no better: CLEAN only means no conflict against the base, not that the
+  // duplicate commits are gone.
+  if (input.parentCommitsInChild === false) {
     return {
       number: child.number,
       action: STACK_ACTION.LAND,
-      needsRetarget: false,
+      needsRetarget,
       oldBase,
       newBase,
       needsRebase: false,
       rebaseKind: null,
-      reason: "already rebased onto the new base",
+      reason: "parent commits already dropped from this branch",
       steps,
       confirmationRequired: false,
       warnings,
     };
   }
 
-  const rebaseKind = needsRetarget ? "onto" : "plain";
   let cutoff = parentHead;
-  if (rebaseKind === "onto") {
-    if (typeof parent.headRefOid === "string" && parent.headRefOid !== "") {
-      cutoff = parent.headRefOid;
-    } else {
-      warnings.push(
-        `parent branch ${parentHead} may already be deleted by --delete-branch; ` +
-          `pass --parent-sha for a deterministic rebase`,
-      );
-    }
+  if (parent.headRefOid === undefined || parent.headRefOid === null || parent.headRefOid === "") {
+    warnings.push(
+      `parent branch ${parentHead} may already be deleted by --delete-branch; ` +
+        `pass --parent-sha for a deterministic rebase`,
+    );
+  } else {
+    cutoff = assertSha(parent.headRefOid, `parent #${parent.number} head sha`);
   }
 
   steps.push({ id: "fetch", cmd: `git fetch ${remote} ${newBase}` });
   steps.push({ id: "checkout", cmd: `git checkout ${childHead}` });
-  steps.push({
-    id: "rebase",
-    cmd:
-      rebaseKind === "onto"
-        ? `git rebase --onto ${remote}/${newBase} ${cutoff} ${childHead}`
-        : `git rebase ${remote}/${newBase}`,
-  });
+  steps.push({ id: "rebase", cmd: `git rebase --onto ${remote}/${newBase} ${cutoff} ${childHead}` });
   steps.push({ id: "push", cmd: `git push --force-with-lease ${remote} ${childHead}` });
 
   return {
@@ -616,10 +639,8 @@ export function planChildTransition(input) {
     oldBase,
     newBase,
     needsRebase: true,
-    rebaseKind,
-    reason: needsRetarget
-      ? `parent #${parent.number} squash-merged; drop its commits and retarget to ${newBase}`
-      : `branch is ${child.mergeStateStatus} relative to ${newBase}`,
+    rebaseKind: "onto",
+    reason: `parent #${parent.number} squash-merged; drop its commits and replay onto ${newBase}`,
     steps,
     confirmationRequired: steps.some((s) => s.cmd.includes("--force-with-lease")),
     warnings,

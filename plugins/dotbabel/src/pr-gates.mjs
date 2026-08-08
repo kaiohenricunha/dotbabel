@@ -58,8 +58,8 @@ const MIN_SHA_PREFIX = 7;
 const SKIP_CI_RE = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/i;
 const SKIP_CHECKS_RE = /^skip-checks:\s*true$/i;
 
-/** Fence openers/closers we strip before scanning a PR body for headings. */
-const FENCE_RE = /^\s{0,3}(?:`{3,}|~{3,})/;
+/** A CommonMark fenced-code delimiter: run of >=3 backticks/tildes + info string. */
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
 /**
  * Build a case-insensitive matcher for an exact ATX h2 heading, allowing the
@@ -87,13 +87,23 @@ const RE_NO_SPEC = h2("No-spec rationale");
  */
 function stripFences(body) {
   const out = [];
-  let inFence = false;
+  /** @type {{char: string, len: number}|null} */
+  let open = null;
+
   for (const line of body.split("\n")) {
-    if (FENCE_RE.test(line)) {
-      inFence = !inFence;
+    const m = FENCE_RE.exec(line);
+    if (open === null) {
+      if (m === null) out.push(line);
+      else open = { char: m[1][0], len: m[1].length };
       continue;
     }
-    if (!inFence) out.push(line);
+    // Per CommonMark 4.5 only a run of the SAME character, at least as long as
+    // the opener and carrying no info string, closes the block. A naive toggle
+    // flips polarity on a nested fence and leaks its contents back out as body
+    // text — which would let a PR that merely documents the template pass.
+    if (m !== null && m[1][0] === open.char && m[1].length >= open.len && m[2].trim() === "") {
+      open = null;
+    }
   }
   return out.join("\n");
 }

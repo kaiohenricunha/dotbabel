@@ -179,6 +179,33 @@ describe("checkMergeGate", () => {
     expect(checkMergeGate({ ...base, body }).ok).toBe(false);
   });
 
+  // A naive toggle flips polarity on the inner fence and leaks the headings back
+  // out as real body text — letting a body that merely DOCUMENTS the template
+  // satisfy the gate, including the protected-path Spec ID requirement.
+  it("does not count headings inside a nested fenced block", () => {
+    const body = ["````markdown", "```text", "## Summary", "## Test plan", "## Spec ID", "```", "````"].join(
+      "\n",
+    );
+    const r = checkMergeGate({ ...base, body, hasSpecsDir: true });
+    expect(r.ok).toBe(false);
+    expect(codes(r).sort()).toEqual(["MISSING_SPEC_ID", "MISSING_SUMMARY", "MISSING_TEST_PLAN"]);
+  });
+
+  it("closes a fence only on a run at least as long as the opener", () => {
+    const body = ["````", "```", "## Summary", "````", "", "## Test plan", ""].join("\n");
+    expect(codes(checkMergeGate({ ...base, body }))).toContain("MISSING_SUMMARY");
+  });
+
+  it("does not treat a closing fence with an info string as a close", () => {
+    const body = ["```", "## Summary", "```js", "## Test plan", "```"].join("\n");
+    expect(checkMergeGate({ ...base, body }).ok).toBe(false);
+  });
+
+  it("matches a single character with ? but not a separator", () => {
+    expect(checkMergeGate({ ...base, changedPaths: ["a/b.mjs"], protectedPaths: ["a/?.mjs"] }).ok).toBe(false);
+    expect(checkMergeGate({ ...base, changedPaths: ["a/bc.mjs"], protectedPaths: ["a/?.mjs"] }).ok).toBe(true);
+  });
+
   it("normalizes CRLF line endings", () => {
     expect(checkMergeGate({ ...base, body: "## Summary\r\n\r\n## Test plan\r\n" }).ok).toBe(true);
   });

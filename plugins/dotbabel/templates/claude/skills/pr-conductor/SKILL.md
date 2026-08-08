@@ -54,7 +54,7 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 | 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation |
 | 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                  |
 
-> **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify effectiveness with `dotbabel pr-stack` rather than by eye: a marker buried mid-body is inert, it only counts on the first or last line.
+> **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye: a marker buried mid-body is inert, it only counts on the first or last line (or as a `skip-checks: true` trailer).
 
 ## Steps
 
@@ -75,7 +75,7 @@ If the target PR appears in `pending`, it is blocked by an unmerged parent. Repo
 
 Run `/pre-pr` (`commands/pre-pr.md`). It already runs `/code-simplifier`, the security review, and the full test suite.
 
-**Do not run `/simplify` or `/code-simplifier` separately** — `commands/pre-pr.md:67` already invokes it and commits the result as `style: pre-pr simplification pass`. A second pass produces an empty commit and a confusing diff.
+**Do not run `/simplify` or `/code-simplifier` separately** — `commands/pre-pr.md` step 2 already invokes it and commits the result as `style: pre-pr simplification pass`. A second pass produces an empty commit and a confusing diff.
 
 Hard stops from this phase are real stops: a CRITICAL security finding, or a test failure proven branch-introduced by the `git stash` check. Do not advance past them.
 
@@ -103,10 +103,10 @@ It is dry-run by default in an interactive session. Posting for real needs `--au
 
 Run `/review-pr <N>` (`skills/review-pr/SKILL.md`) — all 14 steps. It validates each comment, applies fixes in its own worktree, replies, resolves threads, and pushes.
 
-Every commit it produces must carry `[skip ci]`. Verify before each push rather than trusting it:
+Every commit it produces must carry an **effective** `[skip ci]`. Verify before each push rather than trusting it — a marker buried mid-body is inert, and `head -1` cannot see the last-line or `skip-checks:` trailer forms:
 
 ```bash
-git log -1 --pretty=%B | head -1   # the marker must be on the first (or last) line
+dotbabel pr-stack gate --gate skip-ci
 ```
 
 ### 5. `local-attest`

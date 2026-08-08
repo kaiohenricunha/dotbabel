@@ -15,6 +15,7 @@
  *   dotbabel pr-stack plan   [--trunk <ref>] [--limit <N>] [--json]
  *   dotbabel pr-stack next   --pr <N> --parent <N> [--parent-sha <sha>] [--remote <name>]
  *   dotbabel pr-stack gate   --gate local-attest|merge --pr <N>
+ *   dotbabel pr-stack gate   --gate skip-ci [--sha <rev>]
  *   dotbabel pr-stack phases
  *
  * `next` prints the commands to run; it never executes them. A rebase after a
@@ -35,7 +36,13 @@ import { pathToFileURL } from "node:url";
 import { parse } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { buildStackGraph, planStack, planChildTransition } from "../src/pr-stack.mjs";
-import { CONDUCTOR_PHASES, checkLocalAttestGate, checkMergeGate, summarizeGates } from "../src/pr-gates.mjs";
+import {
+  CONDUCTOR_PHASES,
+  checkLocalAttestGate,
+  checkMergeGate,
+  hasSkipCi,
+  summarizeGates,
+} from "../src/pr-gates.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -51,6 +58,7 @@ const FLAGS = {
   "parent-sha": { type: "string" },
   remote: { type: "string", default: "origin" },
   gate: { type: "string" },
+  sha: { type: "string" },
 };
 
 const HELP = `${TOOL} <subcommand> [options]
@@ -62,7 +70,7 @@ Subcommands:
   graph              Print the raw dependency graph
   plan               Print what can land now, what is blocked, and any problems
   next               Print the commands to move a child PR after its parent merged
-  gate               Evaluate a precondition gate (local-attest | merge)
+  gate               Evaluate a precondition gate (local-attest | merge | skip-ci)
   phases             Print the canonical pipeline phase order
 
 Options:
@@ -72,7 +80,8 @@ Options:
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
-  --gate <name>      Gate to evaluate: local-attest | merge
+  --gate <name>      Gate to evaluate: local-attest | merge | skip-ci
+  --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD)
   --json             Emit a single JSON object on stdout
   --help, -h         Show this help
   --version, -V      Show version
@@ -128,6 +137,19 @@ function ghJson(cmd) {
 }
 
 /**
+ * Guard a user-supplied git revision before it reaches a command string.
+ *
+ * @param {string} rev
+ * @returns {string}
+ */
+function assertRev(rev) {
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(rev)) {
+    return fail(EXIT_CODES.USAGE, `--sha is not a valid revision: ${JSON.stringify(rev)}`);
+  }
+  return rev;
+}
+
+/**
  * Parse a `--pr`-style flag into a positive integer.
  *
  * @param {unknown} raw
@@ -146,13 +168,31 @@ function requireNumber(raw, flag) {
  *
  * @returns {string[]}
  */
-function protectedPaths() {
-  if (!existsSync("docs/repo-facts.json")) return [];
+function repoRoot() {
+  const r = sh("git rev-parse --show-toplevel");
+  if (r.status !== 0 || r.stdout.trim() === "") {
+    return fail(EXIT_CODES.ENV, "not inside a git repository");
+  }
+  return r.stdout.trim();
+}
+
+/**
+ * Read `protected_paths` from docs/repo-facts.json. Resolved against the repo
+ * root, never the cwd: a relative probe silently returns [] when invoked from
+ * a subdirectory, which would make the merge gate skip the Spec ID check and
+ * report PASS on a PR that `merge-pr` will block — a fail-open gate.
+ *
+ * @param {string} root
+ * @returns {string[]}
+ */
+function protectedPaths(root) {
+  const factsPath = `${root}/docs/repo-facts.json`;
+  if (!existsSync(factsPath)) return [];
   try {
-    const facts = JSON.parse(readFileSync("docs/repo-facts.json", "utf8"));
+    const facts = JSON.parse(readFileSync(factsPath, "utf8"));
     return Array.isArray(facts.protected_paths) ? facts.protected_paths : [];
   } catch {
-    return fail(EXIT_CODES.ENV, "docs/repo-facts.json is unreadable");
+    return fail(EXIT_CODES.ENV, `${factsPath} is unreadable`);
   }
 }
 
@@ -313,8 +353,41 @@ async function main() {
     });
   }
 
-  const prNumber = requireNumber(flags.pr, "--pr");
   const which = flags.gate;
+
+  // skip-ci inspects a local commit message, so it needs no PR number.
+  if (which === "skip-ci") {
+    const rev = typeof flags.sha === "string" && flags.sha !== "" ? assertRev(flags.sha) : "HEAD";
+    const msg = sh(`git log -1 --pretty=%B ${rev}`);
+    if (msg.status !== 0) return fail(EXIT_CODES.ENV, `cannot read commit message for ${rev}`);
+    const verdict = hasSkipCi(msg.stdout);
+    const result = {
+      ok: verdict.effective,
+      gate: "skip-ci",
+      reasons: verdict.effective
+        ? []
+        : [
+            {
+              code: verdict.present ? "SKIP_CI_INEFFECTIVE" : "SKIP_CI_ABSENT",
+              message: verdict.present
+                ? `marker ${verdict.marker} sits on the ${verdict.location}; only the first or last line counts`
+                : "commit message carries no [skip ci] marker",
+            },
+          ],
+      hint: verdict.effective ? null : "put [skip ci] on the first or last line of the message",
+      verdict,
+    };
+    return emit({
+      subcommand: sub,
+      ok: result.ok,
+      result,
+      problems: result.reasons,
+      lines: [`gate skip-ci: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      json,
+    });
+  }
+
+  const prNumber = requireNumber(flags.pr, "--pr");
 
   if (which === "local-attest") {
     const view = ghJson(`gh pr view ${prNumber} --json headRefOid`);
@@ -336,12 +409,13 @@ async function main() {
   }
 
   if (which === "merge") {
+    const root = repoRoot();
     const view = ghJson(`gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files`);
     const result = checkMergeGate({
       body: view.body,
-      hasSpecsDir: existsSync("docs/specs"),
+      hasSpecsDir: existsSync(`${root}/docs/specs`),
       changedPaths: (view.files ?? []).map((f) => f.path),
-      protectedPaths: protectedPaths(),
+      protectedPaths: protectedPaths(root),
       mergeable: view.mergeable,
       mergeStateStatus: view.mergeStateStatus,
     });
@@ -356,7 +430,7 @@ async function main() {
     });
   }
 
-  return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge`);
+  return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge, skip-ci`);
 }
 
 // Run only when invoked as a CLI, not when imported by tests.
