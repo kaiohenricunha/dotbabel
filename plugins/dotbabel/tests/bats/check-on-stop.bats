@@ -24,16 +24,23 @@ setup() {
   git -C "$REPO" config user.email bats@example.test
   git -C "$REPO" config user.name bats
   printf 'seed\n' > "$REPO/README.md"
-  # These checkers run build tooling, so a repo must opt in. Committed rather
-  # than left untracked so it does not itself dirty the working tree.
-  touch "$REPO/.dotbabel-check-on-stop"
   git -C "$REPO" add -A
   git -C "$REPO" commit -q -m init
+  # These checkers run build tooling, so the repo must be allowlisted — and
+  # the allowlist lives OUTSIDE the repo, because an in-tree marker is one a
+  # hostile repo can simply commit for itself.
+  # Deliberately NOT inside $STATE_DIR — the recursion-guard test asserts the
+  # state dir is empty, and a trust file there would count as state.
+  TRUST_DIR=$(mktemp -d)
+  TRUST_FILE="$TRUST_DIR/trusted"
+  export CHECK_ON_STOP_TRUSTED_FILE="$TRUST_FILE"
+  printf '%s\n' "$REPO" > "$TRUST_FILE"
 }
 
 teardown() {
   rm_stub_path
   if [ -n "${STATE_DIR:-}" ] && [ -d "$STATE_DIR" ]; then rm -rf "$STATE_DIR"; fi
+  if [ -n "${TRUST_DIR:-}" ] && [ -d "$TRUST_DIR" ]; then rm -rf "$TRUST_DIR"; fi
   if [ -n "${REPO:-}" ] && [ -d "$REPO" ]; then rm -rf "$REPO"; fi
 }
 
@@ -84,8 +91,13 @@ seed_go() {
 }
 
 @test "a passing run resets the give-up counter" {
+  # Must exhaust the counter first and then re-emit the BYTE-IDENTICAL
+  # failure: with a different message the signature changes and the run
+  # would block regardless of any reset, so the test would prove nothing.
   seed_go
-  stub_checker go 1 "" "transient failure"
+  stub_checker go 1 "" "same failure"
+  feed_stop_json "$HOOK" false "$REPO" sess-reset
+  [[ "$output" == *'"decision"'* ]]
   feed_stop_json "$HOOK" false "$REPO" sess-reset
   [[ "$output" == *'"decision"'* ]]
 
@@ -94,10 +106,25 @@ seed_go() {
   [ "$status" -eq 0 ]
   [ -z "$output" ]
 
-  # Counter reset, so a new failure blocks again rather than staying silent.
-  stub_checker go 1 "" "new failure"
+  # Counter cleared, so the identical failure blocks again instead of being
+  # silenced by the exhausted count.
+  stub_checker go 1 "" "same failure"
   feed_stop_json "$HOOK" false "$REPO" sess-reset
   [[ "$output" == *'"decision"'* ]]
+}
+
+@test "signature tracks checker output, not just the language set" {
+  # Partial progress must keep earning feedback. Same language, different
+  # message => new signature => blocks again rather than giving up.
+  seed_go
+  stub_checker go 1 "" "10 errors remain"
+  feed_stop_json "$HOOK" false "$REPO" sess-partial
+  feed_stop_json "$HOOK" false "$REPO" sess-partial
+  # Counter is now at MAX_BLOCKS for that signature.
+  stub_checker go 1 "" "2 errors remain"
+  feed_stop_json "$HOOK" false "$REPO" sess-partial
+  [[ "$output" == *'"decision"'* ]]
+  [[ "$output" == *"2 errors remain"* ]]
 }
 
 @test "a different failure signature blocks again rather than giving up" {
@@ -181,14 +208,9 @@ seed_go() {
   [ -z "$(stub_calls go)" ]
 }
 
-@test "a repo that has not opted in runs nothing" {
-  # The trust gate. cargo check runs build.rs, mvn runs plugins, dotnet runs
-  # MSBuild targets — all repo-controlled code. Confirmed: a build.rs payload
-  # executes under `cargo check`. So an untrusted repo must run no checker.
+@test "a repo not on the allowlist runs nothing" {
   seed_go
-  rm -f "$REPO/.dotbabel-check-on-stop"
-  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "drop opt-in"
-  printf 'package main\n\nfunc main() {}\n' > "$REPO/main2.go"
+  : > "$TRUST_FILE"
   stub_checker go 1 "" "should not run"
   feed_stop_json "$HOOK" false "$REPO"
   [ "$status" -eq 0 ]
@@ -196,16 +218,50 @@ seed_go() {
   [ -z "$(stub_calls go)" ]
 }
 
-@test "CHECK_ON_STOP_TRUST_ALL=1 overrides the opt-in requirement" {
+@test "a missing allowlist file runs nothing" {
   seed_go
-  rm -f "$REPO/.dotbabel-check-on-stop"
-  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "drop opt-in"
+  rm -f "$TRUST_FILE"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$(stub_calls go)" ]
+}
+
+@test "a repo cannot grant itself trust with an in-tree marker" {
+  # The flaw that killed the first design: authorization read out of the
+  # artifact being authorized is not authorization. A hostile repo committing
+  # its own marker must gain nothing.
+  seed_go
+  : > "$TRUST_FILE"
+  touch "$REPO/.dotbabel-check-on-stop"
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "self-signed marker"
   printf 'package main\n\nfunc main() {}\n' > "$REPO/main2.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$(stub_calls go)" ]
+}
+
+@test "allowlist matches exactly, not by prefix" {
+  # A trusted /srv/app must not confer trust on /srv/app-untrusted.
+  seed_go
+  printf '%s\n' "${REPO}-untrusted" > "$TRUST_FILE"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$(stub_calls go)" ]
+}
+
+@test "CHECK_ON_STOP_TRUST_ALL=1 overrides the allowlist" {
+  seed_go
+  : > "$TRUST_FILE"
   stub_checker go 0
   local payload
   payload=$(jq -n --arg c "$REPO" \
     '{session_id:"trust",hook_event_name:"Stop",cwd:$c,stop_hook_active:false}')
-  run env CHECK_ON_STOP_TRUST_ALL=1 bash -c "printf '%s' \"\$1\" | '$HOOK'" _ "$payload"
+  run env CHECK_ON_STOP_TRUST_ALL=1 CHECK_ON_STOP_TRUSTED_FILE="$TRUST_FILE" \
+    CHECK_ON_STOP_STATE_DIR="$STATE_DIR" \
+    bash -c "printf '%s' \"\$1\" | '$HOOK'" _ "$payload"
   [ "$status" -eq 0 ]
   [ -n "$(stub_calls go)" ]
 }
@@ -390,4 +446,10 @@ STUB
   CHECK_ON_STOP_TIMEOUT=3 feed_stop_json "$HOOK" false "$REPO"
   elapsed=$((SECONDS - start))
   [ "$elapsed" -lt 20 ]
+  # A timeout kill is not a code defect: without the rc 124/137 branch the
+  # hook would emit "exited 124 with no output" as a block. Assert silence,
+  # and that no give-up state was burned on it.
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -f "$STATE_DIR/bats-session.state" ]
 }

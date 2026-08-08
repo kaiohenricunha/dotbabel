@@ -51,9 +51,17 @@
 # per-file checkers in check-on-write.sh, there is no flag that disables this
 # — executing build logic is the whole point of these tools.
 #
-# So each repo must be explicitly trusted by creating the marker file below.
-# Enable:  touch .dotbabel-check-on-stop   (at the project root)
-#          or set CHECK_ON_STOP_TRUST_ALL=1 to restore blanket behavior
+# The trust record therefore lives OUTSIDE the repo. An in-tree marker file
+# does not work and was tried first: a hostile repo simply commits it and
+# arrives pre-trusted on clone (reproduced — a build.rs payload executed).
+# Authorization read out of the artifact being authorized is not
+# authorization. The allowlist is user-scope, one realpath per line:
+#
+#   Enable:  echo "$(realpath .)" >> ~/.config/dotbabel/check-on-stop-trusted
+#   Or:      CHECK_ON_STOP_TRUST_ALL=1 for blanket behavior
+#
+# Comparison is exact against the resolved path, not a prefix, so a trusted
+# /srv/app does not silently trust /srv/app-untrusted.
 # Bypass:  BYPASS_CHECK_ON_STOP=1
 # Tuning:  CHECK_ON_STOP_TIMEOUT (seconds per check, default 120)
 #          CHECK_ON_STOP_MAX_LINES (default 30)
@@ -92,9 +100,24 @@ fi
 [ -d "$ROOT" ] || exit 0
 
 # Trust gate. See the header: these checkers execute repo-controlled build
-# code, so a repo must opt in before any of them runs.
-if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ] && [ ! -e "$ROOT/.dotbabel-check-on-stop" ]; then
-  exit 0
+# code, so the user must have allowlisted this repo out-of-tree. Nothing
+# below this point may read anything from $ROOT — note in particular that
+# `git rev-parse`/`git status` would load the repo's own .git/config.
+if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ]; then
+  TRUST_FILE="${CHECK_ON_STOP_TRUSTED_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/dotbabel/check-on-stop-trusted}"
+  [ -f "$TRUST_FILE" ] || exit 0
+  # Resolve before comparing so symlinks and ./.. cannot dodge the list.
+  ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P) || exit 0
+  TRUSTED=0
+  while IFS= read -r entry; do
+    case "$entry" in ''|'#'*) continue ;; esac
+    entry_real=$(cd "$entry" 2>/dev/null && pwd -P) || continue
+    if [ "$entry_real" = "$ROOT_REAL" ]; then
+      TRUSTED=1
+      break
+    fi
+  done < "$TRUST_FILE"
+  [ "$TRUSTED" = "1" ] || exit 0
 fi
 
 # ------------------------------------------------------------- state ------

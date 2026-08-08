@@ -32,6 +32,11 @@ unset GITHUB_COPILOT_CLI COPILOT_SESSION
 unset CODEX_HOME CODEX_SESSION_ID
 unset GEMINI_CLI GEMINI_CLI_SESSION
 unset GEMINI_CLI_NO_RELAUNCH
+# Claude Code exports this into every hook subprocess, and hooks that resolve
+# their project root from it would otherwise evaluate the dotbabel checkout
+# instead of the test's fixture repo — the suite would pass in CI and fail
+# on a maintainer's machine.
+unset CLAUDE_PROJECT_DIR
 
 make_tmp_home() {
   local dir
