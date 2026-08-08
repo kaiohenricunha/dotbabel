@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-08T19:21:47.825Z",
+  "generatedAt": "2026-08-08T21:03:15.244Z",
   "skills": [
     {
       "name": "agents-search",
@@ -224,7 +224,7 @@
     {
       "name": "release-conductor",
       "path": ".claude/skills/release-conductor/SKILL.md",
-      "checksum": "sha256:968cce5a0ef4fa0c01d5badf367bd7616b30fd87f4245cd9cad5a2ccf8868b24",
+      "checksum": "sha256:82d522ae0f5296b9eabd935283f6d8b3354d98c36d5f7c3429ed67c60dea302a",
       "dependencies": [
         "deploy-status"
       ],

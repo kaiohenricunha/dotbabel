@@ -39,11 +39,21 @@ feature PRs merged → release-please opens release PR → /release-conductor (g
 
 ## Steps
 
-### 0. Branch on subcommand
+### 0. Refresh local refs, then branch on subcommand
 
-If `$ARGUMENTS` starts with `verify`, jump to the **`verify` subcommand** section below.
+If `$ARGUMENTS` starts with `verify`, jump to the **`verify` subcommand** section below — it reads only from `gh` and needs no local git state.
 
-Otherwise, continue with the gate + merge flow.
+Otherwise refresh before anything reads local git state:
+
+```bash
+git fetch origin main --tags --prune-tags
+```
+
+**This is load-bearing — do not skip it.** Steps 4 and 5 derive `LAST_TAG` from local tags and diff against `origin/main`. On a clone whose tags are stale, every downstream number is wrong _and still looks plausible_: the bump comparison, the "PRs merged since last tag" list, and the commit-type check all describe the wrong release window, and nothing blocks — the gate reports READY on a false picture.
+
+Observed in practice: a clone three tags behind reported the bump as `2.10.0 → 2.13.0` with 23 landed PRs, when the truth was `2.12.0 → 2.13.0` with 3.
+
+Then continue with the gate + merge flow.
 
 ### 1. Find the open release-please PR
 
@@ -55,7 +65,9 @@ gh pr list --state open --search "head:release-please--" \
 - **Zero matches.** Check what's accumulated since the last tag:
 
   ```bash
+  # Requires the step 0 fetch — stale tags here mean the wrong commit window.
   LAST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -1)
+  [ -n "$LAST_TAG" ] || { echo "no v* tag found — run: git fetch origin --tags"; exit 1; }
   git log "$LAST_TAG"..origin/main --oneline --no-merges
   ```
 
@@ -109,7 +121,10 @@ If the most recent run on `main` is failing, surface as **WARNING** (not blockin
 ### 4. Verify no release blockers and feature PRs landed
 
 ```bash
+# Requires the step 0 fetch. A stale tag here silently shifts the whole
+# release window: wrong bump, wrong landed-PR list, wrong commit-type check.
 LAST_TAG=$(git tag --list 'v*' --sort=-version:refname | head -1)
+[ -n "$LAST_TAG" ] || { echo "no v* tag found — run: git fetch origin --tags"; exit 1; }
 LAST_TAG_DATE=$(git log -1 --format=%cI "$LAST_TAG")
 
 # Feature PRs merged since last tag
@@ -239,3 +254,4 @@ Report PASS / FAIL per check. Specifics:
 - **Squash merge by default.** Matches `/merge-pr` convention. Repo override (if any) wins, but record it.
 - **No polling.** Print the run URL and exit. Use `verify <tag>` later.
 - **Pre-1.0 bump checks read config.** Don't assume semver — `release-please-config.json` may have `bump-minor-pre-major` flags that alter the expected bump.
+- **Always fetch tags before reading them.** `LAST_TAG` comes from the local tag list; a stale clone yields a wrong release window that still reports READY. Step 0's fetch is not optional.
