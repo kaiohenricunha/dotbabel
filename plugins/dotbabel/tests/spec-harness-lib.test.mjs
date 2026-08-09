@@ -83,15 +83,55 @@ describe("listRepoPaths", () => {
 describe("git arg validation", () => {
   it("throws on --upload-pack arg", () => {
     const ctx = createHarnessContext({ repoRoot: "/some/path" });
-    expect(() => git(ctx, ["--upload-pack=evil"])).toThrow("refusing forbidden arg");
+    expect(() => git(ctx, ["fetch", "--upload-pack=evil"])).toThrow("refusing forbidden arg");
   });
   it("throws on --receive-pack arg", () => {
     const ctx = createHarnessContext({ repoRoot: "/some/path" });
-    expect(() => git(ctx, ["--receive-pack=evil"])).toThrow("refusing forbidden arg");
+    expect(() => git(ctx, ["push", "--receive-pack=evil"])).toThrow("refusing forbidden arg");
   });
   it("throws on non-string arg", () => {
     const ctx = createHarnessContext({ repoRoot: "/some/path" });
     expect(() => git(ctx, [123])).toThrow(TypeError);
+  });
+
+  // Pre-command options are where `-c core.sshCommand=…`, `--config-env`,
+  // and `--exec-path` become arbitrary command execution. Requiring a bare
+  // allow-listed subcommand in slot 0 closes every one of them at once.
+  it.each([
+    ["-c", ["-c", "core.sshCommand=touch /tmp/pwned", "log"]],
+    ["--config-env", ["--config-env=core.pager=CMD", "log"]],
+    ["--exec-path", ["--exec-path=/tmp/evil", "log"]],
+    ["--git-dir", ["--git-dir=/tmp/evil", "log"]],
+    ["--work-tree", ["--work-tree=/tmp/evil", "log"]],
+    ["-C", ["-C", "/tmp/evil", "log"]],
+    // `--exec-path` trips the forbidden-arg deny-list before the subcommand
+    // check, so accept either rejection message here.
+  ])("rejects the pre-command option %s", (_label, args) => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, args)).toThrow(/^git: refusing/);
+  });
+
+  it("rejects a subcommand outside the read-only allow-list", () => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, ["grep", "-Otouch /tmp/pwned", "x"])).toThrow("refusing git subcommand");
+    expect(() => git(ctx, ["difftool", "--extcmd=touch /tmp/pwned"])).toThrow(
+      "refusing git subcommand",
+    );
+  });
+
+  it("rejects an empty arg list", () => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, [])).toThrow("refusing git subcommand");
+  });
+
+  it("rejects --ext-diff, which runs a configured external differ", () => {
+    const ctx = createHarnessContext({ repoRoot: "/some/path" });
+    expect(() => git(ctx, ["log", "--ext-diff"])).toThrow("refusing forbidden arg");
+  });
+
+  it("runs an allow-listed read-only subcommand", () => {
+    const ctx = createHarnessContext({ repoRoot: path.join(__dirname, "..", "..", "..") });
+    expect(git(ctx, ["rev-parse", "--show-toplevel"])).toBeTruthy();
   });
 });
 

@@ -54,6 +54,27 @@ describe("runScript", () => {
     expect(r.stdout).toBe("");
     expect(r.stderr).toBe("");
   });
+
+  // The script path and the session-file operands come from the filesystem,
+  // so a shell here would turn a crafted file name into command execution.
+  // argv-only spawning must not be overridable through `opts`.
+  it("spawns without a shell", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    lib.runScript("/bin/echo", ["hi"]);
+    expect(spawnSync).toHaveBeenCalledWith(
+      "/bin/echo",
+      ["hi"],
+      expect.objectContaining({ shell: false }),
+    );
+  });
+
+  it("ignores a caller-supplied shell:true", () => {
+    spawnSync.mockReturnValueOnce({ status: 0, stdout: "", stderr: "" });
+    lib.runScript("/bin/echo", ["hi"], { shell: true, cwd: "/tmp" });
+    const opts = spawnSync.mock.calls.at(-1)[2];
+    expect(opts.shell).toBe(false);
+    expect(opts.cwd).toBe("/tmp");
+  });
 });
 
 // ---- runGit / runGitOrThrow --------------------------------------------
