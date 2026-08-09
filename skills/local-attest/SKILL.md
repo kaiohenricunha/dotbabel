@@ -101,14 +101,21 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
    pass to attest; advisory legs are reported but never block. Stdout + stderr
    are tailed at 10 lines per leg so the result table stays readable.
 3. **Hard-leg gate.** Any hard failure aborts: no comment, no label, no push.
-4. **Push first** (if `pushAfterAttest` and not `--no-push`). The attestation
+4. **Re-check HEAD.** The matrix takes minutes — long enough for another agent
+   session, another worktree, or you in a second terminal to commit onto the
+   same branch. Step 1's check is stale by now, so HEAD and the worktree are
+   re-asserted against what was actually tested. If either moved, everything
+   aborts: no comment, no label, no push. Without this the skill would attest
+   the pre-matrix SHA and then push whatever HEAD had become — publishing
+   commits it never tested and labelling the PR verified on an unrun head.
+5. **Push first** (if `pushAfterAttest` and not `--no-push`). The attestation
    must never describe a SHA the remote hasn't seen.
-5. **Upsert comment.** Existing attestation comment (any SHA) is PATCHed in
+6. **Upsert comment.** Existing attestation comment (any SHA) is PATCHed in
    place; otherwise a new one is POSTed. Body always goes via `gh api --input -`
    so multiline markdown can't be mangled by shell quoting.
-6. **Apply label** (default `ci/local-verified`). Best-effort; failure warns
+7. **Apply label** (default `ci/local-verified`). Best-effort; failure warns
    but does not abort.
-7. **Append audit log line** to the configured `auditLogPath` (default
+8. **Append audit log line** to the configured `auditLogPath` (default
    `.local-attest-log.jsonl`). Best-effort.
 
 ## Flags
