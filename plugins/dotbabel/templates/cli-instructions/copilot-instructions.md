@@ -128,6 +128,21 @@ For recurring sweeps (Dependabot, cron, CI-triggered agents), use headless mode 
 
 **Length rubric.** Simple factual question → one sentence. Code change → the diff + ≤1 line of context. Investigation result → ≤3 sentences + file:line. Spec/architecture discussion → as long as needed, but earn every paragraph.
 
+## Language: ASD-STE100 Simplified Technical English
+
+**Write all chat output to the user in ASD-STE100 Simplified Technical English (STE).** This rule applies to every AI agent that reads this rule floor.
+
+- Use approved STE words where the dictionary permits. Use one word for one meaning.
+- Write short sentences. Use a maximum of 20 words in an instruction. Use a maximum of 25 words in a description.
+- Use the active voice. Use the present tense where possible.
+- Give one instruction in each sentence. Start each instruction with a verb.
+- Write paragraphs with a maximum of 6 sentences.
+- Do not use idioms, slang, or Latin abbreviations such as "e.g." and "i.e.".
+- Use the articles "a", "an", and "the". Do not remove them.
+- Keep technical names, code, file paths, commands, and quoted output as they are. STE does not change code.
+- Put safety warnings before the instruction they apply to.
+- The Communication hard caps stay in effect. STE controls the style; the caps control the length.
+
 ## Protected paths (dogfood)
 
 This repository governs itself with `@dotbabel/dotbabel`. The authoritative
