@@ -295,6 +295,82 @@ seed_go() {
   [ -z "$output" ]
 }
 
+# A stub that records the directory it ran in. The monorepo tests care about
+# WHERE the check runs, which argv alone cannot show.
+stub_cwd_recorder() {
+  local name="$1" rc="${2:-0}"
+  cat > "$STUB_BIN/$name" <<STUB
+#!/usr/bin/env bash
+printf '%s\t%s\n' "$name" "\$PWD" >> "$STUB_LOG"
+exit $rc
+STUB
+  chmod +x "$STUB_BIN/$name"
+}
+
+@test "monorepo: a marker in a subdirectory is found" {
+  # The squadranks shape: go.mod lives at api/go.mod, not at the root. The
+  # previous lookup only checked \$ROOT/go.mod, so nothing ever ran.
+  mkdir -p "$REPO/api"
+  printf 'module example.com/api\n\ngo 1.21\n' > "$REPO/api/go.mod"
+  printf 'package main\n\nfunc main() {}\n' > "$REPO/api/main.go"
+  stub_checker go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [[ "$(stub_calls go)" == *"vet"* ]]
+}
+
+@test "monorepo: the check runs inside the sub-project, not the repo root" {
+  mkdir -p "$REPO/api"
+  printf 'module example.com/api\n\ngo 1.21\n' > "$REPO/api/go.mod"
+  printf 'package main\n' > "$REPO/api/main.go"
+  stub_cwd_recorder go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [[ "$(stub_calls go)" == *"$REPO/api"* ]]
+}
+
+@test "monorepo: two sub-projects of one language each get a check" {
+  mkdir -p "$REPO/api" "$REPO/worker"
+  printf 'module example.com/api\n\ngo 1.21\n' > "$REPO/api/go.mod"
+  printf 'module example.com/worker\n\ngo 1.21\n' > "$REPO/worker/go.mod"
+  printf 'package main\n' > "$REPO/api/main.go"
+  printf 'package main\n' > "$REPO/worker/main.go"
+  stub_cwd_recorder go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [[ "$(stub_calls go)" == *"$REPO/api"* ]]
+  [[ "$(stub_calls go)" == *"$REPO/worker"* ]]
+  [ "$(stub_calls go | wc -l)" -eq 2 ]
+}
+
+@test "monorepo: the nearest marker wins" {
+  # A file under api/ must use api/go.mod even when the root has one too.
+  printf 'module example.com/root\n\ngo 1.21\n' > "$REPO/go.mod"
+  mkdir -p "$REPO/api"
+  printf 'module example.com/api\n\ngo 1.21\n' > "$REPO/api/go.mod"
+  printf 'package main\n' > "$REPO/api/main.go"
+  stub_cwd_recorder go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [[ "$(stub_calls go)" == *"$REPO/api"* ]]
+  [ "$(stub_calls go | wc -l)" -eq 1 ]
+}
+
+@test "monorepo: the report names which sub-project failed" {
+  mkdir -p "$REPO/api"
+  printf 'module example.com/api\n\ngo 1.21\n' > "$REPO/api/go.mod"
+  printf 'package main\n' > "$REPO/api/main.go"
+  stub_checker go 1 "" "main.go:3: something is wrong"
+  feed_stop_json "$HOOK" false "$REPO"
+  [[ "$output" == *"[go api]"* ]]
+}
+
+@test "a file with no marker anywhere above it runs nothing" {
+  # Walking up must stop at the repo top rather than escaping the repo.
+  printf 'package main\n' > "$REPO/orphan.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$(stub_calls go)" ]
+}
+
 @test "go: modified .go + go.mod + toolchain dispatches go vet" {
   seed_go
   stub_checker go 0
