@@ -134,20 +134,37 @@ clear_state() {
 command -v git >/dev/null 2>&1 || exit 0
 git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 
-CHANGED=$(git -C "$ROOT" status --porcelain 2>/dev/null) || exit 0
-if [ -z "$CHANGED" ]; then
-  # Nothing changed this turn — a conversational turn, not an edit turn.
-  clear_state
-  exit 0
-fi
-
+# -z and --untracked-files=all are both load-bearing:
+#
+#   -z   disables git's C-quoting. `core.quotePath` defaults to true, so a
+#        path with any byte >= 0x80 is emitted wrapped in quotes —
+#        `?? "caf\303\251.rs"` — and the trailing quote lands in the
+#        extension (`rs"`), matching no arm below. One accented directory
+#        component silently disabled checking for everything beneath it.
+#
+#   --untracked-files=all  expands new directories. The default collapses
+#        them to a single `?? newdir/` entry, whose basename is empty, so a
+#        file created in a brand-new directory was never seen — which is
+#        exactly the turn most worth checking. The explicit flag also
+#        overrides a repo-level `status.showUntrackedFiles=no`.
+#
+# Reading NUL-delimited records means the loop cannot use a here-string (a
+# bash variable cannot hold NUL), so it consumes a process substitution —
+# which still runs in the current shell, keeping TOUCHED assignments visible.
 declare -A TOUCHED=()
-while IFS= read -r line; do
-  [ -n "$line" ] || continue
-  # Strip the two-column status plus its separating space, then take the
-  # destination of a rename ("R  old -> new").
-  path="${line:3}"
-  case "$path" in *" -> "*) path="${path##* -> }" ;; esac
+SAW_CHANGE=0
+while IFS= read -r -d '' entry; do
+  [ -n "$entry" ] || continue
+  SAW_CHANGE=1
+  # Under -z a rename emits TWO records: "R  <new>" then a bare "<old>" with
+  # no XY prefix (the " -> " form exists only in the non -z encoding). Strip
+  # the prefix only when the record actually carries one. Classifying the
+  # rename source as well as its destination is harmless — both extensions
+  # belong to the same language in any realistic rename.
+  case "$entry" in
+    ??" "*) path="${entry:3}" ;;
+    *)      path="$entry" ;;
+  esac
   base="${path##*/}"
   case "$base" in *.*) ;; *) continue ;; esac
   ext="${base##*.}"
@@ -158,7 +175,13 @@ while IFS= read -r line; do
     java)              TOUCHED[java]=1 ;;
     cs)                TOUCHED[csharp]=1 ;;
   esac
-done <<< "$CHANGED"
+done < <(git -C "$ROOT" status --porcelain -z --untracked-files=all 2>/dev/null)
+
+if [ "$SAW_CHANGE" -eq 0 ]; then
+  # Nothing changed this turn — a conversational turn, not an edit turn.
+  clear_state
+  exit 0
+fi
 
 [ "${#TOUCHED[@]}" -gt 0 ] || exit 0
 
