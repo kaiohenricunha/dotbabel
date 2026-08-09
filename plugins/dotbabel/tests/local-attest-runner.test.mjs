@@ -23,7 +23,11 @@ function makeDeps({ runReplies = [], hostname = "stub-host" } = {}) {
     calls.run.push({ cmd, opts });
     for (const [pattern, result] of runReplies) {
       if (pattern.test(cmd)) {
-        return { status: 0, stdout: "", stderr: "", ...result };
+        // A function reply receives the calls-so-far so a test can change the
+        // answer between invocations — required to simulate a branch moving
+        // underneath a long-running matrix.
+        const resolved = typeof result === "function" ? result(calls.run) : result;
+        return { status: 0, stdout: "", stderr: "", ...resolved };
       }
     }
     return { status: 0, stdout: "", stderr: "" };
@@ -353,5 +357,64 @@ describe("execute (orchestration)", () => {
     // label create + label attach
     expect(calls.run.some((c) => /gh label create/.test(c.cmd))).toBe(true);
     expect(calls.run.some((c) => /gh pr edit 42 --add-label/.test(c.cmd))).toBe(true);
+  });
+
+  // Preconditions are checked once, up front; the matrix then runs for minutes.
+  // A concurrent writer on the same branch used to mean: attest the old SHA,
+  // then `git push` the new one — publishing untested commits and labelling the
+  // PR verified on a head nobody ran.
+  const OLD_SHA = "abc1234abc1234abc1234abc1234abc1234abc12";
+  const NEW_SHA = "def5678def5678def5678def5678def5678def56";
+
+  /** HEAD reports OLD_SHA on the precondition read, NEW_SHA on every later read. */
+  const movingHead = () => {
+    let seen = 0;
+    return [/git rev-parse HEAD/, () => ({ stdout: `${seen++ === 0 ? OLD_SHA : NEW_SHA}\n` })];
+  };
+
+  it("aborts when HEAD moves during the matrix", () => {
+    const { deps } = makeDeps({ runReplies: [movingHead(), ...happy] });
+    expect(() => execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false })).toThrow(
+      PreconditionError,
+    );
+  });
+
+  it("names both SHAs so the operator can see what changed", () => {
+    const { deps } = makeDeps({ runReplies: [movingHead(), ...happy] });
+    let err;
+    try {
+      execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false });
+    } catch (e) {
+      err = e;
+    }
+    expect(err.message).toContain(OLD_SHA.slice(0, 8));
+    expect(err.message).toContain(NEW_SHA.slice(0, 8));
+  });
+
+  it("publishes nothing when HEAD moved — no comment, no push, no label, no audit", () => {
+    const { deps, calls } = makeDeps({ runReplies: [movingHead(), ...happy] });
+    expect(() => execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false })).toThrow();
+    expect(calls.gh).toHaveLength(0);
+    expect(calls.appendLog).toHaveLength(0);
+    expect(calls.run.some((c) => /git push/.test(c.cmd))).toBe(false);
+    expect(calls.run.some((c) => /gh pr edit 42 --add-label/.test(c.cmd))).toBe(false);
+  });
+
+  it("aborts when the tree becomes dirty during the matrix", () => {
+    let seen = 0;
+    const dirtying = [/git status --porcelain/, () => ({ stdout: seen++ === 0 ? "" : " M src/x.mjs\n" })];
+    const { deps, calls } = makeDeps({ runReplies: [dirtying, ...happy] });
+    expect(() => execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false })).toThrow(
+      PreconditionError,
+    );
+    expect(calls.gh).toHaveLength(0);
+    expect(calls.run.some((c) => /git push/.test(c.cmd))).toBe(false);
+  });
+
+  it("dry-run is unaffected by the recheck — it publishes nothing anyway", () => {
+    const { deps, calls } = makeDeps({ runReplies: [movingHead(), ...happy] });
+    const r = execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: true });
+    expect(r.exitCode).toBe(0);
+    expect(calls.gh).toHaveLength(0);
   });
 });

@@ -126,6 +126,45 @@ export class PreconditionError extends Error {
 }
 
 /**
+ * Re-assert, after the matrix has run, that the tree still holds exactly what
+ * was tested. Preconditions are checked once up front, but the matrix takes
+ * minutes — long enough for another agent session, another worktree, or the
+ * user in a second terminal to commit onto the same branch.
+ *
+ * Without this, `execute` would attest the pre-matrix SHA and then
+ * `git push` whatever HEAD had become: publishing commits that were never
+ * tested, and labelling the PR `ci/local-verified` on a head nobody verified.
+ * Observed in practice — a matrix attested one SHA and pushed a different one
+ * that had landed during its 441-second test leg.
+ *
+ * @param {Deps} deps
+ * @param {Preconditions} pre
+ * @returns {void}
+ * @throws {PreconditionError} when HEAD moved or the tree became dirty
+ */
+export function verifyHeadUnchanged(deps, pre) {
+  const headNow = capture(deps, "git rev-parse HEAD");
+  if (headNow !== pre.headSha) {
+    throw new PreconditionError(
+      `HEAD moved while the matrix was running: tested ${pre.headSha.slice(0, 8)}, ` +
+        `now ${headNow.slice(0, 8)}.\n` +
+        "Nothing was posted, pushed, or labelled — the results describe a commit that is no " +
+        "longer checked out. Another writer touched this branch; re-run to attest the new head.",
+    );
+  }
+
+  const dirty = capture(deps, "git status --porcelain");
+  if (dirty !== "") {
+    throw new PreconditionError(
+      "The working tree became dirty while the matrix was running:\n" +
+        `${dirty}\n` +
+        "Nothing was posted, pushed, or labelled — the matrix tested a tree that does not " +
+        "match the commit it would attest. Clean the tree and re-run.",
+    );
+  }
+}
+
+/**
  * @param {Deps} deps
  * @param {Config} cfg
  * @param {{ prOverride?: string|null }} [opts]
@@ -354,9 +393,14 @@ export function execute(deps, cfg, flags) {
     return { ok: true, body, results, pre, exitCode: 0 };
   }
 
+  // The marker SHA is the HEAD captured before the matrix ran, but `git push`
+  // publishes whatever HEAD is NOW. Those are only the same commit if nothing
+  // touched the branch in between — re-assert that before any side effect, or
+  // we publish untested work and vouch for it.
+  verifyHeadUnchanged(deps, pre);
+
   // Post the attestation comment BEFORE pushing so it is visible when the
-  // push event fires GitHub Actions. The SHA embedded in the marker is the
-  // local HEAD, which is identical to what gets pushed.
+  // push event fires GitHub Actions.
   upsertComment(deps, { repo: pre.repo, pr: pre.pr, body, trustedAssociations: cfg.trustedAssociations });
 
   if (flags.push && cfg.pushAfterAttest) {
