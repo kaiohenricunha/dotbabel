@@ -134,6 +134,58 @@ clear_state() {
 command -v git >/dev/null 2>&1 || exit 0
 git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 
+# `git status --porcelain` reports paths relative to the repository TOP LEVEL,
+# not to the -C directory, so every changed path is resolved against this.
+GIT_TOP=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -n "$GIT_TOP" ] || exit 0
+
+# marker_for <lang> — the file that identifies a project root for a language.
+# C# is empty on purpose: it matches a glob (*.csproj / *.sln), handled below.
+marker_for() {
+  case "$1" in
+    go)     printf 'go.mod' ;;
+    rust)   printf 'Cargo.toml' ;;
+    ts)     printf 'tsconfig.json' ;;
+    java)   printf 'pom.xml' ;;
+    *)      printf '' ;;
+  esac
+}
+
+# find_project_root <lang> <dir> — print the nearest directory at or above
+# <dir> that holds the language's marker. The walk stops at the repo top.
+#
+# The marker used to be looked up at $ROOT only, which made this hook a silent
+# no-op on every monorepo: squadranks keeps go.mod at api/go.mod, so a Go edit
+# found no marker at the root and no check ever ran.
+#
+# The result must stay inside $ROOT. $ROOT is the directory the user put on
+# the trust allowlist, and these checkers execute repo-controlled build code,
+# so a root discovered outside it is refused rather than checked.
+find_project_root() {
+  local lang="$1" dir="$2" marker parent f
+  marker=$(marker_for "$lang")
+  while :; do
+    if [ -n "$marker" ]; then
+      if [ -f "$dir/$marker" ]; then
+        case "$dir/" in "$ROOT"/*) printf '%s' "$dir"; return 0 ;; esac
+        return 1
+      fi
+    else
+      for f in "$dir"/*.csproj "$dir"/*.sln; do
+        if [ -e "$f" ]; then
+          case "$dir/" in "$ROOT"/*) printf '%s' "$dir"; return 0 ;; esac
+          return 1
+        fi
+      done
+    fi
+    [ "$dir" = "$GIT_TOP" ] && return 1
+    parent="${dir%/*}"
+    [ -n "$parent" ] || return 1
+    [ "$parent" = "$dir" ] && return 1
+    dir="$parent"
+  done
+}
+
 # -z and --untracked-files=all are both load-bearing:
 #
 #   -z   disables git's C-quoting. `core.quotePath` defaults to true, so a
@@ -169,12 +221,18 @@ while IFS= read -r -d '' entry; do
   case "$base" in *.*) ;; *) continue ;; esac
   ext="${base##*.}"
   case "${ext,,}" in
-    go)                TOUCHED[go]=1 ;;
-    rs)                TOUCHED[rust]=1 ;;
-    ts|tsx|mts|cts)    TOUCHED[ts]=1 ;;
-    java)              TOUCHED[java]=1 ;;
-    cs)                TOUCHED[csharp]=1 ;;
+    go)                lang=go ;;
+    rs)                lang=rust ;;
+    ts|tsx|mts|cts)    lang=ts ;;
+    java)              lang=java ;;
+    cs)                lang=csharp ;;
+    *)                 continue ;;
   esac
+  # Key on language AND project root, so a monorepo runs one check per
+  # sub-project instead of one check for the whole tree.
+  abs="$GIT_TOP/$path"
+  proj=$(find_project_root "$lang" "${abs%/*}") || continue
+  TOUCHED["$lang"$'\t'"$proj"]=1
 done < <(git -C "$ROOT" status --porcelain -z --untracked-files=all 2>/dev/null)
 
 if [ "$SAW_CHANGE" -eq 0 ]; then
@@ -208,44 +266,46 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # 127 means "not applicable here" — no marker, or no toolchain — and is
 # always treated as silence, never as a finding.
 
+# Each takes the project root as $1 — find_project_root already proved the
+# marker is there, so none of them re-tests for it. `cd` happens in a subshell
+# so the caller's working directory is never disturbed between projects.
+
 chk_go() {
-  [ -f "$ROOT/go.mod" ] || return 127
   have go || return 127
-  run_bounded go vet ./... 2>&1
+  ( cd "$1" && run_bounded go vet ./... ) 2>&1
 }
 
 chk_rust() {
-  [ -f "$ROOT/Cargo.toml" ] || return 127
   have cargo || return 127
-  run_bounded cargo check --quiet --message-format short 2>&1
+  ( cd "$1" && run_bounded cargo check --quiet --message-format short ) 2>&1
 }
 
 chk_ts() {
-  [ -f "$ROOT/tsconfig.json" ] || return 127
-  local bin="$ROOT/node_modules/.bin/tsc"
-  if [ ! -x "$bin" ]; then
-    have tsc || return 127
+  # node_modules is often hoisted to the repo top in a monorepo, so look in
+  # the project first and then at the top before falling back to PATH.
+  local bin=""
+  if [ -x "$1/node_modules/.bin/tsc" ]; then
+    bin="$1/node_modules/.bin/tsc"
+  elif [ -x "$GIT_TOP/node_modules/.bin/tsc" ]; then
+    bin="$GIT_TOP/node_modules/.bin/tsc"
+  elif have tsc; then
     bin=tsc
+  else
+    return 127
   fi
-  run_bounded "$bin" --noEmit -p "$ROOT/tsconfig.json" 2>&1
+  ( cd "$1" && run_bounded "$bin" --noEmit -p "$1/tsconfig.json" ) 2>&1
 }
 
 chk_java() {
-  [ -f "$ROOT/pom.xml" ] || return 127
   have mvn || return 127
   # -o (offline) so a turn-end check can never sit downloading Maven Central.
   # A cold cache fails fast and is swallowed by NOISE_RX rather than reported.
-  run_bounded mvn -o -q -DskipTests compile 2>&1
+  ( cd "$1" && run_bounded mvn -o -q -DskipTests compile ) 2>&1
 }
 
 chk_csharp() {
-  local found=""
-  for f in "$ROOT"/*.csproj "$ROOT"/*.sln; do
-    if [ -e "$f" ]; then found=1; break; fi
-  done
-  [ -n "$found" ] || return 127
   have dotnet || return 127
-  run_bounded dotnet build --nologo -v q --no-restore 2>&1
+  ( cd "$1" && run_bounded dotnet build --nologo -v q --no-restore ) 2>&1
 }
 
 # ---------------------------------------------------------------- run ----
@@ -253,12 +313,17 @@ chk_csharp() {
 FAILED_LANGS=()
 REPORT=""
 
-cd "$ROOT" || exit 0
-
-for lang in "${!TOUCHED[@]}"; do
+for key in "${!TOUCHED[@]}"; do
+  lang="${key%%$'\t'*}"
+  proj="${key#*$'\t'}"
+  # A readable label: the project's path relative to the repo top, or "." at
+  # the top itself. This is what tells a monorepo user WHICH project failed.
+  label="${proj#"$GIT_TOP"}"
+  label="${label#/}"
+  [ -n "$label" ] || label="."
   out=""
   rc=0
-  out=$("chk_$lang" 2>/dev/null) || rc=$?
+  out=$("chk_$lang" "$proj" 2>/dev/null) || rc=$?
   [ "$rc" -eq 0 ] && continue
   [ "$rc" -eq 127 ] && continue
   # Timed out, or killed. Not a code defect.
@@ -267,10 +332,10 @@ for lang in "${!TOUCHED[@]}"; do
   if printf '%s' "$out" | grep -qE "$NOISE_RX"; then
     continue
   fi
-  FAILED_LANGS+=("$lang")
+  FAILED_LANGS+=("$lang:$label")
   body=$(printf '%s\n' "$out" | head -n "$MAX_LINES" || true)
   total=$(printf '%s\n' "$out" | wc -l || true)
-  REPORT+="[$lang] project check failed"$'\n'
+  REPORT+="[$lang $label] project check failed"$'\n'
   if [ -n "$body" ]; then
     REPORT+="${body:0:3000}"$'\n'
   else
