@@ -347,6 +347,83 @@ seed_go() {
   [[ "$(stub_calls dotnet)" == *"build"* ]]
 }
 
+@test "a non-ASCII filename still triggers its check" {
+  # core.quotePath defaults on, so without -z git emits `?? "caf\303\251.rs"`
+  # and the trailing quote lands in the extension, matching no arm.
+  printf '[package]\nname="x"\nversion="0.1.0"\n' > "$REPO/Cargo.toml"
+  printf 'fn main() {}\n' > "$REPO/café.rs"
+  stub_checker cargo 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -n "$(stub_calls cargo)" ]
+}
+
+@test "a non-ASCII directory component still triggers its check" {
+  # One accented directory silently disabled checking for everything below it.
+  printf '[package]\nname="x"\nversion="0.1.0"\n' > "$REPO/Cargo.toml"
+  mkdir -p "$REPO/münchen"
+  printf 'fn main() {}\n' > "$REPO/münchen/lib.rs"
+  stub_checker cargo 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ -n "$(stub_calls cargo)" ]
+}
+
+@test "a file in a brand-new untracked directory triggers its check" {
+  # The default --untracked-files=normal collapses these to `?? newdir/`,
+  # whose basename is empty — so the turn that creates a package was the one
+  # turn guaranteed not to be checked.
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m marker
+  mkdir -p "$REPO/pkg/newthing"
+  printf 'package newthing\n' > "$REPO/pkg/newthing/a.go"
+  stub_checker go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -n "$(stub_calls go)" ]
+}
+
+@test "status.showUntrackedFiles=no is overridden" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m marker
+  git -C "$REPO" config status.showUntrackedFiles no
+  printf 'package main\n' > "$REPO/brand_new.go"
+  stub_checker go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ -n "$(stub_calls go)" ]
+}
+
+@test "a renamed file triggers its check" {
+  # Under -z a rename is two records: "R  <new>" then a bare "<old>". The
+  # bare record carries no XY prefix and must not have three chars chopped.
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m marker
+  git -C "$REPO" mv main.go renamed.go
+  stub_checker go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -n "$(stub_calls go)" ]
+}
+
+@test "a path with spaces triggers its check" {
+  seed_go
+  mkdir -p "$REPO/dir with spaces"
+  printf 'package x\n' > "$REPO/dir with spaces/file name.go"
+  stub_checker go 0
+  feed_stop_json "$HOOK" false "$REPO"
+  [ -n "$(stub_calls go)" ]
+}
+
+@test "still a no-op when nothing changed, under -z" {
+  # SAW_CHANGE replaced the old `[ -z "$CHANGED" ]` test; pin it still holds.
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m marker
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+}
+
 @test "two touched languages run both checks" {
   seed_go
   printf '[package]\nname="x"\nversion="0.1.0"\n' > "$REPO/Cargo.toml"
