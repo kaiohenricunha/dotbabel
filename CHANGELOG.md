@@ -10,6 +10,29 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.14.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.13.0...v2.14.0) (2026-08-12)
+
+
+### Added
+
+* **hooks:** add check-on-stop Stop-event project gate ([#281](https://github.com/kaiohenricunha/dotbabel/issues/281)) ([fee0f32](https://github.com/kaiohenricunha/dotbabel/commit/fee0f320e592d6f8dee49486a7a5049a587e6fac))
+* **hooks:** add check-on-write PostToolUse syntax gate ([#280](https://github.com/kaiohenricunha/dotbabel/issues/280)) ([4695622](https://github.com/kaiohenricunha/dotbabel/commit/4695622de8770ef2085504a43f121dce7f590a16))
+* **project-init:** add --trust to grant check-on-stop trust ([#289](https://github.com/kaiohenricunha/dotbabel/issues/289)) ([2dbe867](https://github.com/kaiohenricunha/dotbabel/commit/2dbe8673969142178bda72860b4dbefe20ceb841))
+
+
+### Fixed
+
+* **check-on-stop:** find project markers per sub-project, not at the root ([#287](https://github.com/kaiohenricunha/dotbabel/issues/287)) ([5ba6772](https://github.com/kaiohenricunha/dotbabel/commit/5ba677291a6066019abac7af5e0bdacfe66ed29d))
+* **check-on-stop:** parse porcelain with -z and --untracked-files=all ([#283](https://github.com/kaiohenricunha/dotbabel/issues/283)) ([d3fc8dc](https://github.com/kaiohenricunha/dotbabel/commit/d3fc8dcc9dcf5fa406af6c61fa6d6ba17182554c))
+* **local-attest:** re-check HEAD after the matrix before publishing ([#286](https://github.com/kaiohenricunha/dotbabel/issues/286)) ([61aa474](https://github.com/kaiohenricunha/dotbabel/commit/61aa474e6050843eb8f2242ca96c54f26e5690ff))
+* **release-conductor:** fetch tags before deriving LAST_TAG [skip ci] ([#282](https://github.com/kaiohenricunha/dotbabel/issues/282)) ([465a26b](https://github.com/kaiohenricunha/dotbabel/commit/465a26b4059e55ef4e118a6a30d9d94250652a81))
+* **security:** bump js-yaml to 4.3.1 and harden argv-built subprocesses ([#288](https://github.com/kaiohenricunha/dotbabel/issues/288)) ([5db4e72](https://github.com/kaiohenricunha/dotbabel/commit/5db4e72e37fced75817ec0d0dac6eeb8eb245961))
+
+
+### Documentation
+
+* **rules:** add ASD-STE100 Simplified Technical English to rule floor ([#284](https://github.com/kaiohenricunha/dotbabel/issues/284)) ([b08527c](https://github.com/kaiohenricunha/dotbabel/commit/b08527c64c525266024a0a8404b64bbda0f681f8))
+
 ## [2.13.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.12.0...v2.13.0) (2026-08-08)
 
 
