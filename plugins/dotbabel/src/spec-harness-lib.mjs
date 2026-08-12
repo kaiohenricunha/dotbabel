@@ -111,15 +111,62 @@ export function pathExists(ctx, relativePath) {
   return existsSync(path.join(ctx.repoRoot, relativePath));
 }
 
-const FORBIDDEN_GIT_PREFIXES = ["--upload-pack", "--receive-pack", "--exec"];
+// `git` is re-exported from src/index.mjs, so `args` is caller-controlled and
+// must be treated as untrusted. Several git arguments are command execution in
+// disguise, and a deny-list cannot stay complete on its own — git keeps adding
+// options. Two layers close the gap:
+//
+//   1. `args[0]` must be a bare subcommand from ALLOWED_GIT_SUBCOMMANDS. Git
+//      honors `-c core.sshCommand=…`, `--config-env=`, `--exec-path=`,
+//      `--git-dir=`, and `-C` only *before* the subcommand, so this one rule
+//      blocks all of them. The allow-list also keeps out subcommands that run
+//      commands by design (`grep -O`, `difftool --extcmd`, `bisect run`,
+//      `submodule foreach`, `filter-branch`).
+//   2. The per-arg deny-list covers the remaining post-subcommand vectors.
+//
+// Callers that need a write or a plumbing subcommand should spawn git
+// themselves with their own validation rather than widen this helper.
+const ALLOWED_GIT_SUBCOMMANDS = new Set([
+  "branch",
+  "cat-file",
+  "describe",
+  "diff",
+  "for-each-ref",
+  "log",
+  "ls-files",
+  "ls-tree",
+  "merge-base",
+  "name-rev",
+  "remote",
+  "rev-list",
+  "rev-parse",
+  "show",
+  "show-ref",
+  "status",
+  "symbolic-ref",
+]);
+
+const FORBIDDEN_GIT_PREFIXES = [
+  "--upload-pack",
+  "--receive-pack",
+  "--exec",
+  "--ext-diff",
+  "--textconv",
+  "--open-files-in-pager",
+];
 
 /**
  * Run `git <args>` with `cwd = ctx.repoRoot`, return trimmed stdout.
  * Lets the underlying error bubble on non-zero exit.
  *
+ * Only the read-only subcommands in `ALLOWED_GIT_SUBCOMMANDS` are accepted,
+ * and `args[0]` must be that subcommand — see the note above.
+ *
  * @param {HarnessContext} ctx
  * @param {string[]} args
  * @returns {string}
+ * @throws {TypeError} When any arg is not a string.
+ * @throws {Error} When the subcommand is not allow-listed, or an arg is forbidden.
  */
 export function git(ctx, args) {
   for (const a of args) {
@@ -127,6 +174,10 @@ export function git(ctx, args) {
     if (FORBIDDEN_GIT_PREFIXES.some((p) => a.startsWith(p))) {
       throw new Error(`git: refusing forbidden arg: ${a}`);
     }
+  }
+  const subcommand = args[0];
+  if (!ALLOWED_GIT_SUBCOMMANDS.has(subcommand)) {
+    throw new Error(`git: refusing git subcommand: ${subcommand ?? "(none)"}`);
   }
   return execFileSync("git", args, { cwd: ctx.repoRoot, encoding: "utf8" }).trim();
 }

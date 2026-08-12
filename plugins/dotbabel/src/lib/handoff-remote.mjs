@@ -102,9 +102,16 @@ function fail(code, msg) {
 
 // ---- subprocess primitives ---------------------------------------------
 
-/** Spawn a shell script via spawnSync, returning {status, stdout, stderr}. */
+/**
+ * Spawn a shell script via spawnSync, returning {status, stdout, stderr}.
+ *
+ * `script` resolves from the install directory and `args` carries session
+ * file paths discovered on disk, so both are attacker-influenceable file
+ * names. They are passed as argv and never through a shell: `shell: false`
+ * lands after the `opts` spread so no caller can re-enable one.
+ */
 export function runScript(script, args, opts = {}) {
-  const res = spawnSync(script, args, { encoding: "utf8", ...opts });
+  const res = spawnSync(script, args, { encoding: "utf8", ...opts, shell: false });
   return {
     status: res.status ?? 2,
     stdout: res.stdout ?? "",
