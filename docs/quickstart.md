@@ -146,6 +146,25 @@ What lands where:
 `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
 markers, the whole file becomes the rule floor.
 
+Add `$schema` to the top of the file for editor autocomplete and validation:
+
+```json
+{
+  "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
+  "fan_out": ["codex", "gemini", "copilot"],
+  "gate_on_cli_presence": true
+}
+```
+
+`fan_out` accepts only `codex`, `gemini`, and `copilot`. A typo such as
+`co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
+
+`gate_on_cli_presence` (default `true`) skips a CLI's symlink fan-out when its
+binary is absent from `PATH`. `check-project-sync` applies the same gate, so it
+does not report the un-synced CLI as drift and instead prints
+`skipped <cli>: not on PATH`. Pass `--all` to either command to inspect every
+CLI in `fan_out` regardless. Instruction files are always written, never gated.
+
 A repo with `.dotbabel.json` will also be picked up by `dotbabel doctor` —
 the diagnostic adds a project-sync wiring check.
 

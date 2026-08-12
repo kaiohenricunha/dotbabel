@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
+  "title": "dotbabel project config",
+  "description": "Shape of a repo's `.dotbabel.json`, which drives `dotbabel project-sync` and `dotbabel-check-project-sync`. Every key is optional; omitted keys fall back to DEFAULT_PROJECT_CONFIG in plugins/dotbabel/src/project-sync.mjs.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Editor hint pointing at this schema."
+    },
+    "rule_floor_source": {
+      "type": "string",
+      "description": "Markdown file holding the canonical rule floor that instruction files are generated from.",
+      "default": "CLAUDE.md"
+    },
+    "commands_dir": {
+      "type": "string",
+      "description": "Directory of Claude command markdown files that fan out to the other CLIs.",
+      "default": ".claude/commands"
+    },
+    "skills_dir": {
+      "type": "string",
+      "description": "Directory of Claude skill directories that fan out to the other CLIs.",
+      "default": ".claude/skills"
+    },
+    "fan_out": {
+      "type": "array",
+      "description": "CLIs to fan commands and skills out to. An unknown name is rejected at config load rather than skipped.",
+      "default": ["codex", "gemini", "copilot"],
+      "items": {
+        "type": "string",
+        "enum": ["codex", "gemini", "copilot"]
+      }
+    },
+    "gate_on_cli_presence": {
+      "type": "boolean",
+      "description": "When true, skip a CLI's symlink fan-out if its binary is absent from PATH. `dotbabel-check-project-sync` honors the same setting, so it will not report the skipped CLI as drift. Pass --all to either binary to override for one run. Instruction files are always written, never gated.",
+      "default": true
+    },
+    "cli_substitutions": {
+      "type": "object",
+      "description": "Per-CLI text substitutions applied while rendering instruction files.",
+      "additionalProperties": true
+    },
+    "targets": {
+      "type": "array",
+      "description": "Instruction files to generate from the rule floor.",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["relativeOutputPath"],
+        "properties": {
+          "relativeOutputPath": {
+            "type": "string",
+            "description": "Repo-relative path of the generated instruction file."
+          },
+          "cliSet": {
+            "type": "array",
+            "description": "CLIs this instruction file serves.",
+            "items": { "type": "string" }
+          },
+          "substitutionKey": {
+            "type": "string",
+            "description": "Key into cli_substitutions used when rendering this target."
+          }
+        }
+      }
+    }
+  }
+}

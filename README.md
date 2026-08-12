@@ -232,6 +232,7 @@ dotbabel project-init                 # one-time: writes .dotbabel.json and a st
 dotbabel project-sync --dry-run       # preview planned actions
 dotbabel project-sync                 # symlink everything in place
 dotbabel check-project-sync           # CI-safe drift check (read-only)
+dotbabel check-project-sync --all     # ...including CLIs you have not installed
 ```
 
 The fan-out uses symlinks — your `.claude/` tree stays the single source of
@@ -239,6 +240,26 @@ truth. A `.dotbabel.json` is optional; without one, project-sync uses
 sensible defaults and treats the entire `CLAUDE.md` as the project rule
 floor (or the slice between `<!-- dotbabel:rule-floor:begin -->` /
 `<!-- dotbabel:rule-floor:end -->` markers when present).
+
+`gate_on_cli_presence` (default `true`) skips a CLI's symlink fan-out when its
+binary is absent from `PATH`. `check-project-sync` honors the same setting, so
+a machine without `gemini` installed does not report the un-synced Gemini tree
+as drift; pass `--all` to either command to ignore the gate for one run.
+Instruction files (`AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`)
+are always written, never gated.
+
+Point your editor at the config schema for autocomplete and validation:
+
+```json
+{
+  "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
+  "fan_out": ["codex", "gemini", "copilot"],
+  "gate_on_cli_presence": true
+}
+```
+
+An unknown name in `fan_out` fails with `CONFIG_UNKNOWN_CLI` rather than being
+skipped, so a typo cannot silently cost you a CLI's wiring.
 
 ### Node API
 

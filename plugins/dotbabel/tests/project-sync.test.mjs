@@ -6,10 +6,13 @@ import {
   projectSync,
   loadProjectConfig,
   DEFAULT_PROJECT_CONFIG,
+  KNOWN_FAN_OUT_CLIS,
   extractRuleFloorOrWhole,
 } from "../src/project-sync.mjs";
+import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 
 let tmpDirs = [];
+let savedPath = null;
 
 function makeTmpDir(prefix = "project-sync-test-") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -17,7 +20,19 @@ function makeTmpDir(prefix = "project-sync-test-") {
   return dir;
 }
 
+// `commandExists` shells out to `sh -c 'command -v <cli>'`, so pointing PATH at
+// an empty directory is what makes "this CLI is not installed" deterministic on
+// a dev box that may well have codex or gemini on the real PATH.
+function hideAllClisFromPath() {
+  savedPath = process.env.PATH;
+  process.env.PATH = makeTmpDir("project-sync-emptypath-");
+}
+
 afterEach(() => {
+  if (savedPath !== null) {
+    process.env.PATH = savedPath;
+    savedPath = null;
+  }
   for (const dir of tmpDirs) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -95,6 +110,59 @@ describe("loadProjectConfig", () => {
     const repo = makeTmpDir();
     fs.writeFileSync(path.join(repo, ".dotbabel.json"), "{ broken json");
     expect(() => loadProjectConfig(repo)).toThrow(/.dotbabel.json is not valid JSON/);
+  });
+
+  // A typo in fan_out used to warn and skip, which silently produced no fan-out
+  // for that CLI in a non-interactive run (#219, finding E).
+  it("throws CONFIG_UNKNOWN_CLI on an unknown fan_out entry", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out: ["codex", "co-pilot"] }),
+    );
+    let caught;
+    try {
+      loadProjectConfig(repo);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ValidationError);
+    expect(caught.code).toBe(ERROR_CODES.CONFIG_UNKNOWN_CLI);
+    expect(caught.file).toBe(".dotbabel.json");
+    expect(caught.pointer).toBe("/fan_out/1");
+    expect(caught.message).toMatch(/co-pilot/);
+  });
+
+  it("throws when fan_out holds a non-string entry", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out: ["codex", 42] }),
+    );
+    expect(() => loadProjectConfig(repo)).toThrow(ValidationError);
+  });
+
+  it("accepts every known CLI", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out: [...KNOWN_FAN_OUT_CLIS] }),
+    );
+    expect(loadProjectConfig(repo).fan_out).toEqual([...KNOWN_FAN_OUT_CLIS]);
+  });
+
+  it("tolerates the $schema key editors use for autocomplete", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({
+        $schema: "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
+        fan_out: ["codex"],
+      }),
+    );
+    const cfg = loadProjectConfig(repo);
+    expect(cfg.fan_out).toEqual(["codex"]);
+    expect(cfg.rule_floor_source).toBe("CLAUDE.md");
   });
 });
 
@@ -262,12 +330,13 @@ describe("projectSync", () => {
       withDotbabelJson: {
         ...DEFAULT_PROJECT_CONFIG,
         targets: [...DEFAULT_PROJECT_CONFIG.targets],
-        fan_out: ["this-cli-does-not-exist-xyz"],
+        fan_out: ["codex"],
       },
     });
+    hideAllClisFromPath();
     const r = await projectSync({ repoRoot: repo, allCli: false, quiet: true });
     expect(r.ok).toBe(true);
-    // No fan-out happened for the unknown-named CLI.
+    // No fan-out happened for the CLI that is absent from PATH.
     expect(fs.existsSync(path.join(repo, ".codex"))).toBe(false);
     expect(r.skipped).toBeGreaterThan(0);
   });
@@ -294,7 +363,9 @@ describe("projectSync", () => {
     expect(r.ok).toBe(false);
   });
 
-  it("warns and skips an unknown fan_out CLI name", async () => {
+  // Was "warns and skips": a typo now fails the run instead of quietly
+  // producing no fan-out for that CLI (#219, finding E).
+  it("rejects an unknown fan_out CLI name", async () => {
     const repo = makeTmpDir();
     buildFakeRepo(repo, {
       withDotbabelJson: {
@@ -303,9 +374,9 @@ describe("projectSync", () => {
         fan_out: ["mystery-cli-foo"],
       },
     });
-    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
-    expect(r.ok).toBe(true);
-    expect(r.skipped).toBeGreaterThan(0);
+    await expect(
+      projectSync({ repoRoot: repo, allCli: true, quiet: true }),
+    ).rejects.toMatchObject({ code: ERROR_CODES.CONFIG_UNKNOWN_CLI });
   });
 
   it("idempotent instruction-file write: no rewrite when content unchanged", async () => {

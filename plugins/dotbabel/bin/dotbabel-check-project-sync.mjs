@@ -7,6 +7,11 @@
  *
  * Flags:
  *   --repo <path>   target repo root (default: cwd)
+ *   --all           inspect every fan_out CLI even when its binary is missing
+ *                   on PATH (mirrors `dotbabel project-sync --all`)
+ *
+ * By default a CLI absent from PATH is skipped, matching what `project-sync`
+ * did when it declined to write that CLI's symlinks.
  *
  * Exits: 0 ok, 1 drift detected, 2 env error, 64 usage error.
  */
@@ -23,9 +28,10 @@ const META = {
   name: "dotbabel-check-project-sync",
   synopsis: "dotbabel-check-project-sync [OPTIONS]",
   description:
-    "Verify a repo's cross-CLI project-sync wiring (instruction files + symlinks) matches what `dotbabel project-sync` would produce. Read-only.",
+    "Verify a repo's cross-CLI project-sync wiring (instruction files + symlinks) matches what `dotbabel project-sync` would produce. Read-only. CLIs missing from PATH are skipped unless --all is passed.",
   flags: {
     repo: { type: "string" },
+    all: { type: "boolean" },
   },
 };
 
@@ -55,6 +61,7 @@ const repoRoot = path.resolve(
 try {
   const result = await checkProjectSync({
     repoRoot,
+    allCli: Boolean(argv.flags.all),
     json: argv.json,
     noColor: argv.noColor,
     out,
@@ -66,7 +73,11 @@ try {
     out.flush();
     process.exit(EXIT_CODES.VALIDATION);
   }
-  out.pass(`project-sync ok (${result.okEntries.length} entries verified)`);
+  const skippedNote =
+    result.skipped.length > 0 ? `, ${result.skipped.length} CLIs skipped` : "";
+  out.pass(
+    `project-sync ok (${result.okEntries.length} entries verified${skippedNote})`,
+  );
   out.flush();
   process.exit(EXIT_CODES.OK);
 } catch (err) {

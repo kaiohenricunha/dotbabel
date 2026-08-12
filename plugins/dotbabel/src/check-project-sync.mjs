@@ -18,12 +18,17 @@ import {
   validateSubstitutions,
   ERROR_CODES,
 } from "./generate-instructions.mjs";
-import { extractRuleFloorOrWhole, loadProjectConfig } from "./project-sync.mjs";
+import {
+  extractRuleFloorOrWhole,
+  loadProjectConfig,
+  shouldFanOutCli,
+} from "./project-sync.mjs";
 import { ValidationError } from "./lib/errors.mjs";
 
 /**
  * @typedef {object} CheckProjectSyncOpts
  * @property {string} repoRoot
+ * @property {boolean} [allCli]  Inspect every CLI in `fan_out` even when its binary is absent from PATH.
  * @property {boolean} [json]
  * @property {boolean} [noColor]
  * @property {boolean} [quiet]
@@ -36,6 +41,7 @@ import { ValidationError } from "./lib/errors.mjs";
  * @property {DriftEntry[]} missing
  * @property {DriftEntry[]} stale
  * @property {DriftEntry[]} okEntries
+ * @property {string[]} skipped           CLIs not inspected because their binary is absent from PATH
  */
 
 /**
@@ -55,11 +61,12 @@ export async function checkProjectSync(opts) {
   /** @type {DriftEntry[]} */ const missing = [];
   /** @type {DriftEntry[]} */ const stale = [];
   /** @type {DriftEntry[]} */ const okEntries = [];
+  /** @type {string[]} */ const skipped = [];
 
   if (!fs.existsSync(repoRoot)) {
     out.fail(`repo root does not exist: ${repoRoot}`);
     out.flush();
-    return { ok: false, missing, stale, okEntries };
+    return { ok: false, missing, stale, okEntries, skipped };
   }
 
   const cfg = loadProjectConfig(repoRoot);
@@ -67,7 +74,7 @@ export async function checkProjectSync(opts) {
   if (!fs.existsSync(sourcePath)) {
     out.fail(`rule-floor source does not exist: ${cfg.rule_floor_source}`);
     out.flush();
-    return { ok: false, missing, stale, okEntries };
+    return { ok: false, missing, stale, okEntries, skipped };
   }
 
   // ---- Instruction files: compare existing host content against what
@@ -179,6 +186,13 @@ export async function checkProjectSync(opts) {
   const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
 
   for (const cli of fanOut) {
+    // Skip exactly what projectSync skipped. Reporting drift for fan-out that
+    // was deliberately never performed is the bug this closes (#219, finding D).
+    if (!shouldFanOutCli(cli, cfg, { allCli: opts.allCli })) {
+      skipped.push(cli);
+      out.info(`skipped ${cli}: not on PATH (use --all to check anyway)`);
+      continue;
+    }
     if (cli === "codex" || cli === "gemini") {
       const targetDir = path.join(repoRoot, `.${cli}`, "skills");
       if (fs.existsSync(skillsAbs)) {
@@ -232,8 +246,9 @@ export async function checkProjectSync(opts) {
   }
 
   out.flush();
+  // A skipped CLI is not drift, so it must never flip `ok`.
   const ok = missing.length === 0 && stale.length === 0;
-  return { ok, missing, stale, okEntries };
+  return { ok, missing, stale, okEntries, skipped };
 }
 
 // Re-export markers for callers that want to inspect a CLAUDE.md directly.

@@ -130,6 +130,19 @@ outputs.
 
 ---
 
+## Project-config errors (`.dotbabel.json`)
+
+### `CONFIG_UNKNOWN_CLI`
+
+`fan_out` names a CLI that `project-sync` cannot fan out to. Only `codex`,
+`gemini`, and `copilot` are supported, so a typo such as `co-pilot` or
+`github-copilot` would otherwise skip that CLI's wiring without failing.
+**Fix**: correct the name in `.dotbabel.json:fan_out`, or drop the entry. Add
+`"$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json"` to the
+file so your editor flags the typo before you run anything.
+
+---
+
 ## Scaffold errors
 
 ### `SCAFFOLD_CONFLICT`
