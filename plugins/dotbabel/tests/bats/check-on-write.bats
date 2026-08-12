@@ -280,9 +280,10 @@ teardown() {
   [ -z "$(stub_calls ruff)" ]
 }
 
-@test "one noise line discards the entire output" {
-  # Pins the "discard the ENTIRE output" policy, not just per-line filtering:
-  # gcc aborts at the first missing include and the rest is downstream garbage.
+@test "a noise line is dropped but a real finding beside it survives" {
+  # Replaces an earlier "discard the ENTIRE output" policy. That was justified
+  # by gcc aborting at the first missing include, but C/C++ no longer dispatches
+  # here, so the blunt version only cost real findings.
   printf 'x = 1\n' > "$WORK/a.py"
   cat > "$STUB_BIN/ruff" <<'STUB'
 #!/usr/bin/env bash
@@ -291,6 +292,23 @@ echo "ruff: command not found"
 exit 1
 STUB
   chmod +x "$STUB_BIN/ruff"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/a.py"
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"E999"* ]]
+  [[ "$output" != *"command not found"* ]]
+}
+
+@test "output that is entirely noise stays silent" {
+  printf 'x = 1\n' > "$WORK/a.py"
+  stub_checker ruff 1 "" "ruff: command not found"
+  feed_post_tooluse_json "$HOOK" Edit "$WORK/a.py"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "noise matching is case-insensitive" {
+  printf 'x = 1\n' > "$WORK/a.py"
+  stub_checker ruff 1 "" "Command Not Found"
   feed_post_tooluse_json "$HOOK" Edit "$WORK/a.py"
   [ "$status" -eq 0 ]
   [ -z "$output" ]

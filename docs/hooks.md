@@ -197,6 +197,20 @@ Both checkers fail open. A missing `jq`, a missing toolchain, bash 3.2, an
 unmatched extension, a vendored path or a generated file all produce silence
 rather than an error.
 
+### Toolchain noise
+
+Some output means "the toolchain failed to run", not "the code is wrong" — a
+version-manager shim that is on `PATH` but not installed, a cold Maven cache
+under `mvn -o`, or `NETSDK1004` from `dotnet build --no-restore` on a fresh
+clone. None is something the model can fix by editing source.
+
+Those lines are dropped **individually**, and the rest of the output is still
+reported. A check whose output is entirely noise stays silent. Matching is
+case-insensitive, so a tool that capitalises its message is still recognised.
+
+A checker that fails with no output at all is reported rather than swallowed —
+silence from a failing checker is worth surfacing.
+
 ---
 
 ## Troubleshooting

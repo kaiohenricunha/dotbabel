@@ -411,3 +411,123 @@ dotbabel show pre-pr --json
 ```
 
 Exit 1 if the artifact is not found. Exit 2 if the index is missing.
+
+---
+
+## `dotbabel-project-sync`
+
+Fan out this repo's `CLAUDE.md`, `.claude/commands` and `.claude/skills` into
+Codex / Gemini / Copilot project-scope analogues. Repo-local; user-scope
+artifacts are `dotbabel bootstrap`'s job.
+
+| Flag            | Default |                                        |
+| --------------- | ------- | -------------------------------------- |
+| `--repo <path>` | `cwd`   | Target repo root                       |
+| `--all`         | false   | Fan out regardless of CLI presence     |
+| `--force`       | false   | Replace conflicting existing targets   |
+| `--dry-run`     | false   | Report planned actions, mutate nothing |
+
+Gated on CLI presence by default: a target is skipped when its CLI is not on
+PATH. `.dotbabel.json` `gate_on_cli_presence` controls that; `--all` overrides.
+
+---
+
+## `dotbabel-check-project-sync`
+
+Read-only counterpart. Verifies the wiring matches what `project-sync` would
+produce, without writing anything — the CI-safe form.
+
+| Flag            | Default |                  |
+| --------------- | ------- | ---------------- |
+| `--repo <path>` | `cwd`   | Target repo root |
+
+---
+
+## `dotbabel-generate-instructions`
+
+Render `CLAUDE.md`'s rule-floor block into `AGENTS.md`, `GEMINI.md`,
+`.github/copilot-instructions.md` and the per-CLI user-scope templates.
+
+| Flag                 | Default          |                                       |
+| -------------------- | ---------------- | ------------------------------------- |
+| `--repo-root <path>` | resolved via git | Override repo root                    |
+| `--dry-run`          | false            | Report planned writes, mutate nothing |
+
+Hand-editing a generated block is reverted by the next run and is detected by
+`dotbabel-check-instructions-fresh`. Edit `CLAUDE.md` and re-run this instead.
+
+---
+
+## `dotbabel-local-attest`
+
+Run the configured CI matrix locally and, on a clean pass, post an attestation
+comment so the remote pipeline can skip itself for that commit. Exists to
+protect CI minutes.
+
+| Flag              | Default                |                                   |
+| ----------------- | ---------------------- | --------------------------------- |
+| `--pr <N>`        | open PR for the branch | Target PR                         |
+| `--no-push`       | false                  | Do not `git push` after attesting |
+| `--dry-run`       | false                  | Print the comment; post nothing   |
+| `--config <path>` | discovered             | Override the config file location |
+
+Config discovery, in order: `.local-attest.config.mjs`,
+`.local-attest.config.json`, then `package.json#local-attest`.
+
+The attestation is SHA-pinned, so a push after attesting invalidates it. Commit
+first, attest second.
+
+---
+
+## `dotbabel-pr-stack`
+
+Reason about stacked pull requests — dependency graph, merge order, and the
+exact commands a child needs once its parent has merged.
+
+| Subcommand | Purpose                                                          |
+| ---------- | ---------------------------------------------------------------- |
+| `graph`    | Print the raw dependency graph                                   |
+| `plan`     | What can land now, what is blocked, and any structural problems  |
+| `next`     | The commands to move a child PR after its parent merged          |
+| `gate`     | Evaluate a precondition (`local-attest` \| `merge` \| `skip-ci`) |
+| `phases`   | The canonical pipeline phase order                               |
+
+| Flag                 | Default  |                                              |
+| -------------------- | -------- | -------------------------------------------- |
+| `--trunk <ref>`      | `main`   | Trunk branch name                            |
+| `--limit <N>`        | 100      | Max PRs to enumerate                         |
+| `--pr <N>`           | —        | Required by `next` and `gate`                |
+| `--parent <N>`       | —        | Required by `next`                           |
+| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging |
+| `--remote <name>`    | `origin` | Git remote                                   |
+| `--gate <name>`      | —        | Gate to evaluate                             |
+| `--sha <rev>`        | `HEAD`   | Commit to inspect for `--gate skip-ci`       |
+
+Capture `--parent-sha` before the parent merges. The repo squash-merges, so the
+parent's original commits are not ancestors of the squashed commit and
+`git rebase --onto` needs that SHA to know what to drop. `merge-pr` deletes the
+branch, so the ref can be gone by the time you want it.
+
+**Exits 1** from `plan` on a structural problem (cycle, orphan base, two open
+PRs on one head). Those need a human decision, not a retry.
+
+---
+
+## `dotbabel-handoff`
+
+Cross-agent and cross-machine session handoff. See
+[handoff-guide.md](./handoff-guide.md) for the full surface — this entry exists
+so the bin is discoverable from the reference.
+
+| Subcommand | Purpose                                        |
+| ---------- | ---------------------------------------------- |
+| `pull`     | Render a local session as a handoff block      |
+| `push`     | Publish to the remote transport repo           |
+| `fetch`    | Retrieve a handoff pushed from another machine |
+| `list`     | Enumerate local sessions                       |
+| `search`   | Find a session by content                      |
+| `prune`    | Delete aged transport branches                 |
+| `doctor`   | Preflight the remote transport                 |
+
+The remote transport is a user-owned private git repo named by
+`DOTBABEL_HANDOFF_REPO`. `push` without a query requires `--from <cli>`.
