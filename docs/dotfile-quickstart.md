@@ -171,6 +171,13 @@ after a pull the new version is live — but the running session cached the old 
 > Agents are **copied**, not symlinked — Claude Code resolves agent paths at startup
 > and needs real files, not symlinks, on some platforms.
 
+Three hooks land in `~/.claude/hooks/`: `guard-destructive-git.sh`,
+`check-on-write.sh` and `check-on-stop.sh`. **The symlink does not enable them.**
+Bootstrap never edits `settings.json`, so nothing runs until you register it —
+see [hooks.md](./hooks.md#registering-a-hook). `check-on-stop.sh` additionally
+needs the repo on a trust allowlist, because it runs the project's own build
+tooling.
+
 ---
 
 ## Next

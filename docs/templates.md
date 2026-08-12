@@ -51,6 +51,10 @@ templates/
 - **`claude/hooks/guard-destructive-git.sh`** — PreToolUse hook that blocks
   destructive git calls. Exit 2 per Claude Code hook protocol. See
   [ADR-0014](./adr/0014-cli-tick-cross-warn-format.md) for the ✓/✗/⚠ format inheritance.
+  This tree is the **repo-scope** surface `dotbabel-init` scaffolds, and it carries
+  only the guard hook. The editor and turn-end checkers (`check-on-write.sh`,
+  `check-on-stop.sh`) install **user-scope** instead — `bootstrap.sh` symlinks them
+  from `plugins/dotbabel/hooks/` into `~/.claude/hooks/`. See [hooks.md](./hooks.md).
 - **`claude/skills-manifest.json`** — minimal `{version:1, skills:[]}`
   seed. Run `npx dotbabel-validate-skills --update` after adding skills to
   populate checksums.
