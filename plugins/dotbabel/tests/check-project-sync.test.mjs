@@ -14,12 +14,15 @@ function makeTmpDir(prefix = "check-project-sync-test-") {
   return dir;
 }
 
-// `commandExists` shells out to `sh -c 'command -v <cli>'`, so pointing PATH at
-// an empty directory is what makes "this CLI is not installed" deterministic on
-// a dev box that may well have codex or gemini on the real PATH.
+// `commandExists` shells out to `sh -c 'command -v <cli>'`, so a PATH holding
+// only `sh` is what makes "this CLI is not installed" deterministic on a dev box
+// that may well have codex or gemini on the real PATH. Keeping `sh` reachable
+// matters: an entirely empty PATH would fail the probe for the wrong reason.
 function hideAllClisFromPath() {
   savedPath = process.env.PATH;
-  process.env.PATH = makeTmpDir("check-project-sync-emptypath-");
+  const bin = makeTmpDir("check-project-sync-cliless-bin-");
+  fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+  process.env.PATH = bin;
 }
 
 afterEach(() => {
