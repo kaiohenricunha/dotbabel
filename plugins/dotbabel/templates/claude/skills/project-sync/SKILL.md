@@ -57,6 +57,10 @@ dry-run output before mutating the repo.
    `--all`, propagate it.
 4. **Verify.** Run `dotbabel check-project-sync` and report `ok` /
    `missing` / `stale` counts. Exit non-zero output should be surfaced.
+   The check applies the same `gate_on_cli_presence` gate as the sync, so a CLI
+   absent from `PATH` is reported as `skipped <cli>: not on PATH` rather than as
+   drift. Propagate `--all` here too when the user passed it in step 3, so both
+   commands cover the same CLIs.
 
 ## Triggers and invocations
 
@@ -83,5 +87,7 @@ full layout and rationale.
   to the binary's existing collision warnings.
 - For consumer repos with no `.dotbabel.json`, the convention path applies
   (entire `CLAUDE.md` becomes the rule floor when markers are absent).
+- `fan_out` accepts only `codex`, `gemini`, and `copilot`. A typo aborts the run
+  with `CONFIG_UNKNOWN_CLI`; fix the name rather than dropping the gate.
 - This skill is for **project-scope** sync. For user-scope (`~/.claude/`,
   `~/.codex/`, `~/.gemini/`) bootstrap, use `dotbabel bootstrap` instead.

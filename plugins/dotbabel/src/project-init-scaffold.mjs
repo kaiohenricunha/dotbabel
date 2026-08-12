@@ -11,6 +11,7 @@ import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 /** Default `.dotbabel.json` body written when none exists. */
 export const DEFAULT_DOTBABEL_JSON = Object.freeze({
+  $schema: "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
   rule_floor_source: "CLAUDE.md",
   commands_dir: ".claude/commands",
   skills_dir: ".claude/skills",

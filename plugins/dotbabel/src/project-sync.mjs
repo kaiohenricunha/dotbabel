@@ -31,16 +31,22 @@ import {
   extractRuleFloor,
   renderTarget,
   validateSubstitutions,
-  ERROR_CODES,
 } from "./generate-instructions.mjs";
-import { ValidationError } from "./lib/errors.mjs";
+import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
+
+/**
+ * The CLIs `fan_out` may name. Single source of truth: the config validator,
+ * the fan-out dispatch below, and `schemas/dotbabel.config.schema.json` all
+ * agree with this list.
+ */
+export const KNOWN_FAN_OUT_CLIS = Object.freeze(["codex", "gemini", "copilot"]);
 
 /** Default config returned when `.dotbabel.json` is absent. */
 export const DEFAULT_PROJECT_CONFIG = Object.freeze({
   rule_floor_source: "CLAUDE.md",
   commands_dir: ".claude/commands",
   skills_dir: ".claude/skills",
-  fan_out: Object.freeze(["codex", "gemini", "copilot"]),
+  fan_out: KNOWN_FAN_OUT_CLIS,
   gate_on_cli_presence: true,
   cli_substitutions: Object.freeze({}),
   targets: Object.freeze([
@@ -95,7 +101,46 @@ export function loadProjectConfig(repoRoot) {
       message: ".dotbabel.json must be a JSON object at the top level",
     });
   }
+  // A misspelled CLI used to fall through to a warn-and-skip during fan-out,
+  // which reads as success in a non-interactive run. Reject it at load time so
+  // the typo cannot silently cost a consumer their Copilot wiring (#219).
+  if (Array.isArray(raw.fan_out)) {
+    raw.fan_out.forEach((cli, i) => {
+      if (typeof cli === "string" && KNOWN_FAN_OUT_CLIS.includes(cli)) return;
+      throw new ValidationError({
+        code: ERROR_CODES.CONFIG_UNKNOWN_CLI,
+        category: "settings",
+        file: ".dotbabel.json",
+        pointer: `/fan_out/${i}`,
+        message: `unknown fan_out CLI: ${JSON.stringify(cli)}`,
+        expected: `one of: ${KNOWN_FAN_OUT_CLIS.join(", ")}`,
+        got: String(cli),
+        hint: "fix the name in .dotbabel.json:fan_out, or drop the entry",
+      });
+    });
+  }
   return { ...DEFAULT_PROJECT_CONFIG, ...raw };
+}
+
+/**
+ * Whether `cli`'s symlink fan-out should run for this config.
+ *
+ * `dotbabel-check-project-sync` shares this predicate so it skips exactly the
+ * CLIs `dotbabel project-sync` skipped. Without that, a machine missing one CLI
+ * syncs cleanly and then reports the un-synced CLI as drift (#219, finding D).
+ *
+ * Note this governs the symlink fan-out only. Instruction files (AGENTS.md and
+ * friends) are written unconditionally, so they are never gated.
+ *
+ * @param {string} cli
+ * @param {typeof DEFAULT_PROJECT_CONFIG} cfg
+ * @param {{ allCli?: boolean }} [opts]
+ * @returns {boolean}
+ */
+export function shouldFanOutCli(cli, cfg, { allCli = false } = {}) {
+  if (allCli) return true;
+  if (!cfg.gate_on_cli_presence) return true;
+  return commandExists(cli);
 }
 
 /**
@@ -233,6 +278,8 @@ export async function projectSync(opts) {
     } else if (cli === "copilot") {
       fanOutCopilotLayout();
     } else {
+      // Defensive only: loadProjectConfig rejects unknown names before we get
+      // here. Kept so a programmatically-built cfg cannot silently misdispatch.
       out.warn(`unknown fan_out CLI: ${cli} (skipped)`);
       skipped++;
     }
@@ -245,9 +292,7 @@ export async function projectSync(opts) {
   // helpers (closures over linked / skipped / backed_up / out / opts)
 
   function gateOnCli(cli, label) {
-    if (opts.allCli) return true;
-    if (!cfg.gate_on_cli_presence) return true;
-    if (commandExists(cli)) return true;
+    if (shouldFanOutCli(cli, cfg, { allCli: opts.allCli })) return true;
     out.info(`skipped ${label} (${cli} not on PATH; use --all to force)`);
     skipped++;
     return false;

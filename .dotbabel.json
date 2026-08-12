@@ -1,4 +1,5 @@
 {
+  "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
   "rule_floor_source": "CLAUDE.md",
   "commands_dir": ".claude/commands",
   "skills_dir": ".claude/skills",

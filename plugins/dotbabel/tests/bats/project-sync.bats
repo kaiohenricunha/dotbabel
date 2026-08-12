@@ -106,7 +106,7 @@ teardown() {
 
 @test "check-project-sync exit 0 after sync" {
   $PSYNC --repo "$REPO" --all >/dev/null
-  run $PCHECK --repo "$REPO"
+  run $PCHECK --repo "$REPO" --all
   [ "$status" -eq 0 ]
 }
 
@@ -115,9 +115,34 @@ teardown() {
   unlink "$REPO/.codex/skills/commit/SKILL.md"
   # Source must remain untouched.
   [ -f "$REPO/.claude/commands/commit.md" ]
-  run $PCHECK --repo "$REPO"
+  run $PCHECK --repo "$REPO" --all
   [ "$status" -eq 1 ]
   [[ "$output" == *"missing"* ]]
+}
+
+# Without --all the checker honors gate_on_cli_presence, so a CLI that is not
+# installed is reported as skipped rather than as drift (#219, finding D). A CI
+# runner has none of the three CLIs, which is exactly the case that used to make
+# this binary always exit 1.
+@test "check-project-sync skips a CLI that is absent from PATH" {
+  $PSYNC --repo "$REPO" --all >/dev/null
+  unlink "$REPO/.codex/skills/commit/SKILL.md"
+  # A PATH holding only sh and node: the CLIs are genuinely absent, but the
+  # `command -v` probe and the checker itself still run.
+  CLILESS_BIN=$(mktemp -d)
+  ln -s "$(command -v sh)" "$CLILESS_BIN/sh"
+  ln -s "$(command -v node)" "$CLILESS_BIN/node"
+  run env PATH="$CLILESS_BIN" node "$REPO_ROOT/plugins/dotbabel/bin/dotbabel-check-project-sync.mjs" --repo "$REPO"
+  rm -rf "$CLILESS_BIN"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipped codex: not on PATH"* ]]
+}
+
+@test "check-project-sync rejects an unknown fan_out CLI" {
+  printf '{"fan_out":["codex","co-pilot"]}\n' > "$REPO/.dotbabel.json"
+  run $PCHECK --repo "$REPO"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown fan_out CLI"* ]]
 }
 
 @test "project-init scaffolds .dotbabel.json and starter CLAUDE.md" {
