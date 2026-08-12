@@ -10,6 +10,22 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.15.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.14.0...v2.15.0) (2026-08-12)
+
+
+* release as 2.15.0 ([#294](https://github.com/kaiohenricunha/dotbabel/issues/294)) ([95d7558](https://github.com/kaiohenricunha/dotbabel/commit/95d7558f403a6b49d7a971485e88ef15e3d94744))
+
+
+### Fixed
+
+* **hooks:** filter toolchain noise per line, and match it case-insensitively ([#293](https://github.com/kaiohenricunha/dotbabel/issues/293)) ([0ab3222](https://github.com/kaiohenricunha/dotbabel/commit/0ab322299f977cb6fbdb148c3cc917d9956599b3))
+* **project-sync:** gate the drift check on CLI presence, validate fan_out ([#292](https://github.com/kaiohenricunha/dotbabel/issues/292)) ([a4e8cf7](https://github.com/kaiohenricunha/dotbabel/commit/a4e8cf79a71ef9d908ef09603e29ed40e02ac851))
+
+
+### Documentation
+
+* document check-on-write, check-on-stop, and the trust model ([#290](https://github.com/kaiohenricunha/dotbabel/issues/290)) ([bd2b196](https://github.com/kaiohenricunha/dotbabel/commit/bd2b196c396f59eac2c0ce83645f047b92a101aa))
+
 ## [2.14.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.13.0...v2.14.0) (2026-08-12)
 
 
