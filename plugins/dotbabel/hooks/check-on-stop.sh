@@ -79,7 +79,20 @@ readonly CHECK_TIMEOUT="${CHECK_ON_STOP_TIMEOUT:-120}"
 readonly MAX_LINES="${CHECK_ON_STOP_MAX_LINES:-30}"
 readonly MAX_BLOCKS=2
 
-readonly NOISE_RX='not installed for the toolchain|command not found|No such file or directory|is not recognized as|Permission denied|cannot execute binary|unrecognized command-line option|Unable to find|could not resolve dependencies|Cannot access central'
+# Matched case-INSENSITIVELY (grep -i, below). That is deliberate, not
+# cosmetic: Maven emits "Could not resolve dependencies" with a capital C, so a
+# case-sensitive match against the lowercase alternative never fired, and the
+# cold-cache suppression this file documents for `mvn -o` did not work at all.
+#
+# "cannot access .* in offline mode" replaces a hard-coded "Cannot access
+# central". The repository id is whatever the user's settings.xml names, so
+# anyone behind a corporate mirror saw "Cannot access nexus (...)" and matched
+# nothing.
+#
+# The NETSDK1004 group is the .NET counterpart. `dotnet build --no-restore`
+# emits it on any fresh clone, because obj/ is gitignored by the standard
+# template — a state the model cannot fix by editing .cs files.
+readonly NOISE_RX='not installed for the toolchain|command not found|No such file or directory|is not recognized as|Permission denied|cannot execute binary|unrecognized command-line option|Unable to find|could not resolve dependencies|cannot access .* in offline mode|NETSDK1004|assets file .* not found|run a nuget package restore'
 
 INPUT=$(cat)
 
@@ -336,8 +349,19 @@ for key in "${!TOUCHED[@]}"; do
   [ "$rc" -eq 127 ] && continue
   # Timed out, or killed. Not a code defect.
   { [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; } && continue
-  # The toolchain failed to run rather than finding a defect.
-  if printf '%s' "$out" | grep -qE "$NOISE_RX"; then
+  # Drop the lines that mean "the toolchain failed to run" and keep the rest.
+  #
+  # This used to discard the ENTIRE output on a single match, which was far too
+  # blunt: a long mvn or dotnet failure containing one incidental
+  # "No such file or directory" lost every genuine compile error with it, and
+  # the hook then reported success on a broken build.
+  had_output=0
+  [ -n "${out//[[:space:]]/}" ] && had_output=1
+  out=$(printf '%s\n' "$out" | grep -viE "$NOISE_RX" || true)
+  # Output existed but was entirely toolchain noise: nothing to report. This is
+  # distinct from a checker that produced no output at all, which still reports
+  # below — silence from a failing checker is worth surfacing.
+  if [ "$had_output" -eq 1 ] && [ -z "${out//[[:space:]]/}" ]; then
     continue
   fi
   FAILED_LANGS+=("$lang:$label")

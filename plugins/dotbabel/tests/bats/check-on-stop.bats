@@ -634,6 +634,66 @@ STUB
   [ -z "$output" ]
 }
 
+@test "every NOISE_RX alternative is suppressed" {
+  # One test per alternative. Before this, exactly one of them was covered, so
+  # a typo in any of the others was invisible.
+  seed_go
+  local phrase
+  for phrase in \
+    "not installed for the toolchain" \
+    "command not found" \
+    "No such file or directory" \
+    "is not recognized as an internal or external command" \
+    "Permission denied" \
+    "cannot execute binary file" \
+    "unrecognized command-line option" \
+    "Unable to find package Foo" \
+    "Could not resolve dependencies for project x" \
+    "Cannot access nexus (https://nexus.corp) in offline mode" \
+    "error NETSDK1004: Assets file not found" \
+    "Run a NuGet package restore"
+  do
+    stub_checker go 1 "" "$phrase"
+    feed_stop_json "$HOOK" false "$REPO"
+    [ "$status" -eq 0 ] || { echo "not silenced: $phrase"; return 1; }
+    [ -z "$output" ] || { echo "not silenced: $phrase -> $output"; return 1; }
+  done
+}
+
+@test "Maven's capital-C wording is suppressed" {
+  # Maven emits "Could not resolve dependencies", so the lowercase alternative
+  # never matched under a case-sensitive grep. This is the regression guard.
+  seed_go
+  stub_checker go 1 "" "[ERROR] Failed to execute goal: Could not resolve dependencies for project x"
+  feed_stop_json "$HOOK" false "$REPO"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "a real diagnostic survives a noise line beside it" {
+  # Whole-output discard used to lose every genuine compile error when one
+  # incidental noise line appeared anywhere in a long failure.
+  seed_go
+  cat > "$STUB_BIN/go" <<'STUB'
+#!/usr/bin/env bash
+echo "main.go:6:14: fmt.Printf format %d has arg of wrong type string"
+echo "note: module cache: No such file or directory"
+exit 1
+STUB
+  chmod +x "$STUB_BIN/go"
+  feed_stop_json "$HOOK" false "$REPO"
+  [[ "$output" == *"wrong type string"* ]]
+  [[ "$output" != *"No such file or directory"* ]]
+}
+
+@test "a failing checker with no output at all still reports" {
+  # Distinct from "output existed but was all noise", which stays silent.
+  seed_go
+  stub_checker go 1
+  feed_stop_json "$HOOK" false "$REPO"
+  [[ "$output" == *"exited 1 with no output"* ]]
+}
+
 @test "long check output is truncated" {
   seed_go
   cat > "$STUB_BIN/go" <<'STUB'

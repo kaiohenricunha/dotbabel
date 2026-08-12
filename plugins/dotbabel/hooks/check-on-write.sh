@@ -246,10 +246,19 @@ RAW=$("$FN" "$FILE") || RC=$?
 [ "$RC" -eq 0 ] && exit 0
 [ "$RC" -eq 127 ] && exit 0
 
-# The toolchain failed to run rather than finding a defect. Discard the ENTIRE
-# output, not just the offending line: gcc aborts at the first missing include
-# and every subsequent diagnostic is downstream garbage.
-if printf '%s' "$RAW" | grep -qE "$NOISE_RX"; then
+# Drop the lines that mean "the toolchain failed to run" and keep the rest.
+#
+# The original whole-output discard was justified by gcc aborting at the first
+# missing include, which made every later line garbage. C/C++ is no longer
+# dispatched here — it needs a build graph, so it moved to the Stop hook — and
+# with that gone the blunt version only costs real findings: one incidental
+# match anywhere would silence an otherwise valid diagnostic.
+HAD_OUTPUT=0
+[ -n "${RAW//[[:space:]]/}" ] && HAD_OUTPUT=1
+RAW=$(printf '%s\n' "$RAW" | grep -viE "$NOISE_RX" || true)
+# Output existed but was entirely toolchain noise. Distinct from a checker that
+# produced nothing at all, which still reports below.
+if [ "$HAD_OUTPUT" -eq 1 ] && [ -z "${RAW//[[:space:]]/}" ]; then
   exit 0
 fi
 
