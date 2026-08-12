@@ -32,8 +32,8 @@ function warnOnce(dedupeKey, message, code) {
   process.emitWarning(message, { code, type: "DeprecationWarning" });
 }
 
-function xdgConfigHome() {
-  return process.env.XDG_CONFIG_HOME || join(process.env.HOME || "", ".config");
+function xdgConfigHome(env = process.env) {
+  return env.XDG_CONFIG_HOME || join(env.HOME || "", ".config");
 }
 
 function xdgCacheHome() {
@@ -77,10 +77,12 @@ export function configDir() {
  * Use this for **write paths** (bootstrap, persist) so the legacy directory
  * stays read-only and v1 users actively migrate to the new location.
  *
+ * @param {NodeJS.ProcessEnv} [env] Environment to resolve from. Defaults to
+ *   `process.env`; pass an explicit object to keep a caller hermetic in tests.
  * @returns {string}
  */
-export function canonicalConfigDir() {
-  return join(xdgConfigHome(), "dotbabel");
+export function canonicalConfigDir(env = process.env) {
+  return join(xdgConfigHome(env), "dotbabel");
 }
 
 /**

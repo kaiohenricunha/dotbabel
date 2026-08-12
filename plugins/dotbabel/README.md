@@ -58,6 +58,43 @@ for the full surface.
 
 Every bin supports `--help`, `--version`, `--json`, `--verbose`, `--no-color`.
 
+## check-on-stop trust
+
+`hooks/check-on-stop.sh` is a Claude Code `Stop` hook. It runs a project's own
+build tooling once per turn — `tsc --noEmit`, `go vet`, `cargo check`, `mvn
+compile`, `dotnet build` — and reports failures back to the model.
+
+Build tooling executes repo-controlled code by design: `cargo check` runs
+`build.rs`, `mvn` runs plugins, `dotnet` runs MSBuild targets. So the hook does
+nothing in a repo the user has not explicitly allowlisted.
+
+The allowlist is user-scope, one absolute path per line:
+
+```
+~/.config/dotbabel/check-on-stop-trusted
+```
+
+It is deliberately **not** a file in the repo. An in-tree marker was tried first
+and rejected: a hostile repo commits it and arrives pre-trusted on clone.
+
+Grant trust either way:
+
+```bash
+dotbabel project-init --trust --repo .        # records the resolved path
+echo "$(realpath .)" >> ~/.config/dotbabel/check-on-stop-trusted
+```
+
+`--trust` is opt-in. `skills/project-sync/SKILL.md` tells an agent to run
+`project-init`, so a default-on grant would let a model hand a repo turn-end
+code execution with no human deciding.
+
+`dotbabel doctor` reports whether the current repo is trusted. Revoke by
+deleting the line. `CHECK_ON_STOP_TRUST_ALL=1` bypasses the allowlist entirely
+and is not recommended.
+
+Note that dotbabel installs the hook but does not register it. Add a `Stop`
+entry to your own `settings.json` to turn it on.
+
 ## Exit codes
 
 `{OK:0, VALIDATION:1, ENV:2, USAGE:64}` — `64` mirrors BSD `sysexits.h EX_USAGE`.

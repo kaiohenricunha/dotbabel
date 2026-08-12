@@ -99,6 +99,16 @@ fi
 [ -n "$ROOT" ] || exit 0
 [ -d "$ROOT" ] || exit 0
 
+# Resolve ROOT once, here, and use the physical form for everything below.
+#
+# This is not only for the trust compare. `git rev-parse --show-toplevel`
+# returns a physical path, so the containment test in find_project_root would
+# compare a resolved directory against an unresolved $ROOT and never match —
+# meaning a repo reached through a symlink silently ran no checks at all.
+# Claude Code passes exactly such a path when a session works inside a
+# worktree, so this is the common case, not an edge one.
+ROOT=$(cd "$ROOT" 2>/dev/null && pwd -P) || exit 0
+
 # Trust gate. See the header: these checkers execute repo-controlled build
 # code, so the user must have allowlisted this repo out-of-tree. Nothing
 # below this point may read anything from $ROOT — note in particular that
@@ -106,13 +116,11 @@ fi
 if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ]; then
   TRUST_FILE="${CHECK_ON_STOP_TRUSTED_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/dotbabel/check-on-stop-trusted}"
   [ -f "$TRUST_FILE" ] || exit 0
-  # Resolve before comparing so symlinks and ./.. cannot dodge the list.
-  ROOT_REAL=$(cd "$ROOT" 2>/dev/null && pwd -P) || exit 0
   TRUSTED=0
   while IFS= read -r entry; do
     case "$entry" in ''|'#'*) continue ;; esac
     entry_real=$(cd "$entry" 2>/dev/null && pwd -P) || continue
-    if [ "$entry_real" = "$ROOT_REAL" ]; then
+    if [ "$entry_real" = "$ROOT" ]; then
       TRUSTED=1
       break
     fi

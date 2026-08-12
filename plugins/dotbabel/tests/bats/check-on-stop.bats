@@ -208,6 +208,39 @@ seed_go() {
   [ -z "$(stub_calls go)" ]
 }
 
+@test "e2e: a repo granted by project-init --trust is trusted by the hook" {
+  # The only test that proves the WRITER and the CONSUMER agree on the string
+  # format — everything else asserts one side in isolation. Built behind a
+  # symlink, because that is where the two could most easily disagree.
+  local real linkdir link
+  real=$(mktemp -d)
+  linkdir=$(mktemp -d)
+  link="$linkdir/alias"
+  ln -s "$real" "$link"
+
+  git -C "$real" init -q
+  git -C "$real" config user.email a@b.c
+  git -C "$real" config user.name t
+  printf 'module example.com/x\n\ngo 1.21\n' > "$real/go.mod"
+  printf 'package main\n\nfunc main() {}\n' > "$real/main.go"
+  git -C "$real" add -A && git -C "$real" commit -q -m init
+  printf 'package main\n\nfunc main() { _ = 1 }\n' > "$real/main.go"
+
+  # Empty the allowlist first, so only project-init can grant this trust.
+  : > "$TRUST_FILE"
+  [ -n "$REAL_NODE" ] || skip "node not found before PATH isolation"
+  run env PATH="/usr/bin:/bin" CHECK_ON_STOP_TRUSTED_FILE="$TRUST_FILE" \
+    "$REAL_NODE" "$REPO_ROOT/plugins/dotbabel/bin/dotbabel-project-init.mjs" \
+      --repo "$link" --trust
+  [ "$status" -eq 0 ]
+
+  stub_checker go 1 "" "main.go:3: something is wrong"
+  feed_stop_json "$HOOK" false "$link"
+  [[ "$output" == *'"decision"'* ]]
+
+  rm -rf "$real" "$linkdir"
+}
+
 @test "a repo not on the allowlist runs nothing" {
   seed_go
   : > "$TRUST_FILE"
@@ -305,6 +338,34 @@ printf '%s\t%s\n' "$name" "\$PWD" >> "$STUB_LOG"
 exit $rc
 STUB
   chmod +x "$STUB_BIN/$name"
+}
+
+@test "a repo reached through a symlink still runs its checks" {
+  # Regression: `git rev-parse --show-toplevel` returns a PHYSICAL path, so the
+  # containment test in find_project_root compared a resolved directory against
+  # an unresolved $ROOT and never matched — the hook silently ran nothing.
+  # Claude Code passes exactly such a path when a session works in a worktree.
+  local real linkdir link
+  real=$(mktemp -d)
+  linkdir=$(mktemp -d)
+  link="$linkdir/alias"
+  ln -s "$real" "$link"
+
+  git -C "$real" init -q
+  git -C "$real" config user.email a@b.c
+  git -C "$real" config user.name t
+  printf 'module example.com/x\n\ngo 1.21\n' > "$real/go.mod"
+  printf 'package main\n\nfunc main() {}\n' > "$real/main.go"
+  git -C "$real" add -A && git -C "$real" commit -q -m init
+  printf 'package main\n\nfunc main() { _ = 1 }\n' > "$real/main.go"
+
+  printf '%s\n' "$real" > "$TRUST_FILE"
+  stub_checker go 0
+  feed_stop_json "$HOOK" false "$link"
+  [ "$status" -eq 0 ]
+  [ -n "$(stub_calls go)" ]
+
+  rm -rf "$real" "$linkdir"
 }
 
 @test "monorepo: a marker in a subdirectory is found" {

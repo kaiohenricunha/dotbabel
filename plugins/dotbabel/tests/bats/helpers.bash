@@ -402,10 +402,14 @@ feed_stop_json() {
 # really installed on dev machines and would shadow-win, so the absent-path
 # tests would pass by accident locally and behave differently in CI.
 #
-# Exports STUB_BIN (shim dir) and STUB_LOG (call log written by stub shims).
+# Exports STUB_BIN (shim dir), STUB_LOG (call log written by stub shims), and
+# REAL_NODE (node's path before the swap — it usually lives under nvm, so a
+# test that must run a dotbabel bin cannot find it afterwards).
 # Call from setup(); bats scopes each test to its own process, so the PATH
 # mutation does not leak between tests.
 isolate_path() {
+  REAL_NODE=$(command -v node 2>/dev/null || true)
+  export REAL_NODE
   STUB_BIN=$(mktemp -d)
   export STUB_BIN
   STUB_LOG="$STUB_BIN/.calls"

@@ -45,6 +45,7 @@ import {
   pathExists,
 } from "../src/index.mjs";
 import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
+import { isRepoTrusted } from "../src/trust-allowlist.mjs";
 
 const META = {
   name: "dotbabel-doctor",
@@ -170,6 +171,34 @@ if (existsSync(hookPath)) {
   else out.fail("guard-destructive-git.sh present but NOT executable (chmod +x)");
 } else {
   out.warn("guard-destructive-git.sh missing — destructive git commands are unguarded");
+}
+
+// check-on-stop trust. Never out.fail: the exit code is derived from the fail
+// count, and a repo deliberately left off the allowlist is a valid state —
+// reddening doctor for it would train people to ignore doctor.
+{
+  const trust = isRepoTrusted({ repoRoot: ctx.repoRoot, env: process.env });
+  if (trust.trustAll) {
+    out.warn(
+      "check-on-stop: CHECK_ON_STOP_TRUST_ALL=1 — every repo is trusted, including ones you only cloned",
+    );
+  } else if (trust.readError) {
+    out.warn(`check-on-stop: trust allowlist unreadable (${trust.readError})`);
+  } else if (trust.trusted) {
+    out.pass(
+      `check-on-stop: this repo is on the trust allowlist (${trust.trustFile}) — ` +
+        "note dotbabel does not register the Stop hook; add it to your settings.json hooks.Stop",
+    );
+  } else if (trust.fileExists) {
+    out.warn(
+      `check-on-stop: this repo is NOT on the trust allowlist — turn-end project checks are inert here. ` +
+        `Run: dotbabel project-init --trust --repo ${ctx.repoRoot}`,
+    );
+  } else {
+    out.info(
+      `check-on-stop: no trust allowlist at ${trust.trustFile} — turn-end project checks are inert everywhere`,
+    );
+  }
 }
 
 if (argv.flags["install-hooks"]) {
