@@ -35,7 +35,7 @@ function stubBinsOnPath(...names) {
   return stubDir;
 }
 
-function runDoctor({ home, codexHome, geminiHome, extraPath }) {
+function runDoctor({ home, codexHome, geminiHome, extraPath, trustedFile }) {
   // Build a hermetic PATH that does NOT inherit the user's PATH (which on a
   // dev machine likely contains a real codex/gemini install in nvm's bin dir).
   // We invoke node by absolute path so node doesn't need to be on PATH.
@@ -48,6 +48,13 @@ function runDoctor({ home, codexHome, geminiHome, extraPath }) {
   else delete env.CODEX_HOME;
   if (geminiHome) env.GEMINI_HOME = geminiHome;
   else delete env.GEMINI_HOME;
+  // The trust check resolves ${XDG_CONFIG_HOME:-$HOME/.config}, so a temp HOME
+  // alone is not enough — an exported XDG_CONFIG_HOME would send the check at
+  // the developer's real allowlist and make output machine-dependent.
+  delete env.XDG_CONFIG_HOME;
+  delete env.CHECK_ON_STOP_TRUST_ALL;
+  if (trustedFile) env.CHECK_ON_STOP_TRUSTED_FILE = trustedFile;
+  else delete env.CHECK_ON_STOP_TRUSTED_FILE;
 
   const result = spawnSync(process.execPath, [DOCTOR, "--repo-root", REPO_ROOT], {
     env,
@@ -111,5 +118,44 @@ describe("dotbabel-doctor fan-out check", () => {
     const result = runDoctor({ home, geminiHome: customGemini, extraPath: stub });
 
     expect(result.stdout).toMatch(/Gemini skills fan-out (present|sentinel)/i);
+  });
+});
+
+describe("dotbabel-doctor check-on-stop trust check", () => {
+  it("warns when the repo is not on the allowlist", () => {
+    const home = makeTmpDir("home-");
+    const trustedFile = path.join(makeTmpDir("trust-"), "trusted");
+    fs.writeFileSync(trustedFile, "", "utf8");
+
+    const res = runDoctor({ home, trustedFile });
+
+    expect(res.stdout).toMatch(/NOT on the trust allowlist/);
+  });
+
+  it("passes when the repo is on the allowlist, without changing the exit code", () => {
+    const home = makeTmpDir("home-");
+    const trustedDir = makeTmpDir("trust-");
+    const untrusted = path.join(trustedDir, "empty");
+    const trusted = path.join(trustedDir, "trusted");
+    fs.writeFileSync(untrusted, "", "utf8");
+    fs.writeFileSync(trusted, `${fs.realpathSync(REPO_ROOT)}\n`, "utf8");
+
+    const before = runDoctor({ home, trustedFile: untrusted });
+    const after = runDoctor({ home, trustedFile: trusted });
+
+    expect(after.stdout).toMatch(/is on the trust allowlist/);
+    // The check must never contribute a failure: a repo deliberately left off
+    // the allowlist is a valid state, and reddening doctor for it would train
+    // people to ignore doctor.
+    expect(after.status).toBe(before.status);
+  });
+
+  it("reports informationally when no allowlist exists at all", () => {
+    const home = makeTmpDir("home-");
+    const trustedFile = path.join(makeTmpDir("trust-"), "absent");
+
+    const res = runDoctor({ home, trustedFile });
+
+    expect(res.stdout).toMatch(/no trust allowlist at/);
   });
 });

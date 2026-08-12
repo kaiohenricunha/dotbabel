@@ -34,10 +34,16 @@ MD
 setup() {
   REPO=$(mktemp -d)
   build_repo "$REPO"
+  # project-init --trust writes to a user-scope allowlist. Point it at a temp
+  # file so the suite can never append to the developer's real ~/.config.
+  TRUST_DIR=$(mktemp -d)
+  TRUST_FILE="$TRUST_DIR/trusted"
+  export CHECK_ON_STOP_TRUSTED_FILE="$TRUST_FILE"
 }
 
 teardown() {
   [ -n "${REPO:-}" ] && [ -d "$REPO" ] && rm -rf "$REPO"
+  [ -n "${TRUST_DIR:-}" ] && [ -d "$TRUST_DIR" ] && rm -rf "$TRUST_DIR"
 }
 
 @test "project-sync --help exits 0 and lists --dry-run" {
@@ -124,6 +130,74 @@ teardown() {
   [ -f "$EMPTY/.claude/skills/.gitkeep" ]
   grep -q "dotbabel:rule-floor:begin" "$EMPTY/CLAUDE.md"
   rm -rf "$EMPTY"
+}
+
+@test "project-init grants no trust without --trust" {
+  # The regression that catches an accidental flip to default-on. A skill tells
+  # an agent to run project-init, so a default grant would let a model hand a
+  # repo turn-end code execution with no human deciding.
+  EMPTY=$(mktemp -d)
+  run $PINIT --repo "$EMPTY"
+  [ "$status" -eq 0 ]
+  [ ! -f "$TRUST_FILE" ]
+  rm -rf "$EMPTY"
+}
+
+@test "project-init --trust records the resolved repo path" {
+  EMPTY=$(mktemp -d)
+  run $PINIT --repo "$EMPTY" --trust
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"trust GRANTED"* ]]
+  grep -Fxq "$(cd "$EMPTY" && pwd -P)" "$TRUST_FILE"
+  rm -rf "$EMPTY"
+}
+
+@test "project-init --trust records the physical path for a symlinked repo" {
+  # check-on-stop.sh compares `cd && pwd -P` output. Recording the symlink
+  # would let the grant follow the link if it were ever repointed.
+  REAL=$(mktemp -d)
+  LINKDIR=$(mktemp -d)
+  ln -s "$REAL" "$LINKDIR/alias"
+  run $PINIT --repo "$LINKDIR/alias" --trust
+  [ "$status" -eq 0 ]
+  grep -Fxq "$(cd "$REAL" && pwd -P)" "$TRUST_FILE"
+  rm -rf "$REAL" "$LINKDIR"
+}
+
+@test "project-init --trust is idempotent" {
+  EMPTY=$(mktemp -d)
+  run $PINIT --repo "$EMPTY" --trust
+  run $PINIT --repo "$EMPTY" --trust --force
+  [ "$status" -eq 0 ]
+  [ "$(grep -Fxc "$(cd "$EMPTY" && pwd -P)" "$TRUST_FILE")" -eq 1 ]
+  rm -rf "$EMPTY"
+}
+
+@test "project-init --trust --dry-run writes no trust entry" {
+  EMPTY=$(mktemp -d)
+  run $PINIT --repo "$EMPTY" --trust --dry-run
+  [ "$status" -eq 0 ]
+  [ ! -f "$TRUST_FILE" ]
+  rm -rf "$EMPTY"
+}
+
+@test "project-init warns but still exits 0 when the trust file is unwritable" {
+  # A failed secondary user-scope write must not fail a scaffold that already
+  # wrote files into the repo.
+  EMPTY=$(mktemp -d)
+  BLOCKER=$(mktemp -d)/afile
+  printf 'not a directory\n' > "$BLOCKER"
+  run env CHECK_ON_STOP_TRUSTED_FILE="$BLOCKER/trusted" $PINIT --repo "$EMPTY" --trust
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"trust NOT granted"* ]]
+  [ -f "$EMPTY/.dotbabel.json" ]
+  rm -rf "$EMPTY"
+}
+
+@test "project-init --help lists --trust" {
+  run $PINIT --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--trust"* ]]
 }
 
 @test "project-init refuses to overwrite .dotbabel.json without --force (exit 1)" {
