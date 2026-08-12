@@ -57,9 +57,14 @@ substituted at scaffold time.
 npx dotbabel-doctor
 ```
 
-You should see `✓` rows for env, repo, facts, manifest, specs, drift, hook.
+You should see `✓` rows for env, repo, facts, manifest, specs, drift, and hook.
 The first run may warn about missing artifacts (e.g. `docs/specs/` empty) —
 that's expected until you draft your first spec.
+
+A final row reports check-on-stop trust. On a fresh repo it reads "no trust
+allowlist", which is informational and never fails the run — turn-end project
+checks are simply off until you opt in. See
+[hooks.md](./hooks.md#check-on-stop-trust).
 
 ### 4. Your first spec
 

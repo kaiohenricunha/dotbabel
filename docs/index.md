@@ -18,6 +18,7 @@ settings validator, and a destructive-git PreToolUse hook.
 | Integrating the library in CI                | [cli-reference.md](./cli-reference.md) and the `--json` payload examples           |
 | Importing the Node API                       | [api-reference.md](./api-reference.md)                                             |
 | Debugging a validator failure                | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
+| Enabling the editor and turn-end checks      | [hooks.md](./hooks.md) — what each hook does, and the check-on-stop trust model    |
 | Upgrading or forking                         | [upgrade-guide.md](./upgrade-guide.md)                                             |
 | Contributing                                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
 

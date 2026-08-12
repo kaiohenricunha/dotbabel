@@ -163,11 +163,15 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook. Prints `✓/✗/⚠` per check.
+hook → check-on-stop trust. Prints `✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
 | `--repo-root <path>` | resolved via git | Override |
+
+The trust row reports whether this repo may run turn-end project checks. It
+never fails the run — a repo deliberately left off the allowlist is a valid
+state. See [hooks.md](./hooks.md#check-on-stop-trust).
 
 **Exits 2** (`ENV`) when env/repo checks fail before validation can run.
 
@@ -202,6 +206,28 @@ Scaffold the template tree into a target repo.
 Throws `ValidationError(SCAFFOLD_CONFLICT)` when
 `.claude/skills-manifest.json` or `docs/specs/` already exists — use
 `--force` to overwrite.
+
+---
+
+## `dotbabel-project-init`
+
+Scaffold the minimum cross-CLI project-sync layout — `.dotbabel.json`, a
+`.claude/` skeleton, and a starter `CLAUDE.md`. Distinct from `dotbabel-init`,
+which scaffolds the full spec-governance harness.
+
+| Flag            | Default |                                          |
+| --------------- | ------- | ---------------------------------------- |
+| `--repo <path>` | `cwd`   | Target repo root                         |
+| `--force`       | false   | Overwrite an existing `.dotbabel.json`   |
+| `--dry-run`     | false   | Report planned actions, mutate nothing   |
+| `--trust`       | false   | Also grant this repo check-on-stop trust |
+
+`--trust` records the repo's resolved path in
+`~/.config/dotbabel/check-on-stop-trusted`, which permits `check-on-stop.sh` to
+run that project's build tooling at turn end. It is opt-in because build tooling
+executes repo-controlled code — see [hooks.md](./hooks.md#check-on-stop-trust).
+A failed grant warns and still exits 0; the scaffold has already succeeded by
+then.
 
 ---
 
