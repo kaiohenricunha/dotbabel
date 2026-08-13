@@ -49,17 +49,29 @@ describe("scrubDigest", () => {
   });
 
   it("throws when the scrubber script is missing", () => {
-    expect(() =>
-      scrubDigest("any input", { scriptPath: "/nonexistent/handoff-scrub.sh" }),
-    ).toThrow(SCRUB_ERROR_PREFIX);
+    expect(() => scrubDigest("any input", { scriptPath: "/nonexistent/handoff-scrub.sh" })).toThrow(
+      SCRUB_ERROR_PREFIX,
+    );
+  });
+
+  it("ignores any environment override — the script path is not swappable", () => {
+    // SEC-1 freezes the redaction set, so an env var must never redirect the
+    // scrubber. Pointing one at a stub that would report a bogus count has to
+    // leave the real scrubber's answer untouched.
+    const { dir, path } = stubScript('cat; printf "scrubbed:99\\n" >&2');
+    process.env.DOTBABEL_HANDOFF_SCRUB_SCRIPT = path;
+    try {
+      expect(scrubDigest("plain prose with no tokens").count).toBe(0);
+    } finally {
+      delete process.env.DOTBABEL_HANDOFF_SCRUB_SCRIPT;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("throws when the scrubber exits non-zero (fail-closed contract)", () => {
     const { dir, path } = stubScript("exit 3");
     try {
-      expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(
-        SCRUB_ERROR_PREFIX,
-      );
+      expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(SCRUB_ERROR_PREFIX);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -69,22 +81,16 @@ describe("scrubDigest", () => {
     // Exits 0 and echoes stdin to stdout but never writes the count line.
     const { dir, path } = stubScript("cat");
     try {
-      expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(
-        SCRUB_ERROR_PREFIX,
-      );
+      expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(SCRUB_ERROR_PREFIX);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
   it("throws when stderr reports a non-numeric count", () => {
-    const { dir, path } = stubScript(
-      "cat\nprintf 'scrubbed:abc\\n' >&2",
-    );
+    const { dir, path } = stubScript("cat\nprintf 'scrubbed:abc\\n' >&2");
     try {
-      expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(
-        SCRUB_ERROR_PREFIX,
-      );
+      expect(() => scrubDigest("any input", { scriptPath: path })).toThrow(SCRUB_ERROR_PREFIX);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

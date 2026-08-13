@@ -31,9 +31,10 @@ npx dotbabel-doctor         # self-diagnostic
 2. **Write tests first.** Bug fixes land with a failing regression test that
    flips green in the same commit.
 3. **Run the local gate** before `gh pr create`:
+
    ```bash
    npm test -- --coverage   # thresholds: 85/85/80/85
-   npx bats plugins/dotbabel/tests/bats/
+   bash plugins/dotbabel/scripts/run-bats.sh   # parallel when available; see note below
    bash plugins/dotbabel/tests/test_validate_settings.sh
    shellcheck --severity=warning -x bootstrap.sh sync.sh \
      plugins/dotbabel/scripts/*.sh plugins/dotbabel/scripts/lib/*.sh \
@@ -44,6 +45,28 @@ npx dotbabel-doctor         # self-diagnostic
    npm run dogfood
    npm run docs:stamp-check   # verify docs/*.md version stamps match package.json
    ```
+
+   `run-bats.sh` is a thin wrapper over `npx bats plugins/dotbabel/tests/bats/`
+   — use either. bats parallelises only with GNU parallel
+   or [rush](https://github.com/shenwei356/rush) installed; the wrapper picks
+   whichever is on `PATH`, caps the job count at the core count or 8, and runs
+   serially when neither is present. On a 16-core host the suite takes ~125s
+   serial and ~56s at `-j 8`. Override the job count with `BATS_JOBS`; set
+   `BATS_JOBS=1` to force serial. If you re-benchmark, alternate serial and
+   parallel runs in one sitting — this host drifts about 2x between windows,
+   which is enough to manufacture a speedup that isn't there.
+
+   Tests must stay safe to run concurrently: **never mutate a file inside the
+   repo that another test reads.** Renaming or deleting a shared script to
+   prove a failure path is invisible serially and fatal under `-j` — every
+   concurrent test that needs the file dies with it.
+
+   When a failure path can only be reached by making a real file unavailable,
+   assert it against a mocked subprocess boundary in vitest rather than
+   touching the filesystem. `plugins/dotbabel/tests/handoff-push-dryrun.test.mjs`
+   does this for the scrubber fail-closed contract, which is why no production
+   override exists to redirect a spec-frozen security control.
+
 4. **Follow spec discipline.** Every PR touching a protected path (see
    `docs/repo-facts.json`) needs `Spec ID: dotbabel-core` or a
    `## No-spec rationale` section in its body. If you're adding a new

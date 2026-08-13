@@ -102,25 +102,9 @@ EOF
   [ "$fourth" = "[scrubbed 0 secrets]" ]
 }
 
-@test "push: fail-closed when scrubber is missing (no branch written)" {
-  # Temporarily rename the real scrubber so the module's existsSync check
-  # trips. This is the fail-closed baseline: if the scrubber cannot run,
-  # the push must not commit anything to the remote.
-  local backup="$SCRUB.bak.$$"
-  mv "$SCRUB" "$backup"
-
-  run node "$BIN" push aaaa1111
-  local push_status="$status"
-  local push_output="$output"
-
-  # Restore before any assertion can short-circuit the test.
-  mv "$backup" "$SCRUB"
-
-  [ "$push_status" -eq 2 ]
-  [[ "$push_output" == *"stage:  scrub"* ]]
-
-  # Remote must carry no branch for this session.
-  local branch
-  branch="$(handoff_branch_for aaaa1111)"
-  [ -z "$branch" ]
-}
+# The fail-closed case (scrubber unavailable -> exit 2, no branch written)
+# lives in plugins/dotbabel/tests/handoff-push-dryrun.test.mjs. Proving it here
+# meant renaming the real handoff-scrub.sh out of the repo mid-run, which broke
+# every test executing concurrently and made the suite unsafe under `bats -j`.
+# Do not reintroduce it: no test may mutate a file inside the repo that another
+# test reads.

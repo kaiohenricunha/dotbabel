@@ -10,6 +10,11 @@ settings.local.json
 # Local working plans — transient, not for distribution.
 docs/plans/
 
+# local-attest audit trail. Per-machine (it records a hostname), and leaving it
+# untracked breaks the tool: the run appends here, which dirties the worktree,
+# and the next `local-attest` aborts on its own output with WORKTREE_DIRTY.
+.local-attest-log.jsonl
+
 # Articles — written locally, published elsewhere, not versioned here.
 docs/articles/
 

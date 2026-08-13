@@ -32,6 +32,13 @@ const COUNT_LINE_RE = /^scrubbed:(\d+)$/m;
  * redaction count. Throws if the script is missing, exits non-zero, or
  * violates the stderr contract — callers must treat those as push-blocking.
  *
+ * The script path is {@link DEFAULT_SCRUB_SCRIPT} unless `opts.scriptPath`
+ * overrides it. There is deliberately no environment override: SEC-1 freezes
+ * the redaction set for v1.x, so the script this resolves to must not be
+ * swappable at run time. Out-of-process tests assert the fail-closed contract
+ * through the mocked subprocess boundary in `handoff-push-dryrun.test.mjs`
+ * instead.
+ *
  * @param {string} text
  * @param {{ scriptPath?: string }} [opts]
  * @returns {ScrubResult}

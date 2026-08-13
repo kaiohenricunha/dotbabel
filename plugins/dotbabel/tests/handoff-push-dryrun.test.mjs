@@ -26,12 +26,14 @@ vi.mock("node:readline", () => ({
 
 import { spawnSync } from "node:child_process";
 import * as lib from "../src/lib/handoff-remote.mjs";
-import { HandoffError } from "../src/lib/handoff-errors.mjs";
+import { HandoffError, classifyGitError } from "../src/lib/handoff-errors.mjs";
+import { SCRUB_ERROR_PREFIX } from "../src/lib/handoff-scrub.mjs";
 
 // Queue ordered spawnSync returns for a full dry-run: requireTransportRepo
 // validates the URL locally (no spawn); then extractMeta, extractPrompts,
 // extractTurns, scrubDigest, encodeDescription (projectSlugFromCwd's
 // git rev-parse is a no-op since meta.cwd is null here).
+//
 function queueDryRunSpawns({ sessionId = "abc12345-aaaa-bbbb-cccc-000000000001" } = {}) {
   const meta = {
     cli: "claude",
@@ -105,5 +107,75 @@ describe("pushRemote({ dryRun: true })", () => {
 
     // No subprocess should have been spawned — strict env check happened first.
     expect(spawnSync).not.toHaveBeenCalled();
+  });
+});
+
+// The fail-closed baseline: if the scrubber cannot run, the push must abort
+// before anything reaches the remote. This lived in handoff-scrub-push.bats,
+// where the only way to make the scrubber unavailable was renaming the real
+// script inside the repo — a shared-file mutation that broke every test
+// running concurrently and blocked `bats -j`. The subprocess boundary is
+// already mocked here, so the same contract is provable without touching the
+// filesystem, and without a production seam for redirecting a spec-frozen
+// security control (SEC-1, docs/specs/handoff-skill/spec/7-non-functional-requirements.md).
+describe("pushRemote fail-closed scrub", () => {
+  let origRepo;
+  beforeEach(() => {
+    origRepo = process.env.DOTBABEL_HANDOFF_REPO;
+    spawnSync.mockReset();
+  });
+  afterEach(() => {
+    if (origRepo === undefined) delete process.env.DOTBABEL_HANDOFF_REPO;
+    else process.env.DOTBABEL_HANDOFF_REPO = origRepo;
+  });
+
+  it("aborts the push and writes no branch when the scrubber cannot run", async () => {
+    process.env.DOTBABEL_HANDOFF_REPO = "git@example.com:me/store.git";
+
+    // Keyed on the script rather than call order: the non-dry-run path makes
+    // more subprocess calls than the dry-run path, and a positional queue
+    // would run dry before reaching the scrubber.
+    const meta = {
+      cli: "claude",
+      session_id: "abc12345-aaaa-bbbb-cccc-000000000001",
+      short_id: "abc12345",
+      cwd: null,
+      customTitle: null,
+      thread_name: null,
+    };
+    spawnSync.mockImplementation((cmd, args) => {
+      const script = String(cmd);
+      if (script.endsWith("handoff-scrub.sh")) {
+        return { status: 127, stdout: "", stderr: "handoff-scrub.sh: not found\n" };
+      }
+      if (script.endsWith("handoff-extract.sh")) {
+        const sub = Array.isArray(args) ? args[0] : "";
+        if (sub === "meta") return { status: 0, stdout: JSON.stringify(meta), stderr: "" };
+        if (sub === "prompts") return { status: 0, stdout: '"hi"\n', stderr: "" };
+        if (sub === "turns") return { status: 0, stdout: '"hello"\n', stderr: "" };
+        return { status: 0, stdout: "", stderr: "" };
+      }
+      return { status: 0, stdout: "", stderr: "" };
+    });
+
+    // Not dryRun — this is the path that would otherwise reach the remote.
+    await expect(
+      lib.pushRemote({ cli: "claude", path: "/fake/session.jsonl", tag: null }),
+    ).rejects.toThrow(SCRUB_ERROR_PREFIX);
+
+    // Nothing may be committed or pushed once the scrub failed.
+    const gitCalls = spawnSync.mock.calls.filter((c) => c[0] === "git");
+    const writeVerbs = gitCalls.filter(
+      (c) => Array.isArray(c[1]) && ["push", "commit", "add"].some((v) => c[1].includes(v)),
+    );
+    expect(writeVerbs).toHaveLength(0);
+  });
+
+  it("classifies the failure as stage=scrub, which is what exits 2", () => {
+    // main() maps a thrown scrub error through classifyGitError; the CLI
+    // surface the old bats test asserted on was this stage string.
+    expect(
+      classifyGitError(`${SCRUB_ERROR_PREFIX}: handoff-scrub.sh exited 127`, "push").stage,
+    ).toBe("scrub");
   });
 });

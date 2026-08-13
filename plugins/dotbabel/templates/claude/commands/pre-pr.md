@@ -2,7 +2,7 @@
 id: pre-pr
 name: pre-pr
 type: command
-version: 1.0.1
+version: 1.1.0
 domain: [devex]
 platform: [none]
 task: [review, testing]
@@ -10,7 +10,7 @@ maturity: draft
 description: >
   Pre-PR quality gate: simplify changed code, security-review the diff, run the full test
   suite, and surface a go/no-go summary before opening a pull request.
-argument-hint: "[base-branch] — default: origin/main"
+argument-hint: "[base-branch] [--conductor] — default: origin/main"
 model: sonnet
 headless_safe: false
 ---
@@ -19,7 +19,9 @@ Quality gate to run before `/git pr`. Simplifies changed code, security-reviews 
 
 Trigger: when the user is done with a feature and is about to open a PR, or says "prepare PR", "pre-PR", or "clean up before PR". Also triggered directly via `/pre-pr [base-branch]`.
 
-Arguments: `$ARGUMENTS` — optional base branch. Defaults to `origin/main`.
+Arguments: `$ARGUMENTS` — optional base branch, defaulting to `origin/main`, plus an optional `--conductor` flag.
+
+`--conductor` is passed only by `/pr-conductor` phase 1. It replaces step 3's full security review with a secrets-only grep, because the conductor runs the authoritative security pass once in phase 3 via the `security-auditor` agent. Everything else is unchanged. Strip `--conductor` out of `$ARGUMENTS` before binding the base branch.
 
 **Lifecycle:**
 
@@ -34,7 +36,17 @@ phase 1 of it. Invoke `/pre-pr` directly when you only want the quality gate.
 
 ### 1. Detect scope
 
-Bind: `BASE="${ARGUMENTS:-origin/main}"`.
+Bind the mode and the base branch in one visible step — binding `$ARGUMENTS` directly would make `BASE` the literal string `--conductor`:
+
+```bash
+CONDUCTOR=0
+REST="$ARGUMENTS"
+case " $REST " in *" --conductor "*) CONDUCTOR=1 ;; esac
+REST="$(printf '%s' "$REST" | sed 's/--conductor//g' | xargs)"
+BASE="${REST:-origin/main}"
+```
+
+`--conductor` may appear in any position here. `skills/review-pr/SKILL.md` uses the same strip-anywhere rule, so one flag behaves identically in both artifacts.
 
 Guard — verify not on main/master:
 
@@ -85,6 +97,18 @@ git commit -m "style: pre-pr simplification pass"
 Record in summary: "Simplified N files, M changes staged." If no changes: "simplify: clean."
 
 ### 3. Security review
+
+**Conductor mode (`--conductor`):** skip the full `/security-review` pass below — the conductor's phase 3 dispatches the `security-auditor` agent over the same diff, and running both reviews the identical code twice. Run a secrets-only check instead, by piping the added lines through the repo's own scrubber rather than hand-rolling patterns:
+
+```bash
+git diff "$MERGE_BASE" | grep '^+' | grep -v '^+++' \
+  | bash plugins/dotbabel/scripts/handoff-scrub.sh >/dev/null
+# stderr reports `scrubbed:N`
+```
+
+The scrubber carries the curated, unit-tested pattern set (GitHub tokens, `sk-`, AWS keys, Google keys, Slack tokens, bearer headers, `*_TOKEN|KEY|SECRET|PASSWORD=…`, PEM blocks), so this check stays in sync automatically as patterns are added. Warning: `N > 0` is **CRITICAL → STOP**, exactly as below — secrets must never reach a pushed branch, and phase 3 happens after the push. Inspect each hit before acting: prose that merely documents a secret pattern will match, so confirm a real credential before stopping the run. `N == 0` records `security: secrets-scan clean (full review deferred to phase 3)`. Then continue at step 4.
+
+Everything below applies to a standalone `/pre-pr` run.
 
 In pre-PR context all branch changes are committed and the working tree is clean, so `git diff --cached` (the security-review default) would see nothing. Stage the diff vs base explicitly before invoking:
 
@@ -169,6 +193,7 @@ Pre-PR gate: branch → $BRANCH (base: $BASE)
                    |  simplify: clean (no changes)
   Step 3 — Security:  clean (diff vs $MERGE_BASE)
                    |  N warnings (see above)
+                   |  secrets-grep clean (conductor — full review in phase 3)
                    |  ⚠ skill unavailable — skipped
   Step 4 — Tests:     ✓ pass
                    |  ✗ fail — pre-existing (stash proof above)
@@ -186,6 +211,7 @@ Status: READY — run `/git pr` to open the pull request.
 - **STOP if tests fail and the failure is branch-introduced.** Stash proof is required — same standard as `merge-pr`.
 - **Never claim a test failure is pre-existing** without the `git stash` proof.
 - **Security-review unavailable is a warning, not a failure.** Warn, skip, continue.
+- **`--conductor` narrows step 3 only.** A secrets hit still stops the run, and every other step behaves exactly as it does standalone.
 - **Simplify commits are style commits.** Message: `style: pre-pr simplification pass`. Atomic — do not bundle with feature changes.
 - **Do not modify files outside the changed set.** Simplify is focused on recently modified code; do not widen the scope.
 - **Do not generate or submit the PR body.** Checklist in step 5 is a reminder, not authoring.

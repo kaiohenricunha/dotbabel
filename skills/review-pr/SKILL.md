@@ -2,32 +2,46 @@
 id: review-pr
 name: review-pr
 type: skill
-version: 1.0.0
+version: 1.1.0
 domain: [devex]
 platform: [github-actions]
 task: [review]
 maturity: validated
 owner: "@kaiohenricunha"
 created: 2025-01-01
-updated: 2026-04-17
+updated: 2026-08-12
 description: >
   Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.
   Triggers on: "review PR", "review pull request", "check PR".
-argument-hint: "[PR#]"
+argument-hint: "[PR#] [--conductor]"
 tools: Bash, Read, Grep, Glob
 model: sonnet
 ---
 
 Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.
 
-Argument: `$ARGUMENTS` — PR number (required). Example: `/review-pr 42`
+Argument: `$ARGUMENTS` — PR number (required), plus an optional `--conductor` flag. Example: `/review-pr 42`
+
+## Conductor mode
+
+`/pr-conductor` phase 4 passes `--conductor`. The flag trims work the surrounding pipeline already does; a run without it behaves exactly as before. The deltas, each restated at the step it changes:
+
+- **Step 3** — trust comments this pipeline posted itself; validate only human or foreign ones.
+- **Step 5** — record a baseline commit, then run only the tests covering the files the fixes touched.
+- **Step 6** — security-review the fix delta, not the whole PR diff.
+- **Step 11** — do not execute test-plan items; the conductor's `local-attest` phase runs them and ticks the boxes.
+- **Step 14** — the Test Plan column reads `deferred → local-attest` instead of blocking the `reviewed` verdict.
 
 ## Workflow
 
-Before any step, bind the PR number:
+Before any step, bind the PR number and the mode. `--conductor` may appear in any position — strip it first, then take the PR number from what remains, so `/review-pr --conductor 42` and `/review-pr 42 --conductor` behave identically. `commands/pre-pr.md` uses the same strip-anywhere rule.
 
 ```bash
-NUMBER="$ARGUMENTS"
+CONDUCTOR=0
+REST="$ARGUMENTS"
+case " $REST " in *" --conductor "*) CONDUCTOR=1 ;; esac
+REST="$(printf '%s' "$REST" | sed 's/--conductor//g' | xargs)"
+NUMBER="${REST%% *}"
 ```
 
 ### 1. Fetch PR details and check branch health
@@ -62,6 +76,16 @@ List every comment with: author, body, file path + line (if applicable), and sta
 
 ### 3. Validate each comment
 
+**Conductor mode:** a comment that `/post-pr-review` produced was already validated before it was posted — its line was checked against the diff and its confidence against the 80 threshold (`skills/post-pr-review/SKILL.md` step 6). Re-reading the same code to re-judge it is a second full analysis pass for no new information. Classify such a comment `✅ valid — will fix` directly.
+
+Warning: the `post-pr-review:v1:` marker is public text that anyone can paste into a comment. Trust a comment only when it carries the marker **and** its author matches the authenticated login:
+
+```bash
+gh api user -q .login
+```
+
+Validate every unmarked or foreign-authored comment normally, as below.
+
 For each review comment:
 
 - Read the relevant file and surrounding code context
@@ -91,6 +115,12 @@ fi
 
 Work exclusively inside `.claude/worktrees/pr-$NUMBER/`. Do **not** use `gh pr checkout` or `git checkout` — those switch the caller's working tree — and do **not** use `git stash`, because stashes are repo-global and can interfere with the caller's stash list.
 
+**Conductor mode:** record the baseline commit before applying anything — step 6 diffs against it. Bind it against the worktree explicitly, not the caller's checkout: the block above necessarily ran in the caller's tree, and when this skill is invoked from a checkout that is not the PR branch, a bare `git rev-parse HEAD` captures the wrong commit and step 6 silently reviews a two-branch divergence instead of your fixes.
+
+```bash
+BASELINE=$(git -C ".claude/worktrees/pr-$NUMBER" rev-parse HEAD)
+```
+
 - Apply all fixes for valid comments, TDD-first (failing test → fix → green).
 - Detect and run the project test suite:
   - `Makefile` with `test` target → `make test`
@@ -98,6 +128,8 @@ Work exclusively inside `.claude/worktrees/pr-$NUMBER/`. Do **not** use `gh pr c
   - `go.mod` → `go test ./...`
   - `pyproject.toml` → `pytest` (or `uv run pytest`)
 - Commit with a clear message referencing the review (e.g., `fix: address PR review — <summary>`).
+
+**Conductor mode:** once the fixes exist, narrow that test run to the files they touched, using the runner's own scoping (`npx vitest related <files>`, `go test` on the touched packages, `pytest` on the matching test files). A runner with no scoping mechanism — a bare `make test` target — falls back to the full suite. The full suite runs regardless in the conductor's `local-attest` phase, so a second full run here buys nothing.
 
 Leave the worktree in place when done. Print the cleanup command:
 
@@ -107,7 +139,15 @@ git worktree remove .claude/worktrees/pr-$NUMBER
 
 ### 6. Security review
 
-Before pushing, run the `/security-review` skill on the PR diff:
+**Conductor mode:** phase 3's `security-auditor` agent already reviewed the full PR diff. Review only what this step's fixes added, staging the delta the way `commands/pre-pr.md` step 3 does:
+
+```bash
+git diff "$BASELINE"..HEAD | git apply --cached --allow-empty
+```
+
+Then run `/security-review staged` and unstage with `git restore --staged .`. If no fix commits were made, record `security: no delta` and skip to step 7.
+
+Standalone runs review the whole PR diff. Before pushing, run the `/security-review` skill on it:
 
 ```
 /security-review $NUMBER
@@ -170,6 +210,8 @@ For any check with `bucket: "fail"`:
 ### 11. Verify the test plan
 
 **If the PR body has no `## Test plan` section:** leave a comment asking the author to add one, record `test-plan: missing` in the final summary, and skip steps 12 and 13. Jump directly to the summary with status `test-plan-missing`.
+
+**Conductor mode:** still check that the `## Test plan` section exists (a missing one is handled exactly as above) and still classify each item as runnable or manual for the summary. Do not execute any item here, and do not tick any checkbox. The conductor's `local-attest` phase runs the full CI matrix immediately after this skill returns, and ticks each covered box against the attested SHA using the `printf` and PATCH shape below. Then go to step 12. The CI-skip exception below is dead under the conductor anyway: every intermediate commit carries `[skip ci]`, so no passing CI check label exists to match against.
 
 **If a `## Test plan` section exists**, check whether the CI-skip exception applies:
 
@@ -253,7 +295,7 @@ Output a table:
 A PR may only be marked `reviewed` if:
 
 - The §7 push succeeded
-- A test plan is present and all auto-runnable commands passed
+- A test plan is present and all auto-runnable commands passed — or, in conductor mode, a test plan is present and its execution is deferred: the Test Plan column reads `deferred → local-attest`, and the conductor's phase 5 gate owns the verdict
 - No unresolved CI failures remain
 - `mergeable` is `MERGEABLE` and branch is not `BEHIND` (verified in step 13)
 
