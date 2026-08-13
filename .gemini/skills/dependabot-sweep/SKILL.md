@@ -1,1 +1,0 @@
-../../../.claude/commands/dependabot-sweep.md
