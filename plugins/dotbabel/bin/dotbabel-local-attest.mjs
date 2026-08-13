@@ -36,8 +36,7 @@
  *   64  bad CLI invocation (unknown flag, malformed --pr)
  */
 
-import { fileURLToPath } from "node:url";
-import { invokedDirectly } from "../src/lib/invoked-direct.mjs";
+import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { parseArgs } from "../src/local-attest-lib.mjs";
@@ -142,10 +141,14 @@ async function main() {
   }
 }
 
-// Run only when invoked as a CLI, not when imported by tests.
+// Run only when invoked as a CLI, not when imported by tests. When argv[1]
+// names this bin but the guard still missed, exit 0 would read as a PASS to
+// gate tooling — fail loudly instead.
 const invokedDirect = invokedDirectly(import.meta.url);
 if (invokedDirect) {
   main().catch((err) => fail(2, err.message));
+} else if (misfiredAs("dotbabel-local-attest")) {
+  fail(EXIT_CODES.ENV, "run-direct guard did not fire; refusing to exit 0 without running.");
 }
 
 // Re-exports for unit tests that want to drive the binary's `main` without spawning.
