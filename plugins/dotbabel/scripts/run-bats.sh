@@ -14,7 +14,9 @@
 # Job count comes from BATS_JOBS, else the core count capped at 8 — past that
 # the suite is bound by process startup rather than CPU.
 #
-# Measured on a 16-core WSL2 host: 194s serial, 64s at -j 8.
+# Measured on a 16-core WSL2 host, alternating runs in one window: ~125s
+# serial, ~56s at -j 8. Measure in pairs like that if you re-benchmark — this
+# host drifts about 2x between windows, enough to invent a speedup on its own.
 
 set -euo pipefail
 

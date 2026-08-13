@@ -50,8 +50,11 @@ npx dotbabel-doctor         # self-diagnostic
    — use either. bats parallelises only with [GNU parallel](https://www.gnu.org/software/parallel/)
    or [rush](https://github.com/shenwei356/rush) installed; the wrapper picks
    whichever is on `PATH`, caps the job count at the core count or 8, and runs
-   serially when neither is present. On a 16-core host the suite takes 194s
-   serial and 64s at `-j 8`. Override the job count with `BATS_JOBS`.
+   serially when neither is present. On a 16-core host the suite takes ~125s
+   serial and ~56s at `-j 8`. Override the job count with `BATS_JOBS`; set
+   `BATS_JOBS=1` to force serial. If you re-benchmark, alternate serial and
+   parallel runs in one sitting — this host drifts about 2x between windows,
+   which is enough to manufacture a speedup that isn't there.
 
    Tests must stay safe to run concurrently: never mutate a file inside the
    repo that another test reads. Point the code under test at a copy in the
