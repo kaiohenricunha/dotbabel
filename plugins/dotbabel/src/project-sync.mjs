@@ -41,12 +41,31 @@ import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
  */
 export const KNOWN_FAN_OUT_CLIS = Object.freeze(["codex", "gemini", "copilot"]);
 
+/**
+ * How Codex and Gemini get their skills trees.
+ *
+ * `per-cli` writes `.codex/skills/` and `.gemini/skills/` as two byte-identical
+ * trees. `shared` writes one canonical tree at {@link SHARED_SKILLS_DIR} and
+ * points both CLIs at it with a directory symlink, which halves the tracked
+ * entries and the diff noise on every command or skill change (#219, finding C).
+ * Copilot is unaffected either way — its `.prompt.md` / `.instructions.md`
+ * filename contract cannot share a directory with the `SKILL.md` shape.
+ */
+export const KNOWN_FAN_OUT_LAYOUTS = Object.freeze(["per-cli", "shared"]);
+
+/** Canonical skills directory used when `fan_out_layout` is `shared`. */
+export const SHARED_SKILLS_DIR = ".cli/skills";
+
+/** CLIs that read `<dir>/SKILL.md` and can therefore share one tree. */
+const SKILL_DIR_CLIS = Object.freeze(["codex", "gemini"]);
+
 /** Default config returned when `.dotbabel.json` is absent. */
 export const DEFAULT_PROJECT_CONFIG = Object.freeze({
   rule_floor_source: "CLAUDE.md",
   commands_dir: ".claude/commands",
   skills_dir: ".claude/skills",
   fan_out: KNOWN_FAN_OUT_CLIS,
+  fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
   cli_substitutions: Object.freeze({}),
   targets: Object.freeze([
@@ -117,6 +136,18 @@ export function loadProjectConfig(repoRoot) {
         got: String(cli),
         hint: "fix the name in .dotbabel.json:fan_out, or drop the entry",
       });
+    });
+  }
+  if (raw.fan_out_layout !== undefined && !KNOWN_FAN_OUT_LAYOUTS.includes(raw.fan_out_layout)) {
+    throw new ValidationError({
+      code: ERROR_CODES.CONFIG_UNKNOWN_LAYOUT,
+      category: "settings",
+      file: ".dotbabel.json",
+      pointer: "/fan_out_layout",
+      message: `unknown fan_out_layout: ${JSON.stringify(raw.fan_out_layout)}`,
+      expected: `one of: ${KNOWN_FAN_OUT_LAYOUTS.join(", ")}`,
+      got: String(raw.fan_out_layout),
+      hint: "use \"per-cli\" (default) or \"shared\" in .dotbabel.json:fan_out_layout",
     });
   }
   return { ...DEFAULT_PROJECT_CONFIG, ...raw };
@@ -264,17 +295,26 @@ export async function projectSync(opts) {
   const skillsAbs = path.join(repoRoot, cfg.skills_dir);
 
   const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
+  const sharedLayout = cfg.fan_out_layout === "shared";
+  const sharedAbs = path.join(repoRoot, ...SHARED_SKILLS_DIR.split("/"));
+  // The canonical tree is built by whichever gated CLI reaches it first; the
+  // second one only needs its redirect. A repo fanning out to Copilot alone
+  // never gets a .cli/ directory it would not use.
+  let sharedBuilt = false;
+
   for (const cli of fanOut) {
-    if (cli === "codex") {
-      fanOutSkillsLayout({
-        cli: "codex",
-        targetDir: path.join(repoRoot, ".codex", "skills"),
-      });
-    } else if (cli === "gemini") {
-      fanOutSkillsLayout({
-        cli: "gemini",
-        targetDir: path.join(repoRoot, ".gemini", "skills"),
-      });
+    if (SKILL_DIR_CLIS.includes(cli)) {
+      const cliDir = path.join(repoRoot, `.${cli}`, "skills");
+      if (!sharedLayout) {
+        fanOutSkillsLayout({ cli, targetDir: cliDir });
+      } else if (gateOnCli(cli, `${cli} skills fan-out`)) {
+        if (!sharedBuilt) {
+          buildSkillsTree(sharedAbs);
+          sharedBuilt = true;
+        }
+        doEnsureRealDir(path.dirname(cliDir));
+        doLink(sharedAbs, cliDir);
+      }
     } else if (cli === "copilot") {
       fanOutCopilotLayout();
     } else {
@@ -341,6 +381,15 @@ export async function projectSync(opts) {
 
   function fanOutSkillsLayout({ cli, targetDir }) {
     if (!gateOnCli(cli, `${cli} skills fan-out`)) return;
+    buildSkillsTree(targetDir);
+  }
+
+  /**
+   * Populate a `<dir>/<name>/SKILL.md` tree. Split out of
+   * `fanOutSkillsLayout` so the shared layout can build the canonical tree
+   * once and then hand each CLI a redirect instead of a second copy.
+   */
+  function buildSkillsTree(targetDir) {
     if (!opts.dryRun) fs.mkdirSync(targetDir, { recursive: true });
 
     if (fs.existsSync(skillsAbs)) {

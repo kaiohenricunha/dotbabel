@@ -34,6 +34,12 @@
         "enum": ["codex", "gemini", "copilot"]
       }
     },
+    "fan_out_layout": {
+      "type": "string",
+      "description": "Whether Codex and Gemini get their own skills trees or share one. 'per-cli' writes .codex/skills/ and .gemini/skills/ as two identical trees. 'shared' writes one canonical tree at .cli/skills/ and points both CLIs at it with a directory symlink, halving the tracked entries. Copilot is unaffected. Switch back to 'per-cli' if a CLI will not follow the redirect.",
+      "default": "per-cli",
+      "enum": ["per-cli", "shared"]
+    },
     "gate_on_cli_presence": {
       "type": "boolean",
       "description": "When true, skip a CLI's symlink fan-out if its binary is absent from PATH. `dotbabel-check-project-sync` honors the same setting, so it will not report the skipped CLI as drift. Pass --all to either binary to override for one run. Instruction files are always written, never gated.",

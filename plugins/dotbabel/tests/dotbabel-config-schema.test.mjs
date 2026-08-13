@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { DEFAULT_DOTBABEL_JSON } from "../src/project-init-scaffold.mjs";
-import { KNOWN_FAN_OUT_CLIS } from "../src/project-sync.mjs";
+import { KNOWN_FAN_OUT_CLIS, KNOWN_FAN_OUT_LAYOUTS } from "../src/project-sync.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -55,6 +55,17 @@ describe("dotbabel.config.schema.json", () => {
   it("enumerates exactly the CLIs the code knows about", () => {
     const schema = readJson(SCHEMA_PATH);
     expect(schema.properties.fan_out.items.enum).toEqual([...KNOWN_FAN_OUT_CLIS]);
+  });
+
+  it("enumerates exactly the layouts the code knows about", () => {
+    const schema = readJson(SCHEMA_PATH);
+    expect(schema.properties.fan_out_layout.enum).toEqual([...KNOWN_FAN_OUT_LAYOUTS]);
+    expect(schema.properties.fan_out_layout.default).toBe("per-cli");
+  });
+
+  it("rejects an unknown fan_out_layout", () => {
+    const validate = compile();
+    expect(validate({ fan_out_layout: "sideways" })).toBe(false);
   });
 
   it("is referenced by both the scaffolded default and this repo's config", () => {

@@ -206,3 +206,69 @@ describe("checkProjectSync — PATH gating", () => {
     expect(r.missing.some((e) => e.path === "AGENTS.md")).toBe(true);
   });
 });
+
+// The checker has to verify the shape the sync would have produced, which now
+// depends on fan_out_layout (#219, finding C).
+describe("checkProjectSync — shared fan-out layout", () => {
+  function buildSharedSyncedRepo() {
+    const repo = buildSyncedRepo();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out_layout: "shared" }, null, 2),
+    );
+    return repo;
+  }
+
+  it("reports ok for a synced shared repo", async () => {
+    const repo = buildSharedSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(r.okEntries.length).toBeGreaterThan(0);
+  });
+
+  it("reports a deleted canonical entry once, not once per CLI", async () => {
+    const repo = buildSharedSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.unlinkSync(path.join(repo, ".cli", "skills", "commit", "SKILL.md"));
+
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    expect(r.missing.filter((e) => e.path.endsWith("commit/SKILL.md"))).toHaveLength(1);
+  });
+
+  it("reports a redirect replaced by a real directory as drift", async () => {
+    const repo = buildSharedSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const redirect = path.join(repo, ".codex", "skills");
+    fs.unlinkSync(redirect);
+    fs.mkdirSync(redirect, { recursive: true });
+
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    expect(r.stale.some((e) => e.path.endsWith(".codex/skills"))).toBe(true);
+  });
+
+  it("reports a per-cli tree as drift once the config says shared", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out_layout: "shared" }, null, 2),
+    );
+
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+  });
+
+  it("still honors the PATH gate in shared mode", async () => {
+    const repo = buildSharedSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.unlinkSync(path.join(repo, ".codex", "skills"));
+
+    hideAllClisFromPath();
+    const r = await checkProjectSync({ repoRoot: repo, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(r.skipped).toContain("codex");
+  });
+});

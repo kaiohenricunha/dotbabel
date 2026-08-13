@@ -92,5 +92,10 @@ full layout and rationale.
   (entire `CLAUDE.md` becomes the rule floor when markers are absent).
 - `fan_out` accepts only `codex`, `gemini`, and `copilot`. A typo aborts the run
   with `CONFIG_UNKNOWN_CLI`; fix the name rather than dropping the gate.
+- `fan_out_layout` is `per-cli` by default. Under `shared`, Codex and Gemini
+  both point at one `.cli/skills/` tree, so describe changes by the canonical
+  path instead of naming each CLI directory twice. Switching an existing repo
+  leaves `.codex/skills.bak-<timestamp>` behind — say so, so the user can
+  delete it. An unknown value aborts with `CONFIG_UNKNOWN_LAYOUT`.
 - This skill is for **project-scope** sync. For user-scope (`~/.claude/`,
   `~/.codex/`, `~/.gemini/`) bootstrap, use `dotbabel bootstrap` instead.

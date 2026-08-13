@@ -248,18 +248,37 @@ as drift; pass `--all` to either command to ignore the gate for one run.
 Instruction files (`AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`)
 are always written, never gated.
 
+`fan_out_layout` (default `per-cli`) controls whether Codex and Gemini get
+their own trees. Both read `<dir>/SKILL.md`, so `shared` writes one canonical
+tree and points both at it, halving the entries git has to track:
+
+```text
+per-cli                          shared
+.codex/skills/<name>/SKILL.md    .cli/skills/<name>/SKILL.md
+.gemini/skills/<name>/SKILL.md   .codex/skills  -> ../.cli/skills
+                                 .gemini/skills -> ../.cli/skills
+```
+
+Switching an existing repo to `shared` backs the old trees up to
+`.codex/skills.bak-<timestamp>` before replacing them, so nothing is lost —
+delete the backups once you are satisfied. Copilot keeps its own
+`.github/prompts/` and `.github/instructions/` shapes either way. If a CLI
+turns out not to follow the redirect, set `fan_out_layout` back to `per-cli`.
+
 Point your editor at the config schema for autocomplete and validation:
 
 ```json
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
   "fan_out": ["codex", "gemini", "copilot"],
+  "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true
 }
 ```
 
 An unknown name in `fan_out` fails with `CONFIG_UNKNOWN_CLI` rather than being
-skipped, so a typo cannot silently cost you a CLI's wiring.
+skipped, so a typo cannot silently cost you a CLI's wiring; an unknown
+`fan_out_layout` fails with `CONFIG_UNKNOWN_LAYOUT`.
 
 ### Node API
 

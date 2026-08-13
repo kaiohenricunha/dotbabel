@@ -141,6 +141,12 @@ outputs.
 `"$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json"` to the
 file so your editor flags the typo before you run anything.
 
+### `CONFIG_UNKNOWN_LAYOUT`
+
+`fan_out_layout` is neither `per-cli` nor `shared`.
+**Fix**: use `"per-cli"` (the default — `.codex/skills/` and `.gemini/skills/`
+are separate trees) or `"shared"` (both become symlinks to one `.cli/skills/`).
+
 ---
 
 ## Scaffold errors

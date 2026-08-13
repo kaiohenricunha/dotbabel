@@ -22,6 +22,7 @@ import {
   extractRuleFloorOrWhole,
   loadProjectConfig,
   shouldFanOutCli,
+  SHARED_SKILLS_DIR,
 } from "./project-sync.mjs";
 import { ValidationError } from "./lib/errors.mjs";
 
@@ -183,7 +184,43 @@ export async function checkProjectSync(opts) {
     out.pass(`ok: ${relDst}`);
   }
 
+  /**
+   * Verify a `<dir>/<name>/SKILL.md` tree against the canonical sources.
+   * Shared by the per-cli layout (once per CLI) and the shared layout (once
+   * for `.cli/skills/`).
+   *
+   * @param {string} targetDir
+   */
+  function checkSkillsTree(targetDir) {
+    if (fs.existsSync(skillsAbs)) {
+      for (const entry of fs.readdirSync(skillsAbs, { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        if (entry.name === ".system") continue;
+        checkLink(
+          path.join(targetDir, entry.name),
+          path.join(skillsAbs, entry.name),
+        );
+      }
+    }
+    if (fs.existsSync(commandsAbs)) {
+      for (const entry of fs.readdirSync(commandsAbs)) {
+        if (!entry.endsWith(".md")) continue;
+        const name = entry.replace(/\.md$/, "");
+        if (name === ".system") continue;
+        checkLink(
+          path.join(targetDir, name, "SKILL.md"),
+          path.join(commandsAbs, entry),
+        );
+      }
+    }
+  }
+
   const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
+  const sharedLayout = cfg.fan_out_layout === "shared";
+  const sharedAbs = path.join(repoRoot, ...SHARED_SKILLS_DIR.split("/"));
+  // Under the shared layout the canonical tree is verified once, not once per
+  // CLI, so a single broken entry is reported once (#219, finding C).
+  let sharedChecked = false;
 
   for (const cli of fanOut) {
     // Skip exactly what projectSync skipped. Reporting drift for fan-out that
@@ -194,27 +231,14 @@ export async function checkProjectSync(opts) {
       continue;
     }
     if (cli === "codex" || cli === "gemini") {
-      const targetDir = path.join(repoRoot, `.${cli}`, "skills");
-      if (fs.existsSync(skillsAbs)) {
-        for (const entry of fs.readdirSync(skillsAbs, { withFileTypes: true })) {
-          if (!entry.isDirectory()) continue;
-          if (entry.name === ".system") continue;
-          checkLink(
-            path.join(targetDir, entry.name),
-            path.join(skillsAbs, entry.name),
-          );
+      if (sharedLayout) {
+        if (!sharedChecked) {
+          checkSkillsTree(sharedAbs);
+          sharedChecked = true;
         }
-      }
-      if (fs.existsSync(commandsAbs)) {
-        for (const entry of fs.readdirSync(commandsAbs)) {
-          if (!entry.endsWith(".md")) continue;
-          const name = entry.replace(/\.md$/, "");
-          if (name === ".system") continue;
-          checkLink(
-            path.join(targetDir, name, "SKILL.md"),
-            path.join(commandsAbs, entry),
-          );
-        }
+        checkLink(path.join(repoRoot, `.${cli}`, "skills"), sharedAbs);
+      } else {
+        checkSkillsTree(path.join(repoRoot, `.${cli}`, "skills"));
       }
     } else if (cli === "copilot") {
       const promptsDir = path.join(repoRoot, ".github", "prompts");

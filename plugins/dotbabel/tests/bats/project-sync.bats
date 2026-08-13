@@ -145,6 +145,33 @@ teardown() {
   [[ "$output" == *"unknown fan_out CLI"* ]]
 }
 
+# fan_out_layout: shared — one canonical tree, a redirect per CLI (#219, C).
+@test "shared layout: codex and gemini redirect to one .cli/skills tree" {
+  printf '{"fan_out_layout":"shared"}\n' > "$REPO/.dotbabel.json"
+  run $PSYNC --repo "$REPO" --all
+  [ "$status" -eq 0 ]
+
+  [ -L "$REPO/.codex/skills" ]
+  [ -L "$REPO/.gemini/skills" ]
+  [ -f "$REPO/.cli/skills/commit/SKILL.md" ]
+
+  # The redirect resolves, and a command is readable through both hops.
+  [ "$(readlink -f "$REPO/.codex/skills")" = "$(readlink -f "$REPO/.cli/skills")" ]
+  run cat "$REPO/.codex/skills/commit/SKILL.md"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"/commit"* ]]
+
+  run $PCHECK --repo "$REPO" --all
+  [ "$status" -eq 0 ]
+}
+
+@test "shared layout: rejects an unknown fan_out_layout" {
+  printf '{"fan_out_layout":"sideways"}\n' > "$REPO/.dotbabel.json"
+  run $PSYNC --repo "$REPO" --all
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"unknown fan_out_layout"* ]]
+}
+
 @test "project-init scaffolds .dotbabel.json and starter CLAUDE.md" {
   EMPTY=$(mktemp -d)
   run $PINIT --repo "$EMPTY"
