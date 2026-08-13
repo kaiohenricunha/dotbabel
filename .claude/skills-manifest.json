@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T15:39:54.868Z",
+  "generatedAt": "2026-08-13T16:05:21.908Z",
   "skills": [
     {
       "name": "agents-search",
@@ -189,7 +189,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:df9ae2bd2d98a23cdf1eaee313d910bf5c913351b426cedfda8b8d2c990d53c3",
+      "checksum": "sha256:82549d1b6adf1a1fdcfa5e3a48e261c244a03e127457a3636722413c282b270d",
       "dependencies": [
         "pre-pr",
         "git",
@@ -240,7 +240,7 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:8029cec690c32e53b202bb4b2ba422de17b4869f00ea1274aaf2845b385faf7f",
+      "checksum": "sha256:ad8f9312d61e5913f3e36a51b05b43230d1e8f6993c3ff0944dad35539904eed",
       "dependencies": [],
       "lastValidated": "2026-08-13"
     },

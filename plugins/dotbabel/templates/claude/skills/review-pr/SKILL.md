@@ -26,8 +26,8 @@ Argument: `$ARGUMENTS` — PR number (required), plus an optional `--conductor` 
 - **Step 3** — trust comments this pipeline posted itself; validate only human or foreign ones.
 - **Step 5** — record a baseline commit, then run only the tests covering the files the fixes touched.
 - **Step 6** — security-review the fix delta, not the whole PR diff.
-- **Step 11** — do not execute test-plan items; the conductor's `local-attest` phase runs them and ticks the boxes.
-- **Step 14** — the Test Plan column reads `deferred → local-attest` instead of blocking the `reviewed` verdict.
+- **Step 11** — do not execute test-plan items; the conductor's `local-attest` phase runs them and ticks the boxes. Write a `<!-- test-plan: deferred -->` marker into the PR body so the merge gate blocks until they actually run.
+- **Step 14** — a deferred plan yields status `deferred`, not `reviewed`.
 
 ## Workflow
 
@@ -73,15 +73,15 @@ List every comment with: author, body, file path + line (if applicable), and sta
 
 ### 3. Validate each comment
 
-**Conductor mode:** a comment that `/post-pr-review` produced was already validated before it was posted — its line was checked against the diff and its confidence against the 80 threshold (`skills/post-pr-review/SKILL.md` step 6). Re-reading the same code to re-judge it is a second full analysis pass for no new information. Classify such a comment `✅ valid — will fix` directly.
+**Conductor mode:** a comment that `/post-pr-review` produced has passed a _mechanical_ filter — its line is in the diff and its self-rated confidence cleared 80 (`skills/post-pr-review/SKILL.md` step 6). That filter never read the code and never judged whether the finding is correct, so it is not a substitute for this step. What it does justify is skipping the re-read for findings whose correctness is checkable from the diff alone.
 
-Warning: the `post-pr-review:v1:` marker is public text that anyone can paste into a comment. Trust a comment only when it carries the marker **and** its author matches the authenticated login:
+Fast-path a comment only when **all three** hold:
 
-```bash
-gh api user -q .login
-```
+1. It carries a `post-pr-review:v1:` marker, **and**
+2. its author matches the authenticated login (`gh api user -q .login`) — the marker is public text anyone can paste, so the marker alone proves nothing, **and**
+3. its `category` is mechanical: `style`, `comment`, or `type`.
 
-Validate every unmarked or foreign-authored comment normally, as below.
+Everything else — `bug`, `design`, `security`, `test`, `simplify`, `error-handling`, any unmarked comment, any foreign author — gets the full validation below. Those are the categories where a confident agent is most often wrong, and under `--conductor` this is the only stage that can still reject a finding: step 4 replies to false positives, and after this the fixes are applied, pushed with `[skip ci]`, and the threads resolved. Never let a `critical` finding through on the fast path regardless of category.
 
 For each review comment:
 
@@ -208,7 +208,19 @@ For any check with `bucket: "fail"`:
 
 **If the PR body has no `## Test plan` section:** leave a comment asking the author to add one, record `test-plan: missing` in the final summary, and skip steps 12 and 13. Jump directly to the summary with status `test-plan-missing`.
 
-**Conductor mode:** still check that the `## Test plan` section exists (a missing one is handled exactly as above) and still classify each item as runnable or manual for the summary. Do not execute any item here, and do not tick any checkbox. The conductor's `local-attest` phase runs the full CI matrix immediately after this skill returns, and ticks each covered box against the attested SHA using the `printf` and PATCH shape below. Then go to step 12. The CI-skip exception below is dead under the conductor anyway: every intermediate commit carries `[skip ci]`, so no passing CI check label exists to match against.
+**Conductor mode:** still check that the `## Test plan` section exists (a missing one is handled exactly as above) and still classify each item as runnable or manual for the summary. Do not execute any item here, and do not tick any checkbox. The conductor's `local-attest` phase runs the full CI matrix immediately after this skill returns, and ticks each covered box against the attested SHA using the `printf` and PATCH shape below.
+
+**Record the deferral in the PR body** before moving on, so it is a fact a gate can read rather than a promise:
+
+```bash
+gh api "repos/{owner}/{repo}/pulls/$NUMBER" --method PATCH \
+  -f body="$(gh pr view "$NUMBER" --json body -q .body)
+<!-- test-plan: deferred -->"
+```
+
+`dotbabel pr-stack gate --gate merge` fails with `DEFERRED_TEST_PLAN` while that marker is present, so a PR cannot merge on an unrun plan even if this skill is invoked directly, the conductor stops early, or phase 5 aborts. Only the phase that actually runs the items removes it. Then go to step 12.
+
+The CI-skip exception below is dead under the conductor anyway: every intermediate commit carries `[skip ci]`, so no passing CI check label exists to match against.
 
 **If a `## Test plan` section exists**, check whether the CI-skip exception applies:
 
@@ -292,7 +304,7 @@ Output a table:
 A PR may only be marked `reviewed` if:
 
 - The §7 push succeeded
-- A test plan is present and all auto-runnable commands passed — or, in conductor mode, a test plan is present and its execution is deferred: the Test Plan column reads `deferred → local-attest`, and the conductor's phase 5 gate owns the verdict
+- A test plan is present and all auto-runnable commands passed. **In conductor mode a deferred plan does not satisfy this** — the row status is `deferred`, not `reviewed`, the Test Plan column reads `deferred → local-attest`, and the `<!-- test-plan: deferred -->` marker from step 11 keeps the merge gate red until the phase that runs the items clears it. Only the conductor's phase 6 may report the run as complete, and only after phase 5 has disposed of the plan
 - No unresolved CI failures remain
 - `mergeable` is `MERGEABLE` and branch is not `BEHIND` (verified in step 13)
 

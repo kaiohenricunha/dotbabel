@@ -132,14 +132,20 @@ A `WORKTREE_DIRTY` or `HEAD_MISMATCH` failure means `local-attest` would abort a
 dotbabel local-attest --pr <N>
 ```
 
-Phase 4 deferred the test plan to this phase, so **every** exit here owes it a disposition. There are four:
+Phase 4 deferred the test plan to this phase and left a `<!-- test-plan: deferred -->` marker in the PR body to record it, so **every** exit here owes the plan a disposition. There are four:
 
 - **Attest passes** — tick each `## Test plan` checkbox the matrix covered, using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
 - **Attest fails** — record the failure and mark the PR blocked. **Do not push "fix CI" commits in a loop.** The test plan is now unowned: say so explicitly and list every unticked item, so a BLOCKED summary states what still needs verification.
 - **No `.local-attest` config** — skip the attestation and say so plainly; CI will run remotely as normal. **Run the test-plan items now**, per `skills/review-pr/SKILL.md` step 11, before the summary — otherwise the deferral means nothing ever runs them.
 - **Entered here via `--from local-attest`** — no phase 4 ran in this session, so nothing deferred anything. Run the test-plan items as above before the summary rather than assuming a previous session ticked them.
 
-A `WORKTREE_DIRTY` or `HEAD_MISMATCH` precondition failure counts as a failed attest for this purpose: fix the precondition and re-enter, or report the test plan as unrun.
+**Clear the marker only on an exit that actually ran the items** — the passing, no-config, and `--from` branches above. Remove the `<!-- test-plan: deferred -->` line from the body with `gh pr edit <N> --body-file <file>`, then confirm:
+
+```bash
+dotbabel pr-stack gate --gate merge --pr <N>
+```
+
+On a failed attest, **leave the marker in place**. `DEFERRED_TEST_PLAN` keeps the merge gate red, which is the correct state for a plan nothing verified. A `WORKTREE_DIRTY` or `HEAD_MISMATCH` precondition failure counts as a failed attest here: fix the precondition and re-enter, or report the test plan as unrun.
 
 ### 6. `stop`
 

@@ -48,6 +48,27 @@ describe("CONDUCTOR_PHASES", () => {
     expect(Object.isFrozen(CONDUCTOR_PHASES)).toBe(true);
     expect(Object.isFrozen(CONDUCTOR_PHASES[0])).toBe(true);
   });
+
+  it("declares the conductor-only flags each phase must be invoked with", () => {
+    // The flag decides whether phase 1 runs a full security review or a
+    // secrets scan, and whether phase 4 defers the test plan. Leaving it in
+    // prose alone means dropping it silently changes behaviour, so it lives
+    // here and the bats contract diffs the prose against it.
+    const flags = Object.fromEntries(CONDUCTOR_PHASES.map((p) => [p.id, p.conductorFlags]));
+    expect(flags["pre-pr"]).toEqual(["--conductor"]);
+    expect(flags["review-pr"]).toEqual(["--conductor"]);
+    expect(flags["open-pr"]).toEqual([]);
+    expect(flags["post-pr-review"]).toEqual([]);
+    expect(flags["local-attest"]).toEqual([]);
+    expect(flags["stop"]).toEqual([]);
+  });
+
+  it("freezes every conductorFlags array", () => {
+    for (const phase of CONDUCTOR_PHASES) {
+      expect(Array.isArray(phase.conductorFlags)).toBe(true);
+      expect(Object.isFrozen(phase.conductorFlags)).toBe(true);
+    }
+  });
 });
 
 describe("checkLocalAttestGate", () => {
@@ -134,6 +155,34 @@ describe("checkMergeGate", () => {
 
   it("fails EMPTY_BODY on a whitespace-only body", () => {
     expect(codes(checkMergeGate({ ...base, body: "   \n\n" }))).toEqual(["EMPTY_BODY"]);
+  });
+
+  describe("deferred test plan", () => {
+    // `/review-pr --conductor` does not execute test-plan items; the
+    // conductor's local-attest phase does. Before this reason existed the
+    // handoff was a prose promise: "plan present, nothing run" and "plan
+    // present, everything passed" were identical to every downstream gate.
+    const DEFERRED = `${GOOD_BODY}\n<!-- test-plan: deferred -->\n`;
+
+    it("blocks a merge while the deferral marker is still in the body", () => {
+      expect(codes(checkMergeGate({ ...base, body: DEFERRED }))).toContain("DEFERRED_TEST_PLAN");
+    });
+
+    it("passes once the marker is cleared", () => {
+      expect(checkMergeGate({ ...base, body: GOOD_BODY }).ok).toBe(true);
+    });
+
+    it("tolerates whitespace variance in the marker", () => {
+      const spaced = `${GOOD_BODY}\n<!--   test-plan:deferred   -->\n`;
+      expect(codes(checkMergeGate({ ...base, body: spaced }))).toContain("DEFERRED_TEST_PLAN");
+    });
+
+    it("ignores a marker inside a fenced block, which only documents it", () => {
+      const documented = `${GOOD_BODY}\n\`\`\`\n<!-- test-plan: deferred -->\n\`\`\`\n`;
+      expect(codes(checkMergeGate({ ...base, body: documented }))).not.toContain(
+        "DEFERRED_TEST_PLAN",
+      );
+    });
   });
 
   it("fails EMPTY_BODY on a null body", () => {
