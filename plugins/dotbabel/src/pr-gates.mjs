@@ -41,16 +41,42 @@
  * The conductor never invokes it — merging requires an explicit human say-so.
  */
 export const CONDUCTOR_PHASES = Object.freeze([
-  Object.freeze({ id: "pre-pr", artifact: "commands/pre-pr.md", invocation: "/pre-pr" }),
-  Object.freeze({ id: "open-pr", artifact: "skills/git/SKILL.md", invocation: "/git pr" }),
+  Object.freeze({
+    id: "pre-pr",
+    artifact: "commands/pre-pr.md",
+    invocation: "/pre-pr",
+    conductorFlags: Object.freeze(["--conductor"]),
+  }),
+  Object.freeze({
+    id: "open-pr",
+    artifact: "skills/git/SKILL.md",
+    invocation: "/git pr",
+    conductorFlags: Object.freeze([]),
+  }),
   Object.freeze({
     id: "post-pr-review",
     artifact: "skills/post-pr-review/SKILL.md",
     invocation: "/post-pr-review",
+    conductorFlags: Object.freeze([]),
   }),
-  Object.freeze({ id: "review-pr", artifact: "skills/review-pr/SKILL.md", invocation: "/review-pr" }),
-  Object.freeze({ id: "local-attest", artifact: "skills/local-attest/SKILL.md", invocation: "/local-attest" }),
-  Object.freeze({ id: "stop", artifact: "commands/merge-pr.md", invocation: "/merge-pr" }),
+  Object.freeze({
+    id: "review-pr",
+    artifact: "skills/review-pr/SKILL.md",
+    invocation: "/review-pr",
+    conductorFlags: Object.freeze(["--conductor"]),
+  }),
+  Object.freeze({
+    id: "local-attest",
+    artifact: "skills/local-attest/SKILL.md",
+    invocation: "/local-attest",
+    conductorFlags: Object.freeze([]),
+  }),
+  Object.freeze({
+    id: "stop",
+    artifact: "commands/merge-pr.md",
+    invocation: "/merge-pr",
+    conductorFlags: Object.freeze([]),
+  }),
 ]);
 
 const MIN_SHA_PREFIX = 7;
@@ -75,6 +101,15 @@ function h2(text) {
 
 const RE_SUMMARY = h2("Summary");
 const RE_TEST_PLAN = h2("Test plan");
+
+/**
+ * Marker the conductor writes into the PR body when `/review-pr --conductor`
+ * defers test-plan execution to the `local-attest` phase, and clears once that
+ * phase has run the items. While it is present the plan is unverified, which
+ * no other gate can detect: `MISSING_TEST_PLAN` only checks for the heading,
+ * so "plan present, nothing run" and "plan present, all passed" look alike.
+ */
+const RE_DEFERRED_TEST_PLAN = /<!--\s*test-plan:\s*deferred\s*-->/i;
 const RE_SPEC_ID = h2("Spec ID");
 const RE_NO_SPEC = h2("No-spec rationale");
 
@@ -225,6 +260,12 @@ export function checkMergeGate(input = {}) {
     if (!RE_TEST_PLAN.test(body)) {
       reasons.push({ code: "MISSING_TEST_PLAN", message: "body must contain an h2 `## Test plan` section" });
     }
+    if (RE_DEFERRED_TEST_PLAN.test(body)) {
+      reasons.push({
+        code: "DEFERRED_TEST_PLAN",
+        message: "test plan is deferred to local-attest and has not been cleared",
+      });
+    }
 
     const changed = Array.isArray(input.changedPaths) ? input.changedPaths : [];
     const globs = Array.isArray(input.protectedPaths) ? input.protectedPaths : [];
@@ -258,10 +299,19 @@ export function checkMergeGate(input = {}) {
 /**
  * Classify a `[skip ci]`-family marker in a commit message.
  *
- * GitHub Actions honors these markers only on the **first or last line** of
- * the message (or as a `skip-checks: true` trailer). A marker buried mid-body
- * is inert — reported as `present` but not `effective`, which is exactly the
- * mistake this function exists to catch.
+ * GitHub Actions matches these markers **anywhere in the message**, so every
+ * placement is `effective`. This function used to report a mid-body marker as
+ * inert, which was wrong in the dangerous direction: it told a caller CI would
+ * run when GitHub had already decided to skip it.
+ *
+ * Measured on PR #299 — a commit whose message mentioned the marker on its
+ * second-to-last line, inside a sentence stating the commit was *not* skipping
+ * CI, suppressed all 29 checks. Re-pushing the identical tree with the token
+ * absent ran them. `location` is kept for diagnostics only; it no longer
+ * changes the verdict.
+ *
+ * The corollary is a live trap: never write the token in a commit message
+ * unless you mean it, not even to talk about it.
  *
  * @param {unknown} commitMessage
  * @returns {SkipCiVerdict}
@@ -294,7 +344,7 @@ export function hasSkipCi(commitMessage) {
   for (const line of lines) {
     const anywhere = line.match(SKIP_CI_RE);
     if (anywhere !== null) {
-      return { present: true, marker: anywhere[0], location: "body", effective: false };
+      return { present: true, marker: anywhere[0], location: "body", effective: true };
     }
   }
   return absent;

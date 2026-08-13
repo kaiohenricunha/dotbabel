@@ -54,7 +54,7 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 | 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation |
 | 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                  |
 
-> **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye: a marker buried mid-body is inert, it only counts on the first or last line (or as a `skip-checks: true` trailer).
+> **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
 ## Steps
 
@@ -107,9 +107,9 @@ The fleet sizes itself to the diff profile (`skills/post-pr-review/SKILL.md` ste
 
 Run `/review-pr <N> --conductor` (`skills/review-pr/SKILL.md`) — all 14 steps. It applies fixes in its own worktree, replies, resolves threads, and pushes.
 
-`--conductor` removes the duplicated work: it trusts the comments phase 3 posted and gate-validated (validating any human or foreign comment normally), scopes its test run and its security pass to the fix delta, and leaves test-plan execution to phase 5.
+`--conductor` removes the duplicated work: it fast-paths only the mechanical findings this pipeline posted itself (`style`, `comment`, `type`, marker plus matching author — everything else, and every `critical`, still gets validated), scopes its test run and its security pass to the fix delta, and defers test-plan execution to phase 5 behind a marker the merge gate enforces.
 
-Every commit it produces must carry an **effective** `[skip ci]`. Verify before each push rather than trusting it — a marker buried mid-body is inert, and `head -1` cannot see the last-line or `skip-checks:` trailer forms:
+Every commit it produces must carry an **effective** `[skip ci]`. Verify before each push rather than trusting it — `head -1` cannot see the last-line or `skip-checks:` trailer forms:
 
 ```bash
 dotbabel pr-stack gate --gate skip-ci
@@ -129,14 +129,20 @@ A `WORKTREE_DIRTY` or `HEAD_MISMATCH` failure means `local-attest` would abort a
 dotbabel local-attest --pr <N>
 ```
 
-Phase 4 deferred the test plan to this phase, so **every** exit here owes it a disposition. There are four:
+Phase 4 deferred the test plan to this phase and left a `<!-- test-plan: deferred -->` marker in the PR body to record it, so **every** exit here owes the plan a disposition. There are four:
 
 - **Attest passes** — tick each `## Test plan` checkbox the matrix covered, using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
 - **Attest fails** — record the failure and mark the PR blocked. **Do not push "fix CI" commits in a loop.** The test plan is now unowned: say so explicitly and list every unticked item, so a BLOCKED summary states what still needs verification.
 - **No `.local-attest` config** — skip the attestation and say so plainly; CI will run remotely as normal. **Run the test-plan items now**, per `skills/review-pr/SKILL.md` step 11, before the summary — otherwise the deferral means nothing ever runs them.
 - **Entered here via `--from local-attest`** — no phase 4 ran in this session, so nothing deferred anything. Run the test-plan items as above before the summary rather than assuming a previous session ticked them.
 
-A `WORKTREE_DIRTY` or `HEAD_MISMATCH` precondition failure counts as a failed attest for this purpose: fix the precondition and re-enter, or report the test plan as unrun.
+**Clear the marker only on an exit that actually ran the items** — the passing, no-config, and `--from` branches above. Remove the `<!-- test-plan: deferred -->` line from the body with `gh pr edit <N> --body-file <file>`, then confirm:
+
+```bash
+dotbabel pr-stack gate --gate merge --pr <N>
+```
+
+On a failed attest, **leave the marker in place**. `DEFERRED_TEST_PLAN` keeps the merge gate red, which is the correct state for a plan nothing verified. A `WORKTREE_DIRTY` or `HEAD_MISMATCH` precondition failure counts as a failed attest here: fix the precondition and re-enter, or report the test plan as unrun.
 
 ### 6. `stop`
 
@@ -188,7 +194,7 @@ It prints the retarget, fetch, checkout, rebase, and push steps in order. **The 
 
 - **Never merge.** Phase 6 is a full stop. `commands/merge-pr.md` is named as a hand-off target and is never invoked from here.
 - **Never force-push without explicit confirmation**, including the stacked-PR rebase.
-- **`[skip ci]` on every intermediate commit.** A marker is only effective on the first or last line of the message.
+- **`[skip ci]` on every intermediate commit.** GitHub matches the marker anywhere in the message, so it also fires when you only meant to mention it — never write the token in prose unless you want the skip.
 - **`local-attest` is the only CI gate.** If its config is absent, say so — do not invent a substitute.
 - **Do not re-run simplification.** Phase 1 already did it.
 - **One review dispatch.** Phase 3 posts once with `--auto --confirm-post`; never preview-then-post — that doubles the agent fleet for zero information.

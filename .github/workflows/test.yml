@@ -63,8 +63,23 @@ jobs:
         run: npm test -- --coverage
       - name: validate-settings behavior suite
         run: bash plugins/dotbabel/tests/test_validate_settings.sh
+      # Same wrapper the local-attest bats leg runs, so the attested command
+      # and the CI command are one string rather than two that claim to match.
+      # It parallelises only when GNU parallel or rush is installed and runs
+      # serially otherwise, so behaviour here is unchanged unless a runner
+      # gains a backend.
       - name: bats
-        run: npx bats plugins/dotbabel/tests/bats/
+        run: bash plugins/dotbabel/scripts/run-bats.sh
+
+      # Parallel run on one node only. The suite must stay safe to execute
+      # concurrently (CONTRIBUTING, "Development workflow"), and a serial-only
+      # CI can never catch a regression of that rule — a test that mutates a
+      # shared repo file passes here and fails on a maintainer's attest.
+      - name: bats (parallel, concurrency contract)
+        if: matrix.node == '22'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq parallel
+          BATS_JOBS=4 bash plugins/dotbabel/scripts/run-bats.sh
       - name: Upload coverage
         if: matrix.node == '22'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

@@ -75,6 +75,26 @@ BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-pr-stack.mjs"
   done < <(node "$BIN" phases --json | jq -r '.result.phases[].invocation')
 }
 
+@test "pr-conductor: prose invokes every phase with the flags the module declares" {
+  # The invocation grep above is a substring match, so it is blind to flags:
+  # `/pre-pr` matches whether or not the prose passes `--conductor`. That flag
+  # decides whether phase 1 runs a full security review or a secrets scan and
+  # whether phase 4 defers the test plan, so drift here is silent behaviour
+  # change. Require the flag on the same line as the invocation — the prose
+  # writes `/review-pr <N> --conductor`, so the number sits in between and a
+  # plain `grep -qF "<invocation> <flag>"` cannot work.
+  while IFS=$'\t' read -r inv flag; do
+    [ -n "$flag" ] || continue
+    run grep -F "$inv" "$SKILL"
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -qF -- "$flag" || {
+      echo "prose invokes $inv without the declared flag $flag"
+      return 1
+    }
+  done < <(node "$BIN" phases --json \
+    | jq -r '.result.phases[] | .invocation as $i | (.conductorFlags // [])[]? | [$i, .] | @tsv')
+}
+
 @test "pr-conductor: the phase table rows match the module order" {
   # The `## Phases` table is a third copy of the ordered list. Pin it.
   module_artifacts="$(node "$BIN" phases --json | jq -r '.result.phases[].artifact')"
