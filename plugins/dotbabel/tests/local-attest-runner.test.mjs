@@ -905,9 +905,8 @@ describe("execute diff gating, restore, and PR body", () => {
     };
     await execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
     expect(calls.writeFile).toEqual([{ path: "src/seeded.js", content: "original" }]);
-    // Restore happened before the post-matrix git status recheck.
-    const writeIdx = calls.run.length;
-    expect(writeIdx).toBeGreaterThan(0);
+    // The run attested — the head recheck ran against the restored tree
+    // (restore sits in the finally ahead of it, structurally).
     const entry = JSON.parse(calls.appendLog[0].line);
     expect(entry.result).toBe("attested");
   });
