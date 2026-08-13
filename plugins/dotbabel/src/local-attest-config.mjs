@@ -18,6 +18,16 @@
  * @property {string} [cwd]
  * @property {Record<string, string>} [env]
  *
+ * @typedef {object} Toolchain
+ * @property {string} [node]   exact major version pin ("22"); the `node` on PATH
+ *                             must have that major, or an attest run fails closed.
+ *                             Range syntax (">=22", "^22") is rejected at
+ *                             validation — the check is exact-major only, and
+ *                             accepting ranges it would misread is worse than
+ *                             refusing them
+ * @property {string} [goMod]  path (relative, no "..") to a go.mod whose `go`
+ *                             directive's major.minor must match `go version`
+ *
  * @typedef {object} Config
  * @property {Leg[]} matrix
  * @property {string} label
@@ -26,6 +36,7 @@
  * @property {boolean} requireClean
  * @property {boolean} requireDocker
  * @property {boolean} pushAfterAttest
+ * @property {Toolchain|null} toolchain
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -41,6 +52,7 @@ export const DEFAULTS = Object.freeze({
   requireClean: true,
   requireDocker: false,
   pushAfterAttest: true,
+  toolchain: null,
 });
 
 /**
@@ -175,13 +187,15 @@ export function validateConfig(input) {
     if (leg.env !== undefined && (leg.env === null || typeof leg.env !== "object")) {
       throw new ConfigError(`config.matrix[${i}].env must be an object`);
     }
-    matrix.push(/** @type {Leg} */ ({
-      name,
-      mode: leg.mode,
-      command: leg.command,
-      ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
-      ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
-    }));
+    matrix.push(
+      /** @type {Leg} */ ({
+        name,
+        mode: leg.mode,
+        command: leg.command,
+        ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
+        ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
+      }),
+    );
   });
 
   if (typeof merged.label !== "string" || merged.label === "") {
@@ -209,8 +223,14 @@ export function validateConfig(input) {
     throw new ConfigError("config.trustedAssociations must be a non-empty array of strings");
   }
   const VALID_ASSOCIATIONS = new Set([
-    "OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR",
-    "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE",
+    "OWNER",
+    "MEMBER",
+    "COLLABORATOR",
+    "CONTRIBUTOR",
+    "FIRST_TIMER",
+    "FIRST_TIME_CONTRIBUTOR",
+    "MANNEQUIN",
+    "NONE",
   ]);
   for (const assoc of merged.trustedAssociations) {
     if (!VALID_ASSOCIATIONS.has(assoc)) {
@@ -225,6 +245,52 @@ export function validateConfig(input) {
     }
   }
 
+  /** @type {import("./local-attest-config.mjs").Toolchain|null} */
+  let toolchain = null;
+  if (merged.toolchain !== null && merged.toolchain !== undefined) {
+    if (typeof merged.toolchain !== "object" || Array.isArray(merged.toolchain)) {
+      throw new ConfigError("config.toolchain must be an object with optional node/goMod strings");
+    }
+    const t = /** @type {Record<string, unknown>} */ (merged.toolchain);
+    // An empty pin block would silently disable the fail-closed check while
+    // looking like a declared pin — the one shape an operator produces by
+    // commenting out the only entry. Refuse it; omitting the key opts out.
+    if (Object.keys(t).length === 0) {
+      throw new ConfigError(
+        "config.toolchain must declare at least one pin (node, goMod) — omit the key to opt out",
+      );
+    }
+    for (const key of Object.keys(t)) {
+      if (key !== "node" && key !== "goMod") {
+        throw new ConfigError(`config.toolchain.${key} is not a recognised pin (use node, goMod)`);
+      }
+      if (typeof t[key] !== "string" || t[key] === "") {
+        throw new ConfigError(`config.toolchain.${key} must be a non-empty string`);
+      }
+    }
+    // The node check compares exact majors. Range syntax parses to its first
+    // integer, so ">=20" would BLOCK Node 22 — the documented meaning
+    // inverted. Reject it rather than misread it.
+    if (t.node !== undefined && /[><^~|]/.test(/** @type {string} */ (t.node))) {
+      throw new ConfigError(
+        `config.toolchain.node must be an exact major version pin like "22" — range syntax (${JSON.stringify(t.node)}) is not honored`,
+      );
+    }
+    if (t.goMod !== undefined) {
+      const goMod = /** @type {string} */ (t.goMod);
+      if (isAbsolute(goMod)) {
+        throw new ConfigError("config.toolchain.goMod must be a relative path");
+      }
+      if (goMod.split("/").some((seg) => seg === "..")) {
+        throw new ConfigError("config.toolchain.goMod must not contain '..' segments");
+      }
+    }
+    toolchain = {
+      ...(t.node !== undefined ? { node: /** @type {string} */ (t.node) } : {}),
+      ...(t.goMod !== undefined ? { goMod: /** @type {string} */ (t.goMod) } : {}),
+    };
+  }
+
   return /** @type {Config} */ ({
     matrix,
     label: merged.label,
@@ -233,5 +299,6 @@ export function validateConfig(input) {
     requireClean: merged.requireClean,
     requireDocker: merged.requireDocker,
     pushAfterAttest: merged.pushAfterAttest,
+    toolchain,
   });
 }

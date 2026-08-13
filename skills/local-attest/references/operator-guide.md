@@ -2,8 +2,9 @@
 
 CI minutes are billed; running the same matrix on GitHub-hosted runners after
 a maintainer has already verified the change locally is duplicated spend. The
-`/local-attest` skill lets a trusted user trade ~10–15 minutes of local
-runtime for a clean skip of the equivalent remote pipeline.
+`/local-attest` skill lets a trusted user trade the local runtime of the
+configured matrix — minutes to tens of minutes — for a clean skip of the
+equivalent remote pipeline.
 
 This guide is the operator contract for using the skill safely.
 
@@ -56,14 +57,25 @@ dotbabel local-attest --pr 123
 ```
 
 The skill runs every leg of your `.local-attest` matrix, prints a result
-table, pushes (if `pushAfterAttest`), posts/PATCHes the attestation comment,
+table, posts/PATCHes the attestation comment, pushes (if `pushAfterAttest` —
+the comment goes first so the marker is visible when the push event fires),
 applies the label, and appends a line to the audit log.
 
 `--dry-run` runs the matrix and prints the comment without posting anything.
-Use it to validate a new config end-to-end.
+Use it to validate a new config end-to-end. (Combined with `--only`/`--from`
+it is inert — diagnostic runs never post anyway.)
 
 `--no-push` skips the `git push` step but still posts the comment + label.
 Use it when you've pushed manually and just want to attest.
+
+`--fail-fast` stops launching legs after the first hard failure; unstarted
+legs are recorded `not-run` and a stopped run cannot attest. A `--fail-fast`
+run in which nothing failed completed the full matrix and attests normally.
+
+`--only <leg>` / `--from <leg>` are diagnostic modes for the fix-retry loop:
+subsets under relaxed preconditions (dirty tree fine, no PR needed) that never
+post, label, or push, and exit 1 on any selected-leg failure, advisory
+included.
 
 ## Trust model
 
@@ -128,9 +140,11 @@ the diff manually whenever either side changes.
 
 ### Long-running matrices
 
-Attestation runs sequentially. 10–15 minutes is typical; pathologically
-slow matrices (heavy e2e + multiple language runtimes) can hit 30+. That's
-the deliberate cost of skipping the remote run.
+Attestation runs the matrix sequentially and costs whatever the configured
+legs cost — minutes for a lint-and-unit matrix, tens of minutes with heavy
+e2e and multiple language runtimes. That's the deliberate price of skipping
+the remote run; use `--only`/`--from`/`--fail-fast` for iteration and save
+full runs for attestation.
 
 ### Audit
 
@@ -141,17 +155,31 @@ gh pr list --label ci/local-verified --state all
 ```
 
 The audit log (`.local-attest-log.jsonl` by default) records one JSONL line
-per attestation:
+for **every run whose matrix executes** — failures included — tagged with a
+`result` and per-leg statuses:
 
 ```json
 {
-  "ts": "2026-05-23T16:00:00.000Z",
+  "ts": "2026-08-13T16:00:00.000Z",
   "pr": 123,
   "sha": "abc1234...",
   "host": "wsl-laptop",
-  "advisoryFails": ["knip"]
+  "advisoryFails": ["knip"],
+  "result": "attested",
+  "legs": [{ "name": "lint", "mode": "hard", "status": "pass", "durationS": 17 }],
+  "flags": { "only": [], "from": null, "failFast": false, "push": true, "dryRun": false },
+  "toolchain": { "node": "22.11.0" }
 }
 ```
 
-Add the audit log to `.gitignore` if you don't want it in version control;
-the contract is single-line JSONL so any log shipper handles it natively.
+`result` is one of `attested | hard-fail | head-moved | push-fail | post-fail
+| dry-run | diagnostic`. Lines written by versions before `result` existed
+were only ever written after a successful post, so a missing `result` implies
+`attested`. Diagnostic lines add `dirty: true|false`, because a dirty tree's
+`sha` does not identify the tree that ran.
+
+**Add the audit log to `.gitignore` — this is a requirement when
+`requireClean` is on, not a preference.** Every run appends to it, including
+the `--dry-run` this guide recommends for validating a new config, so an
+untracked log makes the very next attest abort on its own output. The
+contract is single-line JSONL so any log shipper handles it natively.

@@ -5,12 +5,20 @@ import {
   buildAttestMarker,
   buildAuditEntry,
   buildGateSnippet,
+  filterMatrix,
   findAttestComment,
+  goMajorMinorFromGoMod,
+  goMajorMinorFromVersion,
   isAttested,
+  legStatus,
+  nodeMajorFromPin,
+  nodeMajorOf,
   parseArgs,
   renderComment,
+  shouldAttest,
   summarizeResults,
   tail,
+  toolchainProblems,
 } from "../src/local-attest-lib.mjs";
 
 describe("buildAttestMarker", () => {
@@ -50,9 +58,7 @@ describe("isAttested", () => {
   const marker = `${ATTEST_MARKER_PREFIX}${SHA} -->`;
 
   it("returns true for an OWNER comment matching the SHA", () => {
-    const comments = [
-      { author_association: "OWNER", body: `${marker}\nbody text here` },
-    ];
+    const comments = [{ author_association: "OWNER", body: `${marker}\nbody text here` }];
     expect(isAttested(comments, SHA)).toBe(true);
   });
 
@@ -124,6 +130,9 @@ describe("parseArgs", () => {
       dryRun: false,
       config: null,
       help: false,
+      only: [],
+      from: null,
+      failFast: false,
     });
   });
 
@@ -150,17 +159,26 @@ describe("parseArgs", () => {
 
   it("rejects non-numeric --pr", () => {
     const die = (code, msg) => ({ code, msg });
-    expect(parseArgs(["--pr", "abc"], die)).toEqual({ code: 64, msg: expect.stringContaining("--pr") });
+    expect(parseArgs(["--pr", "abc"], die)).toEqual({
+      code: 64,
+      msg: expect.stringContaining("--pr"),
+    });
   });
 
   it("rejects unknown flags", () => {
     const die = (code, msg) => ({ code, msg });
-    expect(parseArgs(["--bogus"], die)).toEqual({ code: 64, msg: expect.stringContaining("unknown") });
+    expect(parseArgs(["--bogus"], die)).toEqual({
+      code: 64,
+      msg: expect.stringContaining("unknown"),
+    });
   });
 
   it("rejects --config with no value", () => {
     const die = (code, msg) => ({ code, msg });
-    expect(parseArgs(["--config"], die)).toEqual({ code: 64, msg: expect.stringContaining("--config") });
+    expect(parseArgs(["--config"], die)).toEqual({
+      code: 64,
+      msg: expect.stringContaining("--config"),
+    });
   });
 });
 
@@ -234,20 +252,72 @@ describe("renderComment", () => {
 });
 
 describe("buildAuditEntry", () => {
-  it("produces the documented .local-attest-log.jsonl shape", () => {
+  const RESULTS = [
+    { name: "lint", mode: "hard", passed: true, durationS: 3, tail: "" },
+    { name: "test", mode: "hard", passed: false, durationS: 7, tail: "boom" },
+    { name: "knip", mode: "advisory", passed: false, durationS: 2, tail: "" },
+    { name: "bats", mode: "hard", passed: false, notRun: true, durationS: 0, tail: "" },
+  ];
+
+  it("keeps every legacy field byte-compatible (pre-change lines imply attested)", () => {
     const e = buildAuditEntry({
+      result: "attested",
       pr: "123",
       sha: "abc1234",
       hostname: "host",
       advisoryFails: ["knip"],
+      results: RESULTS,
       now: new Date("2026-01-01T00:00:00Z"),
     });
-    expect(e).toEqual({
+    expect(e).toMatchObject({
       ts: "2026-01-01T00:00:00.000Z",
       pr: 123,
       sha: "abc1234",
       host: "host",
       advisoryFails: ["knip"],
+    });
+  });
+
+  it("records the run outcome and per-leg statuses", () => {
+    const e = buildAuditEntry({
+      result: "hard-fail",
+      pr: 9,
+      sha: "abc1234",
+      hostname: "h",
+      advisoryFails: ["knip"],
+      results: RESULTS,
+      now: new Date(),
+    });
+    expect(e.result).toBe("hard-fail");
+    expect(e.legs).toEqual([
+      { name: "lint", mode: "hard", status: "pass", durationS: 3 },
+      { name: "test", mode: "hard", status: "fail", durationS: 7 },
+      { name: "knip", mode: "advisory", status: "advisory-fail", durationS: 2 },
+      { name: "bats", mode: "hard", status: "not-run", durationS: 0 },
+    ]);
+  });
+
+  it("records flags and diagnostic dirtiness; a missing pr stays null, not 0", () => {
+    const e = buildAuditEntry({
+      result: "diagnostic",
+      pr: null,
+      sha: null,
+      hostname: "h",
+      advisoryFails: [],
+      results: RESULTS.slice(0, 1),
+      flags: { only: ["lint"], from: null, failFast: false, push: false },
+      dirty: true,
+      now: new Date(),
+    });
+    expect(e.pr).toBeNull();
+    expect(e.sha).toBeNull();
+    expect(e.dirty).toBe(true);
+    expect(e.flags).toEqual({
+      only: ["lint"],
+      from: null,
+      failFast: false,
+      push: false,
+      dryRun: false,
     });
   });
 
@@ -278,6 +348,220 @@ describe("summarizeResults", () => {
     expect(s.advisoryFails.map((r) => r.name)).toEqual(["c"]);
     expect(s.totalDurationS).toBe(10);
   });
+
+  it("does not count not-run legs as failures — they were never executed", () => {
+    const results = [
+      { name: "a", mode: "hard", passed: false, durationS: 2, tail: "" },
+      { name: "b", mode: "hard", passed: false, notRun: true, durationS: 0, tail: "" },
+      { name: "c", mode: "advisory", passed: false, notRun: true, durationS: 0, tail: "" },
+    ];
+    const s = summarizeResults(results);
+    expect(s.hardFails.map((r) => r.name)).toEqual(["a"]);
+    expect(s.advisoryFails).toEqual([]);
+  });
+});
+
+describe("legStatus", () => {
+  it("classifies every terminal state, one source of truth for renderer and audit", () => {
+    expect(legStatus({ mode: "hard", passed: true })).toBe("pass");
+    expect(legStatus({ mode: "hard", passed: false })).toBe("fail");
+    expect(legStatus({ mode: "advisory", passed: false })).toBe("advisory-fail");
+    expect(legStatus({ mode: "hard", passed: false, notRun: true })).toBe("not-run");
+    expect(legStatus(undefined)).toBe("not-run");
+  });
+});
+
+describe("parseArgs diagnostic flags", () => {
+  it("defaults include only/from/failFast", () => {
+    const a = parseArgs([]);
+    expect(a.only).toEqual([]);
+    expect(a.from).toBeNull();
+    expect(a.failFast).toBe(false);
+  });
+
+  it("accumulates repeatable --only", () => {
+    const a = parseArgs(["--only", "lint", "--only", "test"]);
+    expect(a.only).toEqual(["lint", "test"]);
+  });
+
+  it("captures --from once and rejects a repeat", () => {
+    expect(parseArgs(["--from", "test"]).from).toBe("test");
+    expect(() => parseArgs(["--from", "a", "--from", "b"])).toThrow(/--from given more than once/);
+  });
+
+  it("rejects --only together with --from", () => {
+    expect(() => parseArgs(["--only", "lint", "--from", "test"])).toThrow(/mutually exclusive/);
+  });
+
+  it("rejects --only and --from with no value", () => {
+    expect(() => parseArgs(["--only"])).toThrow(/requires a leg name/);
+    expect(() => parseArgs(["--from"])).toThrow(/requires a leg name/);
+  });
+
+  it("toggles --fail-fast", () => {
+    expect(parseArgs(["--fail-fast"]).failFast).toBe(true);
+  });
+});
+
+describe("filterMatrix", () => {
+  const MATRIX = [
+    { name: "npm ci", mode: "hard", command: "npm ci" },
+    { name: "lint, strict", mode: "hard", command: "x" },
+    { name: "test", mode: "hard", command: "y" },
+    { name: "bats", mode: "hard", command: "z" },
+  ];
+
+  it("returns the matrix untouched with no filters", () => {
+    expect(filterMatrix(MATRIX, {})).toEqual(MATRIX);
+  });
+
+  it("--only selects by exact name, preserving matrix order", () => {
+    const out = filterMatrix(MATRIX, { only: ["bats", "npm ci"] });
+    expect(out.map((l) => l.name)).toEqual(["npm ci", "bats"]);
+  });
+
+  it("splits comma-separated --only values", () => {
+    const out = filterMatrix(MATRIX, { only: ["test,bats"] });
+    expect(out.map((l) => l.name)).toEqual(["test", "bats"]);
+  });
+
+  it("never splits a token that is itself a leg name containing a comma", () => {
+    const out = filterMatrix(MATRIX, { only: ["lint, strict"] });
+    expect(out.map((l) => l.name)).toEqual(["lint, strict"]);
+  });
+
+  it("--from selects the suffix from the named leg's index", () => {
+    const out = filterMatrix(MATRIX, { from: "test" });
+    expect(out.map((l) => l.name)).toEqual(["test", "bats"]);
+  });
+
+  it("unknown names fail with every valid name listed; matching is case-sensitive", () => {
+    expect(() => filterMatrix(MATRIX, { only: ["nope"] })).toThrow(/npm ci.*test.*bats/s);
+    expect(() => filterMatrix(MATRIX, { only: ["Test"] })).toThrow(/unknown leg/);
+    expect(() => filterMatrix(MATRIX, { from: "nope" })).toThrow(/unknown leg/);
+  });
+});
+
+describe("shouldAttest", () => {
+  const pass = (name, mode = "hard") => ({ name, mode, passed: true, durationS: 1, tail: "" });
+
+  it("attests a full clean run, advisory failures included", () => {
+    const results = [
+      pass("a"),
+      { name: "k", mode: "advisory", passed: false, durationS: 1, tail: "" },
+    ];
+    expect(shouldAttest({ diagnostic: false, results })).toBe(true);
+  });
+
+  it("never attests a diagnostic run, even all-green", () => {
+    expect(shouldAttest({ diagnostic: true, results: [pass("a")] })).toBe(false);
+  });
+
+  it("never attests when any leg was not run", () => {
+    const results = [
+      pass("a"),
+      { name: "b", mode: "hard", passed: false, notRun: true, durationS: 0, tail: "" },
+    ];
+    expect(shouldAttest({ diagnostic: false, results })).toBe(false);
+  });
+
+  it("rejects a subset record via expectedLegs even when the diagnostic flag lies", () => {
+    // Control flow is the first defense; this clause is the second. A filtered
+    // matrix yields fewer results than the config declares, so even a run that
+    // wrongly reports diagnostic: false cannot attest on a subset.
+    const results = [pass("a")];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 3 })).toBe(false);
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 1 })).toBe(true);
+  });
+
+  it("never attests on a hard failure, an empty matrix, or an unsettled hole", () => {
+    expect(
+      shouldAttest({
+        diagnostic: false,
+        results: [{ name: "a", mode: "hard", passed: false, durationS: 1, tail: "" }],
+      }),
+    ).toBe(false);
+    expect(shouldAttest({ diagnostic: false, results: [] })).toBe(false);
+    expect(shouldAttest({ diagnostic: false, results: [pass("a"), undefined] })).toBe(false);
+  });
+});
+
+describe("toolchain helpers", () => {
+  it("parses node majors from pins and versions", () => {
+    for (const pin of ["22", "22.x", ">=22", "^22.1.0"]) {
+      expect(nodeMajorFromPin(pin)).toBe(22);
+    }
+    expect(nodeMajorFromPin("")).toBeNull();
+    expect(nodeMajorFromPin("abc")).toBeNull();
+    expect(nodeMajorOf("22.11.0")).toBe(22);
+    expect(nodeMajorOf("junk")).toBeNull();
+  });
+
+  it("parses go major.minor from `go version` output and go.mod text", () => {
+    expect(goMajorMinorFromVersion("go version go1.26.5 linux/amd64")).toBe("1.26");
+    expect(goMajorMinorFromVersion("garbage")).toBeNull();
+    expect(goMajorMinorFromGoMod("module x\n\ngo 1.26.5\n")).toBe("1.26");
+    expect(goMajorMinorFromGoMod("")).toBeNull();
+  });
+
+  it("toolchainProblems: match is silent, mismatch and unparseable are problems (fail-closed)", () => {
+    const ok = toolchainProblems({
+      pin: { node: "22" },
+      nodeVersion: "22.11.0",
+    });
+    expect(ok).toEqual([]);
+
+    const bad = toolchainProblems({
+      pin: { node: "22", goMod: "api/go.mod" },
+      nodeVersion: "20.1.0",
+      goVersionOutput: "go version go1.25.0 linux/amd64",
+      goModText: "go 1.26.5\n",
+    });
+    expect(bad.length).toBe(2);
+
+    const unparseable = toolchainProblems({
+      pin: { node: "22" },
+      nodeVersion: "junk",
+    });
+    expect(unparseable.length).toBe(1);
+  });
+
+  it("no pin means no problems — the check is opt-in per config", () => {
+    expect(toolchainProblems({ pin: null, nodeVersion: "junk" })).toEqual([]);
+    expect(toolchainProblems({ pin: undefined, nodeVersion: "junk" })).toEqual([]);
+  });
+});
+
+describe("renderComment toolchain line", () => {
+  const SHA = "abc1234abc1234abc1234abc1234abc1234abc12";
+  const RESULTS = [{ name: "lint", mode: "hard", passed: true, durationS: 1, tail: "" }];
+
+  it("records the certified toolchain when pins were measured", () => {
+    const body = renderComment(RESULTS, {
+      headSha: SHA,
+      hostname: "h",
+      toolchain: { node: "22.11.0", go: "1.26" },
+      now: new Date(),
+    });
+    expect(body).toContain("- Toolchain: node 22.11.0 · go 1.26");
+  });
+
+  it("omits the line when no pins are configured", () => {
+    const body = renderComment(RESULTS, { headSha: SHA, hostname: "h", now: new Date() });
+    expect(body).not.toContain("Toolchain:");
+  });
+});
+
+describe("renderComment not-run defense", () => {
+  it("renders a not-run leg as not run, never as pass", () => {
+    const SHA = "abc1234abc1234abc1234abc1234abc1234abc12";
+    const body = renderComment(
+      [{ name: "bats", mode: "hard", passed: false, notRun: true, durationS: 0, tail: "" }],
+      { headSha: SHA, hostname: "h", now: new Date() },
+    );
+    expect(body).toContain("not run (fail-fast)");
+    expect(body).not.toMatch(/\| bats \| hard \| pass/);
+  });
 });
 
 describe("buildGateSnippet", () => {
@@ -296,8 +580,8 @@ describe("buildGateSnippet", () => {
 
   it("rejects empty or non-array trustedAssociations", () => {
     expect(() => buildGateSnippet({ trustedAssociations: [] })).toThrow(/non-empty array/);
-    expect(() =>
-      buildGateSnippet({ trustedAssociations: /** @type {any} */ ("OWNER") }),
-    ).toThrow(/non-empty array/);
+    expect(() => buildGateSnippet({ trustedAssociations: /** @type {any} */ ("OWNER") })).toThrow(
+      /non-empty array/,
+    );
   });
 });

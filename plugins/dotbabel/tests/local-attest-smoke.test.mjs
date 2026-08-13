@@ -117,11 +117,15 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
     });
   });
 
-  it("I/O containment: dry-run never POSTs/PATCHes, never pushes, never writes audit log", () => {
+  it("I/O containment: dry-run never POSTs/PATCHes or pushes; the audit line is its only trace", () => {
+    // Contract change (deliberate): every run whose matrix settles writes one
+    // audit line — dry-runs included, tagged result:"dry-run" — so the log is
+    // a complete run history rather than a successes-only one.
     const { deps, calls } = happyDeps();
     execute(deps, squadranksShapedConfig(), { prOverride: null, push: true, dryRun: true });
     expect(calls.gh).toHaveLength(0);
-    expect(calls.appendLog).toHaveLength(0);
+    expect(calls.appendLog).toHaveLength(1);
+    expect(JSON.parse(calls.appendLog[0].line).result).toBe("dry-run");
     expect(calls.run.some((c) => /git push/.test(c.cmd))).toBe(false);
     expect(calls.run.some((c) => /gh label create/.test(c.cmd))).toBe(false);
     expect(calls.run.some((c) => /gh pr edit/.test(c.cmd))).toBe(false);

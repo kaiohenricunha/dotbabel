@@ -92,13 +92,19 @@ EOF
   [ "$status" -eq 1 ]
 }
 
-@test "local-attest: aborting on a moved HEAD writes no audit-log entry" {
+@test "local-attest: aborting on a moved HEAD audits result:head-moved, attests nothing" {
+  # Contract change (deliberate): the audit log records every run whose matrix
+  # settled, failures included — a moved HEAD leaves a result:head-moved line
+  # instead of vanishing without trace. Publication is still fully suppressed
+  # (the previous test pins that).
   write_config '{ name: "racy", mode: "hard", command: "git commit -q --allow-empty -m concurrent" }'
 
   cd "$REPO"
   run node "$BIN" --pr 42
   [ "$status" -eq 1 ]
-  [ ! -f "$REPO/.local-attest-log.jsonl" ]
+  [ -f "$REPO/.local-attest-log.jsonl" ]
+  run jq -r ".result" "$REPO/.local-attest-log.jsonl"
+  [ "$output" = "head-moved" ]
 }
 
 @test "local-attest: a leg that dirties the tree mid-matrix also aborts" {

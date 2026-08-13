@@ -2,14 +2,14 @@
 id: local-attest
 name: local-attest
 type: skill
-version: 1.0.0
+version: 1.1.0
 domain: [devex, observability]
 platform: [github-actions]
 task: [testing, runtime-ops]
 maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-05-23
-updated: 2026-05-23
+updated: 2026-08-13
 description: >
   Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned
   OWNER-authored PR comment that gates downstream GitHub Actions jobs off for
@@ -17,8 +17,10 @@ description: >
   already verified locally, saving runner minutes without weakening the gate.
   A new push changes the head SHA, the attestation stops matching, CI runs
   again. Side-effectful (posts a PR comment, applies a label, optionally pushes)
-  and slow (10–15 min depending on matrix). Invoke only on explicit request.
-argument-hint: "[--pr <N>] [--no-push] [--dry-run] [--config <path>]"
+  and slow — minutes to tens of minutes, whatever the configured matrix costs.
+  Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can
+  never attest; --fail-fast works in both modes. Invoke only on explicit request.
+argument-hint: "[--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--only <leg>] [--from <leg>] [--config <path>]"
 tools: Bash
 disable-model-invocation: true
 user-invocable: true
@@ -31,9 +33,11 @@ a hidden marker comment to the open PR so the remote `Test` / `Preview` jobs
 read the marker and skip themselves for that exact commit.
 
 > **This skill is side-effectful and slow.** It runs every leg of your CI
-> matrix sequentially (typically 10–15 minutes), posts a PR comment, applies
-> a label, and pushes the current branch. Invoke only when you've decided to
-> attest a specific PR.
+> matrix sequentially — minutes to tens of minutes, whatever the configured
+> matrix costs — posts a PR comment, applies a label, and pushes the current
+> branch. Invoke only when you've decided to attest a specific PR. For the
+> fix-retry loop, use the diagnostic modes below instead: they run subsets,
+> tolerate a dirty tree, and are structurally unable to attest.
 
 ## Quick start
 
@@ -46,7 +50,38 @@ dotbabel local-attest --pr 123 --dry-run
 
 # Run + post + label, but do not git push (useful for offline review):
 dotbabel local-attest --pr 123 --no-push
+
+# Iterate on a fix: run one leg, dirty tree fine, no PR needed, never attests:
+dotbabel local-attest --only lint
+
+# Re-run the matrix from the leg that failed, stopping at the first hard failure:
+dotbabel local-attest --from bats --fail-fast
 ```
+
+## Diagnostic modes — the fix-retry loop
+
+`--only <leg>` (repeatable or comma-separated) and `--from <leg>` run a subset
+of the matrix under relaxed preconditions: any git repo state is fine (dirty
+tree, detached HEAD, no PR — iterating is the point), Docker and toolchain
+problems warn instead of failing. Leg names match exactly and case-sensitively;
+an unknown name lists every valid leg. The two flags are mutually exclusive.
+
+A diagnostic run **never** posts, labels, or pushes. Two mechanisms stack:
+the diagnostic branch in `execute` returns before the publication path even
+exists (and the attest branch always runs the full config matrix), and the
+`shouldAttest` predicate that gates publication receives the diagnostic flag
+plus the expected leg count, so a subset record is rejected even if the
+branch wiring were ever wrong. Exit is 1 when **any** selected leg fails,
+advisory legs included, because there is no attestation gate to grade against
+and `--only <advisory-leg>` exiting 0 on a failure would be useless in a loop.
+
+Subsets get exactly what they name — no dependency injection. `--from` a leg
+that reads a build artifact measures whatever artifact is lying around.
+
+`--fail-fast` works in both modes: the first **hard** failure stops launching
+further legs, which are recorded `not run (fail-fast)` — never as passes. A
+full run with `--fail-fast` where nothing failed completed the whole matrix
+and attests normally; one that stopped early cannot.
 
 ## Prerequisites
 
@@ -67,6 +102,9 @@ dotbabel local-attest --pr 123 --no-push
 - **`gh` authenticated** as a user whose `author_association` is in your
   config's `trustedAssociations` list (default: `["OWNER"]`).
 - **Docker running** if your config sets `requireDocker: true`.
+- **`auditLogPath` gitignored** (default `.local-attest-log.jsonl`). Every
+  run appends to it — including `--dry-run` — so with `requireClean` on, an
+  untracked log makes the next attest abort on the tool's own output.
 
 ## How the gate works
 
@@ -92,31 +130,49 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
 ## What the skill does, in order
 
 1. **Preconditions.** Branch exists, worktree clean (if `requireClean`), local
-   HEAD == PR head, `gh` authed, Docker available (if `requireDocker`). Any
-   failure aborts before a single test runs. The skill also warns (does not
-   fail) if your GitHub `author_association` on the repo (OWNER / MEMBER /
-   COLLABORATOR, etc.) is not in the config's `trustedAssociations` list — the
-   attestation will post but CI will ignore it.
+   HEAD == PR head, `gh` authed, Docker available (if `requireDocker`), and the
+   running toolchain matches `config.toolchain` pins (if set) — a matrix run on
+   a different Node or Go than CI uses certifies a run CI would never perform,
+   so a pin mismatch fails closed here. Any failure aborts before a single test
+   runs. The skill also warns (does not fail) if your GitHub
+   `author_association` on the repo (OWNER / MEMBER / COLLABORATOR, etc.) is
+   not in the config's `trustedAssociations` list — the attestation will post
+   but CI will ignore it.
 2. **Run matrix.** Each leg from the config runs sequentially. Hard legs must
    pass to attest; advisory legs are reported but never block. Stdout + stderr
-   are tailed at 10 lines per leg so the result table stays readable.
-3. **Hard-leg gate.** Any hard failure aborts: no comment, no label, no push.
+   are tailed at 10 lines per leg so the result table stays readable. With
+   `--fail-fast`, the first hard failure stops launching further legs; the
+   rest are recorded `not run`, never as passes.
+3. **Attestation bar.** Posting is gated on a run-record predicate: every leg
+   executed, zero hard fails, not a diagnostic subset. A run that fails the
+   bar aborts — no comment, no label, no push — and still writes its audit
+   line (`result: "hard-fail"`).
 4. **Re-check HEAD.** The matrix takes minutes — long enough for another agent
    session, another worktree, or you in a second terminal to commit onto the
    same branch. Step 1's check is stale by now, so HEAD and the worktree are
    re-asserted against what was actually tested. If either moved, everything
-   aborts: no comment, no label, no push. Without this the skill would attest
-   the pre-matrix SHA and then push whatever HEAD had become — publishing
-   commits it never tested and labelling the PR verified on an unrun head.
-5. **Push first** (if `pushAfterAttest` and not `--no-push`). The attestation
-   must never describe a SHA the remote hasn't seen.
-6. **Upsert comment.** Existing attestation comment (any SHA) is PATCHed in
-   place; otherwise a new one is POSTed. Body always goes via `gh api --input -`
-   so multiline markdown can't be mangled by shell quoting.
+   aborts (`result: "head-moved"`): no comment, no label, no push. Without
+   this the skill would attest the pre-matrix SHA and then push whatever HEAD
+   had become — publishing commits it never tested and labelling the PR
+   verified on an unrun head.
+5. **Upsert comment.** Existing attestation comment (any SHA) is PATCHed in
+   place; otherwise a new one is POSTed — before the push, so the marker is
+   already visible when the push event fires GitHub Actions. Body always goes
+   via `gh api --input -` so multiline markdown can't be mangled by shell
+   quoting.
+6. **Push** (if `pushAfterAttest` and not `--no-push`). A failed push records
+   `result: "push-fail"`; the comment is already in place, so a bare
+   `git push` retry completes the attestation.
 7. **Apply label** (default `ci/local-verified`). Best-effort; failure warns
    but does not abort.
 8. **Append audit log line** to the configured `auditLogPath` (default
-   `.local-attest-log.jsonl`). Best-effort.
+   `.local-attest-log.jsonl`). **Every run whose matrix executes writes
+   exactly one line**, tagged `result: attested | hard-fail | head-moved |
+push-fail | post-fail | dry-run | diagnostic`, with per-leg
+   `{name, mode, status, durationS}` — failures leave a record too, which is
+   what makes failure and duration distributions measurable. Lines written by
+   older versions have no `result` field and imply `attested`. Best-effort:
+   an unwritable log warns but never changes the run's outcome.
 
 ## Flags
 
@@ -125,6 +181,9 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
 | `--pr <N>`        | Target PR number. Defaults to the open PR for the current branch.                                                                            |
 | `--no-push`       | Run matrix + post + label, but skip `git push`.                                                                                              |
 | `--dry-run`       | Run matrix, render the comment, print it. Post nothing, label nothing, push nothing. Use this to validate a new project's config end-to-end. |
+| `--fail-fast`     | Stop launching legs after the first hard failure. Unstarted legs record as `not run`; a run that stopped early can never attest.             |
+| `--only <leg>`    | Diagnostic mode — run only the named leg(s). Repeatable or comma-separated. Relaxed preconditions; never attests. Exit 1 on any failure.     |
+| `--from <leg>`    | Diagnostic mode — run the matrix from the named leg to the end. Mutually exclusive with `--only`.                                            |
 | `--config <path>` | Override config discovery.                                                                                                                   |
 
 ## What this skill never does
