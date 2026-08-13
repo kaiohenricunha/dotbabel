@@ -31,7 +31,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { invokedDirectly } from "../src/lib/invoked-direct.mjs";
 
 import { parse } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
@@ -159,7 +159,8 @@ function assertRev(rev) {
 function requireNumber(raw, flag) {
   if (raw === undefined) return fail(EXIT_CODES.USAGE, `${flag} is required`);
   const n = Number(raw);
-  if (!Number.isInteger(n) || n <= 0) return fail(EXIT_CODES.USAGE, `${flag} must be a positive integer`);
+  if (!Number.isInteger(n) || n <= 0)
+    return fail(EXIT_CODES.USAGE, `${flag} must be a positive integer`);
   return n;
 }
 
@@ -247,7 +248,9 @@ function fetchPrs(limit) {
  * @returns {string[]}
  */
 function renderPlan(plan) {
-  const lines = [`stack on ${plan.trunk}: ${plan.counts.total} PR(s), merge order ${plan.order.join(" → ") || "—"}`];
+  const lines = [
+    `stack on ${plan.trunk}: ${plan.counts.total} PR(s), merge order ${plan.order.join(" → ") || "—"}`,
+  ];
   for (const entry of plan.actionable) {
     lines.push(`  ✓ #${entry.number} ${entry.head} — ${entry.action}: ${entry.reason}`);
   }
@@ -341,14 +344,18 @@ async function main() {
     } catch (err) {
       return fail(EXIT_CODES.VALIDATION, err.message);
     }
-    for (const warning of transition.warnings) process.stderr.write(`${TOOL}: warning: ${warning}\n`);
+    for (const warning of transition.warnings)
+      process.stderr.write(`${TOOL}: warning: ${warning}\n`);
 
     return emit({
       subcommand: sub,
       ok: true,
       trunk: flags.trunk,
       result: transition,
-      lines: [`#${transition.number}: ${transition.reason}`, ...transition.steps.map((s) => `  ${s.cmd}`)],
+      lines: [
+        `#${transition.number}: ${transition.reason}`,
+        ...transition.steps.map((s) => `  ${s.cmd}`),
+      ],
       json,
     });
   }
@@ -382,7 +389,10 @@ async function main() {
       ok: result.ok,
       result,
       problems: result.reasons,
-      lines: [`gate skip-ci: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      lines: [
+        `gate skip-ci: ${result.ok ? "PASS" : "FAIL"}`,
+        ...result.reasons.map((r) => `  ✗ ${r.message}`),
+      ],
       json,
     });
   }
@@ -403,7 +413,10 @@ async function main() {
       ok: result.ok,
       result,
       problems: result.reasons,
-      lines: [`gate local-attest: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      lines: [
+        `gate local-attest: ${result.ok ? "PASS" : "FAIL"}`,
+        ...result.reasons.map((r) => `  ✗ ${r.message}`),
+      ],
       json,
     });
   }
@@ -425,7 +438,10 @@ async function main() {
       ok: summary.ok,
       result,
       problems: result.reasons,
-      lines: [`gate merge: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      lines: [
+        `gate merge: ${result.ok ? "PASS" : "FAIL"}`,
+        ...result.reasons.map((r) => `  ✗ ${r.message}`),
+      ],
       json,
     });
   }
@@ -434,7 +450,7 @@ async function main() {
 }
 
 // Run only when invoked as a CLI, not when imported by tests.
-const invokedDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirect = invokedDirectly(import.meta.url);
 if (invokedDirect) {
   main().catch((err) => fail(EXIT_CODES.ENV, err.message));
 }

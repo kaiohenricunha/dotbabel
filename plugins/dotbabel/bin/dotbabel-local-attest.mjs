@@ -36,7 +36,8 @@
  *   64  bad CLI invocation (unknown flag, malformed --pr)
  */
 
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { invokedDirectly } from "../src/lib/invoked-direct.mjs";
 
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { parseArgs } from "../src/local-attest-lib.mjs";
@@ -142,7 +143,7 @@ async function main() {
 }
 
 // Run only when invoked as a CLI, not when imported by tests.
-const invokedDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirect = invokedDirectly(import.meta.url);
 if (invokedDirect) {
   main().catch((err) => fail(2, err.message));
 }

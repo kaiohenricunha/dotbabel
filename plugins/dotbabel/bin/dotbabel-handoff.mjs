@@ -93,7 +93,8 @@ import {
 export { _HandoffError as HandoffError };
 import { env as legacyEnv } from "../src/lib/legacy-compat.mjs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { invokedDirectly } from "../src/lib/invoked-direct.mjs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -1003,7 +1004,8 @@ async function main() {
     const force = Boolean(argv.flags["force-collision"]);
     const dryRun = Boolean(argv.flags["dry-run"]);
     try {
-      const stateFilePath = argv.flags["state-file"] != null ? String(argv.flags["state-file"]) : null;
+      const stateFilePath =
+        argv.flags["state-file"] != null ? String(argv.flags["state-file"]) : null;
       let stateBlock = null;
       if (stateFilePath) {
         try {
@@ -1153,7 +1155,7 @@ async function main() {
 }
 
 // Only execute the CLI when invoked directly; stay import-safe for unit tests.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (invokedDirectly(import.meta.url)) {
   main().catch((err) => fail(2, err.message));
 }
 
