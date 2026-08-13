@@ -41,7 +41,7 @@ type Config = {
   // versions count as mismatches.
   toolchain?: {
     node?: string; // exact major pin ("22"); range syntax (">=22", "^22") is rejected
-    goMod?: string; // relative path (no "..") to a go.mod; its go directive major.minor must match `go version`
+    goMod?: string; // relative path (no "..") to a go.mod; its go directive major.minor must match `go version` probed from that module directory (so GOTOOLCHAIN=auto counts)
   };
 
   // Tracked files a leg is known to overwrite (e2e fixture seeders). They are

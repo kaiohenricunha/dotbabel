@@ -93,7 +93,8 @@ import {
 export { _HandoffError as HandoffError };
 import { env as legacyEnv } from "../src/lib/legacy-compat.mjs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
+import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -1152,9 +1153,14 @@ async function main() {
   );
 }
 
-// Only execute the CLI when invoked directly; stay import-safe for unit tests.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Only execute main() when this file is the entry script. (Importers still
+// pay the module-scope argv parse above — this guard only withholds main().)
+// When argv[1] names this bin but the guard still missed, fail loudly rather
+// than exit 0 as if the command ran.
+if (invokedDirectly(import.meta.url)) {
   main().catch((err) => fail(2, err.message));
+} else if (misfiredAs("dotbabel-handoff")) {
+  fail(EXIT_CODES.ENV, "run-direct guard did not fire; refusing to exit 0 without running.");
 }
 
 export {

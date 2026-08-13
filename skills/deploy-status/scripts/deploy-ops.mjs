@@ -8,9 +8,9 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 
 const EXIT = {
   OK: 0,
@@ -991,7 +991,26 @@ export async function main(argv = process.argv.slice(2)) {
   return EXIT.USAGE;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Run-direct guard, symlink-safe. bootstrap.sh symlinks this skill into
+// ~/.claude/skills/, and SKILL.md prefers that path — Node realpath-resolves
+// the entry module while argv[1] keeps the symlink, so a verbatim comparison
+// concludes the script was imported and exits 0 without running, which
+// callers read as "every target in sync". Compare realpaths on both sides.
+// (Inlined rather than shared: scaffolded copies of this file have no
+// plugins/dotbabel/src to import a helper from.)
+let runDirect = false;
+if (process.argv[1]) {
+  const self = fileURLToPath(import.meta.url);
+  runDirect = self === process.argv[1];
+  if (!runDirect) {
+    try {
+      runDirect = realpathSync(self) === realpathSync(process.argv[1]);
+    } catch {
+      runDirect = false;
+    }
+  }
+}
+if (runDirect) {
   main().then((code) => {
     process.exitCode = code;
   });

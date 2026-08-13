@@ -31,7 +31,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 
 import { parse } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
@@ -433,10 +433,14 @@ async function main() {
   return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge, skip-ci`);
 }
 
-// Run only when invoked as a CLI, not when imported by tests.
-const invokedDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+// Run only when invoked as a CLI, not when imported by tests. When argv[1]
+// names this bin but the guard still missed, exit 0 would read as a gate
+// PASS — fail loudly instead.
+const invokedDirect = invokedDirectly(import.meta.url);
 if (invokedDirect) {
   main().catch((err) => fail(EXIT_CODES.ENV, err.message));
+} else if (misfiredAs("dotbabel-pr-stack")) {
+  fail(EXIT_CODES.ENV, "run-direct guard did not fire; refusing to exit 0 without running.");
 }
 
 // Re-exports for unit tests that want to drive the binary without spawning.

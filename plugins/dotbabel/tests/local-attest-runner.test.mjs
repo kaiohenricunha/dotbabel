@@ -660,6 +660,21 @@ describe("toolchain precondition", () => {
     expect(calls.run.some((c) => /cat /.test(c.cmd))).toBe(false);
   });
 
+  it("probes go version from the goMod module dir so GOTOOLCHAIN=auto answers for the pin", async () => {
+    // With GOTOOLCHAIN=auto the go command delegates to the module's pinned
+    // toolchain only when run inside the module. Probing from the repo root
+    // reports the PATH binary and flags a machine Go itself considers sound.
+    const cfg = baseConfig({ toolchain: { goMod: "api/go.mod" } });
+    const replies = [...happy, [/go version/, { stdout: "go version go1.26.5 linux/amd64\n" }]];
+    const { deps, calls } = makeDeps({
+      runReplies: replies,
+      readFileReplies: { "api/go.mod": "module x\n\ngo 1.26.5\n" },
+    });
+    expect(() => checkPreconditions(deps, cfg)).not.toThrow();
+    const probe = calls.run.find((c) => /go version/.test(c.cmd));
+    expect(probe.opts.cwd).toBe("api");
+  });
+
   it("records the measured versions on the preconditions for the audit trail", async () => {
     const cfg = baseConfig({ toolchain: { node: "22" } });
     const replies = [...happy, [/node --version/, { stdout: "v22.11.0\n" }]];
