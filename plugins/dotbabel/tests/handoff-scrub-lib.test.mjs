@@ -5,7 +5,7 @@
 // output, the `scrubbed:N` stderr-count parse, and the fail-closed behavior
 // that pushRemote() relies on to avoid uploading unscrubbed content.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -52,6 +52,45 @@ describe("scrubDigest", () => {
     expect(() =>
       scrubDigest("any input", { scriptPath: "/nonexistent/handoff-scrub.sh" }),
     ).toThrow(SCRUB_ERROR_PREFIX);
+  });
+
+  describe("DOTBABEL_HANDOFF_SCRUB_SCRIPT override", () => {
+    const VAR = "DOTBABEL_HANDOFF_SCRUB_SCRIPT";
+
+    afterEach(() => {
+      delete process.env[VAR];
+    });
+
+    it("redirects the default path so a child process can be pointed elsewhere", () => {
+      const { dir, path } = stubScript('cat; printf "scrubbed:7\\n" >&2');
+      try {
+        process.env[VAR] = path;
+        // No scriptPath option — the env var must supply it.
+        expect(scrubDigest("payload").count).toBe(7);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("stays fail-closed when the override points at nothing", () => {
+      process.env[VAR] = "/nonexistent/handoff-scrub.sh";
+      expect(() => scrubDigest("any input")).toThrow(SCRUB_ERROR_PREFIX);
+    });
+
+    it("loses to an explicit scriptPath option", () => {
+      const { dir, path } = stubScript('cat; printf "scrubbed:1\\n" >&2');
+      try {
+        process.env[VAR] = "/nonexistent/handoff-scrub.sh";
+        expect(scrubDigest("payload", { scriptPath: path }).count).toBe(1);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it("is ignored when set to whitespace, falling back to the real scrubber", () => {
+      process.env[VAR] = "   ";
+      expect(scrubDigest("plain prose").count).toBe(0);
+    });
   });
 
   it("throws when the scrubber exits non-zero (fail-closed contract)", () => {

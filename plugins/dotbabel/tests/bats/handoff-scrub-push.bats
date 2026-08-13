@@ -103,18 +103,15 @@ EOF
 }
 
 @test "push: fail-closed when scrubber is missing (no branch written)" {
-  # Temporarily rename the real scrubber so the module's existsSync check
-  # trips. This is the fail-closed baseline: if the scrubber cannot run,
-  # the push must not commit anything to the remote.
-  local backup="$SCRUB.bak.$$"
-  mv "$SCRUB" "$backup"
-
-  run node "$BIN" push aaaa1111
-  local push_status="$status"
-  local push_output="$output"
-
-  # Restore before any assertion can short-circuit the test.
-  mv "$backup" "$SCRUB"
+  # Point the module at a path inside this test's own temp HOME instead of
+  # moving the real scrubber aside. Renaming the shared repo file made every
+  # concurrently-running test that needs the scrubber fail, which is what
+  # kept the suite from running under `bats -j`.
+  local push_status push_output
+  DOTBABEL_HANDOFF_SCRUB_SCRIPT="$TEST_HOME/no-such-scrubber.sh" \
+    run node "$BIN" push aaaa1111
+  push_status="$status"
+  push_output="$output"
 
   [ "$push_status" -eq 2 ]
   [[ "$push_output" == *"stage:  scrub"* ]]
