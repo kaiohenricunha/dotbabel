@@ -21,7 +21,13 @@
  * @property {(cmd: string, opts?: { cwd?: string, env?: Record<string,string>, capture?: boolean }) => { status: number, stdout: string, stderr: string }} run
  * @property {(cmd: string, payload: object) => string} ghApiWithInput
  * @property {(path: string, line: string) => void} appendLog
- * @property {(path: string) => string|null} [readFile]  utf8 read, null on any error
+ * @property {(path: string) => Buffer|string|null} [readFile]  raw read (Buffer in
+ *   realDeps; test stubs may return strings), null on any error
+ * @property {(path: string, content: string) => void} [writeFile]  utf8 write; used only
+ *   by the restoreFiles snapshot/restore
+ * @property {(leg: Leg) => Promise<import("./local-attest-lib.mjs").LegResult>} [runLeg]
+ *   async leg executor enabling concurrent lanes; absent in a stub, runMatrix
+ *   falls back to a promise-wrapped `run`, preserving fully synchronous tests
  * @property {() => string} hostname
  * @property {(msg: string) => void} log
  * @property {(msg: string) => void} warn
@@ -40,8 +46,8 @@
  *   against the config pins; null when no pins are configured
  */
 
-import { spawnSync } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 
 import {
@@ -50,6 +56,7 @@ import {
   findAttestComment,
   goMajorMinorFromVersion,
   legStatus,
+  markSkips,
   renderComment,
   shouldAttest,
   summarizeResults,
@@ -92,11 +99,67 @@ export function realDeps() {
       appendFileSync(path, line);
     },
     readFile(path) {
+      // No encoding: returns a Buffer so restoreFiles round-trips binaries
+      // byte-exact. Text consumers (gatherToolchain) coerce with String().
       try {
-        return readFileSync(path, "utf8");
+        return readFileSync(path);
       } catch {
         return null;
       }
+    },
+    writeFile(path, content) {
+      writeFileSync(path, content);
+    },
+    // Async leg executor for concurrent lanes. Differences from the sync
+    // `run` are deliberate: stdin is "ignore" because two concurrent children
+    // cannot share one terminal (a prompting leg should EOF-fail fast, not
+    // hang); output is decoded with setEncoding so a UTF-8 sequence straddling
+    // a chunk boundary cannot corrupt the failure tail; buffers are bounded
+    // 256 KB rolling windows since only tail() output is ever rendered; and
+    // the "error" event settles too — Node does not guarantee "close" after a
+    // failed spawn (ENOENT cwd, EMFILE), and without it a lane awaits forever.
+    runLeg(leg) {
+      return new Promise((resolve) => {
+        const started = Date.now();
+        let settled = false;
+        const child = spawn(leg.command, {
+          shell: true,
+          cwd: leg.cwd,
+          env: { ...process.env, ...leg.env },
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        child.stdout.setEncoding("utf8");
+        child.stderr.setEncoding("utf8");
+        const CAP = 256 * 1024;
+        let stdout = "";
+        let stderr = "";
+        const append = (buf, d) => {
+          const next = buf + d;
+          return next.length > CAP ? next.slice(-CAP) : next;
+        };
+        const settle = (code) => {
+          if (settled) return;
+          settled = true;
+          resolve({
+            name: leg.name,
+            mode: leg.mode,
+            passed: code === 0,
+            durationS: Math.round((Date.now() - started) / 1000),
+            tail: tail(`${stdout}\n${stderr}`),
+          });
+        };
+        child.stdout.on("data", (d) => {
+          stdout = append(stdout, d);
+        });
+        child.stderr.on("data", (d) => {
+          stderr = append(stderr, d);
+        });
+        child.on("error", (err) => {
+          stderr = append(stderr, `\nspawn failed: ${err.message}\n`);
+          settle(-1);
+        });
+        child.on("close", settle);
+      });
     },
     hostname() {
       return os.hostname();
@@ -171,7 +234,8 @@ function gatherToolchain(deps, cfg) {
     // A direct file read, not a shell cat: this module forbids interpolating
     // strings into shell commands, and validateConfig constrains the path the
     // same way auditLogPath is constrained.
-    inputs.goModText = deps.readFile ? (deps.readFile(pin.goMod) ?? "") : "";
+    const goModRaw = deps.readFile ? deps.readFile(pin.goMod) : null;
+    inputs.goModText = goModRaw === null ? "" : String(goModRaw);
   }
   return { problems: toolchainProblems(inputs), seen };
 }
@@ -344,8 +408,12 @@ export function checkPreconditions(deps, cfg, opts = {}) {
 }
 
 /**
- * Execute the matrix sequentially. Each leg runs to completion; output is
- * tailed at 10 lines so large logs don't bloat the result struct.
+ * Execute the matrix as concurrent lanes: legs sharing a `lane` run serially
+ * in matrix order; distinct lanes run in parallel; legs without a lane share
+ * one default lane, so a lane-less matrix is fully sequential. Results are
+ * preallocated by matrix index — the summary, comment table, and audit line
+ * keep config order regardless of completion order. Output is tailed at 10
+ * lines so large logs don't bloat the result struct.
  *
  * With `failFast`, a hard failure stops launching further legs; the remainder
  * are recorded as `{ notRun: true, passed: false }` — fail-closed for any
@@ -358,35 +426,88 @@ export function checkPreconditions(deps, cfg, opts = {}) {
  * @param {{ failFast?: boolean }} [opts]
  * @returns {LegResult[]}
  */
-export function runMatrix(deps, matrix, { failFast = false } = {}) {
-  /** @type {LegResult[]} */
-  const results = [];
+export async function runMatrix(deps, matrix, { failFast = false } = {}) {
+  /** @type {import("./local-attest-lib.mjs").LegResult[]} */
+  const results = new Array(matrix.length);
   let aborted = false;
-  for (const leg of matrix) {
-    if (aborted) {
-      results.push({
+  // Stubs without an async executor fall back to the sync run, promise-wrapped
+  // — a lane-less matrix then behaves byte-for-byte like the sequential runner.
+  const runLeg =
+    deps.runLeg ??
+    (async (leg) => {
+      const started = Date.now();
+      const r = deps.run(leg.command, { cwd: leg.cwd, env: leg.env });
+      return {
         name: leg.name,
         mode: leg.mode,
-        passed: false,
-        notRun: true,
-        durationS: 0,
-        tail: "",
-      });
-      deps.log(`--- ${leg.name}: NOT RUN (fail-fast)`);
-      continue;
+        passed: r.status === 0,
+        durationS: Math.round((Date.now() - started) / 1000),
+        tail: tail(`${r.stdout || ""}\n${r.stderr || ""}`),
+      };
+    });
+
+  const lanes = [...new Set(matrix.map((l) => l.lane ?? ""))];
+  const runLane = async (lane) => {
+    for (let i = 0; i < matrix.length; i += 1) {
+      const leg = matrix[i];
+      if ((leg.lane ?? "") !== lane) continue;
+      // Skipped before aborted: a diff-skipped leg stays honestly "skipped"
+      // even after a fail-fast trip — it was never going to run.
+      if (leg.skipped) {
+        results[i] = {
+          name: leg.name,
+          mode: leg.mode,
+          passed: true,
+          skipped: true,
+          durationS: 0,
+          tail: "",
+        };
+        deps.log(`--- ${leg.name}: SKIPPED (diff-scoped; the matching CI job skips too)`);
+        continue;
+      }
+      if (aborted) {
+        results[i] = {
+          name: leg.name,
+          mode: leg.mode,
+          passed: false,
+          notRun: true,
+          durationS: 0,
+          tail: "",
+        };
+        deps.log(`--- ${leg.name}: NOT RUN (fail-fast)`);
+        continue;
+      }
+      deps.log(`\n=== ${leg.name} (${leg.mode}) ===`);
+      const r = await runLeg(leg);
+      results[i] = r;
+      deps.log(`--- ${leg.name}: ${r.passed ? "PASS" : "FAIL"} (${r.durationS}s)`);
+      if (!r.passed) deps.log(r.tail);
+      if (failFast && !r.passed && leg.mode === "hard") {
+        aborted = true;
+        deps.log(`fail-fast: ${leg.name} failed \u2014 remaining legs will not run.`);
+      }
     }
-    deps.log(`\n=== ${leg.name} (${leg.mode}) ===`);
-    const started = Date.now();
-    const r = deps.run(leg.command, { cwd: leg.cwd, env: leg.env });
-    const durationS = Math.round((Date.now() - started) / 1000);
-    const passed = r.status === 0;
-    const output = tail(`${r.stdout || ""}\n${r.stderr || ""}`);
-    results.push({ name: leg.name, mode: leg.mode, passed, durationS, tail: output });
-    deps.log(`--- ${leg.name}: ${passed ? "PASS" : "FAIL"} (${durationS}s)`);
-    if (!passed) deps.log(output);
-    if (failFast && !passed && leg.mode === "hard") {
-      aborted = true;
-      deps.log(`fail-fast: ${leg.name} failed — remaining legs will not run.`);
+  };
+
+  // allSettled, not all: a rejecting consumer-supplied runLeg must not unwind
+  // the caller while sibling lanes still have live children — the matrix must
+  // be quiescent before execute's restore runs. A rejected lane's unfilled
+  // slots become hard-failed records, which shouldAttest rejects.
+  const settled = await Promise.allSettled(lanes.map(runLane));
+  for (const outcome of settled) {
+    if (outcome.status === "rejected") {
+      deps.warn(`WARNING: a lane rejected: ${outcome.reason?.message ?? outcome.reason}`);
+    }
+  }
+  for (let i = 0; i < matrix.length; i += 1) {
+    if (!results[i]) {
+      results[i] = {
+        name: matrix[i].name,
+        mode: matrix[i].mode,
+        passed: false,
+        durationS: 0,
+        tail: "lane rejected before this leg settled",
+      };
     }
   }
   return results;
@@ -471,10 +592,83 @@ export function appendAuditLog(deps, { auditLogPath, ...entryInput }) {
   }
 }
 
+/**
+ * Snapshot the config's restoreFiles through deps.readFile. A null entry means
+ * the file was absent — restore will not create it.
+ *
+ * @param {Deps} deps
+ * @param {string[]} paths
+ * @returns {Map<string, string|null>}
+ */
+export function snapshotRestoreFiles(deps, paths) {
+  const snap = new Map();
+  for (const rel of paths) {
+    snap.set(rel, deps.readFile ? deps.readFile(rel) : null);
+  }
+  return snap;
+}
+
+/**
+ * Put the snapshot back, byte for byte, through deps.writeFile. Restores only
+ * files a leg actually changed, never creates an absent file, and never
+ * touches anything outside the snapshot. Runs in execute's finally BEFORE the
+ * post-matrix head recheck — otherwise the recheck aborts every run on the
+ * matrix's own writes.
+ *
+ * @param {Deps} deps
+ * @param {Map<string, string|null>} snap
+ * @returns {string[]} the paths actually restored
+ */
+export function restoreRestoreFiles(deps, snap) {
+  const same = (a, b) => {
+    if (a === null || b === null) return false;
+    if (typeof a === "string" || typeof b === "string") return String(a) === String(b);
+    return a.equals(b);
+  };
+  const restored = [];
+  for (const [rel, before] of snap) {
+    // A null SNAPSHOT means the file did not exist before the matrix — never
+    // create it. A null CURRENT read means a leg deleted it — that is the
+    // mutation the operator most wants undone, so restore it.
+    if (before === null) continue;
+    const now = deps.readFile ? deps.readFile(rel) : null;
+    if (same(now, before)) continue;
+    if (deps.writeFile) {
+      deps.writeFile(rel, before);
+      restored.push(rel);
+    }
+  }
+  return restored;
+}
+
+/**
+ * Guarded restore wrapper. A restore failure (read-only file, removed parent
+ * dir) must never replace the matrix's own exception or skip the audit line —
+ * it warns instead, and the unrestored file then surfaces as a dirty tree in
+ * verifyHeadUnchanged: fail-closed, correctly diagnosed, still audited.
+ *
+ * @param {Deps} deps
+ * @param {Map<string, Buffer|string|null>} snapshot
+ */
+function safeRestore(deps, snapshot) {
+  try {
+    const restored = restoreRestoreFiles(deps, snapshot);
+    if (restored.length > 0) {
+      deps.log(`Restored ${restored.length} seeded file(s): ${restored.join(", ")}`);
+    }
+  } catch (err) {
+    deps.warn(
+      `WARNING: restoring seeded files failed (${err?.message ?? err}) — ` +
+        "the head recheck will flag any residue as a dirty tree.",
+    );
+  }
+}
+
 const SUMMARY_LABELS = {
   pass: "PASS",
   fail: "FAIL",
   "advisory-fail": "fail (advisory)",
+  skipped: "SKIPPED (diff-scoped)",
   "not-run": "NOT RUN (fail-fast)",
 };
 
@@ -513,7 +707,7 @@ function printSummary(deps, results) {
  *           only?: string[], from?: string|null, failFast?: boolean }} flags
  * @returns {{ ok: boolean, body: string, results: LegResult[], pre: Preconditions|null, exitCode: number }}
  */
-export function execute(deps, cfg, flags) {
+export async function execute(deps, cfg, flags) {
   const only = flags.only ?? [];
   const from = flags.from ?? null;
   const failFast = flags.failFast === true;
@@ -535,7 +729,14 @@ export function execute(deps, cfg, flags) {
       `Diagnostic run: ${matrix.length} of ${cfg.matrix.length} leg(s) — attestation disabled.`,
     );
 
-    const results = runMatrix(deps, matrix, { failFast });
+    // The fix-retry loop hits the seeding legs hardest — restore here too.
+    const diagSnapshot = snapshotRestoreFiles(deps, cfg.restoreFiles ?? []);
+    let results;
+    try {
+      results = await runMatrix(deps, matrix, { failFast });
+    } finally {
+      safeRestore(deps, diagSnapshot);
+    }
     printSummary(deps, results);
     const { advisoryFails } = summarizeResults(results);
     appendAuditLog(deps, {
@@ -565,7 +766,68 @@ export function execute(deps, cfg, flags) {
   const pre = checkPreconditions(deps, cfg, { prOverride: flags.prOverride });
   deps.log(`Attesting PR #${pre.pr} (${pre.repo}) at ${pre.headSha.slice(0, 8)}.`);
 
-  const results = runMatrix(deps, cfg.matrix, { failFast });
+  // Diff rules: one paginated Files API call drives every when/skipWhenDiffOnly
+  // decision (the paginated endpoint, not `gh pr view --json files`, which caps
+  // at 100 files and would silently mis-classify a large PR). Fail-open: an
+  // unreadable list runs everything — running too much is safe, an attested PR
+  // skipping too much is not.
+  let matrix = cfg.matrix;
+  const usesDiffRules = cfg.matrix.some((l) => l.when || l.skipWhenDiffOnly);
+  if (usesDiffRules) {
+    // JSON output (not newline-splitting, which would fragment a legal
+    // newline-bearing path into non-matching pieces) plus a count cross-check
+    // against the PR's own changedFiles total: the Files endpoint silently
+    // caps at 3000 files, and a truncated list would bias BOTH diff rules
+    // toward skipping \u2014 the one direction this design must never fail in.
+    let changedFiles = null;
+    try {
+      const raw = capture(
+        deps,
+        `gh api repos/${pre.repo}/pulls/${pre.pr}/files --paginate --jq '[.[].filename]'`,
+      );
+      const parsed = raw
+        .split("\n")
+        .filter(Boolean)
+        .flatMap((page) => JSON.parse(page));
+      const declared = Number(
+        capture(deps, `gh pr view ${pre.pr} --json changedFiles --jq .changedFiles`),
+      );
+      if (!Number.isFinite(declared) || declared !== parsed.length || declared >= 3000) {
+        deps.warn(
+          `WARNING: PR file list looks incomplete (parsed ${parsed.length}, PR declares ${declared}) \u2014 running every leg to be safe.`,
+        );
+      } else {
+        changedFiles = parsed;
+      }
+    } catch {
+      deps.warn("WARNING: could not read the PR file list \u2014 running every leg to be safe.");
+    }
+    matrix = markSkips(cfg.matrix, changedFiles);
+    const skippedNames = matrix.filter((l) => l.skipped).map((l) => l.name);
+    if (skippedNames.length > 0) {
+      deps.log(`Diff rules skip ${skippedNames.length} leg(s): ${skippedNames.join(", ")}`);
+    }
+  }
+
+  // PR body injection: fetched once, empty on error (the consuming leg treats
+  // an empty body as a non-PR context). Env passing, never shell interpolation.
+  if (matrix.some((l) => l.passPrBody)) {
+    let prBody = "";
+    try {
+      prBody = capture(deps, `gh pr view ${pre.pr} --json body --jq .body`);
+    } catch {
+      // Empty is safe; the leg's consumer must tolerate a missing body.
+    }
+    matrix = matrix.map((l) => (l.passPrBody ? { ...l, env: { ...l.env, PR_BODY: prBody } } : l));
+  }
+
+  const snapshot = snapshotRestoreFiles(deps, cfg.restoreFiles ?? []);
+  let results;
+  try {
+    results = await runMatrix(deps, matrix, { failFast });
+  } finally {
+    safeRestore(deps, snapshot);
+  }
   const { hardFails, advisoryFails } = summarizeResults(results);
   printSummary(deps, results);
 

@@ -120,7 +120,7 @@ async function main() {
 
   const deps = realDeps();
   try {
-    const result = execute(deps, cfg, {
+    const result = await execute(deps, cfg, {
       prOverride: argv.pr,
       push: argv.push,
       dryRun: argv.dryRun,

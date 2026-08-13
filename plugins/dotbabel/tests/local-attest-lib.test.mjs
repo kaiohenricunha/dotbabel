@@ -10,7 +10,9 @@ import {
   goMajorMinorFromGoMod,
   goMajorMinorFromVersion,
   isAttested,
+  globToRegExp,
   legStatus,
+  markSkips,
   nodeMajorFromPin,
   nodeMajorOf,
   parseArgs,
@@ -367,7 +369,112 @@ describe("legStatus", () => {
     expect(legStatus({ mode: "hard", passed: false })).toBe("fail");
     expect(legStatus({ mode: "advisory", passed: false })).toBe("advisory-fail");
     expect(legStatus({ mode: "hard", passed: false, notRun: true })).toBe("not-run");
+    expect(legStatus({ mode: "hard", passed: true, skipped: true })).toBe("skipped");
     expect(legStatus(undefined)).toBe("not-run");
+  });
+});
+
+describe("globToRegExp", () => {
+  it("matches ** across separators, * and ? within one segment", () => {
+    expect(globToRegExp("docs/**").test("docs/a/b.md")).toBe(true);
+    expect(globToRegExp("**/*.md")).toBeTruthy();
+    expect(globToRegExp("**/*.md").test("a/b/c.md")).toBe(true);
+    expect(globToRegExp("**/*.md").test("README.md")).toBe(true);
+    expect(globToRegExp("src/Bolao*.jsx").test("src/BolaoList.jsx")).toBe(true);
+    expect(globToRegExp("src/Bolao*.jsx").test("src/Bolao/List.jsx")).toBe(false);
+    expect(globToRegExp("api/**").test("api2/x.go")).toBe(false);
+    expect(globToRegExp("package.json").test("package.json")).toBe(true);
+    expect(globToRegExp("package.json").test("sub/package.json")).toBe(false);
+  });
+});
+
+describe("markSkips", () => {
+  const MATRIX = [
+    { name: "always", mode: "hard", command: "a" },
+    { name: "gated", mode: "hard", command: "b", when: { changedPaths: ["api/**", "pkg.json"] } },
+    { name: "diffy", mode: "hard", command: "c", skipWhenDiffOnly: ["docs/**", "**/*.md"] },
+  ];
+
+  it("fail-open: a null or empty changed-files list runs everything", () => {
+    for (const files of [null, undefined, []]) {
+      const out = markSkips(MATRIX, files);
+      expect(out.map((l) => l.skipped === true)).toEqual([false, false, false]);
+    }
+  });
+
+  it("when: the leg skips when no changed file matches, runs when one does", () => {
+    expect(markSkips(MATRIX, ["src/app.js"])[1].skipped).toBe(true);
+    expect(markSkips(MATRIX, ["api/main.go"])[1].skipped).toBe(false);
+    expect(markSkips(MATRIX, ["pkg.json"])[1].skipped).toBe(false);
+  });
+
+  it("skipWhenDiffOnly: skips only when EVERY changed file matches the globs", () => {
+    expect(markSkips(MATRIX, ["docs/a.md", "README.md"])[2].skipped).toBe(true);
+    expect(markSkips(MATRIX, ["docs/a.md", "src/app.js"])[2].skipped).toBe(false);
+  });
+
+  it("never removes a leg and does not mutate the input matrix", () => {
+    const out = markSkips(MATRIX, ["docs/a.md"]);
+    expect(out).toHaveLength(3);
+    expect(MATRIX[1].skipped).toBeUndefined();
+  });
+});
+
+describe("shouldAttest with skipped legs", () => {
+  it("refuses an all-skipped run — zero legs executed verifies nothing", () => {
+    const results = [
+      { name: "a", mode: "hard", passed: true, skipped: true, durationS: 0, tail: "" },
+      { name: "b", mode: "hard", passed: true, skipped: true, durationS: 0, tail: "" },
+    ];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 2 })).toBe(false);
+  });
+
+  it("a record flagged both skipped and notRun is rejected — notRun wins", () => {
+    const results = [
+      { name: "a", mode: "hard", passed: true, durationS: 1, tail: "" },
+      {
+        name: "b",
+        mode: "hard",
+        passed: false,
+        skipped: true,
+        notRun: true,
+        durationS: 0,
+        tail: "",
+      },
+    ];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 2 })).toBe(false);
+    expect(legStatus(results[1])).toBe("not-run");
+  });
+
+  it("skipped legs are attestable — CI skips the same jobs", () => {
+    const results = [
+      { name: "a", mode: "hard", passed: true, durationS: 1, tail: "" },
+      { name: "b", mode: "hard", passed: true, skipped: true, durationS: 0, tail: "" },
+    ];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 2 })).toBe(true);
+  });
+});
+
+describe("renderComment skipped honesty", () => {
+  const SHA = "abc1234abc1234abc1234abc1234abc1234abc12";
+
+  it("a skipped leg renders as skipped with no duration, and the headline says so", () => {
+    const results = [
+      { name: "lint", mode: "hard", passed: true, durationS: 2, tail: "" },
+      { name: "e2e", mode: "hard", passed: true, skipped: true, durationS: 0, tail: "" },
+    ];
+    const body = renderComment(results, { headSha: SHA, hostname: "h", now: new Date() });
+    expect(body).toContain(
+      "| e2e | hard | skipped (diff-scoped) | \u2014 |".replace("\\u2014", "\u2014"),
+    );
+    expect(body).toContain("1 leg(s) were skipped for this diff");
+    expect(body).not.toContain("The full CI check matrix ran");
+  });
+
+  it("no skips keeps the full-matrix headline", () => {
+    const results = [{ name: "lint", mode: "hard", passed: true, durationS: 2, tail: "" }];
+    const body = renderComment(results, { headSha: SHA, hostname: "h", now: new Date() });
+    expect(body).toContain("The full CI check matrix ran locally");
   });
 });
 

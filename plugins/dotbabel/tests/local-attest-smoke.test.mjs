@@ -90,9 +90,9 @@ function happyDeps() {
 }
 
 describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
-  it("marker invariant: rendered comment line 1 is exactly the marker", () => {
+  it("marker invariant: rendered comment line 1 is exactly the marker", async () => {
     const { deps } = happyDeps();
-    const r = execute(deps, squadranksShapedConfig(), {
+    const r = await execute(deps, squadranksShapedConfig(), {
       prOverride: null,
       push: false,
       dryRun: true,
@@ -102,9 +102,9 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
     expect(firstLine).toMatch(/^<!-- local-attest verified-sha=[0-9a-f]{7,40} -->$/);
   });
 
-  it("table fidelity: every leg appears once, in order, with correct mode + status", () => {
+  it("table fidelity: every leg appears once, in order, with correct mode + status", async () => {
     const { deps } = happyDeps();
-    const r = execute(deps, squadranksShapedConfig(), {
+    const r = await execute(deps, squadranksShapedConfig(), {
       prOverride: null,
       push: false,
       dryRun: true,
@@ -117,12 +117,12 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
     });
   });
 
-  it("I/O containment: dry-run never POSTs/PATCHes or pushes; the audit line is its only trace", () => {
+  it("I/O containment: dry-run never POSTs/PATCHes or pushes; the audit line is its only trace", async () => {
     // Contract change (deliberate): every run whose matrix settles writes one
     // audit line — dry-runs included, tagged result:"dry-run" — so the log is
     // a complete run history rather than a successes-only one.
     const { deps, calls } = happyDeps();
-    execute(deps, squadranksShapedConfig(), { prOverride: null, push: true, dryRun: true });
+    await execute(deps, squadranksShapedConfig(), { prOverride: null, push: true, dryRun: true });
     expect(calls.gh).toHaveLength(0);
     expect(calls.appendLog).toHaveLength(1);
     expect(JSON.parse(calls.appendLog[0].line).result).toBe("dry-run");
@@ -131,9 +131,9 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
     expect(calls.run.some((c) => /gh pr edit/.test(c.cmd))).toBe(false);
   });
 
-  it("snapshot: rendered comment body (timestamp redacted) is stable", () => {
+  it("snapshot: rendered comment body (timestamp redacted) is stable", async () => {
     const { deps } = happyDeps();
-    const r = execute(deps, squadranksShapedConfig(), {
+    const r = await execute(deps, squadranksShapedConfig(), {
       prOverride: null,
       push: false,
       dryRun: true,
@@ -171,10 +171,10 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
     `);
   });
 
-  it("squadranks-shape compatibility: marker, default label, and audit shape match the gate's expectations", () => {
+  it("squadranks-shape compatibility: marker, default label, and audit shape match the gate's expectations", async () => {
     // Full run (not dry-run) so upsert + label + audit fire.
     const { deps, calls } = happyDeps();
-    execute(deps, squadranksShapedConfig(), { prOverride: null, push: false, dryRun: false });
+    await execute(deps, squadranksShapedConfig(), { prOverride: null, push: false, dryRun: false });
 
     // 1) Comment posted via stdin payload, body line 1 is the marker.
     expect(calls.gh).toHaveLength(1);

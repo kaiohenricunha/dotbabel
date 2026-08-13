@@ -20,7 +20,11 @@ type Config = {
       | "advisory"; // "advisory" legs report but never block
     command: string; // shell command (runs under `bash -c`)
     cwd?: string; // working dir relative to project root
-    env?: Record<string, string>; // extra env vars for this leg only
+    env?: Record<string, string>; // extra env vars for this leg only (values must be strings)
+    lane?: string; // legs sharing a lane run serially in matrix order; distinct lanes run concurrently
+    when?: { changedPaths: string[] }; // run only when SOME changed PR file matches a glob (CI path filter, mirrored)
+    skipWhenDiffOnly?: string[]; // skip when EVERY changed PR file matches a glob (docs-only classify, mirrored)
+    passPrBody?: boolean; // inject the PR body as env.PR_BODY for this leg
   }>;
 
   label?: string; // PR label to apply on attest (default: "ci/local-verified")
@@ -39,8 +43,39 @@ type Config = {
     node?: string; // exact major pin ("22"); range syntax (">=22", "^22") is rejected
     goMod?: string; // relative path (no "..") to a go.mod; its go directive major.minor must match `go version`
   };
+
+  // Tracked files a leg is known to overwrite (e2e fixture seeders). They are
+  // snapshotted before the matrix and restored byte-exact afterwards, BEFORE
+  // the post-matrix head recheck — without this, the recheck aborts every run
+  // on the matrix's own writes. Relative paths, no "..".
+  restoreFiles?: string[];
 };
 ```
+
+### Lanes: the authoring contract
+
+Concurrent lanes share one worktree. Two rules keep that safe: **legs that
+mutate the tree, and every leg that reads what they mutate, must share one
+lane, ordered readers-first in the matrix**; and glob-gated skipping never
+reorders anything — skipped legs are marked, not removed. Diff globs use
+`**` (crosses directories), `*` and `?` (single segment). All four fields are
+plain data, so they work identically in `.mjs` and `.json` configs.
+
+Fail-open rule: when the PR's changed-file list cannot be read, looks
+truncated (the Files API caps at 3000 files — the tool cross-checks the
+parsed list against the PR's declared `changedFiles` count), or is empty,
+`when`/`skipWhenDiffOnly` skip nothing and every leg runs. Running too much
+is safe; an attested PR that skipped too much has disabled CI on unverified
+code. An all-skipped run refuses to attest for the same reason.
+
+**The superset burden is yours.** Nothing verifies these globs against
+`.github/workflows/**`. A `when` glob narrower than the mirrored CI job's
+`paths:` filter skips the leg locally while the attestation switches that job
+off remotely — unverified code merges with CI disabled. Keep every diff-rule
+glob at least as broad as the CI filter it mirrors, and re-check the pair
+whenever either side changes. The dialect is deliberately small (`**`, `*`,
+`?`); CI syntax like `{a,b}` or `!` is rejected at validation rather than
+silently matching nothing.
 
 The matrix is the only required field; everything else has sensible defaults.
 
@@ -54,7 +89,7 @@ Every run whose matrix executes appends exactly one JSONL line to
 `auditLogPath`, tagged `result: attested | hard-fail | head-moved | push-fail
 | post-fail | dry-run | diagnostic`, with per-leg
 `{name, mode, status, durationS}` (`status ∈ pass | fail | advisory-fail |
-not-run`), the invocation `flags`, the certified `toolchain` versions when
+skipped | not-run`), the invocation `flags`, the certified `toolchain` versions when
 pins are configured, and — for diagnostic runs — a `dirty` marker, because a
 dirty tree's `sha` does not identify the tree that ran.
 Lines written by versions before `result` existed were only ever written
@@ -138,6 +173,9 @@ export default {
 - Leg `name`s must be unique within the matrix.
 - `auditLogPath` must not contain `..` segments (path-traversal guard).
 - `trustedAssociations` must be a non-empty array of strings.
+- `env` values must be strings; `lane` non-empty; `when` exactly
+  `{ changedPaths: [globs] }` (non-empty); `skipWhenDiffOnly` a non-empty glob
+  array; `passPrBody` boolean; `restoreFiles` relative paths without `..`.
 - Unknown top-level keys are ignored. Defaults are merged from
   `plugins/dotbabel/src/local-attest-config.mjs:DEFAULTS`.
 

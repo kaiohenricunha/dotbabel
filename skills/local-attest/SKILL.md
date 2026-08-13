@@ -2,14 +2,14 @@
 id: local-attest
 name: local-attest
 type: skill
-version: 1.1.0
+version: 1.2.0
 domain: [devex, observability]
 platform: [github-actions]
 task: [testing, runtime-ops]
 maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-05-23
-updated: 2026-08-13
+updated: 2026-08-14
 description: >
   Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned
   OWNER-authored PR comment that gates downstream GitHub Actions jobs off for
@@ -33,9 +33,9 @@ a hidden marker comment to the open PR so the remote `Test` / `Preview` jobs
 read the marker and skip themselves for that exact commit.
 
 > **This skill is side-effectful and slow.** It runs every leg of your CI
-> matrix sequentially — minutes to tens of minutes, whatever the configured
-> matrix costs — posts a PR comment, applies a label, and pushes the current
-> branch. Invoke only when you've decided to attest a specific PR. For the
+> matrix — serially within a lane, lanes in parallel; minutes to tens of
+> minutes, whatever the configured matrix costs — posts a PR comment, applies
+> a label, and pushes the current branch. Invoke only when you've decided to attest a specific PR. For the
 > fix-retry loop, use the diagnostic modes below instead: they run subsets,
 > tolerate a dirty tree, and are structurally unable to attest.
 
@@ -138,16 +138,25 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
    `author_association` on the repo (OWNER / MEMBER / COLLABORATOR, etc.) is
    not in the config's `trustedAssociations` list — the attestation will post
    but CI will ignore it.
-2. **Run matrix.** Each leg from the config runs sequentially. Hard legs must
-   pass to attest; advisory legs are reported but never block. Stdout + stderr
-   are tailed at 10 lines per leg so the result table stays readable. With
-   `--fail-fast`, the first hard failure stops launching further legs; the
+2. **Run matrix.** Legs sharing a `lane` run serially in matrix order;
+   distinct lanes run concurrently; a config without lanes runs fully
+   sequentially. Diff rules (`when.changedPaths`, `skipWhenDiffOnly`) mark
+   legs skipped against the PR's changed files — skipped legs still appear in
+   every table, and the comment headline says so rather than claiming a full
+   run. Hard legs must pass to attest; advisory legs are reported but never
+   block. Stdout + stderr are tailed at 10 lines per leg. With `--fail-fast`,
+   the first hard failure stops launching further legs in every lane; the
    rest are recorded `not run`, never as passes.
 3. **Attestation bar.** Posting is gated on a run-record predicate: every leg
-   executed, zero hard fails, not a diagnostic subset. A run that fails the
-   bar aborts — no comment, no label, no push — and still writes its audit
-   line (`result: "hard-fail"`).
-4. **Re-check HEAD.** The matrix takes minutes — long enough for another agent
+   accounted for — executed or diff-skipped — at least one leg actually
+   executed (an all-skipped run has verified nothing and refuses to attest;
+   CI's own path filters already skip the same jobs), zero hard fails, not a
+   diagnostic subset. A run that fails the bar aborts — no comment, no label,
+   no push — and still writes its audit line (`result: "hard-fail"`).
+4. **Re-check HEAD.** First, `restoreFiles` snapshots taken before the matrix
+   are restored byte-exact (a leg that seeds fixture stubs over tracked files
+   would otherwise fail this recheck on its own writes, every run). Then: the
+   matrix takes minutes — long enough for another agent
    session, another worktree, or you in a second terminal to commit onto the
    same branch. Step 1's check is stale by now, so HEAD and the worktree are
    re-asserted against what was actually tested. If either moved, everything

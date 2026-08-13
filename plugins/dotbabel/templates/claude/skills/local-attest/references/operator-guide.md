@@ -75,7 +75,14 @@ run in which nothing failed completed the full matrix and attests normally.
 `--only <leg>` / `--from <leg>` are diagnostic modes for the fix-retry loop:
 subsets under relaxed preconditions (dirty tree fine, no PR needed) that never
 post, label, or push, and exit 1 on any selected-leg failure, advisory
-included.
+included. `restoreFiles` snapshots and restores in diagnostic runs too.
+
+Config-side execution controls (see [config.md](config.md)): `lane` groups
+legs into concurrent lanes; `when.changedPaths` and `skipWhenDiffOnly` mark
+legs skipped against the PR's changed files (skipped legs still appear in
+every table with status `skipped`, and an all-skipped run refuses to attest);
+`passPrBody` injects the PR body as `env.PR_BODY`; `restoreFiles` snapshots
+tracked files a leg overwrites and restores them before the head recheck.
 
 ## Trust model
 
@@ -140,8 +147,9 @@ the diff manually whenever either side changes.
 
 ### Long-running matrices
 
-Attestation runs the matrix sequentially and costs whatever the configured
-legs cost — minutes for a lint-and-unit matrix, tens of minutes with heavy
+Attestation runs legs serially within a lane and lanes concurrently (a
+config without `lane` fields is fully sequential), and costs whatever the
+configured legs cost — minutes for a lint-and-unit matrix, tens of minutes with heavy
 e2e and multiple language runtimes. That's the deliberate price of skipping
 the remote run; use `--only`/`--from`/`--fail-fast` for iteration and save
 full runs for attestation.
@@ -173,7 +181,8 @@ for **every run whose matrix executes** — failures included — tagged with a
 ```
 
 `result` is one of `attested | hard-fail | head-moved | push-fail | post-fail
-| dry-run | diagnostic`. Lines written by versions before `result` existed
+| dry-run | diagnostic`; per-leg `status` is one of `pass | fail |
+advisory-fail | skipped | not-run`. Lines written by versions before `result` existed
 were only ever written after a successful post, so a missing `result` implies
 `attested`. Diagnostic lines add `dirty: true|false`, because a dirty tree's
 `sha` does not identify the tree that ran.
@@ -183,3 +192,13 @@ were only ever written after a successful post, so a missing `result` implies
 the `--dry-run` this guide recommends for validating a new config, so an
 untracked log makes the very next attest abort on its own output. The
 contract is single-line JSONL so any log shipper handles it natively.
+
+### Drift now has two axes
+
+The classic drift is matrix membership: a CI job with no local leg is
+enforced nowhere once a PR attests. Diff rules add a second axis: a local
+`when`/`skipWhenDiffOnly` glob narrower than the mirrored job's `paths:`
+filter skips the leg locally while the attestation disables the job remotely.
+Nothing cross-checks the globs against `.github/workflows/**` — the config
+author owns that mirror, and each diff-gated leg should cite the workflow
+filter it mirrors in a comment so the pair is reviewable together.
