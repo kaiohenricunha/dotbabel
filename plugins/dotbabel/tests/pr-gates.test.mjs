@@ -350,9 +350,21 @@ describe("hasSkipCi", () => {
     expect(r.effective).toBe(true);
   });
 
-  it("reports a mid-body marker as present but not effective", () => {
+  it("reports a mid-body marker as effective — GitHub matches it anywhere", () => {
+    // Measured, not assumed. On PR #299 a commit whose message mentioned the
+    // marker on its second-to-last line, in a sentence saying the commit was
+    // NOT skipping CI, skipped every workflow. Re-pushing the identical tree
+    // with the token absent from the message ran all 29 checks. `location`
+    // still records where it sat, but placement does not change the outcome.
     const r = hasSkipCi("chore: wip\n\n[skip ci] noted here\n\nmore body");
-    expect(r).toMatchObject({ present: true, location: "body", effective: false });
+    expect(r).toMatchObject({ present: true, location: "body", effective: true });
+  });
+
+  it("treats a marker mentioned in prose as effective, because GitHub does", () => {
+    // The trap this cost us: prose that merely names the token still skips.
+    // Never write it in a commit message unless you mean it.
+    const r = hasSkipCi("ci: explain the policy\n\nNo [skip ci] here: we want CI.\n\ntrailing line");
+    expect(r.effective).toBe(true);
   });
 
   it("detects the skip-checks trailer as effective", () => {

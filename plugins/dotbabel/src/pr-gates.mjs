@@ -299,10 +299,19 @@ export function checkMergeGate(input = {}) {
 /**
  * Classify a `[skip ci]`-family marker in a commit message.
  *
- * GitHub Actions honors these markers only on the **first or last line** of
- * the message (or as a `skip-checks: true` trailer). A marker buried mid-body
- * is inert — reported as `present` but not `effective`, which is exactly the
- * mistake this function exists to catch.
+ * GitHub Actions matches these markers **anywhere in the message**, so every
+ * placement is `effective`. This function used to report a mid-body marker as
+ * inert, which was wrong in the dangerous direction: it told a caller CI would
+ * run when GitHub had already decided to skip it.
+ *
+ * Measured on PR #299 — a commit whose message mentioned the marker on its
+ * second-to-last line, inside a sentence stating the commit was *not* skipping
+ * CI, suppressed all 29 checks. Re-pushing the identical tree with the token
+ * absent ran them. `location` is kept for diagnostics only; it no longer
+ * changes the verdict.
+ *
+ * The corollary is a live trap: never write the token in a commit message
+ * unless you mean it, not even to talk about it.
  *
  * @param {unknown} commitMessage
  * @returns {SkipCiVerdict}
@@ -335,7 +344,7 @@ export function hasSkipCi(commitMessage) {
   for (const line of lines) {
     const anywhere = line.match(SKIP_CI_RE);
     if (anywhere !== null) {
-      return { present: true, marker: anywhere[0], location: "body", effective: false };
+      return { present: true, marker: anywhere[0], location: "body", effective: true };
     }
   }
   return absent;

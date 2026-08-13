@@ -54,7 +54,7 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 | 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation |
 | 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                  |
 
-> **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye: a marker buried mid-body is inert, it only counts on the first or last line (or as a `skip-checks: true` trailer).
+> **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
 ## Steps
 
@@ -107,9 +107,9 @@ The fleet sizes itself to the diff profile (`skills/post-pr-review/SKILL.md` ste
 
 Run `/review-pr <N> --conductor` (`skills/review-pr/SKILL.md`) — all 14 steps. It applies fixes in its own worktree, replies, resolves threads, and pushes.
 
-`--conductor` removes the duplicated work: it trusts the comments phase 3 posted and gate-validated (validating any human or foreign comment normally), scopes its test run and its security pass to the fix delta, and leaves test-plan execution to phase 5.
+`--conductor` removes the duplicated work: it fast-paths only the mechanical findings this pipeline posted itself (`style`, `comment`, `type`, marker plus matching author — everything else, and every `critical`, still gets validated), scopes its test run and its security pass to the fix delta, and defers test-plan execution to phase 5 behind a marker the merge gate enforces.
 
-Every commit it produces must carry an **effective** `[skip ci]`. Verify before each push rather than trusting it — a marker buried mid-body is inert, and `head -1` cannot see the last-line or `skip-checks:` trailer forms:
+Every commit it produces must carry an **effective** `[skip ci]`. Verify before each push rather than trusting it — `head -1` cannot see the last-line or `skip-checks:` trailer forms:
 
 ```bash
 dotbabel pr-stack gate --gate skip-ci
@@ -194,7 +194,7 @@ It prints the retarget, fetch, checkout, rebase, and push steps in order. **The 
 
 - **Never merge.** Phase 6 is a full stop. `commands/merge-pr.md` is named as a hand-off target and is never invoked from here.
 - **Never force-push without explicit confirmation**, including the stacked-PR rebase.
-- **`[skip ci]` on every intermediate commit.** A marker is only effective on the first or last line of the message.
+- **`[skip ci]` on every intermediate commit.** GitHub matches the marker anywhere in the message, so it also fires when you only meant to mention it — never write the token in prose unless you want the skip.
 - **`local-attest` is the only CI gate.** If its config is absent, say so — do not invent a substitute.
 - **Do not re-run simplification.** Phase 1 already did it.
 - **One review dispatch.** Phase 3 posts once with `--auto --confirm-post`; never preview-then-post — that doubles the agent fleet for zero information.

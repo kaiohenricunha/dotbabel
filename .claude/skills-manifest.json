@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T16:05:21.908Z",
+  "generatedAt": "2026-08-13T16:21:13.709Z",
   "skills": [
     {
       "name": "agents-search",
@@ -189,7 +189,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:82549d1b6adf1a1fdcfa5e3a48e261c244a03e127457a3636722413c282b270d",
+      "checksum": "sha256:bc143cd74082dfbf4bc1d5264859a33627afd4b197ad1eebc550aebefc9a00a1",
       "dependencies": [
         "pre-pr",
         "git",
