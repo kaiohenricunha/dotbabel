@@ -107,14 +107,11 @@ EOF
   # moving the real scrubber aside. Renaming the shared repo file made every
   # concurrently-running test that needs the scrubber fail, which is what
   # kept the suite from running under `bats -j`.
-  local push_status push_output
   DOTBABEL_HANDOFF_SCRUB_SCRIPT="$TEST_HOME/no-such-scrubber.sh" \
     run node "$BIN" push aaaa1111
-  push_status="$status"
-  push_output="$output"
 
-  [ "$push_status" -eq 2 ]
-  [[ "$push_output" == *"stage:  scrub"* ]]
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"stage:  scrub"* ]]
 
   # Remote must carry no branch for this session.
   local branch

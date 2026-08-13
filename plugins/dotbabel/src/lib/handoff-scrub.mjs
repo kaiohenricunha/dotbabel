@@ -58,7 +58,7 @@ const COUNT_LINE_RE = /^scrubbed:(\d+)$/m;
  */
 export function scrubDigest(text, opts = {}) {
   const fromEnv = (process.env[SCRUB_SCRIPT_ENV_VAR] ?? "").trim();
-  const scriptPath = opts.scriptPath ?? (fromEnv === "" ? DEFAULT_SCRUB_SCRIPT : fromEnv);
+  const scriptPath = opts.scriptPath ?? (fromEnv || DEFAULT_SCRUB_SCRIPT);
 
   const res = spawnSync(scriptPath, [], {
     input: text,
