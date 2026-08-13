@@ -1,6 +1,6 @@
 # dotbabel Taxonomy
 
-_Last updated: v2.15.0_
+_Last updated: v2.16.0_
 
 The dotbabel taxonomy organizes every artifact (agents, skills, commands, hooks, templates) by **type** (flat directory) and **facets** (YAML frontmatter). This avoids the placement ambiguity of domain-first hierarchies and lets the generated index serve any faceted query.
 
