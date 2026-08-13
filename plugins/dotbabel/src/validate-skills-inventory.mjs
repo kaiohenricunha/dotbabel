@@ -138,56 +138,66 @@ export function validateManifest(ctx) {
   for (const skill of manifest.skills) {
     const abs = path.join(ctx.repoRoot, skill.path);
     if (!existsSync(abs)) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.MANIFEST_ENTRY_MISSING,
-        category: "manifest",
-        file: skill.path,
-        message: `File not found: ${skill.path}`,
-        hint: "remove the manifest entry or restore the file on disk",
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.MANIFEST_ENTRY_MISSING,
+          category: "manifest",
+          file: skill.path,
+          message: `File not found: ${skill.path}`,
+          hint: "remove the manifest entry or restore the file on disk",
+        }),
+      );
       continue;
     }
     const actual = sha256(readFileSync(abs, "utf8"));
     if (actual !== skill.checksum) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.MANIFEST_CHECKSUM_MISMATCH,
-        category: "manifest",
-        file: skill.path,
-        expected: skill.checksum,
-        got: actual,
-        message: `Checksum mismatch for ${skill.name}: expected ${skill.checksum}, got ${actual}`,
-        hint: "run `node plugins/dotbabel/scripts/auto-update-manifest.mjs` to refresh checksums",
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.MANIFEST_CHECKSUM_MISMATCH,
+          category: "manifest",
+          file: skill.path,
+          expected: skill.checksum,
+          got: actual,
+          message: `Checksum mismatch for ${skill.name}: expected ${skill.checksum}, got ${actual}`,
+          hint: "run `node plugins/dotbabel/scripts/auto-update-manifest.mjs` to refresh checksums",
+        }),
+      );
     }
   }
 
   const onDisk = [...listCommandFiles(ctx), ...listSkillFilesRecursive(ctx)];
   for (const p of onDisk) {
     if (!entryPaths.has(p)) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.MANIFEST_ORPHAN_FILE,
-        category: "manifest",
-        file: p,
-        message: `Orphan on disk (not in manifest): ${p}`,
-        hint: "add the file to .claude/skills-manifest.json or delete it",
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.MANIFEST_ORPHAN_FILE,
+          category: "manifest",
+          file: p,
+          message: `Orphan on disk (not in manifest): ${p}`,
+          hint: "add the file to .claude/skills-manifest.json or delete it",
+        }),
+      );
     }
   }
 
   // DAG check — no cycles in dependencies[].
   const graph = new Map(manifest.skills.map((s) => [s.name, s.dependencies ?? []]));
-  const WHITE = 0, GRAY = 1, BLACK = 2;
+  const WHITE = 0,
+    GRAY = 1,
+    BLACK = 2;
   const color = new Map();
   for (const name of graph.keys()) color.set(name, WHITE);
   function visit(name, stack) {
     if (color.get(name) === GRAY) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.MANIFEST_DEPENDENCY_CYCLE,
-        category: "manifest",
-        file: ".claude/skills-manifest.json",
-        got: stack.concat(name).join(" -> "),
-        message: `Dependency cycle: ${stack.concat(name).join(" -> ")}`,
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.MANIFEST_DEPENDENCY_CYCLE,
+          category: "manifest",
+          file: ".claude/skills-manifest.json",
+          got: stack.concat(name).join(" -> "),
+          message: `Dependency cycle: ${stack.concat(name).join(" -> ")}`,
+        }),
+      );
       return;
     }
     if (color.get(name) === BLACK) return;
@@ -256,14 +266,16 @@ export function validateAgents(agentsDir) {
     // --- frontmatter ---
     const fm = parseFrontmatter(content);
     if (!fm) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.AGENT_MISSING_FIELD,
-        category: "agent",
-        file: relPath,
-        line: 1,
-        message: `missing YAML frontmatter (no --- block found)`,
-        hint: "add --- frontmatter with name, description, tools, and model fields",
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.AGENT_MISSING_FIELD,
+          category: "agent",
+          file: relPath,
+          line: 1,
+          message: `missing YAML frontmatter (no --- block found)`,
+          hint: "add --- frontmatter with name, description, tools, and model fields",
+        }),
+      );
       continue;
     }
 
@@ -280,14 +292,16 @@ export function validateAgents(agentsDir) {
             break;
           }
         }
-        errors.push(new ValidationError({
-          code: ERROR_CODES.AGENT_MISSING_FIELD,
-          category: "agent",
-          file: relPath,
-          line: fieldLine,
-          message: `missing required field: ${field}`,
-          hint: `add \`${field}:\` to the frontmatter`,
-        }));
+        errors.push(
+          new ValidationError({
+            code: ERROR_CODES.AGENT_MISSING_FIELD,
+            category: "agent",
+            file: relPath,
+            line: fieldLine,
+            message: `missing required field: ${field}`,
+            hint: `add \`${field}:\` to the frontmatter`,
+          }),
+        );
       }
     }
 
@@ -296,18 +310,23 @@ export function validateAgents(agentsDir) {
     if (modelVal && modelVal.trim() !== "" && !VALID_MODELS.has(modelVal.trim())) {
       let modelLine = 1;
       for (let i = 0; i < lines.length; i++) {
-        if (lines[i].match(/^model\s*:/)) { modelLine = i + 1; break; }
+        if (lines[i].match(/^model\s*:/)) {
+          modelLine = i + 1;
+          break;
+        }
       }
-      errors.push(new ValidationError({
-        code: ERROR_CODES.AGENT_INVALID_MODEL,
-        category: "agent",
-        file: relPath,
-        line: modelLine,
-        got: modelVal.trim(),
-        expected: "opus|sonnet|haiku|inherit",
-        message: `model value "${modelVal.trim()}" is not valid (must be opus|sonnet|haiku|inherit)`,
-        hint: `change model to one of: opus, sonnet, haiku, inherit`,
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.AGENT_INVALID_MODEL,
+          category: "agent",
+          file: relPath,
+          line: modelLine,
+          got: modelVal.trim(),
+          expected: "opus|sonnet|haiku|inherit",
+          message: `model value "${modelVal.trim()}" is not valid (must be opus|sonnet|haiku|inherit)`,
+          hint: `change model to one of: opus, sonnet, haiku, inherit`,
+        }),
+      );
     }
 
     // SEC-2: read-only agents must not have Write or Edit in tools
@@ -315,22 +334,30 @@ export function validateAgents(agentsDir) {
     const toolsVal = (fm.fields.get("tools") ?? "").trim();
     const isReadonly = READONLY_PATTERNS.some((p) => p.test(nameVal));
     if (isReadonly) {
-      const toolsList = toolsVal.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean);
+      const toolsList = toolsVal
+        .split(/[\s,]+/)
+        .map((t) => t.trim())
+        .filter(Boolean);
       const badTools = WRITE_TOOLS.filter((t) => toolsList.includes(t));
       if (badTools.length > 0) {
         let toolsLine = 1;
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i].match(/^tools\s*:/)) { toolsLine = i + 1; break; }
+          if (lines[i].match(/^tools\s*:/)) {
+            toolsLine = i + 1;
+            break;
+          }
         }
-        errors.push(new ValidationError({
-          code: ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY,
-          category: "agent",
-          file: relPath,
-          line: toolsLine,
-          got: badTools.join(", "),
-          message: `read-only agent has write tools: ${badTools.join(", ")}`,
-          hint: `remove ${badTools.join(", ")} from tools: — this agent is designated read-only (name matches auditor/reviewer/inspector)`,
-        }));
+        errors.push(
+          new ValidationError({
+            code: ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY,
+            category: "agent",
+            file: relPath,
+            line: toolsLine,
+            got: badTools.join(", "),
+            message: `read-only agent has write tools: ${badTools.join(", ")}`,
+            hint: `remove ${badTools.join(", ")} from tools: — this agent is designated read-only (name matches auditor/reviewer/inspector)`,
+          }),
+        );
       }
     }
 
@@ -340,14 +367,16 @@ export function validateAgents(agentsDir) {
       const line = lines[i];
       for (const { pattern, label } of SECRET_PATTERNS) {
         if (pattern.test(line)) {
-          warnings.push(new ValidationError({
-            code: ERROR_CODES.AGENT_SECRET_PATTERN,
-            category: "agent",
-            file: relPath,
-            line: i + 1,
-            message: `possible secret pattern: "${label}"`,
-            hint: "remove or redact the secret; never commit credentials in agent files",
-          }));
+          warnings.push(
+            new ValidationError({
+              code: ERROR_CODES.AGENT_SECRET_PATTERN,
+              category: "agent",
+              file: relPath,
+              line: i + 1,
+              message: `possible secret pattern: "${label}"`,
+              hint: "remove or redact the secret; never commit credentials in agent files",
+            }),
+          );
           break; // one warning per line is enough
         }
       }
@@ -420,13 +449,15 @@ export function validateAgentTriggerOverlap(agentsDir) {
       const collab = collaborationByAgent.get(claimant.agentName)?.collaborationText ?? "";
       const referencesAny = otherNames.some((other) => collab.includes(other));
       if (!referencesAny) {
-        warnings.push(new ValidationError({
-          code: ERROR_CODES.AGENT_TRIGGER_OVERLAP,
-          category: "agent",
-          file: claimant.file,
-          message: `trigger "${keyword}" also claimed by: ${otherNames.join(", ")} — but ## Collaboration does not reference them`,
-          hint: `add a handoff line in ## Collaboration naming one of: ${otherNames.join(", ")}, or narrow the trigger keyword to disambiguate`,
-        }));
+        warnings.push(
+          new ValidationError({
+            code: ERROR_CODES.AGENT_TRIGGER_OVERLAP,
+            category: "agent",
+            file: claimant.file,
+            message: `trigger "${keyword}" also claimed by: ${otherNames.join(", ")} — but ## Collaboration does not reference them`,
+            hint: `add a handoff line in ## Collaboration naming one of: ${otherNames.join(", ")}, or narrow the trigger keyword to disambiguate`,
+          }),
+        );
       }
     }
   }

@@ -47,9 +47,9 @@ describe("pushRemote wires autoPreflight", () => {
   });
 
   it("calls autoPreflight with the resolved repo URL before any transport I/O", async () => {
-    await expect(
-      lib.pushRemote({ cli: "claude", path: "/tmp/nonexistent" }),
-    ).rejects.toThrow("__preflight_short_circuit__");
+    await expect(lib.pushRemote({ cli: "claude", path: "/tmp/nonexistent" })).rejects.toThrow(
+      "__preflight_short_circuit__",
+    );
 
     expect(autoPreflight).toHaveBeenCalledTimes(1);
     const call = autoPreflight.mock.calls[0][0];
@@ -97,9 +97,7 @@ describe("pullRemote wires autoPreflight", () => {
   });
 
   it("calls autoPreflight with the resolved repo URL before listing candidates", async () => {
-    await expect(lib.pullRemote(null)).rejects.toThrow(
-      "__preflight_short_circuit__",
-    );
+    await expect(lib.pullRemote(null)).rejects.toThrow("__preflight_short_circuit__");
 
     expect(autoPreflight).toHaveBeenCalledTimes(1);
     const call = autoPreflight.mock.calls[0][0];
@@ -109,9 +107,9 @@ describe("pullRemote wires autoPreflight", () => {
   });
 
   it("forwards verify:true and verbose:true to autoPreflight", async () => {
-    await expect(
-      lib.pullRemote(null, null, { verify: true, verbose: true }),
-    ).rejects.toThrow("__preflight_short_circuit__");
+    await expect(lib.pullRemote(null, null, { verify: true, verbose: true })).rejects.toThrow(
+      "__preflight_short_circuit__",
+    );
 
     const call = autoPreflight.mock.calls[0][0];
     expect(call.verify).toBe(true);

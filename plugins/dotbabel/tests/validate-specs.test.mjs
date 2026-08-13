@@ -46,7 +46,11 @@ describe("validateSpecs", () => {
     const result = validateSpecs(ctx);
     expect(result.ok).toBe(false);
     for (const err of result.errors) expect(err).toBeInstanceOf(ValidationError);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && /title/.test(e.message))).toBe(true);
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && /title/.test(e.message),
+      ),
+    ).toBe(true);
     // Legacy string coercion keeps working (regex on toString()).
     expect(result.errors.some((e) => /title/.test(e))).toBe(true);
   });
@@ -95,7 +99,11 @@ describe("validateSpecs", () => {
     writeSpecJson(root, spec);
     const result = validateSpecs(ctx);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && e.pointer === "owners")).toBe(true);
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && e.pointer === "owners",
+      ),
+    ).toBe(true);
     expect(result.errors.some((e) => /owners/.test(e))).toBe(true);
   });
 
@@ -121,9 +129,22 @@ describe("validateSpecs", () => {
     writeSpecJson(root, spec);
     const result = validateSpecs(ctx);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_LINKED_PATH_MISSING && e.pointer === "linked_paths[]")).toBe(true);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_ACCEPTANCE_EMPTY && e.pointer === "acceptance_commands[]")).toBe(true);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && e.pointer === "active_prs")).toBe(true);
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.SPEC_LINKED_PATH_MISSING && e.pointer === "linked_paths[]",
+      ),
+    ).toBe(true);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.SPEC_ACCEPTANCE_EMPTY && e.pointer === "acceptance_commands[]",
+      ),
+    ).toBe(true);
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.SPEC_MISSING_REQUIRED_FIELD && e.pointer === "active_prs",
+      ),
+    ).toBe(true);
   });
 
   it("emits SPEC_JSON_INVALID when spec.json fails to parse", () => {
@@ -141,7 +162,11 @@ describe("validateSpecs", () => {
     unlinkSync(specJsonPath(root));
     const result = validateSpecs(ctx);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_JSON_INVALID && /missing spec\.json/.test(e.message))).toBe(true);
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.SPEC_JSON_INVALID && /missing spec\.json/.test(e.message),
+      ),
+    ).toBe(true);
   });
 
   it("emits SPEC_ACCEPTANCE_EMPTY when `acceptance_commands` is empty", () => {
@@ -175,28 +200,40 @@ describe("validateSpecs", () => {
 
     it("flags the real-world case: an alarm with no metric or threshold", () => {
       const root = isolateFixture();
-      writeNfr(root, "# §7\n\n- **REL-1**: a calibration drift alarm fires when accuracy is low.\n");
+      writeNfr(
+        root,
+        "# §7\n\n- **REL-1**: a calibration drift alarm fires when accuracy is low.\n",
+      );
       const result = validateSpecs(createHarnessContext({ repoRoot: root }));
       expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toBe(true);
     });
 
     it("accepts a constraint that states its value", () => {
       const root = isolateFixture();
-      writeNfr(root, "# §7\n\n- **PERF-1**: p99 read latency must stay under 200ms; breach pages on-call.\n");
+      writeNfr(
+        root,
+        "# §7\n\n- **PERF-1**: p99 read latency must stay under 200ms; breach pages on-call.\n",
+      );
       const result = validateSpecs(createHarnessContext({ repoRoot: root }));
       expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toEqual([]);
     });
 
     it("accepts an invariant that has no meaningful number", () => {
       const root = isolateFixture();
-      writeNfr(root, "# §7\n\n- **REL-1**: All filesystem operations must be atomic at the individual file level.\n- **OPS-1**: Bootstrap must never overwrite a user-modified agent file.\n");
+      writeNfr(
+        root,
+        "# §7\n\n- **REL-1**: All filesystem operations must be atomic at the individual file level.\n- **OPS-1**: Bootstrap must never overwrite a user-modified agent file.\n",
+      );
       const result = validateSpecs(createHarnessContext({ repoRoot: root }));
       expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toEqual([]);
     });
 
     it("ignores scaffold guidance inside HTML comments", () => {
       const root = isolateFixture();
-      writeNfr(root, "# §7\n\n<!--\n- **PERF-1**: must be fast\n-->\n\n- **PERF-1**: cold start under 2s.\n");
+      writeNfr(
+        root,
+        "# §7\n\n<!--\n- **PERF-1**: must be fast\n-->\n\n- **PERF-1**: cold start under 2s.\n",
+      );
       const result = validateSpecs(createHarnessContext({ repoRoot: root }));
       expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_NFR_UNQUANTIFIED)).toEqual([]);
     });

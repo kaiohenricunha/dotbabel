@@ -40,15 +40,20 @@ function buildFakeSource(dir) {
   fs.writeFileSync(path.join(dir, "skills", "beta", "skill.md"), "# beta\n");
 
   // agents template
-  fs.mkdirSync(path.join(dir, "plugins", "dotbabel", "templates", "claude", "agents"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "plugins", "dotbabel", "templates", "claude", "agents"), {
+    recursive: true,
+  });
   fs.writeFileSync(
     path.join(dir, "plugins", "dotbabel", "templates", "claude", "agents", "my-agent.md"),
-    "---\nname: my-agent\n---\n"
+    "---\nname: my-agent\n---\n",
   );
 
   // hooks/*.sh
   fs.mkdirSync(path.join(dir, "plugins", "dotbabel", "hooks"), { recursive: true });
-  fs.writeFileSync(path.join(dir, "plugins", "dotbabel", "hooks", "guard.sh"), "#!/usr/bin/env bash\n");
+  fs.writeFileSync(
+    path.join(dir, "plugins", "dotbabel", "hooks", "guard.sh"),
+    "#!/usr/bin/env bash\n",
+  );
 
   // bootstrap.sh marker (needed for pkgRoot() detection)
   fs.writeFileSync(path.join(dir, "bootstrap.sh"), "#!/usr/bin/env bash\n");
@@ -73,9 +78,7 @@ describe("bootstrapGlobal", () => {
     const claudeMd = path.join(tgt, "CLAUDE.md");
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(false);
     expect(fs.lstatSync(claudeMd).isFile()).toBe(true);
-    expect(fs.readFileSync(claudeMd, "utf8")).toContain(
-      "<!-- dotbabel:user-overlay:begin -->",
-    );
+    expect(fs.readFileSync(claudeMd, "utf8")).toContain("<!-- dotbabel:user-overlay:begin -->");
 
     // commands/foo.md symlink
     const fooCmd = path.join(tgt, "commands", "foo.md");
@@ -115,9 +118,7 @@ describe("bootstrapGlobal", () => {
     const claudeMd = path.join(tgt, "CLAUDE.md");
     expect(fs.lstatSync(claudeMd).isFile()).toBe(true);
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(false);
-    expect(fs.readFileSync(claudeMd, "utf8")).toContain(
-      "<!-- dotbabel:user-overlay:begin -->",
-    );
+    expect(fs.readFileSync(claudeMd, "utf8")).toContain("<!-- dotbabel:user-overlay:begin -->");
 
     // No extra .bak files created (idempotent on second run).
     const tgtEntries = fs.readdirSync(tgt);
@@ -145,9 +146,7 @@ describe("bootstrapGlobal", () => {
     const claudeMd = path.join(tgt, "CLAUDE.md");
     expect(fs.lstatSync(claudeMd).isFile()).toBe(true);
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(false);
-    expect(fs.readFileSync(claudeMd, "utf8")).toContain(
-      "<!-- dotbabel:user-overlay:begin -->",
-    );
+    expect(fs.readFileSync(claudeMd, "utf8")).toContain("<!-- dotbabel:user-overlay:begin -->");
 
     // A backup file with .bak- prefix exists with the original content.
     const tgtEntries = fs.readdirSync(tgt);
@@ -178,9 +177,7 @@ describe("bootstrapGlobal", () => {
     const claudeMd = path.join(tgt, "CLAUDE.md");
     expect(fs.lstatSync(claudeMd).isFile()).toBe(true);
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(false);
-    expect(fs.readFileSync(claudeMd, "utf8")).toContain(
-      "<!-- dotbabel:user-overlay:begin -->",
-    );
+    expect(fs.readFileSync(claudeMd, "utf8")).toContain("<!-- dotbabel:user-overlay:begin -->");
 
     // Per #228, the legacy symlink is BACKED UP before the file is generated
     // (old behavior was silent replace via linkOne; new behavior preserves
@@ -230,7 +227,7 @@ describe("bootstrapGlobal", () => {
     const hookDst = path.join(tgt, "hooks", "guard.sh");
     expect(fs.lstatSync(hookDst).isSymbolicLink()).toBe(true);
     expect(fs.readlinkSync(hookDst)).toBe(
-      path.join(src, "plugins", "dotbabel", "hooks", "guard.sh")
+      path.join(src, "plugins", "dotbabel", "hooks", "guard.sh"),
     );
   });
 
@@ -257,7 +254,9 @@ describe("bootstrapGlobal", () => {
 
     const backups = fs.readdirSync(codexSkills).filter((entry) => entry.startsWith("foo.bak-"));
     expect(backups).toHaveLength(1);
-    expect(fs.readFileSync(path.join(codexSkills, backups[0]), "utf8")).toBe("# existing wrapper\n");
+    expect(fs.readFileSync(path.join(codexSkills, backups[0]), "utf8")).toBe(
+      "# existing wrapper\n",
+    );
   });
 
   // -------------------------------------------------------------------------
@@ -331,9 +330,7 @@ describe("bootstrapGlobal", () => {
     const tgt = makeTmpDir("bg-tgt-");
     buildFakeSource(src);
 
-    await withOverlayEnv(null, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
+    await withOverlayEnv(null, () => bootstrapGlobal({ source: src, target: tgt }));
 
     const claudeMd = path.join(tgt, "CLAUDE.md");
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(false);
@@ -353,14 +350,9 @@ describe("bootstrapGlobal", () => {
     buildFakeSource(src);
 
     const overlayPath = path.join(overlayDir, "local-rules.md");
-    fs.writeFileSync(
-      overlayPath,
-      "## My personal rules\n\n- be terse\n- be helpful\n",
-    );
+    fs.writeFileSync(overlayPath, "## My personal rules\n\n- be terse\n- be helpful\n");
 
-    await withOverlayEnv(overlayPath, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
+    await withOverlayEnv(overlayPath, () => bootstrapGlobal({ source: src, target: tgt }));
 
     const content = fs.readFileSync(path.join(tgt, "CLAUDE.md"), "utf8");
     expect(content).toContain("- be terse");
@@ -383,9 +375,7 @@ describe("bootstrapGlobal", () => {
     fs.symlinkSync("/some/legacy/symlink/target", claudeMd);
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(true);
 
-    const result = await withOverlayEnv(null, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
+    const result = await withOverlayEnv(null, () => bootstrapGlobal({ source: src, target: tgt }));
 
     expect(result.ok).toBe(true);
     expect(fs.lstatSync(claudeMd).isSymbolicLink()).toBe(false);
@@ -401,9 +391,7 @@ describe("bootstrapGlobal", () => {
     buildFakeSource(src);
 
     // First bootstrap to create the file.
-    await withOverlayEnv(null, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
+    await withOverlayEnv(null, () => bootstrapGlobal({ source: src, target: tgt }));
     const claudeMd = path.join(tgt, "CLAUDE.md");
 
     // User mucks with the file directly.
@@ -411,9 +399,7 @@ describe("bootstrapGlobal", () => {
     expect(fs.readFileSync(claudeMd, "utf8")).toContain("UNAUTHORIZED EDIT");
 
     // Re-bootstrap.
-    await withOverlayEnv(null, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
+    await withOverlayEnv(null, () => bootstrapGlobal({ source: src, target: tgt }));
 
     // The unauthorized edit is gone from the live file.
     expect(fs.readFileSync(claudeMd, "utf8")).not.toContain("UNAUTHORIZED EDIT");
@@ -430,20 +416,12 @@ describe("bootstrapGlobal", () => {
     const tgt = makeTmpDir("bg-tgt-");
     buildFakeSource(src);
 
-    await withOverlayEnv(null, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
-    const baksAfterFirst = fs
-      .readdirSync(tgt)
-      .filter((e) => /^CLAUDE\.md\.bak-/.test(e)).length;
+    await withOverlayEnv(null, () => bootstrapGlobal({ source: src, target: tgt }));
+    const baksAfterFirst = fs.readdirSync(tgt).filter((e) => /^CLAUDE\.md\.bak-/.test(e)).length;
 
     // Second run.
-    await withOverlayEnv(null, () =>
-      bootstrapGlobal({ source: src, target: tgt }),
-    );
-    const baksAfterSecond = fs
-      .readdirSync(tgt)
-      .filter((e) => /^CLAUDE\.md\.bak-/.test(e)).length;
+    await withOverlayEnv(null, () => bootstrapGlobal({ source: src, target: tgt }));
+    const baksAfterSecond = fs.readdirSync(tgt).filter((e) => /^CLAUDE\.md\.bak-/.test(e)).length;
 
     expect(baksAfterSecond).toBe(baksAfterFirst);
   });

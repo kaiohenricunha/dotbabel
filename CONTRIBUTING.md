@@ -56,10 +56,16 @@ npx dotbabel-doctor         # self-diagnostic
    parallel runs in one sitting — this host drifts about 2x between windows,
    which is enough to manufacture a speedup that isn't there.
 
-   Tests must stay safe to run concurrently: never mutate a file inside the
-   repo that another test reads. Point the code under test at a copy in the
-   test's own temp directory instead — `handoff-scrub-push.bats` does this with
-   `DOTBABEL_HANDOFF_SCRUB_SCRIPT`.
+   Tests must stay safe to run concurrently: **never mutate a file inside the
+   repo that another test reads.** Renaming or deleting a shared script to
+   prove a failure path is invisible serially and fatal under `-j` — every
+   concurrent test that needs the file dies with it.
+
+   When a failure path can only be reached by making a real file unavailable,
+   assert it against a mocked subprocess boundary in vitest rather than
+   touching the filesystem. `plugins/dotbabel/tests/handoff-push-dryrun.test.mjs`
+   does this for the scrubber fail-closed contract, which is why no production
+   override exists to redirect a spec-frozen security control.
 
 4. **Follow spec discipline.** Every PR touching a protected path (see
    `docs/repo-facts.json`) needs `Spec ID: dotbabel-core` or a

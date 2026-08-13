@@ -50,9 +50,7 @@ describe("isAttested", () => {
   const marker = `${ATTEST_MARKER_PREFIX}${SHA} -->`;
 
   it("returns true for an OWNER comment matching the SHA", () => {
-    const comments = [
-      { author_association: "OWNER", body: `${marker}\nbody text here` },
-    ];
+    const comments = [{ author_association: "OWNER", body: `${marker}\nbody text here` }];
     expect(isAttested(comments, SHA)).toBe(true);
   });
 
@@ -150,17 +148,26 @@ describe("parseArgs", () => {
 
   it("rejects non-numeric --pr", () => {
     const die = (code, msg) => ({ code, msg });
-    expect(parseArgs(["--pr", "abc"], die)).toEqual({ code: 64, msg: expect.stringContaining("--pr") });
+    expect(parseArgs(["--pr", "abc"], die)).toEqual({
+      code: 64,
+      msg: expect.stringContaining("--pr"),
+    });
   });
 
   it("rejects unknown flags", () => {
     const die = (code, msg) => ({ code, msg });
-    expect(parseArgs(["--bogus"], die)).toEqual({ code: 64, msg: expect.stringContaining("unknown") });
+    expect(parseArgs(["--bogus"], die)).toEqual({
+      code: 64,
+      msg: expect.stringContaining("unknown"),
+    });
   });
 
   it("rejects --config with no value", () => {
     const die = (code, msg) => ({ code, msg });
-    expect(parseArgs(["--config"], die)).toEqual({ code: 64, msg: expect.stringContaining("--config") });
+    expect(parseArgs(["--config"], die)).toEqual({
+      code: 64,
+      msg: expect.stringContaining("--config"),
+    });
   });
 });
 
@@ -296,8 +303,8 @@ describe("buildGateSnippet", () => {
 
   it("rejects empty or non-array trustedAssociations", () => {
     expect(() => buildGateSnippet({ trustedAssociations: [] })).toThrow(/non-empty array/);
-    expect(() =>
-      buildGateSnippet({ trustedAssociations: /** @type {any} */ ("OWNER") }),
-    ).toThrow(/non-empty array/);
+    expect(() => buildGateSnippet({ trustedAssociations: /** @type {any} */ ("OWNER") })).toThrow(
+      /non-empty array/,
+    );
   });
 });

@@ -33,21 +33,23 @@ export function makeClaudeSession(root, opts = {}) {
   } = opts;
   if (!uuid) throw new Error("makeClaudeSession: uuid required");
   const file = join(root, ".claude", "projects", slug, `${uuid}.jsonl`);
-  const lines = [
-    JSON.stringify({ cwd, sessionId: uuid, version: "2.1" }),
-  ];
+  const lines = [JSON.stringify({ cwd, sessionId: uuid, version: "2.1" })];
   if (customTitle) {
-    lines.push(JSON.stringify({
-      type: "custom-title",
-      customTitle,
-      sessionId: uuid,
-    }));
+    lines.push(
+      JSON.stringify({
+        type: "custom-title",
+        customTitle,
+        sessionId: uuid,
+      }),
+    );
   }
   for (const text of prompts) {
-    lines.push(JSON.stringify({
-      type: "user",
-      message: { content: text },
-    }));
+    lines.push(
+      JSON.stringify({
+        type: "user",
+        message: { content: text },
+      }),
+    );
   }
   return writeFile(file, lines.join("\n") + "\n");
 }
@@ -57,12 +59,7 @@ export function makeClaudeSession(root, opts = {}) {
  * <root>/.copilot/session-state/<uuid>/events.jsonl.
  */
 export function makeCopilotSession(root, opts = {}) {
-  const {
-    uuid,
-    cwd = "/work",
-    model = "gpt-4",
-    prompts = [],
-  } = opts;
+  const { uuid, cwd = "/work", model = "gpt-4", prompts = [] } = opts;
   if (!uuid) throw new Error("makeCopilotSession: uuid required");
   const file = join(root, ".copilot", "session-state", uuid, "events.jsonl");
   const lines = [
@@ -72,10 +69,12 @@ export function makeCopilotSession(root, opts = {}) {
     }),
   ];
   for (const text of prompts) {
-    lines.push(JSON.stringify({
-      type: "user.message",
-      data: { content: text },
-    }));
+    lines.push(
+      JSON.stringify({
+        type: "user.message",
+        data: { content: text },
+      }),
+    );
   }
   return writeFile(file, lines.join("\n") + "\n");
 }
@@ -85,18 +84,17 @@ export function makeCopilotSession(root, opts = {}) {
  * <root>/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl.
  */
 export function makeCodexSession(root, opts = {}) {
-  const {
-    uuid,
-    cwd = "/work",
-    timestamp = "2026-04-18T10-00-00",
-    threadName,
-    prompts = [],
-  } = opts;
+  const { uuid, cwd = "/work", timestamp = "2026-04-18T10-00-00", threadName, prompts = [] } = opts;
   if (!uuid) throw new Error("makeCodexSession: uuid required");
   const [year, month, day] = timestamp.split("T")[0].split("-");
   const file = join(
-    root, ".codex", "sessions", year, month, day,
-    `rollout-${timestamp}-${uuid}.jsonl`
+    root,
+    ".codex",
+    "sessions",
+    year,
+    month,
+    day,
+    `rollout-${timestamp}-${uuid}.jsonl`,
   );
   const lines = [
     JSON.stringify({
@@ -105,20 +103,24 @@ export function makeCodexSession(root, opts = {}) {
     }),
   ];
   if (threadName) {
-    lines.push(JSON.stringify({
-      type: "event_msg",
-      payload: { thread_id: uuid, thread_name: threadName, type: "thread_renamed" },
-    }));
+    lines.push(
+      JSON.stringify({
+        type: "event_msg",
+        payload: { thread_id: uuid, thread_name: threadName, type: "thread_renamed" },
+      }),
+    );
   }
   for (const text of prompts) {
-    lines.push(JSON.stringify({
-      type: "response_item",
-      payload: {
-        type: "message",
-        role: "user",
-        content: [{ type: "input_text", text }],
-      },
-    }));
+    lines.push(
+      JSON.stringify({
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text }],
+        },
+      }),
+    );
   }
   return writeFile(file, lines.join("\n") + "\n");
 }

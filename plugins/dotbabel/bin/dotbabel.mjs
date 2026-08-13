@@ -64,7 +64,7 @@ function printUsage() {
       "",
       "Exit codes: 0 ok, 1 validation failure, 2 env error, 64 usage error.",
       "",
-    ].join("\n")
+    ].join("\n"),
   );
 }
 
@@ -83,7 +83,7 @@ if (args[0] === "--version" || args[0] === "-V") {
 const sub = args[0];
 if (!SUBCOMMANDS.includes(sub)) {
   process.stderr.write(
-    `dotbabel: unknown subcommand '${sub}'. Run 'dotbabel --help' for the list.\n`
+    `dotbabel: unknown subcommand '${sub}'. Run 'dotbabel --help' for the list.\n`,
   );
   process.exit(EXIT_CODES.USAGE);
 }
@@ -92,7 +92,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const binPath = resolve(__dirname, `dotbabel-${sub}.mjs`);
 if (!existsSync(binPath)) {
   process.stderr.write(
-    `dotbabel: bin 'dotbabel-${sub}' not found at ${binPath}. Did the package install correctly?\n`
+    `dotbabel: bin 'dotbabel-${sub}' not found at ${binPath}. Did the package install correctly?\n`,
   );
   process.exit(EXIT_CODES.ENV);
 }

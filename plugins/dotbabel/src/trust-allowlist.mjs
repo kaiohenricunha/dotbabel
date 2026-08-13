@@ -96,12 +96,14 @@ function resolveEntry(repoRoot, trustFile) {
  * @returns {string[]} Raw entry lines, comments and blanks removed.
  */
 function readEntries(text) {
-  return text
-    .split("\n")
-    // Strip a trailing CR so a CRLF-edited file cannot yield "/path\r", which
-    // the hook's `cd` would reject — a silently dead entry.
-    .map((line) => line.replace(/\r$/, ""))
-    .filter((line) => line !== "" && !line.startsWith("#"));
+  return (
+    text
+      .split("\n")
+      // Strip a trailing CR so a CRLF-edited file cannot yield "/path\r", which
+      // the hook's `cd` would reject — a silently dead entry.
+      .map((line) => line.replace(/\r$/, ""))
+      .filter((line) => line !== "" && !line.startsWith("#"))
+  );
 }
 
 /**

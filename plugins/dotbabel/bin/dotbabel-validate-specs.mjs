@@ -12,11 +12,7 @@ import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { formatError } from "../src/lib/errors.mjs";
 import { version } from "../src/index.mjs";
-import {
-  createHarnessContext,
-  listSpecDirs,
-  validateSpecs,
-} from "../src/index.mjs";
+import { createHarnessContext, listSpecDirs, validateSpecs } from "../src/index.mjs";
 
 const META = {
   name: "dotbabel-validate-specs",

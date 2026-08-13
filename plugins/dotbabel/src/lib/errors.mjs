@@ -22,60 +22,60 @@
  */
 export const ERROR_CODES = Object.freeze({
   // spec
-  SPEC_JSON_INVALID: 'SPEC_JSON_INVALID',
-  SPEC_STATUS_INVALID: 'SPEC_STATUS_INVALID',
-  SPEC_MISSING_REQUIRED_FIELD: 'SPEC_MISSING_REQUIRED_FIELD',
-  SPEC_ID_MISMATCH: 'SPEC_ID_MISMATCH',
-  SPEC_LINKED_PATH_MISSING: 'SPEC_LINKED_PATH_MISSING',
-  SPEC_ACCEPTANCE_EMPTY: 'SPEC_ACCEPTANCE_EMPTY',
-  SPEC_DEPENDENCY_UNKNOWN: 'SPEC_DEPENDENCY_UNKNOWN',
-  SPEC_NFR_UNQUANTIFIED: 'SPEC_NFR_UNQUANTIFIED',
+  SPEC_JSON_INVALID: "SPEC_JSON_INVALID",
+  SPEC_STATUS_INVALID: "SPEC_STATUS_INVALID",
+  SPEC_MISSING_REQUIRED_FIELD: "SPEC_MISSING_REQUIRED_FIELD",
+  SPEC_ID_MISMATCH: "SPEC_ID_MISMATCH",
+  SPEC_LINKED_PATH_MISSING: "SPEC_LINKED_PATH_MISSING",
+  SPEC_ACCEPTANCE_EMPTY: "SPEC_ACCEPTANCE_EMPTY",
+  SPEC_DEPENDENCY_UNKNOWN: "SPEC_DEPENDENCY_UNKNOWN",
+  SPEC_NFR_UNQUANTIFIED: "SPEC_NFR_UNQUANTIFIED",
   // skill
-  SKILL_FRONTMATTER_MISSING: 'SKILL_FRONTMATTER_MISSING',
-  SKILL_NAME_MISMATCH: 'SKILL_NAME_MISMATCH',
+  SKILL_FRONTMATTER_MISSING: "SKILL_FRONTMATTER_MISSING",
+  SKILL_NAME_MISMATCH: "SKILL_NAME_MISMATCH",
   // manifest
-  MANIFEST_CHECKSUM_MISMATCH: 'MANIFEST_CHECKSUM_MISMATCH',
-  MANIFEST_ENTRY_MISSING: 'MANIFEST_ENTRY_MISSING',
-  MANIFEST_ORPHAN_FILE: 'MANIFEST_ORPHAN_FILE',
-  MANIFEST_DEPENDENCY_CYCLE: 'MANIFEST_DEPENDENCY_CYCLE',
+  MANIFEST_CHECKSUM_MISMATCH: "MANIFEST_CHECKSUM_MISMATCH",
+  MANIFEST_ENTRY_MISSING: "MANIFEST_ENTRY_MISSING",
+  MANIFEST_ORPHAN_FILE: "MANIFEST_ORPHAN_FILE",
+  MANIFEST_DEPENDENCY_CYCLE: "MANIFEST_DEPENDENCY_CYCLE",
   // coverage
-  COVERAGE_UNCOVERED: 'COVERAGE_UNCOVERED',
-  COVERAGE_NO_SPEC_RATIONALE: 'COVERAGE_NO_SPEC_RATIONALE',
-  COVERAGE_UNKNOWN_SPEC_ID: 'COVERAGE_UNKNOWN_SPEC_ID',
+  COVERAGE_UNCOVERED: "COVERAGE_UNCOVERED",
+  COVERAGE_NO_SPEC_RATIONALE: "COVERAGE_NO_SPEC_RATIONALE",
+  COVERAGE_UNKNOWN_SPEC_ID: "COVERAGE_UNKNOWN_SPEC_ID",
   // drift
-  DRIFT_TEAM_COUNT: 'DRIFT_TEAM_COUNT',
-  DRIFT_PROTECTED_PATH: 'DRIFT_PROTECTED_PATH',
-  DRIFT_INSTRUCTION_FILES: 'DRIFT_INSTRUCTION_FILES',
-  DRIFT_INSTRUCTION_FILE_MISSING: 'DRIFT_INSTRUCTION_FILE_MISSING',
-  DRIFT_NESTED_SPAN: 'DRIFT_NESTED_SPAN',
-  DRIFT_UNCLOSED_SPAN: 'DRIFT_UNCLOSED_SPAN',
-  DRIFT_GENERATED_STALE: 'DRIFT_GENERATED_STALE',
-  DRIFT_PARITY_MISSING_HEADING: 'DRIFT_PARITY_MISSING_HEADING',
+  DRIFT_TEAM_COUNT: "DRIFT_TEAM_COUNT",
+  DRIFT_PROTECTED_PATH: "DRIFT_PROTECTED_PATH",
+  DRIFT_INSTRUCTION_FILES: "DRIFT_INSTRUCTION_FILES",
+  DRIFT_INSTRUCTION_FILE_MISSING: "DRIFT_INSTRUCTION_FILE_MISSING",
+  DRIFT_NESTED_SPAN: "DRIFT_NESTED_SPAN",
+  DRIFT_UNCLOSED_SPAN: "DRIFT_UNCLOSED_SPAN",
+  DRIFT_GENERATED_STALE: "DRIFT_GENERATED_STALE",
+  DRIFT_PARITY_MISSING_HEADING: "DRIFT_PARITY_MISSING_HEADING",
   // scaffold
-  SCAFFOLD_CONFLICT: 'SCAFFOLD_CONFLICT',
-  SCAFFOLD_USAGE: 'SCAFFOLD_USAGE',
+  SCAFFOLD_CONFLICT: "SCAFFOLD_CONFLICT",
+  SCAFFOLD_USAGE: "SCAFFOLD_USAGE",
   // settings / hooks (sh validator parity)
-  SETTINGS_SEC_1: 'SETTINGS_SEC_1',
-  SETTINGS_SEC_2: 'SETTINGS_SEC_2',
-  SETTINGS_SEC_3: 'SETTINGS_SEC_3',
-  SETTINGS_SEC_4: 'SETTINGS_SEC_4',
-  SETTINGS_OPS_1: 'SETTINGS_OPS_1',
-  SETTINGS_OPS_2: 'SETTINGS_OPS_2',
+  SETTINGS_SEC_1: "SETTINGS_SEC_1",
+  SETTINGS_SEC_2: "SETTINGS_SEC_2",
+  SETTINGS_SEC_3: "SETTINGS_SEC_3",
+  SETTINGS_SEC_4: "SETTINGS_SEC_4",
+  SETTINGS_OPS_1: "SETTINGS_OPS_1",
+  SETTINGS_OPS_2: "SETTINGS_OPS_2",
   // agent frontmatter
-  AGENT_MISSING_FIELD: 'AGENT_MISSING_FIELD',
-  AGENT_INVALID_MODEL: 'AGENT_INVALID_MODEL',
-  AGENT_WRITE_TOOL_IN_READONLY: 'AGENT_WRITE_TOOL_IN_READONLY',
-  AGENT_SECRET_PATTERN: 'AGENT_SECRET_PATTERN',
-  AGENT_TRIGGER_OVERLAP: 'AGENT_TRIGGER_OVERLAP',
+  AGENT_MISSING_FIELD: "AGENT_MISSING_FIELD",
+  AGENT_INVALID_MODEL: "AGENT_INVALID_MODEL",
+  AGENT_WRITE_TOOL_IN_READONLY: "AGENT_WRITE_TOOL_IN_READONLY",
+  AGENT_SECRET_PATTERN: "AGENT_SECRET_PATTERN",
+  AGENT_TRIGGER_OVERLAP: "AGENT_TRIGGER_OVERLAP",
   // project config (.dotbabel.json)
-  CONFIG_UNKNOWN_CLI: 'CONFIG_UNKNOWN_CLI',
-  CONFIG_UNKNOWN_LAYOUT: 'CONFIG_UNKNOWN_LAYOUT',
+  CONFIG_UNKNOWN_CLI: "CONFIG_UNKNOWN_CLI",
+  CONFIG_UNKNOWN_LAYOUT: "CONFIG_UNKNOWN_LAYOUT",
   // env / usage
-  ENV_REPO_ROOT_UNKNOWN: 'ENV_REPO_ROOT_UNKNOWN',
-  ENV_FACTS_MISSING: 'ENV_FACTS_MISSING',
-  TRUST_WRITE_FAILED: 'TRUST_WRITE_FAILED',
-  USAGE_UNKNOWN_FLAG: 'USAGE_UNKNOWN_FLAG',
-  USAGE_MISSING_POSITIONAL: 'USAGE_MISSING_POSITIONAL',
+  ENV_REPO_ROOT_UNKNOWN: "ENV_REPO_ROOT_UNKNOWN",
+  ENV_FACTS_MISSING: "ENV_FACTS_MISSING",
+  TRUST_WRITE_FAILED: "TRUST_WRITE_FAILED",
+  USAGE_UNKNOWN_FLAG: "USAGE_UNKNOWN_FLAG",
+  USAGE_MISSING_POSITIONAL: "USAGE_MISSING_POSITIONAL",
 });
 
 /**
@@ -88,17 +88,17 @@ export class ValidationError extends Error {
    * @param {StructuredError} details
    */
   constructor(details) {
-    if (!details || typeof details !== 'object') {
-      throw new TypeError('ValidationError requires a StructuredError details object');
+    if (!details || typeof details !== "object") {
+      throw new TypeError("ValidationError requires a StructuredError details object");
     }
-    if (!details.code || typeof details.code !== 'string') {
-      throw new TypeError('ValidationError requires a non-empty `code`');
+    if (!details.code || typeof details.code !== "string") {
+      throw new TypeError("ValidationError requires a non-empty `code`");
     }
-    if (!details.message || typeof details.message !== 'string') {
-      throw new TypeError('ValidationError requires a non-empty `message`');
+    if (!details.message || typeof details.message !== "string") {
+      throw new TypeError("ValidationError requires a non-empty `message`");
     }
     super(details.message);
-    this.name = 'ValidationError';
+    this.name = "ValidationError";
     this.code = details.code;
     if (details.file !== undefined) this.file = details.file;
     if (details.pointer !== undefined) this.pointer = details.pointer;
@@ -146,7 +146,7 @@ export class ValidationError extends Error {
  */
 export function formatError(err, opts = {}) {
   const verbose = Boolean(opts.verbose);
-  const prefix = err.file ? `${err.file}: ` : '';
+  const prefix = err.file ? `${err.file}: ` : "";
   const head = `${prefix}${err.message ?? String(err)}`;
   if (!verbose) return head;
 
@@ -158,5 +158,5 @@ export function formatError(err, opts = {}) {
   if (err.got !== undefined) tail.push(`  got:      ${err.got}`);
   if (err.hint !== undefined) tail.push(`  hint:     ${err.hint}`);
   if (err.category !== undefined) tail.push(`  category: ${err.category}`);
-  return tail.length > 0 ? `${head}\n${tail.join('\n')}` : head;
+  return tail.length > 0 ? `${head}\n${tail.join("\n")}` : head;
 }

@@ -10,17 +10,12 @@ import { parse, helpText } from "../src/lib/argv.mjs";
 import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { formatError } from "../src/lib/errors.mjs";
-import {
-  createHarnessContext,
-  checkInstructionsFresh,
-  version,
-} from "../src/index.mjs";
+import { createHarnessContext, checkInstructionsFresh, version } from "../src/index.mjs";
 
 const META = {
   name: "dotbabel-check-instructions-fresh",
   synopsis: "dotbabel-check-instructions-fresh [OPTIONS]",
-  description:
-    "Verify generated AGENTS.md / GEMINI.md / per-CLI templates match CLAUDE.md.",
+  description: "Verify generated AGENTS.md / GEMINI.md / per-CLI templates match CLAUDE.md.",
   flags: {
     "repo-root": { type: "string" },
   },

@@ -105,11 +105,7 @@ describe("checkProjectSync", () => {
     const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
     expect(r.ok).toBe(false);
     expect(
-      r.stale.some(
-        (e) =>
-          e.path.endsWith("commit/SKILL.md") &&
-          /^dangling: /.test(e.actual ?? ""),
-      ),
+      r.stale.some((e) => e.path.endsWith("commit/SKILL.md") && /^dangling: /.test(e.actual ?? "")),
     ).toBe(true);
   });
 

@@ -28,7 +28,8 @@ const VALID_SUBCOMMANDS = ["pull", "status", "push"];
 const META = {
   name: "dotbabel-sync",
   synopsis: "dotbabel-sync <subcommand> [OPTIONS]",
-  description: "Pull, push, or show status for a dotbabel installation. Subcommands: pull, status, push.",
+  description:
+    "Pull, push, or show status for a dotbabel installation. Subcommands: pull, status, push.",
   flags: {
     source: { type: "string" },
     quiet: { type: "boolean" },
@@ -55,12 +56,16 @@ if (argv.version) {
 const subcommand = argv.positional[0];
 
 if (!subcommand) {
-  process.stderr.write(`${META.synopsis}\n\nNo subcommand provided. Valid subcommands: ${VALID_SUBCOMMANDS.join(", ")}\n`);
+  process.stderr.write(
+    `${META.synopsis}\n\nNo subcommand provided. Valid subcommands: ${VALID_SUBCOMMANDS.join(", ")}\n`,
+  );
   process.exit(EXIT_CODES.USAGE);
 }
 
 if (!VALID_SUBCOMMANDS.includes(subcommand)) {
-  process.stderr.write(`Unknown subcommand: ${subcommand}\nValid subcommands: ${VALID_SUBCOMMANDS.join(", ")}\n`);
+  process.stderr.write(
+    `Unknown subcommand: ${subcommand}\nValid subcommands: ${VALID_SUBCOMMANDS.join(", ")}\n`,
+  );
   process.exit(EXIT_CODES.USAGE);
 }
 

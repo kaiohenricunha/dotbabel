@@ -26,7 +26,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const META = {
   name: "dotbabel-init",
   synopsis: "dotbabel-init [OPTIONS]",
-  description: "Scaffold the harness template tree (.claude/, docs/, .github/workflows/, githooks/) into the current repo.",
+  description:
+    "Scaffold the harness template tree (.claude/, docs/, .github/workflows/, githooks/) into the current repo.",
   flags: {
     "project-name": { type: "string" },
     "project-type": { type: "string" },
@@ -69,7 +70,7 @@ try {
       targetDir,
       placeholders: { project_name: projectName, project_type: projectType, today },
     },
-    { force }
+    { force },
   );
   out.pass(`harness initialized in ${targetDir} (${filesWritten.length} files)`);
   if (argv.verbose) {

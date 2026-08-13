@@ -1,9 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  ValidationError,
-  ERROR_CODES,
-  formatError,
-} from "../src/lib/errors.mjs";
+import { ValidationError, ERROR_CODES, formatError } from "../src/lib/errors.mjs";
 
 describe("ERROR_CODES", () => {
   it("freezes the enum so consumer code cannot mutate it", () => {

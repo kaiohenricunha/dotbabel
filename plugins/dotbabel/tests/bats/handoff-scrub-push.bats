@@ -102,19 +102,9 @@ EOF
   [ "$fourth" = "[scrubbed 0 secrets]" ]
 }
 
-@test "push: fail-closed when scrubber is missing (no branch written)" {
-  # Point the module at a path inside this test's own temp HOME instead of
-  # moving the real scrubber aside. Renaming the shared repo file made every
-  # concurrently-running test that needs the scrubber fail, which is what
-  # kept the suite from running under `bats -j`.
-  DOTBABEL_HANDOFF_SCRUB_SCRIPT="$TEST_HOME/no-such-scrubber.sh" \
-    run node "$BIN" push aaaa1111
-
-  [ "$status" -eq 2 ]
-  [[ "$output" == *"stage:  scrub"* ]]
-
-  # Remote must carry no branch for this session.
-  local branch
-  branch="$(handoff_branch_for aaaa1111)"
-  [ -z "$branch" ]
-}
+# The fail-closed case (scrubber unavailable -> exit 2, no branch written)
+# lives in plugins/dotbabel/tests/handoff-push-dryrun.test.mjs. Proving it here
+# meant renaming the real handoff-scrub.sh out of the repo mid-run, which broke
+# every test executing concurrently and made the suite unsafe under `bats -j`.
+# Do not reintroduce it: no test may mutate a file inside the repo that another
+# test reads.

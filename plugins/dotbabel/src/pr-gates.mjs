@@ -48,8 +48,16 @@ export const CONDUCTOR_PHASES = Object.freeze([
     artifact: "skills/post-pr-review/SKILL.md",
     invocation: "/post-pr-review",
   }),
-  Object.freeze({ id: "review-pr", artifact: "skills/review-pr/SKILL.md", invocation: "/review-pr" }),
-  Object.freeze({ id: "local-attest", artifact: "skills/local-attest/SKILL.md", invocation: "/local-attest" }),
+  Object.freeze({
+    id: "review-pr",
+    artifact: "skills/review-pr/SKILL.md",
+    invocation: "/review-pr",
+  }),
+  Object.freeze({
+    id: "local-attest",
+    artifact: "skills/local-attest/SKILL.md",
+    invocation: "/local-attest",
+  }),
   Object.freeze({ id: "stop", artifact: "commands/merge-pr.md", invocation: "/merge-pr" }),
 ]);
 
@@ -174,7 +182,10 @@ export function checkLocalAttestGate(input = {}) {
     reasons.push({ code: "NO_PR", message: "no open pull request resolved for this branch" });
   }
   if (input.branch === "HEAD") {
-    reasons.push({ code: "DETACHED_HEAD", message: "HEAD is detached; check out the PR branch first" });
+    reasons.push({
+      code: "DETACHED_HEAD",
+      message: "HEAD is detached; check out the PR branch first",
+    });
   }
   const status = typeof input.worktreeStatus === "string" ? input.worktreeStatus : "";
   if (status.trim() !== "") {
@@ -220,10 +231,16 @@ export function checkMergeGate(input = {}) {
   } else {
     const body = stripFences(raw);
     if (!RE_SUMMARY.test(body)) {
-      reasons.push({ code: "MISSING_SUMMARY", message: "body must contain an h2 `## Summary` section" });
+      reasons.push({
+        code: "MISSING_SUMMARY",
+        message: "body must contain an h2 `## Summary` section",
+      });
     }
     if (!RE_TEST_PLAN.test(body)) {
-      reasons.push({ code: "MISSING_TEST_PLAN", message: "body must contain an h2 `## Test plan` section" });
+      reasons.push({
+        code: "MISSING_TEST_PLAN",
+        message: "body must contain an h2 `## Test plan` section",
+      });
     }
 
     const changed = Array.isArray(input.changedPaths) ? input.changedPaths : [];
@@ -244,14 +261,20 @@ export function checkMergeGate(input = {}) {
     reasons.push({ code: "NOT_MERGEABLE", message: "PR has merge conflicts with its base" });
   }
   if (input.mergeStateStatus === "BEHIND") {
-    reasons.push({ code: "BEHIND_BASE", message: "branch is behind its base; rebase before merging" });
+    reasons.push({
+      code: "BEHIND_BASE",
+      message: "branch is behind its base; rebase before merging",
+    });
   }
 
   return {
     ok: reasons.length === 0,
     gate: "merge",
     reasons,
-    hint: reasons.length === 0 ? null : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
+    hint:
+      reasons.length === 0
+        ? null
+        : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
   };
 }
 

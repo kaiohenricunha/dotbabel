@@ -32,10 +32,7 @@ import { spawnSync } from "node:child_process";
  * @returns {string}
  */
 export function buildTimestamp() {
-  const ts = new Date()
-    .toISOString()
-    .replace(/[-:T]/g, "")
-    .replace(/\..+$/, "");
+  const ts = new Date().toISOString().replace(/[-:T]/g, "").replace(/\..+$/, "");
   return `${ts.slice(0, 8)}-${ts.slice(8, 14)}`;
 }
 
@@ -115,11 +112,9 @@ export function ensureRealDir(dst, out, ts) {
  * @returns {boolean}
  */
 export function commandExists(command) {
-  const result = spawnSync(
-    "sh",
-    ["-c", `command -v ${quoteShellWord(command)} >/dev/null 2>&1`],
-    { stdio: "ignore" },
-  );
+  const result = spawnSync("sh", ["-c", `command -v ${quoteShellWord(command)} >/dev/null 2>&1`], {
+    stdio: "ignore",
+  });
   return result.status === 0;
 }
 

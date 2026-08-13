@@ -57,7 +57,7 @@ describe("package barrel — @dotbabel/dotbabel", () => {
     const { dirname, resolve } = await import("node:path");
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const pkg = JSON.parse(
-      readFileSync(resolve(__dirname, "..", "..", "..", "package.json"), "utf8")
+      readFileSync(resolve(__dirname, "..", "..", "..", "package.json"), "utf8"),
     );
     expect(barrel.version).toBe(pkg.version);
   });

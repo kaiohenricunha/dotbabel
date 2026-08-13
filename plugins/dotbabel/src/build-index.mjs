@@ -289,7 +289,11 @@ function inferId(art) {
   if (art.type === "template" && art.path.endsWith("/template.yaml")) {
     return slugify(basename(dirname(art.path)));
   }
-  return slugify(basename(art.path).replace(/\.md$/, "").replace(/\.yaml$/, ""));
+  return slugify(
+    basename(art.path)
+      .replace(/\.md$/, "")
+      .replace(/\.yaml$/, ""),
+  );
 }
 
 /**
@@ -337,19 +341,14 @@ function extractArrayFacet(fm, key) {
 function toIndexEntry(art) {
   const fm = art.frontmatter ?? {};
   const id = inferId(art);
-  const name =
-    typeof fm.name === "string" && fm.name.length > 0 ? fm.name : id;
+  const name = typeof fm.name === "string" && fm.name.length > 0 ? fm.name : id;
   const description =
-    typeof fm.description === "string" && fm.description.length > 0
-      ? fm.description
-      : "";
+    typeof fm.description === "string" && fm.description.length > 0 ? fm.description : "";
   const domain = extractArrayFacet(fm, "domain");
   const platform = extractArrayFacet(fm, "platform");
   const task = extractArrayFacet(fm, "task");
   const maturity =
-    typeof fm.maturity === "string" && fm.maturity.length > 0
-      ? fm.maturity
-      : "draft";
+    typeof fm.maturity === "string" && fm.maturity.length > 0 ? fm.maturity : "draft";
   /** @type {IndexEntry} */
   const entry = {
     id,
@@ -461,9 +460,7 @@ function compileSchemas(schemasDir) {
     skill: ajv.getSchema("https://dotbabel.dev/schemas/skill.schema.json"),
     command: ajv.getSchema("https://dotbabel.dev/schemas/command.schema.json"),
     hook: ajv.getSchema("https://dotbabel.dev/schemas/hook.schema.json"),
-    template: ajv.getSchema(
-      "https://dotbabel.dev/schemas/template.schema.json",
-    ),
+    template: ajv.getSchema("https://dotbabel.dev/schemas/template.schema.json"),
   };
   return { ajv, validators };
 }
@@ -489,9 +486,7 @@ export function validateArtifacts(artifacts, schemasDir = DEFAULT_SCHEMAS_DIR) {
     if (!ok) {
       for (const err of validate.errors ?? []) {
         const ptr = err.instancePath || "/";
-        warnings.push(
-          `${art.path}: schema ${art.type} ${ptr} ${err.message} (${err.keyword})`,
-        );
+        warnings.push(`${art.path}: schema ${art.type} ${ptr} ${err.message} (${err.keyword})`);
       }
     }
   }

@@ -106,7 +106,9 @@ try {
 for (const w of warnings) out.warn(w);
 
 if (argv.flags.strict && warnings.length > 0) {
-  out.fail(`strict mode: ${warnings.length} warning${warnings.length === 1 ? "" : "s"} — fix schema issues before indexing`);
+  out.fail(
+    `strict mode: ${warnings.length} warning${warnings.length === 1 ? "" : "s"} — fix schema issues before indexing`,
+  );
   out.flush();
   process.exit(EXIT_CODES.VALIDATION);
 }
@@ -122,9 +124,7 @@ if (argv.flags.check) {
     out.flush();
     process.exit(EXIT_CODES.VALIDATION);
   }
-  out.pass(
-    `index fresh (${artifacts.length} artifact${artifacts.length === 1 ? "" : "s"})`,
-  );
+  out.pass(`index fresh (${artifacts.length} artifact${artifacts.length === 1 ? "" : "s"})`);
   out.flush();
   process.exit(EXIT_CODES.OK);
 }
@@ -144,18 +144,14 @@ if (existsSync(artifactsPath)) {
       const { generatedAt: _ga, ...rest } = o ?? {};
       return rest;
     };
-    if (
-      JSON.stringify(stripVol(prior)) ===
-      JSON.stringify(stripVol(bundle.artifactsJson))
-    ) {
+    if (JSON.stringify(stripVol(prior)) === JSON.stringify(stripVol(bundle.artifactsJson))) {
       preservedGeneratedAt = prior.generatedAt ?? null;
     }
   } catch {
     // ignore malformed on-disk file; we're about to overwrite it.
   }
 }
-bundle.artifactsJson.generatedAt =
-  preservedGeneratedAt ?? new Date().toISOString();
+bundle.artifactsJson.generatedAt = preservedGeneratedAt ?? new Date().toISOString();
 
 // Format each index file via prettier (same gate `npm run lint` runs) so
 // the regenerator output is lint-clean by construction. Closes #224 — the

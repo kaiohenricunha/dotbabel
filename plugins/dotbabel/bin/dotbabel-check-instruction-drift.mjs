@@ -13,15 +13,13 @@ import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { formatError } from "../src/lib/errors.mjs";
 import { version } from "../src/index.mjs";
-import {
-  createHarnessContext,
-  checkInstructionDrift,
-} from "../src/index.mjs";
+import { createHarnessContext, checkInstructionDrift } from "../src/index.mjs";
 
 const META = {
   name: "dotbabel-check-instruction-drift",
   synopsis: "dotbabel-check-instruction-drift [OPTIONS]",
-  description: "Detect drift between docs/repo-facts.json and instruction files (team_count, protected_paths, instruction_files).",
+  description:
+    "Detect drift between docs/repo-facts.json and instruction files (team_count, protected_paths, instruction_files).",
   flags: {
     "repo-root": { type: "string" },
   },

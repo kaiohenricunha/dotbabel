@@ -14,16 +14,8 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { createOutput } from "./lib/output.mjs";
-import {
-  buildTimestamp,
-  commandExists,
-  ensureRealDir,
-  linkOne,
-} from "./lib/symlink.mjs";
-import {
-  resolveLocalRulesPath,
-  writeUserScopeClaudeMd,
-} from "./lib/user-overlay.mjs";
+import { buildTimestamp, commandExists, ensureRealDir, linkOne } from "./lib/symlink.mjs";
+import { resolveLocalRulesPath, writeUserScopeClaudeMd } from "./lib/user-overlay.mjs";
 
 // ---------------------------------------------------------------------------
 // pkgRoot() — walk up from this file until we find a directory containing
@@ -74,10 +66,10 @@ export function resolveSource(sourceOpt, env) {
   if (env) {
     if (env.DOTBABEL_DIR) return env.DOTBABEL_DIR;
     if (env.DOTCLAUDE_DIR) {
-      process.emitWarning(
-        "DOTCLAUDE_DIR is deprecated; use DOTBABEL_DIR (removal in 3.0.0)",
-        { code: "DOTBABEL_LEGACY_ENV", type: "DeprecationWarning" },
-      );
+      process.emitWarning("DOTCLAUDE_DIR is deprecated; use DOTBABEL_DIR (removal in 3.0.0)", {
+        code: "DOTBABEL_LEGACY_ENV",
+        type: "DeprecationWarning",
+      });
       return env.DOTCLAUDE_DIR;
     }
   }
@@ -235,7 +227,13 @@ export async function bootstrapGlobal(opts = {}) {
     }
   }
 
-  const cliInstructionsSrc = path.join(source, "plugins", "dotbabel", "templates", "cli-instructions");
+  const cliInstructionsSrc = path.join(
+    source,
+    "plugins",
+    "dotbabel",
+    "templates",
+    "cli-instructions",
+  );
   // Copilot CLI has no skill auto-discovery dir (~/.copilot/), so we link only
   // the instruction file, not skills.
   linkCliInstruction({

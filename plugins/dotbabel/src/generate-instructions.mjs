@@ -1,9 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import {
-  loadFacts,
-  readText,
-} from "./spec-harness-lib.mjs";
+import { loadFacts, readText } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 /**
@@ -82,8 +79,7 @@ export const DEFAULT_TARGETS = Object.freeze([
 ]);
 
 /** Repo-relative path for the per-target manifest written alongside outputs. */
-export const MANIFEST_RELATIVE_PATH =
-  "plugins/dotbabel/templates/cli-instructions/.manifest.json";
+export const MANIFEST_RELATIVE_PATH = "plugins/dotbabel/templates/cli-instructions/.manifest.json";
 
 /** Deterministic auto-generated banner written into every output file. */
 export const BANNER =
@@ -95,8 +91,7 @@ export const RULE_FLOOR_BEGIN = "<!-- dotbabel:rule-floor:begin -->";
 export const RULE_FLOOR_END = "<!-- dotbabel:rule-floor:end -->";
 const INJECT_FALLBACK_HEADING = "## Universal rule floor";
 
-const SPAN_OPEN_RE =
-  /^<!--\s*dotbabel:cli\s+([a-z0-9,]+(?:\s+[a-z0-9,]+)*)\s*-->\s*$/;
+const SPAN_OPEN_RE = /^<!--\s*dotbabel:cli\s+([a-z0-9,]+(?:\s+[a-z0-9,]+)*)\s*-->\s*$/;
 const SPAN_END_RE = /^<!--\s*dotbabel:end\s*-->\s*$/;
 const HEADING_RE = /^(#{1,2})\s+(\S.*)$/;
 const FENCE_RE = /^([`~]{3,})/;
@@ -238,10 +233,7 @@ export function renderTarget(sourceText, target, substitutions) {
   }
 
   let body = out.join("\n");
-  const orderedMaps = [
-    substitutions._default_ ?? {},
-    substitutions[target.substitutionKey] ?? {},
-  ];
+  const orderedMaps = [substitutions._default_ ?? {}, substitutions[target.substitutionKey] ?? {}];
   for (const map of orderedMaps) {
     const needles = Object.keys(map).sort((a, b) => b.length - a.length);
     for (const needle of needles) {
@@ -265,10 +257,7 @@ export function renderTarget(sourceText, target, substitutions) {
 export function stripRuleFloorMarkers(body) {
   return body
     .split("\n")
-    .filter(
-      (l) =>
-        l.trim() !== RULE_FLOOR_BEGIN && l.trim() !== RULE_FLOOR_END,
-    )
+    .filter((l) => l.trim() !== RULE_FLOOR_BEGIN && l.trim() !== RULE_FLOOR_END)
     .join("\n");
 }
 
@@ -294,7 +283,10 @@ export function extractRuleFloor(body) {
       hint: "add the marker pair around the rule-floor section in CLAUDE.md",
     });
   }
-  return lines.slice(beginIdx + 1, endIdx).join("\n").trim();
+  return lines
+    .slice(beginIdx + 1, endIdx)
+    .join("\n")
+    .trim();
 }
 
 /**
@@ -328,17 +320,13 @@ export function composeInject(existingHostText, ruleFloor, relativeOutputPath) {
 
   const lines = existingHostText.split("\n");
   const beginLine = lines.findIndex((l) => l.trim() === RULE_FLOOR_BEGIN);
-  const endLine = lines.findIndex(
-    (l, idx) => idx > beginLine && l.trim() === RULE_FLOOR_END,
-  );
+  const endLine = lines.findIndex((l, idx) => idx > beginLine && l.trim() === RULE_FLOOR_END);
 
   if (beginLine !== -1 && endLine !== -1) {
     const before = lines.slice(0, beginLine).join("\n");
     const after = lines.slice(endLine + 1).join("\n");
     const updated = `${before}${before ? "\n" : ""}${block}${after ? `\n${after}` : ""}`;
-    return existingHostText.endsWith("\n") && !updated.endsWith("\n")
-      ? `${updated}\n`
-      : updated;
+    return existingHostText.endsWith("\n") && !updated.endsWith("\n") ? `${updated}\n` : updated;
   }
 
   if (beginLine === -1 && endLine === -1) {
@@ -384,19 +372,13 @@ export function generateInstructions(ctx, opts = {}) {
   const manifestEntries = {};
 
   for (const target of targets) {
-    const { body, omittedHeadings } = renderTarget(
-      sourceText,
-      target,
-      substitutions,
-    );
+    const { body, omittedHeadings } = renderTarget(sourceText, target, substitutions);
 
     let content;
     if (target.mode === "inject") {
       const ruleFloor = extractRuleFloor(body);
       const absHost = path.join(ctx.repoRoot, target.relativeOutputPath);
-      const existing = existsSync(absHost)
-        ? readFileSync(absHost, "utf8")
-        : "";
+      const existing = existsSync(absHost) ? readFileSync(absHost, "utf8") : "";
       content = composeInject(existing, ruleFloor, target.relativeOutputPath);
     } else {
       content = composeSynthesize(body);
@@ -467,7 +449,10 @@ function normalizeGeneratedMarkdown(content) {
     }
     if (end !== line.length) lines[i] = line.slice(0, end);
   }
-  return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").replace(/\n+$/g, "")}\n`;
+  return `${lines
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\n+$/g, "")}\n`;
 }
 
 /**

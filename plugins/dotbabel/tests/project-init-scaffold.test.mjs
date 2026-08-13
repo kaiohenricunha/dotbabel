@@ -2,10 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import {
-  scaffoldProjectInit,
-  DEFAULT_DOTBABEL_JSON,
-} from "../src/project-init-scaffold.mjs";
+import { scaffoldProjectInit, DEFAULT_DOTBABEL_JSON } from "../src/project-init-scaffold.mjs";
 import { ValidationError } from "../src/lib/errors.mjs";
 
 let tmpDirs = [];

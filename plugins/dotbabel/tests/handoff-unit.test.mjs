@@ -16,8 +16,9 @@ import {
 
 describe("UUID_HEAD_RE", () => {
   it("captures the first 8 hex of a UUID embedded in a path", () => {
-    const m = "/root/rollout-2026-04-18T10-00-00-abcd1234-5678-90ab-cdef-112233445566.jsonl"
-      .match(UUID_HEAD_RE);
+    const m = "/root/rollout-2026-04-18T10-00-00-abcd1234-5678-90ab-cdef-112233445566.jsonl".match(
+      UUID_HEAD_RE,
+    );
     expect(m?.[1]).toBe("abcd1234");
   });
 
@@ -26,8 +27,9 @@ describe("UUID_HEAD_RE", () => {
   });
 
   it("captures the first UUID when multiple appear", () => {
-    const m = "aaaa1111-1111-1111-1111-111111111111 / bbbb2222-2222-2222-2222-222222222222"
-      .match(UUID_HEAD_RE);
+    const m = "aaaa1111-1111-1111-1111-111111111111 / bbbb2222-2222-2222-2222-222222222222".match(
+      UUID_HEAD_RE,
+    );
     expect(m?.[1]).toBe("aaaa1111");
   });
 });
@@ -155,7 +157,7 @@ describe("mechanicalSummary", () => {
   it("quotes the first prompt and the last turn", () => {
     const s = mechanicalSummary(
       ["first prompt", "second prompt"],
-      ["turn 1", "turn 2", "final turn"]
+      ["turn 1", "turn 2", "final turn"],
     );
     expect(s).toContain('"first prompt"');
     expect(s).toContain('"final turn"');

@@ -466,14 +466,14 @@ describe("loadPersistedEnv", () => {
   });
 
   it("does nothing when config file does not exist", () => {
-    existsSync.mockReturnValueOnce(true);  // legacy-compat canonical probe
+    existsSync.mockReturnValueOnce(true); // legacy-compat canonical probe
     existsSync.mockReturnValueOnce(false); // loadPersistedEnv's own check
     expect(() => lib.loadPersistedEnv()).not.toThrow();
   });
 
   it("sets env vars from file content (quoted)", () => {
-    existsSync.mockReturnValueOnce(true);  // legacy-compat probe
-    existsSync.mockReturnValueOnce(true);  // loadPersistedEnv's check
+    existsSync.mockReturnValueOnce(true); // legacy-compat probe
+    existsSync.mockReturnValueOnce(true); // loadPersistedEnv's check
     readFileSync.mockReturnValueOnce('export DOTBABEL_HANDOFF_REPO="git@github.com:x/y.git"\n');
     delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
@@ -518,8 +518,8 @@ describe("loadPersistedEnv", () => {
   });
 
   it("swallows a readFileSync error silently", () => {
-    existsSync.mockReturnValueOnce(true);  // legacy-compat probe
-    existsSync.mockReturnValueOnce(true);  // loadPersistedEnv's check
+    existsSync.mockReturnValueOnce(true); // legacy-compat probe
+    existsSync.mockReturnValueOnce(true); // loadPersistedEnv's check
     readFileSync.mockImplementationOnce(() => {
       throw new Error("EACCES");
     });

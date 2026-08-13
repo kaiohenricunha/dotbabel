@@ -39,7 +39,13 @@ describe("buildStackGraph", () => {
 
   it("builds a single root node for one PR based on trunk", () => {
     const g = buildStackGraph([
-      { number: 1, headRefName: "feat/solo", baseRefName: "main", state: "OPEN", mergeStateStatus: "CLEAN" },
+      {
+        number: 1,
+        headRefName: "feat/solo",
+        baseRefName: "main",
+        state: "OPEN",
+        mergeStateStatus: "CLEAN",
+      },
     ]);
     expect(g.roots).toEqual([1]);
     expect(g.nodes["1"].parent).toBeNull();
@@ -111,16 +117,40 @@ describe("buildStackGraph", () => {
 
   it("records parentState MERGED when the parent PR is merged", () => {
     const g = buildStackGraph([
-      { number: 1, headRefName: "feat/alpha", baseRefName: "main", state: "MERGED", mergeStateStatus: "CLEAN" },
-      { number: 2, headRefName: "feat/beta", baseRefName: "feat/alpha", state: "OPEN", mergeStateStatus: "BLOCKED" },
+      {
+        number: 1,
+        headRefName: "feat/alpha",
+        baseRefName: "main",
+        state: "MERGED",
+        mergeStateStatus: "CLEAN",
+      },
+      {
+        number: 2,
+        headRefName: "feat/beta",
+        baseRefName: "feat/alpha",
+        state: "OPEN",
+        mergeStateStatus: "BLOCKED",
+      },
     ]);
     expect(g.nodes["2"].parentState).toBe("MERGED");
   });
 
   it("records parentState CLOSED when the parent was closed without merging", () => {
     const g = buildStackGraph([
-      { number: 1, headRefName: "feat/alpha", baseRefName: "main", state: "CLOSED", mergeStateStatus: "CLEAN" },
-      { number: 2, headRefName: "feat/beta", baseRefName: "feat/alpha", state: "OPEN", mergeStateStatus: "BLOCKED" },
+      {
+        number: 1,
+        headRefName: "feat/alpha",
+        baseRefName: "main",
+        state: "CLOSED",
+        mergeStateStatus: "CLEAN",
+      },
+      {
+        number: 2,
+        headRefName: "feat/beta",
+        baseRefName: "feat/alpha",
+        state: "OPEN",
+        mergeStateStatus: "BLOCKED",
+      },
     ]);
     expect(g.nodes["2"].parentState).toBe("CLOSED");
   });
@@ -147,7 +177,15 @@ describe("buildStackGraph", () => {
 
   it("honors a non-default trunk", () => {
     const g = buildStackGraph(
-      [{ number: 1, headRefName: "feat/x", baseRefName: "develop", state: "OPEN", mergeStateStatus: "CLEAN" }],
+      [
+        {
+          number: 1,
+          headRefName: "feat/x",
+          baseRefName: "develop",
+          state: "OPEN",
+          mergeStateStatus: "CLEAN",
+        },
+      ],
       { trunk: "develop" },
     );
     expect(g.trunk).toBe("develop");
@@ -161,7 +199,13 @@ describe("buildStackGraph", () => {
       { headRefName: "feat/no-number", baseRefName: "main" },
       { number: 3, baseRefName: "main" },
       { number: 4, headRefName: "feat/no-base" },
-      { number: 5, headRefName: "feat/ok", baseRefName: "main", state: "OPEN", mergeStateStatus: "CLEAN" },
+      {
+        number: 5,
+        headRefName: "feat/ok",
+        baseRefName: "main",
+        state: "OPEN",
+        mergeStateStatus: "CLEAN",
+      },
     ]);
     expect(Object.keys(g.nodes)).toEqual(["5"]);
     expect(g.ignored).toHaveLength(4);
@@ -232,7 +276,13 @@ describe("planStack", () => {
   it("marks a lone trunk-based CLEAN PR as actionable with action land", () => {
     const p = planStack(
       buildStackGraph([
-        { number: 1, headRefName: "feat/solo", baseRefName: "main", state: "OPEN", mergeStateStatus: "CLEAN" },
+        {
+          number: 1,
+          headRefName: "feat/solo",
+          baseRefName: "main",
+          state: "OPEN",
+          mergeStateStatus: "CLEAN",
+        },
       ]),
     );
     expect(p.ok).toBe(true);
@@ -252,8 +302,20 @@ describe("planStack", () => {
   it("marks the child as retarget once the parent is MERGED", () => {
     const p = planStack(
       buildStackGraph([
-        { number: 1, headRefName: "feat/alpha", baseRefName: "main", state: "MERGED", mergeStateStatus: "CLEAN" },
-        { number: 2, headRefName: "feat/beta", baseRefName: "feat/alpha", state: "OPEN", mergeStateStatus: "BLOCKED" },
+        {
+          number: 1,
+          headRefName: "feat/alpha",
+          baseRefName: "main",
+          state: "MERGED",
+          mergeStateStatus: "CLEAN",
+        },
+        {
+          number: 2,
+          headRefName: "feat/beta",
+          baseRefName: "feat/alpha",
+          state: "OPEN",
+          mergeStateStatus: "BLOCKED",
+        },
       ]),
     );
     const child = p.actionable.find((a) => a.number === 2);
@@ -263,8 +325,20 @@ describe("planStack", () => {
   it("records a parent-closed-unmerged problem when the parent was closed", () => {
     const p = planStack(
       buildStackGraph([
-        { number: 1, headRefName: "feat/alpha", baseRefName: "main", state: "CLOSED", mergeStateStatus: "CLEAN" },
-        { number: 2, headRefName: "feat/beta", baseRefName: "feat/alpha", state: "OPEN", mergeStateStatus: "BLOCKED" },
+        {
+          number: 1,
+          headRefName: "feat/alpha",
+          baseRefName: "main",
+          state: "CLOSED",
+          mergeStateStatus: "CLEAN",
+        },
+        {
+          number: 2,
+          headRefName: "feat/beta",
+          baseRefName: "feat/alpha",
+          state: "OPEN",
+          mergeStateStatus: "BLOCKED",
+        },
       ]),
     );
     expect(p.ok).toBe(false);
@@ -274,7 +348,13 @@ describe("planStack", () => {
   it("marks a trunk-based BEHIND PR as rebase, not land", () => {
     const p = planStack(
       buildStackGraph([
-        { number: 1, headRefName: "feat/solo", baseRefName: "main", state: "OPEN", mergeStateStatus: "BEHIND" },
+        {
+          number: 1,
+          headRefName: "feat/solo",
+          baseRefName: "main",
+          state: "OPEN",
+          mergeStateStatus: "BEHIND",
+        },
       ]),
     );
     expect(p.actionable[0].action).toBe(STACK_ACTION.REBASE);
@@ -283,7 +363,13 @@ describe("planStack", () => {
   it("marks a trunk-based DIRTY PR as rebase", () => {
     const p = planStack(
       buildStackGraph([
-        { number: 1, headRefName: "feat/solo", baseRefName: "main", state: "OPEN", mergeStateStatus: "DIRTY" },
+        {
+          number: 1,
+          headRefName: "feat/solo",
+          baseRefName: "main",
+          state: "OPEN",
+          mergeStateStatus: "DIRTY",
+        },
       ]),
     );
     expect(p.actionable[0].action).toBe(STACK_ACTION.REBASE);
@@ -503,8 +589,20 @@ describe("planChildTransition", () => {
 
   it("retargets to the grandparent head, not trunk, in a 3-deep stack", () => {
     const t = planChildTransition({
-      child: { number: 30, headRefName: "feat/gamma", baseRefName: "feat/beta", state: "OPEN", mergeStateStatus: "BEHIND" },
-      parent: { number: 20, headRefName: "feat/beta", baseRefName: "feat/alpha", state: "MERGED", headRefOid: ALPHA_SHA },
+      child: {
+        number: 30,
+        headRefName: "feat/gamma",
+        baseRefName: "feat/beta",
+        state: "OPEN",
+        mergeStateStatus: "BEHIND",
+      },
+      parent: {
+        number: 20,
+        headRefName: "feat/beta",
+        baseRefName: "feat/alpha",
+        state: "MERGED",
+        headRefOid: ALPHA_SHA,
+      },
     });
     expect(t.newBase).toBe("feat/alpha");
     expect(t.steps.find((s) => s.id === "retarget").cmd).toBe("gh pr edit 30 --base feat/alpha");
@@ -512,7 +610,10 @@ describe("planChildTransition", () => {
 
   it("rejects branch names containing shell metacharacters", () => {
     expect(() =>
-      planChildTransition({ child: { ...child, headRefName: "feat/x; rm -rf /" }, parent: mergedParent }),
+      planChildTransition({
+        child: { ...child, headRefName: "feat/x; rm -rf /" },
+        parent: mergedParent,
+      }),
     ).toThrow(/branch/i);
   });
 

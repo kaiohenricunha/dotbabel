@@ -38,10 +38,7 @@ import { env as legacyEnv } from "./lib/legacy-compat.mjs";
  * @returns {HarnessContext}
  */
 export function createHarnessContext({ repoRoot } = {}) {
-  const root =
-    repoRoot ??
-    legacyEnv("REPO_ROOT") ??
-    resolveRepoRootFromGit();
+  const root = repoRoot ?? legacyEnv("REPO_ROOT") ?? resolveRepoRootFromGit();
   if (!root) {
     throw new Error(
       "harness: repoRoot not provided; pass { repoRoot } or set DOTBABEL_REPO_ROOT, or run inside a git repo",
@@ -205,18 +202,8 @@ export function listSpecDirs(ctx) {
     .sort();
 }
 
-const DEFAULT_IGNORED_TOP_LEVEL = new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  "coverage",
-]);
-const DEFAULT_IGNORED_DIRS = new Set([
-  ".claude/worktrees",
-  "bin",
-  "api/tmp",
-  "test-results",
-]);
+const DEFAULT_IGNORED_TOP_LEVEL = new Set([".git", "node_modules", "dist", "coverage"]);
+const DEFAULT_IGNORED_DIRS = new Set([".claude/worktrees", "bin", "api/tmp", "test-results"]);
 
 /**
  * Recursively list every file under `ctx.repoRoot`, returning repo-relative
@@ -315,10 +302,7 @@ export function matchesGlob(pattern, value) {
 export function anyPathMatches(pattern, paths) {
   const normalized = toPosix(pattern);
   if (!normalized.includes("*") && !normalized.includes("?")) {
-    return (
-      paths.includes(normalized) ||
-      paths.some((c) => c.startsWith(`${normalized}/`))
-    );
+    return paths.includes(normalized) || paths.some((c) => c.startsWith(`${normalized}/`));
   }
   const rx = globToRegExp(normalized);
   return paths.some((c) => rx.test(c));
@@ -337,10 +321,7 @@ export function anyPathMatches(pattern, paths) {
  */
 export function extractTemplateSection(body, heading) {
   if (!body) return "";
-  const rx = new RegExp(
-    `##\\s*${escapeRegex(heading)}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`,
-    "i",
-  );
+  const rx = new RegExp(`##\\s*${escapeRegex(heading)}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`, "i");
   const m = body.match(rx);
   return m ? m[1].trim() : "";
 }
@@ -421,11 +402,9 @@ export function getChangedFiles() {
   if (csv) return csv.split(",").filter(Boolean);
   const base = process.env.GITHUB_BASE_REF || "main";
   try {
-    const out = execFileSync(
-      "git",
-      ["diff", "--name-only", `origin/${base}...HEAD`],
-      { encoding: "utf8" },
-    );
+    const out = execFileSync("git", ["diff", "--name-only", `origin/${base}...HEAD`], {
+      encoding: "utf8",
+    });
     return out.split("\n").filter(Boolean);
   } catch (err) {
     debug("git:diff", err.message);

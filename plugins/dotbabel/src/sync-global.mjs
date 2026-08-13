@@ -158,7 +158,11 @@ async function statusClone(out, source) {
 
 async function pushNpm(out) {
   out.fail("sync push is only available in clone mode (--source <path>)");
-  return { ok: false, mode: "npm", summary: "push unavailable in npm mode — use clone mode (--source <path>)" };
+  return {
+    ok: false,
+    mode: "npm",
+    summary: "push unavailable in npm mode — use clone mode (--source <path>)",
+  };
 }
 
 async function pushClone(out, source) {
@@ -205,9 +209,7 @@ async function pushClone(out, source) {
     }
     if (SECRET_RX.test(showRes.stdout)) {
       out.fail(`secret-scan: POSSIBLE SECRET in ${file}`);
-      out.fail(
-        "secret-scan: aborting push. Re-run after removing or whitelisting."
-      );
+      out.fail("secret-scan: aborting push. Re-run after removing or whitelisting.");
       return { ok: false, mode: "clone", summary: `secret detected in ${file}` };
     }
   }
@@ -262,9 +264,7 @@ export async function syncGlobal(subcommand, opts = {}) {
 
   try {
     if (subcommand === "pull") {
-      return await (mode === "clone"
-        ? pullClone(out, source, opts)
-        : pullNpm(out, opts));
+      return await (mode === "clone" ? pullClone(out, source, opts) : pullNpm(out, opts));
     }
 
     if (subcommand === "status") {

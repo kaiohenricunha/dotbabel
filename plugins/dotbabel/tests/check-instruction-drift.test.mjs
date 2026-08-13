@@ -46,7 +46,13 @@ describe("checkInstructionDrift", () => {
     const result = checkInstructionDrift(ctx);
     expect(result.ok).toBe(false);
     for (const err of result.errors) expect(err).toBeInstanceOf(ValidationError);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.DRIFT_INSTRUCTION_FILE_MISSING && /NONEXISTENT\.md/.test(e.message))).toBe(true);
+    expect(
+      result.errors.some(
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_INSTRUCTION_FILE_MISSING &&
+          /NONEXISTENT\.md/.test(e.message),
+      ),
+    ).toBe(true);
   });
 
   it("emits DRIFT_TEAM_COUNT on team_count mismatch", () => {
@@ -75,7 +81,9 @@ describe("checkInstructionDrift", () => {
     const result = checkInstructionDrift(ctx);
     expect(result.ok).toBe(false);
     expect(result.errors.some((e) => e.code === ERROR_CODES.DRIFT_PROTECTED_PATH)).toBe(true);
-    expect(result.errors.some((e) => /protected_paths|protected path|docs\/secrets/.test(e))).toBe(true);
+    expect(result.errors.some((e) => /protected_paths|protected path|docs\/secrets/.test(e))).toBe(
+      true,
+    );
   });
 
   it("defaults rule_floor_files to instruction_files for backward compatibility", () => {
@@ -88,9 +96,7 @@ describe("checkInstructionDrift", () => {
     expect(result.ok).toBe(false);
     expect(
       result.errors.some(
-        (e) =>
-          e.code === ERROR_CODES.DRIFT_PROTECTED_PATH &&
-          e.file === "README.md",
+        (e) => e.code === ERROR_CODES.DRIFT_PROTECTED_PATH && e.file === "README.md",
       ),
     ).toBe(true);
   });
@@ -105,9 +111,7 @@ describe("checkInstructionDrift", () => {
     expect(result.ok).toBe(false);
     expect(
       result.errors.some(
-        (e) =>
-          e.code === ERROR_CODES.DRIFT_INSTRUCTION_FILES &&
-          e.pointer === "rule_floor_files",
+        (e) => e.code === ERROR_CODES.DRIFT_INSTRUCTION_FILES && e.pointer === "rule_floor_files",
       ),
     ).toBe(true);
   });

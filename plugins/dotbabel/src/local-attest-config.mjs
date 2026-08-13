@@ -175,13 +175,15 @@ export function validateConfig(input) {
     if (leg.env !== undefined && (leg.env === null || typeof leg.env !== "object")) {
       throw new ConfigError(`config.matrix[${i}].env must be an object`);
     }
-    matrix.push(/** @type {Leg} */ ({
-      name,
-      mode: leg.mode,
-      command: leg.command,
-      ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
-      ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
-    }));
+    matrix.push(
+      /** @type {Leg} */ ({
+        name,
+        mode: leg.mode,
+        command: leg.command,
+        ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
+        ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
+      }),
+    );
   });
 
   if (typeof merged.label !== "string" || merged.label === "") {
@@ -209,8 +211,14 @@ export function validateConfig(input) {
     throw new ConfigError("config.trustedAssociations must be a non-empty array of strings");
   }
   const VALID_ASSOCIATIONS = new Set([
-    "OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR",
-    "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE",
+    "OWNER",
+    "MEMBER",
+    "COLLABORATOR",
+    "CONTRIBUTOR",
+    "FIRST_TIMER",
+    "FIRST_TIME_CONTRIBUTOR",
+    "MANNEQUIN",
+    "NONE",
   ]);
   for (const assoc of merged.trustedAssociations) {
     if (!VALID_ASSOCIATIONS.has(assoc)) {

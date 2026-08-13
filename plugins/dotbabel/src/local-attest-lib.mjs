@@ -115,7 +115,8 @@ export function parseArgs(argv, die) {
     const a = argv[i];
     if (a === "--pr") {
       const v = argv[++i];
-      if (!v || !/^\d+$/.test(v)) return exit(64, `--pr requires a number, got ${v ?? "(missing)"}`);
+      if (!v || !/^\d+$/.test(v))
+        return exit(64, `--pr requires a number, got ${v ?? "(missing)"}`);
       args.pr = v;
     } else if (a === "--no-push") {
       args.push = false;

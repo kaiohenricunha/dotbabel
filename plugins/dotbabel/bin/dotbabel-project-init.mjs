@@ -66,9 +66,7 @@ if (argv.version) {
 
 const out = createOutput({ json: argv.json, noColor: argv.noColor });
 
-const repoRoot = path.resolve(
-  /** @type {string} */ (argv.flags.repo ?? process.cwd()),
-);
+const repoRoot = path.resolve(/** @type {string} */ (argv.flags.repo ?? process.cwd()));
 
 try {
   const result = scaffoldProjectInit({

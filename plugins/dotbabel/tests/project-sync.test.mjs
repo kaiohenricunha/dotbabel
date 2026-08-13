@@ -138,10 +138,7 @@ describe("loadProjectConfig", () => {
 
   it("throws when fan_out holds a non-string entry", () => {
     const repo = makeTmpDir();
-    fs.writeFileSync(
-      path.join(repo, ".dotbabel.json"),
-      JSON.stringify({ fan_out: ["codex", 42] }),
-    );
+    fs.writeFileSync(path.join(repo, ".dotbabel.json"), JSON.stringify({ fan_out: ["codex", 42] }));
     expect(() => loadProjectConfig(repo)).toThrow(ValidationError);
   });
 
@@ -287,7 +284,10 @@ describe("projectSync", () => {
     const repo = makeTmpDir();
     buildFakeRepo(repo);
     fs.mkdirSync(path.join(repo, ".codex", "skills", "commit"), { recursive: true });
-    fs.symlinkSync("/nonexistent-target", path.join(repo, ".codex", "skills", "commit", "SKILL.md"));
+    fs.symlinkSync(
+      "/nonexistent-target",
+      path.join(repo, ".codex", "skills", "commit", "SKILL.md"),
+    );
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     const link = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
     expect(path.isAbsolute(fs.readlinkSync(link))).toBe(false);
@@ -377,9 +377,9 @@ describe("projectSync", () => {
         fan_out: ["mystery-cli-foo"],
       },
     });
-    await expect(
-      projectSync({ repoRoot: repo, allCli: true, quiet: true }),
-    ).rejects.toMatchObject({ code: ERROR_CODES.CONFIG_UNKNOWN_CLI });
+    await expect(projectSync({ repoRoot: repo, allCli: true, quiet: true })).rejects.toMatchObject({
+      code: ERROR_CODES.CONFIG_UNKNOWN_CLI,
+    });
   });
 
   it("idempotent instruction-file write: no rewrite when content unchanged", async () => {
@@ -405,9 +405,7 @@ describe("projectSync", () => {
     const r = await projectSync({ repoRoot: repo, allCli: true, dryRun: true, quiet: true });
     expect(r.ok).toBe(true);
     // Real file is still there (dry-run shouldn't have moved it).
-    expect(
-      fs.lstatSync(path.join(repo, ".codex", "skills", "commit")).isFile(),
-    ).toBe(true);
+    expect(fs.lstatSync(path.join(repo, ".codex", "skills", "commit")).isFile()).toBe(true);
     expect(r.backed_up).toBe(0);
   });
 
@@ -422,15 +420,13 @@ describe("projectSync", () => {
     expect(r.ok).toBe(true);
     // No instructions file should have been emitted for headless-skill.
     expect(
-      fs.existsSync(
-        path.join(repo, ".github", "instructions", "headless-skill.instructions.md"),
-      ),
+      fs.existsSync(path.join(repo, ".github", "instructions", "headless-skill.instructions.md")),
     ).toBe(false);
     // Real skill (deploy) DID get one.
     expect(
-      fs.lstatSync(
-        path.join(repo, ".github", "instructions", "deploy.instructions.md"),
-      ).isSymbolicLink(),
+      fs
+        .lstatSync(path.join(repo, ".github", "instructions", "deploy.instructions.md"))
+        .isSymbolicLink(),
     ).toBe(true);
   });
 

@@ -22,9 +22,7 @@ function applyPrefixMap(relFromTemplates) {
 
 function substitutePlaceholders(content, placeholders) {
   return content.replace(/\{\{(\w+)\}\}/g, (match, key) => {
-    return Object.prototype.hasOwnProperty.call(placeholders, key)
-      ? placeholders[key]
-      : match;
+    return Object.prototype.hasOwnProperty.call(placeholders, key) ? placeholders[key] : match;
   });
 }
 
@@ -61,10 +59,7 @@ function walkFiles(dir) {
  * @param {{ force?: boolean }} [options]
  * @returns {{ filesWritten: string[] }}
  */
-export function scaffoldHarness(
-  { templatesDir, targetDir, placeholders },
-  { force = false } = {}
-) {
+export function scaffoldHarness({ templatesDir, targetDir, placeholders }, { force = false } = {}) {
   // Guard: refuse if already initialized
   if (!force) {
     const manifestPath = path.join(targetDir, ".claude", "skills-manifest.json");
@@ -86,8 +81,7 @@ export function scaffoldHarness(
         category: "scaffold",
         file: specsPath,
         message:
-          `Repo already initialized: ${specsPath} already exists. ` +
-          `Use --force to overwrite.`,
+          `Repo already initialized: ${specsPath} already exists. ` + `Use --force to overwrite.`,
         hint: "pass `{ force: true }` or remove docs/specs/",
       });
     }

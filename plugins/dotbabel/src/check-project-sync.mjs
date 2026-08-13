@@ -82,10 +82,7 @@ export async function checkProjectSync(opts) {
   // composeInject would produce. Differences are "stale".
 
   const sourceText = fs.readFileSync(sourcePath, "utf8");
-  const subs = validateSubstitutions(
-    cfg.cli_substitutions ?? {},
-    ".dotbabel.json",
-  );
+  const subs = validateSubstitutions(cfg.cli_substitutions ?? {}, ".dotbabel.json");
 
   for (const target of cfg.targets) {
     const { body } = renderTarget(sourceText, target, subs);
@@ -196,10 +193,7 @@ export async function checkProjectSync(opts) {
       for (const entry of fs.readdirSync(skillsAbs, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         if (entry.name === ".system") continue;
-        checkLink(
-          path.join(targetDir, entry.name),
-          path.join(skillsAbs, entry.name),
-        );
+        checkLink(path.join(targetDir, entry.name), path.join(skillsAbs, entry.name));
       }
     }
     if (fs.existsSync(commandsAbs)) {
@@ -207,10 +201,7 @@ export async function checkProjectSync(opts) {
         if (!entry.endsWith(".md")) continue;
         const name = entry.replace(/\.md$/, "");
         if (name === ".system") continue;
-        checkLink(
-          path.join(targetDir, name, "SKILL.md"),
-          path.join(commandsAbs, entry),
-        );
+        checkLink(path.join(targetDir, name, "SKILL.md"), path.join(commandsAbs, entry));
       }
     }
   }
@@ -248,10 +239,7 @@ export async function checkProjectSync(opts) {
           if (!entry.endsWith(".md")) continue;
           const name = entry.replace(/\.md$/, "");
           if (name === ".system") continue;
-          checkLink(
-            path.join(promptsDir, `${name}.prompt.md`),
-            path.join(commandsAbs, entry),
-          );
+          checkLink(path.join(promptsDir, `${name}.prompt.md`), path.join(commandsAbs, entry));
         }
       }
       if (fs.existsSync(skillsAbs)) {
@@ -260,10 +248,7 @@ export async function checkProjectSync(opts) {
           if (entry.name === ".system") continue;
           const skillFile = path.join(skillsAbs, entry.name, "SKILL.md");
           if (!fs.existsSync(skillFile)) continue;
-          checkLink(
-            path.join(instructionsDir, `${entry.name}.instructions.md`),
-            skillFile,
-          );
+          checkLink(path.join(instructionsDir, `${entry.name}.instructions.md`), skillFile);
         }
       }
     }

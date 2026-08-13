@@ -1,11 +1,5 @@
-import {
-  extractHeadings,
-  generateInstructions,
-} from "./generate-instructions.mjs";
-import {
-  pathExists,
-  readText,
-} from "./spec-harness-lib.mjs";
+import { extractHeadings, generateInstructions } from "./generate-instructions.mjs";
+import { pathExists, readText } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 /**
@@ -38,29 +32,31 @@ export function checkInstructionParity(ctx, precomputed) {
     if (file.path.endsWith(".manifest.json")) continue;
 
     if (!pathExists(ctx, file.path)) {
-      errors.push(new ValidationError({
-        code: ERROR_CODES.DRIFT_INSTRUCTION_FILE_MISSING,
-        category: "drift",
-        file: file.path,
-        message: `instruction parity target is missing -> ${file.path}`,
-        hint: "run `npx dotbabel-generate-instructions` and commit the generated output",
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.DRIFT_INSTRUCTION_FILE_MISSING,
+          category: "drift",
+          file: file.path,
+          message: `instruction parity target is missing -> ${file.path}`,
+          hint: "run `npx dotbabel-generate-instructions` and commit the generated output",
+        }),
+      );
       continue;
     }
 
-    const currentSet = new Set(
-      extractHeadings(readText(ctx, file.path)).map(normalizeHeading),
-    );
+    const currentSet = new Set(extractHeadings(readText(ctx, file.path)).map(normalizeHeading));
     for (const heading of extractHeadings(file.content)) {
       if (currentSet.has(normalizeHeading(heading))) continue;
-      errors.push(new ValidationError({
-        code: ERROR_CODES.DRIFT_PARITY_MISSING_HEADING,
-        category: "drift",
-        file: file.path,
-        expected: heading,
-        message: `instruction parity heading missing in ${file.path}: ${heading}`,
-        hint: "restore the generated heading or run `npx dotbabel-generate-instructions`",
-      }));
+      errors.push(
+        new ValidationError({
+          code: ERROR_CODES.DRIFT_PARITY_MISSING_HEADING,
+          category: "drift",
+          file: file.path,
+          expected: heading,
+          message: `instruction parity heading missing in ${file.path}: ${heading}`,
+          hint: "restore the generated heading or run `npx dotbabel-generate-instructions`",
+        }),
+      );
     }
   }
 

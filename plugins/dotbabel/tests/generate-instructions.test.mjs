@@ -1,13 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import {
-  readFileSync,
-  writeFileSync,
-  mkdtempSync,
-  cpSync,
-  existsSync,
-} from "fs";
+import { readFileSync, writeFileSync, mkdtempSync, cpSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import {
@@ -48,10 +42,7 @@ function readFacts(root) {
 }
 
 function writeFacts(root, obj) {
-  writeFileSync(
-    path.join(root, "docs", "repo-facts.json"),
-    JSON.stringify(obj, null, 2) + "\n",
-  );
+  writeFileSync(path.join(root, "docs", "repo-facts.json"), JSON.stringify(obj, null, 2) + "\n");
 }
 
 const SYNTH_COPILOT = Object.freeze({
@@ -313,11 +304,7 @@ describe("generateInstructions — inject mode", () => {
   it("appends a rule-floor section on first run when host file lacks markers", () => {
     const root = isolateFixture();
     setupCanonical(root);
-    writeFile(
-      root,
-      "AGENTS.md",
-      "# Repository Guidelines\n\nProject-specific content here.\n",
-    );
+    writeFile(root, "AGENTS.md", "# Repository Guidelines\n\nProject-specific content here.\n");
     const ctx = createHarnessContext({ repoRoot: root });
     generateInstructions(ctx, { targets: [INJECT_AGENTS] });
     const after = readFile(root, "AGENTS.md");
@@ -398,9 +385,7 @@ describe("generateInstructions — inject mode", () => {
     expect(after).toContain("fresh body");
     expect(after).toContain("Hand-authored tail.");
     expect(after).not.toContain("STALE");
-    expect(
-      after.split("\n").filter((line) => line.trim() === RULE_FLOOR_END),
-    ).toHaveLength(1);
+    expect(after.split("\n").filter((line) => line.trim() === RULE_FLOOR_END)).toHaveLength(1);
   });
 
   it("is idempotent — running twice produces the same content", () => {
@@ -418,11 +403,7 @@ describe("generateInstructions — inject mode", () => {
   it("throws on mismatched (orphan) rule-floor markers in host file", () => {
     const root = isolateFixture();
     setupCanonical(root);
-    writeFile(
-      root,
-      "AGENTS.md",
-      `# Guidelines\n\n${RULE_FLOOR_BEGIN}\nbody without close\n`,
-    );
+    writeFile(root, "AGENTS.md", `# Guidelines\n\n${RULE_FLOOR_BEGIN}\nbody without close\n`);
     const ctx = createHarnessContext({ repoRoot: root });
     let caught;
     try {
@@ -483,16 +464,9 @@ describe("generateInstructions — manifest", () => {
       ],
     });
     expect(result.manifest.targets["AGENTS.md"].mode).toBe("inject");
-    expect(result.manifest.targets["AGENTS.md"].cliSet).toEqual([
-      "copilot",
-      "codex",
-    ]);
-    expect(result.manifest.targets["AGENTS.md"].omittedHeadings).toContain(
-      "Claude only",
-    );
-    expect(result.manifest.targets["out/copilot-user.md"].mode).toBe(
-      "synthesize",
-    );
+    expect(result.manifest.targets["AGENTS.md"].cliSet).toEqual(["copilot", "codex"]);
+    expect(result.manifest.targets["AGENTS.md"].omittedHeadings).toContain("Claude only");
+    expect(result.manifest.targets["out/copilot-user.md"].mode).toBe("synthesize");
     expect(existsSync(path.join(root, MANIFEST_RELATIVE_PATH))).toBe(true);
   });
 });
@@ -503,32 +477,23 @@ describe("generateInstructions — cli_substitutions validation", () => {
     const facts = readFacts(root);
     facts.cli_substitutions = value;
     writeFacts(root, facts);
-    writeClaude(
-      root,
-      [`# Doc`, "", RULE_FLOOR_BEGIN, "## Rule", RULE_FLOOR_END, ""].join("\n"),
-    );
+    writeClaude(root, [`# Doc`, "", RULE_FLOOR_BEGIN, "## Rule", RULE_FLOOR_END, ""].join("\n"));
     return createHarnessContext({ repoRoot: root });
   }
 
   it("rejects an array as cli_substitutions", () => {
     const ctx = setup(["copilot"]);
-    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(
-      ValidationError,
-    );
+    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(ValidationError);
   });
 
   it("rejects a non-object substitution map per CLI key", () => {
     const ctx = setup({ copilot: "not an object" });
-    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(
-      /string→string map/,
-    );
+    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(/string→string map/);
   });
 
   it("rejects a non-string replacement value", () => {
     const ctx = setup({ copilot: { foo: 42 } });
-    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(
-      /must be a string/,
-    );
+    expect(() => generateInstructions(ctx, { dryRun: true })).toThrow(/must be a string/);
   });
 
   it("accepts undefined / null without raising", () => {
