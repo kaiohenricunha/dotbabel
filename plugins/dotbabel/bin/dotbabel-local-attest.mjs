@@ -9,12 +9,18 @@
  * GitHub-hosted runners after a maintainer has already verified locally.
  *
  * Usage:
- *   dotbabel local-attest [--pr <N>] [--no-push] [--dry-run] [--config <path>]
+ *   dotbabel local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast]
+ *                         [--only <leg>] [--from <leg>] [--config <path>]
  *
  *   --pr <N>           Target PR number. Defaults to the open PR for the current branch.
  *   --no-push          Run the matrix + post comment + apply label, but do not `git push`.
  *   --dry-run          Run the matrix, render the comment, print it. Post nothing, label
  *                      nothing, push nothing. Use this to verify a new project's config.
+ *   --fail-fast        Stop launching legs after the first hard failure; unstarted legs
+ *                      are recorded not-run and the run can no longer attest.
+ *   --only <leg>       Diagnostic mode: run only the named leg(s), with relaxed
+ *                      preconditions (dirty tree fine, no PR needed). Never attests.
+ *   --from <leg>       Diagnostic mode: run the matrix suffix starting at the named leg.
  *   --config <path>    Override the .local-attest config file location.
  *
  * Config discovery (when --config not given):
@@ -37,7 +43,8 @@ import { parseArgs } from "../src/local-attest-lib.mjs";
 import { ConfigError, loadConfig } from "../src/local-attest-config.mjs";
 import { PreconditionError, execute, realDeps } from "../src/local-attest-runner.mjs";
 
-const HELP = `dotbabel-local-attest [--pr <N>] [--no-push] [--dry-run] [--config <path>]
+const HELP = `dotbabel-local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast]
+                      [--only <leg>] [--from <leg>] [--config <path>]
 
 Run the configured CI matrix locally and, on a clean pass, post an attestation
 comment to the open PR so the remote pipeline skips itself for this commit.
@@ -46,6 +53,14 @@ Options:
   --pr <N>           Target PR number (defaults to the open PR for the branch)
   --no-push          Do not run \`git push\` after attesting
   --dry-run          Print the comment that would be posted; post nothing
+  --fail-fast        Stop launching legs after the first hard failure. A
+                     fail-fast run that stopped early can never attest; one
+                     where nothing failed completed the full matrix and can.
+  --only <leg>       Diagnostic mode: run only the named leg(s). Repeatable,
+                     or comma-separated. Relaxed preconditions (dirty tree
+                     fine, no PR needed); never posts, labels, or pushes.
+  --from <leg>       Diagnostic mode: run the matrix from the named leg to the
+                     end. Same rules as --only; mutually exclusive with it.
   --config <path>    Override the .local-attest config file location
   --help, -h         Show this help
   --version, -V      Show version
@@ -55,7 +70,11 @@ Config discovery (in order, when --config not given):
   .local-attest.config.json
   package.json#local-attest
 
-Exit codes: 0 ok, 1 attestation failure, 2 env error, 64 usage error.`;
+Every run whose matrix executes appends one line to the audit log
+(config.auditLogPath), tagged result: attested | hard-fail | head-moved |
+push-fail | post-fail | dry-run | diagnostic — failures leave a record too.
+
+Exit codes: 0 ok, 1 attestation/leg failure, 2 env error, 64 usage error.`;
 
 function fail(code, msg) {
   if (msg) process.stderr.write(`dotbabel-local-attest: ${msg}\n`);
@@ -105,11 +124,17 @@ async function main() {
       prOverride: argv.pr,
       push: argv.push,
       dryRun: argv.dryRun,
+      only: argv.only,
+      from: argv.from,
+      failFast: argv.failFast,
     });
     process.exit(result.exitCode);
   } catch (err) {
     if (err instanceof PreconditionError) {
       fail(1, err.message);
+    } else if (/** @type {any} */ (err).code === "USAGE") {
+      // filterMatrix throws usage errors (unknown --only/--from leg name).
+      fail(/** @type {any} */ (err).exitCode ?? EXIT_CODES.USAGE, err.message);
     } else {
       fail(2, err.message);
     }
@@ -117,8 +142,7 @@ async function main() {
 }
 
 // Run only when invoked as a CLI, not when imported by tests.
-const invokedDirect =
-  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirect) {
   main().catch((err) => fail(2, err.message));
 }

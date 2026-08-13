@@ -18,6 +18,12 @@
  * @property {string} [cwd]
  * @property {Record<string, string>} [env]
  *
+ * @typedef {object} Toolchain
+ * @property {string} [node]   engines-style pin ("22", "22.x", ">=22"); the running
+ *                             node's major must match, or an attest run fails closed
+ * @property {string} [goMod]  path to a go.mod whose `go` directive's major.minor
+ *                             must match `go version` on PATH
+ *
  * @typedef {object} Config
  * @property {Leg[]} matrix
  * @property {string} label
@@ -26,6 +32,7 @@
  * @property {boolean} requireClean
  * @property {boolean} requireDocker
  * @property {boolean} pushAfterAttest
+ * @property {Toolchain|null} toolchain
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -41,6 +48,7 @@ export const DEFAULTS = Object.freeze({
   requireClean: true,
   requireDocker: false,
   pushAfterAttest: true,
+  toolchain: null,
 });
 
 /**
@@ -175,13 +183,15 @@ export function validateConfig(input) {
     if (leg.env !== undefined && (leg.env === null || typeof leg.env !== "object")) {
       throw new ConfigError(`config.matrix[${i}].env must be an object`);
     }
-    matrix.push(/** @type {Leg} */ ({
-      name,
-      mode: leg.mode,
-      command: leg.command,
-      ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
-      ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
-    }));
+    matrix.push(
+      /** @type {Leg} */ ({
+        name,
+        mode: leg.mode,
+        command: leg.command,
+        ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
+        ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
+      }),
+    );
   });
 
   if (typeof merged.label !== "string" || merged.label === "") {
@@ -209,8 +219,14 @@ export function validateConfig(input) {
     throw new ConfigError("config.trustedAssociations must be a non-empty array of strings");
   }
   const VALID_ASSOCIATIONS = new Set([
-    "OWNER", "MEMBER", "COLLABORATOR", "CONTRIBUTOR",
-    "FIRST_TIMER", "FIRST_TIME_CONTRIBUTOR", "MANNEQUIN", "NONE",
+    "OWNER",
+    "MEMBER",
+    "COLLABORATOR",
+    "CONTRIBUTOR",
+    "FIRST_TIMER",
+    "FIRST_TIME_CONTRIBUTOR",
+    "MANNEQUIN",
+    "NONE",
   ]);
   for (const assoc of merged.trustedAssociations) {
     if (!VALID_ASSOCIATIONS.has(assoc)) {
@@ -225,6 +241,27 @@ export function validateConfig(input) {
     }
   }
 
+  /** @type {import("./local-attest-config.mjs").Toolchain|null} */
+  let toolchain = null;
+  if (merged.toolchain !== null && merged.toolchain !== undefined) {
+    if (typeof merged.toolchain !== "object" || Array.isArray(merged.toolchain)) {
+      throw new ConfigError("config.toolchain must be an object with optional node/goMod strings");
+    }
+    const t = /** @type {Record<string, unknown>} */ (merged.toolchain);
+    for (const key of Object.keys(t)) {
+      if (key !== "node" && key !== "goMod") {
+        throw new ConfigError(`config.toolchain.${key} is not a recognised pin (use node, goMod)`);
+      }
+      if (typeof t[key] !== "string" || t[key] === "") {
+        throw new ConfigError(`config.toolchain.${key} must be a non-empty string`);
+      }
+    }
+    toolchain = {
+      ...(t.node !== undefined ? { node: /** @type {string} */ (t.node) } : {}),
+      ...(t.goMod !== undefined ? { goMod: /** @type {string} */ (t.goMod) } : {}),
+    };
+  }
+
   return /** @type {Config} */ ({
     matrix,
     label: merged.label,
@@ -233,5 +270,6 @@ export function validateConfig(input) {
     requireClean: merged.requireClean,
     requireDocker: merged.requireDocker,
     pushAfterAttest: merged.pushAfterAttest,
+    toolchain,
   });
 }

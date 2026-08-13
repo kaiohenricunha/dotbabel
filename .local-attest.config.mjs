@@ -22,4 +22,9 @@ export default {
     { name: "build-plugin --check", mode: "hard", command: "npm run build-plugin -- --check" },
   ],
   pushAfterAttest: true,
+  // CI's test job runs node 20 and 22 (.github/workflows/test.yml); a local
+  // run can only certify one of them. Pin to 22 so an attest never silently
+  // runs on some other Node — the 20-leg coverage is genuinely skipped under
+  // attestation either way, which predates this pin.
+  toolchain: { node: "22" },
 };

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T16:21:13.709Z",
+  "generatedAt": "2026-08-13T19:01:07.742Z",
   "skills": [
     {
       "name": "agents-search",
@@ -152,7 +152,7 @@
     {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
-      "checksum": "sha256:387fb7d3c71146ac22f79203a647ebebc0aaadf3dad5e38b9777c6ad02a1fdb1",
+      "checksum": "sha256:a051ef983183adb47bf1c60c96c70b58600347cc775efd80ba8c3b9378847f9a",
       "dependencies": [],
       "lastValidated": "2026-08-13"
     },

@@ -28,11 +28,36 @@ type Config = {
   trustedAssociations?: string[]; // gh author_association values that gate CI (default: ["OWNER"])
   requireClean?: boolean; // abort on dirty worktree (default: true)
   requireDocker?: boolean; // abort if `docker info` fails (default: false)
-  pushAfterAttest?: boolean; // git push after attest, before posting (default: true)
+  pushAfterAttest?: boolean; // git push after the comment posts (default: true)
+
+  // Optional toolchain pins. On an attest run a mismatch fails closed —
+  // the attestation claims "CI would pass", and a matrix run on a different
+  // Node or Go than CI uses certifies a run CI would never perform.
+  // Diagnostic runs (--only/--from) warn instead of failing. Unparseable
+  // versions count as mismatches.
+  toolchain?: {
+    node?: string; // engines-style pin ("22", "22.x", ">=22"); running node's major must match
+    goMod?: string; // path to a go.mod; its `go` directive's major.minor must match `go version`
+  };
 };
 ```
 
 The matrix is the only required field; everything else has sensible defaults.
+
+Pin the toolchain to whatever CI's setup steps install (`node-version:`,
+`go-version-file:`). If CI runs a version matrix, pin the one you attest with
+and note that the other legs are skipped under attestation regardless.
+
+## Audit log
+
+Every run whose matrix executes appends exactly one JSONL line to
+`auditLogPath`, tagged `result: attested | hard-fail | head-moved | push-fail
+| post-fail | dry-run | diagnostic`, with per-leg
+`{name, mode, status, durationS}` (`status ∈ pass | fail | advisory-fail |
+not-run`), the invocation `flags`, and — for diagnostic runs — a `dirty`
+marker, because a dirty tree's `sha` does not identify the tree that ran.
+Lines written by versions before `result` existed were only ever written
+after a successful post, so a missing `result` implies `attested`.
 
 ## Example 1 — minimal Node app
 
