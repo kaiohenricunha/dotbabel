@@ -470,14 +470,14 @@ describe("execute (orchestration)", () => {
 describe("runMatrix --fail-fast", () => {
   it("stops launching legs after a hard failure and marks the rest not-run", () => {
     const replies = [[/echo lint/, { status: 1, stderr: "boom" }]];
-    const { deps } = makeDeps({ runReplies: replies });
+    const { deps, calls } = makeDeps({ runReplies: replies });
     const results = runMatrix(deps, baseConfig().matrix, { failFast: true });
     expect(results.map((r) => r.name)).toEqual(["lint", "test", "knip"]);
     expect(results[0].passed).toBe(false);
     expect(results[1]).toMatchObject({ notRun: true, passed: false, durationS: 0 });
     expect(results[2]).toMatchObject({ notRun: true, passed: false });
     // No leg command after the failure was actually executed.
-    expect(deps === undefined).toBe(false);
+    expect(calls.run.some((c) => /echo test|echo knip/.test(c.cmd))).toBe(false);
   });
 
   it("an advisory failure never trips the abort", () => {
