@@ -49,6 +49,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import { dirname } from "node:path";
 
 import {
   buildAuditEntry,
@@ -227,7 +228,11 @@ function gatherToolchain(deps, cfg) {
     if (inputs.nodeVersion) seen.node = inputs.nodeVersion;
   }
   if (pin.goMod !== undefined) {
-    const rv = deps.run("go version", { capture: true });
+    // Probe from the pinned module's directory, not the repo root: with
+    // GOTOOLCHAIN=auto the go command answers with the toolchain the module
+    // will actually use — the same one the Go legs get via leg.cwd. From the
+    // root, an auto-downloaded newer toolchain reads as a false mismatch.
+    const rv = deps.run("go version", { capture: true, cwd: dirname(pin.goMod) });
     inputs.goVersionOutput = rv.status === 0 ? rv.stdout : "";
     const parsed = goMajorMinorFromVersion(inputs.goVersionOutput);
     if (parsed) seen.go = parsed;
