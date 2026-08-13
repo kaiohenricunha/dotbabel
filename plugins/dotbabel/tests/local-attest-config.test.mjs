@@ -217,6 +217,54 @@ describe("validateConfig", () => {
     });
   });
 
+  it("accepts lane, when, skipWhenDiffOnly, passPrBody per leg and restoreFiles top-level", () => {
+    const cfg = validateConfig({
+      matrix: [
+        {
+          name: "a",
+          mode: "hard",
+          command: "true",
+          lane: "go",
+          when: { changedPaths: ["api/**"] },
+          skipWhenDiffOnly: ["docs/**"],
+          passPrBody: true,
+        },
+      ],
+      restoreFiles: ["src/a.js"],
+    });
+    expect(cfg.matrix[0]).toMatchObject({
+      lane: "go",
+      when: { changedPaths: ["api/**"] },
+      skipWhenDiffOnly: ["docs/**"],
+      passPrBody: true,
+    });
+    expect(cfg.restoreFiles).toEqual(["src/a.js"]);
+  });
+
+  it("defaults restoreFiles to an empty array", () => {
+    expect(validateConfig(base()).restoreFiles).toEqual([]);
+  });
+
+  it("rejects malformed lane/when/skipWhenDiffOnly/passPrBody/restoreFiles", () => {
+    const leg = (extra) => ({ matrix: [{ name: "a", mode: "hard", command: "true", ...extra }] });
+    expect(() => validateConfig(leg({ lane: "" }))).toThrow(/lane/);
+    expect(() => validateConfig(leg({ when: {} }))).toThrow(/when/);
+    expect(() => validateConfig(leg({ when: { changedPaths: [] } }))).toThrow(/changedPaths/);
+    expect(() => validateConfig(leg({ when: { changedPaths: ["x"], extra: 1 } }))).toThrow(/when/);
+    expect(() => validateConfig(leg({ skipWhenDiffOnly: [] }))).toThrow(/skipWhenDiffOnly/);
+    expect(() => validateConfig(leg({ skipWhenDiffOnly: [1] }))).toThrow(/skipWhenDiffOnly/);
+    expect(() => validateConfig(leg({ passPrBody: "yes" }))).toThrow(/passPrBody/);
+    expect(() => validateConfig({ ...base(), restoreFiles: "src/a.js" })).toThrow(/restoreFiles/);
+    expect(() => validateConfig({ ...base(), restoreFiles: ["/abs"] })).toThrow(/relative/);
+    expect(() => validateConfig({ ...base(), restoreFiles: ["../x"] })).toThrow(/'\.\.'/);
+  });
+
+  it("rejects non-string env values — they flow straight into the child environment", () => {
+    expect(() =>
+      validateConfig({ matrix: [{ name: "a", mode: "hard", command: "true", env: { X: 1 } }] }),
+    ).toThrow(/env/);
+  });
+
   it("constrains goMod like auditLogPath: relative, no dot-dot", () => {
     expect(() => validateConfig({ ...base(), toolchain: { goMod: "/etc/go.mod" } })).toThrow(
       /relative/,

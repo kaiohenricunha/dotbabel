@@ -17,6 +17,9 @@
  * @property {string} name
  * @property {LegMode} mode
  * @property {boolean} passed
+ * @property {boolean} [skipped]  true when diff rules (leg.when / leg.skipWhenDiffOnly)
+ *                               skipped this leg; `passed` is true because the matching
+ *                               CI job skips the same way
  * @property {boolean} [notRun]  true when fail-fast stopped the run before this leg launched;
  *                               `passed` is false so a consumer that forgets to check errs
  *                               toward reporting failure, never success
@@ -223,6 +226,73 @@ export function filterMatrix(matrix, { only = [], from = null } = {}) {
 }
 
 /**
+ * Translate a path glob into a RegExp: `**` crosses separators, `*` and `?`
+ * do not; everything else matches literally. Same zero-dependency semantics
+ * as the protected-path matcher in pr-gates.mjs — duplicated deliberately so
+ * the two modules stay decoupled.
+ *
+ * @param {string} glob
+ * @returns {RegExp}
+ */
+export function globToRegExp(glob) {
+  let out = "^";
+  for (let i = 0; i < glob.length; i += 1) {
+    const ch = glob[i];
+    if (ch === "*") {
+      if (glob[i + 1] === "*") {
+        out += ".*";
+        i += 1;
+        if (glob[i + 1] === "/") i += 1;
+      } else {
+        out += "[^/]*";
+      }
+    } else if (ch === "?") {
+      out += "[^/]";
+    } else {
+      out += ch.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    }
+  }
+  return new RegExp(`${out}$`);
+}
+
+/**
+ * Apply the config's diff rules to a matrix against the PR's changed files.
+ * Returns a NEW matrix (input untouched) in which affected legs carry
+ * `skipped: true` — legs are marked, never removed, so the result set stays
+ * config-length, the comment table lists every leg CI knows about, and
+ * `shouldAttest`'s expectedLegs invariant holds.
+ *
+ * Fail-open: a null/undefined/empty file list (API failure, zero-file PR)
+ * skips nothing — running too much is safe, running too little is not, since
+ * an attested PR skips every gated remote job.
+ *
+ * - `leg.when.changedPaths`: the leg runs only when SOME changed file matches
+ *   one of the globs (a CI path filter, mirrored locally).
+ * - `leg.skipWhenDiffOnly`: the leg is skipped when EVERY changed file
+ *   matches one of the globs (a docs-only classify rule, mirrored locally).
+ *
+ * @param {Array<object>} matrix
+ * @param {string[]|null|undefined} changedFiles
+ * @returns {Array<object>}
+ */
+export function markSkips(matrix, changedFiles) {
+  const files = Array.isArray(changedFiles) ? changedFiles : [];
+  if (files.length === 0) return matrix.map((leg) => ({ ...leg, skipped: false }));
+  return matrix.map((leg) => {
+    let skipped = false;
+    if (leg.when?.changedPaths) {
+      const res = leg.when.changedPaths.map(globToRegExp);
+      skipped = !files.some((f) => res.some((re) => re.test(f)));
+    }
+    if (!skipped && Array.isArray(leg.skipWhenDiffOnly) && leg.skipWhenDiffOnly.length > 0) {
+      const res = leg.skipWhenDiffOnly.map(globToRegExp);
+      skipped = files.every((f) => res.some((re) => re.test(f)));
+    }
+    return { ...leg, skipped };
+  });
+}
+
+/**
  * Return the last `n` lines of `text`, trimming trailing whitespace.
  *
  * @param {string} text
@@ -251,18 +321,31 @@ export function renderComment(results, { headSha, hostname, toolchain, now }) {
     pass: "pass",
     fail: "FAIL",
     "advisory-fail": "fail (advisory)",
+    skipped: "skipped (diff-scoped)",
     // Unreachable when shouldAttest gates posting, but a future wiring bug
     // must surface as "not run" — never as a pass.
     "not-run": "not run (fail-fast)",
   };
   const rows = results
-    .map((r) => `| ${r.name} | ${r.mode} | ${LABELS[legStatus(r)]} | ${r.durationS}s |`)
+    .map((r) => {
+      const duration = r.skipped ? "\u2014" : `${r.durationS}s`;
+      return `| ${r.name} | ${r.mode} | ${LABELS[legStatus(r)]} | ${duration} |`;
+    })
     .join("\n");
+  // Never claim the full matrix ran when it did not — the comment is the
+  // audit trail for what was actually verified.
+  const skippedCount = results.filter((r) => r.skipped).length;
+  const headline =
+    skippedCount > 0
+      ? `The CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`. ` +
+        `${skippedCount} leg(s) were skipped for this diff per the config's diff rules \u2014 ` +
+        "the corresponding CI jobs skip the same way."
+      : `The full CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`.`;
   return [
     marker,
     "## Local Attestation",
     "",
-    `The full CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`.`,
+    headline,
     "Test and Preview will skip for this commit. A new push re-runs CI automatically.",
     "",
     "| Check | Mode | Result | Duration |",
@@ -296,7 +379,9 @@ export function renderComment(results, { headSha, hostname, toolchain, now }) {
  * @returns {"pass"|"fail"|"advisory-fail"|"not-run"}
  */
 export function legStatus(r) {
-  if (!r || r.notRun) return "not-run";
+  if (!r) return "not-run";
+  if (r.skipped) return "skipped";
+  if (r.notRun) return "not-run";
   if (r.passed) return "pass";
   return r.mode === "advisory" ? "advisory-fail" : "fail";
 }
@@ -317,7 +402,8 @@ export function legStatus(r) {
  * declares.
  *
  * Advisory failures do not block, matching the gate semantics the matrix
- * mirrors. A `--fail-fast` run in which nothing failed completed the full
+ * mirrors. Diff-skipped legs are attestable: the corresponding CI jobs skip
+ * for the same diff, so the attestation claims nothing CI would have run. A `--fail-fast` run in which nothing failed completed the full
  * matrix and may attest.
  *
  * @param {{ diagnostic?: boolean, results: Array<LegResult|undefined>,
@@ -330,8 +416,10 @@ export function shouldAttest({ diagnostic, results, expectedLegs }) {
     Array.isArray(results) &&
     results.length > 0 &&
     (expectedLegs === undefined || results.length === expectedLegs) &&
-    results.every((r) => r && r.notRun !== true && typeof r.passed === "boolean") &&
-    !results.some((r) => r && r.mode === "hard" && !r.passed)
+    results.every(
+      (r) => r && (r.skipped === true || (r.notRun !== true && typeof r.passed === "boolean")),
+    ) &&
+    !results.some((r) => r && !r.skipped && r.mode === "hard" && !r.passed)
   );
 }
 

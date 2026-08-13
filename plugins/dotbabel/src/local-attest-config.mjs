@@ -16,7 +16,21 @@
  * @property {"hard"|"advisory"} mode
  * @property {string} command
  * @property {string} [cwd]
- * @property {Record<string, string>} [env]
+ * @property {Record<string, string>} [env]           values must be strings — they flow
+ *                                                    verbatim into the child environment
+ * @property {string} [lane]                          legs sharing a lane run serially in
+ *                                                    matrix order; distinct lanes run
+ *                                                    concurrently; no lane = one shared
+ *                                                    default lane (fully sequential)
+ * @property {{ changedPaths: string[] }} [when]      run the leg only when SOME changed PR
+ *                                                    file matches one of these globs — a CI
+ *                                                    path filter mirrored locally; misses
+ *                                                    mark the leg skipped, never remove it
+ * @property {string[]} [skipWhenDiffOnly]            skip the leg when EVERY changed PR file
+ *                                                    matches one of these globs — a docs-only
+ *                                                    classify rule mirrored locally
+ * @property {boolean} [passPrBody]                   inject the PR body as env.PR_BODY for
+ *                                                    this leg (fetched once, empty on error)
  *
  * @typedef {object} Toolchain
  * @property {string} [node]   exact major version pin ("22"); the `node` on PATH
@@ -37,6 +51,10 @@
  * @property {boolean} requireDocker
  * @property {boolean} pushAfterAttest
  * @property {Toolchain|null} toolchain
+ * @property {string[]} restoreFiles  tracked files a leg is known to overwrite (e2e seeders);
+ *                                    snapshotted before the matrix and restored byte-exact in
+ *                                    a finally, BEFORE the post-matrix head recheck — without
+ *                                    this the recheck aborts every run on the leg's own writes
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -53,6 +71,7 @@ export const DEFAULTS = Object.freeze({
   requireDocker: false,
   pushAfterAttest: true,
   toolchain: null,
+  restoreFiles: [],
 });
 
 /**
@@ -187,6 +206,53 @@ export function validateConfig(input) {
     if (leg.env !== undefined && (leg.env === null || typeof leg.env !== "object")) {
       throw new ConfigError(`config.matrix[${i}].env must be an object`);
     }
+    if (leg.env !== undefined) {
+      for (const [k, v] of Object.entries(/** @type {object} */ (leg.env))) {
+        if (typeof v !== "string") {
+          throw new ConfigError(
+            `config.matrix[${i}].env.${k} must be a string — env values flow verbatim into the child environment`,
+          );
+        }
+      }
+    }
+    if (leg.lane !== undefined && (typeof leg.lane !== "string" || leg.lane === "")) {
+      throw new ConfigError(`config.matrix[${i}].lane must be a non-empty string`);
+    }
+    if (leg.when !== undefined) {
+      const w = /** @type {Record<string, unknown>} */ (leg.when);
+      if (!w || typeof w !== "object" || Array.isArray(w)) {
+        throw new ConfigError(
+          `config.matrix[${i}].when must be an object like { changedPaths: [globs] }`,
+        );
+      }
+      const keys = Object.keys(w);
+      if (keys.length !== 1 || keys[0] !== "changedPaths") {
+        throw new ConfigError(`config.matrix[${i}].when supports exactly one key: changedPaths`);
+      }
+      if (
+        !Array.isArray(w.changedPaths) ||
+        w.changedPaths.length === 0 ||
+        !w.changedPaths.every((g) => typeof g === "string" && g !== "")
+      ) {
+        throw new ConfigError(
+          `config.matrix[${i}].when.changedPaths must be a non-empty array of glob strings`,
+        );
+      }
+    }
+    if (leg.skipWhenDiffOnly !== undefined) {
+      if (
+        !Array.isArray(leg.skipWhenDiffOnly) ||
+        leg.skipWhenDiffOnly.length === 0 ||
+        !leg.skipWhenDiffOnly.every((g) => typeof g === "string" && g !== "")
+      ) {
+        throw new ConfigError(
+          `config.matrix[${i}].skipWhenDiffOnly must be a non-empty array of glob strings`,
+        );
+      }
+    }
+    if (leg.passPrBody !== undefined && typeof leg.passPrBody !== "boolean") {
+      throw new ConfigError(`config.matrix[${i}].passPrBody must be a boolean`);
+    }
     matrix.push(
       /** @type {Leg} */ ({
         name,
@@ -194,6 +260,18 @@ export function validateConfig(input) {
         command: leg.command,
         ...(leg.cwd !== undefined ? { cwd: leg.cwd } : {}),
         ...(leg.env !== undefined ? { env: { .../** @type {object} */ (leg.env) } } : {}),
+        ...(leg.lane !== undefined ? { lane: leg.lane } : {}),
+        ...(leg.when !== undefined
+          ? {
+              when: {
+                changedPaths: [.../** @type {{changedPaths: string[]}} */ (leg.when).changedPaths],
+              },
+            }
+          : {}),
+        ...(leg.skipWhenDiffOnly !== undefined
+          ? { skipWhenDiffOnly: [.../** @type {string[]} */ (leg.skipWhenDiffOnly)] }
+          : {}),
+        ...(leg.passPrBody !== undefined ? { passPrBody: leg.passPrBody } : {}),
       }),
     );
   });
@@ -291,6 +369,21 @@ export function validateConfig(input) {
     };
   }
 
+  if (
+    !Array.isArray(merged.restoreFiles) ||
+    !merged.restoreFiles.every((f) => typeof f === "string" && f !== "")
+  ) {
+    throw new ConfigError("config.restoreFiles must be an array of file paths");
+  }
+  for (const f of /** @type {string[]} */ (merged.restoreFiles)) {
+    if (isAbsolute(f)) {
+      throw new ConfigError("config.restoreFiles entries must be relative paths");
+    }
+    if (f.split("/").some((seg) => seg === "..")) {
+      throw new ConfigError("config.restoreFiles entries must not contain '..' segments");
+    }
+  }
+
   return /** @type {Config} */ ({
     matrix,
     label: merged.label,
@@ -300,5 +393,6 @@ export function validateConfig(input) {
     requireDocker: merged.requireDocker,
     pushAfterAttest: merged.pushAfterAttest,
     toolchain,
+    restoreFiles: [.../** @type {string[]} */ (merged.restoreFiles)],
   });
 }
