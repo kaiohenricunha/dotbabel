@@ -36,8 +36,8 @@ type Config = {
   // Diagnostic runs (--only/--from) warn instead of failing. Unparseable
   // versions count as mismatches.
   toolchain?: {
-    node?: string; // engines-style pin ("22", "22.x", ">=22"); running node's major must match
-    goMod?: string; // path to a go.mod; its `go` directive's major.minor must match `go version`
+    node?: string; // exact major pin ("22"); range syntax (">=22", "^22") is rejected
+    goMod?: string; // relative path (no "..") to a go.mod; its go directive major.minor must match `go version`
   };
 };
 ```
@@ -54,8 +54,9 @@ Every run whose matrix executes appends exactly one JSONL line to
 `auditLogPath`, tagged `result: attested | hard-fail | head-moved | push-fail
 | post-fail | dry-run | diagnostic`, with per-leg
 `{name, mode, status, durationS}` (`status ∈ pass | fail | advisory-fail |
-not-run`), the invocation `flags`, and — for diagnostic runs — a `dirty`
-marker, because a dirty tree's `sha` does not identify the tree that ran.
+not-run`), the invocation `flags`, the certified `toolchain` versions when
+pins are configured, and — for diagnostic runs — a `dirty` marker, because a
+dirty tree's `sha` does not identify the tree that ran.
 Lines written by versions before `result` existed were only ever written
 after a successful post, so a missing `result` implies `attested`.
 

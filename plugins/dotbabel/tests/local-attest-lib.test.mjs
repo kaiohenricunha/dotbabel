@@ -312,7 +312,13 @@ describe("buildAuditEntry", () => {
     expect(e.pr).toBeNull();
     expect(e.sha).toBeNull();
     expect(e.dirty).toBe(true);
-    expect(e.flags).toEqual({ only: ["lint"], from: null, failFast: false, push: false });
+    expect(e.flags).toEqual({
+      only: ["lint"],
+      from: null,
+      failFast: false,
+      push: false,
+      dryRun: false,
+    });
   });
 
   it("copies the advisoryFails array (no shared reference)", () => {
@@ -459,6 +465,15 @@ describe("shouldAttest", () => {
     expect(shouldAttest({ diagnostic: false, results })).toBe(false);
   });
 
+  it("rejects a subset record via expectedLegs even when the diagnostic flag lies", () => {
+    // Control flow is the first defense; this clause is the second. A filtered
+    // matrix yields fewer results than the config declares, so even a run that
+    // wrongly reports diagnostic: false cannot attest on a subset.
+    const results = [pass("a")];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 3 })).toBe(false);
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 1 })).toBe(true);
+  });
+
   it("never attests on a hard failure, an empty matrix, or an unsettled hole", () => {
     expect(
       shouldAttest({
@@ -514,6 +529,26 @@ describe("toolchain helpers", () => {
   it("no pin means no problems — the check is opt-in per config", () => {
     expect(toolchainProblems({ pin: null, nodeVersion: "junk" })).toEqual([]);
     expect(toolchainProblems({ pin: undefined, nodeVersion: "junk" })).toEqual([]);
+  });
+});
+
+describe("renderComment toolchain line", () => {
+  const SHA = "abc1234abc1234abc1234abc1234abc1234abc12";
+  const RESULTS = [{ name: "lint", mode: "hard", passed: true, durationS: 1, tail: "" }];
+
+  it("records the certified toolchain when pins were measured", () => {
+    const body = renderComment(RESULTS, {
+      headSha: SHA,
+      hostname: "h",
+      toolchain: { node: "22.11.0", go: "1.26" },
+      now: new Date(),
+    });
+    expect(body).toContain("- Toolchain: node 22.11.0 · go 1.26");
+  });
+
+  it("omits the line when no pins are configured", () => {
+    const body = renderComment(RESULTS, { headSha: SHA, hostname: "h", now: new Date() });
+    expect(body).not.toContain("Toolchain:");
   });
 });
 

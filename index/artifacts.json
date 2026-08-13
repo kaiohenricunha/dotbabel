@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-08-13T19:01:07.422Z",
+  "generatedAt": "2026-08-13T19:36:58.038Z",
   "version": "2.16.0",
   "artifacts": [
     {
@@ -580,7 +580,7 @@
       "type": "skill",
       "path": "skills/local-attest/SKILL.md",
       "name": "local-attest",
-      "description": "Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned OWNER-authored PR comment that gates downstream GitHub Actions jobs off for that exact commit. Skips the redundant remote run after a maintainer has already verified locally, saving runner minutes without weakening the gate. A new push changes the head SHA, the attestation stops matching, CI runs again. Side-effectful (posts a PR comment, applies a label, optionally pushes) and slow — minutes to tens of minutes, whatever the configured matrix costs. Diagnostic modes (--only, --from, --fail-fast) run subsets for the fix-retry loop and can never attest. Invoke only on explicit request.\n",
+      "description": "Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned OWNER-authored PR comment that gates downstream GitHub Actions jobs off for that exact commit. Skips the redundant remote run after a maintainer has already verified locally, saving runner minutes without weakening the gate. A new push changes the head SHA, the attestation stops matching, CI runs again. Side-effectful (posts a PR comment, applies a label, optionally pushes) and slow — minutes to tens of minutes, whatever the configured matrix costs. Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can never attest; --fail-fast works in both modes. Invoke only on explicit request.\n",
       "facets": {
         "domain": ["devex", "observability"],
         "platform": ["github-actions"],

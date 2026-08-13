@@ -244,7 +244,7 @@ export function tail(text, n = 10) {
  * @param {{ headSha: string, hostname: string, now?: Date }} ctx
  * @returns {string}
  */
-export function renderComment(results, { headSha, hostname, now }) {
+export function renderComment(results, { headSha, hostname, toolchain, now }) {
   const marker = buildAttestMarker(headSha);
   const ts = (now ?? new Date()).toISOString();
   const LABELS = {
@@ -272,6 +272,15 @@ export function renderComment(results, { headSha, hostname, now }) {
     `- Host: \`${hostname}\``,
     `- Attested at: \`${ts}\``,
     `- Verified SHA: \`${headSha}\``,
+    // Which toolchain this run certified — the marker above can switch off a
+    // multi-version CI matrix, so the comment records the one version it ran.
+    ...(toolchain && Object.keys(toolchain).length > 0
+      ? [
+          `- Toolchain: ${Object.entries(toolchain)
+            .map(([k, v]) => `${k} ${v}`)
+            .join(" \u00b7 ")}`,
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -293,27 +302,34 @@ export function legStatus(r) {
 }
 
 /**
- * The mechanical attestation bar. Posting, labelling, and pushing are only
- * reachable when this returns true — a prose promise that "partial runs never
- * attest" is exactly the kind of obligation that drifts, so the run record
- * itself is judged instead.
+ * The mechanical attestation bar. Posting, labelling, and pushing live inside
+ * this predicate's guard in `execute` — a prose promise that "partial runs
+ * never attest" is exactly the kind of obligation that drifts, so the run
+ * record itself is judged instead.
  *
- * The flag check and the structural checks are deliberately redundant: with
- * `diagnostic` false a `notRun` entry "cannot" exist, but the structural
- * clauses catch the future wiring bug that makes it exist anyway.
+ * The first line of defense against a subset run attesting is control flow:
+ * `execute`'s diagnostic branch returns before the publication path, and the
+ * attest branch runs the full config matrix. This predicate is the second
+ * line, and its clauses are deliberately redundant with each other: pass the
+ * real `diagnostic` value (never a literal), and pass `expectedLegs` (the
+ * full matrix length) so a subset record is rejected even if the flag wiring
+ * is wrong — a filtered matrix produces fewer results than the config
+ * declares.
  *
  * Advisory failures do not block, matching the gate semantics the matrix
  * mirrors. A `--fail-fast` run in which nothing failed completed the full
  * matrix and may attest.
  *
- * @param {{ diagnostic?: boolean, results: Array<LegResult|undefined> }} run
+ * @param {{ diagnostic?: boolean, results: Array<LegResult|undefined>,
+ *           expectedLegs?: number }} run
  * @returns {boolean}
  */
-export function shouldAttest({ diagnostic, results }) {
+export function shouldAttest({ diagnostic, results, expectedLegs }) {
   return (
     diagnostic !== true &&
     Array.isArray(results) &&
     results.length > 0 &&
+    (expectedLegs === undefined || results.length === expectedLegs) &&
     results.every((r) => r && r.notRun !== true && typeof r.passed === "boolean") &&
     !results.some((r) => r && r.mode === "hard" && !r.passed)
   );
@@ -337,8 +353,8 @@ export function shouldAttest({ diagnostic, results }) {
  *
  * @param {{ result: string, pr: number|string|null, sha: string|null, hostname: string,
  *           advisoryFails: string[], results?: Array<LegResult|undefined>,
- *           flags?: { only?: string[], from?: string|null, failFast?: boolean, push?: boolean },
- *           dirty?: boolean, now?: Date }} input
+ *           flags?: { only?: string[], from?: string|null, failFast?: boolean, push?: boolean, dryRun?: boolean },
+ *           dirty?: boolean, toolchain?: { node?: string, go?: string }|null, now?: Date }} input
  * @returns {object}
  */
 export function buildAuditEntry({
@@ -350,6 +366,7 @@ export function buildAuditEntry({
   results,
   flags,
   dirty,
+  toolchain,
   now,
 }) {
   const entry = {
@@ -374,9 +391,14 @@ export function buildAuditEntry({
       from: flags.from ?? null,
       failFast: flags.failFast === true,
       push: flags.push !== false,
+      dryRun: flags.dryRun === true,
     };
   }
   if (dirty !== undefined) entry.dirty = dirty;
+  // The versions this run was certified against — the attestation can switch
+  // off a multi-version CI matrix, and the record should say which version it
+  // actually covered.
+  if (toolchain && Object.keys(toolchain).length > 0) entry.toolchain = toolchain;
   return entry;
 }
 

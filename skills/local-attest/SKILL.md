@@ -18,8 +18,8 @@ description: >
   A new push changes the head SHA, the attestation stops matching, CI runs
   again. Side-effectful (posts a PR comment, applies a label, optionally pushes)
   and slow — minutes to tens of minutes, whatever the configured matrix costs.
-  Diagnostic modes (--only, --from, --fail-fast) run subsets for the fix-retry
-  loop and can never attest. Invoke only on explicit request.
+  Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can
+  never attest; --fail-fast works in both modes. Invoke only on explicit request.
 argument-hint: "[--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--only <leg>] [--from <leg>] [--config <path>]"
 tools: Bash
 disable-model-invocation: true
@@ -66,9 +66,12 @@ tree, detached HEAD, no PR — iterating is the point), Docker and toolchain
 problems warn instead of failing. Leg names match exactly and case-sensitively;
 an unknown name lists every valid leg. The two flags are mutually exclusive.
 
-A diagnostic run **never** posts, labels, or pushes — not by convention but
-mechanically: attestation is gated on a run-record predicate (`shouldAttest`)
-that rejects any subset run. Exit is 1 when **any** selected leg fails,
+A diagnostic run **never** posts, labels, or pushes. Two mechanisms stack:
+the diagnostic branch in `execute` returns before the publication path even
+exists (and the attest branch always runs the full config matrix), and the
+`shouldAttest` predicate that gates publication receives the diagnostic flag
+plus the expected leg count, so a subset record is rejected even if the
+branch wiring were ever wrong. Exit is 1 when **any** selected leg fails,
 advisory legs included, because there is no attestation gate to grade against
 and `--only <advisory-leg>` exiting 0 on a failure would be useless in a loop.
 
@@ -99,6 +102,9 @@ and attests normally; one that stopped early cannot.
 - **`gh` authenticated** as a user whose `author_association` is in your
   config's `trustedAssociations` list (default: `["OWNER"]`).
 - **Docker running** if your config sets `requireDocker: true`.
+- **`auditLogPath` gitignored** (default `.local-attest-log.jsonl`). Every
+  run appends to it — including `--dry-run` — so with `requireClean` on, an
+  untracked log makes the next attest abort on the tool's own output.
 
 ## How the gate works
 

@@ -21,6 +21,7 @@
  * @property {(cmd: string, opts?: { cwd?: string, env?: Record<string,string>, capture?: boolean }) => { status: number, stdout: string, stderr: string }} run
  * @property {(cmd: string, payload: object) => string} ghApiWithInput
  * @property {(path: string, line: string) => void} appendLog
+ * @property {(path: string) => string|null} [readFile]  utf8 read, null on any error
  * @property {() => string} hostname
  * @property {(msg: string) => void} log
  * @property {(msg: string) => void} warn
@@ -35,16 +36,19 @@
  * @property {string} repo
  * @property {string} pr
  * @property {string} headSha
+ * @property {{ node?: string, go?: string }|null} [toolchain]  versions measured
+ *   against the config pins; null when no pins are configured
  */
 
 import { spawnSync } from "node:child_process";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import os from "node:os";
 
 import {
   buildAuditEntry,
   filterMatrix,
   findAttestComment,
+  goMajorMinorFromVersion,
   legStatus,
   renderComment,
   shouldAttest,
@@ -86,6 +90,13 @@ export function realDeps() {
     },
     appendLog(path, line) {
       appendFileSync(path, line);
+    },
+    readFile(path) {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return null;
+      }
     },
     hostname() {
       return os.hostname();
@@ -130,30 +141,39 @@ export class PreconditionError extends Error {
 }
 
 /**
- * Collect toolchain problems for the config's pins, gathering versions through
- * `deps.run` so tests can stub them. Config paths are repo-owned (the same
- * trust level as the leg commands the matrix executes verbatim).
+ * Compare the running toolchain against the config's pins, gathering versions
+ * through `deps.run`/`deps.readFile` so tests can stub them.
  *
  * @param {Deps} deps
  * @param {Config} cfg
- * @returns {string[]}
+ * @returns {{ problems: string[], seen: { node?: string, go?: string }|null }}
+ *   `problems` — one entry per mismatch or unparseable version;
+ *   `seen` — the versions actually measured, recorded in the audit line and
+ *   the attestation comment so the certified toolchain is auditable later.
  */
 function gatherToolchain(deps, cfg) {
   const pin = cfg.toolchain;
-  if (!pin) return [];
+  if (!pin) return { problems: [], seen: null };
   /** @type {Parameters<typeof toolchainProblems>[0]} */
   const inputs = { pin };
+  /** @type {{ node?: string, go?: string }} */
+  const seen = {};
   if (pin.node !== undefined) {
     const r = deps.run("node --version", { capture: true });
     inputs.nodeVersion = r.status === 0 ? r.stdout.trim().replace(/^v/, "") : "";
+    if (inputs.nodeVersion) seen.node = inputs.nodeVersion;
   }
   if (pin.goMod !== undefined) {
     const rv = deps.run("go version", { capture: true });
     inputs.goVersionOutput = rv.status === 0 ? rv.stdout : "";
-    const rf = deps.run(`cat "${pin.goMod}"`, { capture: true });
-    inputs.goModText = rf.status === 0 ? rf.stdout : "";
+    const parsed = goMajorMinorFromVersion(inputs.goVersionOutput);
+    if (parsed) seen.go = parsed;
+    // A direct file read, not a shell cat: this module forbids interpolating
+    // strings into shell commands, and validateConfig constrains the path the
+    // same way auditLogPath is constrained.
+    inputs.goModText = deps.readFile ? (deps.readFile(pin.goMod) ?? "") : "";
   }
-  return toolchainProblems(inputs);
+  return { problems: toolchainProblems(inputs), seen };
 }
 
 /**
@@ -178,7 +198,7 @@ export function checkDiagnosticPreconditions(deps, cfg) {
         "(config.requireDocker is true; diagnostic runs continue anyway.)",
     );
   }
-  for (const p of gatherToolchain(deps, cfg)) {
+  for (const p of gatherToolchain(deps, cfg).problems) {
     deps.warn(`WARNING: ${p} (diagnostic run — continuing; an attest run stops here)`);
   }
 }
@@ -286,11 +306,11 @@ export function checkPreconditions(deps, cfg, opts = {}) {
   // certifies a run CI would never perform. Diagnostic runs warn instead
   // (checkDiagnosticPreconditions) — iterating on the wrong toolchain is the
   // operator's business until they try to attest with it.
-  const toolchainIssues = gatherToolchain(deps, cfg);
-  if (toolchainIssues.length > 0) {
+  const toolchain = gatherToolchain(deps, cfg);
+  if (toolchain.problems.length > 0) {
     throw new PreconditionError(
       "toolchain mismatch — the attestation must certify the toolchain CI runs on:\n  " +
-        toolchainIssues.join("\n  "),
+        toolchain.problems.join("\n  "),
     );
   }
 
@@ -320,7 +340,7 @@ export function checkPreconditions(deps, cfg, opts = {}) {
     // Permission probe is a courtesy — never block on it.
   }
 
-  return { branch, repo, pr, headSha };
+  return { branch, repo, pr, headSha, toolchain: toolchain.seen };
 }
 
 /**
@@ -498,7 +518,7 @@ export function execute(deps, cfg, flags) {
   const from = flags.from ?? null;
   const failFast = flags.failFast === true;
   const diagnostic = only.length > 0 || from !== null;
-  const auditFlags = { only, from, failFast, push: flags.push };
+  const auditFlags = { only, from, failFast, push: flags.push, dryRun: flags.dryRun === true };
 
   if (diagnostic) {
     const matrix = filterMatrix(cfg.matrix, { only, from });
@@ -559,17 +579,19 @@ export function execute(deps, cfg, flags) {
       advisoryFails: advisoryFails.map((r) => r.name),
       results,
       flags: auditFlags,
+      toolchain: pre.toolchain,
     });
 
   const body = renderComment(results, {
     headSha: pre.headSha,
     hostname: deps.hostname(),
+    toolchain: pre.toolchain,
   });
 
   // The mechanical bar: posting is only reachable through this predicate.
   // hardFails covers the executed failures; shouldAttest additionally rejects
   // not-run legs and unsettled holes, so a fail-fast stop can never attest.
-  if (!shouldAttest({ diagnostic: false, results })) {
+  if (!shouldAttest({ diagnostic, results, expectedLegs: cfg.matrix.length })) {
     if (hardFails.length > 0) {
       deps.warn(
         `\n${hardFails.length} hard leg(s) failed: ${hardFails.map((r) => r.name).join(", ")}.`,
@@ -621,9 +643,17 @@ export function execute(deps, cfg, flags) {
       trustedAssociations: cfg.trustedAssociations,
     });
   } catch (err) {
-    // A gh outage after a long green matrix must still leave a record.
+    // A gh outage after a long green matrix must still leave a record — and
+    // it is an attestation failure (exit 1), not an environment error: the
+    // matrix ran green and only the publish step failed, exactly like a
+    // failed push one branch below.
     audit("post-fail");
-    throw err;
+    deps.warn(
+      "posting the attestation comment failed. Nothing was pushed or labelled; " +
+        "re-run to retry once gh recovers.\n" +
+        String(err?.message ?? err),
+    );
+    return { ok: false, body, results, pre, exitCode: 1 };
   }
 
   if (flags.push && cfg.pushAfterAttest) {
@@ -640,8 +670,12 @@ export function execute(deps, cfg, flags) {
     deps.log("Pushed.");
   }
 
-  applyLabel(deps, { repo: pre.repo, pr: pre.pr, label: cfg.label });
+  // Audit before the label: "attested" means comment + push, both done by
+  // here, and the label is best-effort decoration. In the reverse order a
+  // throw inside applyLabel would leave a published attestation with no
+  // record — the exact state the audit invariant exists to prevent.
   audit("attested");
+  applyLabel(deps, { repo: pre.repo, pr: pre.pr, label: cfg.label });
 
   if (flags.push && cfg.pushAfterAttest) {
     deps.log("Remote CI jobs gated by the attestation comment will skip for this commit.");

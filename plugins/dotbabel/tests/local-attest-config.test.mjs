@@ -203,4 +203,26 @@ describe("validateConfig", () => {
       /non-empty string/,
     );
   });
+
+  it("rejects an empty pin object — it would silently disable the check", () => {
+    expect(() => validateConfig({ ...base(), toolchain: {} })).toThrow(/at least one pin/);
+  });
+
+  it("rejects range syntax in the node pin — it would be misread, not honored", () => {
+    for (const bad of [">=22", "^22.1.0", "~22", "20 || 22"]) {
+      expect(() => validateConfig({ ...base(), toolchain: { node: bad } })).toThrow(/exact major/);
+    }
+    expect(validateConfig({ ...base(), toolchain: { node: "22" } }).toolchain).toEqual({
+      node: "22",
+    });
+  });
+
+  it("constrains goMod like auditLogPath: relative, no dot-dot", () => {
+    expect(() => validateConfig({ ...base(), toolchain: { goMod: "/etc/go.mod" } })).toThrow(
+      /relative/,
+    );
+    expect(() => validateConfig({ ...base(), toolchain: { goMod: "../go.mod" } })).toThrow(
+      /'\.\.'/,
+    );
+  });
 });

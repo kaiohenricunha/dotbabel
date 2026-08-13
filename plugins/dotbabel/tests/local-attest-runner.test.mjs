@@ -17,8 +17,8 @@ import {
  * invocation. The `runReplies` parameter is a regex-keyed table mapping a
  * command-substring pattern to its mocked result.
  */
-function makeDeps({ runReplies = [], hostname = "stub-host" } = {}) {
-  const calls = { run: [], gh: [], log: [], warn: [], appendLog: [] };
+function makeDeps({ runReplies = [], readFileReplies = {}, hostname = "stub-host" } = {}) {
+  const calls = { run: [], gh: [], log: [], warn: [], appendLog: [], readFile: [] };
 
   const run = (cmd, opts = {}) => {
     calls.run.push({ cmd, opts });
@@ -43,6 +43,10 @@ function makeDeps({ runReplies = [], hostname = "stub-host" } = {}) {
       },
       appendLog(path, line) {
         calls.appendLog.push({ path, line });
+      },
+      readFile(path) {
+        calls.readFile.push(path);
+        return readFileReplies[path] ?? null;
       },
       hostname() {
         return hostname;
@@ -638,5 +642,101 @@ describe("toolchain precondition", () => {
     const { deps, calls } = makeDeps({ runReplies: happy });
     checkPreconditions(deps, baseConfig());
     expect(calls.run.some((c) => /node --version/.test(c.cmd))).toBe(false);
+  });
+
+  it("reads go.mod through deps.readFile, never a shell, and fails closed on mismatch", () => {
+    const cfg = baseConfig({ toolchain: { goMod: "api/go.mod" } });
+    const replies = [...happy, [/go version/, { stdout: "go version go1.25.0 linux/amd64\n" }]];
+    const { deps, calls } = makeDeps({
+      runReplies: replies,
+      readFileReplies: { "api/go.mod": "module x\n\ngo 1.26.5\n" },
+    });
+    expect(() => checkPreconditions(deps, cfg)).toThrow(/toolchain/i);
+    expect(calls.readFile).toEqual(["api/go.mod"]);
+    expect(calls.run.some((c) => /cat /.test(c.cmd))).toBe(false);
+  });
+
+  it("records the measured versions on the preconditions for the audit trail", () => {
+    const cfg = baseConfig({ toolchain: { node: "22" } });
+    const replies = [...happy, [/node --version/, { stdout: "v22.11.0\n" }]];
+    const { deps } = makeDeps({ runReplies: replies });
+    const pre = checkPreconditions(deps, cfg);
+    expect(pre.toolchain).toEqual({ node: "22.11.0" });
+  });
+
+  it("diagnostic runs warn on a pin mismatch instead of failing — the fix-retry loop survives", () => {
+    const cfg = baseConfig({ toolchain: { node: "9999" } });
+    const replies = [[/node --version/, { stdout: "v22.11.0\n" }]];
+    const { deps, calls } = makeDeps({ runReplies: replies });
+    const r = execute(deps, cfg, {
+      prOverride: null,
+      push: true,
+      dryRun: false,
+      only: ["lint"],
+      from: null,
+      failFast: false,
+    });
+    expect(r.exitCode).toBe(0);
+    expect(calls.warn.some((w) => /an attest run stops here/.test(w))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// audit completeness — the two remaining terminal paths
+// ---------------------------------------------------------------------------
+
+describe("execute audit completeness", () => {
+  const happy = [
+    [/git rev-parse --abbrev-ref HEAD/, { stdout: "feature\n" }],
+    [/git status --porcelain/, { stdout: "" }],
+    [/gh auth status/, { status: 0 }],
+    [/gh repo view --json nameWithOwner/, { stdout: "k/r\n" }],
+    [/gh pr view --json number/, { stdout: "42\n" }],
+    [/git rev-parse HEAD/, { stdout: "abc1234abc1234abc1234abc1234abc1234abc12\n" }],
+    [/gh pr view 42 --json headRefOid/, { stdout: "abc1234abc1234abc1234abc1234abc1234abc12\n" }],
+  ];
+
+  it("post-fail: audits, warns, exits 1 like its sibling push-fail — not 2", () => {
+    const replies = [
+      ...happy,
+      [/gh api repos.*\/comments --paginate/, { status: 1, stderr: "gh down" }],
+    ];
+    const { deps, calls } = makeDeps({ runReplies: replies });
+    const r = execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false });
+    expect(r.exitCode).toBe(1);
+    const entries = calls.appendLog.map((c) => JSON.parse(c.line));
+    expect(entries).toHaveLength(1);
+    expect(entries[0].result).toBe("post-fail");
+    // A green matrix was spent; the failure record is the surviving evidence.
+    expect(entries[0].legs.every((l) => l.status === "pass")).toBe(true);
+    expect(calls.run.some((c) => /git push/.test(c.cmd))).toBe(false);
+  });
+
+  it("the attested line lands even if applyLabel would throw, and records the toolchain", () => {
+    const cfg = baseConfig({ toolchain: { node: "22" } });
+    const replies = [
+      ...happy,
+      [/node --version/, { stdout: "v22.11.0\n" }],
+      [/gh api repos.*\/comments --paginate/, { stdout: "[]" }],
+      [
+        /gh label create/,
+        () => {
+          throw new Error("label exploded");
+        },
+      ],
+    ];
+    const { deps, calls } = makeDeps({ runReplies: replies });
+    let threw = false;
+    try {
+      execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
+    } catch {
+      threw = true;
+    }
+    // Whether or not the label throw propagates, the attested record exists.
+    const entries = calls.appendLog.map((c) => JSON.parse(c.line));
+    expect(entries).toHaveLength(1);
+    expect(entries[0].result).toBe("attested");
+    expect(entries[0].toolchain).toEqual({ node: "22.11.0" });
+    expect(threw).toBe(true);
   });
 });
