@@ -31,6 +31,7 @@ npx dotbabel-doctor         # self-diagnostic
 2. **Write tests first.** Bug fixes land with a failing regression test that
    flips green in the same commit.
 3. **Run the local gate** before `gh pr create`:
+
    ```bash
    npm test -- --coverage   # thresholds: 85/85/80/85
    bash plugins/dotbabel/scripts/run-bats.sh   # parallel when available; see note below
@@ -44,6 +45,7 @@ npx dotbabel-doctor         # self-diagnostic
    npm run dogfood
    npm run docs:stamp-check   # verify docs/*.md version stamps match package.json
    ```
+
    `run-bats.sh` is a thin wrapper over `npx bats plugins/dotbabel/tests/bats/`
    — use either. bats parallelises only with [GNU parallel](https://www.gnu.org/software/parallel/)
    or [rush](https://github.com/shenwei356/rush) installed; the wrapper picks
@@ -55,6 +57,7 @@ npx dotbabel-doctor         # self-diagnostic
    repo that another test reads. Point the code under test at a copy in the
    test's own temp directory instead — `handoff-scrub-push.bats` does this with
    `DOTBABEL_HANDOFF_SCRUB_SCRIPT`.
+
 4. **Follow spec discipline.** Every PR touching a protected path (see
    `docs/repo-facts.json`) needs `Spec ID: dotbabel-core` or a
    `## No-spec rationale` section in its body. If you're adding a new
