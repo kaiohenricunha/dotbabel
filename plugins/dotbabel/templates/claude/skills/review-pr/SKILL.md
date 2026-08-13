@@ -31,10 +31,14 @@ Argument: `$ARGUMENTS` — PR number (required), plus an optional `--conductor` 
 
 ## Workflow
 
-Before any step, bind the PR number and the mode. `NUMBER` is the first token of `$ARGUMENTS`; `--conductor` anywhere in the remainder turns on conductor mode. Binding `$ARGUMENTS` whole would make `NUMBER` the literal string `42 --conductor`.
+Before any step, bind the PR number and the mode. `--conductor` may appear in any position — strip it first, then take the PR number from what remains, so `/review-pr --conductor 42` and `/review-pr 42 --conductor` behave identically. `commands/pre-pr.md` uses the same strip-anywhere rule.
 
 ```bash
-NUMBER="${ARGUMENTS%% *}"
+CONDUCTOR=0
+REST="$ARGUMENTS"
+case " $REST " in *" --conductor "*) CONDUCTOR=1 ;; esac
+REST="$(printf '%s' "$REST" | sed 's/--conductor//g' | xargs)"
+NUMBER="${REST%% *}"
 ```
 
 ### 1. Fetch PR details and check branch health
@@ -108,13 +112,11 @@ fi
 
 Work exclusively inside `.claude/worktrees/pr-$NUMBER/`. Do **not** use `gh pr checkout` or `git checkout` — those switch the caller's working tree — and do **not** use `git stash`, because stashes are repo-global and can interfere with the caller's stash list.
 
-**Conductor mode:** record the baseline commit before applying anything — step 6 diffs against it:
+**Conductor mode:** record the baseline commit before applying anything — step 6 diffs against it. Bind it against the worktree explicitly, not the caller's checkout: the block above necessarily ran in the caller's tree, and when this skill is invoked from a checkout that is not the PR branch, a bare `git rev-parse HEAD` captures the wrong commit and step 6 silently reviews a two-branch divergence instead of your fixes.
 
 ```bash
-BASELINE=$(git rev-parse HEAD)
+BASELINE=$(git -C ".claude/worktrees/pr-$NUMBER" rev-parse HEAD)
 ```
-
-Then run only the tests that cover the files your fixes touched, using the runner's own scoping (`npx vitest related <files>`, `go test` on the touched packages, `pytest` on the matching test files). A runner with no scoping mechanism — a bare `make test` target — falls back to the full suite. The full suite runs regardless in the conductor's `local-attest` phase, so a second full run here buys nothing.
 
 - Apply all fixes for valid comments, TDD-first (failing test → fix → green).
 - Detect and run the project test suite:
@@ -123,6 +125,8 @@ Then run only the tests that cover the files your fixes touched, using the runne
   - `go.mod` → `go test ./...`
   - `pyproject.toml` → `pytest` (or `uv run pytest`)
 - Commit with a clear message referencing the review (e.g., `fix: address PR review — <summary>`).
+
+**Conductor mode:** once the fixes exist, narrow that test run to the files they touched, using the runner's own scoping (`npx vitest related <files>`, `go test` on the touched packages, `pytest` on the matching test files). A runner with no scoping mechanism — a bare `make test` target — falls back to the full suite. The full suite runs regardless in the conductor's `local-attest` phase, so a second full run here buys nothing.
 
 Leave the worktree in place when done. Print the cleanup command:
 

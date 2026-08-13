@@ -36,7 +36,17 @@ phase 1 of it. Invoke `/pre-pr` directly when you only want the quality gate.
 
 ### 1. Detect scope
 
-Bind: remove `--conductor` from `$ARGUMENTS` first — its presence sets conductor mode for step 3. The remainder is the base branch: `BASE="${REST:-origin/main}"`. Binding `$ARGUMENTS` directly would make `BASE` the literal string `--conductor`.
+Bind the mode and the base branch in one visible step — binding `$ARGUMENTS` directly would make `BASE` the literal string `--conductor`:
+
+```bash
+CONDUCTOR=0
+REST="$ARGUMENTS"
+case " $REST " in *" --conductor "*) CONDUCTOR=1 ;; esac
+REST="$(printf '%s' "$REST" | sed 's/--conductor//g' | xargs)"
+BASE="${REST:-origin/main}"
+```
+
+`--conductor` may appear in any position here. `skills/review-pr/SKILL.md` uses the same strip-anywhere rule, so one flag behaves identically in both artifacts.
 
 Guard — verify not on main/master:
 
@@ -88,7 +98,15 @@ Record in summary: "Simplified N files, M changes staged." If no changes: "simpl
 
 ### 3. Security review
 
-**Conductor mode (`--conductor`):** skip the full `/security-review` pass below — the conductor's phase 3 dispatches the `security-auditor` agent over the same diff, and running both reviews the identical code twice. Run a secrets-only grep over the added lines of `git diff "$MERGE_BASE"` instead, matching at minimum: `API_KEY = "…"`, `password.*=.*"…"`, `-----BEGIN [A-Z ]*PRIVATE KEY`, `AKIA[0-9A-Z]{16}`, and bearer tokens. Warning: a secrets hit is still **CRITICAL → STOP**, exactly as below — secrets must never reach a pushed branch, and phase 3 happens after the push. No hits records `security: secrets-grep clean (full review deferred to phase 3)`. Then continue at step 4.
+**Conductor mode (`--conductor`):** skip the full `/security-review` pass below — the conductor's phase 3 dispatches the `security-auditor` agent over the same diff, and running both reviews the identical code twice. Run a secrets-only check instead, by piping the added lines through the repo's own scrubber rather than hand-rolling patterns:
+
+```bash
+git diff "$MERGE_BASE" | grep '^+' | grep -v '^+++' \
+  | bash plugins/dotbabel/scripts/handoff-scrub.sh >/dev/null
+# stderr reports `scrubbed:N`
+```
+
+The scrubber carries the curated, unit-tested pattern set (GitHub tokens, `sk-`, AWS keys, Google keys, Slack tokens, bearer headers, `*_TOKEN|KEY|SECRET|PASSWORD=…`, PEM blocks), so this check stays in sync automatically as patterns are added. Warning: `N > 0` is **CRITICAL → STOP**, exactly as below — secrets must never reach a pushed branch, and phase 3 happens after the push. Inspect each hit before acting: prose that merely documents a secret pattern will match, so confirm a real credential before stopping the run. `N == 0` records `security: secrets-scan clean (full review deferred to phase 3)`. Then continue at step 4.
 
 Everything below applies to a standalone `/pre-pr` run.
 

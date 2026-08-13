@@ -121,9 +121,17 @@ apply the **first** rule that matches:
    even when they are markdown, so this rule is evaluated before the
    docs-only rule.
 2. Every changed file is documentation (`*.md`, or under `docs/`) →
-   `documentation-writer` only.
+   `documentation-writer` + `security-auditor`.
 3. Fewer than 150 changed lines → `security-auditor` + `architect-reviewer`.
 4. Otherwise → **full set**.
+
+`security-auditor` appears in every profile on purpose. Callers may have
+narrowed their own security step on the assumption that this skill runs one —
+`commands/pre-pr.md` step 3 does exactly that under `--conductor` — so
+dropping it here would leave a pipeline with no security review at any stage.
+Markdown is not a safe exemption either: in this repo a `SKILL.md` body is
+executable agent instruction, and in a consumer repo `CLAUDE.md` is the rule
+floor for every session.
 
 The full set (chosen for high signal-to-noise on dotbabel PRs):
 

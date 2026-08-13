@@ -47,7 +47,7 @@ npx dotbabel-doctor         # self-diagnostic
    ```
 
    `run-bats.sh` is a thin wrapper over `npx bats plugins/dotbabel/tests/bats/`
-   — use either. bats parallelises only with [GNU parallel](https://www.gnu.org/software/parallel/)
+   — use either. bats parallelises only with GNU parallel
    or [rush](https://github.com/shenwei356/rush) installed; the wrapper picks
    whichever is on `PATH`, caps the job count at the core count or 8, and runs
    serially when neither is present. On a 16-core host the suite takes ~125s

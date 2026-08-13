@@ -132,11 +132,14 @@ A `WORKTREE_DIRTY` or `HEAD_MISMATCH` failure means `local-attest` would abort a
 dotbabel local-attest --pr <N>
 ```
 
-If it fails, record the failure and mark the PR blocked. **Do not push "fix CI" commits in a loop** — surface the failure instead.
+Phase 4 deferred the test plan to this phase, so **every** exit here owes it a disposition. There are four:
 
-After it passes, close out the test plan phase 4 deferred. Tick each `## Test plan` checkbox the matrix covered, using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave every item the matrix did not cover unticked and list it in the summary.
+- **Attest passes** — tick each `## Test plan` checkbox the matrix covered, using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
+- **Attest fails** — record the failure and mark the PR blocked. **Do not push "fix CI" commits in a loop.** The test plan is now unowned: say so explicitly and list every unticked item, so a BLOCKED summary states what still needs verification.
+- **No `.local-attest` config** — skip the attestation and say so plainly; CI will run remotely as normal. **Run the test-plan items now**, per `skills/review-pr/SKILL.md` step 11, before the summary — otherwise the deferral means nothing ever runs them.
+- **Entered here via `--from local-attest`** — no phase 4 ran in this session, so nothing deferred anything. Run the test-plan items as above before the summary rather than assuming a previous session ticked them.
 
-If the repo has no `.local-attest` config, skip the attestation and say so plainly; CI will run remotely as normal. **Run the test-plan items now** in that case, per `skills/review-pr/SKILL.md` step 11, before the summary — phase 4 deferred them here, so skipping this phase silently would mean nothing ever runs them.
+A `WORKTREE_DIRTY` or `HEAD_MISMATCH` precondition failure counts as a failed attest for this purpose: fix the precondition and re-enter, or report the test plan as unrun.
 
 ### 6. `stop`
 
@@ -149,7 +152,9 @@ PR #<N> — <title>   (base: <base>)
   2 open-pr         ✓ #<N> · body has Summary + Test plan
   3 post-pr-review  ✓ <k> comments posted (<profile>)
   4 review-pr       ✓ <k> resolved · pushed <sha> [skip ci]
-  5 local-attest    ✓ attested <sha> · test plan ticked | SKIP no config | ✗ <reason>
+  5 local-attest    ✓ attested <sha> · test plan ticked
+                  |  SKIP no config · test plan run locally
+                  |  ✗ <reason> · test plan NOT run (<k> items unverified)
   6 stop            → run /merge-pr <N> to merge
 
 Stack: <this PR is standalone | #<N> lands first, then #<M> needs a rebase>
