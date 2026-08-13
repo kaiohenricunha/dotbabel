@@ -2,7 +2,7 @@
 id: post-pr-review
 name: post-pr-review
 type: skill
-version: 0.1.0
+version: 0.2.0
 domain: [devex]
 platform: [github-actions]
 task: [review]
@@ -31,7 +31,7 @@ of a producer/consumer pair — `review-pr` is the consumer.
 | ------------------- | ------------------------------------------------------------ | ------------------------------------------------------ |
 | `<PR#>` positional  | autodetect from current branch                               | optional                                               |
 | `--repo OWNER/REPO` | autodetect                                                   | needed for fork PRs                                    |
-| `--agents <csv>`    | `default-set`                                                | dotbabel agents to dispatch (see step 5)               |
+| `--agents <csv>`    | profile-based (see step 5)                                   | dotbabel agents to dispatch (see step 5)               |
 | `--max-comments N`  | `25`                                                         | hard cap; >25 requires explicit override               |
 | `--event`           | `COMMENT`                                                    | `COMMENT` / `REQUEST_CHANGES` / `APPROVE`              |
 | `--mode`            | `review`                                                     | `review` (atomic batch) or `inline` (per-comment loop) |
@@ -103,13 +103,35 @@ this set is rejected pre-POST to prevent 422s from GitHub.
 
 ### 5. Dispatch review agents in parallel
 
-Resolve `--agents`. Default set (chosen for high signal-to-noise on dotbabel
-PRs):
+Resolve `--agents`. An explicit `--agents` value wins verbatim — the profile
+below applies only when the caller passed none.
+
+**Diff-profile default.** Three of the four agents in the full set run on
+`opus`, so dispatching all four at every diff size is the single most
+expensive thing this skill does. Size the fleet to the diff instead. Take the
+changed files from step 3's context and the changed-line count from
+`gh pr view "$PR" --json additions,deletions` (additions + deletions), then
+apply the **first** rule that matches:
+
+1. Any changed file matches a protected path in `docs/repo-facts.json` (when
+   that file exists) → **full set**. Protected paths are behavior-governing
+   even when they are markdown, so this rule is evaluated before the
+   docs-only rule.
+2. Every changed file is documentation (`*.md`, or under `docs/`) →
+   `documentation-writer` only.
+3. Fewer than 150 changed lines → `security-auditor` + `architect-reviewer`.
+4. Otherwise → **full set**.
+
+The full set (chosen for high signal-to-noise on dotbabel PRs):
 
 - `architect-reviewer` — design/coupling/scalability concerns
 - `security-auditor` — secrets, injection vectors, OWASP top 10
 - `compliance-auditor` — gate coverage, declared-vs-enforced invariants
 - `documentation-writer` — comment accuracy, missing docstrings, drift
+
+Report which profile fired in step 9 — a wrong profile is otherwise invisible,
+and the failure mode (a logic-heavy diff reviewed by the docs agent alone) is
+silent. Pass `--agents` to override whenever the heuristic misjudges a diff.
 
 `--agents inline` skips agent dispatch and uses heuristics in this skill body
 only (see Inline-review heuristics below).
@@ -193,6 +215,7 @@ deferred count, exit 0 with hint at `x-ratelimit-reset`.
 
 ```
 post-pr-review summary for PR #123 (owner/repo)
+  agents dispatched   <csv>  (profile: docs-only | small-code | full | --agents override)
   posted              N
   skipped (dedup)     M
   skipped (out-diff)  K

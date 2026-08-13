@@ -2,7 +2,7 @@
 id: pre-pr
 name: pre-pr
 type: command
-version: 1.0.1
+version: 1.1.0
 domain: [devex]
 platform: [none]
 task: [review, testing]
@@ -10,7 +10,7 @@ maturity: draft
 description: >
   Pre-PR quality gate: simplify changed code, security-review the diff, run the full test
   suite, and surface a go/no-go summary before opening a pull request.
-argument-hint: "[base-branch] — default: origin/main"
+argument-hint: "[base-branch] [--conductor] — default: origin/main"
 model: sonnet
 headless_safe: false
 ---
@@ -19,7 +19,9 @@ Quality gate to run before `/git pr`. Simplifies changed code, security-reviews 
 
 Trigger: when the user is done with a feature and is about to open a PR, or says "prepare PR", "pre-PR", or "clean up before PR". Also triggered directly via `/pre-pr [base-branch]`.
 
-Arguments: `$ARGUMENTS` — optional base branch. Defaults to `origin/main`.
+Arguments: `$ARGUMENTS` — optional base branch, defaulting to `origin/main`, plus an optional `--conductor` flag.
+
+`--conductor` is passed only by `/pr-conductor` phase 1. It replaces step 3's full security review with a secrets-only grep, because the conductor runs the authoritative security pass once in phase 3 via the `security-auditor` agent. Everything else is unchanged. Strip `--conductor` out of `$ARGUMENTS` before binding the base branch.
 
 **Lifecycle:**
 
@@ -34,7 +36,7 @@ phase 1 of it. Invoke `/pre-pr` directly when you only want the quality gate.
 
 ### 1. Detect scope
 
-Bind: `BASE="${ARGUMENTS:-origin/main}"`.
+Bind: remove `--conductor` from `$ARGUMENTS` first — its presence sets conductor mode for step 3. The remainder is the base branch: `BASE="${REST:-origin/main}"`. Binding `$ARGUMENTS` directly would make `BASE` the literal string `--conductor`.
 
 Guard — verify not on main/master:
 
@@ -85,6 +87,10 @@ git commit -m "style: pre-pr simplification pass"
 Record in summary: "Simplified N files, M changes staged." If no changes: "simplify: clean."
 
 ### 3. Security review
+
+**Conductor mode (`--conductor`):** skip the full `/security-review` pass below — the conductor's phase 3 dispatches the `security-auditor` agent over the same diff, and running both reviews the identical code twice. Run a secrets-only grep over the added lines of `git diff "$MERGE_BASE"` instead, matching at minimum: `API_KEY = "…"`, `password.*=.*"…"`, `-----BEGIN [A-Z ]*PRIVATE KEY`, `AKIA[0-9A-Z]{16}`, and bearer tokens. Warning: a secrets hit is still **CRITICAL → STOP**, exactly as below — secrets must never reach a pushed branch, and phase 3 happens after the push. No hits records `security: secrets-grep clean (full review deferred to phase 3)`. Then continue at step 4.
+
+Everything below applies to a standalone `/pre-pr` run.
 
 In pre-PR context all branch changes are committed and the working tree is clean, so `git diff --cached` (the security-review default) would see nothing. Stage the diff vs base explicitly before invoking:
 
@@ -169,6 +175,7 @@ Pre-PR gate: branch → $BRANCH (base: $BASE)
                    |  simplify: clean (no changes)
   Step 3 — Security:  clean (diff vs $MERGE_BASE)
                    |  N warnings (see above)
+                   |  secrets-grep clean (conductor — full review in phase 3)
                    |  ⚠ skill unavailable — skipped
   Step 4 — Tests:     ✓ pass
                    |  ✗ fail — pre-existing (stash proof above)
@@ -186,6 +193,7 @@ Status: READY — run `/git pr` to open the pull request.
 - **STOP if tests fail and the failure is branch-introduced.** Stash proof is required — same standard as `merge-pr`.
 - **Never claim a test failure is pre-existing** without the `git stash` proof.
 - **Security-review unavailable is a warning, not a failure.** Warn, skip, continue.
+- **`--conductor` narrows step 3 only.** A secrets hit still stops the run, and every other step behaves exactly as it does standalone.
 - **Simplify commits are style commits.** Message: `style: pre-pr simplification pass`. Atomic — do not bundle with feature changes.
 - **Do not modify files outside the changed set.** Simplify is focused on recently modified code; do not widen the scope.
 - **Do not generate or submit the PR body.** Checklist in step 5 is a reminder, not authoring.

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-08-13T00:34:56.564Z",
+  "generatedAt": "2026-08-13T01:07:49.280Z",
   "skills": [
     {
       "name": "agents-search",
@@ -180,7 +180,7 @@
     {
       "name": "post-pr-review",
       "path": ".claude/skills/post-pr-review/SKILL.md",
-      "checksum": "sha256:0565fc80dba6872c5da9569cff5e53d112fc3ea3a16b4905fdf38255754ec628",
+      "checksum": "sha256:c6105fc3739c470d960d84e9aa4c8c10596a58c177953fc2811d16add4f6bfea",
       "dependencies": [
         "review-pr"
       ],
@@ -189,7 +189,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:901007639d43bb9a45c14ffa8f22120d78e1adadc5849e54a2ed3234f317b8a7",
+      "checksum": "sha256:ffbad5405ba4c5a488bb329e95790548d92fe25eb204d860585b3017e2f0d0fc",
       "dependencies": [
         "pre-pr",
         "git",
@@ -203,7 +203,7 @@
     {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
-      "checksum": "sha256:fa4809bcd036c784b96ee70ee76999cd69fbfd104aa32543b53cc0c1b6b733ed",
+      "checksum": "sha256:14cb3dcff9ebb68e5545ab53682321d52bdbd35fc87b3c5ee8573d52f73f61f0",
       "dependencies": [],
       "lastValidated": "2026-08-13"
     },
@@ -240,7 +240,7 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:ec5f4190ecd9284fb68f5281f83adfe031a895ed7aaa47767f43cab25f734960",
+      "checksum": "sha256:306689d28f7ad7eb737a41f9d91de623b96b4ab4a195c6af6e7e4e2cccd48c9e",
       "dependencies": [],
       "lastValidated": "2026-08-13"
     },
