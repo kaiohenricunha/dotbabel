@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.16.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.15.0...v2.16.0) (2026-08-13)
+
+
+### Added
+
+* **project-sync:** add fan_out_layout, sharing one skills tree across CLIs ([#296](https://github.com/kaiohenricunha/dotbabel/issues/296)) ([a397d41](https://github.com/kaiohenricunha/dotbabel/commit/a397d41da62f7cf065128194f1c926a6f5b5c889))
+
 ## [2.15.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.14.0...v2.15.0) (2026-08-12)
 
 
