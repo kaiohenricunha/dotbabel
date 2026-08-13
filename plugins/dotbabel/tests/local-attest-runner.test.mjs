@@ -94,9 +94,7 @@ describe("checkPreconditions", () => {
   });
 
   it("fails when not inside a git repo", () => {
-    const { deps } = makeDeps({
-      runReplies: [[/git rev-parse --abbrev-ref HEAD/, { status: 1, stderr: "fatal" }]],
-    });
+    const { deps } = makeDeps({ runReplies: [[/git rev-parse --abbrev-ref HEAD/, { status: 1, stderr: "fatal" }]] });
     expect(() => checkPreconditions(deps, baseConfig())).toThrow(PreconditionError);
   });
 
@@ -174,7 +172,9 @@ describe("checkPreconditions", () => {
 describe("runMatrix", () => {
   it("runs every leg in order and records pass/fail", () => {
     const { deps, calls } = makeDeps({
-      runReplies: [[/echo test/, { status: 1, stderr: "boom" }]],
+      runReplies: [
+        [/echo test/, { status: 1, stderr: "boom" }],
+      ],
     });
     const results = runMatrix(deps, baseConfig().matrix);
     expect(results.map((r) => r.name)).toEqual(["lint", "test", "knip"]);
@@ -329,7 +329,10 @@ describe("execute (orchestration)", () => {
 
   it("exits 1 when a hard leg fails and posts nothing", () => {
     const cfg = baseConfig();
-    const replies = [...happy, [/echo test/, { status: 1, stderr: "boom" }]];
+    const replies = [
+      ...happy,
+      [/echo test/, { status: 1, stderr: "boom" }],
+    ];
     const { deps, calls } = makeDeps({ runReplies: replies });
     const r = execute(deps, cfg, { prOverride: null, push: true, dryRun: false });
     expect(r.exitCode).toBe(1);
@@ -340,7 +343,10 @@ describe("execute (orchestration)", () => {
 
   it("posts + labels + audits on full pass (no dry-run)", () => {
     const cfg = baseConfig();
-    const replies = [...happy, [/gh api repos.*\/comments/, { stdout: "[]" }]];
+    const replies = [
+      ...happy,
+      [/gh api repos.*\/comments/, { stdout: "[]" }],
+    ];
     const { deps, calls } = makeDeps({ runReplies: replies });
     const r = execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
     expect(r.exitCode).toBe(0);
@@ -368,9 +374,9 @@ describe("execute (orchestration)", () => {
 
   it("aborts when HEAD moves during the matrix", () => {
     const { deps } = makeDeps({ runReplies: [movingHead(), ...happy] });
-    expect(() =>
-      execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false }),
-    ).toThrow(PreconditionError);
+    expect(() => execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false })).toThrow(
+      PreconditionError,
+    );
   });
 
   it("names both SHAs so the operator can see what changed", () => {
@@ -387,9 +393,7 @@ describe("execute (orchestration)", () => {
 
   it("publishes nothing when HEAD moved — no comment, no push, no label, no audit", () => {
     const { deps, calls } = makeDeps({ runReplies: [movingHead(), ...happy] });
-    expect(() =>
-      execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false }),
-    ).toThrow();
+    expect(() => execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false })).toThrow();
     expect(calls.gh).toHaveLength(0);
     expect(calls.appendLog).toHaveLength(0);
     expect(calls.run.some((c) => /git push/.test(c.cmd))).toBe(false);
@@ -398,14 +402,11 @@ describe("execute (orchestration)", () => {
 
   it("aborts when the tree becomes dirty during the matrix", () => {
     let seen = 0;
-    const dirtying = [
-      /git status --porcelain/,
-      () => ({ stdout: seen++ === 0 ? "" : " M src/x.mjs\n" }),
-    ];
+    const dirtying = [/git status --porcelain/, () => ({ stdout: seen++ === 0 ? "" : " M src/x.mjs\n" })];
     const { deps, calls } = makeDeps({ runReplies: [dirtying, ...happy] });
-    expect(() =>
-      execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false }),
-    ).toThrow(PreconditionError);
+    expect(() => execute(deps, baseConfig(), { prOverride: null, push: true, dryRun: false })).toThrow(
+      PreconditionError,
+    );
     expect(calls.gh).toHaveLength(0);
     expect(calls.run.some((c) => /git push/.test(c.cmd))).toBe(false);
   });

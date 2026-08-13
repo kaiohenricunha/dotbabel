@@ -10,12 +10,17 @@ import { parse, helpText } from "../src/lib/argv.mjs";
 import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { formatError } from "../src/lib/errors.mjs";
-import { createHarnessContext, checkInstructionParity, version } from "../src/index.mjs";
+import {
+  createHarnessContext,
+  checkInstructionParity,
+  version,
+} from "../src/index.mjs";
 
 const META = {
   name: "dotbabel-check-instruction-parity",
   synopsis: "dotbabel-check-instruction-parity [OPTIONS]",
-  description: "Verify generated cross-CLI instruction outputs preserve applicable headings.",
+  description:
+    "Verify generated cross-CLI instruction outputs preserve applicable headings.",
   flags: {
     "repo-root": { type: "string" },
   },

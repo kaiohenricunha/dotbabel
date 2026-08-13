@@ -444,10 +444,9 @@ function classify(node) {
  */
 export function planStack(graph) {
   const { order } = topoOrder(graph);
-  const scheduled = [
-    ...order,
-    ...Object.keys(graph.nodes).map((k) => graph.nodes[k].number),
-  ].filter((n, i, arr) => arr.indexOf(n) === i);
+  const scheduled = [...order, ...Object.keys(graph.nodes).map((k) => graph.nodes[k].number)].filter(
+    (n, i, arr) => arr.indexOf(n) === i,
+  );
 
   /** @type {PlanEntry[]} */
   const actionable = [];
@@ -630,10 +629,7 @@ export function planChildTransition(input) {
 
   steps.push({ id: "fetch", cmd: `git fetch ${remote} ${newBase}` });
   steps.push({ id: "checkout", cmd: `git checkout ${childHead}` });
-  steps.push({
-    id: "rebase",
-    cmd: `git rebase --onto ${remote}/${newBase} ${cutoff} ${childHead}`,
-  });
+  steps.push({ id: "rebase", cmd: `git rebase --onto ${remote}/${newBase} ${cutoff} ${childHead}` });
   steps.push({ id: "push", cmd: `git push --force-with-lease ${remote} ${childHead}` });
 
   return {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  existsSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -17,7 +23,13 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(__filename, "..", "..", "..", "..");
-const BIN_PATH = join(REPO_ROOT, "plugins", "dotbabel", "bin", "dotbabel-index.mjs");
+const BIN_PATH = join(
+  REPO_ROOT,
+  "plugins",
+  "dotbabel",
+  "bin",
+  "dotbabel-index.mjs",
+);
 
 function mkRepo() {
   return mkdtempSync(join(tmpdir(), "taxonomy-phase1-"));
@@ -139,7 +151,9 @@ describe("parseFrontmatter", () => {
   });
 
   it("warns on YAML syntax errors", () => {
-    const { warnings } = parseFrontmatter('---\nname: x\nval: "unterminated\n---\nbody\n');
+    const { warnings } = parseFrontmatter(
+      '---\nname: x\nval: "unterminated\n---\nbody\n',
+    );
     expect(warnings[0]).toMatch(/parse error/);
   });
 });
@@ -350,9 +364,11 @@ describe("CLI: dotbabel-index --check", () => {
     writeFile(root, "skills/test-skill/SKILL.md", NEW_STYLE_SKILL);
 
     // First, rebuild.
-    const build = spawnSync(process.execPath, [BIN_PATH, "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const build = spawnSync(
+      process.execPath,
+      [BIN_PATH, "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(build.status).toBe(0);
     expect(existsSync(join(root, "index", "artifacts.json"))).toBe(true);
     expect(existsSync(join(root, "index", "by-type.json"))).toBe(true);
@@ -399,11 +415,15 @@ describe("schema round-trip", () => {
       "index-entry",
     ];
     for (const s of schemas) {
-      const raw = JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8"));
+      const raw = JSON.parse(
+        readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8"),
+      );
       expect(() => ajv.addSchema(raw)).not.toThrow();
     }
     for (const s of schemas) {
-      const fn = ajv.getSchema(`https://dotbabel.dev/schemas/${s}.schema.json`);
+      const fn = ajv.getSchema(
+        `https://dotbabel.dev/schemas/${s}.schema.json`,
+      );
       expect(fn).toBeTypeOf("function");
     }
   });
@@ -423,9 +443,13 @@ describe("schema round-trip", () => {
       "template",
       "index-entry",
     ]) {
-      ajv.addSchema(JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")));
+      ajv.addSchema(
+        JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")),
+      );
     }
-    const skillValidate = ajv.getSchema("https://dotbabel.dev/schemas/skill.schema.json");
+    const skillValidate = ajv.getSchema(
+      "https://dotbabel.dev/schemas/skill.schema.json",
+    );
     expect(
       skillValidate({
         id: "ok-skill",
@@ -466,9 +490,13 @@ describe("schema round-trip", () => {
       "template",
       "index-entry",
     ]) {
-      ajv.addSchema(JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")));
+      ajv.addSchema(
+        JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")),
+      );
     }
-    const validate = ajv.getSchema("https://dotbabel.dev/schemas/index-entry.schema.json");
+    const validate = ajv.getSchema(
+      "https://dotbabel.dev/schemas/index-entry.schema.json",
+    );
     expect(
       validate({
         id: "x",
@@ -500,7 +528,10 @@ describe("small helpers", () => {
       join(root, "index", "artifacts.json"),
       JSON.stringify(bundle.artifactsJson, null, 2) + "\n",
     );
-    writeFileSync(join(root, "index", "by-type.json"), "{ not valid json");
+    writeFileSync(
+      join(root, "index", "by-type.json"),
+      "{ not valid json",
+    );
     writeFileSync(
       join(root, "index", "by-facet.json"),
       JSON.stringify(bundle.byFacet, null, 2) + "\n",
@@ -530,20 +561,24 @@ describe("small helpers", () => {
   it("validateArtifacts throws when the schemas directory is missing", () => {
     const root = mkRepo();
     writeFile(root, "skills/ok/SKILL.md", NEW_STYLE_SKILL);
-    expect(() => validateArtifacts(walkArtifacts(root), join(root, "no-such-dir"))).toThrow(
-      /schema not found/,
-    );
+    expect(() =>
+      validateArtifacts(walkArtifacts(root), join(root, "no-such-dir")),
+    ).toThrow(/schema not found/);
   });
 
   it("toIndexEntry falls back when name/description/maturity are missing and preserves related", () => {
     const root = mkRepo();
     // Bare frontmatter — name, description, maturity all absent.
-    writeFile(root, "skills/bare/SKILL.md", "---\nrelated: [foo, bar]\n---\nbody");
+    writeFile(
+      root,
+      "skills/bare/SKILL.md",
+      "---\nrelated: [foo, bar]\n---\nbody",
+    );
     const bundle = buildIndex(walkArtifacts(root));
     const entry = bundle.artifactsJson.artifacts.find((e) => e.id === "bare");
     expect(entry).toBeDefined();
-    expect(entry.name).toBe("bare"); // fell back to id
-    expect(entry.description).toBe(""); // empty default
+    expect(entry.name).toBe("bare");           // fell back to id
+    expect(entry.description).toBe("");        // empty default
     expect(entry.facets.maturity).toBe("draft"); // default maturity
     expect(entry.related).toEqual(["foo", "bar"]);
   });

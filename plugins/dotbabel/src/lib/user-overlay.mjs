@@ -58,8 +58,10 @@ export const NO_OVERLAY_PLACEHOLDER = "(no user overlay)";
  */
 export function composeUserScopeClaudeMd(canonical, overlay) {
   const canonicalBody = canonical.replace(/\s+$/, "");
-  const overlayTrimmed = overlay == null ? "" : overlay.replace(/^\s+|\s+$/g, "");
-  const overlayBody = overlayTrimmed === "" ? NO_OVERLAY_PLACEHOLDER : overlayTrimmed;
+  const overlayTrimmed =
+    overlay == null ? "" : overlay.replace(/^\s+|\s+$/g, "");
+  const overlayBody =
+    overlayTrimmed === "" ? NO_OVERLAY_PLACEHOLDER : overlayTrimmed;
   return `${canonicalBody}\n\n${USER_OVERLAY_BEGIN}\n${overlayBody}\n${USER_OVERLAY_END}\n`;
 }
 
@@ -98,9 +100,17 @@ export function resolveLocalRulesPath(env) {
  * @param {string} cfg.timestamp     YYYYMMDD-HHmmss for backup suffix.
  * @returns {WriteResult}
  */
-export function writeUserScopeClaudeMd({ canonicalSrc, target, overlaySrc, out, timestamp }) {
+export function writeUserScopeClaudeMd({
+  canonicalSrc,
+  target,
+  overlaySrc,
+  out,
+  timestamp,
+}) {
   const canonical = fs.readFileSync(canonicalSrc, "utf8");
-  const overlay = fs.existsSync(overlaySrc) ? fs.readFileSync(overlaySrc, "utf8") : null;
+  const overlay = fs.existsSync(overlaySrc)
+    ? fs.readFileSync(overlaySrc, "utf8")
+    : null;
   const expected = composeUserScopeClaudeMd(canonical, overlay);
 
   let lstat = null;

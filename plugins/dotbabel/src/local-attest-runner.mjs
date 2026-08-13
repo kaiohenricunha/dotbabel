@@ -228,17 +228,8 @@ export function checkPreconditions(deps, cfg, opts = {}) {
   // the warning once at the start of the run so it's loud.
   try {
     const me = capture(deps, "gh api user --jq .login");
-    const ownerAssoc = capture(
-      deps,
-      `gh api repos/${repo}/collaborators/${me}/permission --jq .permission`,
-    ).toUpperCase();
-    const PERM_TO_ASSOC = {
-      ADMIN: "OWNER",
-      WRITE: "MEMBER",
-      READ: "COLLABORATOR",
-      MAINTAIN: "MEMBER",
-      TRIAGE: "COLLABORATOR",
-    };
+    const ownerAssoc = capture(deps, `gh api repos/${repo}/collaborators/${me}/permission --jq .permission`).toUpperCase();
+    const PERM_TO_ASSOC = { ADMIN: "OWNER", WRITE: "MEMBER", READ: "COLLABORATOR", MAINTAIN: "MEMBER", TRIAGE: "COLLABORATOR" };
     const mapped = PERM_TO_ASSOC[ownerAssoc] ?? ownerAssoc;
     if (!cfg.trustedAssociations.includes(mapped)) {
       deps.warn(
@@ -301,9 +292,10 @@ export function upsertComment(deps, { repo, pr, body, trustedAssociations }) {
     if (!Number.isFinite(id) || id <= 0) {
       throw new Error(`unexpected comment id: ${existing.id}`);
     }
-    deps.ghApiWithInput(`gh api --method PATCH repos/${repo}/issues/comments/${id} --input -`, {
-      body,
-    });
+    deps.ghApiWithInput(
+      `gh api --method PATCH repos/${repo}/issues/comments/${id} --input -`,
+      { body },
+    );
     deps.log(`Updated existing attestation comment ${id}.`);
     return { kind: "patch", commentId: id };
   }
@@ -396,9 +388,7 @@ export function execute(deps, cfg, flags) {
   }
 
   if (flags.dryRun) {
-    deps.log(
-      "\n--dry-run: would post the comment below; not posting, not labeling, not pushing.\n",
-    );
+    deps.log("\n--dry-run: would post the comment below; not posting, not labeling, not pushing.\n");
     deps.log(body);
     return { ok: true, body, results, pre, exitCode: 0 };
   }
@@ -411,12 +401,7 @@ export function execute(deps, cfg, flags) {
 
   // Post the attestation comment BEFORE pushing so it is visible when the
   // push event fires GitHub Actions.
-  upsertComment(deps, {
-    repo: pre.repo,
-    pr: pre.pr,
-    body,
-    trustedAssociations: cfg.trustedAssociations,
-  });
+  upsertComment(deps, { repo: pre.repo, pr: pre.pr, body, trustedAssociations: cfg.trustedAssociations });
 
   if (flags.push && cfg.pushAfterAttest) {
     deps.log("\nPushing...");

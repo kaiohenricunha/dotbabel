@@ -18,7 +18,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createOutput } from "./lib/output.mjs";
-import { buildTimestamp, commandExists, ensureRealDir, linkOne } from "./lib/symlink.mjs";
+import {
+  buildTimestamp,
+  commandExists,
+  ensureRealDir,
+  linkOne,
+} from "./lib/symlink.mjs";
 import {
   RULE_FLOOR_BEGIN,
   RULE_FLOOR_END,
@@ -142,7 +147,7 @@ export function loadProjectConfig(repoRoot) {
       message: `unknown fan_out_layout: ${JSON.stringify(raw.fan_out_layout)}`,
       expected: `one of: ${KNOWN_FAN_OUT_LAYOUTS.join(", ")}`,
       got: String(raw.fan_out_layout),
-      hint: 'use "per-cli" (default) or "shared" in .dotbabel.json:fan_out_layout',
+      hint: "use \"per-cli\" (default) or \"shared\" in .dotbabel.json:fan_out_layout",
     });
   }
   return { ...DEFAULT_PROJECT_CONFIG, ...raw };
@@ -250,20 +255,31 @@ export async function projectSync(opts) {
   // ---- 1. Instruction files (AGENTS.md, GEMINI.md, copilot-instructions.md)
 
   const sourceText = fs.readFileSync(sourcePath, "utf8");
-  const subs = validateSubstitutions(cfg.cli_substitutions ?? {}, ".dotbabel.json");
+  const subs = validateSubstitutions(
+    cfg.cli_substitutions ?? {},
+    ".dotbabel.json",
+  );
 
   for (const target of cfg.targets) {
     const { body } = renderTarget(sourceText, target, subs);
     const ruleFloor = extractRuleFloorOrWhole(body);
     const absHost = path.join(repoRoot, target.relativeOutputPath);
-    const existing = fs.existsSync(absHost) ? fs.readFileSync(absHost, "utf8") : "";
-    const next = composeInject(existing, ruleFloor, target.relativeOutputPath);
+    const existing = fs.existsSync(absHost)
+      ? fs.readFileSync(absHost, "utf8")
+      : "";
+    const next = composeInject(
+      existing,
+      ruleFloor,
+      target.relativeOutputPath,
+    );
     if (next === existing) {
       out.pass(`ok: ${target.relativeOutputPath}`);
       continue;
     }
     if (opts.dryRun) {
-      out.info(`would write ${target.relativeOutputPath} (${next.length} bytes, changed)`);
+      out.info(
+        `would write ${target.relativeOutputPath} (${next.length} bytes, changed)`,
+      );
       written++;
       continue;
     }
@@ -428,7 +444,10 @@ export async function projectSync(opts) {
         if (entry.name === ".system") continue;
         const skillFile = path.join(skillsAbs, entry.name, "SKILL.md");
         if (!fs.existsSync(skillFile)) continue;
-        const dst = path.join(instructionsDir, `${entry.name}.instructions.md`);
+        const dst = path.join(
+          instructionsDir,
+          `${entry.name}.instructions.md`,
+        );
         doLink(skillFile, dst);
       }
     }

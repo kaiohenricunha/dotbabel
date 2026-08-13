@@ -30,15 +30,15 @@
  * @property {boolean} noColor
  */
 
-import { parseArgs } from "node:util";
+import { parseArgs } from 'node:util';
 
 /** Harness-wide flag set auto-included in every `parse()` call. */
 export const HARNESS_FLAGS = Object.freeze({
-  help: { type: "boolean", short: "h" },
-  version: { type: "boolean", short: "V" },
-  json: { type: "boolean" },
-  verbose: { type: "boolean", short: "v" },
-  "no-color": { type: "boolean" },
+  help: { type: 'boolean', short: 'h' },
+  version: { type: 'boolean', short: 'V' },
+  json: { type: 'boolean' },
+  verbose: { type: 'boolean', short: 'v' },
+  'no-color': { type: 'boolean' },
 });
 
 /**
@@ -62,7 +62,7 @@ export function parse(argv, spec = {}) {
     });
   } catch (err) {
     const wrapped = new Error(err instanceof Error ? err.message : String(err));
-    /** @type {any} */ (wrapped).code = "USAGE_UNKNOWN_FLAG";
+    /** @type {any} */ (wrapped).code = 'USAGE_UNKNOWN_FLAG';
     throw wrapped;
   }
   const values = /** @type {Record<string, any>} */ (parsed.values);
@@ -73,7 +73,7 @@ export function parse(argv, spec = {}) {
     version: Boolean(values.version),
     json: Boolean(values.json),
     verbose: Boolean(values.verbose),
-    noColor: Boolean(values["no-color"]),
+    noColor: Boolean(values['no-color']),
   };
 }
 
@@ -88,15 +88,21 @@ export function parse(argv, spec = {}) {
  * @returns {string}
  */
 export function helpText(meta) {
-  const lines = [meta.synopsis, "", meta.description, "", "Options:"];
+  const lines = [
+    meta.synopsis,
+    '',
+    meta.description,
+    '',
+    'Options:',
+  ];
   const all = { ...(meta.flags ?? {}), ...HARNESS_FLAGS };
   const longest = Math.max(...Object.keys(all).map((k) => k.length + 2));
   for (const [name, def] of Object.entries(all)) {
     const long = `--${name}`;
-    const short = /** @type {any} */ (def).short ? `, -${/** @type {any} */ (def).short}` : "";
-    lines.push(`  ${long}${short}`.padEnd(longest + 6) + (def.type === "string" ? "<value>" : ""));
+    const short = /** @type {any} */ (def).short ? `, -${/** @type {any} */ (def).short}` : '';
+    lines.push(`  ${long}${short}`.padEnd(longest + 6) + (def.type === 'string' ? '<value>' : ''));
   }
-  lines.push("");
-  lines.push("Exit codes: 0 ok, 1 validation failure, 2 env error, 64 usage error.");
-  return lines.join("\n");
+  lines.push('');
+  lines.push('Exit codes: 0 ok, 1 validation failure, 2 env error, 64 usage error.');
+  return lines.join('\n');
 }

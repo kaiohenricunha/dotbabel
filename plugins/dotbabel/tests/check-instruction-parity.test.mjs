@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkInstructionParity } from "../src/check-instruction-parity.mjs";
@@ -31,7 +36,10 @@ function writeFacts(root) {
     rule_floor_files: ["CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"],
     cli_substitutions: {},
   };
-  writeFileSync(path.join(root, "docs", "repo-facts.json"), `${JSON.stringify(facts, null, 2)}\n`);
+  writeFileSync(
+    path.join(root, "docs", "repo-facts.json"),
+    `${JSON.stringify(facts, null, 2)}\n`,
+  );
 }
 
 function writeClaude(root) {
@@ -81,7 +89,11 @@ describe("checkInstructionParity", () => {
     const root = isolateFixture();
     const ctx = createHarnessContext({ repoRoot: root });
     generateInstructions(ctx);
-    writeFile(root, "AGENTS.md", readFile(root, "AGENTS.md").replace("## Protected Paths\n", ""));
+    writeFile(
+      root,
+      "AGENTS.md",
+      readFile(root, "AGENTS.md").replace("## Protected Paths\n", ""),
+    );
 
     const result = checkInstructionParity(ctx);
     expect(result.ok).toBe(false);
@@ -115,8 +127,10 @@ describe("checkInstructionParity", () => {
 
     const result = checkInstructionParity(ctx, generated);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.code === ERROR_CODES.DRIFT_PARITY_MISSING_HEADING)).toBe(
-      true,
-    );
+    expect(
+      result.errors.some(
+        (e) => e.code === ERROR_CODES.DRIFT_PARITY_MISSING_HEADING,
+      ),
+    ).toBe(true);
   });
 });

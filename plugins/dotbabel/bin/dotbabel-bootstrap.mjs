@@ -27,8 +27,7 @@ import { bootstrapGlobal } from "../src/bootstrap-global.mjs";
 const META = {
   name: "dotbabel-bootstrap",
   synopsis: "dotbabel-bootstrap [OPTIONS]",
-  description:
-    "Set up (or refresh) ~/.claude/ by symlinking commands/, skills/, CLAUDE.md, and copying agent templates into place. Idempotent — safe to re-run.",
+  description: "Set up (or refresh) ~/.claude/ by symlinking commands/, skills/, CLAUDE.md, and copying agent templates into place. Idempotent — safe to re-run.",
   flags: {
     source: { type: "string" },
     target: { type: "string" },
@@ -57,9 +56,7 @@ if (argv.version) {
 // Windows symlink check
 if (process.platform === "win32") {
   const out = createOutput({ json: argv.json, noColor: argv.noColor });
-  out.fail(
-    "bootstrap is not supported on Windows (symlinks require elevated permissions).\n  Use WSL or run bootstrap.sh from Git Bash.",
-  );
+  out.fail("bootstrap is not supported on Windows (symlinks require elevated permissions).\n  Use WSL or run bootstrap.sh from Git Bash.");
   out.flush();
   process.exit(EXIT_CODES.ENV);
 }
@@ -81,9 +78,7 @@ try {
   });
 
   if (result.ok) {
-    out.pass(
-      `bootstrap complete — linked: ${result.linked}, skipped: ${result.skipped}, backed_up: ${result.backed_up}`,
-    );
+    out.pass(`bootstrap complete — linked: ${result.linked}, skipped: ${result.skipped}, backed_up: ${result.backed_up}`);
     out.flush();
     process.exit(EXIT_CODES.OK);
   } else {

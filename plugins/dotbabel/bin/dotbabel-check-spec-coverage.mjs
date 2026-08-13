@@ -22,8 +22,7 @@ import {
 const META = {
   name: "dotbabel-check-spec-coverage",
   synopsis: "dotbabel-check-spec-coverage [OPTIONS]",
-  description:
-    "Check that protected-path changes are covered by a spec (or a No-spec rationale) in the current PR.",
+  description: "Check that protected-path changes are covered by a spec (or a No-spec rationale) in the current PR.",
   flags: {
     "repo-root": { type: "string" },
   },

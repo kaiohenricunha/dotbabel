@@ -19,7 +19,9 @@ vi.mock("../src/bootstrap-global.mjs", () => ({
 }));
 
 vi.mock("../src/generate-instructions.mjs", () => ({
-  generateInstructions: vi.fn().mockReturnValue({ ok: true, files: [], manifest: { targets: {} } }),
+  generateInstructions: vi
+    .fn()
+    .mockReturnValue({ ok: true, files: [], manifest: { targets: {} } }),
 }));
 
 vi.mock("../src/check-instructions-fresh.mjs", () => ({
@@ -73,20 +75,20 @@ describe("syncGlobal", () => {
   it("pull (npm mode) calls npm update when newer version is available", async () => {
     // npm view returns a newer version
     spawnSync
-      .mockReturnValueOnce({ stdout: "1.3.0\n", stderr: "", status: 0 }) // npm view
-      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 }); // npm update
+      .mockReturnValueOnce({ stdout: "1.3.0\n", stderr: "", status: 0 })   // npm view
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });           // npm update
 
     const result = await syncGlobal("pull", {});
 
     expect(spawnSync).toHaveBeenCalledWith(
       "npm",
       ["view", "@dotbabel/dotbabel", "version"],
-      expect.objectContaining({ encoding: "utf8" }),
+      expect.objectContaining({ encoding: "utf8" })
     );
     expect(spawnSync).toHaveBeenCalledWith(
       "npm",
       ["update", "-g", "@dotbabel/dotbabel"],
-      expect.objectContaining({ encoding: "utf8" }),
+      expect.objectContaining({ encoding: "utf8" })
     );
     expect(bootstrapGlobal).toHaveBeenCalled();
     expect(result.ok).toBe(true);
@@ -105,7 +107,7 @@ describe("syncGlobal", () => {
 
     // npm update should NOT have been called
     const updateCalls = spawnSync.mock.calls.filter(
-      (call) => call[0] === "npm" && call[1].includes("update"),
+      (call) => call[0] === "npm" && call[1].includes("update")
     );
     expect(updateCalls).toHaveLength(0);
     // bootstrapGlobal still called (re-link)
@@ -120,8 +122,8 @@ describe("syncGlobal", () => {
 
   it("pull (clone mode) runs git fetch, rebase then bootstraps", async () => {
     spawnSync
-      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 }) // git fetch
-      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 }); // git rebase
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 })  // git fetch
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });  // git rebase
 
     const source = "/home/user/dotbabel";
     const result = await syncGlobal("pull", { source });
@@ -129,19 +131,21 @@ describe("syncGlobal", () => {
     expect(spawnSync).toHaveBeenCalledWith(
       "git",
       ["-C", source, "fetch", "origin"],
-      expect.objectContaining({ encoding: "utf8" }),
+      expect.objectContaining({ encoding: "utf8" })
     );
     expect(spawnSync).toHaveBeenCalledWith(
       "git",
       ["-C", source, "rebase", "origin/main"],
-      expect.objectContaining({ encoding: "utf8" }),
+      expect.objectContaining({ encoding: "utf8" })
     );
     expect(generateInstructions).toHaveBeenCalledWith({ repoRoot: source }, { dryRun: true });
     expect(checkInstructionsFresh).toHaveBeenCalledWith(
       { repoRoot: source },
       expect.objectContaining({ ok: true }),
     );
-    expect(bootstrapGlobal).toHaveBeenCalledWith(expect.objectContaining({ source }));
+    expect(bootstrapGlobal).toHaveBeenCalledWith(
+      expect.objectContaining({ source })
+    );
     expect(result.ok).toBe(true);
     expect(result.mode).toBe("clone");
   });
@@ -158,7 +162,7 @@ describe("syncGlobal", () => {
     expect(spawnSync).toHaveBeenCalledWith(
       "npm",
       ["view", "@dotbabel/dotbabel", "version"],
-      expect.objectContaining({ encoding: "utf8" }),
+      expect.objectContaining({ encoding: "utf8" })
     );
     expect(result.ok).toBe(true);
     expect(result.mode).toBe("npm");
@@ -181,7 +185,7 @@ describe("syncGlobal", () => {
     expect(spawnSync).toHaveBeenCalledWith(
       "git",
       ["-C", source, "status", "--short"],
-      expect.objectContaining({ encoding: "utf8" }),
+      expect.objectContaining({ encoding: "utf8" })
     );
     expect(result.ok).toBe(true);
     expect(result.mode).toBe("clone");
@@ -251,10 +255,7 @@ describe("syncGlobal", () => {
     expect(result.mode).toBe("clone");
     // commit and push must NOT have been called
     const calls = spawnSync.mock.calls.map((c) => c.slice(0, 2));
-    expect(calls).not.toContainEqual([
-      "git",
-      ["-C", source, "commit", expect.any(String), expect.any(String)],
-    ]);
+    expect(calls).not.toContainEqual(["git", ["-C", source, "commit", expect.any(String), expect.any(String)]]);
   });
 
   // -------------------------------------------------------------------------
@@ -271,7 +272,7 @@ describe("syncGlobal", () => {
     expect(result.summary).toMatch(/npm view failed/i);
     // npm update must NOT have been called
     const updateCalls = spawnSync.mock.calls.filter(
-      (call) => call[0] === "npm" && call[1].includes("update"),
+      (call) => call[0] === "npm" && call[1].includes("update")
     );
     expect(updateCalls).toHaveLength(0);
     expect(bootstrapGlobal).not.toHaveBeenCalled();
@@ -288,8 +289,8 @@ describe("syncGlobal", () => {
     });
 
     spawnSync
-      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 }) // git fetch
-      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 }); // git rebase
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 })  // git fetch
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });  // git rebase
 
     const source = "/home/user/dotbabel";
     const result = await syncGlobal("pull", { source });

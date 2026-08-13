@@ -980,13 +980,11 @@ export async function pushRemote({
   const mirror = extractMirror(cli, sessionFile);
   // Mirror records may arrive as bare strings or wrapped JSON {message: "..."};
   // normalize to plain strings before handing to the renderer.
-  const mirrorStrings = mirror
-    .map((m) => {
-      if (typeof m === "string") return m;
-      if (m && typeof m.message === "string") return m.message;
-      return "";
-    })
-    .filter((s) => s.length > 0);
+  const mirrorStrings = mirror.map((m) => {
+    if (typeof m === "string") return m;
+    if (m && typeof m.message === "string") return m.message;
+    return "";
+  }).filter((s) => s.length > 0);
   const toCli = meta.cli;
   const handoffBlock = renderHandoffBlock(meta, prompts, turns, toCli, {
     stateBlock,

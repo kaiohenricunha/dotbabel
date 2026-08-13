@@ -51,13 +51,7 @@ describe("CONDUCTOR_PHASES", () => {
 });
 
 describe("checkLocalAttestGate", () => {
-  const clean = {
-    branch: "feat/beta",
-    worktreeStatus: "",
-    localHead: SHA,
-    prHeadOid: SHA,
-    prNumber: 812,
-  };
+  const clean = { branch: "feat/beta", worktreeStatus: "", localHead: SHA, prHeadOid: SHA, prNumber: 812 };
 
   it("passes when the tree is clean and local HEAD equals the PR head", () => {
     const r = checkLocalAttestGate(clean);
@@ -131,15 +125,11 @@ describe("checkMergeGate", () => {
   });
 
   it("fails MISSING_SUMMARY when only the test plan is present", () => {
-    expect(codes(checkMergeGate({ ...base, body: "## Test plan\n\n- [x] ok\n" }))).toContain(
-      "MISSING_SUMMARY",
-    );
+    expect(codes(checkMergeGate({ ...base, body: "## Test plan\n\n- [x] ok\n" }))).toContain("MISSING_SUMMARY");
   });
 
   it("fails MISSING_TEST_PLAN when only the summary is present", () => {
-    expect(codes(checkMergeGate({ ...base, body: "## Summary\n\n- x\n" }))).toContain(
-      "MISSING_TEST_PLAN",
-    );
+    expect(codes(checkMergeGate({ ...base, body: "## Summary\n\n- x\n" }))).toContain("MISSING_TEST_PLAN");
   });
 
   it("fails EMPTY_BODY on a whitespace-only body", () => {
@@ -151,15 +141,13 @@ describe("checkMergeGate", () => {
   });
 
   it("rejects an h3 heading — the level must be exactly h2", () => {
-    expect(codes(checkMergeGate({ ...base, body: "### Summary\n\n## Test plan\n" }))).toContain(
-      "MISSING_SUMMARY",
-    );
+    expect(codes(checkMergeGate({ ...base, body: "### Summary\n\n## Test plan\n" }))).toContain("MISSING_SUMMARY");
   });
 
   it("rejects a heading with trailing words", () => {
-    expect(
-      codes(checkMergeGate({ ...base, body: "## Summary of changes\n\n## Test plan\n" })),
-    ).toContain("MISSING_SUMMARY");
+    expect(codes(checkMergeGate({ ...base, body: "## Summary of changes\n\n## Test plan\n" }))).toContain(
+      "MISSING_SUMMARY",
+    );
   });
 
   it("accepts trailing whitespace after the heading text", () => {
@@ -195,15 +183,9 @@ describe("checkMergeGate", () => {
   // out as real body text — letting a body that merely DOCUMENTS the template
   // satisfy the gate, including the protected-path Spec ID requirement.
   it("does not count headings inside a nested fenced block", () => {
-    const body = [
-      "````markdown",
-      "```text",
-      "## Summary",
-      "## Test plan",
-      "## Spec ID",
-      "```",
-      "````",
-    ].join("\n");
+    const body = ["````markdown", "```text", "## Summary", "## Test plan", "## Spec ID", "```", "````"].join(
+      "\n",
+    );
     const r = checkMergeGate({ ...base, body, hasSpecsDir: true });
     expect(r.ok).toBe(false);
     expect(codes(r).sort()).toEqual(["MISSING_SPEC_ID", "MISSING_SUMMARY", "MISSING_TEST_PLAN"]);
@@ -220,12 +202,8 @@ describe("checkMergeGate", () => {
   });
 
   it("matches a single character with ? but not a separator", () => {
-    expect(
-      checkMergeGate({ ...base, changedPaths: ["a/b.mjs"], protectedPaths: ["a/?.mjs"] }).ok,
-    ).toBe(false);
-    expect(
-      checkMergeGate({ ...base, changedPaths: ["a/bc.mjs"], protectedPaths: ["a/?.mjs"] }).ok,
-    ).toBe(true);
+    expect(checkMergeGate({ ...base, changedPaths: ["a/b.mjs"], protectedPaths: ["a/?.mjs"] }).ok).toBe(false);
+    expect(checkMergeGate({ ...base, changedPaths: ["a/bc.mjs"], protectedPaths: ["a/?.mjs"] }).ok).toBe(true);
   });
 
   it("normalizes CRLF line endings", () => {
@@ -257,28 +235,18 @@ describe("checkMergeGate", () => {
       protectedPaths: ["plugins/dotbabel/src/**"],
     });
     expect(codes(r)).toContain("MISSING_SPEC_ID");
-    expect(r.reasons.find((x) => x.code === "MISSING_SPEC_ID").detail).toBe(
-      "plugins/dotbabel/src/pr-stack.mjs",
-    );
+    expect(r.reasons.find((x) => x.code === "MISSING_SPEC_ID").detail).toBe("plugins/dotbabel/src/pr-stack.mjs");
   });
 
   it("does not require a spec id when no changed path matches", () => {
     expect(
-      checkMergeGate({
-        ...base,
-        changedPaths: ["README.md"],
-        protectedPaths: ["plugins/dotbabel/src/**"],
-      }).ok,
+      checkMergeGate({ ...base, changedPaths: ["README.md"], protectedPaths: ["plugins/dotbabel/src/**"] }).ok,
     ).toBe(true);
   });
 
   it("does not let a single star cross a path separator", () => {
     expect(
-      checkMergeGate({
-        ...base,
-        changedPaths: ["plugins/dotbabel/src/a/b.mjs"],
-        protectedPaths: ["plugins/*"],
-      }).ok,
+      checkMergeGate({ ...base, changedPaths: ["plugins/dotbabel/src/a/b.mjs"], protectedPaths: ["plugins/*"] }).ok,
     ).toBe(true);
   });
 
@@ -289,9 +257,7 @@ describe("checkMergeGate", () => {
   });
 
   it("treats glob special characters literally outside of stars", () => {
-    expect(
-      checkMergeGate({ ...base, changedPaths: ["a.b.mjs"], protectedPaths: ["axb.mjs"] }).ok,
-    ).toBe(true);
+    expect(checkMergeGate({ ...base, changedPaths: ["a.b.mjs"], protectedPaths: ["axb.mjs"] }).ok).toBe(true);
   });
 
   it("fails NOT_MERGEABLE when the PR conflicts", () => {
@@ -379,15 +345,7 @@ describe("summarizeGates", () => {
   it("collects failed gate names and dedupes reason codes", () => {
     const s = summarizeGates([
       { ok: false, gate: "a", reasons: [{ code: "X", message: "" }], hint: null },
-      {
-        ok: false,
-        gate: "b",
-        reasons: [
-          { code: "X", message: "" },
-          { code: "Y", message: "" },
-        ],
-        hint: null,
-      },
+      { ok: false, gate: "b", reasons: [{ code: "X", message: "" }, { code: "Y", message: "" }], hint: null },
     ]);
     expect(s.ok).toBe(false);
     expect(s.failed).toEqual(["a", "b"]);

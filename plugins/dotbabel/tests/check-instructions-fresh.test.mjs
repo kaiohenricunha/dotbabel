@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "fs";
 import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkInstructionsFresh } from "../src/check-instructions-fresh.mjs";
@@ -31,7 +37,10 @@ function writeFacts(root) {
     rule_floor_files: ["CLAUDE.md", "AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"],
     cli_substitutions: {},
   };
-  writeFileSync(path.join(root, "docs", "repo-facts.json"), `${JSON.stringify(facts, null, 2)}\n`);
+  writeFileSync(
+    path.join(root, "docs", "repo-facts.json"),
+    `${JSON.stringify(facts, null, 2)}\n`,
+  );
 }
 
 function writeClaude(root, heading) {
@@ -107,7 +116,9 @@ describe("checkInstructionsFresh", () => {
     expect(result.ok).toBe(false);
     expect(
       result.errors.some(
-        (e) => e.code === ERROR_CODES.DRIFT_GENERATED_STALE && e.file === "AGENTS.md",
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_GENERATED_STALE &&
+          e.file === "AGENTS.md",
       ),
     ).toBe(true);
   });
@@ -122,7 +133,9 @@ describe("checkInstructionsFresh", () => {
     expect(result.ok).toBe(false);
     expect(
       result.errors.some(
-        (e) => e.code === ERROR_CODES.DRIFT_GENERATED_STALE && e.file === "AGENTS.md",
+        (e) =>
+          e.code === ERROR_CODES.DRIFT_GENERATED_STALE &&
+          e.file === "AGENTS.md",
       ),
     ).toBe(true);
   });

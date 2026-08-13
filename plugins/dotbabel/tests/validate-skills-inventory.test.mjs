@@ -160,18 +160,14 @@ describe("validateAgents — valid agent", () => {
 describe("validateAgents — missing required fields", () => {
   it("emits AGENT_MISSING_FIELD when model: is absent", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "no-model.md",
-      `---
+    writeAgent(dir, "no-model.md", `---
 name: no-model
 description: Missing model field
 tools: Read
 ---
 
 Body here.
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_MISSING_FIELD);
@@ -182,16 +178,12 @@ Body here.
 
   it("emits AGENT_MISSING_FIELD when name: is absent", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "no-name.md",
-      `---
+    writeAgent(dir, "no-name.md", `---
 description: No name
 tools: Read
 model: haiku
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_MISSING_FIELD);
@@ -201,16 +193,12 @@ model: haiku
 
   it("emits AGENT_MISSING_FIELD when description: is absent", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "no-desc.md",
-      `---
+    writeAgent(dir, "no-desc.md", `---
 name: no-desc
 tools: Read
 model: haiku
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_MISSING_FIELD);
@@ -220,16 +208,12 @@ model: haiku
 
   it("emits AGENT_MISSING_FIELD when tools: is absent", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "no-tools.md",
-      `---
+    writeAgent(dir, "no-tools.md", `---
 name: no-tools
 description: No tools
 model: haiku
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_MISSING_FIELD);
@@ -241,17 +225,13 @@ model: haiku
 describe("validateAgents — invalid model value", () => {
   it("emits AGENT_INVALID_MODEL when model value is not in the allowed set", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "bad-model.md",
-      `---
+    writeAgent(dir, "bad-model.md", `---
 name: bad-model
 description: Bad model value
 tools: Read
 model: turbo
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_INVALID_MODEL);
@@ -264,17 +244,13 @@ model: turbo
   it("accepts all four valid model values", () => {
     for (const model of ["opus", "sonnet", "haiku", "inherit"]) {
       const dir = makeAgentDir();
-      writeAgent(
-        dir,
-        `${model}-agent.md`,
-        `---
+      writeAgent(dir, `${model}-agent.md`, `---
 name: ${model}-agent
 description: Testing ${model}
 tools: Read
 model: ${model}
 ---
-`,
-      );
+`);
       const result = validateAgents(dir);
       expect(result.ok).toBe(true, `model "${model}" should be valid`);
     }
@@ -284,17 +260,13 @@ model: ${model}
 describe("validateAgents — SEC-2 read-only agents must not have write tools", () => {
   it("emits AGENT_WRITE_TOOL_IN_READONLY when *-reviewer has Write in tools", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "code-reviewer.md",
-      `---
+    writeAgent(dir, "code-reviewer.md", `---
 name: code-reviewer
 description: Reviews code
 tools: Read, Write, Grep
 model: sonnet
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY);
@@ -305,17 +277,13 @@ model: sonnet
 
   it("emits AGENT_WRITE_TOOL_IN_READONLY when *-auditor has Edit in tools", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "security-auditor.md",
-      `---
+    writeAgent(dir, "security-auditor.md", `---
 name: security-auditor
 description: Audits security
 tools: Read, Edit
 model: opus
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY);
@@ -325,17 +293,13 @@ model: opus
 
   it("emits AGENT_WRITE_TOOL_IN_READONLY when *-inspector has Write in tools", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "log-inspector.md",
-      `---
+    writeAgent(dir, "log-inspector.md", `---
 name: log-inspector
 description: Inspects logs
 tools: Bash, Write
 model: haiku
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(false);
     const err = result.errors.find((e) => e.code === ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY);
@@ -344,32 +308,23 @@ model: haiku
 
   it("does NOT flag a non-readonly agent that has Write in tools", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "backend-developer.md",
-      `---
+    writeAgent(dir, "backend-developer.md", `---
 name: backend-developer
 description: Develops backends
 tools: Read, Write, Edit
 model: sonnet
 ---
-`,
-    );
+`);
     const result = validateAgents(dir);
     expect(result.ok).toBe(true);
-    expect(
-      result.errors.filter((e) => e.code === ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY),
-    ).toHaveLength(0);
+    expect(result.errors.filter((e) => e.code === ERROR_CODES.AGENT_WRITE_TOOL_IN_READONLY)).toHaveLength(0);
   });
 });
 
 describe("validateAgents — SEC-1 secret pattern detection", () => {
   it("emits AGENT_SECRET_PATTERN warning when ghp_ appears in body", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "risky-agent.md",
-      `---
+    writeAgent(dir, "risky-agent.md", `---
 name: risky-agent
 description: Has secrets
 tools: Read
@@ -378,8 +333,7 @@ model: haiku
 
 # Config
 token = ghp_abc123secrettoken
-`,
-    );
+`);
     const result = validateAgents(dir);
     // Warnings do not cause ok=false, only errors do
     expect(result.warnings.length).toBeGreaterThan(0);
@@ -391,10 +345,7 @@ token = ghp_abc123secrettoken
 
   it("emits AGENT_SECRET_PATTERN warning for sk- pattern", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "sk-agent.md",
-      `---
+    writeAgent(dir, "sk-agent.md", `---
 name: sk-agent
 description: Has a key
 tools: Read
@@ -402,8 +353,7 @@ model: haiku
 ---
 
 key = sk-abcdef123456
-`,
-    );
+`);
     const result = validateAgents(dir);
     const warn = result.warnings.find((w) => w.code === ERROR_CODES.AGENT_SECRET_PATTERN);
     expect(warn).toBeDefined();
@@ -503,10 +453,7 @@ describe("validateAgentTriggerOverlap", () => {
     const dir = makeAgentDir();
     // Both agents share "shared-keyword" but each names the other in collaboration.
     writeAgent(dir, "agent-left.md", AGENT_OVERLAPPING_LEFT);
-    writeAgent(
-      dir,
-      "agent-right.md",
-      `---
+    writeAgent(dir, "agent-right.md", `---
 name: agent-right
 description: >
   Triggers on: "shared-keyword", "right-only".
@@ -517,8 +464,7 @@ model: sonnet
 ## Collaboration
 
 - Hand off platform concerns to agent-left.
-`,
-    );
+`);
     const result = validateAgentTriggerOverlap(dir);
     expect(result.warnings).toEqual([]);
   });
@@ -539,10 +485,7 @@ model: sonnet
 
   it("is case-insensitive on trigger keywords", () => {
     const dir = makeAgentDir();
-    writeAgent(
-      dir,
-      "uppercase.md",
-      `---
+    writeAgent(dir, "uppercase.md", `---
 name: uppercase
 description: >
   Triggers on: "SHARED".
@@ -551,12 +494,8 @@ model: sonnet
 ---
 
 Body.
-`,
-    );
-    writeAgent(
-      dir,
-      "lowercase.md",
-      `---
+`);
+    writeAgent(dir, "lowercase.md", `---
 name: lowercase
 description: >
   Triggers on: "shared".
@@ -565,8 +504,7 @@ model: sonnet
 ---
 
 Body.
-`,
-    );
+`);
     const result = validateAgentTriggerOverlap(dir);
     expect(result.warnings.length).toBeGreaterThan(0);
   });

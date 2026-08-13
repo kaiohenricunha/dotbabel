@@ -104,11 +104,15 @@ describe("resolveLocalRulesPath", () => {
       XDG_CONFIG_HOME: "/custom/xdg/config",
       HOME: "/home/test",
     };
-    expect(resolveLocalRulesPath(env)).toBe("/custom/xdg/config/dotbabel/local-rules.md");
+    expect(resolveLocalRulesPath(env)).toBe(
+      "/custom/xdg/config/dotbabel/local-rules.md",
+    );
   });
 
   it("defaults to ~/.config/dotbabel/local-rules.md when neither override is set", () => {
     const env = { HOME: "/home/test" };
-    expect(resolveLocalRulesPath(env)).toBe("/home/test/.config/dotbabel/local-rules.md");
+    expect(resolveLocalRulesPath(env)).toBe(
+      "/home/test/.config/dotbabel/local-rules.md",
+    );
   });
 });

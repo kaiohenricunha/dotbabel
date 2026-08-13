@@ -74,7 +74,11 @@ describe("loadPersistedEnv", () => {
     mkdirSync(join(home, ".config", "dotbabel"), { recursive: true });
     writeFileSync(
       join(home, ".config", "dotbabel", "handoff.env"),
-      ["# a comment", "", "export DOTBABEL_HANDOFF_REPO=git@github.com:me/store.git"].join("\n"),
+      [
+        "# a comment",
+        "",
+        "export DOTBABEL_HANDOFF_REPO=git@github.com:me/store.git",
+      ].join("\n")
     );
     const { loadPersistedEnv } = await importFreshBinary();
     loadPersistedEnv();
@@ -85,7 +89,7 @@ describe("loadPersistedEnv", () => {
     mkdirSync(join(home, ".config", "dotbabel"), { recursive: true });
     writeFileSync(
       join(home, ".config", "dotbabel", "handoff.env"),
-      "DOTBABEL_HANDOFF_REPO=git@github.com:from-file/store.git\n",
+      "DOTBABEL_HANDOFF_REPO=git@github.com:from-file/store.git\n"
     );
     process.env.DOTBABEL_HANDOFF_REPO = "git@github.com:from-env/store.git";
     const { loadPersistedEnv } = await importFreshBinary();
@@ -97,7 +101,7 @@ describe("loadPersistedEnv", () => {
     mkdirSync(join(home, ".config", "dotbabel"), { recursive: true });
     writeFileSync(
       join(home, ".config", "dotbabel", "handoff.env"),
-      `DOTBABEL_HANDOFF_REPO="git@github.com:me/store.git"\n`,
+      `DOTBABEL_HANDOFF_REPO="git@github.com:me/store.git"\n`
     );
     const { loadPersistedEnv } = await importFreshBinary();
     loadPersistedEnv();
@@ -120,9 +124,9 @@ describe("isRepoMissingError", () => {
 
   it("matches GitLab's phrasing", async () => {
     const { isRepoMissingError } = await importFreshBinary();
-    expect(isRepoMissingError("fatal: the project you were looking for could not be found")).toBe(
-      true,
-    );
+    expect(
+      isRepoMissingError("fatal: the project you were looking for could not be found")
+    ).toBe(true);
   });
 
   it("matches permission-denied (the auth-missing sibling of repo-missing)", async () => {
@@ -132,12 +136,8 @@ describe("isRepoMissingError", () => {
 
   it("ignores unrelated git errors", async () => {
     const { isRepoMissingError } = await importFreshBinary();
-    expect(
-      isRepoMissingError("fatal: not a git repository (or any of the parent directories)"),
-    ).toBe(false);
-    expect(isRepoMissingError("error: pathspec did not match any file(s) known to git")).toBe(
-      false,
-    );
+    expect(isRepoMissingError("fatal: not a git repository (or any of the parent directories)")).toBe(false);
+    expect(isRepoMissingError("error: pathspec did not match any file(s) known to git")).toBe(false);
     expect(isRepoMissingError("")).toBe(false);
   });
 });

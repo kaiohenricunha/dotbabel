@@ -68,7 +68,10 @@ describe("scaffoldHarness", () => {
 
     // All expected files exist on disk
     for (const rel of expected) {
-      expect(fs.existsSync(path.join(targetDir, rel)), `Expected file to exist: ${rel}`).toBe(true);
+      expect(
+        fs.existsSync(path.join(targetDir, rel)),
+        `Expected file to exist: ${rel}`
+      ).toBe(true);
     }
 
     // filesWritten matches the expected set exactly (sorted)
@@ -83,13 +86,13 @@ describe("scaffoldHarness", () => {
     });
 
     const repoFacts = JSON.parse(
-      fs.readFileSync(path.join(targetDir, "docs/repo-facts.json"), "utf8"),
+      fs.readFileSync(path.join(targetDir, "docs/repo-facts.json"), "utf8")
     );
     expect(repoFacts.project_name).toBe("my-proj");
     expect(repoFacts.project_type).toBe("node");
 
     const manifest = JSON.parse(
-      fs.readFileSync(path.join(targetDir, ".claude/skills-manifest.json"), "utf8"),
+      fs.readFileSync(path.join(targetDir, ".claude/skills-manifest.json"), "utf8")
     );
     expect(manifest.generatedAt).toBe("2026-04-14");
   });
@@ -151,7 +154,10 @@ describe("scaffoldHarness", () => {
       placeholders: { project_name: "my-proj", project_type: "go" },
     });
 
-    const raw = fs.readFileSync(path.join(targetDir, ".claude/skills-manifest.json"), "utf8");
+    const raw = fs.readFileSync(
+      path.join(targetDir, ".claude/skills-manifest.json"),
+      "utf8"
+    );
     expect(raw).toContain("{{today}}");
   });
 });

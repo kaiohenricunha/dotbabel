@@ -75,7 +75,10 @@ export {
   DEFAULT_PROJECT_CONFIG,
 } from "./project-sync.mjs";
 export { checkProjectSync } from "./check-project-sync.mjs";
-export { scaffoldProjectInit, DEFAULT_DOTBABEL_JSON } from "./project-init-scaffold.mjs";
+export {
+  scaffoldProjectInit,
+  DEFAULT_DOTBABEL_JSON,
+} from "./project-init-scaffold.mjs";
 
 // --- taxonomy index (Phase 1: non-breaking) ---
 export {

@@ -64,9 +64,7 @@ describe("anyPathMatches", () => {
   });
 
   it("matches bare-path prefixes without globs", () => {
-    expect(anyPathMatches("docs/specs/example-spec", ["docs/specs/example-spec/spec.json"])).toBe(
-      true,
-    );
+    expect(anyPathMatches("docs/specs/example-spec", ["docs/specs/example-spec/spec.json"])).toBe(true);
   });
 });
 
@@ -217,11 +215,7 @@ describe("silent-catch replacement (debug-gated)", () => {
     const probe = `import('${libUrl}').then(m => { const r = m.getChangedFiles(); console.log('RESULT:' + JSON.stringify(r)); });`;
     const out = execFileSync(process.execPath, ["-e", probe], {
       cwd: nonGitDir,
-      env: {
-        ...process.env,
-        HARNESS_CHANGED_FILES: "",
-        GITHUB_BASE_REF: "definitely-not-a-real-ref-xyzzy",
-      },
+      env: { ...process.env, HARNESS_CHANGED_FILES: "", GITHUB_BASE_REF: "definitely-not-a-real-ref-xyzzy" },
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });

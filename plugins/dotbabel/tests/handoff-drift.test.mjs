@@ -333,7 +333,9 @@ export function extractFabricationRule(text) {
       /\bbinary\s+(?:not\s+found|missing)\b/.test(lower);
     const mentionsBinary = /\bdotbabel\b/.test(lower);
     const mentionsForbidden =
-      /\bfabricat/.test(lower) || /\breconstruct/.test(lower) || /\bsynthesi[sz]e/.test(lower);
+      /\bfabricat/.test(lower) ||
+      /\breconstruct/.test(lower) ||
+      /\bsynthesi[sz]e/.test(lower);
     const mentionsRequired =
       /\bverbatim\b/.test(lower) ||
       /\b(?:stop|halt)\b/.test(lower) ||
@@ -423,7 +425,9 @@ export function extractFromGuide(text) {
   // inside a fenced code block; using `\n# ` here would silently truncate
   // that section and cause the flags in the code examples after the comment
   // to be missed.
-  const flagSections = text.match(/(?:## The five forms|## Common patterns)[\s\S]*?(?=\n## |$)/g);
+  const flagSections = text.match(
+    /(?:## The five forms|## Common patterns)[\s\S]*?(?=\n## |$)/g,
+  );
   const flagTokens = new Set();
   for (const section of flagSections ?? []) {
     const flagRegex = /(?<![a-zA-Z0-9])(--[a-z][a-zA-Z0-9-]+|-o)(?![a-zA-Z0-9-])/g;
@@ -531,7 +535,9 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     const skillFlags = new Set(skillSurface.flags_by_command["*"] ?? []);
     const guideFlags = new Set(guideSurface.flags_by_command["*"] ?? []);
     const helpFlags = helpSurface.flags_by_command["*"] ?? [];
-    const intersection = helpFlags.filter((f) => skillFlags.has(f) && guideFlags.has(f)).sort();
+    const intersection = helpFlags
+      .filter((f) => skillFlags.has(f) && guideFlags.has(f))
+      .sort();
     expect(intersection).toEqual(PHASE_1_BASELINE_FLAGS_INTERSECTION);
   });
 

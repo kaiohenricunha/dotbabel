@@ -4,7 +4,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -95,9 +99,11 @@ function writeCommand(root, slug, overrides = {}) {
 }
 
 function buildIndex(root) {
-  const result = spawnSync(process.execPath, [INDEX_BIN, "--repo-root", root, "--no-color"], {
-    encoding: "utf8",
-  });
+  const result = spawnSync(
+    process.execPath,
+    [INDEX_BIN, "--repo-root", root, "--no-color"],
+    { encoding: "utf8" },
+  );
   if (result.status !== 0) throw new Error(`index build failed: ${result.stderr}`);
   return root;
 }
@@ -109,9 +115,11 @@ describe("dotbabel-search", () => {
     writeCommand(root, "review-pr");
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [SEARCH_BIN, "kube", "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SEARCH_BIN, "kube", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("kube-debugger");
     expect(r.stdout).not.toContain("review-pr");
@@ -124,9 +132,11 @@ describe("dotbabel-search", () => {
     writeCommand(root, "git-review");
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [SEARCH_BIN, "kube", "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SEARCH_BIN, "kube", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("kube-probe");
     expect(r.stdout).toContain("kube-deploy");
@@ -152,9 +162,11 @@ describe("dotbabel-search", () => {
     writeSkill(root, "kube-debugger");
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [SEARCH_BIN, "kube", "--repo-root", root, "--json"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SEARCH_BIN, "kube", "--repo-root", root, "--json"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(Array.isArray(parsed)).toBe(true);
@@ -166,9 +178,11 @@ describe("dotbabel-search", () => {
     writeSkill(root, "my-tool", { description: "helps you audit AWS IAM policies" });
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [SEARCH_BIN, "IAM", "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SEARCH_BIN, "IAM", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("my-tool");
   });
@@ -178,9 +192,11 @@ describe("dotbabel-search", () => {
     writeSkill(root, "some-skill");
     // deliberately do NOT run buildIndex
 
-    const r = spawnSync(process.execPath, [SEARCH_BIN, "some", "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SEARCH_BIN, "some", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(2);
     expect(r.stderr).toContain("index not found");
   });
@@ -201,9 +217,11 @@ describe("dotbabel-list", () => {
     writeCommand(root, "my-cmd");
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [LIST_BIN, "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [LIST_BIN, "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("kube-tool");
     expect(r.stdout).toContain("my-cmd");
@@ -262,9 +280,11 @@ describe("dotbabel-list", () => {
     writeSkill(root, "kube-tool");
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [LIST_BIN, "--json", "--repo-root", root], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [LIST_BIN, "--json", "--repo-root", root],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(Array.isArray(parsed)).toBe(true);
@@ -273,9 +293,11 @@ describe("dotbabel-list", () => {
 
   it("exits 2 when index does not exist", () => {
     const root = mkRepo();
-    const r = spawnSync(process.execPath, [LIST_BIN, "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [LIST_BIN, "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(2);
   });
 });
@@ -317,9 +339,11 @@ describe("dotbabel-show", () => {
     writeSkill(root, "kube-tool");
     buildIndex(root);
 
-    const r = spawnSync(process.execPath, [SHOW_BIN, "kube-tool", "--json", "--repo-root", root], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SHOW_BIN, "kube-tool", "--json", "--repo-root", root],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(0);
     const parsed = JSON.parse(r.stdout);
     expect(parsed.id).toBe("kube-tool");
@@ -328,9 +352,11 @@ describe("dotbabel-show", () => {
 
   it("exits 2 when index does not exist", () => {
     const root = mkRepo();
-    const r = spawnSync(process.execPath, [SHOW_BIN, "any-id", "--repo-root", root, "--no-color"], {
-      encoding: "utf8",
-    });
+    const r = spawnSync(
+      process.execPath,
+      [SHOW_BIN, "any-id", "--repo-root", root, "--no-color"],
+      { encoding: "utf8" },
+    );
     expect(r.status).toBe(2);
   });
 

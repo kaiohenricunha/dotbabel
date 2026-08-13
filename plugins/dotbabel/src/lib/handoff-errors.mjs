@@ -113,7 +113,9 @@ const PATTERNS = [
 export function classifyGitError(rawMsg, verb, context = {}) {
   const { query, shortId } = context;
   const retryArg = query ?? shortId ?? null;
-  const retryLine = retryArg ? `dotbabel handoff ${verb} ${retryArg}` : `dotbabel handoff ${verb}`;
+  const retryLine = retryArg
+    ? `dotbabel handoff ${verb} ${retryArg}`
+    : `dotbabel handoff ${verb}`;
 
   for (const { re, stage, cause, fix } of PATTERNS) {
     if (re.test(rawMsg)) {

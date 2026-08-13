@@ -50,8 +50,7 @@ import { isRepoTrusted } from "../src/trust-allowlist.mjs";
 const META = {
   name: "dotbabel-doctor",
   synopsis: "dotbabel-doctor [OPTIONS]",
-  description:
-    "Run the harness self-diagnostic across env, repo, facts, manifest, specs, drift, and hooks.",
+  description: "Run the harness self-diagnostic across env, repo, facts, manifest, specs, drift, and hooks.",
   flags: {
     "repo-root": { type: "string" },
     "install-hooks": { type: "boolean" },
@@ -157,8 +156,7 @@ try {
 if (generated) {
   const r = checkInstructionsFresh(ctx, generated);
   if (r.ok) out.pass("generated instruction files fresh");
-  else
-    out.fail(`generated instruction freshness: ${r.errors.length} issue(s)`, { errors: r.errors });
+  else out.fail(`generated instruction freshness: ${r.errors.length} issue(s)`, { errors: r.errors });
 
   const p = checkInstructionParity(ctx, generated);
   if (p.ok) out.pass("generated instruction headings have parity");
@@ -227,13 +225,9 @@ try {
 if (globalLstat === null) {
   out.warn(`~/.claude/CLAUDE.md missing — run 'dotbabel bootstrap' to install global config`);
 } else if (globalLstat.isSymbolicLink()) {
-  out.warn(
-    `~/.claude/CLAUDE.md is a symlink (legacy ≤2.6.x layout) — run 'dotbabel bootstrap' to migrate to a generated file with overlay support (#228)`,
-  );
+  out.warn(`~/.claude/CLAUDE.md is a symlink (legacy ≤2.6.x layout) — run 'dotbabel bootstrap' to migrate to a generated file with overlay support (#228)`);
 } else if (!readFileSync(globalClaudeMd, "utf8").includes(USER_OVERLAY_BEGIN)) {
-  out.warn(
-    `~/.claude/CLAUDE.md is a regular file but lacks the user-overlay markers — run 'dotbabel bootstrap' to regenerate`,
-  );
+  out.warn(`~/.claude/CLAUDE.md is a regular file but lacks the user-overlay markers — run 'dotbabel bootstrap' to regenerate`);
 } else {
   out.pass(`~/.claude/CLAUDE.md is a generated file with overlay support (bootstrap active)`);
 }
@@ -249,9 +243,7 @@ for (const link of [
     if (l.isSymbolicLink()) {
       out.pass(`${label} instruction symlink present`);
     } else {
-      out.warn(
-        `${label} instruction file exists but is not a symlink — run 'dotbabel bootstrap --all' to wire it up`,
-      );
+      out.warn(`${label} instruction file exists but is not a symlink — run 'dotbabel bootstrap --all' to wire it up`);
     }
   } catch {
     out.warn(`${label} instruction symlink missing — run 'dotbabel bootstrap --all' to install it`);
@@ -279,7 +271,9 @@ for (const fanout of [
       );
     }
   } catch {
-    out.warn(`${label} skills fan-out missing — run 'dotbabel bootstrap --all' to wire it up`);
+    out.warn(
+      `${label} skills fan-out missing — run 'dotbabel bootstrap --all' to wire it up`,
+    );
   }
 }
 
@@ -296,7 +290,9 @@ if (existsSync(projectConfigPath)) {
       quiet: true,
     });
     if (psResult.ok) {
-      out.pass(`project-sync wiring ok (${psResult.okEntries.length} entries verified)`);
+      out.pass(
+        `project-sync wiring ok (${psResult.okEntries.length} entries verified)`,
+      );
     } else if (psResult.missing.length > 0) {
       out.fail(
         `project-sync wiring incomplete: ${psResult.missing.length} missing — run 'dotbabel project-sync' to fix`,
@@ -338,7 +334,7 @@ function installPreCommitHook(repoRoot) {
     "if command -v npx >/dev/null 2>&1; then",
     "  npx dotbabel-check-instructions-fresh",
     "else",
-    '  echo "dotbabel: npx is required for dotbabel-check-instructions-fresh" >&2',
+    "  echo \"dotbabel: npx is required for dotbabel-check-instructions-fresh\" >&2",
     "  exit 1",
     "fi",
     end,
@@ -359,6 +355,9 @@ function installPreCommitHook(repoRoot) {
   }
 
   const prefix = current.startsWith("#!") ? current : `#!/usr/bin/env bash\n${current}`;
-  writeFileSync(hookPath, `${prefix.replace(/\s+$/g, "")}\n\n${block}`);
+  writeFileSync(
+    hookPath,
+    `${prefix.replace(/\s+$/g, "")}\n\n${block}`,
+  );
   chmodSync(hookPath, statSync(hookPath).mode | 0o111);
 }

@@ -20,7 +20,10 @@ import { parse, helpText } from "../src/lib/argv.mjs";
 import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { formatError } from "../src/lib/errors.mjs";
-import { createHarnessContext, version } from "../src/index.mjs";
+import {
+  createHarnessContext,
+  version,
+} from "../src/index.mjs";
 import { generateInstructions } from "../src/generate-instructions.mjs";
 
 const META = {

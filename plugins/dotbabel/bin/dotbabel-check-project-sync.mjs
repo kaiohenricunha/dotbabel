@@ -54,7 +54,9 @@ if (argv.version) {
 
 const out = createOutput({ json: argv.json, noColor: argv.noColor });
 
-const repoRoot = path.resolve(/** @type {string} */ (argv.flags.repo ?? process.cwd()));
+const repoRoot = path.resolve(
+  /** @type {string} */ (argv.flags.repo ?? process.cwd()),
+);
 
 try {
   const result = await checkProjectSync({
@@ -65,12 +67,17 @@ try {
     out,
   });
   if (!result.ok) {
-    out.fail(`project-sync drift: ${result.missing.length} missing, ${result.stale.length} stale`);
+    out.fail(
+      `project-sync drift: ${result.missing.length} missing, ${result.stale.length} stale`,
+    );
     out.flush();
     process.exit(EXIT_CODES.VALIDATION);
   }
-  const skippedNote = result.skipped.length > 0 ? `, ${result.skipped.length} CLIs skipped` : "";
-  out.pass(`project-sync ok (${result.okEntries.length} entries verified${skippedNote})`);
+  const skippedNote =
+    result.skipped.length > 0 ? `, ${result.skipped.length} CLIs skipped` : "";
+  out.pass(
+    `project-sync ok (${result.okEntries.length} entries verified${skippedNote})`,
+  );
   out.flush();
   process.exit(EXIT_CODES.OK);
 } catch (err) {

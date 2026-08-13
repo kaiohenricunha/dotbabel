@@ -29,10 +29,10 @@
  * @property {NodeJS.ProcessEnv} [env]         Defaults to process.env.
  */
 
-const GREEN = "\x1b[32m";
-const RED = "\x1b[31m";
-const YELLOW = "\x1b[33m";
-const RESET = "\x1b[0m";
+const GREEN = '\x1b[32m';
+const RED = '\x1b[31m';
+const YELLOW = '\x1b[33m';
+const RESET = '\x1b[0m';
 
 /**
  * Construct an `Output` with the given behavior flags.
@@ -44,7 +44,7 @@ export function createOutput(opts = {}) {
   const env = opts.env ?? process.env;
   const stream = opts.stream ?? process.stdout;
   const json = Boolean(opts.json);
-  const noColor = Boolean(opts.noColor) || "NO_COLOR" in env;
+  const noColor = Boolean(opts.noColor) || 'NO_COLOR' in env;
   const quiet = Boolean(opts.quiet);
   const useAnsi = !json && !noColor && Boolean(stream.isTTY);
 
@@ -60,11 +60,11 @@ export function createOutput(opts = {}) {
    * @param {object} [details]
    */
   const emit = (kind, message, details) => {
-    if (kind === "pass") counts.pass++;
-    else if (kind === "fail") counts.fail++;
-    else if (kind === "warn") counts.warn++;
+    if (kind === 'pass') counts.pass++;
+    else if (kind === 'fail') counts.fail++;
+    else if (kind === 'warn') counts.warn++;
     // quiet mode: suppress per-file progress (pass/info); fail/warn always surface
-    if (quiet && (kind === "pass" || kind === "info")) return;
+    if (quiet && (kind === 'pass' || kind === 'info')) return;
     if (json) {
       /** @type {OutputEvent} */
       const event = { kind, message };
@@ -73,21 +73,21 @@ export function createOutput(opts = {}) {
       return;
     }
     let glyph;
-    if (kind === "pass") glyph = color(GREEN, "✓");
-    else if (kind === "fail") glyph = color(RED, "✗");
-    else if (kind === "warn") glyph = color(YELLOW, "⚠");
-    else glyph = " ";
+    if (kind === 'pass') glyph = color(GREEN, '✓');
+    else if (kind === 'fail') glyph = color(RED, '✗');
+    else if (kind === 'warn') glyph = color(YELLOW, '⚠');
+    else glyph = ' ';
     stream.write(`  ${glyph} ${message}\n`);
   };
 
   return {
-    pass: (msg) => emit("pass", msg),
-    fail: (msg, details) => emit("fail", msg, details),
-    warn: (msg, details) => emit("warn", msg, details),
-    info: (msg) => emit("info", msg),
+    pass: (msg) => emit('pass', msg),
+    fail: (msg, details) => emit('fail', msg, details),
+    warn: (msg, details) => emit('warn', msg, details),
+    info: (msg) => emit('info', msg),
     flush: () => {
       if (!json) return;
-      stream.write(JSON.stringify({ events: buffer, counts }, null, 2) + "\n");
+      stream.write(JSON.stringify({ events: buffer, counts }, null, 2) + '\n');
     },
     counts: () => ({ ...counts }),
   };

@@ -94,13 +94,17 @@ export function scaffoldProjectInit(opts) {
       code: ERROR_CODES.SCAFFOLD_CONFLICT,
       category: "scaffold",
       file: ".dotbabel.json",
-      message: ".dotbabel.json already exists; pass --force to overwrite (a backup is NOT made)",
+      message:
+        ".dotbabel.json already exists; pass --force to overwrite (a backup is NOT made)",
     });
   }
   if (opts.dryRun) {
     filesWritten.push(".dotbabel.json");
   } else {
-    fs.writeFileSync(dotbabelPath, `${JSON.stringify(DEFAULT_DOTBABEL_JSON, null, 2)}\n`);
+    fs.writeFileSync(
+      dotbabelPath,
+      `${JSON.stringify(DEFAULT_DOTBABEL_JSON, null, 2)}\n`,
+    );
     filesWritten.push(".dotbabel.json");
   }
 

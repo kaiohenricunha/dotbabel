@@ -3,13 +3,14 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { ConfigError, DEFAULTS, loadConfig, validateConfig } from "../src/local-attest-config.mjs";
+import {
+  ConfigError,
+  DEFAULTS,
+  loadConfig,
+  validateConfig,
+} from "../src/local-attest-config.mjs";
 
-const FIXTURES = resolve(
-  import.meta.dirname ?? new URL(".", import.meta.url).pathname,
-  "fixtures",
-  "local-attest",
-);
+const FIXTURES = resolve(import.meta.dirname ?? new URL(".", import.meta.url).pathname, "fixtures", "local-attest");
 
 function makeTmpDir() {
   const dir = mkdtempSync(join(tmpdir(), "local-attest-cfg-"));
@@ -155,7 +156,9 @@ describe("validateConfig", () => {
   });
 
   it("rejects auditLogPath with .. segments", () => {
-    expect(() => validateConfig({ ...base(), auditLogPath: "../escape.jsonl" })).toThrow(/\.\./);
+    expect(() =>
+      validateConfig({ ...base(), auditLogPath: "../escape.jsonl" }),
+    ).toThrow(/\.\./);
   });
 
   it("rejects empty trustedAssociations", () => {
@@ -165,13 +168,15 @@ describe("validateConfig", () => {
   });
 
   it("rejects non-string trustedAssociations entries", () => {
-    expect(() => validateConfig({ ...base(), trustedAssociations: ["OWNER", 42] })).toThrow(
-      /trustedAssociations/,
-    );
+    expect(() =>
+      validateConfig({ ...base(), trustedAssociations: ["OWNER", 42] }),
+    ).toThrow(/trustedAssociations/);
   });
 
   it("rejects non-boolean requireClean", () => {
-    expect(() => validateConfig({ ...base(), requireClean: "yes" })).toThrow(/requireClean/);
+    expect(() =>
+      validateConfig({ ...base(), requireClean: "yes" }),
+    ).toThrow(/requireClean/);
   });
 
   it("preserves matrix order", () => {

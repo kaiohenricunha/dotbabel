@@ -31,7 +31,7 @@ if (args.includes("--help") || args.includes("-h")) {
       "",
       "Exit codes: 0 ok, 1 drift detected, 2 env error.",
       "",
-    ].join("\n"),
+    ].join("\n")
   );
   process.exit(EXIT_CODES.OK);
 }

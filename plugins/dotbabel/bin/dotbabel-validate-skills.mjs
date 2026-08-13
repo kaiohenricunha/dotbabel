@@ -25,8 +25,7 @@ import {
 const META = {
   name: "dotbabel-validate-skills",
   synopsis: "dotbabel-validate-skills [OPTIONS]",
-  description:
-    "Validate .claude/skills-manifest.json checksums, orphans, and DAG. Also runs agent frontmatter validation and trigger-overlap detection. Use --update to rewrite checksums in place. Use --strict to promote agent overlap warnings to errors.",
+  description: "Validate .claude/skills-manifest.json checksums, orphans, and DAG. Also runs agent frontmatter validation and trigger-overlap detection. Use --update to rewrite checksums in place. Use --strict to promote agent overlap warnings to errors.",
   flags: {
     "repo-root": { type: "string" },
     update: { type: "boolean" },
@@ -132,15 +131,9 @@ if (overlapResult.warnings.length === 0) {
 } else {
   for (const warn of overlapResult.warnings) {
     if (argv.flags.strict) {
-      out.fail(
-        formatError(warn, { verbose: argv.verbose }),
-        warn.toJSON ? warn.toJSON() : undefined,
-      );
+      out.fail(formatError(warn, { verbose: argv.verbose }), warn.toJSON ? warn.toJSON() : undefined);
     } else {
-      out.warn(
-        formatError(warn, { verbose: argv.verbose }),
-        warn.toJSON ? warn.toJSON() : undefined,
-      );
+      out.warn(formatError(warn, { verbose: argv.verbose }), warn.toJSON ? warn.toJSON() : undefined);
     }
   }
 }

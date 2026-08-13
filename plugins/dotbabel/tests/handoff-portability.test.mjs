@@ -5,7 +5,11 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { collectSessionFiles, projectSlugFromCwd, UUID_HEAD_RE } from "../bin/dotbabel-handoff.mjs";
+import {
+  collectSessionFiles,
+  projectSlugFromCwd,
+  UUID_HEAD_RE,
+} from "../bin/dotbabel-handoff.mjs";
 
 describe("collectSessionFiles (symlink safety)", () => {
   it("does not recurse into a symlink that points back up the walk", () => {

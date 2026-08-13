@@ -117,7 +117,8 @@ async function main() {
 }
 
 // Run only when invoked as a CLI, not when imported by tests.
-const invokedDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const invokedDirect =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirect) {
   main().catch((err) => fail(2, err.message));
 }
