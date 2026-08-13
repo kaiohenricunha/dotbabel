@@ -259,6 +259,16 @@ describe("validateConfig", () => {
     expect(() => validateConfig({ ...base(), restoreFiles: ["../x"] })).toThrow(/'\.\.'/);
   });
 
+  it("rejects CI glob syntax this dialect would silently misread", () => {
+    const leg = (extra) => ({ matrix: [{ name: "a", mode: "hard", command: "true", ...extra }] });
+    for (const bad of ["src/**/*.{ts,tsx}", "!docs/**", "src/[abc].js"]) {
+      expect(() => validateConfig(leg({ when: { changedPaths: [bad] } }))).toThrow(
+        /does not support/,
+      );
+      expect(() => validateConfig(leg({ skipWhenDiffOnly: [bad] }))).toThrow(/does not support/);
+    }
+  });
+
   it("rejects non-string env values — they flow straight into the child environment", () => {
     expect(() =>
       validateConfig({ matrix: [{ name: "a", mode: "hard", command: "true", env: { X: 1 } }] }),

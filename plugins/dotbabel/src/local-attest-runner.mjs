@@ -21,7 +21,8 @@
  * @property {(cmd: string, opts?: { cwd?: string, env?: Record<string,string>, capture?: boolean }) => { status: number, stdout: string, stderr: string }} run
  * @property {(cmd: string, payload: object) => string} ghApiWithInput
  * @property {(path: string, line: string) => void} appendLog
- * @property {(path: string) => string|null} [readFile]  utf8 read, null on any error
+ * @property {(path: string) => Buffer|string|null} [readFile]  raw read (Buffer in
+ *   realDeps; test stubs may return strings), null on any error
  * @property {(path: string, content: string) => void} [writeFile]  utf8 write; used only
  *   by the restoreFiles snapshot/restore
  * @property {(leg: Leg) => Promise<import("./local-attest-lib.mjs").LegResult>} [runLeg]
@@ -98,8 +99,10 @@ export function realDeps() {
       appendFileSync(path, line);
     },
     readFile(path) {
+      // No encoding: returns a Buffer so restoreFiles round-trips binaries
+      // byte-exact. Text consumers (gatherToolchain) coerce with String().
       try {
-        return readFileSync(path, "utf8");
+        return readFileSync(path);
       } catch {
         return null;
       }
@@ -231,7 +234,8 @@ function gatherToolchain(deps, cfg) {
     // A direct file read, not a shell cat: this module forbids interpolating
     // strings into shell commands, and validateConfig constrains the path the
     // same way auditLogPath is constrained.
-    inputs.goModText = deps.readFile ? (deps.readFile(pin.goMod) ?? "") : "";
+    const goModRaw = deps.readFile ? deps.readFile(pin.goMod) : null;
+    inputs.goModText = goModRaw === null ? "" : String(goModRaw);
   }
   return { problems: toolchainProblems(inputs), seen };
 }
@@ -485,7 +489,27 @@ export async function runMatrix(deps, matrix, { failFast = false } = {}) {
     }
   };
 
-  await Promise.all(lanes.map(runLane));
+  // allSettled, not all: a rejecting consumer-supplied runLeg must not unwind
+  // the caller while sibling lanes still have live children — the matrix must
+  // be quiescent before execute's restore runs. A rejected lane's unfilled
+  // slots become hard-failed records, which shouldAttest rejects.
+  const settled = await Promise.allSettled(lanes.map(runLane));
+  for (const outcome of settled) {
+    if (outcome.status === "rejected") {
+      deps.warn(`WARNING: a lane rejected: ${outcome.reason?.message ?? outcome.reason}`);
+    }
+  }
+  for (let i = 0; i < matrix.length; i += 1) {
+    if (!results[i]) {
+      results[i] = {
+        name: matrix[i].name,
+        mode: matrix[i].mode,
+        passed: false,
+        durationS: 0,
+        tail: "lane rejected before this leg settled",
+      };
+    }
+  }
   return results;
 }
 
@@ -596,17 +620,48 @@ export function snapshotRestoreFiles(deps, paths) {
  * @returns {string[]} the paths actually restored
  */
 export function restoreRestoreFiles(deps, snap) {
+  const same = (a, b) => {
+    if (a === null || b === null) return false;
+    if (typeof a === "string" || typeof b === "string") return String(a) === String(b);
+    return a.equals(b);
+  };
   const restored = [];
   for (const [rel, before] of snap) {
+    // A null SNAPSHOT means the file did not exist before the matrix — never
+    // create it. A null CURRENT read means a leg deleted it — that is the
+    // mutation the operator most wants undone, so restore it.
     if (before === null) continue;
     const now = deps.readFile ? deps.readFile(rel) : null;
-    if (now === null || now === before) continue;
+    if (same(now, before)) continue;
     if (deps.writeFile) {
       deps.writeFile(rel, before);
       restored.push(rel);
     }
   }
   return restored;
+}
+
+/**
+ * Guarded restore wrapper. A restore failure (read-only file, removed parent
+ * dir) must never replace the matrix's own exception or skip the audit line —
+ * it warns instead, and the unrestored file then surfaces as a dirty tree in
+ * verifyHeadUnchanged: fail-closed, correctly diagnosed, still audited.
+ *
+ * @param {Deps} deps
+ * @param {Map<string, Buffer|string|null>} snapshot
+ */
+function safeRestore(deps, snapshot) {
+  try {
+    const restored = restoreRestoreFiles(deps, snapshot);
+    if (restored.length > 0) {
+      deps.log(`Restored ${restored.length} seeded file(s): ${restored.join(", ")}`);
+    }
+  } catch (err) {
+    deps.warn(
+      `WARNING: restoring seeded files failed (${err?.message ?? err}) — ` +
+        "the head recheck will flag any residue as a dirty tree.",
+    );
+  }
 }
 
 const SUMMARY_LABELS = {
@@ -674,7 +729,14 @@ export async function execute(deps, cfg, flags) {
       `Diagnostic run: ${matrix.length} of ${cfg.matrix.length} leg(s) — attestation disabled.`,
     );
 
-    const results = await runMatrix(deps, matrix, { failFast });
+    // The fix-retry loop hits the seeding legs hardest — restore here too.
+    const diagSnapshot = snapshotRestoreFiles(deps, cfg.restoreFiles ?? []);
+    let results;
+    try {
+      results = await runMatrix(deps, matrix, { failFast });
+    } finally {
+      safeRestore(deps, diagSnapshot);
+    }
     printSummary(deps, results);
     const { advisoryFails } = summarizeResults(results);
     appendAuditLog(deps, {
@@ -712,14 +774,31 @@ export async function execute(deps, cfg, flags) {
   let matrix = cfg.matrix;
   const usesDiffRules = cfg.matrix.some((l) => l.when || l.skipWhenDiffOnly);
   if (usesDiffRules) {
+    // JSON output (not newline-splitting, which would fragment a legal
+    // newline-bearing path into non-matching pieces) plus a count cross-check
+    // against the PR's own changedFiles total: the Files endpoint silently
+    // caps at 3000 files, and a truncated list would bias BOTH diff rules
+    // toward skipping \u2014 the one direction this design must never fail in.
     let changedFiles = null;
     try {
-      changedFiles = capture(
+      const raw = capture(
         deps,
-        `gh api repos/${pre.repo}/pulls/${pre.pr}/files --paginate --jq '.[].filename'`,
-      )
+        `gh api repos/${pre.repo}/pulls/${pre.pr}/files --paginate --jq '[.[].filename]'`,
+      );
+      const parsed = raw
         .split("\n")
-        .filter(Boolean);
+        .filter(Boolean)
+        .flatMap((page) => JSON.parse(page));
+      const declared = Number(
+        capture(deps, `gh pr view ${pre.pr} --json changedFiles --jq .changedFiles`),
+      );
+      if (!Number.isFinite(declared) || declared !== parsed.length || declared >= 3000) {
+        deps.warn(
+          `WARNING: PR file list looks incomplete (parsed ${parsed.length}, PR declares ${declared}) \u2014 running every leg to be safe.`,
+        );
+      } else {
+        changedFiles = parsed;
+      }
     } catch {
       deps.warn("WARNING: could not read the PR file list \u2014 running every leg to be safe.");
     }
@@ -747,10 +826,7 @@ export async function execute(deps, cfg, flags) {
   try {
     results = await runMatrix(deps, matrix, { failFast });
   } finally {
-    const restored = restoreRestoreFiles(deps, snapshot);
-    if (restored.length > 0) {
-      deps.log(`Restored ${restored.length} seeded file(s): ${restored.join(", ")}`);
-    }
+    safeRestore(deps, snapshot);
   }
   const { hardFails, advisoryFails } = summarizeResults(results);
   printSummary(deps, results);

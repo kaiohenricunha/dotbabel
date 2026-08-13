@@ -148,9 +148,11 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
    the first hard failure stops launching further legs in every lane; the
    rest are recorded `not run`, never as passes.
 3. **Attestation bar.** Posting is gated on a run-record predicate: every leg
-   executed, zero hard fails, not a diagnostic subset. A run that fails the
-   bar aborts — no comment, no label, no push — and still writes its audit
-   line (`result: "hard-fail"`).
+   accounted for — executed or diff-skipped — at least one leg actually
+   executed (an all-skipped run has verified nothing and refuses to attest;
+   CI's own path filters already skip the same jobs), zero hard fails, not a
+   diagnostic subset. A run that fails the bar aborts — no comment, no label,
+   no push — and still writes its audit line (`result: "hard-fail"`).
 4. **Re-check HEAD.** First, `restoreFiles` snapshots taken before the matrix
    are restored byte-exact (a leg that seeds fixture stubs over tracked files
    would otherwise fail this recheck on its own writes, every run). Then: the

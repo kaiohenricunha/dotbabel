@@ -421,6 +421,31 @@ describe("markSkips", () => {
 });
 
 describe("shouldAttest with skipped legs", () => {
+  it("refuses an all-skipped run — zero legs executed verifies nothing", () => {
+    const results = [
+      { name: "a", mode: "hard", passed: true, skipped: true, durationS: 0, tail: "" },
+      { name: "b", mode: "hard", passed: true, skipped: true, durationS: 0, tail: "" },
+    ];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 2 })).toBe(false);
+  });
+
+  it("a record flagged both skipped and notRun is rejected — notRun wins", () => {
+    const results = [
+      { name: "a", mode: "hard", passed: true, durationS: 1, tail: "" },
+      {
+        name: "b",
+        mode: "hard",
+        passed: false,
+        skipped: true,
+        notRun: true,
+        durationS: 0,
+        tail: "",
+      },
+    ];
+    expect(shouldAttest({ diagnostic: false, results, expectedLegs: 2 })).toBe(false);
+    expect(legStatus(results[1])).toBe("not-run");
+  });
+
   it("skipped legs are attestable — CI skips the same jobs", () => {
     const results = [
       { name: "a", mode: "hard", passed: true, durationS: 1, tail: "" },

@@ -61,10 +61,21 @@ reorders anything — skipped legs are marked, not removed. Diff globs use
 `**` (crosses directories), `*` and `?` (single segment). All four fields are
 plain data, so they work identically in `.mjs` and `.json` configs.
 
-Fail-open rule: when the PR's changed-file list cannot be read (API failure,
-detached context), `when`/`skipWhenDiffOnly` skip nothing and every leg runs.
-Running too much is safe; an attested PR that skipped too much has disabled
-CI on unverified code.
+Fail-open rule: when the PR's changed-file list cannot be read, looks
+truncated (the Files API caps at 3000 files — the tool cross-checks the
+parsed list against the PR's declared `changedFiles` count), or is empty,
+`when`/`skipWhenDiffOnly` skip nothing and every leg runs. Running too much
+is safe; an attested PR that skipped too much has disabled CI on unverified
+code. An all-skipped run refuses to attest for the same reason.
+
+**The superset burden is yours.** Nothing verifies these globs against
+`.github/workflows/**`. A `when` glob narrower than the mirrored CI job's
+`paths:` filter skips the leg locally while the attestation switches that job
+off remotely — unverified code merges with CI disabled. Keep every diff-rule
+glob at least as broad as the CI filter it mirrors, and re-check the pair
+whenever either side changes. The dialect is deliberately small (`**`, `*`,
+`?`); CI syntax like `{a,b}` or `!` is rejected at validation rather than
+silently matching nothing.
 
 The matrix is the only required field; everything else has sensible defaults.
 
@@ -78,7 +89,7 @@ Every run whose matrix executes appends exactly one JSONL line to
 `auditLogPath`, tagged `result: attested | hard-fail | head-moved | push-fail
 | post-fail | dry-run | diagnostic`, with per-leg
 `{name, mode, status, durationS}` (`status ∈ pass | fail | advisory-fail |
-not-run`), the invocation `flags`, the certified `toolchain` versions when
+skipped | not-run`), the invocation `flags`, the certified `toolchain` versions when
 pins are configured, and — for diagnostic runs — a `dirty` marker, because a
 dirty tree's `sha` does not identify the tree that ran.
 Lines written by versions before `result` existed were only ever written

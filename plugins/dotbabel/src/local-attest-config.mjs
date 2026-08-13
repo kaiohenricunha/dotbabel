@@ -58,6 +58,8 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
+
+import { UNSUPPORTED_GLOB_CHARS } from "./local-attest-lib.mjs";
 import { resolve as resolvePath, isAbsolute } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -238,6 +240,13 @@ export function validateConfig(input) {
           `config.matrix[${i}].when.changedPaths must be a non-empty array of glob strings`,
         );
       }
+      for (const g of w.changedPaths) {
+        if (UNSUPPORTED_GLOB_CHARS.test(/** @type {string} */ (g))) {
+          throw new ConfigError(
+            `config.matrix[${i}].when.changedPaths: ${JSON.stringify(g)} uses glob syntax this dialect does not support (only **, *, ?) — a copied CI glob that silently matches nothing would skip this leg on every PR`,
+          );
+        }
+      }
     }
     if (leg.skipWhenDiffOnly !== undefined) {
       if (
@@ -248,6 +257,13 @@ export function validateConfig(input) {
         throw new ConfigError(
           `config.matrix[${i}].skipWhenDiffOnly must be a non-empty array of glob strings`,
         );
+      }
+      for (const g of /** @type {string[]} */ (leg.skipWhenDiffOnly)) {
+        if (UNSUPPORTED_GLOB_CHARS.test(g)) {
+          throw new ConfigError(
+            `config.matrix[${i}].skipWhenDiffOnly: ${JSON.stringify(g)} uses glob syntax this dialect does not support (only **, *, ?)`,
+          );
+        }
       }
     }
     if (leg.passPrBody !== undefined && typeof leg.passPrBody !== "boolean") {

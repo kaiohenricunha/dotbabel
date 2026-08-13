@@ -8,6 +8,7 @@ import {
   applyLabel,
   checkPreconditions,
   execute,
+  restoreRestoreFiles,
   runMatrix,
   upsertComment,
 } from "../src/local-attest-runner.mjs";
@@ -868,7 +869,11 @@ describe("execute diff gating, restore, and PR body", () => {
         },
       ],
     });
-    const replies = [...happy, [/pulls\/42\/files/, { stdout: "docs/a.md\nREADME.md\n" }]];
+    const replies = [
+      ...happy,
+      [/pulls\/42\/files/, { stdout: '["docs/a.md","README.md"]\n' }],
+      [/--json changedFiles/, { stdout: "2\n" }],
+    ];
     const { deps, calls } = makeDeps({ runReplies: replies });
     const r = await execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
     expect(r.exitCode).toBe(0);
@@ -925,5 +930,167 @@ describe("execute diff gating, restore, and PR body", () => {
     const plain = calls.run.find((c) => /echo plain/.test(c.cmd));
     expect(harness.opts.env.PR_BODY).toBe("The Body");
     expect(plain.opts.env?.PR_BODY).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// review fixes: floor, truncation, restore hardening, ordering pins
+// ---------------------------------------------------------------------------
+
+describe("review hardening", () => {
+  const happy = [
+    [/git rev-parse --abbrev-ref HEAD/, { stdout: "feature\n" }],
+    [/gh auth status/, { status: 0 }],
+    [/gh repo view --json nameWithOwner/, { stdout: "k/r\n" }],
+    [/gh pr view --json number/, { stdout: "42\n" }],
+    [/git rev-parse HEAD/, { stdout: "abc1234abc1234abc1234abc1234abc1234abc12\n" }],
+    [/gh pr view 42 --json headRefOid/, { stdout: "abc1234abc1234abc1234abc1234abc1234abc12\n" }],
+    [/gh api repos.*\/comments --paginate/, { stdout: "[]" }],
+  ];
+  const clean = [[/git status --porcelain/, { stdout: "" }], ...happy];
+
+  it("an all-skipped matrix refuses to attest — the zero-executed floor", async () => {
+    const cfg = validateConfig({
+      matrix: [
+        { name: "a", mode: "hard", command: "echo a", skipWhenDiffOnly: ["**/*.md"] },
+        { name: "b", mode: "hard", command: "echo b", skipWhenDiffOnly: ["**/*.md"] },
+      ],
+    });
+    const replies = [
+      ...clean,
+      [/pulls\/42\/files/, { stdout: '["README.md"]\n' }],
+      [/--json changedFiles/, { stdout: "1\n" }],
+    ];
+    const { deps, calls } = makeDeps({ runReplies: replies });
+    const r = await execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
+    expect(r.exitCode).toBe(1);
+    expect(calls.gh).toHaveLength(0);
+    const entry = JSON.parse(calls.appendLog[0].line);
+    expect(entry.result).toBe("hard-fail");
+  });
+
+  it("a truncation mismatch between parsed list and declared count fails open", async () => {
+    const cfg = validateConfig({
+      matrix: [
+        { name: "gated", mode: "hard", command: "echo gated", when: { changedPaths: ["api/**"] } },
+      ],
+    });
+    const replies = [
+      ...clean,
+      [/pulls\/42\/files/, { stdout: '["docs/a.md"]\n' }],
+      [/--json changedFiles/, { stdout: "3200\n" }],
+    ];
+    const { deps, calls } = makeDeps({ runReplies: replies });
+    await execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
+    expect(calls.run.some((c) => /echo gated/.test(c.cmd))).toBe(true);
+    expect(calls.warn.some((w) => /looks incomplete/.test(w))).toBe(true);
+  });
+
+  it("a throwing restore is swallowed with a warning and the audit line still lands", async () => {
+    const cfg = validateConfig({
+      matrix: [{ name: "a", mode: "hard", command: "echo a" }],
+      restoreFiles: ["src/seeded.js"],
+    });
+    let reads = 0;
+    const { deps, calls } = makeDeps({ runReplies: clean });
+    deps.readFile = () => (reads++ === 0 ? "original" : "stubbed");
+    deps.writeFile = () => {
+      throw new Error("EACCES: read-only");
+    };
+    const r = await execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
+    expect(r.exitCode).toBe(0);
+    expect(calls.warn.some((w) => /restoring seeded files failed/.test(w))).toBe(true);
+    const entry = JSON.parse(calls.appendLog[0].line);
+    expect(entry.result).toBe("attested");
+  });
+
+  it("a file a leg DELETED is restored from the snapshot", () => {
+    const snap = new Map([["src/x.js", "content"]]);
+    const writes = [];
+    const deps = {
+      readFile: () => null,
+      writeFile: (path, content) => writes.push({ path, content }),
+    };
+    const restored = restoreRestoreFiles(deps, snap);
+    expect(restored).toEqual(["src/x.js"]);
+    expect(writes).toEqual([{ path: "src/x.js", content: "content" }]);
+  });
+
+  it("Buffer snapshots compare by content, not identity", () => {
+    const before = Buffer.from([0xde, 0xad]);
+    const nowSame = Buffer.from([0xde, 0xad]);
+    const deps = { readFile: () => nowSame, writeFile: () => {} };
+    expect(restoreRestoreFiles(deps, new Map([["f", before]]))).toEqual([]);
+  });
+
+  it("diagnostic runs restore seeded files too", async () => {
+    const cfg = validateConfig({
+      matrix: [{ name: "seeder", mode: "hard", command: "echo seed" }],
+      restoreFiles: ["src/seeded.js"],
+    });
+    let reads = 0;
+    const { deps, calls } = makeDeps();
+    deps.readFile = () => (reads++ === 0 ? "original" : "stubbed");
+    await execute(deps, cfg, {
+      prOverride: null,
+      push: true,
+      dryRun: false,
+      only: ["seeder"],
+      from: null,
+      failFast: false,
+    });
+    expect(calls.writeFile).toEqual([{ path: "src/seeded.js", content: "original" }]);
+  });
+
+  it("a diff-skipped leg stays skipped, not not-run, after a fail-fast trip", async () => {
+    const cfg = validateConfig({
+      matrix: [
+        { name: "boom", mode: "hard", command: "echo boom" },
+        { name: "skippy", mode: "hard", command: "echo skippy" },
+      ],
+    });
+    cfg.matrix[1].skipped = true;
+    const replies = [[/echo boom/, { status: 1 }]];
+    const { deps } = makeDeps({ runReplies: replies });
+    const results = await runMatrix(deps, cfg.matrix, { failFast: true });
+    expect(results[1]).toMatchObject({ skipped: true, passed: true });
+    expect(results[1].notRun).toBeUndefined();
+  });
+
+  it("restore happens before the head recheck — a dirty-until-restored tree still attests", async () => {
+    const cfg = validateConfig({
+      matrix: [{ name: "mutator", mode: "hard", command: "echo mutate" }],
+      restoreFiles: ["src/seeded.js"],
+    });
+    // git status is driven by restore state: dirty until writeFile runs.
+    let restoredFlag = false;
+    let reads = 0;
+    const replies = [
+      [/git status --porcelain/, () => ({ stdout: restoredFlag ? "" : " M src/seeded.js\n" })],
+      ...happy,
+    ];
+    const { deps, calls } = makeDeps({ runReplies: replies });
+    deps.readFile = () => (reads++ === 0 ? "original" : "stubbed");
+    const origWrite = deps.writeFile;
+    deps.writeFile = (path, content) => {
+      restoredFlag = true;
+      origWrite(path, content);
+    };
+    // requireClean would see the dirty stub pre-matrix; disable it for this
+    // scenario — the discriminating part is the POST-matrix recheck.
+    const r = await execute(
+      deps,
+      validateConfig({
+        ...{
+          matrix: cfg.matrix.map((l) => ({ name: l.name, mode: l.mode, command: l.command })),
+          restoreFiles: ["src/seeded.js"],
+        },
+        requireClean: false,
+      }),
+      { prOverride: null, push: false, dryRun: false },
+    );
+    expect(r.exitCode).toBe(0);
+    expect(calls.writeFile).toHaveLength(1);
+    expect(JSON.parse(calls.appendLog[0].line).result).toBe("attested");
   });
 });

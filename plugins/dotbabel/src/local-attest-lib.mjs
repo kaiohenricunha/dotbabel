@@ -227,9 +227,21 @@ export function filterMatrix(matrix, { only = [], from = null } = {}) {
 
 /**
  * Translate a path glob into a RegExp: `**` crosses separators, `*` and `?`
- * do not; everything else matches literally. Same zero-dependency semantics
+ * do not; everything else matches literally. This dialect is a strict subset
+ * of CI path-filter syntax — `{a,b}` alternation and `!` negation are NOT
+ * supported and are rejected at config validation (UNSUPPORTED_GLOB_CHARS),
+ * because a copied CI glob that silently matches nothing would skip its leg
+ * on every PR forever. Same zero-dependency semantics
  * as the protected-path matcher in pr-gates.mjs — duplicated deliberately so
  * the two modules stay decoupled.
+ *
+ * Characters from richer glob dialects that this matcher would misread are
+ * rejected at config validation via this pattern.
+ */
+export const UNSUPPORTED_GLOB_CHARS = /[!{}[\]]/;
+
+/**
+ * (see the dialect note in the doc block above UNSUPPORTED_GLOB_CHARS)
  *
  * @param {string} glob
  * @returns {RegExp}
@@ -338,8 +350,8 @@ export function renderComment(results, { headSha, hostname, toolchain, now }) {
   const headline =
     skippedCount > 0
       ? `The CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`. ` +
-        `${skippedCount} leg(s) were skipped for this diff per the config's diff rules \u2014 ` +
-        "the corresponding CI jobs skip the same way."
+        `${skippedCount} leg(s) were skipped for this diff per this repo's local-attest diff rules ` +
+        "(see .local-attest config; the rules are the config author's mirror of CI's own path filters)."
       : `The full CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`.`;
   return [
     marker,
@@ -376,12 +388,11 @@ export function renderComment(results, { headSha, hostname, toolchain, now }) {
  * so is the honest reading of a hole.
  *
  * @param {LegResult|undefined} r
- * @returns {"pass"|"fail"|"advisory-fail"|"not-run"}
+ * @returns {"pass"|"fail"|"advisory-fail"|"skipped"|"not-run"}
  */
 export function legStatus(r) {
-  if (!r) return "not-run";
+  if (!r || r.notRun) return "not-run";
   if (r.skipped) return "skipped";
-  if (r.notRun) return "not-run";
   if (r.passed) return "pass";
   return r.mode === "advisory" ? "advisory-fail" : "fail";
 }
@@ -402,8 +413,10 @@ export function legStatus(r) {
  * declares.
  *
  * Advisory failures do not block, matching the gate semantics the matrix
- * mirrors. Diff-skipped legs are attestable: the corresponding CI jobs skip
- * for the same diff, so the attestation claims nothing CI would have run. A `--fail-fast` run in which nothing failed completed the full
+ * mirrors. Diff-skipped legs are attestable ONLY alongside at least one
+ * executed leg, and their soundness rests on the config's globs mirroring
+ * the CI path filters — a burden the config author carries (see the
+ * operator guide's drift caveat); nothing here verifies the workflows. A `--fail-fast` run in which nothing failed completed the full
  * matrix and may attest.
  *
  * @param {{ diagnostic?: boolean, results: Array<LegResult|undefined>,
@@ -417,8 +430,16 @@ export function shouldAttest({ diagnostic, results, expectedLegs }) {
     results.length > 0 &&
     (expectedLegs === undefined || results.length === expectedLegs) &&
     results.every(
-      (r) => r && (r.skipped === true || (r.notRun !== true && typeof r.passed === "boolean")),
+      (r) =>
+        r &&
+        ((r.skipped === true && r.notRun !== true) ||
+          (r.notRun !== true && typeof r.passed === "boolean")),
     ) &&
+    // Floor: at least one leg actually executed. An all-skipped run has
+    // verified nothing, and the marker it would post switches off every gated
+    // CI job — for a diff that skips everything locally, CI's own path
+    // filters already skip the same jobs, so nothing is lost by refusing.
+    results.some((r) => r && !r.skipped && r.notRun !== true) &&
     !results.some((r) => r && !r.skipped && r.mode === "hard" && !r.passed)
   );
 }
