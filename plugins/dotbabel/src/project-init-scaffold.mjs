@@ -16,6 +16,7 @@ export const DEFAULT_DOTBABEL_JSON = Object.freeze({
   commands_dir: ".claude/commands",
   skills_dir: ".claude/skills",
   fan_out: ["codex", "gemini", "copilot"],
+  fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
   cli_substitutions: {},
   targets: [

@@ -152,12 +152,22 @@ Add `$schema` to the top of the file for editor autocomplete and validation:
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
   "fan_out": ["codex", "gemini", "copilot"],
+  "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true
 }
 ```
 
 `fan_out` accepts only `codex`, `gemini`, and `copilot`. A typo such as
 `co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
+
+`fan_out_layout` (default `per-cli`) decides whether Codex and Gemini get one
+tree each or share a canonical one. Under `shared`, the table above collapses:
+`.claude/` fans out once to `.cli/skills/`, and `.codex/skills` and
+`.gemini/skills` become symlinks to it, so each command and skill is tracked
+once instead of twice. Copilot's `.github/` shapes are unchanged. Switching an
+existing repo backs the old trees up to `.codex/skills.bak-<timestamp>`; an
+unknown value fails with `CONFIG_UNKNOWN_LAYOUT`. Revert to `per-cli` if a CLI
+will not follow the redirect.
 
 `gate_on_cli_presence` (default `true`) skips a CLI's symlink fan-out when its
 binary is absent from `PATH`. `check-project-sync` applies the same gate, so it

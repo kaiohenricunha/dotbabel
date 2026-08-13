@@ -430,16 +430,32 @@ artifacts are `dotbabel bootstrap`'s job.
 Gated on CLI presence by default: a target is skipped when its CLI is not on
 PATH. `.dotbabel.json` `gate_on_cli_presence` controls that; `--all` overrides.
 
+`.dotbabel.json` `fan_out_layout` chooses the Codex/Gemini shape:
+
+| Value               | Result                                                         |
+| ------------------- | -------------------------------------------------------------- |
+| `per-cli` (default) | `.codex/skills/` and `.gemini/skills/` are two identical trees |
+| `shared`            | one `.cli/skills/` tree; both CLI paths become symlinks to it  |
+
+Switching to `shared` backs the old trees up to `.codex/skills.bak-<timestamp>`.
+Copilot's `.github/prompts/` and `.github/instructions/` are unaffected.
+
 ---
 
 ## `dotbabel-check-project-sync`
 
 Read-only counterpart. Verifies the wiring matches what `project-sync` would
-produce, without writing anything — the CI-safe form.
+produce, without writing anything — the CI-safe form. Honors `fan_out_layout`,
+so it checks whichever shape the config asks for.
 
-| Flag            | Default |                  |
-| --------------- | ------- | ---------------- |
-| `--repo <path>` | `cwd`   | Target repo root |
+| Flag            | Default |                                                        |
+| --------------- | ------- | ------------------------------------------------------ |
+| `--repo <path>` | `cwd`   | Target repo root                                       |
+| `--all`         | false   | Check every `fan_out` CLI, even one absent from `PATH` |
+
+Without `--all` a CLI missing from `PATH` is reported as
+`skipped <cli>: not on PATH` rather than as drift, matching what `project-sync`
+declined to write.
 
 ---
 

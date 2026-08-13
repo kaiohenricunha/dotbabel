@@ -4,6 +4,7 @@
   "commands_dir": ".claude/commands",
   "skills_dir": ".claude/skills",
   "fan_out": ["codex", "gemini", "copilot"],
+  "fan_out_layout": "shared",
   "gate_on_cli_presence": true,
   "cli_substitutions": {},
   "targets": []

@@ -528,3 +528,130 @@ describe("projectSync", () => {
     expect(fs.realpathSync(linkPath)).toBe(fs.realpathSync(absSrc));
   });
 });
+
+// ---------------------------------------------------------------------------
+// fan_out_layout — Codex and Gemini share one canonical tree (#219, finding C)
+// ---------------------------------------------------------------------------
+
+describe("projectSync — shared fan-out layout", () => {
+  const shared = (repo, ...rest) => path.join(repo, ".cli", "skills", ...rest);
+
+  function buildSharedRepo() {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out_layout: "shared",
+      },
+    });
+    return repo;
+  }
+
+  it("defaults to per-cli when the key is absent", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".cli"))).toBe(false);
+    expect(fs.lstatSync(path.join(repo, ".codex", "skills")).isSymbolicLink()).toBe(false);
+  });
+
+  it("writes one canonical tree and a redirect per CLI", async () => {
+    const repo = buildSharedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    expect(fs.existsSync(shared(repo, "commit", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(shared(repo, "deploy"))).toBe(true);
+
+    for (const cli of ["codex", "gemini"]) {
+      const redirect = path.join(repo, `.${cli}`, "skills");
+      expect(fs.lstatSync(redirect).isSymbolicLink()).toBe(true);
+      expect(fs.realpathSync(redirect)).toBe(fs.realpathSync(shared(repo)));
+    }
+  });
+
+  it("stores the redirect as a relative target, like every other link (#218)", async () => {
+    const repo = buildSharedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const target = fs.readlinkSync(path.join(repo, ".codex", "skills"));
+    expect(path.isAbsolute(target)).toBe(false);
+  });
+
+  it("resolves a command through both hops to the file in .claude/", async () => {
+    const repo = buildSharedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const viaCodex = path.join(repo, ".codex", "skills", "commit", "SKILL.md");
+    expect(fs.readFileSync(viaCodex, "utf8")).toBe("# /commit\n");
+    expect(fs.realpathSync(viaCodex)).toBe(
+      fs.realpathSync(path.join(repo, ".claude", "commands", "commit.md")),
+    );
+  });
+
+  it("backs the old per-cli tree up when a repo switches to shared", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(fs.lstatSync(path.join(repo, ".codex", "skills")).isDirectory()).toBe(true);
+
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out_layout: "shared" }),
+    );
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    expect(fs.lstatSync(path.join(repo, ".codex", "skills")).isSymbolicLink()).toBe(true);
+    const backups = fs
+      .readdirSync(path.join(repo, ".codex"))
+      .filter((e) => e.startsWith("skills.bak-"));
+    expect(backups).toHaveLength(1);
+  });
+
+  it("creates no .cli tree when only copilot fans out", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["copilot"],
+        fan_out_layout: "shared",
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".cli"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".github", "prompts", "commit.prompt.md"))).toBe(true);
+  });
+
+  it("builds the canonical tree exactly once for both CLIs", async () => {
+    const repo = buildSharedRepo();
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(fs.readdirSync(shared(repo)).sort()).toEqual(["commit", "deploy", "review"]);
+  });
+
+  it("rejects an unknown fan_out_layout", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out_layout: "sideways" }),
+    );
+    let caught;
+    try {
+      loadProjectConfig(repo);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(ValidationError);
+    expect(caught.code).toBe(ERROR_CODES.CONFIG_UNKNOWN_LAYOUT);
+    expect(caught.pointer).toBe("/fan_out_layout");
+    expect(caught.message).toMatch(/sideways/);
+  });
+
+  it("builds nothing when every CLI is gated off PATH", async () => {
+    const repo = buildSharedRepo();
+    hideAllClisFromPath();
+    const r = await projectSync({ repoRoot: repo, allCli: false, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".codex", "skills"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".cli"))).toBe(false);
+  });
+});
