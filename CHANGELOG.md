@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.17.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.17.0...v2.17.1) (2026-08-14)
+
+
+### Fixed
+
+* **tests:** drop fs.globSync — Node 20 leg red on main ([#306](https://github.com/kaiohenricunha/dotbabel/issues/306)) ([1ee3225](https://github.com/kaiohenricunha/dotbabel/commit/1ee322500d0c9f464e177e5578ef5b8ec9cddc32))
+
 ## [2.17.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.16.0...v2.17.0) (2026-08-14)
 
 
