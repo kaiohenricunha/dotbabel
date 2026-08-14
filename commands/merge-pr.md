@@ -91,19 +91,31 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
    - The exact merge command you will run
      Wait for the user to say "merge" (or equivalent).
 
-9. **Merge — with an explicit, marker-free squash body.**
-   The default squash body concatenates the branch's commit messages. Every
-   intermediate commit carries `[skip ci]` (the conductor requires it), GitHub
-   honors the marker **anywhere** in the final message, and release-please is
-   a push-triggered workflow — so a default-body squash merge silently
-   suppresses the release for its own commits. Build the body from the PR
-   description and strip any CI-suppression markers it happens to quote:
+9. **Merge — with an explicit, marker-free squash subject AND body.**
+   The default squash body concatenates the branch's commit messages, and —
+   the sneakier half — on a **single-commit PR** the default squash _subject_
+   is that commit's subject line, not the PR title. Every intermediate commit
+   carries `[skip ci]` (the conductor requires it), GitHub honors the marker
+   **anywhere** in the final message including line 1, and release-please is
+   a push-triggered workflow — so a default merge silently suppresses the
+   release for its own commits. Pass both halves explicitly, built from the
+   PR title and description with any CI-suppression markers stripped:
 
    ```bash
-   gh pr view <N> --json body -q .body \
-     | sed -e 's/\[skip ci\]//g' -e 's/\[ci skip\]//g' -e 's/skip-checks: *true//g' \
-     > /tmp/merge-pr-<N>-body.md
-   gh pr merge <N> --squash --delete-branch --body-file /tmp/merge-pr-<N>-body.md
+   STRIP='s/\[skip ci\]//g; s/\[ci skip\]//g; s/skip-checks: *true//g'
+   SUBJ="$(gh pr view <N> --json title -q .title | sed "$STRIP") (#<N>)"
+   gh pr view <N> --json body -q .body | sed "$STRIP" > /tmp/merge-pr-<N>-body.md
+   gh pr merge <N> --squash --delete-branch \
+     --subject "$SUBJ" --body-file /tmp/merge-pr-<N>-body.md
+   ```
+
+   Afterwards, verify the merge commit is marker-free — this exact flow has
+   been beaten three ways (body, then subject) and the check is one line:
+
+   ```bash
+   git log --format=%B -1 <merge-sha> | grep -nE '\[skip ci\]|\[ci skip\]|skip-checks' \
+     && echo "SUPPRESSED — run: gh workflow run release-please.yml --ref main" \
+     || echo "clean"
    ```
 
    Then clean up the worktree:
@@ -116,7 +128,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 ## Rules
 
 - Never skip the full test suite, even if CI is green — CI config drift is real.
-- Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 9's `--body-file` flow exists for exactly this.
+- Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 9's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
 - Never claim a failure is "pre-existing" without the `git stash` proof.
 - Never merge without explicit user confirmation. CI green alone is not authorization.
 - Never force-push; never merge into `main`/`master` with failing local tests.
