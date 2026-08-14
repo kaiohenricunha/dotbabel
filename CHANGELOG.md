@@ -10,6 +10,31 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.17.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.16.0...v2.17.0) (2026-08-14)
+
+
+### Added
+
+* **local-attest:** diagnostic modes, failure-complete audit log, toolchain pins ([#300](https://github.com/kaiohenricunha/dotbabel/issues/300)) ([20deb8c](https://github.com/kaiohenricunha/dotbabel/commit/20deb8c3d7a5bb7524bc0b4a4e0133735e687831))
+* **local-attest:** lanes, diff-gated legs, worktree restore, PR-body env ([#301](https://github.com/kaiohenricunha/dotbabel/issues/301)) ([34f77b3](https://github.com/kaiohenricunha/dotbabel/commit/34f77b34fc95b4da6c81425925f385308d6d3b7d))
+
+
+### Fixed
+
+* **bin:** resolve argv[1] symlinks in the run-direct guard ([#302](https://github.com/kaiohenricunha/dotbabel/issues/302)) ([584e11a](https://github.com/kaiohenricunha/dotbabel/commit/584e11ace08592bd9e39589321520c482d4a6234))
+* **pr-conductor:** close the four deferred review findings ([#299](https://github.com/kaiohenricunha/dotbabel/issues/299)) ([98c1a98](https://github.com/kaiohenricunha/dotbabel/commit/98c1a980aaf699db44e9044a8d2f979964a66596))
+* **release:** stop squash merges from suppressing release-please [skip ci] ([#303](https://github.com/kaiohenricunha/dotbabel/issues/303)) ([8a1f64a](https://github.com/kaiohenricunha/dotbabel/commit/8a1f64aa34e840a9a44be1171fa2300fea75dee0))
+
+
+### Performance
+
+* **pr-conductor:** cut redundant passes and parallelise the bats suite ([#298](https://github.com/kaiohenricunha/dotbabel/issues/298)) ([4488f54](https://github.com/kaiohenricunha/dotbabel/commit/4488f547bfba83e3fabb18f620c0d6ae5a30e478))
+
+
+### Documentation
+
+* **merge-pr:** clean the squash subject too — single-commit PRs inherit it ([#305](https://github.com/kaiohenricunha/dotbabel/issues/305)) ([5bfbc61](https://github.com/kaiohenricunha/dotbabel/commit/5bfbc61862efed5bcc2f857f51b99ffaaa5822a5))
+
 ## [2.16.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.15.0...v2.16.0) (2026-08-13)
 
 
