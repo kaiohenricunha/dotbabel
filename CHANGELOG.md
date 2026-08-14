@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.18.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.17.1...v2.18.0) (2026-08-14)
+
+
+### Added
+
+* **local-attest:** --init drafts a matrix from .github/workflows ([#309](https://github.com/kaiohenricunha/dotbabel/issues/309)) ([541b82e](https://github.com/kaiohenricunha/dotbabel/commit/541b82eeba84ff78ad163ee970222fb4c1ed65da))
+
 ## [2.17.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.17.0...v2.17.1) (2026-08-14)
 
 
