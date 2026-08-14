@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+  # Manual escape hatch: a squash body that inherits a CI-suppression marker
+  # from its intermediate commits suppresses this push workflow too (GitHub
+  # matches the marker anywhere in the message), leaving pending releasable
+  # commits with no trigger — branch protection forbids empty pushes to main.
+  workflow_dispatch:
 
 permissions:
   contents: write
