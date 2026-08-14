@@ -1,3 +1,9 @@
+---
+name: init-harness
+description: Scaffold the harness + spec-driven-development skeleton in the current repo and install the @dotbabel/dotbabel plugin.
+argument-hint: "[project-name]"
+---
+
 Scaffold the harness + SDD skeleton in the current repo and install the `@dotbabel/dotbabel` plugin.
 
 Trigger: direct invocation via `/init-harness <project-name>`. Also triggered when the user says "scaffold the harness in this repo" / "set up spec-driven development here" / "init claude config for this project".
