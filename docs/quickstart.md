@@ -1,6 +1,6 @@
 # Quickstart
 
-_Last updated: v2.17.1_
+_Last updated: v2.18.0_
 
 **Two paths — pick yours:**
 
