@@ -8,7 +8,14 @@
 // the same loud behavior a direct invocation produces.
 
 import { spawnSync } from "node:child_process";
-import { globSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -51,6 +58,17 @@ const PROBES = [
 
 const shimDir = mkdtempSync(path.join(tmpdir(), "dotbabel-bin-shim-"));
 afterAll(() => rmSync(shimDir, { recursive: true, force: true }));
+
+// Every .mjs file under dir, recursively (Node 20-compatible glob substitute).
+function mjsFilesUnder(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) out.push(...mjsFilesUnder(full));
+    else if (entry.name.endsWith(".mjs")) out.push(full);
+  }
+  return out;
+}
 
 describe.each(PROBES)("$bin invoked through a .bin-style symlink", ({ bin, args, expects }) => {
   it("still runs main() instead of a silent exit 0", () => {
@@ -96,10 +114,13 @@ describe("no file reintroduces the symlink-blind guard", () => {
     // (or deploy-ops' inlined realpath comparison), neither of which needs
     // this expression — so any new occurrence is a regression, most likely
     // copy-pasted from a pre-fix file.
+    // Recursive readdir, not fs.globSync: engines say node >=20 and CI runs
+    // a Node 20 leg, but globSync only exists from Node 22. Sweeping every
+    // .mjs under these roots is also strictly broader than the old globs.
     const files = [
-      ...globSync(path.join(BIN_DIR, "*.mjs")),
-      ...globSync(path.join(REPO_ROOT, "skills/*/scripts/*.mjs")),
-      ...globSync(path.join(REPO_ROOT, "plugins/dotbabel/templates/**/scripts/*.mjs")),
+      ...mjsFilesUnder(BIN_DIR),
+      ...mjsFilesUnder(path.join(REPO_ROOT, "skills")),
+      ...mjsFilesUnder(path.join(REPO_ROOT, "plugins/dotbabel/templates")),
     ];
     expect(files.length).toBeGreaterThan(20);
     const offenders = files.filter((f) =>
