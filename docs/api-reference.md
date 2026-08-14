@@ -1,6 +1,6 @@
 # Node API reference
 
-_Last updated: v2.16.0_
+_Last updated: v2.17.0_
 
 The public contract lives at `plugins/dotbabel/src/index.mjs` — import from
 the package root, not deep paths:
