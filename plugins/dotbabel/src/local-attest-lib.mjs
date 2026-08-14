@@ -35,6 +35,8 @@
  * @property {string[]} only
  * @property {string|null} from
  * @property {boolean} failFast
+ * @property {boolean} init   draft a config from .github/workflows and exit; runs no legs
+ * @property {boolean} force  allow --init to overwrite an existing config
  */
 
 export const ATTEST_MARKER_PREFIX = "<!-- local-attest verified-sha=";
@@ -128,6 +130,8 @@ export function parseArgs(argv, die) {
     only: [],
     from: null,
     failFast: false,
+    init: false,
+    force: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -153,6 +157,10 @@ export function parseArgs(argv, die) {
       if (!v) return exit(64, "--from requires a leg name");
       if (args.from !== null) return exit(64, "--from given more than once");
       args.from = v;
+    } else if (a === "--init") {
+      args.init = true;
+    } else if (a === "--force") {
+      args.force = true;
     } else if (a === "--fail-fast") {
       args.failFast = true;
     } else if (a === "--help" || a === "-h") {

@@ -36,7 +36,15 @@
  *   64  bad CLI invocation (unknown flag, malformed --pr)
  */
 
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
+import {
+  matrixFromWorkflows,
+  renderConfig,
+  toolchainFromWorkflows,
+} from "../src/local-attest-init.mjs";
 
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { parseArgs } from "../src/local-attest-lib.mjs";
@@ -45,11 +53,16 @@ import { PreconditionError, execute, realDeps } from "../src/local-attest-runner
 
 const HELP = `dotbabel-local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast]
                       [--only <leg>] [--from <leg>] [--config <path>]
+                      [--init [--force]]
 
 Run the configured CI matrix locally and, on a clean pass, post an attestation
 comment to the open PR so the remote pipeline skips itself for this commit.
 
 Options:
+  --init             Draft a .local-attest config from .github/workflows and
+                     exit. Runs no legs and posts nothing. The draft is a
+                     starting point for review, never a finished gate.
+  --force            Let --init overwrite an existing config file.
   --pr <N>           Target PR number (defaults to the open PR for the branch)
   --no-push          Do not run \`git push\` after attesting
   --dry-run          Print the comment that would be posted; post nothing
@@ -81,6 +94,63 @@ function fail(code, msg) {
   process.exit(code);
 }
 
+/**
+ * `--init`: draft a config from the repo's workflows and write it.
+ *
+ * Refuses to clobber an existing config without --force — that file is a
+ * gate, and silently replacing a reviewed matrix with a draft is the worst
+ * thing this command could do.
+ *
+ * @param {ReturnType<typeof parseArgs>} argv
+ * @returns {Promise<number>} exit code
+ */
+async function runInit(argv) {
+  const dir = resolve(process.cwd(), ".github/workflows");
+  if (!existsSync(dir)) {
+    fail(EXIT_CODES.ENV, `no .github/workflows directory in ${process.cwd()} — nothing to read.`);
+  }
+  const names = readdirSync(dir).filter((f) => f.endsWith(".yml") || f.endsWith(".yaml"));
+  if (names.length === 0) {
+    fail(EXIT_CODES.ENV, "no workflow files in .github/workflows.");
+  }
+
+  const target = resolve(process.cwd(), argv.config ?? ".local-attest.config.mjs");
+  if (existsSync(target) && !argv.force) {
+    fail(
+      EXIT_CODES.VALIDATION,
+      `${target} already exists. Pass --force to overwrite it, but read it first:\n` +
+        "  a reviewed matrix replaced by a draft is a gate you no longer control.",
+    );
+  }
+
+  const files = names.map((n) => ({
+    path: `.github/workflows/${n}`,
+    text: readFileSync(resolve(dir, n), "utf8"),
+  }));
+  const draft = matrixFromWorkflows(files);
+  const toolchain = toolchainFromWorkflows(files);
+
+  if (draft.legs.length === 0) {
+    fail(
+      EXIT_CODES.VALIDATION,
+      "no pull_request-triggered `run:` steps found — nothing to draft.\n" +
+        draft.warnings.map((w) => `  - ${w}`).join("\n"),
+    );
+  }
+
+  writeFileSync(target, renderConfig({ ...draft, toolchain }), "utf8");
+
+  process.stdout.write(
+    `Drafted ${target}\n` +
+      `  ${draft.legs.length} leg(s) from ${files.length} workflow file(s)\n` +
+      `  ${draft.warnings.length} TODO(s) written into the file\n\n` +
+      "This is a DRAFT, not a gate. Attesting switches remote CI off, so a leg\n" +
+      "missing here is enforced nowhere. Review it against your workflows, then:\n" +
+      "  dotbabel local-attest --dry-run    # run the matrix, post nothing\n",
+  );
+  return EXIT_CODES.OK;
+}
+
 async function main() {
   const rawArgs = process.argv.slice(2);
   if (rawArgs.includes("--version") || rawArgs.includes("-V")) {
@@ -102,6 +172,10 @@ async function main() {
   if (argv.help) {
     process.stdout.write(HELP + "\n");
     process.exit(EXIT_CODES.OK);
+  }
+
+  if (argv.init) {
+    process.exit(await runInit(argv));
   }
 
   /** @type {import("../src/local-attest-config.mjs").Config} */

@@ -6,16 +6,39 @@
 
 > Maintained by [@kaiohenricunha](https://github.com/kaiohenricunha) · [Changelog](./CHANGELOG.md) · [Security](./SECURITY.md)
 
-An opinionated, model-agnostic governance toolkit for Claude Code, Codex,
-Gemini CLI, Copilot CLI, and other agentic CLIs. Ships a curated library of
-skills, slash commands, and cloud/IaC specialists plus a global rule floor
-that hardens every agent session — and an optional spec-driven-development
-governance CLI on top, for repos that want PR-time gates.
+**Stop paying for CI you already ran locally.**
+
+You run the test suite on your machine, push, and then wait ten minutes while
+GitHub-hosted runners run exactly the same commands again — and bill you for
+it. `dotbabel local-attest` runs your CI matrix locally and, on a clean pass,
+posts a SHA-pinned comment that makes your workflows skip themselves for that
+commit. One repo using it cut ~27 minutes of runner time per push to zero.
+
+```bash
+npx dotbabel-local-attest --init      # draft a matrix from .github/workflows
+npx dotbabel-local-attest --dry-run   # run it locally, post nothing
+npx dotbabel-local-attest             # run it, attest, push
+```
+
+It is deliberately hard to fool. The attestation is pinned to the exact head
+SHA, so the next push invalidates it; only repo-owner comments are trusted;
+the run refuses to attest if any leg was skipped, never launched, or hard
+failed; every run — including every failure — appends a line to an audit log;
+and toolchain pins fail the run closed when your local Node or Go differs from
+CI's. The tradeoffs, including the ones that should stop you adopting it, are
+in [the operator guide](./skills/local-attest/references/operator-guide.md).
+
+**That is the wedge. The rest of the toolkit is optional.** dotbabel is also an
+opinionated, model-agnostic library of skills, slash commands, and cloud/IaC
+specialists for Claude Code, Codex, Gemini CLI, and Copilot CLI, plus a global
+rule floor and spec-governance gates. Take the CLI, take the library, or take
+both.
 
 **Who is this for?**
 
 | I am…            | I want…                                                                          | Start here                                       |
 | ---------------- | -------------------------------------------------------------------------------- | ------------------------------------------------ |
+| **CI payer**     | To stop re-running verified checks on paid runners                               | [Cut your CI bill](#cut-your-ci-bill)            |
 | **Dotfile user** | The toolkit — skills, commands, and CLAUDE.md in every Claude session            | [Clone & bootstrap](#clone--bootstrap)           |
 | **Consumer**     | The CLI in my repo — bootstrap, doctor, drift detection, optional spec-gov gates | [Install the CLI](#install-the-cli)              |
 | **Library user** | Node API in my own tooling                                                       | [docs/api-reference.md](./docs/api-reference.md) |
@@ -27,10 +50,47 @@ governance CLI on top, for repos that want PR-time gates.
 
 | What you want                                                                | How                                                                                |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Skip remote CI for commits you verified locally                              | **[Cut your CI bill](#cut-your-ci-bill)** — `npx dotbabel-local-attest --init`     |
 | Skills & commands library wired into `~/.claude/`                            | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required           |
 | Governance CLI for your own repos (bootstrap + doctor + optional spec gates) | **[Install the CLI](#install-the-cli)** — see install section (Node ≥ 20 required) |
 
-Both paths are independent. You can use one or both.
+All three paths are independent. You can use one, two, or all of them.
+
+---
+
+## Cut your CI bill
+
+`local-attest` needs one file: a matrix of the checks CI runs. `--init` drafts
+it from your existing workflows, so adoption is a command rather than an
+afternoon:
+
+```bash
+npx dotbabel-local-attest --init
+```
+
+It reads `.github/workflows/*.yml`, turns every `run:` step in a
+pull-request-triggered job into a leg, groups legs into one lane per job (lanes
+run concurrently, legs within a lane run in order), mirrors any `paths:` filter
+as a `when.changedPaths` rule, and copies `setup-node` / `setup-go` versions
+into toolchain pins. Anything it cannot translate — a marketplace action, a
+service container, a job-level `if:` — becomes a `TODO:` comment inside the
+generated file rather than a silent omission.
+
+**The draft is a starting point, not a gate.** Read it against your workflows
+before you attest anything: a green attestation switches remote CI off, so a
+check missing from the matrix is enforced nowhere. Then:
+
+```bash
+npx dotbabel-local-attest --dry-run   # run the matrix, print the comment, post nothing
+npx dotbabel-local-attest             # run it, post the attestation, push
+```
+
+Wire the gate into a workflow by skipping when a trusted attestation matches
+the head SHA. The full contract — comment format, trust model, audit log, and
+the branch-protection caveat — is in
+[`skills/local-attest/references/operator-guide.md`](./skills/local-attest/references/operator-guide.md);
+the config schema is in
+[`skills/local-attest/references/config.md`](./skills/local-attest/references/config.md).
 
 ---
 
