@@ -1,7 +1,7 @@
 {
   "name": "@dotbabel/dotbabel",
   "version": "2.17.1",
-  "description": "An opinionated, model-agnostic governance toolkit for Claude Code, Codex, Gemini, and other agentic CLIs: skills, slash commands, cloud/IaC specialists, and an optional spec-governance CLI.",
+  "description": "Skip remote CI for commits you verified locally: run your GitHub Actions matrix on your machine and post a SHA-pinned attestation that makes the workflows skip themselves. Plus a model-agnostic toolkit of skills, slash commands, and governance gates for Claude Code, Codex, Gemini, and Copilot CLI.",
   "type": "module",
   "main": "plugins/dotbabel/src/index.mjs",
   "exports": {
@@ -81,6 +81,12 @@
     "url": "https://github.com/kaiohenricunha/dotbabel/issues"
   },
   "keywords": [
+    "ci-cd",
+    "github-actions",
+    "ci-optimization",
+    "ci-cost",
+    "local-ci",
+    "developer-tools",
     "claude-code",
     "codex",
     "gemini",
@@ -88,13 +94,9 @@
     "agent-toolkit",
     "skills",
     "slash-commands",
-    "cloud-specialists",
     "dotbabel",
-    "sdd",
-    "spec-driven",
-    "validator",
-    "linter",
     "governance",
+    "spec-driven",
     "cli"
   ],
   "license": "MIT",

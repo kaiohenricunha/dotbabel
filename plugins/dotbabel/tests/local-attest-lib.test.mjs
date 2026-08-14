@@ -135,7 +135,15 @@ describe("parseArgs", () => {
       only: [],
       from: null,
       failFast: false,
+      init: false,
+      force: false,
     });
+  });
+
+  it("parses --init and --force; both default off so a bare run never scaffolds", () => {
+    expect(parseArgs(["--init"]).init).toBe(true);
+    expect(parseArgs(["--init", "--force"]).force).toBe(true);
+    expect(parseArgs(["--dry-run"]).init).toBe(false);
   });
 
   it("parses --pr <N>", () => {
