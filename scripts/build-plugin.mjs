@@ -230,6 +230,26 @@ function buildExpected() {
  *
  * @returns {string | null}
  */
+/**
+ * The version to stamp into the plugin manifest, read from the package.json of
+ * the repo being built — `--repo-root`, not this script's own location, so the
+ * shipped generator stamps a consumer's version rather than dotbabel's.
+ * Returns null when the repo has no readable package.json version, in which
+ * case the manifest keeps whatever it already had.
+ *
+ * @returns {string|null}
+ */
+function pkgVersion() {
+  const p = join(repoRoot, "package.json");
+  if (!existsSync(p)) return null;
+  try {
+    const v = JSON.parse(readFileSync(p, "utf8")).version;
+    return typeof v === "string" && v ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildExpectedPluginJson() {
   if (!existsSync(pluginJsonPath)) return null;
   let manifest;
@@ -248,8 +268,16 @@ function buildExpectedPluginJson() {
       .map(toPath);
   const updated = {
     ...manifest,
+    // `version` tracks the package so a release cannot ship a plugin manifest
+    // claiming an older one. Hand-editing it here is pointless — it is
+    // overwritten on every build, unless the repo has no package.json version
+    // to read, in which case whatever the manifest already declares stands.
+    ...(pkgVersion() ? { version: pkgVersion() } : {}),
     agents: pathsFor("agent", (id) => `./templates/claude/agents/${id}.md`),
-    skills: pathsFor("skill", (id) => `./templates/claude/skills/${id}/SKILL.md`),
+    // Skills entries are DIRECTORIES containing SKILL.md, not the file itself.
+    // `claude plugin validate` rejects a file path outright, which made every
+    // manifest this generator produced uninstallable.
+    skills: pathsFor("skill", (id) => `./templates/claude/skills/${id}`),
   };
   return JSON.stringify(updated, null, 2) + "\n";
 }

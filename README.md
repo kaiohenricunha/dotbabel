@@ -51,6 +51,7 @@ both.
 | What you want                                                                | How                                                                                |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Skip remote CI for commits you verified locally                              | **[Cut your CI bill](#cut-your-ci-bill)** — `npx dotbabel-local-attest --init`     |
+| Skills & subagents inside Claude Code, no clone                              | **[Install as a plugin](#install-as-a-claude-code-plugin)** — two slash commands   |
 | Skills & commands library wired into `~/.claude/`                            | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required           |
 | Governance CLI for your own repos (bootstrap + doctor + optional spec gates) | **[Install the CLI](#install-the-cli)** — see install section (Node ≥ 20 required) |
 
@@ -91,6 +92,23 @@ the branch-protection caveat — is in
 [`skills/local-attest/references/operator-guide.md`](./skills/local-attest/references/operator-guide.md);
 the config schema is in
 [`skills/local-attest/references/config.md`](./skills/local-attest/references/config.md).
+
+---
+
+## Install as a Claude Code plugin
+
+The fastest path if you just want the skills and subagents inside Claude Code —
+no clone, no npm:
+
+```
+/plugin marketplace add kaiohenricunha/dotbabel
+/plugin install dotbabel@dotbabel
+```
+
+That installs the skills library and the specialist subagents. The
+`local-attest` CLI is a separate install (`npx dotbabel-local-attest`, above),
+because it runs your test suite and pushes commits — that belongs behind an
+explicit install, not a plugin that arrives with everything else.
 
 ---
 

@@ -424,8 +424,29 @@ describe("build-plugin", () => {
       "./templates/claude/agents/alpha-agent.md",
       "./templates/claude/agents/zeta-agent.md",
     ]);
-    // skills: generated; commands are NOT skills
-    expect(pj.skills).toEqual(["./templates/claude/skills/beta-skill/SKILL.md"]);
+    // skills: generated; commands are NOT skills. Entries are DIRECTORIES —
+    // `claude plugin validate` rejects a SKILL.md file path, which is what
+    // this generator emitted until the manifests were first validated.
+    expect(pj.skills).toEqual(["./templates/claude/skills/beta-skill"]);
+  });
+
+  it("overwrites version from the built repo's package.json, not this script's own", () => {
+    const root = mkRepo();
+    writeFileSync(join(root, "package.json"), JSON.stringify({ version: "9.9.9" }) + "\n");
+    writePluginJson(root, { name: "harness", version: "0.0.1-stale", agents: [] });
+    writeSkill(root, "beta-skill");
+    buildIndex(root);
+    expect(runBuild(root).status).toBe(0);
+    expect(readPluginJson(root).version).toBe("9.9.9");
+  });
+
+  it("leaves an existing version alone when the repo has no package.json", () => {
+    const root = mkRepo();
+    writePluginJson(root, { name: "harness", version: "1.2.3", agents: [] });
+    writeSkill(root, "beta-skill");
+    buildIndex(root);
+    expect(runBuild(root).status).toBe(0);
+    expect(readPluginJson(root).version).toBe("1.2.3");
   });
 
   it("--check exits 1 when plugin.json is stale", () => {
