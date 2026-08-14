@@ -91,11 +91,23 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
    - The exact merge command you will run
      Wait for the user to say "merge" (or equivalent).
 
-9. **Merge.**
+9. **Merge — with an explicit, marker-free squash body.**
+   The default squash body concatenates the branch's commit messages. Every
+   intermediate commit carries `[skip ci]` (the conductor requires it), GitHub
+   honors the marker **anywhere** in the final message, and release-please is
+   a push-triggered workflow — so a default-body squash merge silently
+   suppresses the release for its own commits. Build the body from the PR
+   description and strip any CI-suppression markers it happens to quote:
+
    ```bash
-   gh pr merge <N> --squash --delete-branch
+   gh pr view <N> --json body -q .body \
+     | sed -e 's/\[skip ci\]//g' -e 's/\[ci skip\]//g' -e 's/skip-checks: *true//g' \
+     > /tmp/merge-pr-<N>-body.md
+   gh pr merge <N> --squash --delete-branch --body-file /tmp/merge-pr-<N>-body.md
    ```
+
    Then clean up the worktree:
+
    ```bash
    cd -
    git worktree remove /tmp/merge-pr-<N>
@@ -104,6 +116,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 ## Rules
 
 - Never skip the full test suite, even if CI is green — CI config drift is real.
+- Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 9's `--body-file` flow exists for exactly this.
 - Never claim a failure is "pre-existing" without the `git stash` proof.
 - Never merge without explicit user confirmation. CI green alone is not authorization.
 - Never force-push; never merge into `main`/`master` with failing local tests.
