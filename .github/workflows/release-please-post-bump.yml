@@ -1,13 +1,19 @@
 name: release-please-post-bump
 
 # Runs after release-please bumps package.json on a release branch.
-# Regenerates the two artefacts that dogfood CI checks in --check mode:
+# Regenerates the three artefacts that dogfood CI checks in --check mode:
 #   1. index/artifacts.json + index/by-type.json + index/by-facet.json
 #      (version field in the envelope comes from package.json)
 #   2. docs/*.md  _Last updated: vX.Y.Z_ stamps
+#   3. plugins/dotbabel/.claude-plugin/plugin.json (version stamped from
+#      package.json by build-plugin). Missing this one turned main red on the
+#      2.18.1 release: package.json said 2.18.1, the plugin manifest still
+#      said 2.18.0, and both `build-plugin --check` and the plugin-manifest
+#      bats gate failed. Anything that derives from the version belongs here.
 #
-# No-loop guarantee: the post-bump commit touches only index/ + docs/, not
-# package.json, so the paths filter never re-fires on the commit itself.
+# No-loop guarantee: the post-bump commit touches only index/, docs/, and the
+# plugin manifest — never package.json — so the paths filter never re-fires on
+# the commit itself.
 #
 # PAT required: GITHUB_TOKEN pushes suppress the pull_request (synchronize)
 # event on the open release PR — without the PAT, dogfood CI never re-runs
@@ -51,14 +57,17 @@ jobs:
       - name: stamp doc versions
         run: node scripts/stamp-doc-versions.mjs
 
+      - name: regen plugin manifest
+        run: node scripts/build-plugin.mjs
+
       - name: commit if anything changed
         run: |
-          git diff --quiet index/ docs/ && {
-            echo "Nothing changed — index and stamps already current."
+          git diff --quiet index/ docs/ plugins/dotbabel/ && {
+            echo "Nothing changed — index, stamps and plugin manifest already current."
             exit 0
           }
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index/ docs/
-          git commit -m "chore: refresh index envelope + doc stamps for $(node -p "require('./package.json').version")"
+          git add index/ docs/ plugins/dotbabel/
+          git commit -m "chore: refresh index envelope + doc stamps + plugin manifest for $(node -p "require('./package.json').version")"
           git push
