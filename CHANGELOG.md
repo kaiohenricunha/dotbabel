@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.18.2](https://github.com/kaiohenricunha/dotbabel/compare/v2.18.1...v2.18.2) (2026-08-15)
+
+
+### Fixed
+
+* **release:** regen the plugin manifest after the version bump ([#315](https://github.com/kaiohenricunha/dotbabel/issues/315)) ([3d8c8ce](https://github.com/kaiohenricunha/dotbabel/commit/3d8c8ce611284032aefa0556b6bac9032c2e9fca))
+
 ## [2.18.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.18.0...v2.18.1) (2026-08-15)
 
 

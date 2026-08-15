@@ -1,6 +1,6 @@
 # Upgrade guide
 
-_Last updated: v2.18.1_
+_Last updated: v2.18.2_
 
 ## 1.x → 2.0.0 — project renamed `dotclaude` → `dotbabel`
 
