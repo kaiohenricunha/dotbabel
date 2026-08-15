@@ -1,7 +1,7 @@
 {
   "name": "dotbabel",
   "displayName": "dotbabel",
-  "description": "Skip remote CI for commits you verified locally: run your GitHub Actions matrix on your machine and post a SHA-pinned attestation that makes the workflows skip themselves. Ships with a library of engineering skills and specialist subagents, spec-governance gates, and cross-CLI instruction sync.",
+  "description": "Make an AI coding agent show its work. A verification layer for agentic development: skills that force an agent to ground every claim in real source, reproduce a bug before fixing it, and cite file:line — plus gates that check the result. Includes local CI attestation, spec-governance checks, and one rule floor fanned out to Claude Code, Codex, Gemini, and Copilot CLI.",
   "version": "2.18.0",
   "author": {
     "name": "Kaio Cunha",

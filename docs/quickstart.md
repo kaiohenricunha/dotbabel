@@ -2,12 +2,15 @@
 
 _Last updated: v2.18.0_
 
+dotbabel is a verification layer for agentic development: skills that make an
+agent ground its claims in real source, and gates that check the result.
+
 **Two paths — pick yours:**
 
-| I want…                                                                 | Path                                                                           |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Skills & commands in every Claude Code session                          | **[Dotfile bootstrap](./dotfile-quickstart.md)** — 30 seconds, no npm required |
-| Governance CLI for my own repo (bootstrap, doctor, optional spec gates) | **This page** — 10 minutes, Node ≥ 20 required                                 |
+| I want…                                                                | Path                                                                           |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Skills & commands in every Claude Code session                         | **[Dotfile bootstrap](./dotfile-quickstart.md)** — 30 seconds, no npm required |
+| The CLI in my own repo (verification gates, local attestation, doctor) | **This page** — 10 minutes, Node ≥ 20 required                                 |
 
 ---
 
