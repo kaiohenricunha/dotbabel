@@ -102,8 +102,8 @@ jobs:
           set -euo pipefail
           export HOME="$WORK"
           export XDG_CONFIG_HOME="$WORK"
-          export DOTCLAUDE_HANDOFF_REPO="$WORK/nonexistent-handoff-repo"
-          export DOTCLAUDE_QUIET=1
+          export DOTBABEL_HANDOFF_REPO="$WORK/nonexistent-handoff-repo"
+          export DOTBABEL_QUIET=1
           export TZ=UTC
 
           # Scrub host-CLI detection markers (dotbabel-handoff.mjs:detectHost).

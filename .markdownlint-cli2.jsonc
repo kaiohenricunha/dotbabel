@@ -16,7 +16,7 @@
   "ignores": [
     "node_modules/**",
     ".claude/worktrees/**",
-    "plugins/dotclaude/tests/fixtures/**",
+    "plugins/dotbabel/tests/fixtures/**",
     "commands/**",
     "skills/**",
     ".claude/commands/**",

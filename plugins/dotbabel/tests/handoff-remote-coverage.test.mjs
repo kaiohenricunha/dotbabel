@@ -449,13 +449,10 @@ describe("printManualSetupBlock", () => {
 // ---- loadPersistedEnv --------------------------------------------------
 
 describe("loadPersistedEnv", () => {
-  // currentConfigFile() now resolves through legacy-compat's configDir(),
-  // which probes existsSync() once on the canonical path before returning.
-  // Each test that wants loadPersistedEnv to actually read a file therefore
-  // needs TWO queued mockReturnValueOnce(true) calls: the first satisfies
-  // legacy-compat's canonical-exists probe (so it returns the canonical path
-  // without further probing), the second satisfies loadPersistedEnv's own
-  // existsSync(configFile) check.
+  // currentConfigFile() resolves through paths.mjs's configDir(), a pure join
+  // with no filesystem probe. The only existsSync() call on this path is
+  // loadPersistedEnv's own existsSync(configFile) check, so each test queues
+  // exactly ONE mockReturnValueOnce.
 
   afterEach(() => {
     delete process.env.DOTBABEL_HANDOFF_REPO;
@@ -466,13 +463,11 @@ describe("loadPersistedEnv", () => {
   });
 
   it("does nothing when config file does not exist", () => {
-    existsSync.mockReturnValueOnce(true);  // legacy-compat canonical probe
     existsSync.mockReturnValueOnce(false); // loadPersistedEnv's own check
     expect(() => lib.loadPersistedEnv()).not.toThrow();
   });
 
   it("sets env vars from file content (quoted)", () => {
-    existsSync.mockReturnValueOnce(true);  // legacy-compat probe
     existsSync.mockReturnValueOnce(true);  // loadPersistedEnv's check
     readFileSync.mockReturnValueOnce('export DOTBABEL_HANDOFF_REPO="git@github.com:x/y.git"\n');
     delete process.env.DOTBABEL_HANDOFF_REPO;
@@ -482,7 +477,6 @@ describe("loadPersistedEnv", () => {
 
   it("sets env vars from file content (bare value)", () => {
     existsSync.mockReturnValueOnce(true);
-    existsSync.mockReturnValueOnce(true);
     readFileSync.mockReturnValueOnce("DOTBABEL_HANDOFF_REPO=https://example.com/x.git\n");
     delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
@@ -491,7 +485,6 @@ describe("loadPersistedEnv", () => {
 
   it("skips comment lines and blank lines", () => {
     existsSync.mockReturnValueOnce(true);
-    existsSync.mockReturnValueOnce(true);
     readFileSync.mockReturnValueOnce("# comment\n\nDOTBABEL_HANDOFF_REPO=val\n");
     delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
@@ -499,7 +492,6 @@ describe("loadPersistedEnv", () => {
   });
 
   it("does not overwrite an already-set env var", () => {
-    existsSync.mockReturnValueOnce(true);
     existsSync.mockReturnValueOnce(true);
     readFileSync.mockReturnValueOnce("DOTBABEL_HANDOFF_REPO=new-val\n");
     process.env.DOTBABEL_HANDOFF_REPO = "existing";
@@ -510,7 +502,6 @@ describe("loadPersistedEnv", () => {
 
   it("strips single-quoted values", () => {
     existsSync.mockReturnValueOnce(true);
-    existsSync.mockReturnValueOnce(true);
     readFileSync.mockReturnValueOnce("DOTBABEL_HANDOFF_REPO='git@github.com:x/y.git'\n");
     delete process.env.DOTBABEL_HANDOFF_REPO;
     lib.loadPersistedEnv();
@@ -518,7 +509,6 @@ describe("loadPersistedEnv", () => {
   });
 
   it("swallows a readFileSync error silently", () => {
-    existsSync.mockReturnValueOnce(true);  // legacy-compat probe
     existsSync.mockReturnValueOnce(true);  // loadPersistedEnv's check
     readFileSync.mockImplementationOnce(() => {
       throw new Error("EACCES");
@@ -527,7 +517,6 @@ describe("loadPersistedEnv", () => {
   });
 
   it("skips lines that do not match the VAR=VAL pattern", () => {
-    existsSync.mockReturnValueOnce(true);
     existsSync.mockReturnValueOnce(true);
     readFileSync.mockReturnValueOnce("not-valid-line\nDOTBABEL_HANDOFF_REPO=good-val\n");
     delete process.env.DOTBABEL_HANDOFF_REPO;
