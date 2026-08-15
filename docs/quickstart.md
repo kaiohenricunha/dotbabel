@@ -1,6 +1,6 @@
 # Quickstart
 
-_Last updated: v2.18.0_
+_Last updated: v2.18.1_
 
 dotbabel is a verification layer for agentic development: skills that make an
 agent ground its claims in real source, and gates that check the result.
