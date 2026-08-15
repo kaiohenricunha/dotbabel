@@ -10,6 +10,19 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [2.18.1](https://github.com/kaiohenricunha/dotbabel/compare/v2.18.0...v2.18.1) (2026-08-15)
+
+
+### Fixed
+
+* **plugin:** make the plugin installable and add a marketplace manifest ([#311](https://github.com/kaiohenricunha/dotbabel/issues/311)) ([c962087](https://github.com/kaiohenricunha/dotbabel/commit/c96208776abbfa71517fc8cf36a5ee2de6b29720))
+
+
+### Documentation
+
+* lead with verification discipline, not CI cost ([#313](https://github.com/kaiohenricunha/dotbabel/issues/313)) ([6efec10](https://github.com/kaiohenricunha/dotbabel/commit/6efec10bbc8e0d30e50da0cc74acd56612c3a3d7))
+* **rule-floor:** require agents to clean up their own worktrees ([#314](https://github.com/kaiohenricunha/dotbabel/issues/314)) ([5fa5911](https://github.com/kaiohenricunha/dotbabel/commit/5fa5911d0030d4b254166e4c0ab8cad9e4e6c1e9))
+
 ## [2.18.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.17.1...v2.18.0) (2026-08-14)
 
 
