@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "dotbabel",
-  "description": "Kaio Cunha's Claude Code plugins: local CI attestation, engineering skills, and governance gates.",
+  "description": "Kaio Cunha's Claude Code plugins: verification discipline for agentic development, local CI attestation, and governance gates.",
   "owner": {
     "name": "Kaio Cunha",
     "url": "https://github.com/kaiohenricunha"
@@ -9,7 +9,7 @@
   "plugins": [
     {
       "name": "dotbabel",
-      "description": "Skip remote CI for commits you verified locally: run your GitHub Actions matrix on your machine and post a SHA-pinned attestation that makes the workflows skip themselves. Ships with a library of engineering skills and specialist subagents, spec-governance gates, and cross-CLI instruction sync.",
+      "description": "Make an AI coding agent show its work. A verification layer for agentic development: skills that force an agent to ground every claim in real source, reproduce a bug before fixing it, and cite file:line \u2014 plus gates that check the result. Includes local CI attestation, spec-governance checks, and one rule floor fanned out to Claude Code, Codex, Gemini, and Copilot CLI.",
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/kaiohenricunha/dotbabel.git",

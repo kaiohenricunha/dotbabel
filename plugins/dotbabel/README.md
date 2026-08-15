@@ -1,9 +1,14 @@
 # `@dotbabel/dotbabel`
 
-Portable Claude Code plugin + zero-dependency npm package for
-spec-driven-development governance. Installs seven CLI bins, a Node API
-barrel, a destructive-git PreToolUse hook, and a gold-standard shell
-settings validator.
+**Make an AI coding agent show its work.** A verification layer for agentic
+development: skills that force an agent to ground every claim in real source,
+reproduce a bug before fixing it, and cite `file:line` — plus the gates that
+check the result before it merges.
+
+This is the portable Claude Code plugin and zero-dependency npm package. It
+installs the CLI bins (including `dotbabel-local-attest`, which runs your CI
+matrix locally and attests it), a Node API barrel, a destructive-git
+PreToolUse hook, and a shell settings validator.
 
 This README is the npm tarball's entry point. **The full docs set lives at
 <https://github.com/kaiohenricunha/dotbabel/tree/main/docs>.**

@@ -6,43 +6,48 @@
 
 > Maintained by [@kaiohenricunha](https://github.com/kaiohenricunha) · [Changelog](./CHANGELOG.md) · [Security](./SECURITY.md)
 
-**Stop paying for CI you already ran locally.**
+**Make an AI coding agent show its work.**
 
-You run the test suite on your machine, push, and then wait ten minutes while
-GitHub-hosted runners run exactly the same commands again — and bill you for
-it. `dotbabel local-attest` runs your CI matrix locally and, on a clean pass,
-posts a SHA-pinned comment that makes your workflows skip themselves for that
-commit. One repo using it cut ~27 minutes of runner time per push to zero.
+Agents produce plausible output fast. The expensive failures come from the
+plausible-but-unverified kind: a fix for a bug nobody reproduced, an analysis
+citing a file that was never opened, a "done" that no test covers. dotbabel is
+the verification layer — a library of skills that force an agent to ground
+every claim, plus gates that check the result before it merges.
 
-```bash
-npx dotbabel-local-attest --init      # draft a matrix from .github/workflows
-npx dotbabel-local-attest --dry-run   # run it locally, post nothing
-npx dotbabel-local-attest             # run it, attest, push
-```
+The skills encode the discipline. `/ground-first` refuses to propose an edit
+until the relevant source has actually been read. `/fix-with-evidence` demands
+a failing reproduction before a fix and a passing run after it.
+`/veracity-audit` and `/plan-grader` grade work against what the code really
+says. `/security-review`, `/detect-flaky`, and `/validate-spec` gate the
+output. Cloud and IaC specialists (`aws`, `gcp`, `azure`, `kubernetes`,
+`terraform`, `crossplane`) bring the same evidence-first posture to
+infrastructure work.
 
-It is deliberately hard to fool. The attestation is pinned to the exact head
-SHA, so the next push invalidates it; only repo-owner comments are trusted;
-the run refuses to attest if any leg was skipped, never launched, or hard
-failed; every run — including every failure — appends a line to an audit log;
-and toolchain pins fail the run closed when your local Node or Go differs from
-CI's. The tradeoffs, including the ones that should stop you adopting it, are
-in [the operator guide](./skills/local-attest/references/operator-guide.md).
+**How serious is that verification? Serious enough to replace your CI gate.**
+`dotbabel local-attest` runs your GitHub Actions matrix on your machine and,
+on a clean pass, posts a SHA-pinned attestation that makes the remote
+workflows skip themselves for that commit — one repo cut ~27 minutes of runner
+time per push to zero. It is deliberately hard to fool: pinned to the exact
+head SHA so the next push invalidates it, owner-authored comments only, a
+refusal to attest when any leg was skipped or never launched, an audit log
+that records failures as well as passes, and toolchain pins that fail the run
+closed when your local Node or Go differs from CI's. That is the standard the
+rest of the toolkit is built to.
 
-**That is the wedge. The rest of the toolkit is optional.** dotbabel is also an
-opinionated, model-agnostic library of skills, slash commands, and cloud/IaC
-specialists for Claude Code, Codex, Gemini CLI, and Copilot CLI, plus a global
-rule floor and spec-governance gates. Take the CLI, take the library, or take
-both.
+It also runs everywhere you work: one rule floor, fanned out to Claude Code,
+Codex, Gemini CLI, and Copilot CLI, with drift detection so the copies cannot
+silently disagree.
 
 **Who is this for?**
 
-| I am…            | I want…                                                                          | Start here                                       |
-| ---------------- | -------------------------------------------------------------------------------- | ------------------------------------------------ |
-| **CI payer**     | To stop re-running verified checks on paid runners                               | [Cut your CI bill](#cut-your-ci-bill)            |
-| **Dotfile user** | The toolkit — skills, commands, and CLAUDE.md in every Claude session            | [Clone & bootstrap](#clone--bootstrap)           |
-| **Consumer**     | The CLI in my repo — bootstrap, doctor, drift detection, optional spec-gov gates | [Install the CLI](#install-the-cli)              |
-| **Library user** | Node API in my own tooling                                                       | [docs/api-reference.md](./docs/api-reference.md) |
-| **Contributor**  | Dev workflow, local gates                                                        | [CONTRIBUTING.md](./CONTRIBUTING.md)             |
+| I am…            | I want…                                                                          | Start here                                              |
+| ---------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Agent user**   | Skills that make Claude ground, verify, and cite its work                        | [Install as a plugin](#install-as-a-claude-code-plugin) |
+| **Dotfile user** | The toolkit — skills, commands, and CLAUDE.md in every Claude session            | [Clone & bootstrap](#clone--bootstrap)                  |
+| **CI payer**     | To stop re-running checks I already verified locally                             | [Local attestation](#local-attestation)                 |
+| **Consumer**     | The CLI in my repo — bootstrap, doctor, drift detection, optional spec-gov gates | [Install the CLI](#install-the-cli)                     |
+| **Library user** | Node API in my own tooling                                                       | [docs/api-reference.md](./docs/api-reference.md)        |
+| **Contributor**  | Dev workflow, local gates                                                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                    |
 
 ---
 
@@ -50,20 +55,20 @@ both.
 
 | What you want                                                                | How                                                                                |
 | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Skip remote CI for commits you verified locally                              | **[Cut your CI bill](#cut-your-ci-bill)** — `npx dotbabel-local-attest --init`     |
 | Skills & subagents inside Claude Code, no clone                              | **[Install as a plugin](#install-as-a-claude-code-plugin)** — two slash commands   |
 | Skills & commands library wired into `~/.claude/`                            | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required           |
+| Skip remote CI for commits you verified locally                              | **[Local attestation](#local-attestation)** — `npx dotbabel-local-attest --init`   |
 | Governance CLI for your own repos (bootstrap + doctor + optional spec gates) | **[Install the CLI](#install-the-cli)** — see install section (Node ≥ 20 required) |
 
-All three paths are independent. You can use one, two, or all of them.
+All four paths are independent. You can use one, some, or all of them.
 
 ---
 
-## Cut your CI bill
+## Local attestation
 
-`local-attest` needs one file: a matrix of the checks CI runs. `--init` drafts
-it from your existing workflows, so adoption is a command rather than an
-afternoon:
+Verification you can substitute for the remote run. `local-attest` needs one
+file: a matrix of the checks CI runs. `--init` drafts it from your existing
+workflows, so adoption is a command rather than an afternoon:
 
 ```bash
 npx dotbabel-local-attest --init
