@@ -85,7 +85,7 @@ formatError(lib/errors) → exit(lib/exit-codes)`. Flag raw
 - Reserved variable names: `status`, `path`, `pwd`, `prompt`, `HISTFILE`.
 - Direct `echo`/`printf` for status output instead of `pass` / `fail` /
   `warn` / `out_summary` from `plugins/dotbabel/scripts/lib/output.sh`.
-- JSON output not gated behind `DOTCLAUDE_JSON=1`.
+- JSON output not gated behind `DOTBABEL_JSON=1`.
 - Bats tests asserting on stderr without `2>&1` redirect — `run` only
   captures stdout, and handoff scripts deliberately print to stderr.
 

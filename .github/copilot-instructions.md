@@ -89,7 +89,7 @@ plugin with its own `scripts/lib/output.sh` + `src/lib/argv.mjs` conventions
   undocumented `export`s under `plugins/dotbabel/src/`.
 - **Shell discipline.** `set -euo pipefail` at the top of every script;
   source `plugins/dotbabel/scripts/lib/output.sh` for `pass` / `fail` /
-  `warn` / `out_summary`; gate JSON output via `DOTCLAUDE_JSON=1`. `bash`
+  `warn` / `out_summary`; gate JSON output via `DOTBABEL_JSON=1`. `bash`
   only — never `zsh` (its read-only `$status` silently breaks scripts).
 - **Bats tests** capture stderr by redirecting `2>&1` because `run` only
   captures stdout; handoff scripts intentionally print usage/errors to

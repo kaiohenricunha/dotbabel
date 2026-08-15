@@ -91,7 +91,6 @@ import {
   parseHandoffBranch,
 } from "../src/lib/handoff-remote.mjs";
 export { _HandoffError as HandoffError };
-import { env as legacyEnv } from "../src/lib/legacy-compat.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
@@ -304,7 +303,7 @@ async function resolveLocalForPull(id, narrowTo) {
     stripResolverPrefix(stderr) ||
     (narrowTo ? `no ${narrowTo} session matches: ${id}` : `no session matches: ${id}`);
   process.stderr.write(`dotbabel-handoff: ${msg}\n`);
-  if (legacyEnv("HANDOFF_REPO")) {
+  if (process.env.DOTBABEL_HANDOFF_REPO) {
     process.stderr.write("for remote handoffs use `fetch <id>`\n");
   }
   process.exit(r.status === 64 ? EXIT_CODES.USAGE : 2);
@@ -812,7 +811,7 @@ async function main() {
       `gh: ${ghAvailable() ? (ghAuthenticated() ? "authenticated" : "installed, not authenticated") : "not installed"}\n`,
     );
     process.stdout.write(
-      `DOTBABEL_HANDOFF_REPO: ${legacyEnv("HANDOFF_REPO") || "(unset — will bootstrap on first push)"}\n`,
+      `DOTBABEL_HANDOFF_REPO: ${process.env.DOTBABEL_HANDOFF_REPO || "(unset — will bootstrap on first push)"}\n`,
     );
     process.exit(r.status !== 0 ? r.status : EXIT_CODES.OK);
   }
@@ -882,7 +881,7 @@ async function main() {
     const wantHistogram = Boolean(argv.flags.tags);
     const needTags = tagFilters.length > 0 || wantHistogram;
     if (showRemote) {
-      if (!legacyEnv("HANDOFF_REPO")) {
+      if (!process.env.DOTBABEL_HANDOFF_REPO) {
         remoteSkipped = true;
         process.stderr.write(
           "dotbabel-handoff: list --remote: DOTBABEL_HANDOFF_REPO not set; skipping remote enumeration\n",

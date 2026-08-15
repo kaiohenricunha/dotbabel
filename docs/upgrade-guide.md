@@ -2,9 +2,45 @@
 
 _Last updated: v2.18.2_
 
+## 2.x → 3.0.0 — `dotclaude` compat shims removed
+
+The read-fallback compatibility layer that shipped through the whole 2.x window is gone. dotbabel now reads **canonical names only**.
+
+### Breaking
+
+| Surface    | Removed                                                                        | Effect on an unmigrated install                                                      |
+| ---------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Config dir | fallback read of `~/.config/dotclaude/`                                        | dotbabel reads `~/.config/dotbabel/`; a config left in the legacy dir is not found   |
+| Cache dir  | fallback read of `~/.cache/dotclaude/`                                         | the preflight cache re-warms in `~/.cache/dotbabel/`                                 |
+| Env vars   | every `DOTCLAUDE_*` fallback (all 12 vars in the table below)                  | a `DOTCLAUDE_*` var is ignored, with no warning — the setting silently has no effect |
+| Warnings   | `DOTBABEL_LEGACY_CONFIG`, `DOTBABEL_LEGACY_CACHE`, `DOTBABEL_LEGACY_ENV` codes | nothing emits these codes anymore; drop any CI matcher that greps for them           |
+
+The `legacy-compat` module is deleted. Canonical path resolution now lives in `plugins/dotbabel/src/lib/paths.mjs` (`configDir()` / `cacheDir()`), both pure joins with no filesystem probe.
+
+### Migrate before you upgrade
+
+**Warning: do these two steps first. A `DOTCLAUDE_*` variable is ignored silently after the upgrade — there is no deprecation warning left to tell you.**
+
+1. **Move your config and cache:**
+
+   ```bash
+   [ -d ~/.config/dotclaude ] && mv ~/.config/dotclaude ~/.config/dotbabel
+   [ -d ~/.cache/dotclaude ] && rm -rf ~/.cache/dotclaude   # rebuilt on demand
+   ```
+
+2. **Rename every env var** in shell rc files, CI workflows, and wrapper scripts: `DOTCLAUDE_*` → `DOTBABEL_*`. Use the mapping table in the 1.x → 2.0.0 section below.
+
+3. **Verify:** `dotbabel doctor`, then `env | grep DOTCLAUDE_` returns nothing.
+
+Still on v1 (`@dotclaude/dotclaude`)? Follow the full 1.x → 2.0.0 section first. There is no compat path left in 3.0.0 — upgrading straight from v1 without migrating breaks handoff transport config and every `DOTCLAUDE_*` override.
+
+---
+
 ## 1.x → 2.0.0 — project renamed `dotclaude` → `dotbabel`
 
-Strategic rebrand to position the toolkit as model-agnostic. **Every reference to `dotclaude` in your install is renamed to `dotbabel`.** A read-fallback compatibility layer keeps v1 setups working through the 2.x release window; all compat shims are removed in 3.0.0.
+_Historical — kept for anyone still upgrading from v1. The compat layer described here existed in 2.x only and was removed in 3.0.0 (see the section above)._
+
+Strategic rebrand to position the toolkit as model-agnostic. **Every reference to `dotclaude` in your install is renamed to `dotbabel`.** A read-fallback compatibility layer kept v1 setups working through the 2.x release window.
 
 ### What changed
 
@@ -34,9 +70,9 @@ Strategic rebrand to position the toolkit as model-agnostic. **Every reference t
 | `DOTCLAUDE_SKIP_BOOTSTRAP` | `DOTBABEL_SKIP_BOOTSTRAP` |
 | `DOTCLAUDE_HANDOFF_DEBUG`  | `DOTBABEL_HANDOFF_DEBUG`  |
 
-### Compatibility window (2.x only)
+### Compatibility window (2.x only — removed in 3.0.0)
 
-For one release window, dotbabel reads the legacy paths and env vars when canonical ones are absent and emits a one-time deprecation warning per process:
+Through the 2.x window, dotbabel read the legacy paths and env vars when canonical ones were absent and emitted a one-time deprecation warning per process:
 
 - **Config / cache:** if `~/.config/dotbabel/` is missing AND `~/.config/dotclaude/` exists, the legacy path is used and a `DOTBABEL_LEGACY_CONFIG` (or `_CACHE`) `process.emitWarning` fires once.
 - **Env vars:** `DOTBABEL_<NAME>` wins; if unset, `DOTCLAUDE_<NAME>` is honored with a `DOTBABEL_LEGACY_ENV` warning naming the variable.
@@ -53,7 +89,7 @@ For one release window, dotbabel reads the legacy paths and env vars when canoni
 
 ### Compat removal in 3.0.0
 
-The `legacy-compat` helper, the env-var fallback chain, and the legacy-path reads are all removed in 3.0.0. Migrate before then to avoid breakage.
+The `legacy-compat` helper, the env-var fallback chain, and the legacy-path reads were all removed in 3.0.0. See the 2.x → 3.0.0 section at the top of this guide.
 
 ---
 

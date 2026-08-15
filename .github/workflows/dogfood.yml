@@ -74,9 +74,9 @@ jobs:
       - run: npm ci
       - name: validators against minimal-consumer scaffold
         env:
-          DOTCLAUDE_REPO_ROOT: ${{ github.workspace }}/examples/minimal-consumer
+          DOTBABEL_REPO_ROOT: ${{ github.workspace }}/examples/minimal-consumer
         run: |
-          node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"
+          node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --repo-root "$DOTBABEL_REPO_ROOT"
           # validate-specs requires docs/specs/ — the scaffold ships an empty
           # docs/specs/ (README only), so listSpecDirs returns [] and result is ok.
-          node plugins/dotbabel/bin/dotbabel-validate-specs.mjs --repo-root "$DOTCLAUDE_REPO_ROOT"
+          node plugins/dotbabel/bin/dotbabel-validate-specs.mjs --repo-root "$DOTBABEL_REPO_ROOT"

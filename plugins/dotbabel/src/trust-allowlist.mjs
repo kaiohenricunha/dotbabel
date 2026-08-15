@@ -23,7 +23,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } fro
 import { dirname, isAbsolute, join } from "node:path";
 
 import { ERROR_CODES, ValidationError } from "./lib/errors.mjs";
-import { canonicalConfigDir } from "./lib/legacy-compat.mjs";
+import { configDir } from "./lib/paths.mjs";
 
 /** Basename of the allowlist inside the dotbabel config directory. */
 const TRUST_FILE_NAME = "check-on-stop-trusted";
@@ -50,7 +50,7 @@ const HEADER = [
  */
 export function resolveTrustFilePath(env = process.env) {
   if (env.CHECK_ON_STOP_TRUSTED_FILE) return env.CHECK_ON_STOP_TRUSTED_FILE;
-  return join(canonicalConfigDir(env), TRUST_FILE_NAME);
+  return join(configDir(env), TRUST_FILE_NAME);
 }
 
 /**

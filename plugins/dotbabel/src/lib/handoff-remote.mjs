@@ -21,13 +21,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 
 import { scrubDigest } from "./handoff-scrub.mjs";
 import { autoPreflight } from "./handoff-preflight.mjs";
-import {
-  configDir as legacyConfigDir,
-  canonicalConfigDir,
-  env as legacyEnv,
-  setEnv as legacySetEnv,
-  unsetEnv as legacyUnsetEnv,
-} from "./legacy-compat.mjs";
+import { configDir } from "./paths.mjs";
 
 // ---- constants ---------------------------------------------------------
 
@@ -56,31 +50,17 @@ export function parseHandoffBranch(branch) {
   return { version: null, cli: "?", shortId: "", yearMonth: "" };
 }
 
-// Callers that read state at run time (loadPersistedEnv,
+// Callers that read or write state at run time (loadPersistedEnv,
 // bootstrapTransportRepo) go through these helpers so an updated
 // process.env.HOME / XDG_CONFIG_HOME takes effect without a module
 // reload. The exported CONFIG_FILE constant below captures the path
 // at library-init time and is kept only for the diagnostic display
 // in `doctor` + the test-contract `typeof mod.CONFIG_FILE === "string"`.
-// READ helpers — fall back to ~/.config/dotclaude/ if the canonical dir is
-// absent so v1 users keep working through 2.x (one-time DOTBABEL_LEGACY_CONFIG
-// warning per process). loadPersistedEnv() and other read paths use these.
 function currentConfigDir() {
-  return legacyConfigDir();
+  return configDir();
 }
 function currentConfigFile() {
   return join(currentConfigDir(), "handoff.env");
-}
-
-// WRITE helpers — canonical only, never the legacy dir. Bootstrap/persist
-// uses these so a v1 user's new state lands in ~/.config/dotbabel/ and the
-// legacy directory stays read-only (the migration rule is "writes always go
-// to canonical"; the legacy dir must not gain new files in 2.x).
-function bootstrapConfigDir() {
-  return canonicalConfigDir();
-}
-function bootstrapConfigFile() {
-  return join(bootstrapConfigDir(), "handoff.env");
 }
 
 /** Path to the persisted handoff env file; evaluated at library-init time. */
@@ -703,11 +683,7 @@ export async function bootstrapTransportRepo() {
     process.exit(2);
   }
 
-  // Bootstrap is a write path — show and use the canonical-only target so
-  // a v1 user's new state lands in ~/.config/dotbabel/ rather than being
-  // written back into ~/.config/dotclaude/ (migration rule: writes always
-  // go to canonical; legacy dir is read-only fallback).
-  const configFile = bootstrapConfigFile();
+  const configFile = currentConfigFile();
   process.stderr.write(
     [
       "",
@@ -787,7 +763,7 @@ export async function bootstrapTransportRepo() {
     process.stderr.write(`  ⚠ ${seed.warning}\n`);
   }
 
-  mkdirSync(bootstrapConfigDir(), { recursive: true, mode: 0o700 });
+  mkdirSync(currentConfigDir(), { recursive: true, mode: 0o700 });
   writeFileSync(
     configFile,
     `# Written by dotbabel handoff on ${new Date().toISOString()}\n` +
@@ -800,7 +776,7 @@ export async function bootstrapTransportRepo() {
     `    (add \`source ${configFile}\` to ~/.bashrc or ~/.zshrc to persist across shells)\n`,
   );
 
-  legacySetEnv("HANDOFF_REPO", url);
+  process.env.DOTBABEL_HANDOFF_REPO = url;
   return url;
 }
 
@@ -809,7 +785,7 @@ export async function bootstrapTransportRepo() {
  * is missing. Call site for push/pull/list/doctor.
  */
 export async function requireTransportRepo() {
-  const existing = legacyEnv("HANDOFF_REPO");
+  const existing = process.env.DOTBABEL_HANDOFF_REPO;
   if (existing) return validateTransportUrl(existing);
   const fresh = await bootstrapTransportRepo();
   return validateTransportUrl(fresh);
@@ -820,7 +796,7 @@ export async function requireTransportRepo() {
  * Use for read-only paths (list, doctor) that cannot trigger interactive bootstrap.
  */
 export function requireTransportRepoStrict() {
-  const url = legacyEnv("HANDOFF_REPO");
+  const url = process.env.DOTBABEL_HANDOFF_REPO;
   if (!url)
     throw new HandoffError({
       stage: "preflight",
@@ -1105,17 +1081,17 @@ export async function pushRemote({
     if (!isRepoMissingError(err.message)) throw err;
     if (!isTty()) {
       printManualSetupBlock(
-        `configured repo is unreachable (${legacyEnv("HANDOFF_REPO")}) and we can't prompt in non-interactive mode`,
+        `configured repo is unreachable (${process.env.DOTBABEL_HANDOFF_REPO}) and we can't prompt in non-interactive mode`,
       );
       throw err;
     }
     process.stderr.write(
-      `\n  The configured repo (${legacyEnv("HANDOFF_REPO")}) is unreachable.\n`,
+      `\n  The configured repo (${process.env.DOTBABEL_HANDOFF_REPO}) is unreachable.\n`,
     );
     const again = await promptLine("  Re-bootstrap (create a new one)? [y/N] ");
     if (!/^y(es)?$/i.test(again)) throw err;
     // Clear the stale URL so bootstrapTransportRepo() doesn't short-circuit.
-    legacyUnsetEnv("HANDOFF_REPO");
+    delete process.env.DOTBABEL_HANDOFF_REPO;
     const fresh = await bootstrapTransportRepo();
     return doPush(validateTransportUrl(fresh));
   }
