@@ -68,6 +68,8 @@ Universal behavior for every Copilot CLI session in every repo. Project-level `C
 - The main checkout is effectively read-only for agentic work unless the user says "do it on main" for this specific task. A one-line typo fix they want committed directly is fine; anything larger is not.
 - Never use `gh pr checkout`, `git checkout <other-branch>`, `git switch`, or `git stash` in the main checkout as a way to swap contexts; those operations silently corrupt any concurrent session editing the same checkout.
 - **Respect other sessions' worktrees and branches.** Multiple agents and humans work concurrently. Before creating a worktree, run `git worktree list` and scan for anything that looks active (recent HEAD, branch name matching your intent). Never remove, rename, or force-overwrite a worktree you did not create in this session.
+- **Clean up your own worktree when the work lands.** After the PR merges, or after you abandon the task, remove the worktree you created in this session: `git worktree remove .claude/worktrees/<slug>` from the main checkout, then `git worktree prune`. This deletes only the checkout directory — the branch and its commits survive. Do it before you end the task. No other session will do it for you, because the rule above forbids them from touching a worktree they did not create.
+- **Never remove a worktree that holds content living nowhere else.** Run `git status --porcelain` first. Uncommitted edits to tracked files, and untracked files absent from `origin/main`, are destroyed by removal — commit them to the branch or ask the user before you remove. Regenerated exports, coverage output, build artifacts, and `test-results/` are safe to discard.
 
 ## Worktree & Sandbox Conventions
 
