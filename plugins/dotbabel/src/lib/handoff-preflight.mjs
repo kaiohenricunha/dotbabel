@@ -23,7 +23,7 @@ import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "
 
 import { runScript } from "./handoff-remote.mjs";
 import { debug } from "./debug.mjs";
-import { env as legacyEnv, cacheDir as legacyCacheDir } from "./legacy-compat.mjs";
+import { cacheDir } from "./paths.mjs";
 
 /** Cache schema version — increment to invalidate all existing entries. */
 export const CACHE_SCHEMA_VERSION = 1;
@@ -40,19 +40,18 @@ const SCRIPTS = resolvePath(__dirname, "..", "..", "scripts");
 export const DOCTOR_SH = join(SCRIPTS, "handoff-doctor.sh");
 
 /**
- * Resolve the doctor script to run. Honors `DOTBABEL_DOCTOR_SH` (legacy
- * `DOTCLAUDE_DOCTOR_SH` honored as fallback through 2.x) so the bats suite
- * can swap in a counter-shim without patching the shipped script. Any
+ * Resolve the doctor script to run. Honors `DOTBABEL_DOCTOR_SH` so the bats
+ * suite can swap in a counter-shim without patching the shipped script. Any
  * production path leaves this unset and gets the bundled `handoff-doctor.sh`.
  */
 function resolveDoctorScript() {
-  const override = legacyEnv("DOCTOR_SH");
+  const override = process.env.DOTBABEL_DOCTOR_SH;
   return override && override.length > 0 ? override : DOCTOR_SH;
 }
 
-/** Returns the directory that holds the preflight cache, with legacy fallback. */
+/** Returns the directory that holds the preflight cache. */
 export function currentCacheDir() {
-  return legacyCacheDir();
+  return cacheDir();
 }
 
 /** Returns the absolute path to the preflight cache file. */

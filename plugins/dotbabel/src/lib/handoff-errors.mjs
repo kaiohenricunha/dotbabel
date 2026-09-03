@@ -76,7 +76,7 @@ const PATTERNS = [
     fix: "Reinstall dotbabel: `npm install -g @dotbabel/dotbabel`",
   },
   {
-    re: /(DOTBABEL|DOTCLAUDE)_HANDOFF_REPO is not set/i,
+    re: /DOTBABEL_HANDOFF_REPO is not set/i,
     stage: "preflight",
     cause: "transport not configured",
     fix: "Run `dotbabel handoff push` to auto-bootstrap, or set DOTBABEL_HANDOFF_REPO manually",

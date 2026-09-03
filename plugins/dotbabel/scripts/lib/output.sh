@@ -24,12 +24,7 @@
 FAIL=${FAIL:-0}
 WARN=${WARN:-0}
 G=""; R=""; Y=""; N=""
-# Canonical DOTBABEL_JSON with legacy DOTCLAUDE_JSON fallback (deprecated, removal in 3.0.0).
-# Emits a one-shot deprecation warning if only the legacy var is set.
-if [ -z "${DOTBABEL_JSON:-}" ] && [ -n "${DOTCLAUDE_JSON:-}" ]; then
-  printf 'warning: DOTCLAUDE_JSON is deprecated; use DOTBABEL_JSON (removal in 3.0.0)\n' >&2
-fi
-DOTBABEL_JSON=${DOTBABEL_JSON:-${DOTCLAUDE_JSON:-0}}
+DOTBABEL_JSON=${DOTBABEL_JSON:-0}
 DOTBABEL_JSON_BUFFER=""
 # shellcheck disable=SC2034  # CATEGORY is consumed by sourced scripts
 CATEGORY=${CATEGORY:-general}

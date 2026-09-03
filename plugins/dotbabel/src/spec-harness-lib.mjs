@@ -2,7 +2,6 @@ import { execFileSync } from "child_process";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 import { debug } from "./lib/debug.mjs";
-import { env as legacyEnv } from "./lib/legacy-compat.mjs";
 
 /**
  * Execution context threaded through every validator.
@@ -27,8 +26,7 @@ import { env as legacyEnv } from "./lib/legacy-compat.mjs";
  * three-step fallback:
  *
  *   1. `repoRoot` option passed in.
- *   2. `DOTBABEL_REPO_ROOT` env var (legacy `DOTCLAUDE_REPO_ROOT` honored
- *      via legacy-compat fallback through 2.x).
+ *   2. `DOTBABEL_REPO_ROOT` env var.
  *   3. `git rev-parse --show-toplevel` in the current working directory.
  *
  * Throws when none of the three produce a value (typically when running
@@ -38,10 +36,7 @@ import { env as legacyEnv } from "./lib/legacy-compat.mjs";
  * @returns {HarnessContext}
  */
 export function createHarnessContext({ repoRoot } = {}) {
-  const root =
-    repoRoot ??
-    legacyEnv("REPO_ROOT") ??
-    resolveRepoRootFromGit();
+  const root = repoRoot ?? process.env.DOTBABEL_REPO_ROOT ?? resolveRepoRootFromGit();
   if (!root) {
     throw new Error(
       "harness: repoRoot not provided; pass { repoRoot } or set DOTBABEL_REPO_ROOT, or run inside a git repo",

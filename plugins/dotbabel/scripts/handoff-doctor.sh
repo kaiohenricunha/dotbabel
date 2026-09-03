@@ -77,13 +77,7 @@ if ! command -v git >/dev/null 2>&1; then
     "git is required — there is no alternative remote transport"
 fi
 
-# Canonical DOTBABEL_HANDOFF_REPO with legacy DOTCLAUDE_HANDOFF_REPO fallback.
-# Emits a one-shot deprecation warning if only the legacy var is set
-# (compat shim removed in 3.0.0).
-if [[ -z "${DOTBABEL_HANDOFF_REPO:-}" && -n "${DOTCLAUDE_HANDOFF_REPO:-}" ]]; then
-  printf 'warning: DOTCLAUDE_HANDOFF_REPO is deprecated; use DOTBABEL_HANDOFF_REPO (removal in 3.0.0)\n' >&2
-fi
-repo="${DOTBABEL_HANDOFF_REPO:-${DOTCLAUDE_HANDOFF_REPO:-}}"
+repo="${DOTBABEL_HANDOFF_REPO:-}"
 if [[ -z "$repo" ]]; then
   # Not a hard failure: the binary auto-bootstraps on `push` when stdin is
   # a TTY and `gh` is authenticated. Surface that so running `doctor`
