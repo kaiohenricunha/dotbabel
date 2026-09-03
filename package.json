@@ -1,6 +1,6 @@
 {
   "name": "@dotbabel/dotbabel",
-  "version": "2.18.2",
+  "version": "3.0.0",
   "description": "Make an AI coding agent show its work. A verification layer for agentic development: skills that force an agent to ground every claim in real source, reproduce a bug before fixing it, and cite file:line — plus gates that check the result. Includes local CI attestation, spec-governance checks, and one rule floor fanned out to Claude Code, Codex, Gemini, and Copilot CLI.",
   "type": "module",
   "main": "plugins/dotbabel/src/index.mjs",

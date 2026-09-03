@@ -10,6 +10,17 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.18.2...v3.0.0) (2026-09-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* the `dotclaude` read-fallback layer is removed. Users still on `~/.config/dotclaude/`, `~/.cache/dotclaude/`, or any `DOTCLAUDE_*` environment variable must migrate before upgrading — those names are now ignored silently, with no deprecation warning. The `DOTBABEL_LEGACY_CONFIG`, `DOTBABEL_LEGACY_CACHE`, and `DOTBABEL_LEGACY_ENV` warning codes no longer exist. See the "2.x -> 3.0.0" section of docs/upgrade-guide.md.
+
+### Added
+
+* remove dotclaude compat shims ([#317](https://github.com/kaiohenricunha/dotbabel/issues/317)) ([388f7ba](https://github.com/kaiohenricunha/dotbabel/commit/388f7ba4469bd6ed13c9a0f719304527f704eb7b))
+
 ## [2.18.2](https://github.com/kaiohenricunha/dotbabel/compare/v2.18.1...v2.18.2) (2026-08-15)
 
 
