@@ -144,6 +144,18 @@ What lands where:
 | `.claude/skills/<id>/SKILL.md` | `.codex/skills/<id>/` (whole-dir symlink) | `.github/instructions/<id>.instructions.md` (symlink) |
 | `CLAUDE.md` (rule-floor block) | rendered into `AGENTS.md` + `GEMINI.md`   | rendered into `.github/copilot-instructions.md`       |
 
+**What the other CLIs get.** Every destination is a symlink to the Claude
+source file, not a translated copy. Codex, Gemini, and Copilot each read their
+own frontmatter shape, so the Claude-shaped frontmatter (`allowed-tools`,
+`model`, `effort`, `disable-model-invocation`, the auto-routing `description`)
+is not honored on those surfaces. Expect only direct slash invocation by name:
+`/commit` works everywhere, but natural-language auto-routing, tool
+restrictions, and model selection apply in Claude Code alone. A command that
+describes a Claude-only flow (headless Claude workers, Claude-specific flags)
+still fans out verbatim, so its instructions may not be actionable on the other
+CLIs. Per-CLI allowlists and a portable frontmatter contract are tracked in
+[#219](https://github.com/kaiohenricunha/dotbabel/issues/219).
+
 `.dotbabel.json` is optional — without one, project-sync uses defaults
 (`fan_out: ["codex", "gemini", "copilot"]`, the standard target list, no
 `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
