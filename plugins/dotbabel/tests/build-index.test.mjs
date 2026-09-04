@@ -511,6 +511,134 @@ describe("schema round-trip", () => {
   });
 });
 
+describe("schema fix: allowed-tools / disable-model-invocation (#324 prerequisite)", () => {
+  async function makeAjv() {
+    const { default: Ajv } = await import("ajv/dist/2020.js");
+    const { default: addFormats } = await import("ajv-formats");
+    const ajv = new Ajv({ strict: false, allErrors: true });
+    addFormats(ajv);
+    for (const s of [
+      "facets",
+      "common",
+      "agent",
+      "skill",
+      "command",
+      "hook",
+      "template",
+      "index-entry",
+    ]) {
+      ajv.addSchema(
+        JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")),
+      );
+    }
+    return ajv;
+  }
+
+  it("command schema no longer declares the unused allowed_tools (underscore) key", () => {
+    const raw = JSON.parse(
+      readFileSync(join(SCHEMAS_DIR, "command.schema.json"), "utf8"),
+    );
+    expect(raw.properties).not.toHaveProperty("allowed_tools");
+    expect(raw.properties).toHaveProperty("allowed-tools");
+  });
+
+  const BASE_COMMON_FIELDS = {
+    id: "ok-artifact",
+    name: "ok",
+    description: "ok",
+    version: "1.0.0",
+    domain: ["infra"],
+    platform: ["none"],
+    task: ["review"],
+    maturity: "production",
+    owner: "@test",
+    created: "2025-01-01",
+    updated: "2026-04-17",
+  };
+
+  it("command schema accepts allowed-tools as a string or an array", async () => {
+    const ajv = await makeAjv();
+    const validate = ajv.getSchema(
+      "https://dotbabel.dev/schemas/command.schema.json",
+    );
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "command",
+        "allowed-tools": "Read Grep Glob",
+      }),
+    ).toBe(true);
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "command",
+        "allowed-tools": ["Read", "Grep"],
+      }),
+    ).toBe(true);
+  });
+
+  it("skill schema accepts allowed-tools mirroring tools' shape", async () => {
+    const ajv = await makeAjv();
+    const validate = ajv.getSchema(
+      "https://dotbabel.dev/schemas/skill.schema.json",
+    );
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "skill",
+        "allowed-tools": "Read Grep Glob Bash",
+      }),
+    ).toBe(true);
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "skill",
+        "allowed-tools": ["Read", "Grep"],
+      }),
+    ).toBe(true);
+  });
+
+  it("skill schema accepts disable-model-invocation booleans and rejects non-booleans", async () => {
+    const ajv = await makeAjv();
+    const validate = ajv.getSchema(
+      "https://dotbabel.dev/schemas/skill.schema.json",
+    );
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "skill",
+        "disable-model-invocation": true,
+      }),
+    ).toBe(true);
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "skill",
+        "disable-model-invocation": false,
+      }),
+    ).toBe(true);
+    expect(
+      validate({
+        ...BASE_COMMON_FIELDS,
+        type: "skill",
+        "disable-model-invocation": "true",
+      }),
+    ).toBe(false);
+  });
+
+  it("introduces zero new tools/invocation validation warnings against this repo's real commands and skills", () => {
+    const artifacts = walkArtifacts(REPO_ROOT).filter(
+      (a) => a.type === "command" || a.type === "skill",
+    );
+    expect(artifacts.length).toBeGreaterThan(0);
+    const { warnings } = validateArtifacts(artifacts, SCHEMAS_DIR);
+    const toolsRelated = warnings.filter((w) =>
+      /allowed[-_]tools|disable-model-invocation/.test(w),
+    );
+    expect(toolsRelated).toEqual([]);
+  });
+});
+
 describe("small helpers", () => {
   it("isDirectory returns true for a directory and false for missing paths", () => {
     const root = mkRepo();

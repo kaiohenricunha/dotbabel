@@ -13,9 +13,14 @@
       "type": "string",
       "enum": ["opus", "sonnet", "haiku", "inherit"]
     },
-    "allowed_tools": {
-      "type": "array",
-      "items": { "type": "string" }
+    "allowed-tools": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
     },
     "headless_safe": { "type": "boolean" }
   }
