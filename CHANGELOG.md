@@ -10,6 +10,18 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.0.0...v3.1.0) (2026-09-04)
+
+
+### Added
+
+* **project-sync:** add cli_excluded, a per-CLI command and skill allowlist ([#219](https://github.com/kaiohenricunha/dotbabel/issues/219) A) ([#323](https://github.com/kaiohenricunha/dotbabel/issues/323)) ([7ebed08](https://github.com/kaiohenricunha/dotbabel/commit/7ebed08e1427d7a0794f6335da17773113a9870a))
+
+
+### Documentation
+
+* **project-sync:** document the verbatim-symlink fan-out limitation ([#219](https://github.com/kaiohenricunha/dotbabel/issues/219) B-3) ([#321](https://github.com/kaiohenricunha/dotbabel/issues/321)) ([5b5c127](https://github.com/kaiohenricunha/dotbabel/commit/5b5c1279f8f9a56a02a401a61b30ba1cc345e4b6))
+
 ## [3.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v2.18.2...v3.0.0) (2026-09-03)
 
 
