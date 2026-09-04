@@ -94,5 +94,11 @@ full layout and rationale.
   path instead of naming each CLI directory twice. Switching an existing repo
   leaves `.codex/skills.bak-<timestamp>` behind — say so, so the user can
   delete it. An unknown value aborts with `CONFIG_UNKNOWN_LAYOUT`.
+- `cli_excluded` maps a CLI to command basenames and skill ids it must not
+  receive. Suggest it when a command describes a Claude-only flow. The sync
+  removes an excluded link it wrote earlier and reports `removed: <path>`;
+  mention that so the user expects the deletion in the diff. Under `shared`,
+  an exclusion for `codex` or `gemini` applies to both and the sync warns when
+  the lists differ. A malformed value aborts with `CONFIG_INVALID_EXCLUSION`.
 - This skill is for **project-scope** sync. For user-scope (`~/.claude/`,
   `~/.codex/`, `~/.gemini/`) bootstrap, use `dotbabel bootstrap` instead.

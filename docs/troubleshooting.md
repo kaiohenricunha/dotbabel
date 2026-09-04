@@ -134,10 +134,12 @@ outputs.
 
 ### `CONFIG_UNKNOWN_CLI`
 
-`fan_out` names a CLI that `project-sync` cannot fan out to. Only `codex`,
-`gemini`, and `copilot` are supported, so a typo such as `co-pilot` or
-`github-copilot` would otherwise skip that CLI's wiring without failing.
-**Fix**: correct the name in `.dotbabel.json:fan_out`, or drop the entry. Add
+`fan_out` names, or `cli_excluded` is keyed by, a CLI that `project-sync`
+cannot fan out to. Only `codex`, `gemini`, and `copilot` are supported, so a
+typo such as `co-pilot` or `github-copilot` would otherwise skip that CLI's
+wiring (or exclude nothing) without failing.
+**Fix**: correct the name in `.dotbabel.json:fan_out` or `cli_excluded`, or
+drop the entry. Add
 `"$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json"` to the
 file so your editor flags the typo before you run anything.
 
@@ -146,6 +148,13 @@ file so your editor flags the typo before you run anything.
 `fan_out_layout` is neither `per-cli` nor `shared`.
 **Fix**: use `"per-cli"` (the default — `.codex/skills/` and `.gemini/skills/`
 are separate trees) or `"shared"` (both become symlinks to one `.cli/skills/`).
+
+### `CONFIG_INVALID_EXCLUSION`
+
+`cli_excluded` is not an object, or one of its values is not a list of
+non-empty strings. The error's `pointer` names the offending key or index.
+**Fix**: shape it as `{ "<cli>": ["<command-or-skill-name>", ...] }`, using
+command basenames without `.md` and skill directory ids.
 
 ---
 

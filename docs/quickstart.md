@@ -152,8 +152,8 @@ is not honored on those surfaces. Expect only direct slash invocation by name:
 `/commit` works everywhere, but natural-language auto-routing, tool
 restrictions, and model selection apply in Claude Code alone. A command that
 describes a Claude-only flow (headless Claude workers, Claude-specific flags)
-still fans out verbatim, so its instructions may not be actionable on the other
-CLIs. Per-CLI allowlists and a portable frontmatter contract are tracked in
+fans out verbatim unless you list it in `cli_excluded` below. A portable
+frontmatter contract is tracked in
 [#219](https://github.com/kaiohenricunha/dotbabel/issues/219).
 
 `.dotbabel.json` is optional — without one, project-sync uses defaults
@@ -189,6 +189,23 @@ binary is absent from `PATH`. `check-project-sync` applies the same gate, so it
 does not report the un-synced CLI as drift and instead prints
 `skipped <cli>: not on PATH`. Pass `--all` to either command to inspect every
 CLI in `fan_out` regardless. Instruction files are always written, never gated.
+
+`cli_excluded` (default `{}`) maps a CLI to the command basenames and skill ids
+it must not receive:
+
+```json
+{
+  "cli_excluded": { "codex": ["review-prs-parallel"], "copilot": ["review-prs-parallel"] }
+}
+```
+
+The sync skips those entries for that CLI and removes a link it wrote on an
+earlier run; `check-project-sync` reports a lingering one as
+`stale (excluded but present)`. A name that matches nothing warns, an unknown
+CLI key fails with `CONFIG_UNKNOWN_CLI`, and any other shape fails with
+`CONFIG_INVALID_EXCLUSION`. Under `fan_out_layout: "shared"` Codex and Gemini
+read one tree, so an exclusion for either applies to both and the sync warns
+when their lists differ.
 
 A repo with `.dotbabel.json` will also be picked up by `dotbabel doctor` —
 the diagnostic adds a project-sync wiring check.

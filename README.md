@@ -348,6 +348,13 @@ delete the backups once you are satisfied. Copilot keeps its own
 `.github/prompts/` and `.github/instructions/` shapes either way. If a CLI
 turns out not to follow the redirect, set `fan_out_layout` back to `per-cli`.
 
+`cli_excluded` keeps a command or skill off a CLI it cannot serve. Some
+commands describe a Claude-only flow (headless Claude workers, Claude-specific
+flags); list them per CLI and the fan-out skips them there, removing a link it
+wrote earlier. Names are command basenames without `.md` or skill ids. Under
+`fan_out_layout: "shared"` an exclusion for `codex` or `gemini` applies to
+both, since they read one tree, and the sync warns when the two lists differ.
+
 Point your editor at the config schema for autocomplete and validation:
 
 ```json
@@ -355,13 +362,16 @@ Point your editor at the config schema for autocomplete and validation:
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
   "fan_out": ["codex", "gemini", "copilot"],
   "fan_out_layout": "per-cli",
-  "gate_on_cli_presence": true
+  "gate_on_cli_presence": true,
+  "cli_excluded": { "codex": ["review-prs-parallel"], "gemini": ["review-prs-parallel"] }
 }
 ```
 
-An unknown name in `fan_out` fails with `CONFIG_UNKNOWN_CLI` rather than being
-skipped, so a typo cannot silently cost you a CLI's wiring; an unknown
-`fan_out_layout` fails with `CONFIG_UNKNOWN_LAYOUT`.
+An unknown name in `fan_out` or a key in `cli_excluded` fails with
+`CONFIG_UNKNOWN_CLI` rather than being skipped, so a typo cannot silently cost
+you a CLI's wiring; an unknown `fan_out_layout` fails with
+`CONFIG_UNKNOWN_LAYOUT`, and a malformed `cli_excluded` with
+`CONFIG_INVALID_EXCLUSION`.
 
 ### Node API
 
