@@ -25,6 +25,10 @@ import {
   shouldFanOutCli,
   SHARED_SKILLS_DIR,
 } from "./project-sync.mjs";
+import {
+  composeGeneratedFrontmatter,
+  isGeneratedFile,
+} from "./copilot-frontmatter.mjs";
 import { ValidationError } from "./lib/errors.mjs";
 
 /**
@@ -36,7 +40,7 @@ import { ValidationError } from "./lib/errors.mjs";
  * @property {boolean} [quiet]
  * @property {import('./lib/output.mjs').Output} [out]
  *
- * @typedef {{ kind: 'instruction'|'symlink', path: string, expected?: string, actual?: string }} DriftEntry
+ * @typedef {{ kind: 'instruction'|'symlink'|'generated', path: string, expected?: string, actual?: string }} DriftEntry
  *
  * @typedef {object} CheckProjectSyncResult
  * @property {boolean} ok                 true iff missing.length === 0 && stale.length === 0
@@ -186,6 +190,50 @@ export async function checkProjectSync(opts) {
   }
 
   /**
+   * Compare a generated Copilot file at `dstAbs` against what
+   * {@link composeGeneratedFrontmatter} would produce from `srcAbs` right
+   * now. Unlike {@link checkLink}, this reads and diffs real content — a
+   * generated file has no symlink target to resolve.
+   *
+   * @param {string} dstAbs
+   * @param {string} srcAbs
+   * @param {"command"|"skill"} kind
+   */
+  function checkGenerated(dstAbs, srcAbs, kind) {
+    const relDst = path.relative(repoRoot, dstAbs);
+    let existing;
+    try {
+      existing = fs.readFileSync(dstAbs, "utf8");
+    } catch {
+      missing.push({ kind: "generated", path: relDst, expected: srcAbs });
+      out.fail(`missing: ${relDst}`);
+      return;
+    }
+    if (!isGeneratedFile(existing)) {
+      stale.push({
+        kind: "generated",
+        path: relDst,
+        expected: srcAbs,
+        actual: "not dotbabel-generated",
+      });
+      out.fail(`stale (not generated): ${relDst}`);
+      return;
+    }
+    const { content: expected } = composeGeneratedFrontmatter(
+      fs.readFileSync(srcAbs, "utf8"),
+      kind,
+      path.relative(repoRoot, srcAbs),
+    );
+    if (existing === expected) {
+      okEntries.push({ kind: "generated", path: relDst });
+      out.pass(`ok: ${relDst}`);
+    } else {
+      stale.push({ kind: "generated", path: relDst, expected: srcAbs, actual: "content differs" });
+      out.fail(`stale: ${relDst}`);
+    }
+  }
+
+  /**
    * An excluded destination is expected to be absent. Anything still there is
    * drift `projectSync` would retire on its next run (#219, finding A). Absence
    * is not recorded as `ok` — the entry was never expected.
@@ -281,7 +329,7 @@ export async function checkProjectSync(opts) {
             checkExcluded(dst);
             continue;
           }
-          checkLink(dst, path.join(commandsAbs, entry));
+          checkGenerated(dst, path.join(commandsAbs, entry), "command");
         }
       }
       if (fs.existsSync(skillsAbs)) {
@@ -295,7 +343,7 @@ export async function checkProjectSync(opts) {
             checkExcluded(dst);
             continue;
           }
-          checkLink(dst, skillFile);
+          checkGenerated(dst, skillFile, "skill");
         }
       }
     }

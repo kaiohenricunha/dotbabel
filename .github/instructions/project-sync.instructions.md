@@ -1,1 +1,95 @@
-../../.claude/skills/project-sync/SKILL.md
+---
+# dotbabel:generated — do not edit directly. Source: .claude/skills/project-sync/SKILL.md. Regenerate with `dotbabel project-sync`.
+name: project-sync
+description: >
+  Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills
+  into Codex, Gemini, and Copilot project-scope analogues (.codex/skills,
+  .gemini/skills, .github/prompts, .github/instructions) plus refresh AGENTS.md,
+  GEMINI.md, and .github/copilot-instructions.md from the project's rule floor.
+  Wraps `dotbabel project-sync`. Use when adopting cross-CLI workflows in a repo
+  for the first time, or when adding a new command/skill that needs to be
+  visible to Codex/Gemini/Copilot. Triggers on: "sync this repo", "project
+  sync", "fan out commands", "wire up gemini for this project", "add this
+  command to codex", "make this skill available in copilot", "regenerate
+  AGENTS.md for this project".
+applyTo: '**'
+---
+
+# project-sync — Repo-local cross-CLI fan-out
+
+Thin wrapper around `dotbabel project-sync`. The binary owns all writes; this
+skill maps natural-language requests to the right invocation and surfaces
+dry-run output before mutating the repo.
+
+## When to invoke
+
+- The user wants to adopt cross-CLI workflows in a repo that already has
+  `.claude/commands/*` or `.claude/skills/*`, but no `AGENTS.md`/`GEMINI.md`/
+  `.github/prompts/`/`.github/instructions/` wiring.
+- A new command or skill was just added to `.claude/`, and the user wants
+  Codex/Gemini/Copilot to see it without leaving the editor.
+- The user asks for "drift check" or "is this repo synced" — run
+  `dotbabel check-project-sync` instead and surface the diff.
+- First-time setup: if `.dotbabel.json` is missing, suggest
+  `dotbabel project-init` first.
+
+## Workflow
+
+1. **Pre-flight.** Confirm cwd is a git repo and contains `CLAUDE.md` (with or
+   without rule-floor markers) plus at least one of `.claude/commands/` or
+   `.claude/skills/`. If `.dotbabel.json` is absent, mention that defaults will
+   apply (no `cli_substitutions`, full fan-out to codex/gemini/copilot,
+   gating on each CLI's `command -v` check).
+2. **Dry-run first.** Always run `dotbabel project-sync --dry-run` before
+   mutating. Summarize the planned actions to the user (count of instruction
+   files, count of new symlinks per CLI). Pause for confirmation **unless**
+   the user already said "do it" or "go ahead" in the same turn.
+3. **Apply.** Run `dotbabel project-sync` (no `--dry-run`). If the user passed
+   `--all`, propagate it.
+4. **Verify.** Run `dotbabel check-project-sync` and report `ok` /
+   `missing` / `stale` counts. Exit non-zero output should be surfaced.
+   The check applies the same `gate_on_cli_presence` gate as the sync, so a CLI
+   absent from `PATH` is reported as `skipped <cli>: not on PATH` rather than as
+   drift. Propagate `--all` here too when the user passed it in step 3, so both
+   commands cover the same CLIs.
+
+## Triggers and invocations
+
+| Trigger phrase                                        | Invocation                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| "sync this repo", "project sync", "fan out commands"  | `dotbabel project-sync --dry-run` then apply               |
+| "wire up gemini for this project"                     | `dotbabel project-sync --all` (covers all)                 |
+| "is this repo synced", "drift check the project sync" | `dotbabel check-project-sync` (read-only)                  |
+| "regenerate AGENTS.md for this project"               | `dotbabel project-sync` (instructions are part of the run) |
+| "set up project sync here", "first-time project sync" | `dotbabel project-init` then project-sync                  |
+
+## Reference: Copilot mapping
+
+The Copilot CLI fan-out targets `.github/prompts/*.prompt.md` (commands) and
+`.github/instructions/*.instructions.md` (skills) inside the target repo.
+See [`references/copilot-mapping.md`](references/copilot-mapping.md) for the
+full layout and rationale.
+
+## Boundaries
+
+- Always operate on the user's current working directory unless they pass an
+  explicit `--repo <path>`. Never silently target a different repo.
+- Never run `--force`. The plan reserves it for collision overrides; defer
+  to the binary's existing collision warnings.
+- For consumer repos with no `.dotbabel.json`, the convention path applies
+  (entire `CLAUDE.md` becomes the rule floor when markers are absent).
+- `fan_out` accepts only `codex`, `gemini`, and `copilot`. A typo aborts the run
+  with `CONFIG_UNKNOWN_CLI`; fix the name rather than dropping the gate.
+- `fan_out_layout` is `per-cli` by default. Under `shared`, Codex and Gemini
+  both point at one `.cli/skills/` tree, so describe changes by the canonical
+  path instead of naming each CLI directory twice. Switching an existing repo
+  leaves `.codex/skills.bak-<timestamp>` behind — say so, so the user can
+  delete it. An unknown value aborts with `CONFIG_UNKNOWN_LAYOUT`.
+- `cli_excluded` maps a CLI to command basenames and skill ids it must not
+  receive. Suggest it when a command describes a Claude-only flow. The sync
+  removes an excluded link it wrote earlier and reports `removed: <path>`;
+  mention that so the user expects the deletion in the diff. Under `shared`,
+  an exclusion for `codex` or `gemini` applies to both and the sync warns when
+  the lists differ. A malformed value aborts with `CONFIG_INVALID_EXCLUSION`.
+- This skill is for **project-scope** sync. For user-scope (`~/.claude/`,
+  `~/.codex/`, `~/.gemini/`) bootstrap, use `dotbabel bootstrap` instead.

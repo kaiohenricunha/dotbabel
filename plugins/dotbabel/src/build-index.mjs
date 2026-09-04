@@ -74,40 +74,43 @@ function toRelPosix(repoRoot, absPath) {
  *
  * Supports both inline arrays (`domain: [infra, observability]`) and block
  * arrays thanks to js-yaml. Returns `{}` when no frontmatter is present so
- * callers can always destructure.
+ * callers can always destructure. `body` is the content after the closing
+ * `---` (or the entire input when there is no frontmatter block), letting a
+ * caller reassemble the document after transforming `frontmatter` alone.
  *
  * @param {string} content
- * @returns {{ frontmatter: object, warnings: string[] }}
+ * @returns {{ frontmatter: object, warnings: string[], body: string }}
  */
 export function parseFrontmatter(content) {
   const warnings = [];
   if (typeof content !== "string" || content.length === 0) {
-    return { frontmatter: {}, warnings: ["empty content"] };
+    return { frontmatter: {}, warnings: ["empty content"], body: "" };
   }
   const lines = content.split("\n");
   if (lines[0].trim() !== "---") {
     warnings.push("no YAML frontmatter (no opening --- on line 1)");
-    return { frontmatter: {}, warnings };
+    return { frontmatter: {}, warnings, body: content };
   }
   const closeIdx = lines.findIndex((l, i) => i > 0 && l.trim() === "---");
   if (closeIdx === -1) {
     warnings.push("unterminated YAML frontmatter (no closing ---)");
-    return { frontmatter: {}, warnings };
+    return { frontmatter: {}, warnings, body: content };
   }
   const block = lines.slice(1, closeIdx).join("\n");
+  const body = lines.slice(closeIdx + 1).join("\n");
   try {
     const parsed = getYaml().load(block);
     if (parsed === null || parsed === undefined) {
-      return { frontmatter: {}, warnings };
+      return { frontmatter: {}, warnings, body };
     }
     if (typeof parsed !== "object" || Array.isArray(parsed)) {
       warnings.push("frontmatter is not a YAML mapping");
-      return { frontmatter: {}, warnings };
+      return { frontmatter: {}, warnings, body };
     }
-    return { frontmatter: normalizeDates(parsed), warnings };
+    return { frontmatter: normalizeDates(parsed), warnings, body };
   } catch (err) {
     warnings.push(`frontmatter YAML parse error: ${err.message}`);
-    return { frontmatter: {}, warnings };
+    return { frontmatter: {}, warnings, body };
   }
 }
 

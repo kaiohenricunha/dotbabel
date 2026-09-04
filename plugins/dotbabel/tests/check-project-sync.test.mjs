@@ -148,6 +148,62 @@ describe("checkProjectSync", () => {
   });
 });
 
+// Copilot targets are generated files, not symlinks (#324) — checkGenerated
+// diffs regenerated content instead of resolving a symlink target.
+describe("checkProjectSync — Copilot generated files", () => {
+  it("reports missing when a generated Copilot file is deleted", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.unlinkSync(path.join(repo, ".github", "prompts", "commit.prompt.md"));
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    expect(r.missing.some((e) => e.path === ".github/prompts/commit.prompt.md")).toBe(
+      true,
+    );
+  });
+
+  it("reports stale when a Copilot generated file is hand-edited after sync", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const dst = path.join(repo, ".github", "prompts", "commit.prompt.md");
+    // Keep the marker (still "generated"), but change content the sync would
+    // not have produced.
+    fs.appendFileSync(dst, "\nhand-added line\n");
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    expect(r.stale.some((e) => e.path === ".github/prompts/commit.prompt.md")).toBe(
+      true,
+    );
+  });
+
+  it("reports stale (not generated) when the marker is stripped", async () => {
+    const repo = buildSyncedRepo();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const dst = path.join(repo, ".github", "prompts", "commit.prompt.md");
+    fs.writeFileSync(dst, "---\ndescription: hijacked\n---\n\nbody\n");
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    const hit = r.stale.find((e) => e.path === ".github/prompts/commit.prompt.md");
+    expect(hit).toBeDefined();
+    expect(hit.actual).toBe("not dotbabel-generated");
+  });
+
+  it("reports a lingering excluded Copilot generated file as stale", async () => {
+    const repo = buildSyncedRepo();
+    fs.writeFileSync(path.join(repo, ".claude", "commands", "review.md"), "# /review\n");
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ cli_excluded: { copilot: ["review"] } }, null, 2),
+    );
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    const hit = r.stale.find((e) => e.path === ".github/prompts/review.prompt.md");
+    expect(hit).toBeDefined();
+    expect(hit.actual).toMatch(/excluded/);
+  });
+});
+
 // `projectSync` skips a CLI's fan-out when gate_on_cli_presence is set and the
 // binary is absent, so the checker has to skip the same CLI or it reports drift
 // for work that was deliberately never done (#219, finding D).
