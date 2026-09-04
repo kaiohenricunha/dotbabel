@@ -67,6 +67,7 @@ export const DEFAULT_PROJECT_CONFIG = Object.freeze({
   fan_out: KNOWN_FAN_OUT_CLIS,
   fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
+  cli_excluded: Object.freeze({}),
   cli_substitutions: Object.freeze({}),
   targets: Object.freeze([
     Object.freeze({
@@ -150,7 +151,87 @@ export function loadProjectConfig(repoRoot) {
       hint: "use \"per-cli\" (default) or \"shared\" in .dotbabel.json:fan_out_layout",
     });
   }
+  if (raw.cli_excluded !== undefined) validateCliExcluded(raw.cli_excluded);
   return { ...DEFAULT_PROJECT_CONFIG, ...raw };
+}
+
+/**
+ * Reject a malformed `cli_excluded` at load time, mirroring the `fan_out`
+ * check above: a key that is not a known CLI, or a value that is not a list of
+ * names, would otherwise silently exclude nothing (#219, finding A).
+ *
+ * @param {unknown} value
+ */
+function validateCliExcluded(value) {
+  const invalid = (pointer, got, message) =>
+    new ValidationError({
+      code: ERROR_CODES.CONFIG_INVALID_EXCLUSION,
+      category: "settings",
+      file: ".dotbabel.json",
+      pointer,
+      message,
+      expected: "an object mapping a CLI name to a list of command or skill names",
+      got: JSON.stringify(got),
+      hint: 'example: { "cli_excluded": { "codex": ["review-prs-parallel"] } }',
+    });
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw invalid("/cli_excluded", value, "cli_excluded must be an object");
+  }
+  for (const [cli, names] of Object.entries(value)) {
+    if (!KNOWN_FAN_OUT_CLIS.includes(cli)) {
+      throw new ValidationError({
+        code: ERROR_CODES.CONFIG_UNKNOWN_CLI,
+        category: "settings",
+        file: ".dotbabel.json",
+        pointer: `/cli_excluded/${cli}`,
+        message: `unknown cli_excluded CLI: ${JSON.stringify(cli)}`,
+        expected: `one of: ${KNOWN_FAN_OUT_CLIS.join(", ")}`,
+        got: cli,
+        hint: "fix the key in .dotbabel.json:cli_excluded, or drop it",
+      });
+    }
+    if (!Array.isArray(names)) {
+      throw invalid(
+        `/cli_excluded/${cli}`,
+        names,
+        `cli_excluded.${cli} must be a list of command or skill names`,
+      );
+    }
+    names.forEach((name, i) => {
+      if (typeof name === "string" && name.length > 0) return;
+      throw invalid(
+        `/cli_excluded/${cli}/${i}`,
+        name,
+        `cli_excluded.${cli}[${i}] must be a non-empty string`,
+      );
+    });
+  }
+}
+
+/**
+ * Names (command basenames and skill ids) that `cli` must not receive.
+ *
+ * Under the shared layout one canonical tree serves Codex and Gemini alike, so
+ * an exclusion for either applies to both: the result is the union of the two
+ * lists. `projectSync` warns when the lists differ, since the config then
+ * promises a per-CLI distinction the layout cannot deliver.
+ *
+ * @param {string} cli
+ * @param {typeof DEFAULT_PROJECT_CONFIG} cfg
+ * @returns {Set<string>}
+ */
+export function excludedNamesFor(cli, cfg) {
+  const map = cfg.cli_excluded ?? {};
+  if (cfg.fan_out_layout === "shared" && SKILL_DIR_CLIS.includes(cli)) {
+    const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
+    const union = new Set();
+    for (const sharedCli of SKILL_DIR_CLIS) {
+      if (!fanOut.includes(sharedCli)) continue;
+      for (const name of map[sharedCli] ?? []) union.add(name);
+    }
+    return union;
+  }
+  return new Set(map[cli] ?? []);
 }
 
 /**
@@ -214,6 +295,7 @@ export function extractRuleFloorOrWhole(body) {
  * @property {number} skipped
  * @property {number} backed_up
  * @property {number} written     Number of instruction files written (or planned in dry-run).
+ * @property {number} removed     Number of `cli_excluded` links removed (or planned in dry-run).
  */
 
 /**
@@ -235,7 +317,7 @@ export async function projectSync(opts) {
   if (!fs.existsSync(repoRoot)) {
     out.fail(`repo root does not exist: ${repoRoot}`);
     out.flush();
-    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0 };
+    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0, removed: 0 };
   }
 
   const cfg = loadProjectConfig(repoRoot);
@@ -243,7 +325,7 @@ export async function projectSync(opts) {
   if (!fs.existsSync(sourcePath)) {
     out.fail(`rule-floor source does not exist: ${cfg.rule_floor_source}`);
     out.flush();
-    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0 };
+    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0, removed: 0 };
   }
 
   const timestamp = buildTimestamp();
@@ -251,6 +333,7 @@ export async function projectSync(opts) {
   let skipped = 0;
   let backed_up = 0;
   let written = 0;
+  let removed = 0;
 
   // ---- 1. Instruction files (AGENTS.md, GEMINI.md, copilot-instructions.md)
 
@@ -302,6 +385,8 @@ export async function projectSync(opts) {
   // never gets a .cli/ directory it would not use.
   let sharedBuilt = false;
 
+  warnOnExclusionMismatch();
+
   for (const cli of fanOut) {
     if (SKILL_DIR_CLIS.includes(cli)) {
       const cliDir = path.join(repoRoot, `.${cli}`, "skills");
@@ -309,7 +394,7 @@ export async function projectSync(opts) {
         fanOutSkillsLayout({ cli, targetDir: cliDir });
       } else if (gateOnCli(cli, `${cli} skills fan-out`)) {
         if (!sharedBuilt) {
-          buildSkillsTree(sharedAbs);
+          buildSkillsTree(sharedAbs, excludedNamesFor(cli, cfg));
           sharedBuilt = true;
         }
         doEnsureRealDir(path.dirname(cliDir));
@@ -326,10 +411,54 @@ export async function projectSync(opts) {
   }
 
   out.flush();
-  return { ok: true, linked, skipped, backed_up, written };
+  return { ok: true, linked, skipped, backed_up, written, removed };
 
   // -------------------------------------------------------------------------
-  // helpers (closures over linked / skipped / backed_up / out / opts)
+  // helpers (closures over linked / skipped / backed_up / removed / out / opts)
+
+  /**
+   * Surface `cli_excluded` entries the fan-out cannot honor as written: a name
+   * that matches no command or skill, or a per-CLI distinction the shared
+   * layout collapses. Neither is an error — the sync still runs — but a silent
+   * no-op is exactly what finding A set out to remove.
+   */
+  function warnOnExclusionMismatch() {
+    const map = cfg.cli_excluded ?? {};
+    const known = new Set();
+    if (fs.existsSync(commandsAbs)) {
+      for (const entry of fs.readdirSync(commandsAbs)) {
+        if (entry.endsWith(".md")) known.add(entry.replace(/\.md$/, ""));
+      }
+    }
+    if (fs.existsSync(skillsAbs)) {
+      for (const entry of fs.readdirSync(skillsAbs, { withFileTypes: true })) {
+        if (entry.isDirectory()) known.add(entry.name);
+      }
+    }
+    for (const [cli, names] of Object.entries(map)) {
+      for (const name of names) {
+        if (known.has(name)) continue;
+        out.warn(
+          `cli_excluded: ${cli}: no command or skill named "${name}" in ${cfg.commands_dir} or ${cfg.skills_dir}`,
+        );
+      }
+    }
+    if (!sharedLayout) return;
+    const [a, b] = SKILL_DIR_CLIS;
+    if (!fanOut.includes(a) || !fanOut.includes(b)) return;
+    for (const [only, other] of [
+      [a, b],
+      [b, a],
+    ]) {
+      const otherSet = new Set(map[other] ?? []);
+      for (const name of map[only] ?? []) {
+        if (otherSet.has(name)) continue;
+        out.warn(
+          `cli_excluded: fan_out_layout "shared" drops "${name}" for ${other} too (excluded for ${only} only)`,
+        );
+      }
+    }
+  }
 
   function gateOnCli(cli, label) {
     if (shouldFanOutCli(cli, cfg, { allCli: opts.allCli })) return true;
@@ -379,17 +508,65 @@ export async function projectSync(opts) {
     if (r.action === "backed_up") backed_up++;
   }
 
+  /**
+   * Retire a link at an excluded destination. Only a symlink that resolves to
+   * `src` (or dangles) is ours to remove — a real file or a link elsewhere is
+   * left in place with a warning, because we did not write it. `wrapDir` is
+   * the `<name>/` wrapper of a command entry, dropped once it is empty.
+   */
+  function doRemoveExcluded(dst, src, wrapDir) {
+    let lstat;
+    try {
+      lstat = fs.lstatSync(dst);
+    } catch {
+      return;
+    }
+    const rel = path.relative(repoRoot, dst);
+    if (!lstat.isSymbolicLink()) {
+      out.warn(`excluded but not a symlink, left alone: ${rel}`);
+      return;
+    }
+    let resolved = null;
+    try {
+      resolved = fs.realpathSync(dst);
+    } catch {
+      // Dangling: nothing to compare against, and nothing worth keeping.
+    }
+    if (resolved !== null && resolved !== fs.realpathSync(src)) {
+      out.warn(`excluded but links elsewhere, left alone: ${rel}`);
+      return;
+    }
+    if (opts.dryRun) {
+      out.info(`would remove: ${rel}`);
+      removed++;
+      return;
+    }
+    fs.unlinkSync(dst);
+    if (wrapDir) {
+      try {
+        if (fs.readdirSync(wrapDir).length === 0) fs.rmdirSync(wrapDir);
+      } catch {
+        // The wrapper is not ours if it holds anything else; leave it.
+      }
+    }
+    out.pass(`removed: ${rel}`);
+    removed++;
+  }
+
   function fanOutSkillsLayout({ cli, targetDir }) {
     if (!gateOnCli(cli, `${cli} skills fan-out`)) return;
-    buildSkillsTree(targetDir);
+    buildSkillsTree(targetDir, excludedNamesFor(cli, cfg));
   }
 
   /**
    * Populate a `<dir>/<name>/SKILL.md` tree. Split out of
    * `fanOutSkillsLayout` so the shared layout can build the canonical tree
    * once and then hand each CLI a redirect instead of a second copy.
+   *
+   * @param {string} targetDir
+   * @param {Set<string>} excluded  Names to leave out (and retire if present).
    */
-  function buildSkillsTree(targetDir) {
+  function buildSkillsTree(targetDir, excluded) {
     if (!opts.dryRun) fs.mkdirSync(targetDir, { recursive: true });
 
     if (fs.existsSync(skillsAbs)) {
@@ -399,6 +576,10 @@ export async function projectSync(opts) {
         if (entry.name === ".system") continue;
         const src = path.join(skillsAbs, entry.name);
         const dst = path.join(targetDir, entry.name);
+        if (excluded.has(entry.name)) {
+          doRemoveExcluded(dst, src);
+          continue;
+        }
         doLink(src, dst);
       }
     }
@@ -410,8 +591,12 @@ export async function projectSync(opts) {
         if (name === ".system") continue;
         const src = path.join(commandsAbs, entry);
         const wrapDir = path.join(targetDir, name);
-        doEnsureRealDir(wrapDir);
         const dst = path.join(wrapDir, "SKILL.md");
+        if (excluded.has(name)) {
+          doRemoveExcluded(dst, src, wrapDir);
+          continue;
+        }
+        doEnsureRealDir(wrapDir);
         doLink(src, dst);
       }
     }
@@ -419,6 +604,7 @@ export async function projectSync(opts) {
 
   function fanOutCopilotLayout() {
     if (!gateOnCli("copilot", "copilot prompt/instruction fan-out")) return;
+    const excluded = excludedNamesFor("copilot", cfg);
     const promptsDir = path.join(repoRoot, ".github", "prompts");
     const instructionsDir = path.join(repoRoot, ".github", "instructions");
 
@@ -431,6 +617,10 @@ export async function projectSync(opts) {
         if (name === ".system") continue;
         const src = path.join(commandsAbs, entry);
         const dst = path.join(promptsDir, `${name}.prompt.md`);
+        if (excluded.has(name)) {
+          doRemoveExcluded(dst, src);
+          continue;
+        }
         doLink(src, dst);
       }
     }
@@ -448,6 +638,10 @@ export async function projectSync(opts) {
           instructionsDir,
           `${entry.name}.instructions.md`,
         );
+        if (excluded.has(entry.name)) {
+          doRemoveExcluded(dst, skillFile);
+          continue;
+        }
         doLink(skillFile, dst);
       }
     }

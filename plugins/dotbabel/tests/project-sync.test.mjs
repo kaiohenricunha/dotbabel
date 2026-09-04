@@ -655,3 +655,210 @@ describe("projectSync — shared fan-out layout", () => {
     expect(fs.existsSync(path.join(repo, ".cli"))).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// cli_excluded — per-CLI command / skill allowlist (#219, finding A)
+// ---------------------------------------------------------------------------
+
+describe("loadProjectConfig — cli_excluded", () => {
+  function loadWith(cfg) {
+    const repo = makeTmpDir();
+    fs.writeFileSync(path.join(repo, ".dotbabel.json"), JSON.stringify(cfg));
+    let caught;
+    try {
+      return { cfg: loadProjectConfig(repo) };
+    } catch (err) {
+      caught = err;
+    }
+    return { caught };
+  }
+
+  it("defaults to an empty map", () => {
+    expect(DEFAULT_PROJECT_CONFIG.cli_excluded).toEqual({});
+    const repo = makeTmpDir();
+    expect(loadProjectConfig(repo).cli_excluded).toEqual({});
+  });
+
+  it("accepts a map of known CLI to name list", () => {
+    const { cfg } = loadWith({ cli_excluded: { codex: ["review"], copilot: [] } });
+    expect(cfg.cli_excluded).toEqual({ codex: ["review"], copilot: [] });
+  });
+
+  it("rejects an unknown CLI key with CONFIG_UNKNOWN_CLI", () => {
+    const { caught } = loadWith({ cli_excluded: { "co-pilot": ["review"] } });
+    expect(caught).toBeInstanceOf(ValidationError);
+    expect(caught.code).toBe(ERROR_CODES.CONFIG_UNKNOWN_CLI);
+    expect(caught.pointer).toBe("/cli_excluded/co-pilot");
+  });
+
+  it("rejects a non-object value with CONFIG_INVALID_EXCLUSION", () => {
+    const { caught } = loadWith({ cli_excluded: ["review"] });
+    expect(caught).toBeInstanceOf(ValidationError);
+    expect(caught.code).toBe(ERROR_CODES.CONFIG_INVALID_EXCLUSION);
+    expect(caught.pointer).toBe("/cli_excluded");
+  });
+
+  it("rejects a non-array name list with CONFIG_INVALID_EXCLUSION", () => {
+    const { caught } = loadWith({ cli_excluded: { codex: "review" } });
+    expect(caught.code).toBe(ERROR_CODES.CONFIG_INVALID_EXCLUSION);
+    expect(caught.pointer).toBe("/cli_excluded/codex");
+  });
+
+  it("rejects a non-string name with CONFIG_INVALID_EXCLUSION", () => {
+    const { caught } = loadWith({ cli_excluded: { codex: ["review", 7] } });
+    expect(caught.code).toBe(ERROR_CODES.CONFIG_INVALID_EXCLUSION);
+    expect(caught.pointer).toBe("/cli_excluded/codex/1");
+  });
+});
+
+describe("projectSync — cli_excluded", () => {
+  function buildExcludedRepo(cli_excluded, extra = {}) {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        cli_excluded,
+        ...extra,
+      },
+    });
+    return repo;
+  }
+
+  it("omits an excluded command from that CLI only", async () => {
+    const repo = buildExcludedRepo({ codex: ["review"] });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "review"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "commit", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".gemini", "skills", "review", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".github", "prompts", "review.prompt.md"))).toBe(true);
+  });
+
+  it("omits an excluded skill from copilot only", async () => {
+    const repo = buildExcludedRepo({ copilot: ["deploy"] });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(
+      fs.existsSync(path.join(repo, ".github", "instructions", "deploy.instructions.md")),
+    ).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".github", "prompts", "commit.prompt.md"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "deploy"))).toBe(true);
+  });
+
+  it("removes a previously fanned-out entry once it is excluded", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "review", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".github", "prompts", "review.prompt.md"))).toBe(true);
+
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ cli_excluded: { codex: ["review"], copilot: ["review"] } }),
+    );
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(r.removed).toBe(2);
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "review"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".github", "prompts", "review.prompt.md"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".gemini", "skills", "review", "SKILL.md"))).toBe(true);
+  });
+
+  it("removes an excluded skill-directory link but never the source", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ cli_excluded: { codex: ["deploy"] } }),
+    );
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.removed).toBe(1);
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "deploy"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".claude", "skills", "deploy", "SKILL.md"))).toBe(true);
+  });
+
+  it("leaves a real file at an excluded destination alone", async () => {
+    const repo = buildExcludedRepo({ copilot: ["review"] });
+    fs.mkdirSync(path.join(repo, ".github", "prompts"), { recursive: true });
+    const handWritten = path.join(repo, ".github", "prompts", "review.prompt.md");
+    fs.writeFileSync(handWritten, "hand-written\n");
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.removed).toBe(0);
+    expect(fs.readFileSync(handWritten, "utf8")).toBe("hand-written\n");
+  });
+
+  it("--dry-run reports but does not remove", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ cli_excluded: { codex: ["review"] } }),
+    );
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true, dryRun: true });
+    expect(r.removed).toBe(1);
+    expect(fs.existsSync(path.join(repo, ".codex", "skills", "review", "SKILL.md"))).toBe(true);
+  });
+
+  it("is idempotent: a second run after removal removes nothing", async () => {
+    const repo = buildExcludedRepo({ codex: ["review"] });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.removed).toBe(0);
+  });
+
+  it("warns on a name that matches no command or skill", async () => {
+    const repo = buildExcludedRepo({ codex: ["nope"] });
+    const warnings = [];
+    const out = {
+      pass() {},
+      fail() {},
+      info() {},
+      warn(msg) {
+        warnings.push(msg);
+      },
+      flush() {},
+    };
+    const r = await projectSync({ repoRoot: repo, allCli: true, out });
+    expect(r.ok).toBe(true);
+    expect(warnings.some((w) => /cli_excluded.*codex.*nope/.test(w))).toBe(true);
+  });
+
+  it("shared layout: an exclusion for one CLI drops the entry from the canonical tree and warns", async () => {
+    const repo = buildExcludedRepo({ codex: ["review"] }, { fan_out_layout: "shared" });
+    const warnings = [];
+    const out = {
+      pass() {},
+      fail() {},
+      info() {},
+      warn(msg) {
+        warnings.push(msg);
+      },
+      flush() {},
+    };
+    await projectSync({ repoRoot: repo, allCli: true, out });
+    expect(fs.existsSync(path.join(repo, ".cli", "skills", "review"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".gemini", "skills", "review"))).toBe(false);
+    expect(warnings.some((w) => /shared.*review.*gemini/.test(w))).toBe(true);
+  });
+
+  it("shared layout: identical exclusions for codex and gemini do not warn", async () => {
+    const repo = buildExcludedRepo(
+      { codex: ["review"], gemini: ["review"] },
+      { fan_out_layout: "shared" },
+    );
+    const warnings = [];
+    const out = {
+      pass() {},
+      fail() {},
+      info() {},
+      warn(msg) {
+        warnings.push(msg);
+      },
+      flush() {},
+    };
+    await projectSync({ repoRoot: repo, allCli: true, out });
+    expect(fs.existsSync(path.join(repo, ".cli", "skills", "review"))).toBe(false);
+    expect(warnings).toEqual([]);
+  });
+});

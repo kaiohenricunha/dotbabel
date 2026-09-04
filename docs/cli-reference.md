@@ -440,11 +440,18 @@ PATH. `.dotbabel.json` `gate_on_cli_presence` controls that; `--all` overrides.
 Switching to `shared` backs the old trees up to `.codex/skills.bak-<timestamp>`.
 Copilot's `.github/prompts/` and `.github/instructions/` are unaffected.
 
+`.dotbabel.json` `cli_excluded` maps a CLI to command basenames and skill ids
+it must not receive, for commands that describe a Claude-only flow. An excluded
+link written by an earlier run is removed (`removed: <path>`; `would remove:`
+under `--dry-run`). Under `shared`, an exclusion for `codex` or `gemini`
+applies to both.
+
 Limitation: targets are symlinks to the Claude source, never per-CLI
 translations. Claude-shaped frontmatter (`allowed-tools`, `model`, `effort`,
 `disable-model-invocation`, auto-routing `description`) is not honored by
 Codex, Gemini, or Copilot; those CLIs get direct slash invocation by name only.
-Commands that describe Claude-only flows fan out unchanged. See
+Commands that describe Claude-only flows fan out unchanged unless listed in
+`cli_excluded`. See
 [#219](https://github.com/kaiohenricunha/dotbabel/issues/219).
 
 ---

@@ -272,3 +272,48 @@ describe("checkProjectSync — shared fan-out layout", () => {
     expect(r.skipped).toContain("codex");
   });
 });
+
+describe("checkProjectSync — cli_excluded", () => {
+  function buildExcludedRepo(cli_excluded, extra = {}) {
+    const repo = buildSyncedRepo();
+    fs.writeFileSync(path.join(repo, ".claude", "commands", "review.md"), "# /review\n");
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ cli_excluded, ...extra }, null, 2),
+    );
+    return repo;
+  }
+
+  it("does not expect an excluded entry", async () => {
+    const repo = buildExcludedRepo({ codex: ["review"], copilot: ["deploy"] });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(r.missing).toEqual([]);
+    expect(r.okEntries.some((e) => e.path === ".codex/skills/review/SKILL.md")).toBe(false);
+    expect(r.okEntries.some((e) => e.path === ".gemini/skills/review/SKILL.md")).toBe(true);
+  });
+
+  it("reports a lingering excluded link as stale", async () => {
+    const repo = buildSyncedRepo();
+    fs.writeFileSync(path.join(repo, ".claude", "commands", "review.md"), "# /review\n");
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ cli_excluded: { codex: ["review"] } }, null, 2),
+    );
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(false);
+    const hit = r.stale.find((e) => e.path === ".codex/skills/review/SKILL.md");
+    expect(hit).toBeDefined();
+    expect(hit.actual).toMatch(/excluded/);
+  });
+
+  it("shared layout: an exclusion for one CLI is checked against the canonical tree", async () => {
+    const repo = buildExcludedRepo({ codex: ["review"] }, { fan_out_layout: "shared" });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const r = await checkProjectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.ok).toBe(true);
+    expect(r.okEntries.some((e) => e.path === ".cli/skills/review/SKILL.md")).toBe(false);
+  });
+});

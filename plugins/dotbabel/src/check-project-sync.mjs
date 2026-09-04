@@ -19,6 +19,7 @@ import {
   ERROR_CODES,
 } from "./generate-instructions.mjs";
 import {
+  excludedNamesFor,
   extractRuleFloorOrWhole,
   loadProjectConfig,
   shouldFanOutCli,
@@ -185,21 +186,45 @@ export async function checkProjectSync(opts) {
   }
 
   /**
+   * An excluded destination is expected to be absent. Anything still there is
+   * drift `projectSync` would retire on its next run (#219, finding A). Absence
+   * is not recorded as `ok` — the entry was never expected.
+   */
+  function checkExcluded(dstAbs) {
+    const relDst = path.relative(repoRoot, dstAbs);
+    try {
+      fs.lstatSync(dstAbs);
+    } catch {
+      return;
+    }
+    stale.push({
+      kind: "symlink",
+      path: relDst,
+      expected: "absent (cli_excluded)",
+      actual: "excluded but present",
+    });
+    out.fail(`stale (excluded but present): ${relDst}`);
+  }
+
+  /**
    * Verify a `<dir>/<name>/SKILL.md` tree against the canonical sources.
    * Shared by the per-cli layout (once per CLI) and the shared layout (once
    * for `.cli/skills/`).
    *
    * @param {string} targetDir
+   * @param {Set<string>} excluded  Names that must not be present.
    */
-  function checkSkillsTree(targetDir) {
+  function checkSkillsTree(targetDir, excluded) {
     if (fs.existsSync(skillsAbs)) {
       for (const entry of fs.readdirSync(skillsAbs, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         if (entry.name === ".system") continue;
-        checkLink(
-          path.join(targetDir, entry.name),
-          path.join(skillsAbs, entry.name),
-        );
+        const dst = path.join(targetDir, entry.name);
+        if (excluded.has(entry.name)) {
+          checkExcluded(dst);
+          continue;
+        }
+        checkLink(dst, path.join(skillsAbs, entry.name));
       }
     }
     if (fs.existsSync(commandsAbs)) {
@@ -207,10 +232,12 @@ export async function checkProjectSync(opts) {
         if (!entry.endsWith(".md")) continue;
         const name = entry.replace(/\.md$/, "");
         if (name === ".system") continue;
-        checkLink(
-          path.join(targetDir, name, "SKILL.md"),
-          path.join(commandsAbs, entry),
-        );
+        const dst = path.join(targetDir, name, "SKILL.md");
+        if (excluded.has(name)) {
+          checkExcluded(dst);
+          continue;
+        }
+        checkLink(dst, path.join(commandsAbs, entry));
       }
     }
   }
@@ -230,15 +257,16 @@ export async function checkProjectSync(opts) {
       out.info(`skipped ${cli}: not on PATH (use --all to check anyway)`);
       continue;
     }
+    const excluded = excludedNamesFor(cli, cfg);
     if (cli === "codex" || cli === "gemini") {
       if (sharedLayout) {
         if (!sharedChecked) {
-          checkSkillsTree(sharedAbs);
+          checkSkillsTree(sharedAbs, excluded);
           sharedChecked = true;
         }
         checkLink(path.join(repoRoot, `.${cli}`, "skills"), sharedAbs);
       } else {
-        checkSkillsTree(path.join(repoRoot, `.${cli}`, "skills"));
+        checkSkillsTree(path.join(repoRoot, `.${cli}`, "skills"), excluded);
       }
     } else if (cli === "copilot") {
       const promptsDir = path.join(repoRoot, ".github", "prompts");
@@ -248,10 +276,12 @@ export async function checkProjectSync(opts) {
           if (!entry.endsWith(".md")) continue;
           const name = entry.replace(/\.md$/, "");
           if (name === ".system") continue;
-          checkLink(
-            path.join(promptsDir, `${name}.prompt.md`),
-            path.join(commandsAbs, entry),
-          );
+          const dst = path.join(promptsDir, `${name}.prompt.md`);
+          if (excluded.has(name)) {
+            checkExcluded(dst);
+            continue;
+          }
+          checkLink(dst, path.join(commandsAbs, entry));
         }
       }
       if (fs.existsSync(skillsAbs)) {
@@ -260,10 +290,12 @@ export async function checkProjectSync(opts) {
           if (entry.name === ".system") continue;
           const skillFile = path.join(skillsAbs, entry.name, "SKILL.md");
           if (!fs.existsSync(skillFile)) continue;
-          checkLink(
-            path.join(instructionsDir, `${entry.name}.instructions.md`),
-            skillFile,
-          );
+          const dst = path.join(instructionsDir, `${entry.name}.instructions.md`);
+          if (excluded.has(entry.name)) {
+            checkExcluded(dst);
+            continue;
+          }
+          checkLink(dst, skillFile);
         }
       }
     }

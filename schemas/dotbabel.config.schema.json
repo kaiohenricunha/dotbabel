@@ -45,6 +45,18 @@
       "description": "When true, skip a CLI's symlink fan-out if its binary is absent from PATH. `dotbabel-check-project-sync` honors the same setting, so it will not report the skipped CLI as drift. Pass --all to either binary to override for one run. Instruction files are always written, never gated.",
       "default": true
     },
+    "cli_excluded": {
+      "type": "object",
+      "description": "Per-CLI exclusion list. Maps a CLI name to command basenames (without .md) and skill ids that must not fan out to it, for commands that describe a Claude-only flow. An excluded entry already on disk is removed on the next sync; `dotbabel-check-project-sync` reports it as drift until then. Under fan_out_layout 'shared' an exclusion for codex or gemini applies to both, since they read one tree.",
+      "default": {},
+      "propertyNames": {
+        "enum": ["codex", "gemini", "copilot"]
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      }
+    },
     "cli_substitutions": {
       "type": "object",
       "description": "Per-CLI text substitutions applied while rendering instruction files.",
