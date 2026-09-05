@@ -11,14 +11,14 @@ owner: "@kaiohenricunha"
 created: 2026-04-18
 updated: 2026-08-12
 description: >
-  Pre-PR quality gate: simplify changed code, security-review the diff, run the full test
-  suite, and surface a go/no-go summary before opening a pull request.
+  Pre-PR quality gate: simplify changed code, security-review the diff, run the PR quality
+  profile, and surface a go/no-go summary before opening a pull request.
 argument-hint: "[base-branch] [--conductor] — default: origin/main"
 model: sonnet
 headless_safe: false
 ---
 
-Quality gate to run before `/git pr`. Simplifies changed code, security-reviews the diff, runs the full test suite, and surfaces a go/no-go summary. Does not open the PR — that is `/git pr`.
+Quality gate to run before `/git pr`. Simplifies changed code, security-reviews the diff, runs the PR quality profile, and surfaces a go/no-go summary. Does not open the PR — that is `/git pr`.
 
 Trigger: when the user is done with a feature and is about to open a PR, or says "prepare PR", "pre-PR", or "clean up before PR". Also triggered directly via `/pre-pr [base-branch]`.
 
@@ -146,31 +146,18 @@ Classify findings:
 - **INFO** → record in summary only.
 - No findings → record "security: clean."
 
-### 4. Run the full test suite
+### 4. Run the PR quality profile
 
-Detect runner from the project:
-
-| Signal                        | Command                                                |
-| ----------------------------- | ------------------------------------------------------ |
-| `Makefile` with `test` target | `make test`                                            |
-| `package.json`                | `npm test` (or `pnpm test` / `yarn test` per lockfile) |
-| `go.mod`                      | `go test ./...`                                        |
-| `pyproject.toml`              | `pytest` or `uv run pytest`                            |
-
-Run and paste the **last 40 lines** of output regardless of pass/fail.
-
-**If tests fail**, determine whether the failure is branch-introduced or pre-existing:
+Run the resolved repository commands and normalized policy checks through one entry point:
 
 ```bash
-git stash
-<test-command>
-git stash pop
+dotbabel quality check --profile pr --base "$BASE"
 ```
 
-- Failure survives stash → pre-existing. Note in summary, do not stop.
-- Failure disappears → introduced by this branch. **STOP.** Tell the user to fix the regression before opening the PR.
+Do not pass `--allow-project-commands` during a local run. Use the external trust allowlist.
 
-Never claim pre-existing without running this proof.
+Exit code `1` means a checked rule failed. Exit code `2` means required evidence, trust, or tooling is unavailable.
+**STOP** for either exit code. Surface each unavailable and not-configured capability in the summary.
 
 ### 5. PR body checklist reminder
 
@@ -198,9 +185,9 @@ Pre-PR gate: branch → $BRANCH (base: $BASE)
                    |  N warnings (see above)
                    |  secrets-grep clean (conductor — full review in phase 3)
                    |  ⚠ skill unavailable — skipped
-  Step 4 — Tests:     ✓ pass
-                   |  ✗ fail — pre-existing (stash proof above)
-                   |  ✗ fail — THIS BRANCH (BLOCKED)
+  Step 4 — Quality:   ✓ PR profile passed
+                   |  ✗ checked rule failed (BLOCKED)
+                   |  ✗ required evidence unavailable (BLOCKED)
   Step 5 — PR body:   checklist above
 
 Status: READY — run `/git pr` to open the pull request.
@@ -211,8 +198,7 @@ Status: READY — run `/git pr` to open the pull request.
 
 - **Never open the PR.** That is `/git pr`. This command only gates.
 - **STOP on CRITICAL security findings.** Do not advance to steps 4–6; surface findings immediately.
-- **STOP if tests fail and the failure is branch-introduced.** Stash proof is required — same standard as `merge-pr`.
-- **Never claim a test failure is pre-existing** without the `git stash` proof.
+- **STOP if the PR quality profile returns exit code 1 or 2.** Surface the normalized results.
 - **Security-review unavailable is a warning, not a failure.** Warn, skip, continue.
 - **`--conductor` narrows step 3 only.** A secrets hit still stops the run, and every other step behaves exactly as it does standalone.
 - **Simplify commits are style commits.** Message: `style: pre-pr simplification pass`. Atomic — do not bundle with feature changes.

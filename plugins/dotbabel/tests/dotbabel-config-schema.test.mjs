@@ -68,6 +68,22 @@ describe("dotbabel.config.schema.json", () => {
     expect(validate({ fan_out_layout: "sideways" })).toBe(false);
   });
 
+  it("accepts a strict language-aware quality policy", () => {
+    const validate = compile();
+    expect(validate({ quality: {
+      enabled: true,
+      rules: { "coverage.changed_lines": { threshold: 90, on_unavailable: "warning" } },
+      components: [{ root: "api", languages: ["go", "rust"], tools: { test: { argv: ["make", "test"], report: { format: "exit-code" } } } }],
+      exceptions: [{ id: "QEX-1", rule: "complexity.cognitive", fingerprint: "sha256:abc", reason: "One ordered parser state machine.", expires: "2027-01-01" }],
+    } })).toBe(true);
+  });
+
+  it("rejects unknown keys inside quality", () => {
+    const validate = compile();
+    expect(validate({ quality: { unknown: true } })).toBe(false);
+    expect(validate({ quality: { rules: { "unknown.rule": {} } } })).toBe(false);
+  });
+
   it("is referenced by both the scaffolded default and this repo's config", () => {
     expect(DEFAULT_DOTBABEL_JSON.$schema).toBe(SCHEMA_ID);
     expect(readJson(path.join(REPO_ROOT, ".dotbabel.json")).$schema).toBe(SCHEMA_ID);

@@ -102,3 +102,21 @@ See `docs/adr/` for the canonical decision records. Summary:
 - **Exit-code convention** (ADR-0013 → `{0,1,2,64}` with 64 mirroring BSD `EX_USAGE`).
 - **CLI `✓/✗/⚠` format** (ADR-0014 → gold-standard from `validate-settings.sh:43-45`).
 - **`exit 2` on PreToolUse blocks** (Claude Code hook protocol, documented in the hook comment block).
+
+## Quality pipeline boundaries
+
+The quality subsystem uses a one-way data flow:
+
+```text
+policy defaults -> user defaults -> project overrides -> profile
+  -> Git scope and component discovery -> language adapter plans
+  -> trusted argv runner -> normalized reports -> evaluator -> reporter
+```
+
+`quality/policy.mjs` owns stable rule identifiers and numeric defaults. It does not know tool names.
+`quality/adapters/` owns language markers, commands, and tool diagnostic mappings. The registry is explicit and does not load repository code.
+`quality/runner.mjs` owns trust, process execution, timeouts, output limits, and environment filtering.
+`quality/evaluate.mjs` owns thresholds, baseline ratchets, availability policy, and exact exceptions.
+
+A component identity is a normalized root and a language. Several languages can share one root.
+Explicit components override discovery at their root but do not disable discovery elsewhere.

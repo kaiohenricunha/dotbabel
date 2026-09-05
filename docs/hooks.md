@@ -49,6 +49,11 @@ build gives a correct answer.
 
 Both hooks stay silent on style. Only a hard error is reported.
 
+The hooks are low-cost feedback, not the full quality policy.
+Run `dotbabel quality check --profile fast` for an explicit changed-code check.
+Run the `pr` or `deep` profile for tests, coverage, and configured analyzers.
+Unlike fail-open hooks, the quality command reports unavailable tools and uses documented exit codes.
+
 ---
 
 ## check-on-stop trust

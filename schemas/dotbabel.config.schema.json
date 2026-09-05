@@ -85,6 +85,195 @@
           }
         }
       }
+    },
+    "quality": {
+      "$ref": "#/$defs/quality"
+    }
+  },
+  "$defs": {
+    "repositoryPath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [{ "pattern": "^(?:/|[A-Za-z]:[\\\\/])" }, { "pattern": "(?:^|/)\\.\\.(?:/|$)" }]
+      }
+    },
+    "qualityRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "level": { "enum": ["error", "warning", "info"] },
+        "threshold": { "type": "number", "minimum": 0 },
+        "scope": { "enum": ["changed", "component", "repository"] },
+        "on_unavailable": { "enum": ["error", "warning", "info"] },
+        "profiles": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["fast", "pr", "deep"] }
+        }
+      }
+    },
+    "qualityReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format"],
+      "properties": {
+        "format": {
+          "enum": [
+            "exit-code",
+            "go-coverprofile",
+            "coveragepy-json",
+            "istanbul-json",
+            "lcov",
+            "sarif",
+            "golangci-json",
+            "eslint-json",
+            "ruff-json",
+            "jscpd-json",
+            "stryker-json",
+            "dotbabel-v1"
+          ]
+        },
+        "path": { "$ref": "#/$defs/repositoryPath" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "format": { "const": "exit-code" } }, "required": ["format"] },
+          "else": { "required": ["path"] }
+        }
+      ]
+    },
+    "qualityTool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["argv"],
+      "properties": {
+        "argv": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "report": { "$ref": "#/$defs/qualityReport" }
+      }
+    },
+    "qualityComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "languages"],
+      "properties": {
+        "root": { "$ref": "#/$defs/repositoryPath" },
+        "languages": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format": { "$ref": "#/$defs/qualityTool" },
+            "compile": { "$ref": "#/$defs/qualityTool" },
+            "typecheck": { "$ref": "#/$defs/qualityTool" },
+            "lint": { "$ref": "#/$defs/qualityTool" },
+            "test": { "$ref": "#/$defs/qualityTool" },
+            "coverage": { "$ref": "#/$defs/qualityTool" },
+            "complexity": { "$ref": "#/$defs/qualityTool" },
+            "mutation": { "$ref": "#/$defs/qualityTool" },
+            "dead-code": { "$ref": "#/$defs/qualityTool" },
+            "dependencies": { "$ref": "#/$defs/qualityTool" },
+            "duplication": { "$ref": "#/$defs/qualityTool" },
+            "security": { "$ref": "#/$defs/qualityTool" },
+            "race": { "$ref": "#/$defs/qualityTool" }
+          }
+        }
+      }
+    },
+    "qualityException": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "rule", "fingerprint", "reason", "expires"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^QEX-[0-9]+$" },
+        "rule": { "$ref": "#/$defs/qualityRuleId" },
+        "fingerprint": { "type": "string", "pattern": "^sha256:" },
+        "reason": { "type": "string", "minLength": 1 },
+        "expires": { "type": "string", "format": "date" },
+        "tracking": { "type": "string", "format": "uri" }
+      }
+    },
+    "qualityRuleId": {
+      "enum": [
+        "correctness.format",
+        "correctness.compile",
+        "correctness.types",
+        "correctness.tests",
+        "correctness.lint",
+        "security.high_confidence",
+        "coverage.no_regression",
+        "complexity.cognitive",
+        "complexity.cyclomatic",
+        "coverage.changed_lines",
+        "coverage.changed_branches",
+        "mutation.changed_score",
+        "duplication.percent",
+        "size.function_loc",
+        "size.file_loc",
+        "maintainability.dead_code",
+        "maintainability.unused_dependencies",
+        "semantic.ignored_errors",
+        "semantic.swallowed_errors",
+        "semantic.dynamic_types",
+        "semantic.unchecked_assertions",
+        "semantic.unbounded_concurrency",
+        "semantic.lifecycle",
+        "architecture.speculative_abstraction",
+        "policy.new_suppression"
+      ]
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "default_profile": { "enum": ["fast", "pr", "deep"], "default": "fast" },
+        "base_ref": { "type": "string", "minLength": 1 },
+        "baseline_file": { "$ref": "#/$defs/repositoryPath" },
+        "exclude": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "critical_paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "propertyNames": { "$ref": "#/$defs/qualityRuleId" },
+          "properties": {
+            "correctness.format": { "$ref": "#/$defs/qualityRule" },
+            "correctness.compile": { "$ref": "#/$defs/qualityRule" },
+            "correctness.types": { "$ref": "#/$defs/qualityRule" },
+            "correctness.tests": { "$ref": "#/$defs/qualityRule" },
+            "correctness.lint": { "$ref": "#/$defs/qualityRule" },
+            "security.high_confidence": { "$ref": "#/$defs/qualityRule" },
+            "coverage.no_regression": { "$ref": "#/$defs/qualityRule" },
+            "complexity.cognitive": { "$ref": "#/$defs/qualityRule" },
+            "complexity.cyclomatic": { "$ref": "#/$defs/qualityRule" },
+            "coverage.changed_lines": { "$ref": "#/$defs/qualityRule" },
+            "coverage.changed_branches": { "$ref": "#/$defs/qualityRule" },
+            "mutation.changed_score": { "$ref": "#/$defs/qualityRule" },
+            "duplication.percent": { "$ref": "#/$defs/qualityRule" },
+            "size.function_loc": { "$ref": "#/$defs/qualityRule" },
+            "size.file_loc": { "$ref": "#/$defs/qualityRule" },
+            "maintainability.dead_code": { "$ref": "#/$defs/qualityRule" },
+            "maintainability.unused_dependencies": { "$ref": "#/$defs/qualityRule" },
+            "semantic.ignored_errors": { "$ref": "#/$defs/qualityRule" },
+            "semantic.swallowed_errors": { "$ref": "#/$defs/qualityRule" },
+            "semantic.dynamic_types": { "$ref": "#/$defs/qualityRule" },
+            "semantic.unchecked_assertions": { "$ref": "#/$defs/qualityRule" },
+            "semantic.unbounded_concurrency": { "$ref": "#/$defs/qualityRule" },
+            "semantic.lifecycle": { "$ref": "#/$defs/qualityRule" },
+            "architecture.speculative_abstraction": { "$ref": "#/$defs/qualityRule" },
+            "policy.new_suppression": { "$ref": "#/$defs/qualityRule" }
+          }
+        },
+        "components": { "type": "array", "items": { "$ref": "#/$defs/qualityComponent" } },
+        "exceptions": { "type": "array", "items": { "$ref": "#/$defs/qualityException" } }
+      }
     }
   }
 }

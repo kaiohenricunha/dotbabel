@@ -7,5 +7,42 @@
   "fan_out_layout": "shared",
   "gate_on_cli_presence": true,
   "cli_substitutions": {},
-  "targets": []
+  "targets": [],
+  "quality": {
+    "enabled": true,
+    "default_profile": "fast",
+    "base_ref": "origin/main",
+    "exclude": ["plugins/dotbabel/templates/**", "examples/minimal-consumer/**"],
+    "rules": {
+      "coverage.changed_lines": {
+        "threshold": 85
+      },
+      "coverage.changed_branches": {
+        "threshold": 80
+      }
+    },
+    "components": [
+      {
+        "root": ".",
+        "languages": ["javascript"],
+        "tools": {
+          "lint": {
+            "argv": ["npm", "run", "lint"],
+            "timeout_seconds": 600,
+            "report": { "format": "exit-code" }
+          },
+          "test": {
+            "argv": ["npm", "test"],
+            "timeout_seconds": 900,
+            "report": { "format": "exit-code" }
+          },
+          "coverage": {
+            "argv": ["npm", "run", "coverage"],
+            "timeout_seconds": 900,
+            "report": { "format": "lcov", "path": "coverage/lcov.info" }
+          }
+        }
+      }
+    ]
+  }
 }
