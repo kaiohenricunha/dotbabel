@@ -255,6 +255,9 @@ dotbabel check-instructions-fresh # verify generated cross-CLI instruction files
 dotbabel check-instruction-parity # verify applicable headings are preserved per CLI
 dotbabel detect-drift             # flag commands diverged from origin/main 14+ days
 dotbabel init                     # scaffold specs, hooks, manifest into a repo
+dotbabel quality explain          # show the resolved quality policy and provenance
+dotbabel quality detect           # inspect languages and tools without execution
+dotbabel quality check --profile pr --base origin/main # run the PR quality floor
 ```
 
 Every subcommand also works as a standalone bin — `npx dotbabel-doctor`,
@@ -262,6 +265,7 @@ Every subcommand also works as a standalone bin — `npx dotbabel-doctor`,
 `--json`, `--verbose`, `--no-color`.
 
 Five-minute walkthrough: [docs/quickstart.md](./docs/quickstart.md).
+Quality policy and adapter guide: [docs/quality.md](./docs/quality.md).
 
 ### Scaffold a repo
 

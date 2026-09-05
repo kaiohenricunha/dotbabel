@@ -1,0 +1,1 @@
+../../.claude/skills/quality-review/SKILL.md

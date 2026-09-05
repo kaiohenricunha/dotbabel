@@ -37,6 +37,11 @@ import {
   getPullRequestContext,
   isBotActor,
   getChangedFiles,
+  resolveQualityPolicy,
+  detectQualityCapabilities,
+  planQualityCheck,
+  runQualityCheck,
+  loadQualityBaseline,
 } from "@dotbabel/dotbabel";
 ```
 
@@ -75,6 +80,16 @@ if (!ok) {
 - **`PullRequestContext`** — `{ isPullRequest, body, actor }`, the shape
   `getPullRequestContext()` returns.
 
+## Quality API
+
+- `resolveQualityPolicy(options)` loads shipped, user, project, and operational layers with provenance.
+- `detectQualityCapabilities(options)` returns components, evidence, trust state, and capability states without project execution.
+- `planQualityCheck(options)` returns deduplicated adapter command plans for a profile and change set.
+- `runQualityCheck(options)` executes trusted plans and returns a `schema_version: 1` result envelope.
+- `loadQualityBaseline(options)` reads and validates a committed baseline, or returns `null` when absent.
+
+Stable quality constants include profiles, rule classes, measurement states, verdicts, capabilities, report formats, and schema versions.
+
 ## Error codes
 
 See `ERROR_CODES` for the full list (it's `Object.freeze`d). Renames are
@@ -96,6 +111,9 @@ breaking changes; additions are not. Enumerated families:
   `SETTINGS_OPS_1`, `SETTINGS_OPS_2`.
 - **env/usage**: `ENV_REPO_ROOT_UNKNOWN`, `ENV_FACTS_MISSING`,
   `USAGE_UNKNOWN_FLAG`, `USAGE_MISSING_POSITIONAL`.
+- **quality**: `QUALITY_CONFIG_INVALID`, `QUALITY_BASE_UNAVAILABLE`,
+  `QUALITY_REPORT_INVALID`, `QUALITY_BASELINE_INVALID`,
+  `QUALITY_TRUST_REQUIRED`, `QUALITY_EXECUTION_FAILED`.
 
 ## Exit codes
 

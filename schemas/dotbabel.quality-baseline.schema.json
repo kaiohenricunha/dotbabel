@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.quality-baseline.schema.json",
+  "title": "dotbabel quality baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_revision",
+    "policy_hash",
+    "components",
+    "tool_versions",
+    "metrics",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "source_revision": { "type": "string", "minLength": 1 },
+    "policy_hash": { "type": "string", "pattern": "^sha256:" },
+    "components": { "type": "object" },
+    "tool_versions": { "type": "object" },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["rule", "actual", "key"],
+        "properties": {
+          "rule": { "type": "string" },
+          "actual": { "type": "number" },
+          "key": { "type": "string", "minLength": 1 },
+          "component": { "type": "string" },
+          "language": { "type": "string" },
+          "path": { "type": "string" },
+          "symbol": { "type": "string" },
+          "tool": { "type": "string" },
+          "tool_version": { "type": "string" },
+          "tool_config_hash": { "type": "string" }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["rule", "fingerprint"],
+        "properties": {
+          "rule": { "type": "string" },
+          "fingerprint": { "type": "string", "minLength": 1 },
+          "component": { "type": "string" },
+          "language": { "type": "string" },
+          "path": { "type": "string" }
+        }
+      }
+    }
+  }
+}

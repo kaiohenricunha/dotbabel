@@ -18,6 +18,7 @@ export const DEFAULT_DOTBABEL_JSON = Object.freeze({
   fan_out: ["codex", "gemini", "copilot"],
   fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
+  quality: Object.freeze({ enabled: true }),
   cli_substitutions: {},
   targets: [
     {

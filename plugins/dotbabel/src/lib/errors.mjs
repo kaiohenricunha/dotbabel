@@ -14,7 +14,7 @@
  * @property {string} [expected] Text describing what the validator expected.
  * @property {string} [got]      Text describing what was observed.
  * @property {string} [hint]     Actionable remediation suggestion.
- * @property {'spec'|'skill'|'manifest'|'coverage'|'drift'|'scaffold'|'settings'|'env'|'usage'|'agent'} [category]
+ * @property {'spec'|'skill'|'manifest'|'coverage'|'drift'|'scaffold'|'settings'|'env'|'usage'|'agent'|'quality'} [category]
  */
 
 /**
@@ -71,6 +71,13 @@ export const ERROR_CODES = Object.freeze({
   CONFIG_UNKNOWN_CLI: 'CONFIG_UNKNOWN_CLI',
   CONFIG_UNKNOWN_LAYOUT: 'CONFIG_UNKNOWN_LAYOUT',
   CONFIG_INVALID_EXCLUSION: 'CONFIG_INVALID_EXCLUSION',
+  // quality
+  QUALITY_CONFIG_INVALID: 'QUALITY_CONFIG_INVALID',
+  QUALITY_BASE_UNAVAILABLE: 'QUALITY_BASE_UNAVAILABLE',
+  QUALITY_REPORT_INVALID: 'QUALITY_REPORT_INVALID',
+  QUALITY_BASELINE_INVALID: 'QUALITY_BASELINE_INVALID',
+  QUALITY_TRUST_REQUIRED: 'QUALITY_TRUST_REQUIRED',
+  QUALITY_EXECUTION_FAILED: 'QUALITY_EXECUTION_FAILED',
   // env / usage
   ENV_REPO_ROOT_UNKNOWN: 'ENV_REPO_ROOT_UNKNOWN',
   ENV_FACTS_MISSING: 'ENV_FACTS_MISSING',

@@ -243,6 +243,17 @@ Common pitfalls:
   `plugins/dotbabel/scripts/lib/output.sh` for `pass`/`fail`/`warn`. Run
   `shellcheck --severity=warning` locally.
 
+## Quality adapters
+
+Run `dotbabel quality detect` before you change policy-sensitive code. Run the `pr` profile before a pull request.
+
+Add a language through one module under `plugins/dotbabel/src/quality/adapters/` and one explicit registry entry.
+Keep tool names and diagnostic mappings in the adapter. Keep thresholds and rule identifiers in `quality/policy.mjs`.
+Do not install tools, execute copied CI text, load repository plugins, or use shell command strings.
+
+Add fixture repositories for markers, mixed-language ownership, configured tools, missing tools, and unsupported capabilities.
+Add report fixtures for every new parser. Preserve visible `unsupported`, `not_configured`, and `unavailable` states.
+
 ## What not to send
 
 - **TypeScript migration** — deliberately deferred (ADR-0002).

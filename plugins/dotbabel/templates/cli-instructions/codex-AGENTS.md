@@ -113,6 +113,18 @@ Universal behavior for every Codex CLI session in every repo. Project-level `CLA
 
 For recurring sweeps (Dependabot, cron, CI-triggered agents), use headless mode to skip tool-approval prompts.
 
+## AI code quality floor
+
+- Use the resolved project policy. Run `dotbabel quality explain` before policy-sensitive changes.
+- Simplify control flow before splitting a function. Split a file only when each result has one coherent responsibility.
+- Add tests for behavior and failure boundaries. Reject assertion-free or implementation-coupled coverage padding.
+- Do not add abstractions only to reduce local metrics. Remove obsolete code instead of moving it.
+- Do not replace a safe `unknown` value with a cast. Narrow or validate untrusted data before use.
+- Treat each new suppression as a review finding. Keep each exception narrow, temporary, and justified.
+- Exclude generated and vendor code only with file evidence. Do not exclude difficult code for convenience.
+- Use changed-code checks and no-regression rules in legacy repositories. Report improvements that remain above a target.
+- Report unsupported, unavailable, and not-configured measurements. Never claim that an unsupported metric passed.
+
 ## Communication
 
 **Hard caps. Not aspirational — enforced.**

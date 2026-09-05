@@ -44,6 +44,7 @@ const SUBCOMMANDS = [
   "handoff",
   "local-attest",
   "pr-stack",
+  "quality",
 ];
 
 function printUsage() {

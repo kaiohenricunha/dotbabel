@@ -95,6 +95,25 @@ export {
 export { ValidationError, ERROR_CODES, formatError } from "./lib/errors.mjs";
 export { EXIT_CODES } from "./lib/exit-codes.mjs";
 
+// --- language-aware code quality ---
+export {
+  resolveQualityPolicy,
+  detectQualityCapabilities,
+  planQualityCheck,
+  runQualityCheck,
+  loadQualityBaseline,
+} from "./quality/index.mjs";
+export {
+  QUALITY_PROFILES,
+  QUALITY_RULE_CLASSES,
+  QUALITY_STATES,
+  QUALITY_VERDICTS,
+  QUALITY_CAPABILITIES,
+  QUALITY_REPORT_FORMATS,
+  QUALITY_RESULT_SCHEMA_VERSION,
+  QUALITY_BASELINE_SCHEMA_VERSION,
+} from "./quality/types.mjs";
+
 // --- package version (read from root package.json) ---
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, "..", "..", "..", "package.json");

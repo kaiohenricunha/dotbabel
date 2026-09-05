@@ -72,6 +72,9 @@ templates/
 - **`workflows/ai-review.yml`** — Claude Code review wiring (same-repo PR
   gating).
 
+The quality workflow remains an opt-in example under `examples/quality/`.
+The harness scaffolder copies every file in `templates/workflows/`, so a quality workflow there would execute project commands without an adopter choice.
+
 ## Changing a template
 
 1. Edit the file under `plugins/dotbabel/templates/…`.

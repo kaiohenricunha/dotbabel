@@ -19,6 +19,7 @@ settings validator, and a destructive-git PreToolUse hook.
 | Importing the Node API                       | [api-reference.md](./api-reference.md)                                             |
 | Debugging a validator failure                | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
 | Enabling the editor and turn-end checks      | [hooks.md](./hooks.md) — what each hook does, and the check-on-stop trust model    |
+| Enforcing a language-aware quality floor     | [quality.md](./quality.md) — policies, adapters, baselines, trust, and CI          |
 | Upgrading or forking                         | [upgrade-guide.md](./upgrade-guide.md)                                             |
 | Contributing                                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
 

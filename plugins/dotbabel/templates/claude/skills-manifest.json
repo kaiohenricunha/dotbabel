@@ -213,6 +213,13 @@
       "lastValidated": null
     },
     {
+      "name": "quality-review",
+      "path": ".claude/skills/quality-review/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "release-conductor",
       "path": ".claude/skills/release-conductor/SKILL.md",
       "checksum": "",

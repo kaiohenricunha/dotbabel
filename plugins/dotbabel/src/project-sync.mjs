@@ -37,6 +37,7 @@ import {
   isGeneratedFile,
 } from "./copilot-frontmatter.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
+import { validateQualityConfig } from "./quality/config.mjs";
 
 /**
  * The CLIs `fan_out` may name. Single source of truth: the config validator,
@@ -156,6 +157,7 @@ export function loadProjectConfig(repoRoot) {
     });
   }
   if (raw.cli_excluded !== undefined) validateCliExcluded(raw.cli_excluded);
+  if (raw.quality !== undefined) validateQualityConfig(raw.quality, { source: "project" });
   return { ...DEFAULT_PROJECT_CONFIG, ...raw };
 }
 
