@@ -10,6 +10,19 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.1.0...v3.2.0) (2026-09-05)
+
+
+### Added
+
+* **project-sync:** map Copilot frontmatter instead of symlinking verbatim ([#326](https://github.com/kaiohenricunha/dotbabel/issues/326)) ([40d7322](https://github.com/kaiohenricunha/dotbabel/commit/40d7322e756b43dd37dfe40aaadc2e23fa73c767))
+* **quality:** add language-aware code quality floor ([#328](https://github.com/kaiohenricunha/dotbabel/issues/328)) ([3d49807](https://github.com/kaiohenricunha/dotbabel/commit/3d49807c240d017bd659cfcabc58439a477731a0))
+
+
+### Fixed
+
+* **schemas:** correct allowed-tools key and add disable-model-invocation ([#325](https://github.com/kaiohenricunha/dotbabel/issues/325)) ([cb19a73](https://github.com/kaiohenricunha/dotbabel/commit/cb19a730bc1cbe49c78f6bee0f69cfa17d7538a5))
+
 ## [3.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.0.0...v3.1.0) (2026-09-04)
 
 
