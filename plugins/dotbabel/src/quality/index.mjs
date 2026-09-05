@@ -20,7 +20,18 @@ function parseExecutionReports(repoRoot, executions, scope) {
   const metrics = [];
   const findings = [];
   for (const execution of executions) {
-    if (execution.exitCode !== 0) continue;
+    const capabilities = execution.capabilities ?? [execution.capability];
+    if (execution.exitCode !== 0) {
+      if (capabilities.includes("coverage")) {
+        execution.state = "unavailable";
+        execution.stderr = execution.stderr || "coverage command exited non-zero";
+        const reportRules = capabilities.flatMap((capability) => capability === "coverage"
+          ? ["coverage.no_regression", "coverage.changed_lines", "coverage.changed_branches"]
+          : capabilityRules(capability));
+        execution.ruleIds = [...new Set([...(execution.ruleIds ?? []), ...reportRules])];
+      }
+      continue;
+    }
     for (const report of execution.reports ?? (execution.report ? [execution.report] : [])) {
       if (report.format === "exit-code") continue;
       const componentRoot = execution.componentId.slice(0, execution.componentId.lastIndexOf(":"));
@@ -28,7 +39,6 @@ function parseExecutionReports(repoRoot, executions, scope) {
       if (!fs.existsSync(reportPath) || !fs.statSync(reportPath).isFile() || !inside(repoRoot, reportPath)) {
         execution.state = "unavailable";
         execution.stderr = "configured report is missing or escapes the repository";
-        const capabilities = execution.capabilities ?? [execution.capability];
         const reportRules = capabilities.flatMap((capability) => capability === "coverage"
           ? ["coverage.no_regression", "coverage.changed_lines", "coverage.changed_branches"]
           : capabilityRules(capability));

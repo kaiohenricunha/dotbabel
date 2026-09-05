@@ -96,4 +96,26 @@ describe("quality adapters", () => {
       expect(plans.find((plan) => plan.capability === "typecheck")).toMatchObject({ executable: "tsc", argv: ["--noEmit", "-p", "tsconfig.json"] });
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
+
+  it("terminates node --check flag parsing so a changed filename cannot inject a Node CLI flag", () => {
+    const evil = "--require=payload.js";
+    const plans = getQualityAdapter("javascript").plan({
+      id: ".:javascript", root: ".", absoluteRoot: process.cwd(), language: "javascript", files: [evil], tools: {},
+    }, { rules: {} }, { changedFiles: [{ path: evil }] }, "fast");
+    const plan = plans.find((item) => item.capability === "compile" && item.source === "built-in");
+    expect(plan.argv[0]).toBe("--check");
+    expect(plan.argv[1]).toBe("--");
+    expect(plan.argv[2]).toMatch(/^\.\//);
+  });
+
+  it("terminates gofmt flag parsing so a changed filename cannot inject a gofmt CLI flag", () => {
+    const evil = "-cpuprofile=pwned.go";
+    const plans = getQualityAdapter("go").plan({
+      id: ".:go", root: ".", absoluteRoot: process.cwd(), language: "go", files: [evil], tools: {},
+    }, { rules: {} }, { changedFiles: [{ path: evil }] }, "fast");
+    const plan = plans.find((item) => item.capability === "format");
+    expect(plan.argv[0]).toBe("-l");
+    expect(plan.argv[1]).toBe("--");
+    expect(plan.argv[2]).toMatch(/^\.\//);
+  });
 });

@@ -53,6 +53,12 @@ export const QUALITY_RULES = Object.freeze(Object.fromEntries([
   rule("policy.new_suppression", "advisory", "changed", all, "warning", "info"),
 ].map((item) => [item.id, item])));
 
+/** Rules an exception can never suppress, regardless of config source. */
+export const FORBIDDEN_EXCEPTION_RULES = Object.freeze(new Set([
+  "correctness.format", "correctness.compile", "correctness.types", "correctness.tests",
+  "correctness.lint", "security.high_confidence",
+]));
+
 /** Shipped non-rule defaults. */
 export const SHIPPED_QUALITY_DEFAULTS = Object.freeze({
   enabled: true,

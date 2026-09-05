@@ -100,4 +100,41 @@ describe("quality evaluation", () => {
     expect(result.results.find((item) => item.rule === "semantic.dynamic_types")).toMatchObject({ verdict: "warn", state: "checked" });
     expect(result.results.find((item) => item.rule === "semantic.lifecycle")).toMatchObject({ verdict: "info", state: "skipped" });
   });
+
+  it("does not let an exception downgrade a result whose state is not \"checked\"", () => {
+    const exceptions = [{ id: "QEX-1", rule: "coverage.changed_lines", fingerprint: "sha256:unavailable", expires: "2027-01-01" }];
+    const result = evaluateQuality({
+      policy: policy(exceptions),
+      profile: "pr",
+      now: new Date("2026-01-01T00:00:00Z"),
+      metrics: [{ rule: "coverage.changed_lines", component: ".:js", actual: NaN, fingerprint: "sha256:unavailable", key: "a" }],
+    });
+    const item = result.results.find((entry) => entry.rule === "coverage.changed_lines");
+    expect(item).toMatchObject({ state: "unavailable", verdict: "fail" });
+    expect(item.exception).toBeUndefined();
+    expect(result.exceptions).toEqual([{ id: "QEX-1", state: "unused" }]);
+  });
+
+  it("does not let an exception downgrade a forbidden rule even if config validation was bypassed", () => {
+    const exceptions = [{ id: "QEX-1", rule: "correctness.lint", fingerprint: "sha256:forbidden", expires: "2027-01-01" }];
+    const result = evaluateQuality({
+      policy: policy(exceptions),
+      profile: "fast",
+      now: new Date("2026-01-01T00:00:00Z"),
+      findings: [{ rule: "correctness.lint", fingerprint: "sha256:forbidden", message: "banned pattern" }],
+    });
+    const item = result.results.find((entry) => entry.rule === "correctness.lint");
+    expect(item).toMatchObject({ verdict: "fail" });
+    expect(item.exception).toBeUndefined();
+    expect(result.exceptions).toEqual([{ id: "QEX-1", state: "unused" }]);
+  });
+
+  it("reports a non-finite metric value as unavailable instead of a silent pass", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "pr",
+      metrics: [{ rule: "coverage.changed_lines", component: ".:js", actual: NaN, key: "a" }],
+    });
+    expect(result.results.find((item) => item.rule === "coverage.changed_lines")).toMatchObject({ state: "unavailable", verdict: "fail" });
+  });
 });

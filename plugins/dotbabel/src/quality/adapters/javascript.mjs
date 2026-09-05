@@ -20,7 +20,7 @@ export const javascriptAdapter = Object.freeze({
     const plans = projectToolPlans(component, profile);
     plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability))));
     const changed = changeSet.changedFiles.map((item) => item.path).filter((file) => /\.[cm]?js$/.test(file) && component.files.includes(file));
-    for (const file of changed) plans.push({ id: `${component.id}:node-check:${file}`, componentId: component.id, capability: "compile", ruleIds: ["correctness.compile"], executable: "node", argv: ["--check", path.relative(component.root, file)], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: false });
+    for (const file of changed) plans.push({ id: `${component.id}:node-check:${file}`, componentId: component.id, capability: "compile", ruleIds: ["correctness.compile"], executable: "node", argv: ["--check", "--", `./${path.relative(component.root, file)}`], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: false });
     return plans;
   },
 });

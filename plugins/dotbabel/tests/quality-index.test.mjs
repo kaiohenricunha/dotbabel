@@ -7,11 +7,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runQualityCheck } from "../src/quality/index.mjs";
 
 const dirs = [];
-function repository({ missingReport = false } = {}) {
+function repository({ missingReport = false, crashingCoverage = false } = {}) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-quality-index-"));
   dirs.push(repoRoot);
   fs.mkdirSync(path.join(repoRoot, "coverage"));
-  const coverageScript = missingReport
+  const coverageScript = crashingCoverage
+    ? "process.exit(1)"
+    : missingReport
     ? "process.exit(0)"
     : "require('node:fs').writeFileSync('coverage/lcov.info', 'SF:index.js\\nDA:1,1\\nDA:2,1\\nend_of_record\\n')";
   fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ quality: {
@@ -63,5 +65,19 @@ describe("quality check orchestration", () => {
     });
     expect(result.environment_error).toBe(true);
     expect(result.results.find((item) => item.rule === "coverage.changed_lines")).toMatchObject({ state: "unavailable", verdict: "fail" });
+  });
+
+  it("treats a crashing coverage command as an environment failure instead of not-configured", async () => {
+    const repoRoot = repository({ crashingCoverage: true });
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "pr",
+      base: "main",
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    expect(result.environment_error).toBe(true);
+    expect(result.results.find((item) => item.rule === "coverage.changed_lines")).toMatchObject({ state: "unavailable", verdict: "fail" });
+    expect(result.results.find((item) => item.rule === "coverage.changed_lines")).not.toMatchObject({ state: "not_configured" });
   });
 });

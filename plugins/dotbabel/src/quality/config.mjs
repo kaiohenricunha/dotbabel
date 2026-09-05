@@ -8,7 +8,7 @@ import {
   QUALITY_PROFILES,
   QUALITY_REPORT_FORMATS,
 } from "./types.mjs";
-import { QUALITY_RULES, SHIPPED_QUALITY_DEFAULTS, hashQualityPolicy } from "./policy.mjs";
+import { FORBIDDEN_EXCEPTION_RULES, QUALITY_RULES, SHIPPED_QUALITY_DEFAULTS, hashQualityPolicy } from "./policy.mjs";
 
 const QUALITY_KEYS = new Set([
   "enabled", "default_profile", "base_ref", "baseline_file", "exclude",
@@ -20,10 +20,6 @@ const TOOL_KEYS = new Set(["argv", "timeout_seconds", "report"]);
 const REPORT_KEYS = new Set(["format", "path"]);
 const EXCEPTION_KEYS = new Set(["id", "rule", "fingerprint", "reason", "expires", "tracking"]);
 const PROJECT_ONLY = new Set(["base_ref", "baseline_file", "critical_paths", "components", "exceptions"]);
-const FORBIDDEN_EXCEPTION_RULES = new Set([
-  "correctness.format", "correctness.compile", "correctness.types", "correctness.tests",
-  "correctness.lint", "security.high_confidence",
-]);
 
 function qualityError(message, pointer, source) {
   return new ValidationError({
@@ -202,9 +198,14 @@ export function resolveQualityPolicy({ repoRoot, env = process.env, profile, bas
     },
   };
   if (profile !== undefined) result.default_profile = profile;
+  // base_ref/head_ref/jobs are run metadata (the revisions being diffed, the
+  // concurrency level), not policy content — excluded so the hash reflects
+  // only what can change a verdict, and stays stable across the same policy
+  // run against different commits.
+  const { base_ref: _baseRef, head_ref: _headRef, jobs: _jobs, ...hashable } = result;
+  result.policy_hash = hashQualityPolicy(hashable);
   if (base !== undefined) result.base_ref = base;
   if (head !== undefined) result.head_ref = head;
   if (jobs !== undefined) result.jobs = jobs;
-  result.policy_hash = hashQualityPolicy({ ...result, policy_hash: undefined });
   return result;
 }

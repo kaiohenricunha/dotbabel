@@ -24,7 +24,7 @@ export const goAdapter = Object.freeze({
     const changed = changeSet.changedFiles.map((item) => item.path).filter((file) => file.endsWith(".go") && component.files.includes(file));
     const plans = [...explicit, ...makeRepositoryPlans(component, profile, claimed)];
     for (const plan of plans) claimed.add(plan.capability);
-    if (changed.length > 0 && !claimed.has("format")) plans.push({ id: `${component.id}:format`, componentId: component.id, capability: "format", ruleIds: ["correctness.format"], executable: "gofmt", argv: ["-l", ...changed.map((file) => path.relative(component.root, file))], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: false, stdoutFailure: true });
+    if (changed.length > 0 && !claimed.has("format")) plans.push({ id: `${component.id}:format`, componentId: component.id, capability: "format", ruleIds: ["correctness.format"], executable: "gofmt", argv: ["-l", "--", ...changed.map((file) => `./${path.relative(component.root, file)}`)], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: false, stdoutFailure: true });
     if (!claimed.has("compile")) plans.push({ id: `${component.id}:compile`, componentId: component.id, capability: "compile", ruleIds: ["correctness.compile"], executable: "go", argv: ["test", "-run", "^$", "./..."], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: true });
     if (!claimed.has("lint")) {
       const golangci = [".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"].some((file) => fs.existsSync(path.join(component.absoluteRoot, file)));

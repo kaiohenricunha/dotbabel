@@ -61,6 +61,26 @@ describe("quality configuration", () => {
     expect(resolveQualityPolicy({ repoRoot, env: {} }).enabled).toBe(false);
   });
 
+  it("keeps policy_hash stable across different base/head revisions and job counts", () => {
+    const repoRoot = tempDir();
+    const a = resolveQualityPolicy({ repoRoot, env: {}, base: "main", head: "feature", jobs: 2 });
+    const b = resolveQualityPolicy({ repoRoot, env: {}, base: "release/1.0", head: "hotfix", jobs: 8 });
+    expect(a.policy_hash).toBe(b.policy_hash);
+  });
+
+  it("changes policy_hash when a rule or threshold actually changes", () => {
+    const repoRoot = tempDir();
+    fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ quality: {
+      rules: { "size.file_loc": { threshold: 400 } },
+    } }));
+    const before = resolveQualityPolicy({ repoRoot, env: {}, base: "main" });
+    fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ quality: {
+      rules: { "size.file_loc": { threshold: 300 } },
+    } }));
+    const after = resolveQualityPolicy({ repoRoot, env: {}, base: "main" });
+    expect(after.policy_hash).not.toBe(before.policy_hash);
+  });
+
   it("rejects exceptions for configured hard lint failures", () => {
     expect(() => validateQualityConfig({ exceptions: [{
       id: "QEX-9",

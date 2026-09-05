@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { evaluateMetricAgainstBaseline } from "./baseline.mjs";
-import { compareThreshold, selectProfileRules } from "./policy.mjs";
+import { FORBIDDEN_EXCEPTION_RULES, compareThreshold, selectProfileRules } from "./policy.mjs";
 
 function fingerprint(item) {
   if (item.fingerprint) return item.fingerprint;
@@ -53,6 +53,10 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
       results.push({ ...metric, class: rule.class, state: "checked", verdict: checkedVerdict(rule, pass), baseline: old, baseline_covered: oldMetric.covered, baseline_total: oldMetric.total, provenance: rule.provenance });
       continue;
     }
+    if (!Number.isFinite(metric.actual)) {
+      results.push({ ...metric, class: rule.class, state: "unavailable", verdict: unavailableVerdict(rule.on_unavailable), threshold: rule.threshold, baseline: old, message: "measured value is not a finite number", provenance: rule.provenance });
+      continue;
+    }
     const ratchet = evaluateMetricAgainstBaseline({ actual: metric.actual, threshold: rule.threshold, baseline: old, direction: rule.direction });
     const pass = old === undefined ? compareThreshold(rule, metric.actual) : ratchet.verdict === "pass";
     results.push({ ...metric, class: rule.class, state: "checked", verdict: checkedVerdict(rule, pass), threshold: rule.threshold, baseline: old, improved: ratchet.improved, provenance: rule.provenance });
@@ -81,9 +85,9 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
 
   const exceptionStates = [];
   for (const exception of policy.exceptions ?? []) {
-    const matched = results.find((item) => item.rule === exception.rule && item.fingerprint === exception.fingerprint);
+    const matched = results.find((item) => item.rule === exception.rule && item.fingerprint === exception.fingerprint && item.state === "checked");
     const expired = new Date(`${exception.expires}T23:59:59Z`) < now;
-    if (matched && !expired && matched.verdict === "fail") {
+    if (matched && !FORBIDDEN_EXCEPTION_RULES.has(exception.rule) && !expired && matched.verdict === "fail") {
       matched.verdict = "warn";
       matched.exception = exception.id;
       exceptionStates.push({ id: exception.id, state: "active" });
