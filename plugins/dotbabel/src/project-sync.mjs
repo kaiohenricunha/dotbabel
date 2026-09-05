@@ -32,6 +32,10 @@ import {
   renderTarget,
   validateSubstitutions,
 } from "./generate-instructions.mjs";
+import {
+  composeGeneratedFrontmatter,
+  isGeneratedFile,
+} from "./copilot-frontmatter.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
 /**
@@ -296,6 +300,7 @@ export function extractRuleFloorOrWhole(body) {
  * @property {number} backed_up
  * @property {number} written     Number of instruction files written (or planned in dry-run).
  * @property {number} removed     Number of `cli_excluded` links removed (or planned in dry-run).
+ * @property {number} generated   Number of generated Copilot prompt/instructions files written (or planned in dry-run).
  */
 
 /**
@@ -317,7 +322,7 @@ export async function projectSync(opts) {
   if (!fs.existsSync(repoRoot)) {
     out.fail(`repo root does not exist: ${repoRoot}`);
     out.flush();
-    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0, removed: 0 };
+    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0, removed: 0, generated: 0 };
   }
 
   const cfg = loadProjectConfig(repoRoot);
@@ -325,7 +330,7 @@ export async function projectSync(opts) {
   if (!fs.existsSync(sourcePath)) {
     out.fail(`rule-floor source does not exist: ${cfg.rule_floor_source}`);
     out.flush();
-    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0, removed: 0 };
+    return { ok: false, linked: 0, skipped: 0, backed_up: 0, written: 0, removed: 0, generated: 0 };
   }
 
   const timestamp = buildTimestamp();
@@ -334,6 +339,7 @@ export async function projectSync(opts) {
   let backed_up = 0;
   let written = 0;
   let removed = 0;
+  let generated = 0;
 
   // ---- 1. Instruction files (AGENTS.md, GEMINI.md, copilot-instructions.md)
 
@@ -411,7 +417,7 @@ export async function projectSync(opts) {
   }
 
   out.flush();
-  return { ok: true, linked, skipped, backed_up, written, removed };
+  return { ok: true, linked, skipped, backed_up, written, removed, generated };
 
   // -------------------------------------------------------------------------
   // helpers (closures over linked / skipped / backed_up / removed / out / opts)
@@ -553,6 +559,112 @@ export async function projectSync(opts) {
     removed++;
   }
 
+  /**
+   * Write a generated Copilot file (`.prompt.md` for a command, `.instructions.md`
+   * for a skill) at `dst`, mapping `src`'s frontmatter per
+   * `copilot-frontmatter.mjs`. Unlike `doLink`, this is a real write, not a
+   * symlink, so collision handling is keyed on {@link isGeneratedFile} rather
+   * than the symlink bit:
+   *
+   *  - missing                                  -> write
+   *  - present, byte-identical to fresh content  -> no-op
+   *  - present, a symlink (pre-#324 leftover)    -> replace, no backup
+   *  - present, generated, content differs       -> overwrite, no backup
+   *    (our own output evolving, same discipline `composeInject` already
+   *    uses for AGENTS.md)
+   *  - present, not generated (hand-authored)    -> back up, then write
+   *
+   * @param {string} dst
+   * @param {string} src
+   * @param {"command"|"skill"} kind
+   */
+  function doWriteGenerated(dst, src, kind) {
+    const relDst = path.relative(repoRoot, dst);
+    const relSrc = path.relative(repoRoot, src);
+    const { content, dropped } = composeGeneratedFrontmatter(
+      fs.readFileSync(src, "utf8"),
+      kind,
+      relSrc,
+    );
+    const surface = kind === "command" ? ".prompt.md" : ".instructions.md";
+    for (const key of dropped) {
+      out.warn(
+        `copilot: dropped Claude-only key "${key}" from ${relDst} (no ${surface} equivalent)`,
+      );
+    }
+
+    let lstat = null;
+    try {
+      lstat = fs.lstatSync(dst);
+    } catch {
+      // Missing — plain write below.
+    }
+
+    if (lstat && !lstat.isSymbolicLink()) {
+      const existing = fs.readFileSync(dst, "utf8");
+      if (existing === content) {
+        out.pass(`ok: ${relDst}`);
+        generated++;
+        return;
+      }
+      if (!isGeneratedFile(existing)) {
+        if (opts.dryRun) {
+          out.info(`would back up + write: ${relDst}`);
+          generated++;
+          return;
+        }
+        fs.renameSync(dst, `${dst}.bak-${timestamp}`);
+        backed_up++;
+        out.warn(`hand-authored file backed up: ${relDst}.bak-${timestamp}`);
+        fs.writeFileSync(dst, content);
+        out.pass(`generated: ${relDst}`);
+        generated++;
+        return;
+      }
+    }
+
+    if (opts.dryRun) {
+      out.info(`would generate: ${relDst}`);
+      generated++;
+      return;
+    }
+    if (lstat && lstat.isSymbolicLink()) fs.unlinkSync(dst);
+    fs.mkdirSync(path.dirname(dst), { recursive: true });
+    fs.writeFileSync(dst, content);
+    out.pass(`generated: ${relDst}`);
+    generated++;
+  }
+
+  /**
+   * Retire a generated Copilot file at an excluded destination. Mirrors
+   * {@link doRemoveExcluded}'s "only remove what's recognizably ours" rule,
+   * keyed on {@link isGeneratedFile} instead of the symlink bit — a flat
+   * file has no wrapper directory to drop.
+   *
+   * @param {string} dst
+   */
+  function doRemoveExcludedGenerated(dst) {
+    let content;
+    try {
+      content = fs.readFileSync(dst, "utf8");
+    } catch {
+      return;
+    }
+    const rel = path.relative(repoRoot, dst);
+    if (!isGeneratedFile(content)) {
+      out.warn(`excluded but not dotbabel-generated, left alone: ${rel}`);
+      return;
+    }
+    if (opts.dryRun) {
+      out.info(`would remove: ${rel}`);
+      removed++;
+      return;
+    }
+    fs.unlinkSync(dst);
+    out.pass(`removed: ${rel}`);
+    removed++;
+  }
+
   function fanOutSkillsLayout({ cli, targetDir }) {
     if (!gateOnCli(cli, `${cli} skills fan-out`)) return;
     buildSkillsTree(targetDir, excludedNamesFor(cli, cfg));
@@ -608,7 +720,7 @@ export async function projectSync(opts) {
     const promptsDir = path.join(repoRoot, ".github", "prompts");
     const instructionsDir = path.join(repoRoot, ".github", "instructions");
 
-    // commands → .github/prompts/<name>.prompt.md
+    // commands → .github/prompts/<name>.prompt.md (generated, frontmatter mapped)
     if (fs.existsSync(commandsAbs)) {
       if (!opts.dryRun) fs.mkdirSync(promptsDir, { recursive: true });
       for (const entry of fs.readdirSync(commandsAbs)) {
@@ -618,14 +730,14 @@ export async function projectSync(opts) {
         const src = path.join(commandsAbs, entry);
         const dst = path.join(promptsDir, `${name}.prompt.md`);
         if (excluded.has(name)) {
-          doRemoveExcluded(dst, src);
+          doRemoveExcludedGenerated(dst);
           continue;
         }
-        doLink(src, dst);
+        doWriteGenerated(dst, src, "command");
       }
     }
 
-    // skills/<id>/SKILL.md → .github/instructions/<id>.instructions.md
+    // skills/<id>/SKILL.md → .github/instructions/<id>.instructions.md (generated, frontmatter mapped)
     if (fs.existsSync(skillsAbs)) {
       if (!opts.dryRun) fs.mkdirSync(instructionsDir, { recursive: true });
       const entries = fs.readdirSync(skillsAbs, { withFileTypes: true });
@@ -639,10 +751,10 @@ export async function projectSync(opts) {
           `${entry.name}.instructions.md`,
         );
         if (excluded.has(entry.name)) {
-          doRemoveExcluded(dst, skillFile);
+          doRemoveExcludedGenerated(dst);
           continue;
         }
-        doLink(skillFile, dst);
+        doWriteGenerated(dst, skillFile, "skill");
       }
     }
   }

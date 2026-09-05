@@ -138,23 +138,31 @@ npx dotbabel check-project-sync
 
 What lands where:
 
-| Source                         | Codex / Gemini destination                | Copilot destination                                   |
-| ------------------------------ | ----------------------------------------- | ----------------------------------------------------- |
-| `.claude/commands/<name>.md`   | `.codex/skills/<name>/SKILL.md` (symlink) | `.github/prompts/<name>.prompt.md` (symlink)          |
-| `.claude/skills/<id>/SKILL.md` | `.codex/skills/<id>/` (whole-dir symlink) | `.github/instructions/<id>.instructions.md` (symlink) |
-| `CLAUDE.md` (rule-floor block) | rendered into `AGENTS.md` + `GEMINI.md`   | rendered into `.github/copilot-instructions.md`       |
+| Source                         | Codex / Gemini destination                | Copilot destination                                                         |
+| ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------- |
+| `.claude/commands/<name>.md`   | `.codex/skills/<name>/SKILL.md` (symlink) | `.github/prompts/<name>.prompt.md` (generated, frontmatter mapped)          |
+| `.claude/skills/<id>/SKILL.md` | `.codex/skills/<id>/` (whole-dir symlink) | `.github/instructions/<id>.instructions.md` (generated, frontmatter mapped) |
+| `CLAUDE.md` (rule-floor block) | rendered into `AGENTS.md` + `GEMINI.md`   | rendered into `.github/copilot-instructions.md`                             |
 
-**What the other CLIs get.** Every destination is a symlink to the Claude
-source file, not a translated copy. Codex, Gemini, and Copilot each read their
-own frontmatter shape, so the Claude-shaped frontmatter (`allowed-tools`,
-`model`, `effort`, `disable-model-invocation`, the auto-routing `description`)
-is not honored on those surfaces. Expect only direct slash invocation by name:
-`/commit` works everywhere, but natural-language auto-routing, tool
-restrictions, and model selection apply in Claude Code alone. A command that
-describes a Claude-only flow (headless Claude workers, Claude-specific flags)
-fans out verbatim unless you list it in `cli_excluded` below. A portable
-frontmatter contract is tracked in
+**What Codex and Gemini get.** Every Codex/Gemini destination is a symlink to
+the Claude source file, not a translated copy — they read their own
+frontmatter shape, so Claude-shaped frontmatter (`allowed-tools`, `model`,
+`effort`, `disable-model-invocation`, the auto-routing `description`) is not
+honored. Expect only direct slash invocation by name: `/commit` works, but
+natural-language auto-routing, tool restrictions, and model selection apply
+in Claude Code alone. A command that describes a Claude-only flow (headless
+Claude workers, Claude-specific flags) fans out verbatim unless you list it
+in `cli_excluded` below. Tracked at
 [#219](https://github.com/kaiohenricunha/dotbabel/issues/219).
+
+**What Copilot gets.** Unlike Codex/Gemini, Copilot's targets are generated
+files with mapped frontmatter — `description`, `name`, `argument-hint`, and
+tool grants carry over correctly. `model`, `effort`, and
+`disable-model-invocation` still have no Copilot equivalent and are dropped
+with a warning naming the file and the key. See
+[`docs/copilot-frontmatter-mapping.md`](./copilot-frontmatter-mapping.md) for
+the full key-by-key table. A generated file that is hand-edited is backed up
+before the next sync overwrites it.
 
 `.dotbabel.json` is optional — without one, project-sync uses defaults
 (`fan_out: ["codex", "gemini", "copilot"]`, the standard target list, no

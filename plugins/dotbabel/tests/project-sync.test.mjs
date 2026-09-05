@@ -10,6 +10,7 @@ import {
   extractRuleFloorOrWhole,
 } from "../src/project-sync.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
+import { isGeneratedFile } from "../src/copilot-frontmatter.mjs";
 
 let tmpDirs = [];
 let savedPath = null;
@@ -243,19 +244,133 @@ describe("projectSync", () => {
     buildFakeRepo(repo);
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
 
+    // Copilot targets are generated files, not symlinks (#324) — Codex/Gemini
+    // (asserted above) are unaffected and stay symlinks.
     const prompt = path.join(repo, ".github", "prompts", "commit.prompt.md");
-    expect(fs.lstatSync(prompt).isSymbolicLink()).toBe(true);
-    expect(path.isAbsolute(fs.readlinkSync(prompt))).toBe(false);
-    expect(fs.realpathSync(prompt)).toBe(
-      fs.realpathSync(path.join(repo, ".claude", "commands", "commit.md")),
-    );
+    expect(fs.lstatSync(prompt).isSymbolicLink()).toBe(false);
+    const promptContent = fs.readFileSync(prompt, "utf8");
+    expect(isGeneratedFile(promptContent)).toBe(true);
+    expect(promptContent).toContain("# /commit");
 
     const instr = path.join(repo, ".github", "instructions", "deploy.instructions.md");
-    expect(fs.lstatSync(instr).isSymbolicLink()).toBe(true);
-    expect(path.isAbsolute(fs.readlinkSync(instr))).toBe(false);
-    expect(fs.realpathSync(instr)).toBe(
-      fs.realpathSync(path.join(repo, ".claude", "skills", "deploy", "SKILL.md")),
+    expect(fs.lstatSync(instr).isSymbolicLink()).toBe(false);
+    const instrContent = fs.readFileSync(instr, "utf8");
+    expect(isGeneratedFile(instrContent)).toBe(true);
+    expect(instrContent).toContain("name: deploy");
+    expect(instrContent).toContain('applyTo: "**"');
+    expect(instrContent).toContain("# deploy");
+  });
+
+  it("Copilot: drops Claude-only behavioral keys and warns naming each one", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    fs.writeFileSync(
+      path.join(repo, ".claude", "commands", "commit.md"),
+      "---\nmodel: opus\neffort: high\ndisable-model-invocation: true\nallowed-tools: Read Grep\n---\n# /commit\n",
     );
+    const warnings = [];
+    const out = {
+      pass() {},
+      fail() {},
+      info() {},
+      warn(msg) {
+        warnings.push(msg);
+      },
+      flush() {},
+    };
+    await projectSync({ repoRoot: repo, allCli: true, out });
+    const commitWarnings = warnings.filter((w) => w.includes("commit.prompt.md"));
+    expect(commitWarnings.some((w) => w.includes('"model"'))).toBe(true);
+    expect(commitWarnings.some((w) => w.includes('"effort"'))).toBe(true);
+    expect(
+      commitWarnings.some((w) => w.includes('"disable-model-invocation"')),
+    ).toBe(true);
+    expect(commitWarnings.some((w) => w.includes("copilot"))).toBe(true);
+    const content = fs.readFileSync(
+      path.join(repo, ".github", "prompts", "commit.prompt.md"),
+      "utf8",
+    );
+    expect(content).toContain("Read");
+    expect(content).toContain("Grep");
+    expect(content).not.toContain("opus");
+  });
+
+  it("Copilot: does not warn for dotbabel taxonomy keys", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    fs.writeFileSync(
+      path.join(repo, ".claude", "commands", "commit.md"),
+      "---\nid: commit\ntype: command\ndomain: [devex]\nplatform: [none]\ntask: [review]\nmaturity: validated\nowner: '@kaio'\ncreated: 2025-01-01\nupdated: 2026-04-17\nversion: 1.0.0\n---\n# /commit\n",
+    );
+    const warnings = [];
+    const out = {
+      pass() {},
+      fail() {},
+      info() {},
+      warn(msg) {
+        warnings.push(msg);
+      },
+      flush() {},
+    };
+    await projectSync({ repoRoot: repo, allCli: true, out });
+    const commitWarnings = warnings.filter((w) => w.includes("commit.prompt.md"));
+    expect(commitWarnings).toEqual([]);
+  });
+
+  it("Copilot: is idempotent — second run produces no backups and byte-identical output", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const before = fs.readFileSync(
+      path.join(repo, ".github", "prompts", "commit.prompt.md"),
+      "utf8",
+    );
+    const r2 = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const after = fs.readFileSync(
+      path.join(repo, ".github", "prompts", "commit.prompt.md"),
+      "utf8",
+    );
+    expect(r2.backed_up).toBe(0);
+    expect(after).toBe(before);
+  });
+
+  it("Copilot: regenerates when source frontmatter changes, without a backup", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const before = fs.readFileSync(
+      path.join(repo, ".github", "prompts", "commit.prompt.md"),
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(repo, ".claude", "commands", "commit.md"),
+      "---\ndescription: Updated.\n---\n# /commit\n",
+    );
+    const r2 = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const after = fs.readFileSync(
+      path.join(repo, ".github", "prompts", "commit.prompt.md"),
+      "utf8",
+    );
+    expect(after).not.toBe(before);
+    expect(after).toContain("description: Updated.");
+    expect(r2.backed_up).toBe(0);
+  });
+
+  it("Copilot: backs up a hand-authored .prompt.md that predates any sync", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    fs.mkdirSync(path.join(repo, ".github", "prompts"), { recursive: true });
+    const dst = path.join(repo, ".github", "prompts", "commit.prompt.md");
+    fs.writeFileSync(dst, "hand-authored content\n");
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.backed_up).toBeGreaterThan(0);
+    const dir = fs.readdirSync(path.join(repo, ".github", "prompts"));
+    const backup = dir.find((f) => f.startsWith("commit.prompt.md.bak-"));
+    expect(backup).toBeDefined();
+    expect(fs.readFileSync(path.join(repo, ".github", "prompts", backup), "utf8")).toBe(
+      "hand-authored content\n",
+    );
+    expect(isGeneratedFile(fs.readFileSync(dst, "utf8"))).toBe(true);
   });
 
   it("is idempotent: second run produces no additional backups", async () => {
@@ -428,9 +543,9 @@ describe("projectSync", () => {
     ).toBe(false);
     // Real skill (deploy) DID get one.
     expect(
-      fs.lstatSync(
+      fs.existsSync(
         path.join(repo, ".github", "instructions", "deploy.instructions.md"),
-      ).isSymbolicLink(),
+      ),
     ).toBe(true);
   });
 
@@ -470,12 +585,12 @@ describe("projectSync", () => {
     const repo = makeTmpDir();
     buildFakeRepo(repo);
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    // Copilot targets are generated files, not symlinks (#324), so #218's
+    // "relative target" premise does not apply to them — covered separately.
     for (const link of [
       path.join(repo, ".codex", "skills", "commit", "SKILL.md"),
       path.join(repo, ".codex", "skills", "deploy"),
       path.join(repo, ".gemini", "skills", "commit", "SKILL.md"),
-      path.join(repo, ".github", "prompts", "commit.prompt.md"),
-      path.join(repo, ".github", "instructions", "deploy.instructions.md"),
     ]) {
       const target = fs.readlinkSync(link);
       expect(path.isAbsolute(target)).toBe(false);
@@ -497,17 +612,26 @@ describe("projectSync", () => {
     tmpDirs.push(renamed);
     tmpDirs = tmpDirs.filter((d) => d !== original);
 
+    // Copilot targets are generated files, not symlinks (#324): a rename
+    // can't break what was never a link, so only Codex/Gemini are asserted
+    // here — the generated files are content-identical regardless of path.
     for (const [link, expectedRel] of [
       [".codex/skills/commit/SKILL.md", ".claude/commands/commit.md"],
       [".gemini/skills/commit/SKILL.md", ".claude/commands/commit.md"],
-      [".github/prompts/commit.prompt.md", ".claude/commands/commit.md"],
       [".codex/skills/deploy", ".claude/skills/deploy"],
-      [".github/instructions/deploy.instructions.md", ".claude/skills/deploy/SKILL.md"],
     ]) {
       const linkPath = path.join(renamed, link);
       const expectedAbs = path.join(renamed, expectedRel);
       expect(fs.realpathSync(linkPath)).toBe(fs.realpathSync(expectedAbs));
     }
+    expect(
+      fs.existsSync(path.join(renamed, ".github", "prompts", "commit.prompt.md")),
+    ).toBe(true);
+    expect(
+      fs.existsSync(
+        path.join(renamed, ".github", "instructions", "deploy.instructions.md"),
+      ),
+    ).toBe(true);
   });
 
   it("upgrades absolute symlinks (from v2.4.0) to relative on next sync", async () => {

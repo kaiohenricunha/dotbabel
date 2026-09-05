@@ -446,13 +446,21 @@ link written by an earlier run is removed (`removed: <path>`; `would remove:`
 under `--dry-run`). Under `shared`, an exclusion for `codex` or `gemini`
 applies to both.
 
-Limitation: targets are symlinks to the Claude source, never per-CLI
-translations. Claude-shaped frontmatter (`allowed-tools`, `model`, `effort`,
-`disable-model-invocation`, auto-routing `description`) is not honored by
-Codex, Gemini, or Copilot; those CLIs get direct slash invocation by name only.
-Commands that describe Claude-only flows fan out unchanged unless listed in
-`cli_excluded`. See
+Limitation (Codex/Gemini): targets are symlinks to the Claude source, never
+per-CLI translations. Claude-shaped frontmatter (`allowed-tools`, `model`,
+`effort`, `disable-model-invocation`, auto-routing `description`) is not
+honored; those CLIs get direct slash invocation by name only. Commands that
+describe Claude-only flows fan out unchanged unless listed in
+`cli_excluded`. Tracked at
 [#219](https://github.com/kaiohenricunha/dotbabel/issues/219).
+
+Copilot is different: its targets are generated files whose frontmatter is
+mapped into GitHub's `.prompt.md`/`.instructions.md` shape (`description`,
+`name`, `argument-hint`, tool grants). `model`, `effort`, and
+`disable-model-invocation` still have no Copilot equivalent and are dropped
+with a warning. See
+[`docs/copilot-frontmatter-mapping.md`](./copilot-frontmatter-mapping.md) for
+the full mapping.
 
 ---
 

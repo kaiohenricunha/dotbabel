@@ -156,6 +156,17 @@ describe("parseFrontmatter", () => {
     );
     expect(warnings[0]).toMatch(/parse error/);
   });
+
+  it("returns the body after the closing --- separately from the frontmatter", () => {
+    const { body } = parseFrontmatter("---\nname: x\n---\nBody line.\n");
+    expect(body).toBe("Body line.\n");
+  });
+
+  it("returns the entire input as body when there is no frontmatter block", () => {
+    const content = "Just a body.\n";
+    const { body } = parseFrontmatter(content);
+    expect(body).toBe(content);
+  });
 });
 
 describe("walkArtifacts", () => {

@@ -78,13 +78,14 @@ teardown() {
   [ -L "$REPO/.gemini/skills/commit/SKILL.md" ]
 }
 
-@test "project-sync creates Copilot prompts and instructions" {
+@test "project-sync creates Copilot prompts and instructions as generated files, not symlinks" {
   run $PSYNC --repo "$REPO" --all
   [ "$status" -eq 0 ]
-  [ -L "$REPO/.github/prompts/commit.prompt.md" ]
-  [ -L "$REPO/.github/instructions/deploy.instructions.md" ]
-  resolved=$(readlink -f "$REPO/.github/prompts/commit.prompt.md")
-  [ "$resolved" = "$REPO/.claude/commands/commit.md" ]
+  [ -f "$REPO/.github/prompts/commit.prompt.md" ]
+  [ ! -L "$REPO/.github/prompts/commit.prompt.md" ]
+  [ -f "$REPO/.github/instructions/deploy.instructions.md" ]
+  [ ! -L "$REPO/.github/instructions/deploy.instructions.md" ]
+  grep -q "# dotbabel:generated" "$REPO/.github/prompts/commit.prompt.md"
 }
 
 @test "project-sync --dry-run does not mutate the filesystem" {
@@ -286,11 +287,9 @@ teardown() {
     /*) echo "BUG: target is absolute: $target" >&2; return 1 ;;
     *)  : ;;
   esac
-  prompt_target=$(readlink "$REPO/.github/prompts/commit.prompt.md")
-  case "$prompt_target" in
-    /*) echo "BUG: copilot prompt target is absolute: $prompt_target" >&2; return 1 ;;
-    *)  : ;;
-  esac
+  # Copilot targets are generated files, not symlinks (#324) — #218's
+  # "relative target" premise does not apply to them.
+  [ ! -L "$REPO/.github/prompts/commit.prompt.md" ]
 }
 
 @test "symlinks survive a repo rename (regression #218)" {
@@ -303,9 +302,10 @@ teardown() {
   resolved=$(readlink -f "$RENAMED/.codex/skills/commit/SKILL.md")
   [ "$resolved" = "$RENAMED/.claude/commands/commit.md" ]
 
-  [ -L "$RENAMED/.github/prompts/commit.prompt.md" ]
-  resolved=$(readlink -f "$RENAMED/.github/prompts/commit.prompt.md")
-  [ "$resolved" = "$RENAMED/.claude/commands/commit.md" ]
+  # Copilot targets are generated files, not symlinks (#324): nothing to
+  # resolve, but the content survives the rename untouched.
+  [ -f "$RENAMED/.github/prompts/commit.prompt.md" ]
+  grep -q "# dotbabel:generated" "$RENAMED/.github/prompts/commit.prompt.md"
 
   run $PCHECK --repo "$RENAMED"
   [ "$status" -eq 0 ]
