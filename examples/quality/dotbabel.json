@@ -1,0 +1,57 @@
+{
+  "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
+  "quality": {
+    "enabled": true,
+    "default_profile": "fast",
+    "base_ref": "origin/main",
+    "exclude": ["examples/generated/**"],
+    "critical_paths": ["api/internal/auth/**"],
+    "components": [
+      {
+        "root": "api",
+        "languages": ["go"],
+        "tools": {
+          "test": {
+            "argv": ["make", "test-api"],
+            "timeout_seconds": 600,
+            "report": { "format": "exit-code" }
+          },
+          "coverage": {
+            "argv": ["make", "coverage-api"],
+            "report": { "format": "go-coverprofile", "path": "coverage.out" }
+          }
+        }
+      },
+      {
+        "root": "worker",
+        "languages": ["python"],
+        "tools": {
+          "lint": {
+            "argv": ["uv", "run", "ruff", "check", "."],
+            "report": { "format": "exit-code" }
+          },
+          "coverage": {
+            "argv": ["uv", "run", "pytest", "--cov", "--cov-report=json"],
+            "report": { "format": "coveragepy-json", "path": "coverage.json" }
+          }
+        }
+      },
+      {
+        "root": "web",
+        "languages": ["typescript", "javascript"],
+        "tools": {
+          "lint": { "argv": ["npm", "run", "lint"], "report": { "format": "exit-code" } },
+          "test": { "argv": ["npm", "test"], "report": { "format": "exit-code" } },
+          "coverage": {
+            "argv": ["npm", "run", "coverage"],
+            "report": { "format": "lcov", "path": "coverage/lcov.info" }
+          },
+          "mutation": {
+            "argv": ["npm", "run", "mutation:changed"],
+            "report": { "format": "stryker-json", "path": "reports/mutation.json" }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-04T00:33:49.018Z",
+  "generatedAt": "2026-09-04T16:37:53.857Z",
   "version": "3.1.0",
   "artifacts": [
     {
@@ -685,7 +685,7 @@
       "type": "command",
       "path": "commands/pre-pr.md",
       "name": "pre-pr",
-      "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the full test suite, and surface a go/no-go summary before opening a pull request.\n",
+      "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the PR quality profile, and surface a go/no-go summary before opening a pull request.\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
@@ -738,6 +738,21 @@
         "maturity": "validated"
       },
       "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "quality-review",
+      "type": "skill",
+      "path": "skills/quality-review/SKILL.md",
+      "name": "quality-review",
+      "description": "Check changed code against the resolved dotbabel quality policy, then review semantic risks that tools cannot judge. Triggers on: \"quality review\", \"quality check\", \"review code quality\".\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "draft"
+      },
+      "version": "0.1.0",
       "owner": "@kaiohenricunha"
     },
     {

@@ -33,7 +33,8 @@
     "dotbabel-pr-stack": "./plugins/dotbabel/bin/dotbabel-pr-stack.mjs",
     "dotbabel-project-sync": "./plugins/dotbabel/bin/dotbabel-project-sync.mjs",
     "dotbabel-project-init": "./plugins/dotbabel/bin/dotbabel-project-init.mjs",
-    "dotbabel-check-project-sync": "./plugins/dotbabel/bin/dotbabel-check-project-sync.mjs"
+    "dotbabel-check-project-sync": "./plugins/dotbabel/bin/dotbabel-check-project-sync.mjs",
+    "dotbabel-quality": "./plugins/dotbabel/bin/dotbabel-quality.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",

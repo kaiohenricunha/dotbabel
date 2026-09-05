@@ -36,6 +36,7 @@ describe("scaffoldProjectInit", () => {
     const cfg = JSON.parse(fs.readFileSync(path.join(repo, ".dotbabel.json"), "utf8"));
     expect(cfg.fan_out).toEqual(DEFAULT_DOTBABEL_JSON.fan_out);
     expect(cfg.targets).toEqual(DEFAULT_DOTBABEL_JSON.targets);
+    expect(cfg.quality).toEqual({ enabled: true });
 
     const claudeMd = fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8");
     expect(claudeMd).toContain("<!-- dotbabel:rule-floor:begin -->");

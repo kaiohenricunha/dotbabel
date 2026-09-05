@@ -51,6 +51,7 @@
     "pr-conductor",
     "project-sync",
     "pulumi-specialist",
+    "quality-review",
     "release-conductor",
     "reproduce-bug",
     "review-pr",
