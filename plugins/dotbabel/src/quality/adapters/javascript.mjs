@@ -1,5 +1,5 @@
 import path from "node:path";
-import { capabilityInProfile, capabilityRules } from "./shared.mjs";
+import { projectToolPlans } from "./shared.mjs";
 import { nodeRepositoryPlans } from "./node-tools.mjs";
 
 /** Built-in JavaScript quality adapter. */
@@ -17,7 +17,7 @@ export const javascriptAdapter = Object.freeze({
     return files.some((file) => /\.[cm]?js$/.test(file)) ? [{ root: ".", language: "javascript", markers: [] }] : [];
   },
   plan(component, _policy, changeSet, profile) {
-    const plans = Object.entries(component.tools ?? {}).filter(([capability]) => capabilityInProfile(capability, profile)).map(([capability, tool]) => ({ id: `${component.id}:${capability}`, componentId: component.id, capability, ruleIds: capabilityRules(capability), executable: tool.argv[0], argv: tool.argv.slice(1), cwd: component.absoluteRoot, timeoutSeconds: tool.timeout_seconds, report: tool.report, availability: "available", source: "project", requiresTrust: true }));
+    const plans = projectToolPlans(component, profile);
     plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability))));
     const changed = changeSet.changedFiles.map((item) => item.path).filter((file) => /\.[cm]?js$/.test(file) && component.files.includes(file));
     for (const file of changed) plans.push({ id: `${component.id}:node-check:${file}`, componentId: component.id, capability: "compile", ruleIds: ["correctness.compile"], executable: "node", argv: ["--check", path.relative(component.root, file)], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: false });

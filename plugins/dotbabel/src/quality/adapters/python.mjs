@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { capabilityInProfile, capabilityRules } from "./shared.mjs";
+import { capabilityInProfile, capabilityRules, projectToolPlans } from "./shared.mjs";
 import { makeRepositoryPlans } from "./make-tools.mjs";
 
 function has(root, name) { return fs.existsSync(path.join(root, name)); }
@@ -43,7 +43,7 @@ export const pythonAdapter = Object.freeze({
     return files.some((file) => file.endsWith(".py")) ? [{ root: ".", language: "python", markers: [] }] : [];
   },
   plan(component, _policy, _changeSet, profile) {
-    const plans = Object.entries(component.tools ?? {}).filter(([capability]) => capabilityInProfile(capability, profile)).map(([capability, tool]) => ({ id: `${component.id}:${capability}`, componentId: component.id, capability, ruleIds: capabilityRules(capability), executable: tool.argv[0], argv: tool.argv.slice(1), cwd: component.absoluteRoot, timeoutSeconds: tool.timeout_seconds, report: tool.report, availability: "available", source: "project", requiresTrust: true }));
+    const plans = projectToolPlans(component, profile);
     const claimed = new Set(plans.map((plan) => plan.capability));
     const absoluteRoot = component.absoluteRoot ?? path.resolve(component.root);
     component.absoluteRoot = absoluteRoot;

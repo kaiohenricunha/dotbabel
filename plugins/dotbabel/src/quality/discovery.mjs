@@ -94,7 +94,7 @@ export function detectQualityCapabilities({ repoRoot, policy = {} } = {}) {
     id: `${component.root}:${component.language}`,
     absoluteRoot: path.resolve(repoRoot, component.root),
     files: files.filter((file) => under(file, component.root)),
-    state: getQualityAdapter(component.language) || Object.values(component.tools ?? {}).some((tool) => ["exit-code", "dotbabel-v1"].includes(tool.report?.format ?? "exit-code")) ? "checked" : "unsupported",
+    state: (getQualityAdapter(component.language) || Object.values(component.tools ?? {}).some((tool) => ["exit-code", "dotbabel-v1"].includes(tool.report?.format ?? "exit-code"))) ? "checked" : "unsupported",
     evidence: component.markers,
   }));
   const tsComponents = components.filter((component) => component.language === "typescript");

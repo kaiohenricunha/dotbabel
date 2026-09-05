@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { capabilityInProfile, capabilityRules } from "./shared.mjs";
+import { projectToolPlans } from "./shared.mjs";
 import { nodeRepositoryPlans } from "./node-tools.mjs";
 
 /** Built-in TypeScript quality adapter. */
@@ -11,7 +11,7 @@ export const typescriptAdapter = Object.freeze({
     return files.filter((file) => /^tsconfig.*\.json$/.test(path.basename(file))).map((marker) => ({ root: path.dirname(marker) === "." ? "." : path.dirname(marker), language: "typescript", markers: [marker] }));
   },
   plan(component, _policy, _changeSet, profile) {
-    const plans = Object.entries(component.tools ?? {}).filter(([capability]) => capabilityInProfile(capability, profile)).map(([capability, tool]) => ({ id: `${component.id}:${capability}`, componentId: component.id, capability, ruleIds: capabilityRules(capability), executable: tool.argv[0], argv: tool.argv.slice(1), cwd: component.absoluteRoot, timeoutSeconds: tool.timeout_seconds, report: tool.report, availability: "available", source: "project", requiresTrust: true }));
+    const plans = projectToolPlans(component, profile);
     plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability))));
     for (const plan of plans.filter((item) => item.capability === "typecheck")) plan.ruleIds = ["correctness.compile", "correctness.types"];
     if (!plans.some((plan) => plan.capability === "typecheck")) {

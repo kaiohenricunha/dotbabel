@@ -14,16 +14,20 @@ function inside(root, candidate) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+function executionError(message) {
+  return new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message });
+}
+
 /** Validate a command plan before execution. */
 export function validateCommandPlan({ repoRoot, plan }) {
-  if (typeof plan.executable !== "string" || plan.executable.length === 0 || plan.executable.includes("\0")) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "command executable must be a safe string" });
-  if (path.isAbsolute(plan.executable) && plan.executable !== process.execPath) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "absolute executable paths are not permitted" });
-  if (!path.isAbsolute(plan.executable) && plan.executable.includes("/") && !plan.executable.startsWith("./")) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "configured executables must be PATH names or repository-relative './' paths" });
-  if (!Array.isArray(plan.argv) || plan.argv.some((arg) => typeof arg !== "string" || arg.includes("\0"))) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "command argv must contain safe strings" });
-  if (!fs.existsSync(plan.cwd) || !inside(repoRoot, plan.cwd)) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "command cwd must stay inside the repository" });
+  if (typeof plan.executable !== "string" || plan.executable.length === 0 || plan.executable.includes("\0")) throw executionError("command executable must be a safe string");
+  if (path.isAbsolute(plan.executable) && plan.executable !== process.execPath) throw executionError("absolute executable paths are not permitted");
+  if (!path.isAbsolute(plan.executable) && plan.executable.includes("/") && !plan.executable.startsWith("./")) throw executionError("configured executables must be PATH names or repository-relative './' paths");
+  if (!Array.isArray(plan.argv) || plan.argv.some((arg) => typeof arg !== "string" || arg.includes("\0"))) throw executionError("command argv must contain safe strings");
+  if (!fs.existsSync(plan.cwd) || !inside(repoRoot, plan.cwd)) throw executionError("command cwd must stay inside the repository");
   if (plan.executable.startsWith("./")) {
     const executable = path.resolve(plan.cwd, plan.executable);
-    if (!fs.existsSync(executable) || !inside(repoRoot, executable)) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "repository executable escapes the repository" });
+    if (!fs.existsSync(executable) || !inside(repoRoot, executable)) throw executionError("repository executable escapes the repository");
   }
   return plan;
 }
@@ -91,7 +95,7 @@ function runOne(plan, options) {
 
 /** Execute validated plans with per-component serialization and bounded concurrency. */
 export async function runQualityPlans({ repoRoot, plans, allowProjectCommands = false, passEnv = [], env = process.env, jobs = 2, timeoutSeconds = 120 } = {}) {
-  if (passEnv.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) throw new ValidationError({ code: ERROR_CODES.QUALITY_EXECUTION_FAILED, category: "quality", message: "--pass-env names must be valid environment variable names" });
+  if (passEnv.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) throw executionError("--pass-env names must be valid environment variable names");
   const trust = isRepoTrusted({ repoRoot, env });
   const pending = plans.filter((plan) => plan.executable && ["available", "candidate"].includes(plan.availability));
   const results = plans.filter((plan) => !pending.includes(plan)).map((plan) => ({ id: plan.id, componentId: plan.componentId, capability: plan.capability, ruleIds: plan.ruleIds, state: plan.availability ?? "not_configured", candidates: plan.candidates, evidence: plan.evidence }));

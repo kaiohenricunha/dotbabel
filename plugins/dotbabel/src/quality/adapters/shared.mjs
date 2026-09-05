@@ -1,9 +1,11 @@
+const FAST_CAPABILITIES = new Set(["format", "compile", "typecheck", "lint", "complexity"]);
+const PR_CAPABILITIES = new Set([...FAST_CAPABILITIES, "test", "coverage", "dead-code", "dependencies", "duplication", "security"]);
+const DEEP_CAPABILITIES = new Set([...PR_CAPABILITIES, "mutation", "race"]);
+
 /** Return true when a capability belongs to a fixed profile. */
 export function capabilityInProfile(capability, profile) {
-  const fast = new Set(["format", "compile", "typecheck", "lint", "complexity"]);
-  const pr = new Set([...fast, "test", "coverage", "dead-code", "dependencies", "duplication", "security"]);
-  const deep = new Set([...pr, "mutation", "race"]);
-  return (profile === "fast" ? fast : profile === "pr" ? pr : deep).has(capability);
+  const capabilities = profile === "fast" ? FAST_CAPABILITIES : profile === "pr" ? PR_CAPABILITIES : DEEP_CAPABILITIES;
+  return capabilities.has(capability);
 }
 
 /** Map a tool capability to language-independent policy rules. */
@@ -23,4 +25,24 @@ export function capabilityRules(capability) {
     security: ["security.high_confidence"],
     race: ["correctness.tests"],
   }[capability] ?? [];
+}
+
+/** Build one command plan per project-configured tool capability in scope for a profile. */
+export function projectToolPlans(component, profile) {
+  return Object.entries(component.tools ?? {})
+    .filter(([capability]) => capabilityInProfile(capability, profile))
+    .map(([capability, tool]) => ({
+      id: `${component.id}:${capability}`,
+      componentId: component.id,
+      capability,
+      ruleIds: capabilityRules(capability),
+      executable: tool.argv[0],
+      argv: tool.argv.slice(1),
+      cwd: component.absoluteRoot,
+      timeoutSeconds: tool.timeout_seconds,
+      report: tool.report,
+      availability: "available",
+      source: "project",
+      requiresTrust: true,
+    }));
 }
