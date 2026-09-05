@@ -10,7 +10,7 @@ description: >
   (single source end-to-end). Invoke when: "audit pipeline", "veracity check",
   "scoring math correct?", "check gates", "trace source", "verify quality
   gates", "formula correct?".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Veracity Audit

@@ -12,7 +12,7 @@ description: >
   Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can
   never attest; --fail-fast works in both modes. Invoke only on explicit
   request.
-applyTo: '**'
+applyTo: "**"
 ---
 
 # /local-attest — Local CI attestation

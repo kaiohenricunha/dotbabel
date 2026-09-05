@@ -10,7 +10,7 @@ description: >
   done", "is this spec really done", or otherwise wants closure on spec-driven
   work. Read-only against the spec — produces an audit, never modifies the spec
   itself.
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Validate Spec — Implementation Audit

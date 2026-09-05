@@ -4,7 +4,7 @@ name: merge-pr
 description: >
   Merge a pull request only after full local verification, with an optional
   data-regression gate for paths configured in docs/repo-facts.json.
-argument-hint: '[PR#]'
+argument-hint: "[PR#]"
 ---
 
 Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in `docs/repo-facts.json`.

@@ -6,7 +6,7 @@ description: >
   while preserving all functionality. PR-scoped by default. Accepts an optional
   PR number, file glob, or base branch to narrow scope. Triggers on: "simplify
   code", "code simplifier", "clean up the code", "simplify the PR".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default — operates only on files changed in the current branch.

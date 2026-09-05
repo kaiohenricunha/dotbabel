@@ -5,7 +5,7 @@ description: >
   Review a pull request: fetch comments, validate, apply fixes, resolve
   conflicts, and close out all threads. Triggers on: "review PR", "review pull
   request", "check PR".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.

@@ -7,7 +7,7 @@ description: >
   ComponentResource coupling, ESC configuration, and Automation API workflows.
   Triggers on: "Pulumi audit", "stack review", "Automation API review",
   "ComponentResource design", "ESC audit", "Pulumi secrets", "Pulumi testing".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Pulumi Specialist

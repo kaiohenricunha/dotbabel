@@ -7,7 +7,7 @@ description: >
   multi-service design reviews. Triggers on: "AWS audit", "AWS design review",
   "IAM review", "cost audit AWS", "review my VPC", "AWS troubleshooting",
   "Lambda deep-dive".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # AWS Specialist

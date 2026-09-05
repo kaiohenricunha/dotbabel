@@ -5,7 +5,7 @@ description: >
   Run an audit-then-implement pipeline: produce an audit, cluster findings into
   PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.
   Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Run a long-horizon audit-then-implement pipeline: produce a structured audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.

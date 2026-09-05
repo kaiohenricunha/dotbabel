@@ -7,7 +7,7 @@ description: >
   design review of Kubernetes manifests, or a health audit of a namespace or
   workload. Triggers on: "debug kubernetes", "why is my pod", "review my
   manifests", "cluster health", "kubernetes design review", "k8s audit".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Kubernetes Specialist

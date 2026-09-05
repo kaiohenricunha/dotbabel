@@ -7,7 +7,7 @@ description: >
   multi-service design reviews. Triggers on: "GCP audit", "GCP design review",
   "Workload Identity debug", "IAM review GCP", "review my GKE", "GCP
   troubleshooting", "Cloud Run deep-dive".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # GCP Specialist

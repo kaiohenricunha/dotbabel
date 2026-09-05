@@ -5,7 +5,7 @@ description: >
   Project-aware git workflow: conventional commits, PR creation, safe pushes, PR
   merges, and branch naming suggestions. Triggers on: "conventional commit",
   "create PR", "push changes".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # /git

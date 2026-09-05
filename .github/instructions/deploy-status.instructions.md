@@ -6,7 +6,7 @@ description: >
   against origin/main. Use during deploy verification, incident response, and
   release drift checks. Triggers on: "what is deployed", "deploy status",
   "production drift", "is prod on main", "compare prod to main".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Deploy Status

@@ -5,7 +5,7 @@ description: >
   Create a structured assessment document grading a target on a 0-10 scale with
   a weighted rubric, saved to docs/assessments/. Triggers on: "grade", "rate",
   "score", "evaluate", "assess".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Create a structured assessment document that grades a target on a 0-10 scale using a weighted rubric and save it to the project's `docs/assessments/` directory.

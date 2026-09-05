@@ -8,7 +8,7 @@ description: >
   changelog/bump/tag; release.yml owns OIDC npm publish — this skill only gates
   the merge in between. Triggers on: "ship a release", "cut a release", "merge
   the release PR", "is the release ready", "verify the release".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Gate the open release-please PR before merging. release-please drafts the changelog and version bump; `release.yml` handles OIDC npm publish on tag push. This skill is the human-in-the-loop step between them: verifies the PR is safe to merge, then merges it.

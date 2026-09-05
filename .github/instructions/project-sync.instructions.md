@@ -12,7 +12,7 @@ description: >
   sync", "fan out commands", "wire up gemini for this project", "add this
   command to codex", "make this skill available in copilot", "regenerate
   AGENTS.md for this project".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # project-sync — Repo-local cross-CLI fan-out

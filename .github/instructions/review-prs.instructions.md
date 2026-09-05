@@ -5,7 +5,7 @@ description: >
   Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an
   isolated worktree, aggregate results into a summary table. Triggers on:
   "review all PRs", "check my PRs", "PR status".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Batch-review a list of PRs in parallel. Each PR gets its own sub-agent running the full `review-pr` workflow (fetch comments → validate → apply fixes → push → resolve threads → CI gate). Results are aggregated into a single summary table.

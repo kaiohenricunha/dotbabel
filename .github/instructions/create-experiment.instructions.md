@@ -4,7 +4,7 @@ name: create-experiment
 description: >
   Run a scoped, local-only experiment and save the report to docs/experiments/.
   Triggers on: "let's try", "compare A vs B", "prototype", "explore".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Run a scoped, local-only experiment and produce a structured report saved to the project's `docs/experiments/` directory.

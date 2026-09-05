@@ -7,7 +7,7 @@ description: >
   document, RFC, or engineering plan. Triggers on "let's spec this out", "create
   a spec", "design doc", "write a technical plan", "plan the architecture".
   Works for greenfield and brownfield projects. Outputs to docs/specs/.
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Spec-Driven Design

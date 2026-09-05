@@ -4,7 +4,7 @@ name: ground-first
 description: >
   Produce a code-grounded analysis before any edit is proposed. Triggers on:
   "analyze", "understand behavior", "how does this work".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Produce a code-grounded analysis of a subject before any edits are proposed.

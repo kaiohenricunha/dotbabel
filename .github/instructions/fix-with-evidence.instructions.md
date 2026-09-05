@@ -4,7 +4,7 @@ name: fix-with-evidence
 description: >
   Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on:
   "fix this", "apply fix", "solve issue".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Fix a bug using a strict four-phase evidence loop: Reproduce → Fix → Verify → PR. Each phase gates on the previous.

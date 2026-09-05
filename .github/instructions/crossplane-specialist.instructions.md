@@ -8,7 +8,7 @@ description: >
   credential injection patterns. Triggers on: "Crossplane audit", "XRD review",
   "Composition debug", "stuck Claim", "managed resource stuck", "provider config
   review", "Crossplane GitOps".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Crossplane Specialist

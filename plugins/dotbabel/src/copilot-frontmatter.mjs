@@ -162,13 +162,16 @@ export function mapSkillFrontmatter(frontmatter) {
 /**
  * Render a plain object as a YAML frontmatter body (the lines between the
  * `---` delimiters, each ending in `\n`; empty string for an empty object).
+ * Quotes with `"` rather than js-yaml's default `'` so generated output
+ * already matches this repo's prettier config (`singleQuote: false`) and
+ * never needs a follow-up reformat.
  *
  * @param {object} obj
  * @returns {string}
  */
 export function renderFrontmatterBlock(obj) {
   if (Object.keys(obj).length === 0) return "";
-  return getYaml().dump(obj);
+  return getYaml().dump(obj, { quotingType: '"' });
 }
 
 /**

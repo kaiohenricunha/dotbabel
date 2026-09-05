@@ -138,11 +138,11 @@ npx dotbabel check-project-sync
 
 What lands where:
 
-| Source                         | Codex / Gemini destination                | Copilot destination                                              |
-| ------------------------------ | ----------------------------------------- | -------------------------------------------------------------------- |
-| `.claude/commands/<name>.md`   | `.codex/skills/<name>/SKILL.md` (symlink) | `.github/prompts/<name>.prompt.md` (generated, frontmatter mapped) |
+| Source                         | Codex / Gemini destination                | Copilot destination                                                         |
+| ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------- |
+| `.claude/commands/<name>.md`   | `.codex/skills/<name>/SKILL.md` (symlink) | `.github/prompts/<name>.prompt.md` (generated, frontmatter mapped)          |
 | `.claude/skills/<id>/SKILL.md` | `.codex/skills/<id>/` (whole-dir symlink) | `.github/instructions/<id>.instructions.md` (generated, frontmatter mapped) |
-| `CLAUDE.md` (rule-floor block) | rendered into `AGENTS.md` + `GEMINI.md`   | rendered into `.github/copilot-instructions.md`                   |
+| `CLAUDE.md` (rule-floor block) | rendered into `AGENTS.md` + `GEMINI.md`   | rendered into `.github/copilot-instructions.md`                             |
 
 **What Codex and Gemini get.** Every Codex/Gemini destination is a symlink to
 the Claude source file, not a translated copy — they read their own

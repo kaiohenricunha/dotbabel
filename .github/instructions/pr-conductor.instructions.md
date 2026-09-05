@@ -9,7 +9,7 @@ description: >
   its parent squash-merges. Delegates every phase to an existing artifact rather
   than reimplementing it. Triggers on: "land this PR", "run the PR pipeline",
   "take this branch to a PR", "ship this branch", "what's blocking my PR".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Land one pull request end to end. This skill is a conductor: it sequences existing artifacts in a fixed order and owns only what none of them own — stacked-PR ordering and the stop-before-merge gate. It does not reimplement simplification, review, testing, or merging.

@@ -5,7 +5,7 @@ description: >
   Analyze a diff or changed files for common security vulnerabilities
   (injection, XSS, SSRF, secrets). Defaults to staged changes. Triggers on:
   "security review", "check for secrets", "vulnerability scan".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Analyze a diff or set of changed files for common security vulnerabilities.

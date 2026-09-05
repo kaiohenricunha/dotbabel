@@ -6,7 +6,7 @@ description: >
   available agents, list installed agents, or refresh the agent catalog.
   Triggers on: "search agents", "list agents", "find agent", "what agents",
   "agent catalog".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Agents Search — Discovery and Management

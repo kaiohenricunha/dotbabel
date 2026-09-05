@@ -5,7 +5,7 @@ description: >
   Roll back the most recent production release across configured deploy targets
   after an explicit typed confirmation. Use only when the user directly invokes
   /rollback-prod during incident response or release recovery.
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Rollback Prod

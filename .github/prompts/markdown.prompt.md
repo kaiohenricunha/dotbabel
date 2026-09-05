@@ -4,7 +4,7 @@ name: markdown
 description: >
   Fix markdown formatting and structure across a file or directory. Normalizes
   headings, tables, code blocks, link references.
-argument-hint: '[file | dir]'
+argument-hint: "[file | dir]"
 ---
 
 # Command: fix_markdown

@@ -4,7 +4,7 @@ name: changelog
 description: >
   Generate a changelog entry from git history. Defaults to commits since the
   last tag or the last 20 commits.
-argument-hint: '[ref-range|count|since-deploy]'
+argument-hint: "[ref-range|count|since-deploy]"
 ---
 
 Generate a changelog entry from git history.

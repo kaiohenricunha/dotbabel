@@ -8,7 +8,7 @@ description: >
   correctness. Triggers on: "Terragrunt audit", "run-all review", "dependency
   block", "DRY pattern review", "env hierarchy audit", "mock_outputs",
   "terragrunt hooks".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Terragrunt Specialist

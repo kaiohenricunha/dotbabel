@@ -4,7 +4,7 @@ name: create-audit
 description: >
   Create an evidence-based audit document and save it to docs/audits/. Triggers
   on: "audit", "review", "assessment".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Create a structured audit document and save it to the project's `docs/audits/` directory.

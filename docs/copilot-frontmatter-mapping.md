@@ -22,16 +22,16 @@ prompt files and custom instructions.
 
 ## Commands → `.prompt.md`
 
-| Claude key                  | `.prompt.md` key | Behavior                                                                          |
-| ---------------------------- | ----------------- | ---------------------------------------------------------------------------------- |
-| `description`                | `description`      | Passed through unchanged.                                                          |
-| `name`                       | `name`             | Passed through unchanged.                                                          |
-| `argument-hint`               | `argument-hint`    | Passed through unchanged — same key name on both sides.                            |
-| `allowed-tools` or `tools`   | `tools`            | Normalized to an array. `allowed-tools` wins when both are present.                |
-| `model`                      | _(dropped)_        | Warned. Claude's `model` is a tier enum (`opus`/`sonnet`/`haiku`/`inherit`); Copilot's is a free-form model identifier (e.g. `GPT-4o`). No safe crosswalk exists. |
-| `effort`                     | _(dropped)_        | Warned. No Copilot equivalent.                                                     |
-| `disable-model-invocation`   | _(dropped)_        | Warned. No Copilot equivalent — Copilot has no auto-routing concept to disable.    |
-| every other key (`id`, `type`, `version`, `domain`, `platform`, `task`, `maturity`, `owner`, `created`, `updated`, ...) | _(dropped)_ | Silent. These are dotbabel taxonomy fields with no Copilot meaning; warning on every one of them would be noise with no fix available. |
+| Claude key                                                                                                              | `.prompt.md` key | Behavior                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description`                                                                                                           | `description`    | Passed through unchanged.                                                                                                                                         |
+| `name`                                                                                                                  | `name`           | Passed through unchanged.                                                                                                                                         |
+| `argument-hint`                                                                                                         | `argument-hint`  | Passed through unchanged — same key name on both sides.                                                                                                           |
+| `allowed-tools` or `tools`                                                                                              | `tools`          | Normalized to an array. `allowed-tools` wins when both are present.                                                                                               |
+| `model`                                                                                                                 | _(dropped)_      | Warned. Claude's `model` is a tier enum (`opus`/`sonnet`/`haiku`/`inherit`); Copilot's is a free-form model identifier (e.g. `GPT-4o`). No safe crosswalk exists. |
+| `effort`                                                                                                                | _(dropped)_      | Warned. No Copilot equivalent.                                                                                                                                    |
+| `disable-model-invocation`                                                                                              | _(dropped)_      | Warned. No Copilot equivalent — Copilot has no auto-routing concept to disable.                                                                                   |
+| every other key (`id`, `type`, `version`, `domain`, `platform`, `task`, `maturity`, `owner`, `created`, `updated`, ...) | _(dropped)_      | Silent. These are dotbabel taxonomy fields with no Copilot meaning; warning on every one of them would be noise with no fix available.                            |
 
 `tools` normalization accepts both a space-separated string
 (`allowed-tools: Read Grep Glob Bash`) and a comma-separated string
@@ -43,17 +43,17 @@ same file.
 `.instructions.md` has a smaller schema than `.prompt.md` — critically, **no
 `tools` key at all** — so a skill's tool grant has nowhere to go.
 
-| Claude key                  | `.instructions.md` key | Behavior                                                              |
-| ---------------------------- | ------------------------ | ------------------------------------------------------------------------ |
-| `description`                | `description`             | Passed through unchanged.                                               |
-| `name`                       | `name`                    | Passed through unchanged.                                               |
-| _(none)_                     | `applyTo`                 | Always set to `**` — every generated instructions file applies repo-wide. Claude has no source key for this. |
-| `allowed-tools` or `tools`   | _(dropped)_               | Warned. Neither has a home on `.instructions.md`.                        |
-| `model`                      | _(dropped)_               | Warned. Same reasoning as commands.                                     |
-| `effort`                     | _(dropped)_               | Warned. No Copilot equivalent.                                          |
-| `disable-model-invocation`   | _(dropped)_               | Warned. No Copilot equivalent.                                          |
-| `argument-hint`               | _(dropped)_               | **Silent**, not warned — instructions files have no per-invocation argument concept and never will, so this would be permanent, unactionable noise. |
-| every dotbabel taxonomy key  | _(dropped)_               | Silent, same reasoning as commands.                                     |
+| Claude key                  | `.instructions.md` key | Behavior                                                                                                                                            |
+| --------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description`               | `description`          | Passed through unchanged.                                                                                                                           |
+| `name`                      | `name`                 | Passed through unchanged.                                                                                                                           |
+| _(none)_                    | `applyTo`              | Always set to `**` — every generated instructions file applies repo-wide. Claude has no source key for this.                                        |
+| `allowed-tools` or `tools`  | _(dropped)_            | Warned. Neither has a home on `.instructions.md`.                                                                                                   |
+| `model`                     | _(dropped)_            | Warned. Same reasoning as commands.                                                                                                                 |
+| `effort`                    | _(dropped)_            | Warned. No Copilot equivalent.                                                                                                                      |
+| `disable-model-invocation`  | _(dropped)_            | Warned. No Copilot equivalent.                                                                                                                      |
+| `argument-hint`             | _(dropped)_            | **Silent**, not warned — instructions files have no per-invocation argument concept and never will, so this would be permanent, unactionable noise. |
+| every dotbabel taxonomy key | _(dropped)_            | Silent, same reasoning as commands.                                                                                                                 |
 
 ## The generated-file marker
 

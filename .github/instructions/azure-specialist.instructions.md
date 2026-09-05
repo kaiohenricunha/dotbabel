@@ -7,7 +7,7 @@ description: >
   and multi-service design reviews. Triggers on: "Azure audit", "Azure design
   review", "EntraID review", "Managed Identity debug", "review my Azure", "Azure
   troubleshooting", "AKS deep-dive".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Azure Specialist

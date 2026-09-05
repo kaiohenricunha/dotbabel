@@ -7,7 +7,7 @@ description: >
   configuration, module coupling, import workflows, and test coverage. Triggers
   on: "Terraform audit", "module review", "state management", "Terraform
   import", "workspace design", "provider config review", "Terraform testing".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Terraform Specialist

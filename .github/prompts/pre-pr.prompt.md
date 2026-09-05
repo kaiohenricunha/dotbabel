@@ -4,7 +4,7 @@ name: pre-pr
 description: >
   Pre-PR quality gate: simplify changed code, security-review the diff, run the
   full test suite, and surface a go/no-go summary before opening a pull request.
-argument-hint: '[base-branch] [--conductor] — default: origin/main'
+argument-hint: "[base-branch] [--conductor] — default: origin/main"
 ---
 
 Quality gate to run before `/git pr`. Simplifies changed code, security-reviews the diff, runs the full test suite, and surfaces a go/no-go summary. Does not open the PR — that is `/git pr`.

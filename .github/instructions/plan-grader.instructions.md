@@ -5,7 +5,7 @@ description: >
   Grade implementation plans on a 0-10 scale without mutating the workspace.
   Accepts plan files, quoted inline plans, or best-effort latest-plan discovery
   for Claude, Codex, Copilot, and Gemini.
-applyTo: '**'
+applyTo: "**"
 ---
 
 Grade an implementation plan on a 0-10 scale using the plan-grader rubric. This skill is

@@ -14,7 +14,7 @@ description: >
   "codex resume", "find the session where", "search sessions", "which session
   did I", "push handoff", "fetch handoff", "handoff to other machine", "resume
   on my other laptop".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # Handoff — Cross-CLI Session Context Transfer

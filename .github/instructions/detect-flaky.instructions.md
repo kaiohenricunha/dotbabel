@@ -5,7 +5,7 @@ description: >
   Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript
   codebases by repeated execution + root-cause analysis. Triggers on: "detect
   flaky tests", "find flaky tests", "diagnose flaky tests".
-applyTo: '**'
+applyTo: "**"
 ---
 
 # /detect-flaky — Flaky Test Detection and Diagnosis Agent

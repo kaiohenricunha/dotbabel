@@ -10,7 +10,7 @@ description: >
   is delegated to /rollback-prod; cross-provider SHA reporting is delegated to
   /deploy-status. Unlisted subcommands require `flyctl <subcommand> --help`
   first.
-applyTo: '**'
+applyTo: "**"
 ---
 
 # flyctl

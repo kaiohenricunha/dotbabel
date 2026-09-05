@@ -10,7 +10,7 @@ description: >
   comments this skill produces and applies fixes. Triggers on: "post PR review",
   "leave inline comments on PR", "AI review and comment on PR", "Copilot-style
   PR review".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Post AI review findings on a GitHub PR as inline comments. The producer side

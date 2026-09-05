@@ -5,7 +5,7 @@ description: >
   Investigate a specific problem and surface viable fix paths with trade-offs,
   saved to docs/inspections/. Triggers on: "how should I fix", "what are my
   options", "investigate before I touch".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Investigate a specific problem and produce a structured fix-path document saved to the project's `docs/inspections/` directory.

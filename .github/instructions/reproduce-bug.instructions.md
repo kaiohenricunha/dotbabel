@@ -6,7 +6,7 @@ description: >
   failing regression test as the objective baseline to fix against. Saves a
   report to docs/reproductions/. Triggers on: "reproduce this bug", "can't
   reproduce", "make it fail reliably", "repro".
-applyTo: '**'
+applyTo: "**"
 ---
 
 Reproduce a bug under isolation and the exact conditions that trigger it, then capture a **failing regression test** as the objective baseline to fix against. The output is a dated report under `docs/reproductions/` plus a failing test left in the sandbox.

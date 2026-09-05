@@ -257,7 +257,7 @@ describe("projectSync", () => {
     const instrContent = fs.readFileSync(instr, "utf8");
     expect(isGeneratedFile(instrContent)).toBe(true);
     expect(instrContent).toContain("name: deploy");
-    expect(instrContent).toContain("applyTo: '**'");
+    expect(instrContent).toContain('applyTo: "**"');
     expect(instrContent).toContain("# deploy");
   });
 
