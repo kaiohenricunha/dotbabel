@@ -17,6 +17,15 @@
         }
       ]
     },
+    "allowed-tools": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
     "model": {
       "type": "string",
       "enum": ["opus", "sonnet", "haiku", "inherit"]
@@ -25,6 +34,7 @@
       "type": "string",
       "enum": ["low", "medium", "max"]
     },
+    "disable-model-invocation": { "type": "boolean" },
     "inputs": {
       "type": "array",
       "items": { "type": "string" }
