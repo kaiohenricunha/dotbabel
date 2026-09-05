@@ -84,6 +84,14 @@ every table with status `skipped`, and an all-skipped run refuses to attest);
 `passPrBody` injects the PR body as `env.PR_BODY`; `restoreFiles` snapshots
 tracked files a leg overwrites and restores them before the head recheck.
 
+The restore also runs on `SIGINT`/`SIGTERM`, so a Ctrl-C mid-matrix puts the
+files back instead of leaving fixture stubs in the tree. That matters because
+`requireClean` is checked _before_ the snapshot is taken: a run killed between
+seeding and restoring would otherwise leave every later run aborting on a dirty
+tree it can no longer clean up. If that still happens (a `SIGKILL`, a power
+loss), the precondition error now recognises the case and prints the exact
+`git restore` command instead of generic "commit or stash" advice.
+
 ## Trust model
 
 Default `trustedAssociations: ["OWNER"]`. Only comments from a user with

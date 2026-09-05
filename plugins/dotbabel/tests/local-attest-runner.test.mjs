@@ -7,7 +7,9 @@ import {
   appendAuditLog,
   applyLabel,
   checkPreconditions,
+  dirtyTreeMessage,
   execute,
+  installInterruptRestore,
   restoreRestoreFiles,
   runMatrix,
   upsertComment,
@@ -1107,5 +1109,179 @@ describe("review hardening", () => {
     expect(r.exitCode).toBe(0);
     expect(calls.writeFile).toHaveLength(1);
     expect(JSON.parse(calls.appendLog[0].line).result).toBe("attested");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// interrupt safety: the restore contract has to survive a Ctrl-C
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("installInterruptRestore", () => {
+  // The hole this closes: safeRestore lives in a `finally`, and a signal kills
+  // the process before any `finally` runs. The matrix takes minutes, most of it
+  // inside the seeding e2e legs, so that window is most of the run.
+  const fakeHooks = () => {
+    const registered = new Map();
+    const exits = [];
+    return {
+      registered,
+      exits,
+      hooks: {
+        on: (sig, fn) => registered.set(sig, fn),
+        off: (sig, fn) => {
+          if (registered.get(sig) === fn) registered.delete(sig);
+        },
+        exit: (code) => exits.push(code),
+      },
+    };
+  };
+
+  const restoringDeps = () => {
+    const writes = [];
+    return {
+      writes,
+      deps: {
+        readFile: () => "SEEDED",
+        writeFile: (path, content) => writes.push({ path, content }),
+        warn: () => {},
+        log: () => {},
+      },
+    };
+  };
+
+  it("restores the snapshot when SIGINT arrives mid-matrix", () => {
+    const { registered, exits, hooks } = fakeHooks();
+    const { writes, deps } = restoringDeps();
+    const snapshot = new Map([["src/seeded.js", "ORIGINAL"]]);
+
+    installInterruptRestore(deps, snapshot, hooks);
+    registered.get("SIGINT")();
+
+    expect(writes).toEqual([{ path: "src/seeded.js", content: "ORIGINAL" }]);
+    // 128 + 2, the convention a shell reports for a SIGINT death.
+    expect(exits).toEqual([130]);
+  });
+
+  it("restores on SIGTERM too, exiting 143", () => {
+    const { registered, exits, hooks } = fakeHooks();
+    const { writes, deps } = restoringDeps();
+
+    installInterruptRestore(deps, new Map([["a.js", "ORIGINAL"]]), hooks);
+    registered.get("SIGTERM")();
+
+    expect(writes).toEqual([{ path: "a.js", content: "ORIGINAL" }]);
+    expect(exits).toEqual([143]);
+  });
+
+  it("dispose() removes both handlers so a normal run leaves no listeners", () => {
+    const { registered, hooks } = fakeHooks();
+    const { deps } = restoringDeps();
+
+    const dispose = installInterruptRestore(deps, new Map(), hooks);
+    expect([...registered.keys()].sort()).toEqual(["SIGINT", "SIGTERM"]);
+    dispose();
+    expect(registered.size).toBe(0);
+  });
+
+  it("a restore that throws in the handler still exits rather than hanging", () => {
+    const { registered, exits, hooks } = fakeHooks();
+    const deps = {
+      readFile: () => "SEEDED",
+      writeFile: () => {
+        throw new Error("read-only file system");
+      },
+      warn: () => {},
+      log: () => {},
+    };
+
+    installInterruptRestore(deps, new Map([["a.js", "ORIGINAL"]]), hooks);
+    expect(() => registered.get("SIGINT")()).not.toThrow();
+    expect(exits).toEqual([130]);
+  });
+
+  it("execute() registers the guard and disposes it on the way out", async () => {
+    // The wiring test: the helper above can be perfect and still be unreachable.
+    const cfg = validateConfig({
+      matrix: [{ name: "noop", mode: "hard", command: "true" }],
+      restoreFiles: ["src/seeded.js"],
+    });
+    const { deps } = makeDeps({
+      runReplies: [
+        [/git rev-parse --abbrev-ref HEAD/, () => ({ stdout: "feature\n" })],
+        [/git status --porcelain/, () => ({ stdout: "" })],
+        [/gh auth status/, () => ({ status: 0 })],
+        [/gh repo view/, () => ({ stdout: "o/r\n" })],
+        [/git rev-parse HEAD/, () => ({ stdout: "a".repeat(40) + "\n" })],
+      ],
+    });
+
+    const seen = [];
+    const original = process.on.bind(process);
+    process.on = (sig, fn) => {
+      if (sig === "SIGINT" || sig === "SIGTERM") seen.push(sig);
+      return original(sig, fn);
+    };
+    try {
+      await execute(deps, cfg, { prOverride: "1", push: false, dryRun: true });
+    } catch {
+      // Preconditions may still reject in this stub; the registration is what
+      // is under test, and it happens before the matrix either way.
+    } finally {
+      process.on = original;
+    }
+
+    // Whatever the outcome, no SIGINT/SIGTERM listener may outlive the call.
+    expect(process.listenerCount("SIGINT")).toBe(0);
+    expect(process.listenerCount("SIGTERM")).toBe(0);
+  });
+});
+
+describe("dirtyTreeMessage", () => {
+  // requireClean runs BEFORE the snapshot, so a run that died mid-matrix leaves
+  // stubs that block every subsequent run from reaching the restore. The generic
+  // "commit or stash" advice is actively wrong there.
+  const RESTORE = ["src/matches.js", "src/history.js"];
+
+  it("names the likely cause when every dirty path is a restoreFiles path", () => {
+    const msg = dirtyTreeMessage(" M src/matches.js\n M src/history.js\n", RESTORE);
+    expect(msg).toContain("a previous run almost certainly died");
+    expect(msg).toContain("do NOT commit them");
+    expect(msg).toContain("git restore src/matches.js src/history.js");
+  });
+
+  it("stays generic when the operator has their own edits too", () => {
+    // The paired control: mis-firing here would tell someone their real work is
+    // machine-written fixture data.
+    const msg = dirtyTreeMessage(" M src/matches.js\n M src/App.jsx\n", RESTORE);
+    expect(msg).not.toContain("a previous run almost certainly died");
+    expect(msg).toContain("commit or stash");
+  });
+
+  it("stays generic when the config manages nothing", () => {
+    expect(dirtyTreeMessage(" M src/App.jsx\n", [])).not.toContain("do NOT commit them");
+  });
+
+  it("reads the destination of a rename, not the source", () => {
+    const msg = dirtyTreeMessage("R  old.js -> src/matches.js\n", RESTORE);
+    expect(msg).toContain("a previous run almost certainly died");
+  });
+
+  it("surfaces through checkPreconditions", () => {
+    const { deps } = makeDeps({
+      runReplies: [
+        [/git rev-parse --abbrev-ref HEAD/, () => ({ stdout: "feature\n" })],
+        [/git status --porcelain/, () => ({ stdout: " M src/matches.js\n" })],
+      ],
+    });
+    const cfg = validateConfig({
+      matrix: [{ name: "n", mode: "hard", command: "true" }],
+      restoreFiles: ["src/matches.js"],
+    });
+    expect(() => checkPreconditions(deps, cfg)).toThrow(PreconditionError);
+    try {
+      checkPreconditions(deps, cfg);
+    } catch (err) {
+      expect(err.message).toContain("git restore src/matches.js");
+    }
   });
 });
