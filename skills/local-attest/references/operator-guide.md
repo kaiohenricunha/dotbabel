@@ -89,8 +89,12 @@ files back instead of leaving fixture stubs in the tree. That matters because
 `requireClean` is checked _before_ the snapshot is taken: a run killed between
 seeding and restoring would otherwise leave every later run aborting on a dirty
 tree it can no longer clean up. If that still happens (a `SIGKILL`, a power
-loss), the precondition error now recognises the case and prints the exact
-`git restore` command instead of generic "commit or stash" advice.
+loss), the precondition error appends the exact recovery command to the usual
+"commit or stash" advice — `git restore` for tracked paths, `git clean` for
+any the matrix created. It scopes both to the paths actually dirty, and only
+fires when _every_ dirty path is one `restoreFiles` manages: one unrelated
+edit alongside the stubs and the message stays generic, because the check
+cannot tell a leftover stub from your own work on the same file.
 
 ## Trust model
 

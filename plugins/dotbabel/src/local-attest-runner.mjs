@@ -312,6 +312,17 @@ export function verifyHeadUnchanged(deps, pre) {
 }
 
 /**
+ * POSIX single-quote a path so copy-pasted advice survives spaces and shell
+ * metacharacters. `validateConfig` constrains restoreFiles to relative, `..`-free
+ * paths and nothing else, so a space makes the printed command silently wrong and
+ * a `;` makes it actively dangerous when pasted.
+ *
+ * @param {string} f
+ * @returns {string}
+ */
+const shQuote = (f) => (/^[A-Za-z0-9._/-]+$/.test(f) ? f : `'${f.replaceAll("'", `'\\''`)}'`);
+
+/**
  * Explain a dirty tree, and name the one cause the operator cannot otherwise
  * diagnose.
  *
@@ -338,29 +349,59 @@ export function dirtyTreeMessage(dirty, restoreFiles) {
     dirty;
   if (restoreFiles.length === 0) return base;
 
-  // Porcelain v1 is "XY <path>", but capture() trims its output, so the FIRST
-  // line arrives with its leading status column already stripped (" M f" -> "M f").
-  // Strip the status token by pattern rather than by column index; a fixed
-  // slice(3) silently mis-parses that first line into "rc/matches.js" and the
-  // whole check quietly degrades to the generic message.
-  // A rename carries "old -> new"; the destination is what is dirty.
-  const paths = dirty
+  // Porcelain v1 is "XY <path>", but capture() trims, so the FIRST line arrives
+  // with its leading status column already stripped (" M f" -> "M f"). Strip the
+  // status by pattern, never by column index: a fixed slice(3) mis-parses that
+  // first line into "rc/matches.js" and the check silently degrades to generic.
+  //
+  // The rename split is GATED on an R/C status. Splitting on " -> " for every
+  // line lets a file whose NAME contains " -> " parse to its own suffix, and a
+  // suffix equal to a restoreFiles entry would fire this check on a tree it does
+  // not manage — the one direction a gate that prints a destructive command must
+  // never fail in. An unparseable line is kept verbatim so it cannot compare
+  // equal to a managed path.
+  const entries = dirty
     .split("\n")
     .filter(Boolean)
     .map((line) => {
-      const p = line.replace(/^\s*[A-Z?!ADMRCU ]{1,2}\s+/, "");
-      const arrow = p.indexOf(" -> ");
-      return (arrow === -1 ? p : p.slice(arrow + 4)).replace(/^"|"$/g, "");
+      const m = /^\s*([A-Z?!ADMRCU ]{1,2})\s+/.exec(line);
+      if (!m) return { status: "", path: line };
+      const rest = line.slice(m[0].length);
+      const renamed = m[1].includes("R") || m[1].includes("C");
+      const arrow = renamed ? rest.indexOf(" -> ") : -1;
+      return {
+        status: m[1],
+        path: (arrow === -1 ? rest : rest.slice(arrow + 4)).replace(/^"|"$/g, ""),
+      };
     });
+
   const managed = new Set(restoreFiles);
-  if (paths.length === 0 || !paths.every((p) => managed.has(p))) return base;
+  if (entries.length === 0 || !entries.every((e) => managed.has(e.path))) return base;
+
+  // Only the paths actually dirty, never the whole managed list — a destructive
+  // command must not reach past the evidence for it.
+  const tracked = entries.filter((e) => !e.status.includes("?")).map((e) => e.path);
+  const untracked = entries.filter((e) => e.status.includes("?")).map((e) => e.path);
+
+  // restoreRestoreFiles never recreates an absent file, so a leg that CREATES a
+  // managed path leaves it untracked — and `git restore` cannot remove that.
+  const lines = [];
+  if (tracked.length > 0) {
+    lines.push(`    git restore -- ${tracked.map(shQuote).join(" ")}`);
+  }
+  if (untracked.length > 0) {
+    lines.push(`    git clean -f -- ${untracked.map(shQuote).join(" ")}`);
+  }
 
   return (
     base +
-    "\n\nEvery dirty path above is one this config's `restoreFiles` manages, which\n" +
-    "means a previous run almost certainly died before it could restore them.\n" +
-    "They are e2e fixture stubs, not your work — do NOT commit them:\n\n" +
-    `    git restore ${restoreFiles.join(" ")}\n`
+    "\n\nEvery dirty path above is one this config's `restoreFiles` manages, so a\n" +
+    "previous run may have died before it could restore them. If you did not edit\n" +
+    "these yourself they are machine-written fixture stubs — do not commit them.\n\n" +
+    "Check before you discard; neither command is undoable:\n\n" +
+    `    git diff -- ${tracked.concat(untracked).map(shQuote).join(" ")}\n` +
+    lines.join("\n") +
+    "\n"
   );
 }
 
@@ -707,6 +748,15 @@ export function restoreRestoreFiles(deps, snap) {
  *
  * Restore is idempotent (it compares before writing), so running in the handler
  * and again in the `finally` is harmless.
+ *
+ * Limitation worth knowing: the handler restores and exits, but it does not stop
+ * the matrix's children — `runLeg` spawns them without `detached` and keeps no
+ * handle. A terminal Ctrl-C reaches the whole foreground process group, so the
+ * legs are dying too and the restore sticks. A SIGTERM delivered to the runner
+ * alone (`kill <pid>`, a supervisor, an IDE stop button) does not: an orphaned
+ * seeding leg can re-write the files just restored, and the "Restored N seeded
+ * file(s)" line then overstates what happened. Killing the tracked children
+ * first, or moving to a cancellation model, is the fuller fix.
  *
  * Injectable hooks: `process` is the default, but tests drive it directly rather
  * than raising real signals at the test runner.
