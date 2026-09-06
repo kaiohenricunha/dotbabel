@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.2.2](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.1...v3.2.2) (2026-09-06)
+
+
+### Fixed
+
+* **tests:** raise vitest timeouts for subprocess-spawning tests ([#332](https://github.com/kaiohenricunha/dotbabel/issues/332)) ([f11b4b0](https://github.com/kaiohenricunha/dotbabel/commit/f11b4b09865398c8b6e3d1b6f78456a26d9cfeb1))
+
 ## [3.2.1](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.0...v3.2.1) (2026-09-06)
 
 
