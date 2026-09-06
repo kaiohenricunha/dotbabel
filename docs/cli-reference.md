@@ -1,6 +1,6 @@
 # CLI reference
 
-_Last updated: v3.2.1_
+_Last updated: v3.2.2_
 
 Every bin honors the **dotbabel-wide flag set** in addition to its own:
 

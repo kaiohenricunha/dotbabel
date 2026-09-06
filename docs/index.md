@@ -1,6 +1,6 @@
 # `@dotbabel/dotbabel` — docs
 
-_Last updated: v3.2.1_
+_Last updated: v3.2.2_
 
 dotbabel is an opinionated Claude Code toolkit shipped as a portable
 npm package + Claude Code plugin. It curates a library of skills,
