@@ -7,7 +7,9 @@ import {
   appendAuditLog,
   applyLabel,
   checkPreconditions,
+  dirtyTreeMessage,
   execute,
+  installInterruptRestore,
   restoreRestoreFiles,
   runMatrix,
   upsertComment,
@@ -1107,5 +1109,256 @@ describe("review hardening", () => {
     expect(r.exitCode).toBe(0);
     expect(calls.writeFile).toHaveLength(1);
     expect(JSON.parse(calls.appendLog[0].line).result).toBe("attested");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// interrupt safety: the restore contract has to survive a Ctrl-C
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("installInterruptRestore", () => {
+  // The hole this closes: safeRestore lives in a `finally`, and a signal kills
+  // the process before any `finally` runs. The matrix takes minutes, most of it
+  // inside the seeding e2e legs, so that window is most of the run.
+  const fakeHooks = () => {
+    const registered = new Map();
+    const exits = [];
+    return {
+      registered,
+      exits,
+      hooks: {
+        on: (sig, fn) => registered.set(sig, fn),
+        off: (sig, fn) => {
+          if (registered.get(sig) === fn) registered.delete(sig);
+        },
+        exit: (code) => exits.push(code),
+      },
+    };
+  };
+
+  const restoringDeps = () => {
+    const writes = [];
+    return {
+      writes,
+      deps: {
+        readFile: () => "SEEDED",
+        writeFile: (path, content) => writes.push({ path, content }),
+        warn: () => {},
+        log: () => {},
+      },
+    };
+  };
+
+  it("restores the snapshot when SIGINT arrives mid-matrix", () => {
+    const { registered, exits, hooks } = fakeHooks();
+    const { writes, deps } = restoringDeps();
+    const snapshot = new Map([["src/seeded.js", "ORIGINAL"]]);
+
+    installInterruptRestore(deps, snapshot, hooks);
+    registered.get("SIGINT")();
+
+    expect(writes).toEqual([{ path: "src/seeded.js", content: "ORIGINAL" }]);
+    // 128 + 2, the convention a shell reports for a SIGINT death.
+    expect(exits).toEqual([130]);
+  });
+
+  it("restores on SIGTERM too, exiting 143", () => {
+    const { registered, exits, hooks } = fakeHooks();
+    const { writes, deps } = restoringDeps();
+
+    installInterruptRestore(deps, new Map([["a.js", "ORIGINAL"]]), hooks);
+    registered.get("SIGTERM")();
+
+    expect(writes).toEqual([{ path: "a.js", content: "ORIGINAL" }]);
+    expect(exits).toEqual([143]);
+  });
+
+  it("dispose() removes both handlers so a normal run leaves no listeners", () => {
+    const { registered, hooks } = fakeHooks();
+    const { deps } = restoringDeps();
+
+    const dispose = installInterruptRestore(deps, new Map(), hooks);
+    expect([...registered.keys()].sort()).toEqual(["SIGINT", "SIGTERM"]);
+    dispose();
+    expect(registered.size).toBe(0);
+  });
+
+  it("a restore that throws in the handler still exits rather than hanging", () => {
+    const { registered, exits, hooks } = fakeHooks();
+    const deps = {
+      readFile: () => "SEEDED",
+      writeFile: () => {
+        throw new Error("read-only file system");
+      },
+      warn: () => {},
+      log: () => {},
+    };
+
+    installInterruptRestore(deps, new Map([["a.js", "ORIGINAL"]]), hooks);
+    expect(() => registered.get("SIGINT")()).not.toThrow();
+    expect(exits).toEqual([130]);
+  });
+
+  it("execute() actually installs the guard during the matrix, and disposes it after", async () => {
+    // Falsified before shipping: the first version of this test stubbed no
+    // `gh pr view --json headRefOid` reply, so checkPreconditions threw, a bare
+    // `catch {}` swallowed it, and the only assertion was listenerCount === 0 —
+    // which passes when no listener was ever added. Deleting both
+    // installInterruptRestore call sites left it green. It now samples the
+    // listener count from INSIDE a leg, so the guard must be live while the
+    // matrix runs, and asserts the registration it collects.
+    const cfg = validateConfig({
+      matrix: [{ name: "noop", mode: "hard", command: "true" }],
+      restoreFiles: ["src/seeded.js"],
+    });
+    const sha = "a".repeat(40);
+    let liveDuringMatrix = null;
+    const { deps } = makeDeps({
+      runReplies: [
+        [/git rev-parse --abbrev-ref HEAD/, () => ({ stdout: "feature\n" })],
+        [/git status --porcelain/, () => ({ stdout: "" })],
+        [/gh auth status/, () => ({ status: 0 })],
+        [/gh repo view/, () => ({ stdout: "o/r\n" })],
+        [/gh pr view .*headRefOid/, () => ({ stdout: sha + "\n" })],
+        [/git rev-parse HEAD/, () => ({ stdout: sha + "\n" })],
+        [
+          /^true$/,
+          () => {
+            liveDuringMatrix = process.listenerCount("SIGINT");
+            return { status: 0 };
+          },
+        ],
+      ],
+    });
+
+    const baseline = process.listenerCount("SIGINT");
+    const seen = [];
+    const original = process.on.bind(process);
+    process.on = (sig, fn) => {
+      if (sig === "SIGINT" || sig === "SIGTERM") seen.push(sig);
+      return original(sig, fn);
+    };
+    try {
+      // No catch: a throw means the guard was never reached, which is exactly
+      // the regression this test exists to catch.
+      await execute(deps, cfg, { prOverride: "1", push: false, dryRun: true });
+    } finally {
+      process.on = original;
+    }
+
+    expect(seen.sort()).toEqual(["SIGINT", "SIGTERM"]);
+    expect(liveDuringMatrix, "guard was not live while the matrix ran").toBe(baseline + 1);
+    expect(process.listenerCount("SIGINT")).toBe(baseline);
+    expect(process.listenerCount("SIGTERM")).toBe(baseline);
+  });
+
+  it("the diagnostic path installs and disposes the guard too", async () => {
+    // --only/--from is where an operator is MOST likely to Ctrl-C: it is the
+    // fix-retry loop, and it hits the seeding legs hardest. This branch had no
+    // test at all; deleting its call site left the suite green.
+    const cfg = validateConfig({
+      matrix: [{ name: "noop", mode: "hard", command: "true" }],
+      restoreFiles: ["src/seeded.js"],
+    });
+    let liveDuringMatrix = null;
+    const { deps } = makeDeps({
+      runReplies: [
+        [
+          /^true$/,
+          () => {
+            liveDuringMatrix = process.listenerCount("SIGINT");
+            return { status: 0 };
+          },
+        ],
+      ],
+    });
+    const baseline = process.listenerCount("SIGINT");
+    await execute(deps, cfg, { only: ["noop"], push: false, dryRun: true });
+    expect(liveDuringMatrix, "diagnostic path never installed the guard").toBe(baseline + 1);
+    expect(process.listenerCount("SIGINT")).toBe(baseline);
+  });
+});
+
+describe("dirtyTreeMessage", () => {
+  // requireClean runs BEFORE the snapshot, so a run that died mid-matrix leaves
+  // stubs that block every subsequent run from reaching the restore. The generic
+  // "commit or stash" advice is actively wrong there.
+  const RESTORE = ["src/matches.js", "src/history.js"];
+
+  it("names the likely cause when every dirty path is a restoreFiles path", () => {
+    const msg = dirtyTreeMessage(" M src/matches.js\n M src/history.js\n", RESTORE);
+    expect(msg).toContain("may have died");
+    expect(msg).toContain("do not commit them");
+    expect(msg).toContain("git restore -- src/matches.js src/history.js");
+  });
+
+  it("stays generic when the operator has their own edits too", () => {
+    // The paired control: mis-firing here would tell someone their real work is
+    // machine-written fixture data.
+    const msg = dirtyTreeMessage(" M src/matches.js\n M src/App.jsx\n", RESTORE);
+    expect(msg).not.toContain("may have died");
+    expect(msg).toContain("commit or stash");
+  });
+
+  it("stays generic when the config manages nothing", () => {
+    expect(dirtyTreeMessage(" M src/App.jsx\n", [])).not.toContain("do not commit them");
+  });
+
+  it("reads the destination of a rename, not the source", () => {
+    const msg = dirtyTreeMessage("R  old.js -> src/matches.js\n", RESTORE);
+    expect(msg).toContain("may have died");
+  });
+
+  it("a filename containing ' -> ' cannot forge a managed path", () => {
+    // The rename split is gated on an R/C status. Ungated, `?? "a -> src/matches.js"`
+    // parses to its own suffix and fires this gate on a tree it does not manage —
+    // then prints a destructive command. Fail safe to generic instead.
+    const msg = dirtyTreeMessage('?? "a -> src/matches.js"\n', RESTORE);
+    expect(msg).not.toContain("may have died");
+  });
+
+  it("scopes the command to the dirty paths, not the whole managed list", () => {
+    const msg = dirtyTreeMessage(" M src/matches.js\n", RESTORE);
+    expect(msg).toContain("git restore -- src/matches.js");
+    expect(msg).not.toContain("src/history.js");
+  });
+
+  it("uses git clean for an untracked managed path, which git restore cannot remove", () => {
+    // restoreRestoreFiles never recreates an absent file, so a leg that CREATES
+    // a managed path leaves it untracked — and the old advice handed the
+    // operator a command that errors with "pathspec did not match".
+    const msg = dirtyTreeMessage("?? src/history.js\n", RESTORE);
+    expect(msg).toContain("git clean -f -- src/history.js");
+    expect(msg).not.toContain("git restore --");
+  });
+
+  it("shell-quotes paths so pasted advice survives spaces and metacharacters", () => {
+    const msg = dirtyTreeMessage(' M "my data.js"\n', ["my data.js"]);
+    expect(msg).toContain("'my data.js'");
+  });
+
+  it("tells the operator to look before discarding", () => {
+    const msg = dirtyTreeMessage(" M src/matches.js\n", RESTORE);
+    expect(msg).toContain("git diff --");
+    expect(msg).toContain("undoable");
+  });
+
+  it("surfaces through checkPreconditions", () => {
+    const { deps } = makeDeps({
+      runReplies: [
+        [/git rev-parse --abbrev-ref HEAD/, () => ({ stdout: "feature\n" })],
+        [/git status --porcelain/, () => ({ stdout: " M src/matches.js\n" })],
+      ],
+    });
+    const cfg = validateConfig({
+      matrix: [{ name: "n", mode: "hard", command: "true" }],
+      restoreFiles: ["src/matches.js"],
+    });
+    expect(() => checkPreconditions(deps, cfg)).toThrow(PreconditionError);
+    try {
+      checkPreconditions(deps, cfg);
+    } catch (err) {
+      expect(err.message).toContain("git restore -- src/matches.js");
+    }
   });
 });

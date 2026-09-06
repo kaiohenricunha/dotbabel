@@ -312,6 +312,100 @@ export function verifyHeadUnchanged(deps, pre) {
 }
 
 /**
+ * POSIX single-quote a path so copy-pasted advice survives spaces and shell
+ * metacharacters. `validateConfig` constrains restoreFiles to relative, `..`-free
+ * paths and nothing else, so a space makes the printed command silently wrong and
+ * a `;` makes it actively dangerous when pasted.
+ *
+ * @param {string} f
+ * @returns {string}
+ */
+const shQuote = (f) => (/^[A-Za-z0-9._/-]+$/.test(f) ? f : `'${f.replaceAll("'", `'\\''`)}'`);
+
+/**
+ * Explain a dirty tree, and name the one cause the operator cannot otherwise
+ * diagnose.
+ *
+ * requireClean runs BEFORE the restoreFiles snapshot, which creates a trap: if a
+ * previous run died between seeding and restoring — Ctrl-C, a crash, a killed
+ * terminal — the seeded files are still in the tree, and every subsequent run
+ * aborts here without ever reaching the code that would put them back. The
+ * generic "commit or stash your changes" is actively misleading then: these are
+ * machine-written fixture stubs, and committing them is the failure mode the
+ * whole restore mechanism exists to prevent.
+ *
+ * Interrupts are handled now (see installInterruptRestore), so this should only
+ * be reachable after a SIGKILL or a power loss. It stays because "should only"
+ * is not "cannot".
+ *
+ * @param {string} dirty  `git status --porcelain` output
+ * @param {string[]} restoreFiles
+ * @returns {string}
+ */
+export function dirtyTreeMessage(dirty, restoreFiles) {
+  const base =
+    "worktree is not clean — commit or stash your changes before attesting.\n" +
+    "The attestation must certify the exact tree that gets pushed.\n\n" +
+    dirty;
+  if (restoreFiles.length === 0) return base;
+
+  // Porcelain v1 is "XY <path>", but capture() trims, so the FIRST line arrives
+  // with its leading status column already stripped (" M f" -> "M f"). Strip the
+  // status by pattern, never by column index: a fixed slice(3) mis-parses that
+  // first line into "rc/matches.js" and the check silently degrades to generic.
+  //
+  // The rename split is GATED on an R/C status. Splitting on " -> " for every
+  // line lets a file whose NAME contains " -> " parse to its own suffix, and a
+  // suffix equal to a restoreFiles entry would fire this check on a tree it does
+  // not manage — the one direction a gate that prints a destructive command must
+  // never fail in. An unparseable line is kept verbatim so it cannot compare
+  // equal to a managed path.
+  const entries = dirty
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const m = /^\s*([A-Z?!ADMRCU ]{1,2})\s+/.exec(line);
+      if (!m) return { status: "", path: line };
+      const rest = line.slice(m[0].length);
+      const renamed = m[1].includes("R") || m[1].includes("C");
+      const arrow = renamed ? rest.indexOf(" -> ") : -1;
+      return {
+        status: m[1],
+        path: (arrow === -1 ? rest : rest.slice(arrow + 4)).replace(/^"|"$/g, ""),
+      };
+    });
+
+  const managed = new Set(restoreFiles);
+  if (entries.length === 0 || !entries.every((e) => managed.has(e.path))) return base;
+
+  // Only the paths actually dirty, never the whole managed list — a destructive
+  // command must not reach past the evidence for it.
+  const tracked = entries.filter((e) => !e.status.includes("?")).map((e) => e.path);
+  const untracked = entries.filter((e) => e.status.includes("?")).map((e) => e.path);
+
+  // restoreRestoreFiles never recreates an absent file, so a leg that CREATES a
+  // managed path leaves it untracked — and `git restore` cannot remove that.
+  const lines = [];
+  if (tracked.length > 0) {
+    lines.push(`    git restore -- ${tracked.map(shQuote).join(" ")}`);
+  }
+  if (untracked.length > 0) {
+    lines.push(`    git clean -f -- ${untracked.map(shQuote).join(" ")}`);
+  }
+
+  return (
+    base +
+    "\n\nEvery dirty path above is one this config's `restoreFiles` manages, so a\n" +
+    "previous run may have died before it could restore them. If you did not edit\n" +
+    "these yourself they are machine-written fixture stubs — do not commit them.\n\n" +
+    "Check before you discard; neither command is undoable:\n\n" +
+    `    git diff -- ${tracked.concat(untracked).map(shQuote).join(" ")}\n` +
+    lines.join("\n") +
+    "\n"
+  );
+}
+
+/**
  * @param {Deps} deps
  * @param {Config} cfg
  * @param {{ prOverride?: string|null }} [opts]
@@ -331,11 +425,7 @@ export function checkPreconditions(deps, cfg, opts = {}) {
   if (cfg.requireClean) {
     const dirty = capture(deps, "git status --porcelain");
     if (dirty !== "") {
-      throw new PreconditionError(
-        "worktree is not clean — commit or stash your changes before attesting.\n" +
-          "The attestation must certify the exact tree that gets pushed.\n\n" +
-          dirty,
-      );
+      throw new PreconditionError(dirtyTreeMessage(dirty, cfg.restoreFiles ?? []));
     }
   }
 
@@ -647,6 +737,60 @@ export function restoreRestoreFiles(deps, snap) {
 }
 
 /**
+ * Restore the seeded files if the process is interrupted.
+ *
+ * Without this, the snapshot/restore contract has a hole exactly the width of a
+ * Ctrl-C: `safeRestore` lives in a `finally`, and a SIGINT terminates the
+ * process before any `finally` runs. The matrix takes minutes, most of it in the
+ * seeding e2e legs, so the interrupt window is most of the run. What the
+ * operator is left with is a tree full of fixture stubs and no log line saying
+ * so — and, before dirtyTreeMessage, no way to tell that from their own edits.
+ *
+ * Restore is idempotent (it compares before writing), so running in the handler
+ * and again in the `finally` is harmless.
+ *
+ * Limitation worth knowing: the handler restores and exits, but it does not stop
+ * the matrix's children — `runLeg` spawns them without `detached` and keeps no
+ * handle. A terminal Ctrl-C reaches the whole foreground process group, so the
+ * legs are dying too and the restore sticks. A SIGTERM delivered to the runner
+ * alone (`kill <pid>`, a supervisor, an IDE stop button) does not: an orphaned
+ * seeding leg can re-write the files just restored, and the "Restored N seeded
+ * file(s)" line then overstates what happened. Killing the tracked children
+ * first, or moving to a cancellation model, is the fuller fix.
+ *
+ * Injectable hooks: `process` is the default, but tests drive it directly rather
+ * than raising real signals at the test runner.
+ *
+ * @param {Deps} deps
+ * @param {Map<string, Buffer|string|null>} snapshot
+ * @param {{on?: Function, off?: Function, exit?: Function}} [hooks]
+ * @returns {() => void} dispose — removes the handlers
+ */
+export function installInterruptRestore(deps, snapshot, hooks = {}) {
+  const on = hooks.on ?? process.on.bind(process);
+  const off = hooks.off ?? process.off.bind(process);
+  const exit = hooks.exit ?? process.exit.bind(process);
+
+  // 128 + signal number, the convention a shell reports for a signal death.
+  const EXIT_CODE = { SIGINT: 130, SIGTERM: 143 };
+  const handlers = [];
+
+  for (const sig of ["SIGINT", "SIGTERM"]) {
+    const handler = () => {
+      deps.warn(`\nInterrupted (${sig}) — restoring seeded files before exit.`);
+      safeRestore(deps, snapshot);
+      exit(EXIT_CODE[sig]);
+    };
+    handlers.push([sig, handler]);
+    on(sig, handler);
+  }
+
+  return () => {
+    for (const [sig, handler] of handlers) off(sig, handler);
+  };
+}
+
+/**
  * Guarded restore wrapper. A restore failure (read-only file, removed parent
  * dir) must never replace the matrix's own exception or skip the audit line —
  * it warns instead, and the unrestored file then surfaces as a dirty tree in
@@ -736,10 +880,12 @@ export async function execute(deps, cfg, flags) {
 
     // The fix-retry loop hits the seeding legs hardest — restore here too.
     const diagSnapshot = snapshotRestoreFiles(deps, cfg.restoreFiles ?? []);
+    const disposeDiagGuard = installInterruptRestore(deps, diagSnapshot);
     let results;
     try {
       results = await runMatrix(deps, matrix, { failFast });
     } finally {
+      disposeDiagGuard();
       safeRestore(deps, diagSnapshot);
     }
     printSummary(deps, results);
@@ -827,10 +973,12 @@ export async function execute(deps, cfg, flags) {
   }
 
   const snapshot = snapshotRestoreFiles(deps, cfg.restoreFiles ?? []);
+  const disposeGuard = installInterruptRestore(deps, snapshot);
   let results;
   try {
     results = await runMatrix(deps, matrix, { failFast });
   } finally {
+    disposeGuard();
     safeRestore(deps, snapshot);
   }
   const { hardFails, advisoryFails } = summarizeResults(results);
