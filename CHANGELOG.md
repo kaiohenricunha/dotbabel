@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.2.1](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.0...v3.2.1) (2026-09-06)
+
+
+### Fixed
+
+* **local-attest:** restore seeded files on interrupt, and diagnose a poisoned tree ([#330](https://github.com/kaiohenricunha/dotbabel/issues/330)) ([7767b2e](https://github.com/kaiohenricunha/dotbabel/commit/7767b2e81dcd0f44150ada9f0e70910489b80090))
+
 ## [3.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.1.0...v3.2.0) (2026-09-05)
 
 
