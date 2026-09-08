@@ -3,6 +3,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
+import { GIT_MAX_BUFFER } from "../lib/limits.mjs";
 import { QUALITY_BASELINE_SCHEMA_VERSION } from "./types.mjs";
 
 const NEVER_BASELINE = new Set(["correctness.compile", "correctness.types", "correctness.tests", "correctness.format", "correctness.lint", "security.high_confidence"]);
@@ -48,8 +49,13 @@ export function loadQualityBaselineAtRevision({ repoRoot, baselineFile = ".dotba
   const normalized = path.posix.normalize(baselineFile.replaceAll("\\", "/"));
   if (path.isAbsolute(baselineFile) || normalized === ".." || normalized.startsWith("../")) throw new ValidationError({ code: ERROR_CODES.QUALITY_BASELINE_INVALID, category: "quality", message: "baseline path escapes the repository" });
   let text;
-  try { text = execFileSync("git", ["-C", repoRoot, "show", `${revision}:${normalized}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 8 * 1024 * 1024 }); }
-  catch { return null; }
+  // A clean non-zero exit means the file is absent at that revision, which is a
+  // legitimate answer. A spawn-level failure sets a string code and is not.
+  try { text = execFileSync("git", ["-C", repoRoot, "show", `${revision}:${normalized}`], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: GIT_MAX_BUFFER }); }
+  catch (error) {
+    if (typeof error?.code !== "string" && Number.isInteger(error?.status)) return null;
+    throw new ValidationError({ code: ERROR_CODES.QUALITY_BASELINE_INVALID, category: "quality", message: `git show ${revision}:${normalized} failed: ${error?.code === "ENOBUFS" ? `output exceeded the ${GIT_MAX_BUFFER / 1024 / 1024} MiB read limit` : error?.message ?? "unknown failure"}` });
+  }
   return parseBaseline(text);
 }
 

@@ -64,6 +64,7 @@ import {
   tail,
   toolchainProblems,
 } from "./local-attest-lib.mjs";
+import { GIT_MAX_BUFFER } from "./lib/limits.mjs";
 
 /**
  * Build a `Deps` bundle wired to the real environment. Tests construct their
@@ -80,7 +81,7 @@ export function realDeps() {
         env: { ...process.env, ...env },
         encoding: "utf8",
         stdio: capture ? "pipe" : ["inherit", "pipe", "pipe"],
-        maxBuffer: 64 * 1024 * 1024,
+        maxBuffer: GIT_MAX_BUFFER,
       });
       return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
     },

@@ -87,6 +87,39 @@ describe("listRepositoryFiles", () => {
     expect(files).toContain("untracked.js");
   });
 
+  it("fails loudly instead of walking when the file list exceeds the read buffer", () => {
+    const repoRoot = tempDir();
+    fs.writeFileSync(path.join(repoRoot, "tracked.js"), "export const a = 1;\n");
+    execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
+    execFileSync("git", ["-C", repoRoot, "add", "."]);
+    execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
+
+    let caught;
+    try { listRepositoryFiles(repoRoot, { maxBuffer: 1 }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+  });
+
+  it("fails loudly when Git fails inside a repository", () => {
+    const repoRoot = tempDir();
+    fs.writeFileSync(path.join(repoRoot, "tracked.js"), "export const a = 1;\n");
+    execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
+    execFileSync("git", ["-C", repoRoot, "add", "."]);
+    execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
+    // A corrupt index fails ls-files while rev-parse --git-dir still succeeds,
+    // so the probe confirms this really is a repository and the walk must not run.
+    fs.writeFileSync(path.join(repoRoot, ".git", "index"), "not-a-valid-index");
+
+    let caught;
+    try { listRepositoryFiles(repoRoot); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+  });
+
   it("falls back to a filesystem walk outside a Git repository", () => {
     const repoRoot = tempDir();
     fs.mkdirSync(path.join(repoRoot, "src"), { recursive: true });

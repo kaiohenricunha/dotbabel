@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -16,6 +16,41 @@ function tempRepo(config = {}) {
   return dir;
 }
 afterEach(() => dirs.splice(0).forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })));
+
+describe("quality CLI scope failures", () => {
+  function brokenGitRepo() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-quality-cli-broken-"));
+    dirs.push(dir);
+    fs.writeFileSync(path.join(dir, ".dotbabel.json"), JSON.stringify({}));
+    fs.writeFileSync(path.join(dir, "index.js"), "const value = 1;\n");
+    execFileSync("git", ["init", "-q", "-b", "main", dir]);
+    execFileSync("git", ["-C", dir, "config", "user.email", "test@example.com"]);
+    execFileSync("git", ["-C", dir, "config", "user.name", "Test"]);
+    execFileSync("git", ["-C", dir, "add", "."]);
+    execFileSync("git", ["-C", dir, "commit", "-qm", "base"]);
+    fs.writeFileSync(path.join(dir, ".git", "index"), "not-a-valid-index");
+    return dir;
+  }
+
+  it("reports a scope failure as an environment failure, not a policy failure", () => {
+    const repo = brokenGitRepo();
+    const result = spawnSync(process.execPath, [bin, "check", "--repo", repo, "--json"], { encoding: "utf8" });
+    expect(result.status).toBe(2);
+    expect(result.status).not.toBe(1);
+    expect(JSON.parse(result.stdout).error.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+  });
+
+  it("reports a scope failure from the path pre-check as an environment failure", () => {
+    const repo = brokenGitRepo();
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "index.js"], { encoding: "utf8" });
+    expect(result.status).toBe(2);
+    // A formatted error, not an uncaught throw: no stack frame, and it names
+    // the command that failed rather than dumping a trace.
+    expect(result.stderr).not.toContain("at Object.<anonymous>");
+    expect(result.stderr).not.toContain("node:internal");
+    expect(result.stderr).toContain("ls-files failed");
+  });
+});
 
 describe("quality CLI path scoping", () => {
   it("rejects a path filter that matches no repository file", () => {

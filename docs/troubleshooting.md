@@ -180,6 +180,22 @@ existing `--base`. Resolution order is `--base` → `DOTBABEL_QUALITY_BASE` →
 `quality.base_ref` → `origin/HEAD` → `origin/main` → `main` → `master`. Use
 `--all` when you want a whole-repository run with no base at all.
 
+### `QUALITY_SCOPE_UNAVAILABLE`
+
+A Git command needed to work out which files and lines to check failed, or
+produced more output than the 64 MiB read limit.
+
+**Fix**: for an overflow, compare against a nearer `--base`, or use `--all`,
+which resolves scope from the repository file list instead of a diff. Note that
+`--path` filters _after_ the diff runs, so it does not make the diff smaller.
+For any other failure the message carries Git's own last line — run the same
+command in the repository to see it in full.
+
+This is not `QUALITY_BASE_UNAVAILABLE`: the base resolved fine, so deepening the
+checkout with `fetch-depth: 0` will not help and makes the diff larger. Before
+this check existed, these failures produced an empty change set and a passing
+verdict, so a run could report `pass` having measured nothing.
+
 ### `QUALITY_TRUST_REQUIRED`
 
 A plan needs a project-owned command and the repository is not in the trust
