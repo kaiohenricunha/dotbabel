@@ -158,6 +158,70 @@ command basenames without `.md` and skill directory ids.
 
 ---
 
+## Quality errors
+
+### `QUALITY_CONFIG_INVALID`
+
+An unknown key, an unknown rule id, an out-of-range threshold, or an unsafe
+command in the `quality` block of `.dotbabel.json` or
+`${XDG_CONFIG_HOME}/dotbabel/quality.json`.
+**Fix**: the error's `pointer` names the exact JSON path. `argv` must be an
+array, and its first element must be a `PATH` name or a `./`-relative path —
+never an absolute path and never a shell string. The user-scope file cannot set
+`base_ref`, `baseline_file`, `critical_paths`, `components`, or `exceptions`.
+Run `dotbabel quality explain` to see the merged result and its provenance.
+
+### `QUALITY_BASE_UNAVAILABLE`
+
+The base or head revision is not present in the local clone. A shallow CI
+checkout is the usual cause.
+**Fix**: set `fetch-depth: 0` in CI, run `git fetch origin main`, or pass an
+existing `--base`. Resolution order is `--base` → `DOTBABEL_QUALITY_BASE` →
+`quality.base_ref` → `origin/HEAD` → `origin/main` → `main` → `master`. Use
+`--all` when you want a whole-repository run with no base at all.
+
+### `QUALITY_TRUST_REQUIRED`
+
+A plan needs a project-owned command and the repository is not in the trust
+allowlist.
+**Fix**: grant trust for the exact repository path locally, or pass
+`--allow-project-commands` for one CI run — it never persists. `baseline --write`
+needs trust **and** a clean worktree.
+
+### `QUALITY_REPORT_INVALID`
+
+A report did not match its declared `format`, or a `dotbabel-v1` report is
+missing `schema_version: 1`, `metrics[]`, or `findings[]`.
+**Fix**: validate the file against
+[`../schemas/dotbabel.quality-report.schema.json`](../schemas/dotbabel.quality-report.schema.json).
+A _missing_ report is not this code — that makes the measurement `unavailable`.
+
+### `QUALITY_BASELINE_INVALID`
+
+The baseline failed to load, or `--write` ran against a dirty worktree.
+**Fix**: commit or stash first, then re-run. Validate a hand-edited baseline
+against [`../schemas/dotbabel.quality-baseline.schema.json`](../schemas/dotbabel.quality-baseline.schema.json).
+
+### `QUALITY_EXECUTION_FAILED`
+
+An absolute executable, an executable or `cwd` outside the repository, or an
+invalid `--pass-env` name.
+**Fix**: use a `PATH` name or a `./`-relative path inside the component root.
+`--pass-env` names must match `[A-Za-z_][A-Za-z0-9_]*`.
+
+### Measurement states are not error codes
+
+`not_configured`, `unsupported`, and `unavailable` are measurement states, not
+errors. Run `dotbabel quality detect` to see which applies where.
+`not_configured` most often means **two equal-authority candidates** were found —
+two `package.json` scripts, two `Makefile` targets, or both `[tool.mypy]` and
+`[tool.pyright]` — and dotbabel refuses to guess.
+**Fix**: pin one tool under `quality.components[].tools`. Note that a rule whose
+`on_unavailable` is `error` produces exit `2`, not exit `1`, and that exit `2` is
+never a pass.
+
+---
+
 ## Scaffold errors
 
 ### `SCAFFOLD_CONFLICT`

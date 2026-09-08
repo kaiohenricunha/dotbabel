@@ -14,6 +14,10 @@ Every bin honors the **dotbabel-wide flag set** in addition to its own:
 | `NO_COLOR=` env        | env   | Same as `--no-color`, honors the cross-tool convention                             |
 | `DOTBABEL_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
 
+`dotbabel-quality` is the one exception to the `--json` shape: it emits a
+`schema_version: 1` quality envelope rather than `{events, counts}`. See
+[`dotbabel-quality`](#dotbabel-quality).
+
 **Exit codes** follow a single convention across every bin:
 
 | Code | Name         | Meaning                                                                                       |
@@ -46,6 +50,9 @@ dotbabel index [OPTIONS]
 dotbabel search <query> [OPTIONS]
 dotbabel list [OPTIONS]
 dotbabel show <id> [OPTIONS]
+
+# Language-aware quality (added v3.2.0)
+dotbabel quality [check|detect|explain|baseline] [OPTIONS]
 ```
 
 Each subcommand also exists standalone — `npx dotbabel-doctor` and
@@ -517,6 +524,69 @@ Config discovery, in order: `.local-attest.config.mjs`,
 
 The attestation is SHA-pinned, so a push after attesting invalidates it. Commit
 first, attest second.
+
+---
+
+## `dotbabel-quality`
+
+_Added v3.2.0._ Measure one language-independent quality policy using the tools
+the repository already has. Discovers analyzers, never installs one. Full policy
+semantics — rule catalog, language adapters, baselines, trust — live in
+[quality.md](./quality.md).
+
+| Subcommand          | Purpose                                                                       |
+| ------------------- | ----------------------------------------------------------------------------- |
+| `check` _(default)_ | Execute the selected profile and emit a verdict                               |
+| `detect`            | Inspect components, tools, exclusions, and trust; executes no project command |
+| `explain`           | Print every resolved rule with shipped / user / project provenance            |
+| `baseline`          | Print a candidate legacy baseline; `--write` saves it                         |
+
+| Flag                         | Default                                |                                                                                        |
+| ---------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------- |
+| `--repo <path>`              | current directory                      | Repository root                                                                        |
+| `--profile <fast\|pr\|deep>` | `quality.default_profile`, else `fast` | Rule set to run                                                                        |
+| `--base <revision>`          | see resolution order below             | Comparison base; the diff runs from its merge-base                                     |
+| `--head <revision>`          | working tree                           | Compare a committed revision. Without it, untracked files join the change set          |
+| `--path <glob>`              | —                                      | Repeatable. Narrow the run to matching files. A glob-free value is a directory prefix  |
+| `--all`                      | false                                  | Check the whole repository instead of a diff. Cannot combine with `--base` or `--head` |
+| `--jobs <1-8>`               | `2`                                    | Components checked concurrently; plans inside one component stay serial                |
+| `--allow-project-commands`   | false                                  | Authorize project commands for this run only. Never persists                           |
+| `--pass-env <name>`          | —                                      | Repeatable. Add one variable to the otherwise fixed child environment                  |
+| `--rule <id>`                | —                                      | `explain` only. Show one rule; an unknown id exits `64`                                |
+| `--write`                    | false                                  | `baseline` only. Requires a clean worktree **and** trust                               |
+
+**Base resolution order**: `--base` → `DOTBABEL_QUALITY_BASE` → `quality.base_ref`
+→ `origin/HEAD` → `origin/main` → `main` → `master`. A revision missing from the
+local clone is `QUALITY_BASE_UNAVAILABLE`, exit `2` — in CI that usually means a
+shallow checkout, so set `fetch-depth: 0`.
+
+**Exit codes**: `0` no error verdict, `1` policy failure, `2` environment failure
+(missing tool, report, base, or trust), `64` invalid usage. Exit `2` is not a pass.
+
+Usage errors that exit `64`: a `--path` matching no repository file, an absolute
+or `..`-escaping `--path`, `--path` with `explain`, `--path` with `baseline --write`,
+and `--all` with `--base`/`--head`.
+
+**Emitted error codes**: `QUALITY_CONFIG_INVALID`, `QUALITY_BASE_UNAVAILABLE`,
+`QUALITY_REPORT_INVALID`, `QUALITY_BASELINE_INVALID`, `QUALITY_TRUST_REQUIRED`,
+`QUALITY_EXECUTION_FAILED` — each with remediation in
+[troubleshooting.md](./troubleshooting.md#quality-errors).
+
+**`--json` envelope** carries `schema_version`, `command`, `state`, `profile`,
+`policy_hash`, `scope`, `path_scope`, `all_files`, `components`, `exclusions`,
+`executions`, `results[]`, `exceptions[]`, `verdict`, and `environment_error`.
+`path_scope` and `all_files` are always present, so a consumer can tell a scoped
+run from a full one without an `undefined` check. `policy_hash` deliberately
+excludes `base_ref`, `head_ref`, and `jobs`, so it is stable across commits for
+the same policy.
+
+```bash
+npx dotbabel-quality detect
+npx dotbabel-quality explain --rule complexity.cognitive
+npx dotbabel-quality check --profile pr --base origin/main --allow-project-commands --json
+npx dotbabel-quality check --all --path src/api          # one package, entirely
+npx dotbabel-quality check --json | jq -r '.results[] | select(.verdict=="fail") | .rule'
+```
 
 ---
 
