@@ -31,8 +31,7 @@ PATTERNS=(
   "${BOUNDARY}${G}reset[[:space:]]+--hard(\b|[[:space:]]|$)"
   "${BOUNDARY}${G}push[[:space:]][^&;|]*(-f|--force|--force-with-lease)(\b|=|[[:space:]]|$)"
   "${BOUNDARY}${G}clean[[:space:]][^&;|]*(-[a-zA-Z]*f[a-zA-Z]*|--force)(\b|=|[[:space:]]|$)"
-  "${BOUNDARY}${G}checkout[[:space:]]+\.(\b|$)"
-  "${BOUNDARY}${G}restore[[:space:]]+\.(\b|$)"
+  "${BOUNDARY}${G}(checkout|restore)[[:space:]]+(--[[:space:]]+)?\.(/)?([[:space:]]|$)"
   "${BOUNDARY}${G}branch[[:space:]]+-D\b"
   "${BOUNDARY}${G}worktree[[:space:]]+remove[[:space:]]+--force\b"
 )

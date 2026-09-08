@@ -39,8 +39,27 @@ PATTERNS=(
   "${BOUNDARY}${G}reset[[:space:]]+--hard(\b|[[:space:]]|$)"
   "${BOUNDARY}${G}push[[:space:]][^&;|]*(-f|--force|--force-with-lease)(\b|=|[[:space:]]|$)"
   "${BOUNDARY}${G}clean[[:space:]][^&;|]*(-[a-zA-Z]*f[a-zA-Z]*|--force)(\b|=|[[:space:]]|$)"
-  "${BOUNDARY}${G}checkout[[:space:]]+\.(\b|$)"
-  "${BOUNDARY}${G}restore[[:space:]]+\.(\b|$)"
+  # One pattern for both verbs, and the dot must TERMINATE the pathspec.
+  #
+  # The previous form ended in `\.(\b|$)`. The `$` correctly caught a trailing
+  # bare dot, but the `\b` also matched a DOTFILE pathspec -- dot -> letter is
+  # a word boundary -- so restoring a single ignore or config file was blocked
+  # as if it were a wholesale discard. That false positive is the bug fixed
+  # here; it trains people to work around the guard, which is worse than not
+  # having one.
+  #
+  # A downstream copy that kept only the `\b` and dropped the `$` additionally
+  # failed OPEN on a trailing bare dot, since `\b` cannot match after a
+  # non-word character at end-of-string. Requiring the dot to terminate the
+  # pathspec removes both failure modes.
+  #
+  # `(--[[:space:]]+)?` also covers an explicit end-of-options separator before
+  # the pathspec, and `(/)?` the trailing-slash spelling.
+  #
+  # Test with /usr/bin/grep. A shell aliased to ugrep mis-compiles `(\b|$)` as
+  # an empty sub-expression and reports NO match, so a broken pattern reads as
+  # a passing one.
+  "${BOUNDARY}${G}(checkout|restore)[[:space:]]+(--[[:space:]]+)?\.(/)?([[:space:]]|$)"
   "${BOUNDARY}${G}branch[[:space:]]+-D\b"
   "${BOUNDARY}${G}worktree[[:space:]]+remove[[:space:]]+--force\b"
 )

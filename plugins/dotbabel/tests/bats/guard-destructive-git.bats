@@ -56,6 +56,26 @@ setup() {
   [ "$status" -eq 2 ]
 }
 
+@test "blocks git checkout ./" {
+  feed_hook_json "$HOOK" "git checkout ./"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks git restore with an explicit end-of-options separator" {
+  feed_hook_json "$HOOK" "git restore -- ."
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a wholesale discard as the last token of a chained command" {
+  # Not a regression for THIS repo -- the old pattern's `$` alternative already
+  # covered a trailing dot. It is pinned because a downstream copy that dropped
+  # the `$` (keeping only `\b`) silently failed open on exactly this shape, and
+  # `\b` cannot match after a dot at end-of-string. Cheap insurance that the
+  # alternation is never "simplified" back to a bare `\b`.
+  feed_hook_json "$HOOK" "cd /tmp && git restore ."
+  [ "$status" -eq 2 ]
+}
+
 @test "blocks git branch -D" {
   feed_hook_json "$HOOK" "git branch -D feature-branch"
   [ "$status" -eq 2 ]
@@ -72,6 +92,29 @@ setup() {
 }
 
 # ---------------- allow paths ----------------
+
+@test "allows restoring a single dotfile" {
+  # The other half of the same bug: dot -> letter IS a word boundary, so the
+  # old pattern blocked every single-file restore of a dotfile while letting
+  # the wholesale form through. Restoring one named file is not destructive.
+  feed_hook_json "$HOOK" "git restore .gitignore"
+  [ "$status" -eq 0 ]
+}
+
+@test "allows restoring a dotfile with a compound extension" {
+  feed_hook_json "$HOOK" "git restore .prettierrc.json"
+  [ "$status" -eq 0 ]
+}
+
+@test "allows checking out a single dotfile" {
+  feed_hook_json "$HOOK" "git checkout .env.example"
+  [ "$status" -eq 0 ]
+}
+
+@test "allows restoring a path under a dotted directory" {
+  feed_hook_json "$HOOK" "git restore .claude/settings.json"
+  [ "$status" -eq 0 ]
+}
 
 @test "allows git status" {
   feed_hook_json "$HOOK" "git status"
