@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
+import { listRepositoryFiles, matchesPathScope } from "./paths.mjs";
 
 function git(repoRoot, args, { allowFailure = false } = {}) {
   try {
@@ -77,7 +78,24 @@ function parseChangedLines(text) {
 }
 
 /** Resolve Git change scope, hunks, and rename information. */
-export function resolveQualityScope({ repoRoot, base, head, env = process.env, configuredBase } = {}) {
+export function resolveQualityScope({ repoRoot, base, head, env = process.env, configuredBase, paths = [], all = false } = {}) {
+  if (all) {
+    // Whole-repository mode reads no diff, so it needs no base revision and
+    // works on a shallow clone, a detached HEAD, and a repository with no
+    // default branch. Every line counts as changed so changed-scope rules
+    // evaluate across the repository.
+    const files = listRepositoryFiles(repoRoot).filter((file) => matchesPathScope(paths, file));
+    const changedLines = {};
+    const changedFiles = [];
+    for (const file of files) {
+      const absolute = path.join(repoRoot, file);
+      let count = 0;
+      try { count = fs.lstatSync(absolute).isFile() ? fs.readFileSync(absolute, "utf8").split("\n").length - 1 : 0; } catch { continue; }
+      changedFiles.push({ path: file, status: "changed" });
+      changedLines[file] = Array.from({ length: count }, (_, index) => index + 1);
+    }
+    return { baseRevision: null, headRevision: null, mergeBase: null, changedFiles, changedLines, renames: [], paths, all: true };
+  }
   const baseRevision = resolveBaseRevision({ repoRoot, base, env, configuredBase });
   const headRevision = head ?? "HEAD";
   if (head && !existsRevision(repoRoot, head)) throw new ValidationError({ code: ERROR_CODES.QUALITY_BASE_UNAVAILABLE, category: "quality", message: `head revision is unavailable: ${head}` });
@@ -94,6 +112,13 @@ export function resolveQualityScope({ repoRoot, base, head, env = process.env, c
       changedLines[file] = Array.from({ length: count }, (_, index) => index + 1);
     }
   }
-  const unique = [...new Map(names.files.map((file) => [file.path, file])).values()].sort((a, b) => a.path.localeCompare(b.path));
-  return { baseRevision, headRevision: head ?? null, mergeBase, changedFiles: unique, changedLines, renames: names.renames };
+  const unique = [...new Map(names.files.map((file) => [file.path, file])).values()]
+    .filter((file) => matchesPathScope(paths, file.path))
+    .sort((a, b) => a.path.localeCompare(b.path));
+  for (const file of Object.keys(changedLines)) if (!matchesPathScope(paths, file)) delete changedLines[file];
+  // Keep a rename when either side is in scope: evaluate.mjs resolves a
+  // baseline metric through renames, so dropping a rename whose source sits
+  // outside the filter would make a file moved into scope look brand new.
+  const renames = names.renames.filter((item) => matchesPathScope(paths, item.to) || matchesPathScope(paths, item.from));
+  return { baseRevision, headRevision: head ?? null, mergeBase, changedFiles: unique, changedLines, renames, paths, all: false };
 }

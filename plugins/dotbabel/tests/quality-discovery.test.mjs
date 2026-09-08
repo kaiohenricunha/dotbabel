@@ -81,6 +81,60 @@ describe("quality discovery", () => {
     expect(result.plans[0].ruleIds).toEqual(["correctness.lint"]);
   });
 
+  it("counts files outside the path filter as a visible exclusion", () => {
+    const repoRoot = tempRepo({
+      "src/live.js": "export const live = true;\n",
+      "web/other.js": "export const other = true;\n",
+    });
+    const result = detectQualityCapabilities({ repoRoot, policy: {}, paths: ["src"] });
+    expect(result.files).toContain("src/live.js");
+    expect(result.files).not.toContain("web/other.js");
+    expect(result.exclusions).toEqual(expect.arrayContaining([expect.objectContaining({ reason: "outside path filter", count: 1 })]));
+    expect(result.paths).toEqual(["src"]);
+  });
+
+  it("matches a directory name without a trailing glob", () => {
+    const repoRoot = tempRepo({ "src/quality/a.js": "export const a = 1;\n", "src/other/b.js": "export const b = 2;\n" });
+    const result = detectQualityCapabilities({ repoRoot, policy: {}, paths: ["src/quality"] });
+    expect(result.files).toEqual(["src/quality/a.js"]);
+  });
+
+  it("keeps a policy exclusion authoritative inside the path filter", () => {
+    const repoRoot = tempRepo({ "src/live.js": "export const live = true;\n", "src/legacy/x.js": "export const x = 1;\n" });
+    const result = detectQualityCapabilities({ repoRoot, policy: { exclude: ["src/legacy/**"] }, paths: ["src"] });
+    expect(result.files).toEqual(["src/live.js"]);
+    expect(result.exclusions).toEqual(expect.arrayContaining([expect.objectContaining({ reason: "policy pattern src/legacy/**" })]));
+  });
+
+  it("cannot re-include a file the policy excludes", () => {
+    const repoRoot = tempRepo({ "fixtures/skip.js": "export const skip = true;\n" });
+    const result = detectQualityCapabilities({ repoRoot, policy: { exclude: ["fixtures/**"] }, paths: ["fixtures"] });
+    expect(result.files).toEqual([]);
+  });
+
+  it("drops plans for components with no file inside the path filter", () => {
+    const repoRoot = tempRepo({
+      "api/go.mod": "module example.com/api\n",
+      "api/main.go": "package main\n",
+      "web/package.json": JSON.stringify({ scripts: { lint: "eslint ." } }),
+      "web/index.js": "export const web = 1;\n",
+    });
+    const planned = planQualityCheck({ repoRoot, policy: {}, changeSet: { changedFiles: [] }, profile: "fast", paths: ["api"] });
+    expect(planned.plans.length).toBeGreaterThan(0);
+    expect(planned.plans.every((plan) => plan.componentId.startsWith("api"))).toBe(true);
+  });
+
+  it("keeps every plan when no path filter is supplied", () => {
+    const repoRoot = tempRepo({
+      "api/go.mod": "module example.com/api\n",
+      "api/main.go": "package main\n",
+      "web/package.json": JSON.stringify({ scripts: { lint: "eslint ." } }),
+      "web/index.js": "export const web = 1;\n",
+    });
+    const planned = planQualityCheck({ repoRoot, policy: {}, changeSet: { changedFiles: [] }, profile: "fast" });
+    expect(planned.plans.some((plan) => plan.componentId.startsWith("web"))).toBe(true);
+  });
+
   it("excludes configured and generated files with visible reasons", () => {
     const repoRoot = tempRepo({
       "package.json": "{}\n",

@@ -53,4 +53,24 @@ describe("quality reporters", () => {
     expect(text).toContain("Candidate baseline:");
     expect(text).toContain('"schema_version": 1');
   });
+
+  it("labels a path-scoped check so it cannot read as a full run", () => {
+    const text = renderQualityHuman({
+      command: "check", verdict: "pass", path_scope: ["src/quality"], all_files: false,
+      scope: { changedFiles: [{ path: "src/quality/a.mjs" }] }, results: [],
+    });
+    expect(text).toContain("path-scoped: src/quality");
+    expect(text).toContain("were not checked");
+  });
+
+  it("does not label an unscoped check", () => {
+    const text = renderQualityHuman({ command: "check", verdict: "pass", path_scope: [], all_files: false, results: [] });
+    expect(text).not.toContain("path-scoped");
+    expect(text).not.toContain("were not checked");
+  });
+
+  it("labels a whole-repository check", () => {
+    const text = renderQualityHuman({ command: "check", verdict: "pass", path_scope: [], all_files: true, results: [] });
+    expect(text).toContain("whole repository");
+  });
 });

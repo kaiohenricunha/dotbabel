@@ -11,6 +11,7 @@ import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { createQualityBaseline, writeQualityBaseline } from "../src/quality/baseline.mjs";
 import { resolveQualityPolicy } from "../src/quality/config.mjs";
 import { detectQualityCapabilities, planQualityCheck } from "../src/quality/discovery.mjs";
+import { listRepositoryFiles, matchesPathScope, normalizePathScope } from "../src/quality/paths.mjs";
 import { runQualityCheck } from "../src/quality/index.mjs";
 import { QUALITY_PROFILES } from "../src/quality/types.mjs";
 import { qualityEnvelope, renderQualityHuman } from "../src/quality/reporters.mjs";
@@ -21,12 +22,13 @@ const FLAGS = {
   repo: { type: "string" }, profile: { type: "string" }, base: { type: "string" },
   head: { type: "string" }, jobs: { type: "string" }, "allow-project-commands": { type: "boolean" },
   "pass-env": { type: "string", multiple: true }, rule: { type: "string" }, write: { type: "boolean" },
+  path: { type: "string", multiple: true }, all: { type: "boolean" },
 };
 
 function usage() {
   return `dotbabel-quality [check|detect|explain|baseline] [OPTIONS]\n\n` +
     `Commands:\n  check     execute the selected quality profile\n  detect    inspect components and tools without execution\n  explain   show resolved rules and provenance\n  baseline  print a candidate baseline; use --write to save it\n\n` +
-    `Options:\n  --repo <path>\n  --profile <fast|pr|deep>\n  --base <revision>\n  --head <revision>\n  --jobs <count>\n  --allow-project-commands\n  --pass-env <name>\n  --rule <id>\n  --write\n  --json\n  --verbose\n  --no-color\n  --help\n  --version\n\n` +
+    `Options:\n  --repo <path>\n  --profile <fast|pr|deep>\n  --base <revision>\n  --head <revision>\n  --path <glob>\n  --all\n  --jobs <count>\n  --allow-project-commands\n  --pass-env <name>\n  --rule <id>\n  --write\n  --json\n  --verbose\n  --no-color\n  --help\n  --version\n\n` +
     `Exit codes: 0 no error verdict, 1 policy failure, 2 environment failure, 64 invalid usage.\n`;
 }
 
@@ -49,6 +51,36 @@ const jobs = argv.flags.jobs === undefined ? undefined : Number(argv.flags.jobs)
 if (jobs !== undefined && (!Number.isInteger(jobs) || jobs < 1 || jobs > 8)) { process.stderr.write("--jobs must be an integer from 1 through 8\n"); process.exit(EXIT_CODES.USAGE); }
 const passEnv = Array.isArray(argv.flags["pass-env"]) ? argv.flags["pass-env"] : argv.flags["pass-env"] ? [String(argv.flags["pass-env"])] : [];
 
+// Run scoping is validated here, before the try block below, so every failure
+// exits with the usage code. A ValidationError thrown inside the try would be
+// reported as an environment failure instead.
+const rawPaths = Array.isArray(argv.flags.path) ? argv.flags.path : argv.flags.path ? [String(argv.flags.path)] : [];
+let pathScope = [];
+try { pathScope = normalizePathScope(rawPaths); }
+catch (error) { process.stderr.write(`${error.message}\n`); process.exit(EXIT_CODES.USAGE); }
+const allFiles = Boolean(argv.flags.all);
+if (allFiles && (argv.flags.base !== undefined || argv.flags.head !== undefined)) {
+  process.stderr.write("--all cannot be combined with --base or --head\n");
+  process.exit(EXIT_CODES.USAGE);
+}
+if (pathScope.length > 0 && command === "explain") {
+  process.stderr.write("--path is not valid for explain\n");
+  process.exit(EXIT_CODES.USAGE);
+}
+if (pathScope.length > 0 && command === "baseline" && argv.flags.write) {
+  process.stderr.write("baseline --write cannot be combined with --path\n");
+  process.exit(EXIT_CODES.USAGE);
+}
+if (pathScope.length > 0) {
+  const repositoryFiles = listRepositoryFiles(repoRoot);
+  for (const pattern of pathScope) {
+    if (!repositoryFiles.some((file) => matchesPathScope([pattern], file))) {
+      process.stderr.write(`no repository file matches --path ${pattern}\n`);
+      process.exit(EXIT_CODES.USAGE);
+    }
+  }
+}
+
 function print(report) {
   writeAll(argv.json ? `${JSON.stringify(report, null, 2)}\n` : renderQualityHuman(report));
 }
@@ -70,9 +102,9 @@ try {
     process.exit(EXIT_CODES.OK);
   }
   if (command === "detect") {
-    const detection = detectQualityCapabilities({ repoRoot, policy });
-    const planned = planQualityCheck({ repoRoot, policy, changeSet: { changedFiles: [] }, profile, detection });
-    print(qualityEnvelope("detect", { state: policy.enabled ? "configured" : "disabled", profile, policy_hash: policy.policy_hash, components: detection.components, plans: planned.plans, trust: detection.trust, exclusions: detection.exclusions, rejected_candidates: detection.rejectedCandidates, results: [] }));
+    const detection = detectQualityCapabilities({ repoRoot, policy, paths: pathScope });
+    const planned = planQualityCheck({ repoRoot, policy, changeSet: { changedFiles: [] }, profile, detection, paths: pathScope });
+    print(qualityEnvelope("detect", { state: policy.enabled ? "configured" : "disabled", profile, policy_hash: policy.policy_hash, path_scope: pathScope, components: detection.components, plans: planned.plans, trust: detection.trust, exclusions: detection.exclusions, rejected_candidates: detection.rejectedCandidates, results: [] }));
     process.exit(EXIT_CODES.OK);
   }
   if (command === "baseline" && argv.flags.write) {
@@ -80,7 +112,7 @@ try {
     if (dirty) throw new ValidationError({ code: ERROR_CODES.QUALITY_BASELINE_INVALID, category: "quality", message: "baseline --write requires a clean worktree" });
     if (!argv.flags["allow-project-commands"] && !isRepoTrusted({ repoRoot }).trusted) throw new ValidationError({ code: ERROR_CODES.QUALITY_TRUST_REQUIRED, category: "quality", message: "baseline --write requires explicit project-command trust" });
   }
-  const report = await runQualityCheck({ repoRoot, policy, profile, base: argv.flags.base, head: argv.flags.head, jobs, allowProjectCommands: Boolean(argv.flags["allow-project-commands"]), passEnv });
+  const report = await runQualityCheck({ repoRoot, policy, profile, base: argv.flags.base, head: argv.flags.head, jobs, allowProjectCommands: Boolean(argv.flags["allow-project-commands"]), passEnv, paths: pathScope, all: allFiles });
   if (command === "baseline") {
     const revision = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
     const baseline = createQualityBaseline({

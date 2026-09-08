@@ -67,6 +67,46 @@ describe("quality check orchestration", () => {
     expect(result.results.find((item) => item.rule === "coverage.changed_lines")).toMatchObject({ state: "unavailable", verdict: "fail" });
   });
 
+  it("labels a path-scoped run in the result envelope", async () => {
+    const repoRoot = repository();
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "fast",
+      base: "main",
+      paths: ["index.js"],
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    expect(result.path_scope).toEqual(["index.js"]);
+    expect(result.all_files).toBe(false);
+  });
+
+  it("reports an empty path scope for a full run", async () => {
+    const repoRoot = repository();
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "fast",
+      base: "main",
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    expect(result.path_scope).toEqual([]);
+    expect(result.all_files).toBe(false);
+  });
+
+  it("reads the working-tree baseline in the whole-repository mode", async () => {
+    const repoRoot = repository();
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "pr",
+      all: true,
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    expect(result.all_files).toBe(true);
+    expect(result.scope.mergeBase).toBeNull();
+  });
+
   it("treats a crashing coverage command as an environment failure instead of not-configured", async () => {
     const repoRoot = repository({ crashingCoverage: true });
     const result = await runQualityCheck({

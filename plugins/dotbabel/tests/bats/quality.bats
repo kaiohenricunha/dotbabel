@@ -22,6 +22,18 @@ teardown() {
   [[ "$output" == *"baseline"* ]]
 }
 
+@test "quality help lists the path and whole-repository filters" {
+  run $QUALITY --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--path"* ]]
+  [[ "$output" == *"--all"* ]]
+}
+
+@test "an invalid path filter is a usage error" {
+  run $QUALITY detect --repo "$REPO" --path /etc
+  [ "$status" -eq 64 ]
+}
+
 @test "disabled quality policy is visible and successful" {
   run $QUALITY check --repo "$REPO" --json
   [ "$status" -eq 0 ]

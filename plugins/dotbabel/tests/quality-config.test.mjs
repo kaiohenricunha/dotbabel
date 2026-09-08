@@ -61,6 +61,16 @@ describe("quality configuration", () => {
     expect(resolveQualityPolicy({ repoRoot, env: {} }).enabled).toBe(false);
   });
 
+  it("keeps run scoping out of the resolved policy and its hash", () => {
+    const repoRoot = tempDir();
+    const policy = resolveQualityPolicy({ repoRoot, env: {} });
+    // --path and --all are run scoping, not policy: they must never reach the
+    // resolved policy or perturb the hash that baselines compare against.
+    expect(policy.paths).toBeUndefined();
+    expect(policy.all).toBeUndefined();
+    expect(resolveQualityPolicy({ repoRoot, env: {}, base: "main" }).policy_hash).toBe(policy.policy_hash);
+  });
+
   it("keeps policy_hash stable across different base/head revisions and job counts", () => {
     const repoRoot = tempDir();
     const a = resolveQualityPolicy({ repoRoot, env: {}, base: "main", head: "feature", jobs: 2 });

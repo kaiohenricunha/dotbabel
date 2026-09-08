@@ -10,7 +10,9 @@ export function renderQualityHuman(report) {
   if (report.state === "disabled") return "dotbabel quality: disabled by project policy\n";
   if (report.command === "detect") return renderDetection(report);
   if (report.command === "explain") return renderPolicy(report);
-  const lines = [`dotbabel quality ${report.command}: ${report.verdict ?? "ok"}`];
+  const lines = [`dotbabel quality ${report.command}: ${report.verdict ?? "ok"}${scopeLabel(report)}`];
+  const scopeNote = scopeNoteFor(report);
+  if (scopeNote) lines.push(scopeNote);
   let group = "";
   for (const item of report.results ?? []) {
     const next = `${item.component ?? "repository"} / ${item.class}`;
@@ -23,8 +25,20 @@ export function renderQualityHuman(report) {
   return `${lines.join("\n")}\n`;
 }
 
+function scopeLabel(report) {
+  if (report.all_files) return report.path_scope?.length ? ` (whole repository, path-scoped: ${report.path_scope.join(", ")})` : " (whole repository)";
+  return report.path_scope?.length ? ` (path-scoped: ${report.path_scope.join(", ")})` : "";
+}
+
+function scopeNoteFor(report) {
+  if (!report.path_scope?.length) return "";
+  const count = report.scope?.changedFiles?.length ?? 0;
+  return `scope: ${count} file(s) in scope; files outside the path filter were not checked`;
+}
+
 function renderDetection(report) {
   const lines = ["dotbabel quality detect", `Project command trust: ${report.trust?.trusted ? "trusted" : "not trusted"}`];
+  if (report.path_scope?.length) lines.push(`path filter: ${report.path_scope.join(", ")}`);
   for (const component of report.components ?? []) {
     lines.push("", `${component.id} [${component.state}]`, `  markers: ${(component.markers ?? []).join(", ") || "source files"}`);
     for (const plan of (report.plans ?? []).filter((item) => item.componentId === component.id)) {

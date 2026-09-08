@@ -81,17 +81,21 @@ export async function runQualityCheck(options = {}) {
   const policy = options.policy ?? resolveQualityPolicy({ repoRoot, env: options.env, profile: options.profile, base: options.base, head: options.head, jobs: options.jobs });
   const profile = options.profile ?? policy.default_profile;
   if (!policy.enabled) return qualityEnvelope("check", { state: "disabled", profile, verdict: "pass", results: [] });
-  const scope = resolveQualityScope({ repoRoot, base: options.base, head: options.head, env: options.env, configuredBase: policy.base_ref });
-  const detection = detectQualityCapabilities({ repoRoot, policy });
-  const planned = planQualityCheck({ repoRoot, policy, changeSet: scope, profile, detection });
+  const paths = options.paths ?? [];
+  const all = Boolean(options.all);
+  const scope = resolveQualityScope({ repoRoot, base: options.base, head: options.head, env: options.env, configuredBase: policy.base_ref, paths, all });
+  const detection = detectQualityCapabilities({ repoRoot, policy, paths });
+  const planned = planQualityCheck({ repoRoot, policy, changeSet: scope, profile, detection, paths });
   const executions = await runQualityPlans({ repoRoot, plans: planned.plans, allowProjectCommands: options.allowProjectCommands, passEnv: options.passEnv, env: options.env, jobs: options.jobs ?? policy.jobs ?? 2, timeoutSeconds: profile === "deep" ? 1800 : profile === "pr" ? 900 : 120 });
   const parsed = parseExecutionReports(repoRoot, executions, scope);
   const native = sourceFindings(repoRoot, scope, detection.files);
-  const baseline = ["pr", "deep"].includes(profile)
+  // Whole-repository mode reads no diff, so there is no merge base to read a
+  // committed baseline from; fall back to the working-tree baseline.
+  const baseline = ["pr", "deep"].includes(profile) && scope.mergeBase
     ? loadQualityBaselineAtRevision({ repoRoot, baselineFile: policy.baseline_file, revision: scope.mergeBase })
     : loadQualityBaseline({ repoRoot, baselineFile: policy.baseline_file });
   const evaluation = evaluateQuality({ policy, profile, executions, metrics: [...parsed.metrics, ...native.metrics], findings: [...parsed.findings, ...native.findings], baseline, renames: scope.renames });
-  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, components: detection.components, executions, ...evaluation });
+  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, components: detection.components, exclusions: detection.exclusions, executions, ...evaluation });
 }
 
 export { resolveQualityPolicy } from "./config.mjs";

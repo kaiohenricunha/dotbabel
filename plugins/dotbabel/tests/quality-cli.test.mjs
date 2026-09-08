@@ -17,6 +17,73 @@ function tempRepo(config = {}) {
 }
 afterEach(() => dirs.splice(0).forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })));
 
+describe("quality CLI path scoping", () => {
+  it("rejects a path filter that matches no repository file", () => {
+    const repo = tempRepo();
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "does/not/exist"], { encoding: "utf8" });
+    expect(result.status).toBe(64);
+    expect(result.stderr).toMatch(/--path/);
+  });
+
+  it("rejects an absolute path filter", () => {
+    const repo = tempRepo();
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "/etc"], { encoding: "utf8" });
+    expect(result.status).toBe(64);
+  });
+
+  it("rejects a parent-escaping path filter", () => {
+    const repo = tempRepo();
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "../outside"], { encoding: "utf8" });
+    expect(result.status).toBe(64);
+  });
+
+  it("rejects a path filter on explain", () => {
+    const repo = tempRepo();
+    const result = spawnSync(process.execPath, [bin, "explain", "--repo", repo, "--path", "index.js"], { encoding: "utf8" });
+    expect(result.status).toBe(64);
+  });
+
+  it("rejects a path filter with baseline --write as usage, not an environment failure", () => {
+    const repo = tempRepo();
+    const result = spawnSync(process.execPath, [bin, "baseline", "--repo", repo, "--path", "index.js", "--write"], { encoding: "utf8" });
+    expect(result.status).toBe(64);
+    expect(result.status).not.toBe(2);
+  });
+
+  it("rejects the whole-repository mode together with a base revision", () => {
+    const repo = tempRepo();
+    const result = spawnSync(process.execPath, [bin, "check", "--repo", repo, "--all", "--base", "main"], { encoding: "utf8" });
+    expect(result.status).toBe(64);
+  });
+
+  it("scopes detect to one path and reports the remainder as excluded", () => {
+    const repo = tempRepo();
+    fs.writeFileSync(path.join(repo, "other.js"), "const other = 2;\n");
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "index.js", "--json"], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    const body = JSON.parse(result.stdout);
+    expect(body.path_scope).toEqual(["index.js"]);
+    expect(body.exclusions).toEqual(expect.arrayContaining([expect.objectContaining({ reason: "outside path filter" })]));
+  });
+
+  it("accepts a repeated path filter", () => {
+    const repo = tempRepo();
+    fs.writeFileSync(path.join(repo, "other.js"), "const other = 2;\n");
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "index.js", "--path", "other.js", "--json"], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).path_scope).toEqual(["index.js", "other.js"]);
+  });
+
+  it("normalizes a Windows-separated path filter", () => {
+    const repo = tempRepo();
+    fs.mkdirSync(path.join(repo, "src"), { recursive: true });
+    fs.writeFileSync(path.join(repo, "src", "a.js"), "const a = 1;\n");
+    const result = spawnSync(process.execPath, [bin, "detect", "--repo", repo, "--path", "src\\", "--json"], { encoding: "utf8" });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).path_scope).toEqual(["src"]);
+  });
+});
+
 describe("quality CLI", () => {
   it("explains one rule through a versioned JSON envelope", () => {
     const repo = tempRepo();

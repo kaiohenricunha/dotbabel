@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -6,32 +5,20 @@ import { isRepoTrusted } from "../trust-allowlist.mjs";
 import { matchesGlob } from "../spec-harness-lib.mjs";
 import { QUALITY_ADAPTERS, getQualityAdapter } from "./adapters/registry.mjs";
 import { capabilityInProfile, capabilityRules } from "./adapters/shared.mjs";
+import { listRepositoryFiles, matchesPathScope } from "./paths.mjs";
 
-function inventory(repoRoot) {
-  try {
-    const tracked = execFileSync("git", ["-C", repoRoot, "ls-files", "-co", "--exclude-standard"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    return [...new Set(tracked.split("\n").filter(Boolean))].sort();
-  } catch {
-    const files = [];
-    function walk(dir) {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if ([".git", "node_modules", ".venv", "vendor"].includes(entry.name)) continue;
-        const absolute = path.join(dir, entry.name);
-        if (entry.isDirectory()) walk(absolute);
-        else if (entry.isFile()) files.push(path.relative(repoRoot, absolute).replaceAll(path.sep, "/"));
-      }
-    }
-    walk(repoRoot);
-    return files.sort();
-  }
-}
-
-function applyExclusions(repoRoot, files, patterns) {
+function applyExclusions(repoRoot, files, patterns, paths = []) {
   const counts = new Map();
   const included = [];
   for (const file of files) {
-    const pattern = patterns.find((candidate) => matchesGlob(candidate, file));
-    let reason = pattern ? `policy pattern ${pattern}` : undefined;
+    // The path filter runs first so an out-of-scope file is attributed to the
+    // filter rather than to a policy pattern, and so it skips the per-file
+    // generated-marker read below.
+    let reason = paths.length > 0 && !matchesPathScope(paths, file) ? "outside path filter" : undefined;
+    if (!reason) {
+      const pattern = patterns.find((candidate) => matchesGlob(candidate, file));
+      reason = pattern ? `policy pattern ${pattern}` : undefined;
+    }
     if (!reason) {
       try {
         const firstLines = fs.readFileSync(path.join(repoRoot, file), "utf8").split("\n").slice(0, 3).join("\n");
@@ -65,8 +52,8 @@ function hasTsCheck(repoRoot, file) {
 }
 
 /** Detect language components and non-executing capability plans. */
-export function detectQualityCapabilities({ repoRoot, policy = {} } = {}) {
-  const filtered = applyExclusions(repoRoot, inventory(repoRoot), policy.exclude ?? []);
+export function detectQualityCapabilities({ repoRoot, policy = {}, paths = [] } = {}) {
+  const filtered = applyExclusions(repoRoot, listRepositoryFiles(repoRoot), policy.exclude ?? [], paths);
   const files = filtered.files;
   const discovered = QUALITY_ADAPTERS.flatMap((adapter) => adapter.discover({ root: repoRoot, files }));
   const byKey = new Map();
@@ -116,14 +103,18 @@ export function detectQualityCapabilities({ repoRoot, policy = {} } = {}) {
   }
   components.sort((a, b) => a.id.localeCompare(b.id));
   const trust = isRepoTrusted({ repoRoot });
-  return { repoRoot, files, components, trust, exclusions: filtered.exclusions, rejectedCandidates: [] };
+  return { repoRoot, files, components, trust, exclusions: filtered.exclusions, rejectedCandidates: [], paths };
 }
 
 /** Create adapter plans for a detected repository. */
-export function planQualityCheck({ repoRoot, policy, changeSet, profile, detection } = {}) {
-  const found = detection ?? detectQualityCapabilities({ repoRoot, policy });
+export function planQualityCheck({ repoRoot, policy, changeSet, profile, detection, paths = [] } = {}) {
+  const found = detection ?? detectQualityCapabilities({ repoRoot, policy, paths });
   const plans = found.components.flatMap((component) => getQualityAdapter(component.language)?.plan(component, policy, changeSet, profile) ?? genericPlans(component, profile));
-  return { ...found, plans };
+  // A path filter turns a reporting narrowing into an execution narrowing: a
+  // component with no in-scope file must not run its package-level tools.
+  // Guarded, because a component can hold no file in an unfiltered run.
+  const scoped = paths.length === 0 ? plans : plans.filter((plan) => (found.components.find((component) => component.id === plan.componentId)?.files.length ?? 0) > 0);
+  return { ...found, plans: scoped };
 }
 
 function genericPlans(component, profile) {
