@@ -10,6 +10,19 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.1...v3.3.0) (2026-09-08)
+
+
+### Added
+
+* **quality:** add --path and --all run scoping ([#339](https://github.com/kaiohenricunha/dotbabel/issues/339)) ([181db74](https://github.com/kaiohenricunha/dotbabel/commit/181db7466d5a19931fdc07cc481af456bab99801))
+
+
+### Fixed
+
+* **quality:** stop a markerless component claiming repository Make targets ([#338](https://github.com/kaiohenricunha/dotbabel/issues/338)) ([d5a202c](https://github.com/kaiohenricunha/dotbabel/commit/d5a202cca0426e4405105f739e45c3e1249bf207))
+* **tests:** raise vitest timeouts for subprocess-spawning tests ([#332](https://github.com/kaiohenricunha/dotbabel/issues/332)) ([f11b4b0](https://github.com/kaiohenricunha/dotbabel/commit/f11b4b09865398c8b6e3d1b6f78456a26d9cfeb1))
+
 ## [3.2.1](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.0...v3.2.1) (2026-09-06)
 
 
