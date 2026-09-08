@@ -41,6 +41,11 @@ settings validator, and a destructive-git PreToolUse hook.
   `--no-color` on every bin.
 - **Named exit codes.** `{OK:0, VALIDATION:1, ENV:2, USAGE:64}` — `64`
   mirrors BSD `sysexits.h`.
+- **Language-aware quality floor.** One policy measured with the repository's own
+  tools across Go, Python, TypeScript, and JavaScript, plus any language that can
+  emit a generic report. 25 stable rule ids, three profiles, and honest
+  `unsupported` / `not_configured` / `unavailable` states instead of silent
+  passes (see [quality.md](./quality.md)).
 - **Minimal runtime footprint.** Plain Node 20+, no bundler, no TypeScript
   runtime — three small JSON/YAML utility dependencies (ajv, ajv-formats, js-yaml).
 

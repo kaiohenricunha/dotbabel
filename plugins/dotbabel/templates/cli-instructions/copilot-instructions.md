@@ -115,7 +115,16 @@ For recurring sweeps (Dependabot, cron, CI-triggered agents), use headless mode 
 
 ## AI code quality floor
 
-- Use the resolved project policy. Run `dotbabel quality explain` before policy-sensitive changes.
+Use the resolved project policy. `dotbabel quality` measures it with the tools the repository already has. It never installs a checker.
+
+- Run `dotbabel quality explain` before a policy-sensitive change. Add `--rule <id>` for one rule.
+- Run `dotbabel quality detect` to see the components, the selected tools, and the trust state. It executes no project command.
+- Run `dotbabel quality check --profile fast` while you edit. Run `--profile pr --base <ref>` before a pull request. Keep `--profile deep` for a scheduled audit.
+- Add `--path <glob>` to narrow a run to one package. Add `--all` to check the whole repository instead of a diff.
+- Read the exit code. `0` is no error verdict. `1` is a policy failure. `2` is a missing tool, report, base, or trust. `64` is invalid usage. Never report `2` as a pass.
+- Set project policy in the repository `.dotbabel.json` under the `quality` key. Do not lower a shipped threshold to make a check pass.
+- Trust project commands by their exact repository path. Pass `--allow-project-commands` for one CI run only.
+- Resolve an ambiguous tool choice in configuration. Do not guess, and do not install a missing tool.
 - Simplify control flow before splitting a function. Split a file only when each result has one coherent responsibility.
 - Add tests for behavior and failure boundaries. Reject assertion-free or implementation-coupled coverage padding.
 - Do not add abstractions only to reduce local metrics. Remove obsolete code instead of moving it.

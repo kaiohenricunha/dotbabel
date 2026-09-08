@@ -34,33 +34,43 @@ that records failures as well as passes, and toolchain pins that fail the run
 closed when your local Node or Go differs from CI's. That is the standard the
 rest of the toolkit is built to.
 
+And it holds a floor under the code an agent writes. `dotbabel quality`
+resolves one policy — complexity, changed-line coverage, duplication, dead code,
+high-confidence security findings — and measures it with the tools your repo
+already has: your `Makefile` targets, your `package.json` scripts, your
+`pyproject.toml` config. It installs nothing, runs nothing outside an explicit
+trust allowlist, and when it cannot measure something it says `unsupported`,
+`not_configured`, or `unavailable` rather than quietly passing.
+
 It also runs everywhere you work: one rule floor, fanned out to Claude Code,
 Codex, Gemini CLI, and Copilot CLI, with drift detection so the copies cannot
 silently disagree.
 
 **Who is this for?**
 
-| I am…            | I want…                                                                          | Start here                                              |
-| ---------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| **Agent user**   | Skills that make Claude ground, verify, and cite its work                        | [Install as a plugin](#install-as-a-claude-code-plugin) |
-| **Dotfile user** | The toolkit — skills, commands, and CLAUDE.md in every Claude session            | [Clone & bootstrap](#clone--bootstrap)                  |
-| **CI payer**     | To stop re-running checks I already verified locally                             | [Local attestation](#local-attestation)                 |
-| **Consumer**     | The CLI in my repo — bootstrap, doctor, drift detection, optional spec-gov gates | [Install the CLI](#install-the-cli)                     |
-| **Library user** | Node API in my own tooling                                                       | [docs/api-reference.md](./docs/api-reference.md)        |
-| **Contributor**  | Dev workflow, local gates                                                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                    |
+| I am…             | I want…                                                                          | Start here                                              |
+| ----------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Agent user**    | Skills that make Claude ground, verify, and cite its work                        | [Install as a plugin](#install-as-a-claude-code-plugin) |
+| **Dotfile user**  | The toolkit — skills, commands, and CLAUDE.md in every Claude session            | [Clone & bootstrap](#clone--bootstrap)                  |
+| **CI payer**      | To stop re-running checks I already verified locally                             | [Local attestation](#local-attestation)                 |
+| **Quality owner** | One enforceable quality floor across a mixed-language repo                       | [Language-aware quality](#language-aware-quality)       |
+| **Consumer**      | The CLI in my repo — bootstrap, doctor, drift detection, optional spec-gov gates | [Install the CLI](#install-the-cli)                     |
+| **Library user**  | Node API in my own tooling                                                       | [docs/api-reference.md](./docs/api-reference.md)        |
+| **Contributor**   | Dev workflow, local gates                                                        | [CONTRIBUTING.md](./CONTRIBUTING.md)                    |
 
 ---
 
 ## TL;DR — pick your path
 
-| What you want                                                                | How                                                                                |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Skills & subagents inside Claude Code, no clone                              | **[Install as a plugin](#install-as-a-claude-code-plugin)** — two slash commands   |
-| Skills & commands library wired into `~/.claude/`                            | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required           |
-| Skip remote CI for commits you verified locally                              | **[Local attestation](#local-attestation)** — `npx dotbabel-local-attest --init`   |
-| Governance CLI for your own repos (bootstrap + doctor + optional spec gates) | **[Install the CLI](#install-the-cli)** — see install section (Node ≥ 20 required) |
+| What you want                                                                | How                                                                                   |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Skills & subagents inside Claude Code, no clone                              | **[Install as a plugin](#install-as-a-claude-code-plugin)** — two slash commands      |
+| Skills & commands library wired into `~/.claude/`                            | **[Clone & bootstrap](#clone--bootstrap)** — 30 seconds, no npm required              |
+| Skip remote CI for commits you verified locally                              | **[Local attestation](#local-attestation)** — `npx dotbabel-local-attest --init`      |
+| Governance CLI for your own repos (bootstrap + doctor + optional spec gates) | **[Install the CLI](#install-the-cli)** — see install section (Node ≥ 20 required)    |
+| One quality floor across every language in the repo                          | **[Language-aware quality](#language-aware-quality)** — `npx dotbabel-quality detect` |
 
-All four paths are independent. You can use one, some, or all of them.
+All five paths are independent. You can use one, some, or all of them.
 
 ---
 
@@ -97,6 +107,46 @@ the branch-protection caveat — is in
 [`skills/local-attest/references/operator-guide.md`](./skills/local-attest/references/operator-guide.md);
 the config schema is in
 [`skills/local-attest/references/config.md`](./skills/local-attest/references/config.md).
+
+---
+
+## Language-aware quality
+
+One quality policy across a mixed-language repository, measured with the tools
+the repo already has. Dotbabel discovers your `Makefile` targets, `package.json`
+scripts, and `pyproject.toml` config — it never installs a checker.
+
+```bash
+dotbabel quality detect                                   # what would run; executes nothing
+dotbabel quality explain                                  # resolved rules and provenance
+dotbabel quality check --profile pr --base origin/main    # the PR floor
+dotbabel quality check --all --path src/api               # one package, entirely
+```
+
+| Profile | Use             | Default work                                                        |
+| ------- | --------------- | ------------------------------------------------------------------- |
+| `fast`  | Agent iteration | Changed format, syntax, types, lint, size, and available complexity |
+| `pr`    | Pull requests   | `fast`, tests, coverage, security, duplication, and dead-code tools |
+| `deep`  | Scheduled audit | `pr`, configured mutation, race, and repository analyzers           |
+
+25 stable rule ids with shipped defaults — complexity 15, changed-line coverage
+90%, mutation 85%, duplication 5%. Every one is overridable per repo, and
+`dotbabel quality explain` shows whether a value came from the shipped policy,
+your user file, or the project.
+
+Exit `0` means no error verdict, `1` a policy failure, `2` a missing tool,
+report, base, or trust. **Exit `2` is not a pass** — an unavailable measurement
+is reported as `unsupported`, `not_configured`, or `unavailable` rather than
+silently succeeding.
+
+Local runs execute project-owned commands only for a repository in the exact-path
+trust allowlist; CI passes `--allow-project-commands` for a single run, and it
+never persists. Trust is not a sandbox — it is an explicit choice to run the
+repository's own commands.
+
+Details: [docs/quality.md](./docs/quality.md) ·
+flags and JSON envelope: [docs/cli-reference.md](./docs/cli-reference.md#dotbabel-quality) ·
+copy-paste config and workflow: [examples/quality/](./examples/quality/)
 
 ---
 
@@ -190,6 +240,10 @@ After `./bootstrap.sh`, open any repo in Claude Code and try:
 /fix-with-evidence 140
 # → reproduces the issue, fixes it, verifies, opens a PR
 
+# Check changed code against the resolved quality policy
+/quality-review pr origin/main
+# → explain + detect + check, then reviews the semantic risks tools cannot judge
+
 # Get a deep AWS IAM review of this repo
 /aws-specialist review IAM policies in the production account
 # → structured review: least-privilege gaps, trust-policy findings, remediations
@@ -258,6 +312,8 @@ dotbabel init                     # scaffold specs, hooks, manifest into a repo
 dotbabel quality explain          # show the resolved quality policy and provenance
 dotbabel quality detect           # inspect languages and tools without execution
 dotbabel quality check --profile pr --base origin/main # run the PR quality floor
+dotbabel quality check --all --path src/api       # scope a run to one package
+dotbabel quality baseline --profile pr --base origin/main # candidate legacy baseline
 ```
 
 Every subcommand also works as a standalone bin — `npx dotbabel-doctor`,
@@ -266,6 +322,7 @@ Every subcommand also works as a standalone bin — `npx dotbabel-doctor`,
 
 Five-minute walkthrough: [docs/quickstart.md](./docs/quickstart.md).
 Quality policy and adapter guide: [docs/quality.md](./docs/quality.md).
+Flags and the JSON envelope: [docs/cli-reference.md](./docs/cli-reference.md#dotbabel-quality).
 
 ### Scaffold a repo
 
@@ -443,19 +500,20 @@ pins every contract.
 
 ## Further reading
 
-|                                                      |                                             |
-| ---------------------------------------------------- | ------------------------------------------- |
-| [docs/index.md](./docs/index.md)                     | Nav map with persona-tailored entry points  |
-| [docs/quickstart.md](./docs/quickstart.md)           | Install → scaffold → first green validator  |
-| [docs/cli-reference.md](./docs/cli-reference.md)     | Every bin, flag, exit code, `--json` schema |
-| [docs/api-reference.md](./docs/api-reference.md)     | Node API surface                            |
-| [docs/architecture.md](./docs/architecture.md)       | Layer diagram + PR-time sequence            |
-| [docs/troubleshooting.md](./docs/troubleshooting.md) | Error-code → remediation index              |
-| [docs/upgrade-guide.md](./docs/upgrade-guide.md)     | 0.1 → 0.2 migration, forking                |
-| [docs/personas.md](./docs/personas.md)               | Who reads which file                        |
-| [CONTRIBUTING.md](./CONTRIBUTING.md)                 | Dev workflow + local gates                  |
-| [SECURITY.md](./SECURITY.md)                         | Private vulnerability disclosure            |
-| [CHANGELOG.md](./CHANGELOG.md)                       | Keep-a-Changelog history                    |
+|                                                      |                                              |
+| ---------------------------------------------------- | -------------------------------------------- |
+| [docs/index.md](./docs/index.md)                     | Nav map with persona-tailored entry points   |
+| [docs/quickstart.md](./docs/quickstart.md)           | Install → scaffold → first green validator   |
+| [docs/cli-reference.md](./docs/cli-reference.md)     | Every bin, flag, exit code, `--json` schema  |
+| [docs/api-reference.md](./docs/api-reference.md)     | Node API surface                             |
+| [docs/architecture.md](./docs/architecture.md)       | Layer diagram + PR-time sequence             |
+| [docs/quality.md](./docs/quality.md)                 | Rule catalog, adapters, baselines, trust, CI |
+| [docs/troubleshooting.md](./docs/troubleshooting.md) | Error-code → remediation index               |
+| [docs/upgrade-guide.md](./docs/upgrade-guide.md)     | 0.1 → 0.2 migration, forking                 |
+| [docs/personas.md](./docs/personas.md)               | Who reads which file                         |
+| [CONTRIBUTING.md](./CONTRIBUTING.md)                 | Dev workflow + local gates                   |
+| [SECURITY.md](./SECURITY.md)                         | Private vulnerability disclosure             |
+| [CHANGELOG.md](./CHANGELOG.md)                       | Keep-a-Changelog history                     |
 
 ## License
 
