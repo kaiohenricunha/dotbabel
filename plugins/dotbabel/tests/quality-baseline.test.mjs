@@ -59,4 +59,32 @@ describe("quality baselines", () => {
       expect(() => loadQualityBaselineAtRevision({ repoRoot: repo, baselineFile: "../escape.json", revision })).toThrow(/escapes/);
     } finally { fs.rmSync(repo, { recursive: true, force: true }); }
   });
+
+  it("fails loudly when Git cannot be run, rather than reporting no baseline", () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-baseline-"));
+    try {
+      execFileSync("git", ["init", "-q", repo]);
+      execFileSync("git", ["-C", repo, "config", "user.email", "test@example.com"]);
+      execFileSync("git", ["-C", repo, "config", "user.name", "Test"]);
+      fs.writeFileSync(path.join(repo, "a.js"), "const a = 1;\n");
+      execFileSync("git", ["-C", repo, "add", "."]);
+      execFileSync("git", ["-C", repo, "commit", "-qm", "base"]);
+      const revision = execFileSync("git", ["-C", repo, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+
+      const previousPath = process.env.PATH;
+      let caught;
+      try {
+        process.env.PATH = "";
+        loadQualityBaselineAtRevision({ repoRoot: repo, baselineFile: ".dotbabel/quality-baseline.json", revision });
+      } catch (error) {
+        caught = error;
+      } finally {
+        process.env.PATH = previousPath;
+      }
+      // "Absent at that revision" is a clean non-zero exit and still returns
+      // null; a spawn failure must not be reported as an absent baseline.
+      expect(caught).toBeDefined();
+      expect(caught.code).toBe("QUALITY_BASELINE_INVALID");
+    } finally { fs.rmSync(repo, { recursive: true, force: true }); }
+  });
 });
