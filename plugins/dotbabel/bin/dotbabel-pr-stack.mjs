@@ -43,6 +43,7 @@ import {
   hasSkipCi,
   summarizeGates,
 } from "../src/pr-gates.mjs";
+import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -112,7 +113,7 @@ function sh(cmd) {
     shell: true,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
-    maxBuffer: 64 * 1024 * 1024,
+    maxBuffer: GIT_MAX_BUFFER,
   });
   return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }

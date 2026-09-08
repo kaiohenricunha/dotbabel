@@ -87,6 +87,73 @@ describe("listRepositoryFiles", () => {
     expect(files).toContain("untracked.js");
   });
 
+  it("fails loudly instead of walking when the file list exceeds the read buffer", () => {
+    const repoRoot = tempDir();
+    fs.writeFileSync(path.join(repoRoot, "tracked.js"), "export const a = 1;\n");
+    execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
+    execFileSync("git", ["-C", repoRoot, "add", "."]);
+    execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
+
+    let caught;
+    try { listRepositoryFiles(repoRoot, { maxBuffer: 1 }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+  });
+
+  it("fails loudly when Git fails inside a repository", () => {
+    const repoRoot = tempDir();
+    fs.writeFileSync(path.join(repoRoot, "tracked.js"), "export const a = 1;\n");
+    execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
+    execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
+    execFileSync("git", ["-C", repoRoot, "add", "."]);
+    execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
+    // A corrupt index fails ls-files while rev-parse --git-dir still succeeds,
+    // so the probe confirms this really is a repository and the walk must not run.
+    fs.writeFileSync(path.join(repoRoot, ".git", "index"), "not-a-valid-index");
+
+    let caught;
+    try { listRepositoryFiles(repoRoot); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+  });
+
+  it("keeps the walk fallback when Git is not installed", () => {
+    const repoRoot = tempDir();
+    fs.mkdirSync(path.join(repoRoot, "src"), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, "src", "a.js"), "export const a = 1;\n");
+    const previousPath = process.env.PATH;
+    try {
+      process.env.PATH = "";
+      // No git binary and no .git directory: this is genuinely not a repository,
+      // so the walk is the correct answer rather than a masked failure.
+      expect(listRepositoryFiles(repoRoot)).toContain("src/a.js");
+    } finally {
+      process.env.PATH = previousPath;
+    }
+  });
+
+  it("fails loudly when Git is missing but the directory is a repository", () => {
+    const repoRoot = tempDir();
+    fs.mkdirSync(path.join(repoRoot, ".git"), { recursive: true });
+    fs.writeFileSync(path.join(repoRoot, "a.js"), "export const a = 1;\n");
+    const previousPath = process.env.PATH;
+    let caught;
+    try {
+      process.env.PATH = "";
+      listRepositoryFiles(repoRoot);
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = previousPath;
+    }
+    // A .gitignore-blind walk of a real repository would be a wrong answer.
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+  });
+
   it("falls back to a filesystem walk outside a Git repository", () => {
     const repoRoot = tempDir();
     fs.mkdirSync(path.join(repoRoot, "src"), { recursive: true });

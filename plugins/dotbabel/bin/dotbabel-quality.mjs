@@ -72,7 +72,15 @@ if (pathScope.length > 0 && command === "baseline" && argv.flags.write) {
   process.exit(EXIT_CODES.USAGE);
 }
 if (pathScope.length > 0) {
-  const repositoryFiles = listRepositoryFiles(repoRoot);
+  // listRepositoryFiles can fail on an unreadable repository. This runs before
+  // the try block below, so catch it here or it escapes as an uncaught throw
+  // and exits 1, which means "policy failure" rather than environment failure.
+  let repositoryFiles;
+  try { repositoryFiles = listRepositoryFiles(repoRoot); }
+  catch (error) {
+    process.stderr.write(`${error instanceof ValidationError ? formatError(error, { verbose: argv.verbose }) : error.message}\n`);
+    process.exit(EXIT_CODES.ENV);
+  }
   for (const pattern of pathScope) {
     if (!repositoryFiles.some((file) => matchesPathScope([pattern], file))) {
       process.stderr.write(`no repository file matches --path ${pattern}\n`);

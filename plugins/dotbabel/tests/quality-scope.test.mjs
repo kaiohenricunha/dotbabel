@@ -106,6 +106,85 @@ describe("quality git scope", () => {
     expect(scope.changedFiles.map((file) => file.path)).toEqual(["src/a.js"]);
   });
 
+  it("fails loudly when the name-status diff exceeds the read buffer", () => {
+    const repoRoot = repo();
+    const base = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    for (let index = 0; index < 40; index++) fs.writeFileSync(path.join(repoRoot, `changed-file-number-${index}.js`), "const a = 1;\n");
+    execFileSync("git", ["-C", repoRoot, "add", "."]);
+
+    let caught;
+    try { resolveQualityScope({ repoRoot, base, env: {}, maxBuffer: 256 }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+    expect(caught.message).toContain("--name-status");
+    expect(caught.hint).toContain("--base");
+  });
+
+  it("fails loudly when the unified diff exceeds the read buffer", () => {
+    const repoRoot = repo();
+    const base = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    // One short path so --name-status stays small, one long line so --unified=0 does not.
+    fs.appendFileSync(path.join(repoRoot, "old.js"), `const b = "${"x".repeat(2048)}";\n`);
+
+    let caught;
+    try { resolveQualityScope({ repoRoot, base, env: {}, maxBuffer: 512 }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+    expect(caught.message).toContain("--unified=0");
+  });
+
+  it("fails loudly when the untracked file list exceeds the read buffer", () => {
+    const repoRoot = repo();
+    const base = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    // No tracked change at all: both diffs exit 0 with empty output, so only the
+    // untracked listing can overflow. Proves empty-success and overflow differ.
+    for (let index = 0; index < 40; index++) {
+      fs.writeFileSync(path.join(repoRoot, `untracked-file-with-a-long-name-${index}.js`), "const a = 1;\n");
+    }
+
+    let caught;
+    try { resolveQualityScope({ repoRoot, base, env: {}, maxBuffer: 256 }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+    expect(caught.message).toContain("ls-files");
+  });
+
+  it("reports a read-buffer overflow as a scope failure, not a missing base revision", () => {
+    const repoRoot = repo();
+    const base = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+
+    let caught;
+    try { resolveQualityScope({ repoRoot, base, env: {}, maxBuffer: 1 }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+    expect(caught.message).not.toMatch(/base revision/);
+  });
+
+  it("fails loudly when Git itself fails", () => {
+    const repoRoot = repo();
+    const base = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    // An orphan branch shares no history, so merge-base exits non-zero.
+    execFileSync("git", ["-C", repoRoot, "checkout", "-q", "--orphan", "unrelated"]);
+    fs.writeFileSync(path.join(repoRoot, "other.js"), "const c = 3;\n");
+    execFileSync("git", ["-C", repoRoot, "add", "."]);
+    execFileSync("git", ["-C", repoRoot, "commit", "-qm", "orphan"]);
+
+    let caught;
+    try { resolveQualityScope({ repoRoot, base, env: {} }); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.code).toBe("QUALITY_SCOPE_UNAVAILABLE");
+    expect(caught.message).toContain("merge-base");
+  });
+
+  it("returns an empty change set for a clean worktree without throwing", () => {
+    const repoRoot = repo();
+    const base = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+
+    const scope = resolveQualityScope({ repoRoot, base, env: {} });
+    expect(scope.changedFiles).toEqual([]);
+    expect(scope.changedLines).toEqual({});
+  });
+
   it("resolves without a base revision in the whole-repository mode", () => {
     const repoRoot = repo();
     // Diff mode throws for this repository; whole-repository mode must not.

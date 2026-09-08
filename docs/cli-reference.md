@@ -561,13 +561,14 @@ local clone is `QUALITY_BASE_UNAVAILABLE`, exit `2` — in CI that usually means
 shallow checkout, so set `fetch-depth: 0`.
 
 **Exit codes**: `0` no error verdict, `1` policy failure, `2` environment failure
-(missing tool, report, base, or trust), `64` invalid usage. Exit `2` is not a pass.
+(missing tool, report, base, scope, or trust), `64` invalid usage. Exit `2` is not a pass.
 
 Usage errors that exit `64`: a `--path` matching no repository file, an absolute
 or `..`-escaping `--path`, `--path` with `explain`, `--path` with `baseline --write`,
 and `--all` with `--base`/`--head`.
 
 **Emitted error codes**: `QUALITY_CONFIG_INVALID`, `QUALITY_BASE_UNAVAILABLE`,
+`QUALITY_SCOPE_UNAVAILABLE`,
 `QUALITY_REPORT_INVALID`, `QUALITY_BASELINE_INVALID`, `QUALITY_TRUST_REQUIRED`,
 `QUALITY_EXECUTION_FAILED` — each with remediation in
 [troubleshooting.md](./troubleshooting.md#quality-errors).
