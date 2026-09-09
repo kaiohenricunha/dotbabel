@@ -68,6 +68,23 @@ describe("collectSessionFiles (symlinks)", () => {
     }
   });
 
+  it("lists a session file reachable under two names only once", () => {
+    // Following symlinks means one file can be reached by its real name and by
+    // a link beside it. Without identity dedup `handoff list` renders the same
+    // session twice, under two different short ids derived from the two paths.
+    const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
+    try {
+      mkdirSync(join(root, "proj"));
+      writeFileSync(join(root, "proj", "a.jsonl"), "{}\n");
+      symlinkSync(join(root, "proj", "a.jsonl"), join(root, "proj", "latest.jsonl"));
+
+      const files = collectSessionFiles(root, 1, (name) => name.endsWith(".jsonl"));
+      expect(files).toHaveLength(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it("skips a dangling symlink instead of throwing", () => {
     const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
     try {

@@ -179,19 +179,26 @@ fi
 # --- OPS-2 disk budgets (soft) ---
 CATEGORY=OPS-2
 if [ -d "$PROJECTS_DIR" ]; then
-  PROJECTS_MB=$(du -sm "$PROJECTS_DIR" 2>/dev/null | awk '{print $1}')
+  # -L: `test -d` above dereferences, but `du` does not. On a redirected
+  # projects dir this measured the link inode and reported 0 MB, so the budget
+  # never fired for exactly the setup #329 is about — a false PASS, which is
+  # worse than no check. Internal links can now double-count; still better.
+  PROJECTS_MB=$(du -sLm "$PROJECTS_DIR" 2>/dev/null | awk '{print $1}')
   if [ "$PROJECTS_MB" -gt 1536 ]; then
     # shellcheck disable=SC2088  # literal ~ is user-readable text, not a filesystem path
-    # -L: the projects dir is often a symlink to another volume, and plain find
-    # would report nothing to prune. Same reason as handoff-resolve.sh (#329).
-    warn "~/.claude/projects/ is ${PROJECTS_MB} MB (budget: 1536 MB). Prune: find -L ~/.claude/projects -mindepth 2 -maxdepth 2 -type f -mtime +60 -delete"
+    # -H, not -L: the projects dir is often a symlink to another volume and
+    # plain find would report nothing to prune (#329), but this string is a
+    # copy-paste `-delete`. -H dereferences only the root named on the command
+    # line; -L would descend a symlink found *inside* the tree and unlink files
+    # in whatever it points at.
+    warn "~/.claude/projects/ is ${PROJECTS_MB} MB (budget: 1536 MB). Prune: find -H ~/.claude/projects -mindepth 2 -maxdepth 2 -type f -mtime +60 -delete"
   else
     pass "projects/ size OK (${PROJECTS_MB} MB / 1536)"
   fi
 fi
 
 if [ -d "$FILE_HISTORY_DIR" ]; then
-  FH_MB=$(du -sm "$FILE_HISTORY_DIR" 2>/dev/null | awk '{print $1}')
+  FH_MB=$(du -sLm "$FILE_HISTORY_DIR" 2>/dev/null | awk '{print $1}')  # -L: see above
   if [ "$FH_MB" -gt 100 ]; then
     # shellcheck disable=SC2088  # literal ~ is user-readable text, not a filesystem path
     warn "~/.claude/file-history/ is ${FH_MB} MB (budget: 100 MB)"

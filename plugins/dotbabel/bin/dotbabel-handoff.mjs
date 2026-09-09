@@ -512,6 +512,17 @@ function collectSessionFiles(root, walk, match) {
       if (isDir) {
         if (depth < walk) recur(full, depth + 1);
       } else if (isFile && match(ent.name)) {
+        // Same-identity dedup as the directory case: now that symlinks are
+        // followed, a session file reachable by both its real name and a link
+        // would otherwise be listed twice under two different short ids.
+        let realFile;
+        try {
+          realFile = realpathSync(full);
+        } catch {
+          continue;
+        }
+        if (seen.has(realFile)) continue;
+        seen.add(realFile);
         files.push(full);
       }
     }

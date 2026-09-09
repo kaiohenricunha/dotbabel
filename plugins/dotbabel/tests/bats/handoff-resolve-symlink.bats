@@ -158,6 +158,90 @@ seed_gemini() {
   [[ "$output" == *"$CLAUDE_UUID.jsonl" ]]
 }
 
+@test "resolve claude alias through a symlinked project directory nested inside a root" {
+  # Distinct from the UUID case above and from the symlinked-ROOT alias case:
+  # the alias prefilter is grep, not find, and `grep -r` follows a symlink only
+  # when it is named on the command line. A nested link therefore needs `-R`, or
+  # every other query shape resolves here while the alias shape alone does not.
+  make_claude_session_tree "$TEST_HOME" "$CLAUDE_UUID"
+  set_claude_custom_title \
+    "$TEST_HOME/.claude/projects/-home-user-projects-demo0/$CLAUDE_UUID.jsonl" \
+    "$CLAUDE_UUID" "nested-alias"
+  mv "$TEST_HOME/.claude/projects/-home-user-projects-demo0" "$TEST_HOME/elsewhere"
+  ln -s "$TEST_HOME/elsewhere" "$TEST_HOME/.claude/projects/-home-user-projects-demo0"
+
+  run --separate-stderr "$RESOLVE" claude "nested-alias"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$CLAUDE_UUID.jsonl" ]]
+  [[ "$stderr" == *"matched-field=customTitle"* ]]
+}
+
+@test "resolve codex thread_name alias through a symlinked date directory" {
+  # The codex alias prefilter is the third grep -R site. Redirect the YYYY/MM/DD
+  # leaf rather than the root so the link is found during recursion.
+  make_codex_session_tree "$TEST_HOME" "$CODEX_UUID"
+  set_codex_thread_name \
+    "$TEST_HOME/.codex/sessions/2026/04/18/rollout-2026-04-18T00-00-00-${CODEX_UUID}.jsonl" \
+    "$CODEX_UUID" "nested-thread"
+  mv "$TEST_HOME/.codex/sessions/2026/04/18" "$TEST_HOME/elsewhere-codex"
+  ln -s "$TEST_HOME/elsewhere-codex" "$TEST_HOME/.codex/sessions/2026/04/18"
+
+  run --separate-stderr "$RESOLVE" codex "nested-thread"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$CODEX_UUID.jsonl" ]]
+  [[ "$stderr" == *"matched-field=thread_name"* ]]
+}
+
+@test "latest ranks a symlinked session file by its target's mtime" {
+  # `stat` lstat(2)s by default on every substrate, so without -L the link's own
+  # mtime — effectively its creation time, and so newer than any real session —
+  # would win `latest` on the bsd and posix branches of pick_newest.
+  make_codex_session_tree "$TEST_HOME" "$CODEX_UUID" "ffff6666-6666-6666-6666-666666666666"
+  dir="$TEST_HOME/.codex/sessions/2026/04/18"
+  touch -t 202604180900 "$dir/rollout-2026-04-18T00-00-00-${CODEX_UUID}.jsonl"
+  touch -t 202604181000 "$dir/rollout-2026-04-18T01-00-00-ffff6666-6666-6666-6666-666666666666.jsonl"
+  # A brand-new link to the OLDER session. Its own mtime is now.
+  ln -s "$dir/rollout-2026-04-18T00-00-00-${CODEX_UUID}.jsonl" \
+    "$dir/rollout-2026-04-18T02-00-00-aaaa9999-9999-9999-9999-999999999999.jsonl"
+
+  run --separate-stderr "$RESOLVE" codex latest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ffff6666-6666-6666-6666-666666666666.jsonl" ]]
+}
+
+# -- one session reachable twice is not a collision ----------------------
+
+@test "an intra-root link to a copilot session dir is not a collision" {
+  # -L reports a directory under every name it is reachable by, so a sibling
+  # link to a session dir yields two entries for one session. Without identity
+  # dedup the alias scan accumulates two rows and exits 2 "multiple sessions
+  # match" — where the pre-#329 walk exited 0 with the path.
+  make_copilot_session_tree "$TEST_HOME" "cccc3333-3333-3333-3333-333333333333"
+  set_copilot_workspace_name "$TEST_HOME" "cccc3333-3333-3333-3333-333333333333" "shared-name"
+  ln -s "$TEST_HOME/.copilot/session-state/cccc3333-3333-3333-3333-333333333333" \
+    "$TEST_HOME/.copilot/session-state/current"
+
+  run --separate-stderr "$RESOLVE" copilot "shared-name"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"multiple sessions match"* ]]
+  [[ "$output" == *"events.jsonl" ]]
+  # The short id must be the real uuid, never the link's name.
+  [[ "$stderr" == *"matched-field=name"* ]]
+}
+
+@test "an intra-root link to a codex date dir is not a collision" {
+  make_codex_session_tree "$TEST_HOME" "$CODEX_UUID"
+  set_codex_thread_name \
+    "$TEST_HOME/.codex/sessions/2026/04/18/rollout-2026-04-18T00-00-00-${CODEX_UUID}.jsonl" \
+    "$CODEX_UUID" "dup-thread"
+  ln -s "$TEST_HOME/.codex/sessions/2026/04/18" "$TEST_HOME/.codex/sessions/current"
+
+  run --separate-stderr "$RESOLVE" codex "dup-thread"
+  [ "$status" -eq 0 ]
+  [[ "$stderr" != *"multiple sessions match"* ]]
+  [[ "$output" == *"$CODEX_UUID.jsonl" ]]
+}
+
 # -- hazards introduced by -L --------------------------------------------
 
 @test "a symlink loop under a session root does not kill the resolver" {

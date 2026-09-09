@@ -67,6 +67,41 @@ teardown() {
   [[ "$output" == *"$newer.jsonl" ]]
 }
 
+@test "pick_newest ranks a symlinked session by target mtime on the posix branch" {
+  # The `stat -L` half of #329. On this host _STAT_FLAVOR is gnu, so the
+  # `find -L` branch runs and the `stat -L -c` branch is never exercised — the
+  # shim is the only way to reach it. `stat` lstat(2)s by default on every
+  # substrate, so without -L the link's own mtime (its creation time, and so
+  # newer than any real session) would win `latest`.
+  local older="aaaa1111-1111-1111-1111-111111111111"
+  local newer="bbbb2222-2222-2222-2222-222222222222"
+  local dir="$TEST_HOME/.claude/projects/-demo"
+  mkdir -p "$dir"
+  printf '{"cwd":"/x","sessionId":"%s"}\n' "$older" > "$dir/$older.jsonl"
+  printf '{"cwd":"/x","sessionId":"%s"}\n' "$newer" > "$dir/$newer.jsonl"
+  touch -d '2026-04-18 10:00:00' "$dir/$older.jsonl"
+  touch -d '2026-04-18 10:00:02' "$dir/$newer.jsonl"
+  # A link to the OLDER session, created now, so its own mtime is the newest.
+  ln -s "$dir/$older.jsonl" "$dir/cccc3333-3333-3333-3333-333333333333.jsonl"
+
+  # Install the shim inline rather than via with_fake_tool_bin. That helper is
+  # called as `shim=$(with_fake_tool_bin ...)`, so its `export PATH` lands in
+  # the command-substitution subshell and never reaches the test — the sibling
+  # tests in this file therefore run against the real GNU stat, not the busybox
+  # substrate they name. Pre-existing and left alone here; this test needs the
+  # posix branch to actually run, so it wires PATH itself.
+  local shim
+  shim=$(mktemp -d)
+  SHIM_DIRS+=("$shim")
+  printf '#!/usr/bin/env bash\n%s\n' "$BUSYBOX_STAT_BODY" > "$shim/stat"
+  chmod +x "$shim/stat"
+  PATH="$shim:$PATH"
+
+  run --separate-stderr "$RESOLVE" claude latest
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$newer.jsonl" ]]
+}
+
 @test "resolve does not crash when stat -f returns multi-line garbage" {
   # Regression for the busybox bug: stat -f exits 0 with multi-line output,
   # causing secs to capture a path fragment and set -u fires on unbound var.
