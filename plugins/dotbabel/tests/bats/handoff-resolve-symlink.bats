@@ -29,7 +29,7 @@ setup() {
 }
 
 teardown() {
-  [ -n "${TEST_HOME:-}" ] && rm -rf "$TEST_HOME"
+  rm -rf "$TEST_HOME"
 }
 
 # Seed a gemini tree; there is no make_gemini_session_tree helper.
