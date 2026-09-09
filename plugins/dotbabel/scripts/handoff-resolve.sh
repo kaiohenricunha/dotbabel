@@ -23,7 +23,11 @@
 #
 # Exits:
 #   0  success — single path resolved
-#   2  "not found", "no session matches", or "multiple sessions match" (collision)
+#   2  "not found", "no session matches", or "multiple sessions match" (collision).
+#      Since #329 this also subsumes "the walk could not complete" — an
+#      unreadable subtree or a root behind an unmounted volume reports the same
+#      "no sessions found" as an empty root, because find_sessions discards the
+#      walk's own error output. See docs/troubleshooting.md § Handoff.
 #   64 usage error
 
 set -euo pipefail

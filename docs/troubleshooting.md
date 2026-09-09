@@ -305,6 +305,41 @@ A required positional argument is missing. Exit 64. **Fix**: see `--help`.
 
 ---
 
+## Handoff
+
+### `handoff list` shows a session that `handoff pull` cannot find
+
+Symptom: `dotbabel handoff list` prints sessions, but `dotbabel handoff pull <id>`
+answers `no <cli> sessions found under <root>` or `<cli> session not found for
+uuid: <id>` for one of them.
+
+Cause (fixed in v3.3.1, issue #329): the resolver walked session roots without
+following symlinks. Redirecting CLI state to another volume is common —
+`~/.codex/sessions -> /mnt/storage/cli-state/codex/sessions` — and the walk
+returned nothing for every query shape, while `list` was unaffected because it
+reads the directory a different way.
+
+**Fix**: upgrade to v3.3.1 or later. To confirm a root is redirected:
+
+```bash
+ls -ld ~/.claude/projects ~/.codex/sessions ~/.copilot/session-state ~/.gemini/tmp
+```
+
+### `handoff pull` reports "no sessions found" and the root is on another volume
+
+Exit 2 covers three cases: the root is genuinely empty, no session matched, and
+the walk could not complete. A redirected root behind an unmounted volume — a
+dead NFS mount, a `/mnt` path not mounted this boot — reports the same message
+as an empty root, because the walk's own error output is discarded.
+
+**Fix**: check the root resolves and is readable before reading further into it:
+
+```bash
+readlink -f ~/.codex/sessions && ls ~/.codex/sessions >/dev/null && echo readable
+```
+
+---
+
 ## Skills & commands (dotfile users)
 
 These issues apply when using the bootstrap path (`./bootstrap.sh`) rather than
