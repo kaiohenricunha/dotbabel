@@ -100,10 +100,13 @@ teardown() {
 
 # -- symlink containment ------------------------------------------------
 
-@test "resolve does not follow symlinks that escape session root" {
-  # Dangle a symlink inside ~/.claude/projects/ pointing at /etc. The
-  # resolver only calls find under the session root; -name filters exclude
-  # /etc/passwd regardless, so the symlink must not surface it.
+@test "resolve surfaces only session files from a symlink that escapes the root" {
+  # Dangle a symlink inside ~/.claude/projects/ pointing at /etc. Since #329
+  # the resolver walks with `find -L`, so it DOES follow this link — the
+  # containment is the -name/-path filter plus -maxdepth, never symlink policy.
+  # A session root redirected to another volume is the case that made following
+  # mandatory; this test pins that following it still cannot surface a non-session
+  # file.
   ln -s /etc "$TEST_HOME/.claude/projects/escape"
   run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]

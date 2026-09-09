@@ -182,7 +182,9 @@ if [ -d "$PROJECTS_DIR" ]; then
   PROJECTS_MB=$(du -sm "$PROJECTS_DIR" 2>/dev/null | awk '{print $1}')
   if [ "$PROJECTS_MB" -gt 1536 ]; then
     # shellcheck disable=SC2088  # literal ~ is user-readable text, not a filesystem path
-    warn "~/.claude/projects/ is ${PROJECTS_MB} MB (budget: 1536 MB). Prune: find ~/.claude/projects -mindepth 2 -maxdepth 2 -type f -mtime +60 -delete"
+    # -L: the projects dir is often a symlink to another volume, and plain find
+    # would report nothing to prune. Same reason as handoff-resolve.sh (#329).
+    warn "~/.claude/projects/ is ${PROJECTS_MB} MB (budget: 1536 MB). Prune: find -L ~/.claude/projects -mindepth 2 -maxdepth 2 -type f -mtime +60 -delete"
   else
     pass "projects/ size OK (${PROJECTS_MB} MB / 1536)"
   fi

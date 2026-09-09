@@ -11,12 +11,11 @@ import {
   UUID_HEAD_RE,
 } from "../bin/dotbabel-handoff.mjs";
 
-describe("collectSessionFiles (symlink safety)", () => {
-  it("does not recurse into a symlink that points back up the walk", () => {
-    // `readdirSync(..., { withFileTypes:true })` returns Dirents where
-    // symlinks report isDirectory()=false, so the walker skips them
-    // entirely rather than following or loop-detecting them. Pin that
-    // the walk terminates and the leaf file appears exactly once.
+describe("collectSessionFiles (symlinks)", () => {
+  it("terminates on a symlink loop and yields the leaf exactly once", () => {
+    // The walker follows symlinked directories (#329), so a link pointing back
+    // up the walk would recurse forever. Termination comes from a set of
+    // realpaths already visited, not from refusing to follow.
     const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
     try {
       const leaf = join(root, "leaf");
@@ -26,6 +25,58 @@ describe("collectSessionFiles (symlink safety)", () => {
 
       const files = collectSessionFiles(root, 2, (name) => name.endsWith(".jsonl"));
       expect(files.length).toBe(1);
+      expect(files[0]).toContain("session.jsonl");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("follows a symlinked directory nested inside the root", () => {
+    // #329: a project directory redirected to another volume. A Dirent reports
+    // a symlink as neither file nor directory, so without a follow-through stat
+    // the whole subtree is invisible — `list` then omits sessions that exist.
+    const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
+    try {
+      const real = join(root, "real");
+      mkdirSync(real);
+      writeFileSync(join(real, "session.jsonl"), "{}\n");
+      mkdirSync(join(root, "walk"));
+      symlinkSync(real, join(root, "walk", "linked"));
+
+      const files = collectSessionFiles(join(root, "walk"), 2, (name) => name.endsWith(".jsonl"));
+      expect(files.length).toBe(1);
+      // The caller-visible path, not the realpath — cliFromPath tags a session
+      // by matching "/.codex/sessions/" and friends against this string.
+      expect(files[0]).toContain(join("walk", "linked"));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("finds a symlinked session file", () => {
+    const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
+    try {
+      writeFileSync(join(root, "target.jsonl"), "{}\n");
+      mkdirSync(join(root, "walk"));
+      symlinkSync(join(root, "target.jsonl"), join(root, "walk", "session.jsonl"));
+
+      const files = collectSessionFiles(join(root, "walk"), 2, (name) => name.endsWith(".jsonl"));
+      expect(files).toHaveLength(1);
+      expect(files[0]).toContain("session.jsonl");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("skips a dangling symlink instead of throwing", () => {
+    const root = mkdtempSync(join(tmpdir(), "handoff-symlink-"));
+    try {
+      writeFileSync(join(root, "session.jsonl"), "{}\n");
+      symlinkSync(join(root, "gone"), join(root, "dangling.jsonl"));
+      symlinkSync(join(root, "gone-dir"), join(root, "dangling-dir"));
+
+      const files = collectSessionFiles(root, 2, (name) => name.endsWith(".jsonl"));
+      expect(files).toHaveLength(1);
       expect(files[0]).toContain("session.jsonl");
     } finally {
       rmSync(root, { recursive: true, force: true });

@@ -113,7 +113,7 @@ fi
 # Pure-bash loop: no word-splitting on paths with spaces, no subshell per file.
 # Returns 0 on both empty and populated input. Empty input → empty stdout, exit 0
 # (NOT exit 1 — callers compose this in pipefail-sensitive substitutions like
-# `hit="$(find ... | pick_newest)"` and rely on `[[ -z "$hit" ]]` for the no-match
+# `hit="$(find_sessions ... | pick_newest)"` and rely on `[[ -z "$hit" ]]` for the no-match
 # branch; an exit-1 from the helper would propagate via pipefail and errexit-kill
 # the calling script before the no-match branch could dispatch).
 pick_newest() {
@@ -121,7 +121,10 @@ pick_newest() {
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
     case "$_STAT_FLAVOR" in
-      gnu) frac=$(find "$file" -maxdepth 0 -printf '%T@' 2>/dev/null || echo 0) ;;
+      # -L so a symlinked session file is ranked by its target's mtime. The bsd
+      # and posix branches below already follow, and so does statSync on the
+      # Node side (dotbabel-handoff.mjs), so this keeps all three in agreement.
+      gnu) frac=$(find -L "$file" -maxdepth 0 -printf '%T@' 2>/dev/null || echo 0) ;;
       bsd) frac=$(stat -f '%Fm' "$file" 2>/dev/null || echo 0) ;;
       *)   frac=$(stat -c '%Y' "$file" 2>/dev/null || echo 0) ;;
     esac
@@ -143,6 +146,26 @@ pick_newest() {
   return 0
 }
 
+# Walk a session tree, following symlinks. Usage mirrors find:
+#   find_sessions <path>... <predicate>...
+#
+# `-L` is the fix for #329. A session root, or a project directory inside one,
+# is routinely a symlink to another volume — `~/.codex/sessions ->
+# /mnt/storage/cli-state/codex/sessions`. `[[ -d "$root" ]]` dereferences and
+# passes, but default `-P` find matches the root as `-type l`, `-type f`
+# excludes it, and every query shape resolves to nothing.
+#
+# `|| true` is load-bearing, not defensive noise. `set -euo pipefail` is on and
+# every caller is of the shape `hit="$(find_sessions ... | pick_newest)"`, so a
+# find that exits non-zero — a symlink loop under `-L`, an unreadable subdir,
+# SIGPIPE from a `head -1` consumer — would propagate through pipefail and
+# errexit-kill the script with a bare exit 1 and no message, since stderr is
+# discarded. Degrade to the paths we did find instead, and let the caller's
+# existing `[[ -z "$hit" ]]` branch report the documented exit 2.
+find_sessions() {
+  find -L "$@" 2>/dev/null || true
+}
+
 resolve_claude() {
   local id="$1"
   local root="${HOME}/.claude/projects"
@@ -150,7 +173,7 @@ resolve_claude() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name '*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no claude sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -161,7 +184,7 @@ resolve_claude() {
   # Full UUID (36 chars, 5 hyphen-separated groups).
   if [[ "$id" =~ $UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name "${id}.jsonl" 2>/dev/null | head -1)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${id}.jsonl" | head -1)"
     [[ -n "$hit" ]] || die_runtime "claude session not found for uuid: $id"
     printf '%s\n' "$hit"
     printf 'matched-field=uuid\n' >&2
@@ -174,7 +197,7 @@ resolve_claude() {
   # as aliases on miss (no fall-through to customTitle/aiTitle scans).
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name "${id}*.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${id}*.jsonl" | pick_newest)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       printf 'matched-field=short-uuid\n' >&2
@@ -214,7 +237,7 @@ resolve_claude() {
         esac
         seen_sids="$seen_sids $session_id"
         local hit
-        hit="$(find "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" 2>/dev/null | head -1)"
+        hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" | head -1)"
         [[ -n "$hit" ]] || continue
         if [[ -z "$claude_hit_path" ]]; then
           claude_hit_path="$hit"
@@ -245,7 +268,7 @@ resolve_claude() {
         esac
         seen_sids="$seen_sids $session_id"
         local hit
-        hit="$(find "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" 2>/dev/null | head -1)"
+        hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" | head -1)"
         [[ -n "$hit" ]] || continue
         if [[ -z "$claude_hit_path" ]]; then
           claude_hit_path="$hit"
@@ -289,7 +312,7 @@ resolve_copilot() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name 'events.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name 'events.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no copilot sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -310,7 +333,7 @@ resolve_copilot() {
   # Short UUID — pick newest matching session dir by mtime of its events.jsonl.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -path "*/${id}*/events.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -path "*/${id}*/events.jsonl" | pick_newest)"
     [[ -n "$hit" ]] \
       || die_runtime "copilot session not found for short-uuid: $id"
     printf '%s\n' "$hit"
@@ -354,7 +377,7 @@ resolve_copilot() {
       "$hit" \
       "$(sanitize_for_tsv "$name_value")" \
       "name")")
-  done < <(find "$root" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+  done < <(find_sessions "$root" -maxdepth 1 -mindepth 1 -type d)
 
   case ${#name_rows[@]} in
     0) ;;  # no name match; fall through to die_runtime below
@@ -379,7 +402,7 @@ resolve_codex() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -type f -name 'rollout-*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 4 -type f -name 'rollout-*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no codex sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -394,7 +417,7 @@ resolve_codex() {
   # from claude/copilot's strict-precedence shape.
   if [[ "$id" =~ $UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -type f -name "rollout-*-${id}.jsonl" 2>/dev/null | head -1)"
+    hit="$(find_sessions "$root" -maxdepth 4 -type f -name "rollout-*-${id}.jsonl" | head -1)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       printf 'matched-field=uuid\n' >&2
@@ -409,7 +432,7 @@ resolve_codex() {
   # as aliases on miss (no fall-through to thread_name scan).
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -type f -name "rollout-*-${id}-*.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 4 -type f -name "rollout-*-${id}-*.jsonl" | pick_newest)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       printf 'matched-field=short-uuid\n' >&2
@@ -511,7 +534,7 @@ resolve_gemini() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 3 -type f -path '*/chats/session-*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 3 -type f -path '*/chats/session-*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no gemini sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -531,14 +554,14 @@ resolve_gemini() {
         printf 'matched-value=%s\n' "$(sanitize_for_tsv "$id")" >&2
         return 0
       fi
-    done < <(find "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id:0:8}.jsonl" 2>/dev/null)
+    done < <(find_sessions "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id:0:8}.jsonl")
     die_runtime "gemini session not found for uuid: $id"
   fi
 
   # Short UUID — Gemini filenames end with the 8-hex session prefix.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id}.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id}.jsonl" | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "gemini session not found for short-uuid: $id"
     printf '%s\n' "$hit"
     printf 'matched-field=short-uuid\n' >&2
@@ -568,7 +591,7 @@ resolve_gemini() {
       project_dir=$(dirname "$checkpoint")
       [[ -d "${project_dir}/chats" ]] || continue
       session_path="$(
-        find "${project_dir}/chats" -maxdepth 1 -type f -name 'session-*.jsonl' 2>/dev/null \
+        find_sessions "${project_dir}/chats" -maxdepth 1 -type f -name 'session-*.jsonl' \
           | while IFS= read -r f; do
               jq -e --arg tag "$tag" '
                 select(.type == "info"
@@ -593,7 +616,7 @@ resolve_gemini() {
         "$session_path" \
         "$(sanitize_for_tsv "$tag")" \
         "checkpoint")")
-    done < <(find "$root" -maxdepth 2 -type f -name 'checkpoint-*.json' 2>/dev/null)
+    done < <(find_sessions "$root" -maxdepth 2 -type f -name 'checkpoint-*.json')
 
     case ${#checkpoint_rows[@]} in
       0) ;;  # no resolvable checkpoint alias; fall through to die_runtime
@@ -658,7 +681,7 @@ resolve_any() {
     [[ -d "${HOME}/.gemini/tmp" ]]            && roots+=("${HOME}/.gemini/tmp")
     [[ ${#roots[@]} -gt 0 ]] || die_runtime "no session roots found under \$HOME"
     local hit
-    hit="$(find "${roots[@]}" -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "${roots[@]}" -maxdepth 4 -type f -name '*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no sessions found across any root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
