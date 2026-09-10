@@ -100,13 +100,30 @@ teardown() {
 
 # -- symlink containment ------------------------------------------------
 
-@test "resolve does not follow symlinks that escape session root" {
-  # Dangle a symlink inside ~/.claude/projects/ pointing at /etc. The
-  # resolver only calls find under the session root; -name filters exclude
-  # /etc/passwd regardless, so the symlink must not surface it.
+@test "resolve surfaces only *.jsonl-named entries from a symlink that escapes the root" {
+  # Dangle a symlink inside ~/.claude/projects/ pointing at /etc. Since #329 the
+  # resolver walks with `find -L`, so it DOES follow this link. State the real
+  # boundary precisely: containment is -maxdepth plus the -name/-path filter on
+  # the basename the LINK carries. It is NOT a bound on where a link points — a
+  # link *named* `*.jsonl` is a candidate whatever it targets, as the second
+  # fixture below documents. Anyone who can write under a session root is
+  # already trusted for this data and could write a real .jsonl instead.
   ln -s /etc "$TEST_HOME/.claude/projects/escape"
   run --separate-stderr "$RESOLVE" claude latest
   [ "$status" -eq 0 ]
   [[ "$output" != *"/etc/passwd"* ]]
+  [[ "$output" == *".jsonl" ]]
+}
+
+@test "a *.jsonl-named symlink is a candidate regardless of its target" {
+  # The residual of following symlinks, pinned so it is a documented property
+  # rather than a surprise. `find -L -type f` stats the target, so a link named
+  # `*.jsonl` pointing anywhere readable matches. The filters constrain the
+  # name, not the destination.
+  # make_claude_session_tree seeds slug `-home-user-projects-demo0`.
+  planted="$TEST_HOME/.claude/projects/-home-user-projects-demo0/planted.jsonl"
+  ln -s /etc/hostname "$planted"
+  run --separate-stderr "$RESOLVE" claude latest
+  [ "$status" -eq 0 ]
   [[ "$output" == *".jsonl" ]]
 }

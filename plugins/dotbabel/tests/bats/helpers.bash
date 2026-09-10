@@ -10,6 +10,7 @@
 #   make_tmp_git_repo     mktemp an initialized git repo with an origin remote.
 #   with_fake_git_bin     prepend a shim dir to PATH providing a fake `git`.
 #   with_fake_tool_bin    prepend a shim dir to PATH providing a fake <tool>.
+#   link_session_root     replace a seeded session root with a symlink to it.
 #   make_many_codex_sessions     bulk-seed N codex sessions, no sleep.
 #   make_many_transport_branches bulk-create N handoff/claude/<short> branches.
 #   feed_hook_json        send a PreToolUse JSON payload to a hook script.
@@ -215,6 +216,31 @@ set_claude_ai_title() {
 set_codex_thread_name() {
   local path="$1" uuid="$2" name="$3"
   printf '{"type":"event_msg","payload":{"thread_id":"%s","thread_name":"%s","type":"thread_renamed"}}\n' "$uuid" "$name" >> "$path"
+}
+
+# link_session_root <home> <cli>
+# Turn an already-seeded session root into a symlink: move the real tree to
+# $home/real-<cli> and point the canonical path at it. Models the common setup
+# where CLI state is redirected to another volume
+# (~/.codex/sessions -> /mnt/storage/cli-state/codex/sessions) — see #329.
+# Call AFTER the matching make_*_session_tree.
+link_session_root() {
+  local home="$1" cli="$2" rel
+  case "$cli" in
+    claude)  rel=".claude/projects" ;;
+    copilot) rel=".copilot/session-state" ;;
+    codex)   rel=".codex/sessions" ;;
+    gemini)  rel=".gemini/tmp" ;;
+    *) printf 'link_session_root: unknown cli: %s\n' "$cli" >&2; return 1 ;;
+  esac
+  local canonical="$home/$rel" target="$home/real-$cli"
+  [[ -d "$canonical" && ! -L "$canonical" ]] || {
+    printf 'link_session_root: %s is not a real directory (seed it first)\n' "$canonical" >&2
+    return 1
+  }
+  mv "$canonical" "$target"
+  mkdir -p "$(dirname "$canonical")"
+  ln -s "$target" "$canonical"
 }
 
 # make_many_codex_sessions <home> <count>

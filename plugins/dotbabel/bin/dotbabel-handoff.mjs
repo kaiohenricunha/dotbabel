@@ -95,7 +95,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 import { dirname, join, resolve as resolvePath } from "node:path";
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const CLIS = new Set(["claude", "copilot", "codex", "gemini"]);
@@ -473,7 +473,20 @@ const CLI_LAYOUTS = {
 
 function collectSessionFiles(root, walk, match) {
   const files = [];
+  const seen = new Set();
   const recur = (dir, depth) => {
+    // Break symlink loops on real identity, and visit a directory reachable by
+    // two paths only once. `dir` stays the caller-visible path: cliFromPath
+    // tags a session by matching "/.codex/sessions/" and friends against it, so
+    // rewriting paths to their realpath would mis-attribute a redirected root.
+    let real;
+    try {
+      real = realpathSync(dir);
+    } catch {
+      return;
+    }
+    if (seen.has(real)) return;
+    seen.add(real);
     let entries;
     try {
       entries = readdirSync(dir, { withFileTypes: true });
@@ -482,9 +495,34 @@ function collectSessionFiles(root, walk, match) {
     }
     for (const ent of entries) {
       const full = join(dir, ent.name);
-      if (ent.isDirectory()) {
+      let isDir = ent.isDirectory();
+      let isFile = ent.isFile();
+      if (ent.isSymbolicLink()) {
+        // A Dirent reports a symlink as neither file nor directory, so a
+        // symlinked project directory or session file needs a follow-through
+        // stat to be visible at all (#329).
+        try {
+          const st = statSync(full);
+          isDir = st.isDirectory();
+          isFile = st.isFile();
+        } catch {
+          continue; // dangling link
+        }
+      }
+      if (isDir) {
         if (depth < walk) recur(full, depth + 1);
-      } else if (ent.isFile() && match(ent.name)) {
+      } else if (isFile && match(ent.name)) {
+        // Same-identity dedup as the directory case: now that symlinks are
+        // followed, a session file reachable by both its real name and a link
+        // would otherwise be listed twice under two different short ids.
+        let realFile;
+        try {
+          realFile = realpathSync(full);
+        } catch {
+          continue;
+        }
+        if (seen.has(realFile)) continue;
+        seen.add(realFile);
         files.push(full);
       }
     }

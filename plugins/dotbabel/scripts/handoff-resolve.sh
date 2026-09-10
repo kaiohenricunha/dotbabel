@@ -23,7 +23,11 @@
 #
 # Exits:
 #   0  success — single path resolved
-#   2  "not found", "no session matches", or "multiple sessions match" (collision)
+#   2  "not found", "no session matches", or "multiple sessions match" (collision).
+#      Since #329 this also subsumes "the walk could not complete" — an
+#      unreadable subtree or a root behind an unmounted volume reports the same
+#      "no sessions found" as an empty root, because find_sessions discards the
+#      walk's own error output. See docs/troubleshooting.md § Handoff.
 #   64 usage error
 
 set -euo pipefail
@@ -113,7 +117,7 @@ fi
 # Pure-bash loop: no word-splitting on paths with spaces, no subshell per file.
 # Returns 0 on both empty and populated input. Empty input → empty stdout, exit 0
 # (NOT exit 1 — callers compose this in pipefail-sensitive substitutions like
-# `hit="$(find ... | pick_newest)"` and rely on `[[ -z "$hit" ]]` for the no-match
+# `hit="$(find_sessions ... | pick_newest)"` and rely on `[[ -z "$hit" ]]` for the no-match
 # branch; an exit-1 from the helper would propagate via pipefail and errexit-kill
 # the calling script before the no-match branch could dispatch).
 pick_newest() {
@@ -121,9 +125,16 @@ pick_newest() {
   while IFS= read -r file; do
     [[ -n "$file" ]] || continue
     case "$_STAT_FLAVOR" in
-      gnu) frac=$(find "$file" -maxdepth 0 -printf '%T@' 2>/dev/null || echo 0) ;;
-      bsd) frac=$(stat -f '%Fm' "$file" 2>/dev/null || echo 0) ;;
-      *)   frac=$(stat -c '%Y' "$file" 2>/dev/null || echo 0) ;;
+      # Dereference in every branch so a symlinked session file is ranked by its
+      # target's mtime, matching statSync on the Node side. All three of GNU,
+      # BSD and busybox `stat` call lstat(2) by default — verified: `stat -c %Y`
+      # on a link reports the link's own mtime, which is its creation time and
+      # so almost always newer than the real session. Without -L, `latest` picks
+      # the freshest *link* on macOS and busybox and the freshest session on
+      # Linux. A dangling link now scores 0 rather than winning on link mtime.
+      gnu) frac=$(find -L "$file" -maxdepth 0 -printf '%T@' 2>/dev/null || echo 0) ;;
+      bsd) frac=$(stat -L -f '%Fm' "$file" 2>/dev/null || echo 0) ;;
+      *)   frac=$(stat -L -c '%Y' "$file" 2>/dev/null || echo 0) ;;
     esac
     if [[ "$frac" == *.* ]]; then
       secs="${frac%%.*}"
@@ -143,6 +154,50 @@ pick_newest() {
   return 0
 }
 
+# Walk a session tree, following symlinks. Usage mirrors find:
+#   find_sessions <path>... <predicate>...
+#
+# `-L` is the fix for #329. A session root, or a project directory inside one,
+# is routinely a symlink to another volume — `~/.codex/sessions ->
+# /mnt/storage/cli-state/codex/sessions`. `[[ -d "$root" ]]` dereferences and
+# passes, but default `-P` find matches the root as `-type l`, `-type f`
+# excludes it, and every query shape resolves to nothing.
+#
+# `|| true` is load-bearing, not defensive noise. `set -euo pipefail` is on and
+# every caller is of the shape `hit="$(find_sessions ... | pick_newest)"`, so a
+# find that exits non-zero — a symlink loop under `-L`, an unreadable subdir,
+# SIGPIPE from a `head -1` consumer — would propagate through pipefail and
+# errexit-kill the script with a bare exit 1 and no message, since stderr is
+# discarded. Degrade to the paths we did find instead, and let the caller's
+# existing `[[ -z "$hit" ]]` branch report the documented exit 2.
+find_sessions() {
+  find -L "$@" 2>/dev/null || true
+}
+
+# Physical path of a directory or file, with every symlink in its directory
+# chain resolved. Uses `cd` + `pwd -P` rather than `readlink -f`, which is
+# absent on older macOS and is not in the busybox floor this script targets
+# (see the _STAT_FLAVOR probe above). Echoes the input unchanged if the
+# directory cannot be entered.
+#
+# Needed because `find -L` and `grep -R` report one session under EVERY name it
+# is reachable by. The alias scans dedup by path string, so a session directory
+# reachable as both `<uuid>` and a sibling link to it would accumulate two rows
+# and be reported as a collision — exit 2 for what is a single session, where
+# the pre-#329 walk returned exit 0 and the path.
+# `cd --` throughout: a path component beginning with `-` is otherwise parsed as
+# an option and the cd fails. Session paths are rooted under $HOME so this is
+# defence in depth, not a live case.
+physical_path() {
+  local p="$1"
+  if [[ -d "$p" ]]; then
+    ( cd -- "$p" 2>/dev/null && pwd -P ) || printf '%s\n' "$p"
+  else
+    ( cd -- "$(dirname -- "$p")" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$(basename -- "$p")" ) \
+      || printf '%s\n' "$p"
+  fi
+}
+
 resolve_claude() {
   local id="$1"
   local root="${HOME}/.claude/projects"
@@ -150,7 +205,7 @@ resolve_claude() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name '*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no claude sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -161,7 +216,7 @@ resolve_claude() {
   # Full UUID (36 chars, 5 hyphen-separated groups).
   if [[ "$id" =~ $UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name "${id}.jsonl" 2>/dev/null | head -1)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${id}.jsonl" | head -1)"
     [[ -n "$hit" ]] || die_runtime "claude session not found for uuid: $id"
     printf '%s\n' "$hit"
     printf 'matched-field=uuid\n' >&2
@@ -174,7 +229,7 @@ resolve_claude() {
   # as aliases on miss (no fall-through to customTitle/aiTitle scans).
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name "${id}*.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${id}*.jsonl" | pick_newest)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       printf 'matched-field=short-uuid\n' >&2
@@ -195,7 +250,11 @@ resolve_claude() {
   #
   # Both scans use:
   #   - jq ascii_downcase for case-insensitive exact match (Decisions 1/2)
-  #   - grep -iF prefilter so case-folded inputs pass the gate
+  #   - grep -RiF prefilter so case-folded inputs pass the gate. `-R`, not `-r`:
+  #     `-r` follows a symlink only when it is named on the command line, so it
+  #     would resolve an alias under a symlinked ROOT but not under a symlinked
+  #     project directory — leaving alias queries broken on exactly the case
+  #     `find_sessions` fixes for every other query shape (#329).
   #   - intra-file dedup-by-sessionId (claude rewrites these records on every
   #     save, producing 100+ identical records per file — Phase 1 cardinality
   #     survey: 73-366 records per file)
@@ -214,7 +273,7 @@ resolve_claude() {
         esac
         seen_sids="$seen_sids $session_id"
         local hit
-        hit="$(find "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" 2>/dev/null | head -1)"
+        hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" | head -1)"
         [[ -n "$hit" ]] || continue
         if [[ -z "$claude_hit_path" ]]; then
           claude_hit_path="$hit"
@@ -231,7 +290,7 @@ resolve_claude() {
         select(.type == "custom-title"
                and (.customTitle | ascii_downcase) == ($name | ascii_downcase))
         | "\(.sessionId)\t\(.customTitle | gsub("[\t\n]"; " "))"' "$f" 2>/dev/null)
-    done < <(grep -rl --include='*.jsonl' -iF "\"customTitle\":\"${id}\"" "$root" 2>/dev/null)
+    done < <(grep -Rl --include='*.jsonl' -iF "\"customTitle\":\"${id}\"" "$root" 2>/dev/null)
 
     # aiTitle scan — shares seen_sids with customTitle so a session matched by
     # both mechanisms collapses to one row (whichever scan saw it first wins
@@ -245,7 +304,7 @@ resolve_claude() {
         esac
         seen_sids="$seen_sids $session_id"
         local hit
-        hit="$(find "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" 2>/dev/null | head -1)"
+        hit="$(find_sessions "$root" -maxdepth 2 -type f -name "${session_id}.jsonl" | head -1)"
         [[ -n "$hit" ]] || continue
         if [[ -z "$claude_hit_path" ]]; then
           claude_hit_path="$hit"
@@ -262,7 +321,7 @@ resolve_claude() {
         select(.type == "ai-title"
                and (.aiTitle | ascii_downcase) == ($name | ascii_downcase))
         | "\(.sessionId)\t\(.aiTitle | gsub("[\t\n]"; " "))"' "$f" 2>/dev/null)
-    done < <(grep -rl --include='*.jsonl' -iF "\"aiTitle\":\"${id}\"" "$root" 2>/dev/null)
+    done < <(grep -Rl --include='*.jsonl' -iF "\"aiTitle\":\"${id}\"" "$root" 2>/dev/null)
 
     # Unified dispatch over the union of customTitle + aiTitle hits.
     case ${#claude_rows[@]} in
@@ -289,7 +348,7 @@ resolve_copilot() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -name 'events.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -name 'events.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no copilot sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -310,7 +369,7 @@ resolve_copilot() {
   # Short UUID — pick newest matching session dir by mtime of its events.jsonl.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 2 -type f -path "*/${id}*/events.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 2 -type f -path "*/${id}*/events.jsonl" | pick_newest)"
     [[ -n "$hit" ]] \
       || die_runtime "copilot session not found for short-uuid: $id"
     printf '%s\n' "$hit"
@@ -326,15 +385,23 @@ resolve_copilot() {
   # companion key, often identical but not the resolution target per Decision 4).
   # Case-insensitive exact match via LC_ALL=C tr (matching the bash 3.2 floor
   # established at handoff-description.sh:34). One workspace.yaml per session
-  # directory, so no intra-resource dedup needed (structural invariant: one
-  # name per UUID directory). Cross-directory matches are real collisions —
+  # directory. The "one name per UUID directory" invariant used to make dedup
+  # unnecessary, but `find -L` (#329) can reach one directory under both its
+  # real name and a sibling link, so dedup on the PHYSICAL directory. Two names
+  # for one session are not a collision. Cross-directory matches still are —
   # accumulate into name_rows + emit_collision_tsv.
   local id_lower
   id_lower="$(printf '%s' "$id" | LC_ALL=C tr '[:upper:]' '[:lower:]')"
-  local d workspace_yaml name_value name_lower sid
+  local d workspace_yaml name_value name_lower sid physical
   local -a name_rows=()
   local name_hit_path="" name_hit_value=""
+  local seen_dirs=""
   while IFS= read -r d; do
+    physical="$(physical_path "$d")"
+    case " $seen_dirs " in
+      *" $physical "*) continue ;;
+    esac
+    seen_dirs="$seen_dirs $physical"
     workspace_yaml="${d}/workspace.yaml"
     [[ -f "$workspace_yaml" ]] || continue
     name_value=$(sed -n 's/^name: *//p' "$workspace_yaml" 2>/dev/null | head -1)
@@ -345,7 +412,9 @@ resolve_copilot() {
     [[ "$name_lower" == "$id_lower" ]] || continue
     local hit="${d}/events.jsonl"
     [[ -f "$hit" ]] || continue
-    sid=$(basename "$d")
+    # Basename of the PHYSICAL directory: the copilot session id is the
+    # directory name, and a link's own name is not it.
+    sid=$(basename "$physical")
     name_hit_path="$hit"
     name_hit_value="$name_value"
     name_rows+=("$(printf '%s\t%s\t%s\t%s\t%s' \
@@ -354,7 +423,7 @@ resolve_copilot() {
       "$hit" \
       "$(sanitize_for_tsv "$name_value")" \
       "name")")
-  done < <(find "$root" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+  done < <(find_sessions "$root" -maxdepth 1 -mindepth 1 -type d)
 
   case ${#name_rows[@]} in
     0) ;;  # no name match; fall through to die_runtime below
@@ -379,7 +448,7 @@ resolve_codex() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -type f -name 'rollout-*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 4 -type f -name 'rollout-*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no codex sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -394,7 +463,7 @@ resolve_codex() {
   # from claude/copilot's strict-precedence shape.
   if [[ "$id" =~ $UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -type f -name "rollout-*-${id}.jsonl" 2>/dev/null | head -1)"
+    hit="$(find_sessions "$root" -maxdepth 4 -type f -name "rollout-*-${id}.jsonl" | head -1)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       printf 'matched-field=uuid\n' >&2
@@ -409,7 +478,7 @@ resolve_codex() {
   # as aliases on miss (no fall-through to thread_name scan).
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -type f -name "rollout-*-${id}-*.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 4 -type f -name "rollout-*-${id}-*.jsonl" | pick_newest)"
     if [[ -n "$hit" ]]; then
       printf '%s\n' "$hit"
       printf 'matched-field=short-uuid\n' >&2
@@ -447,16 +516,20 @@ resolve_codex() {
       while IFS=$'\t' read -r path matched_value; do
         [[ -n "$path" ]] || continue
         [[ -f "$path" ]] || continue
-        # Intra-file dedup-by-path: codex sessionId is encoded in the rollout
-        # filename, so same path === same session. Multiple thread_name records
-        # within one rollout (if any — Phase 1 found 0 records on local data)
-        # would dedupe to one row. NOT to be confused with cross-file collision
-        # detection — different paths with the same alias are real collisions,
-        # handled by accumulation into thread_rows + emit_collision_tsv.
+        # Intra-file dedup by PHYSICAL path: codex sessionId is encoded in the
+        # rollout filename, so same file === same session. Multiple thread_name
+        # records within one rollout (if any — Phase 1 found 0 records on local
+        # data) dedupe to one row. Keyed on the physical path since #329: with
+        # `grep -R`, a symlinked date directory yields two spellings of one
+        # rollout, and the raw string would make that a false collision. NOT to
+        # be confused with cross-file collision detection — genuinely different
+        # files with the same alias are real collisions, handled by accumulation
+        # into thread_rows + emit_collision_tsv.
+        local physical; physical=$(physical_path "$path")
         case " $seen_paths " in
-          *" $path "*) continue ;;
+          *" $physical "*) continue ;;
         esac
-        seen_paths="$seen_paths $path"
+        seen_paths="$seen_paths $physical"
         local sid; sid=$(session_id_from_path "codex" "$path")
         thread_hit_path="$path"
         thread_hit_value="$matched_value"
@@ -471,7 +544,7 @@ resolve_codex() {
                and .payload.thread_name != null
                and (.payload.thread_name | ascii_downcase) == ($name | ascii_downcase))
         | "\(input_filename)\t\(.payload.thread_name | gsub("[\t\n]"; " "))"' "$f" 2>/dev/null)
-    done < <(grep -rl --include='rollout-*.jsonl' -iF "\"thread_name\":\"${id}\"" "$root" 2>/dev/null)
+    done < <(grep -Rl --include='rollout-*.jsonl' -iF "\"thread_name\":\"${id}\"" "$root" 2>/dev/null)
 
     case ${#thread_rows[@]} in
       0) ;;  # no thread_name match; fall through to die_runtime at function bottom
@@ -511,7 +584,7 @@ resolve_gemini() {
 
   if [[ "$id" == [Ll][Aa][Tt][Ee][Ss][Tt] ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 3 -type f -path '*/chats/session-*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 3 -type f -path '*/chats/session-*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no gemini sessions found under $root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
@@ -531,14 +604,14 @@ resolve_gemini() {
         printf 'matched-value=%s\n' "$(sanitize_for_tsv "$id")" >&2
         return 0
       fi
-    done < <(find "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id:0:8}.jsonl" 2>/dev/null)
+    done < <(find_sessions "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id:0:8}.jsonl")
     die_runtime "gemini session not found for uuid: $id"
   fi
 
   # Short UUID — Gemini filenames end with the 8-hex session prefix.
   if [[ "$id" =~ $SHORT_UUID_RE ]]; then
     local hit
-    hit="$(find "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id}.jsonl" 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "$root" -maxdepth 3 -type f -path "*/chats/session-*-${id}.jsonl" | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "gemini session not found for short-uuid: $id"
     printf '%s\n' "$hit"
     printf 'matched-field=short-uuid\n' >&2
@@ -568,7 +641,7 @@ resolve_gemini() {
       project_dir=$(dirname "$checkpoint")
       [[ -d "${project_dir}/chats" ]] || continue
       session_path="$(
-        find "${project_dir}/chats" -maxdepth 1 -type f -name 'session-*.jsonl' 2>/dev/null \
+        find_sessions "${project_dir}/chats" -maxdepth 1 -type f -name 'session-*.jsonl' \
           | while IFS= read -r f; do
               jq -e --arg tag "$tag" '
                 select(.type == "info"
@@ -580,10 +653,14 @@ resolve_gemini() {
           || true
       )"
       [[ -n "$session_path" ]] || continue
+      # Physical path, not the raw string: since #329 a symlinked project
+      # directory makes one session reachable under two spellings, and keying on
+      # the string would report that single session as a collision.
+      local physical; physical="$(physical_path "$session_path")"
       case " $seen_paths " in
-        *" $session_path "*) continue ;;
+        *" $physical "*) continue ;;
       esac
-      seen_paths="$seen_paths $session_path"
+      seen_paths="$seen_paths $physical"
       sid="$(gemini_session_id_from_file "$session_path")"
       checkpoint_hit_path="$session_path"
       checkpoint_hit_value="$tag"
@@ -593,7 +670,7 @@ resolve_gemini() {
         "$session_path" \
         "$(sanitize_for_tsv "$tag")" \
         "checkpoint")")
-    done < <(find "$root" -maxdepth 2 -type f -name 'checkpoint-*.json' 2>/dev/null)
+    done < <(find_sessions "$root" -maxdepth 2 -type f -name 'checkpoint-*.json')
 
     case ${#checkpoint_rows[@]} in
       0) ;;  # no resolvable checkpoint alias; fall through to die_runtime
@@ -658,7 +735,7 @@ resolve_any() {
     [[ -d "${HOME}/.gemini/tmp" ]]            && roots+=("${HOME}/.gemini/tmp")
     [[ ${#roots[@]} -gt 0 ]] || die_runtime "no session roots found under \$HOME"
     local hit
-    hit="$(find "${roots[@]}" -type f -name '*.jsonl' 2>/dev/null | pick_newest)"
+    hit="$(find_sessions "${roots[@]}" -maxdepth 4 -type f -name '*.jsonl' | pick_newest)"
     [[ -n "$hit" ]] || die_runtime "no sessions found across any root"
     printf '%s\n' "$hit"
     printf 'matched-field=latest\n' >&2
