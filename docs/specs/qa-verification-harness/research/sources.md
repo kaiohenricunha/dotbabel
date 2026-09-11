@@ -23,3 +23,5 @@
 - **DOC-19**: Martin Fowler, "Eradicating Non-Determinism in Tests" (2011) — quarantine non-deterministic tests and fix them. Feeds: §7 (REL-4), §8 (R-4, A-11).
 - **DOC-20**: Dan North, "Introducing BDD" (2006), and the Gherkin Given/When/Then vocabulary. Feeds: §4 (KD-1), §8 (A-10).
 - **DOC-21**: Semantic Versioning 2.0.0 — backward-compatible additions release as a minor version. Feeds: §3, §6.5.
+- **DOC-22**: GitHub documentation on managing comments — users with write access can edit and hide comments — and the GraphQL `IssueComment.lastEditedAt` field and `minimizeComment` mutation with the `OUTDATED` classifier. Feeds: §3, §4 (KD-2), §5, §7 (SEC-3), §8 (R-20, A-14).
+- **DOC-23**: WHATWG Fetch Standard — the `manual` redirect mode, and the removal of only the `Authorization` header on a cross-origin redirect — which Node's built-in `fetch` follows by default. Feeds: §5, §7 (SEC-8).

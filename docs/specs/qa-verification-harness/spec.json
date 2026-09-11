@@ -10,6 +10,7 @@
     "plugins/dotbabel/src/criteria/**",
     "plugins/dotbabel/src/pr-gates.mjs",
     "plugins/dotbabel/src/local-attest-lib.mjs",
+    "plugins/dotbabel/src/spec-harness-lib.mjs",
     "plugins/dotbabel/src/project-sync.mjs",
     "plugins/dotbabel/src/quality/**",
     "plugins/dotbabel/src/index.mjs",
@@ -18,12 +19,34 @@
     "plugins/dotbabel/bin/dotbabel-pr-stack.mjs",
     "plugins/dotbabel/bin/dotbabel-doctor.mjs",
     "plugins/dotbabel/hooks/check-on-stop.sh",
+    "plugins/dotbabel/hooks/guard-criteria-evidence.sh",
     "plugins/dotbabel/templates/workflows/**",
     "plugins/dotbabel/templates/githooks/**",
+    "plugins/dotbabel/templates/claude/hooks/guard-criteria-evidence.sh",
+    "plugins/dotbabel/templates/claude/commands/merge-pr.md",
+    "plugins/dotbabel/templates/cli-instructions/**",
     "plugins/dotbabel/templates/docs/repo-facts.json",
+    "plugins/dotbabel/templates/docs/specs/README.md",
     "plugins/dotbabel/tests/criteria-*.test.mjs",
+    "plugins/dotbabel/tests/validate-specs.test.mjs",
+    "plugins/dotbabel/tests/pr-gates.test.mjs",
+    "plugins/dotbabel/tests/pr-stack-criteria.test.mjs",
+    "plugins/dotbabel/tests/quality-*.test.mjs",
+    "plugins/dotbabel/tests/workflow-templates.test.mjs",
+    "plugins/dotbabel/tests/deploy-ops.test.mjs",
+    "plugins/dotbabel/tests/repo-facts-keys.test.mjs",
+    "plugins/dotbabel/tests/eval-thresholds.test.mjs",
     "plugins/dotbabel/tests/evals/test-quality-judgment/**",
+    "plugins/dotbabel/tests/bats/pre-push-hook.bats",
+    "plugins/dotbabel/tests/bats/review-pr-criteria.bats",
+    "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats",
+    "plugins/dotbabel/tests/bats/spec-skill-criteria.bats",
+    "plugins/dotbabel/tests/bats/check-on-stop-tests.bats",
+    "plugins/dotbabel/tests/bats/smoke-test-skill.bats",
+    "plugins/dotbabel/tests/bats/merge-pr-quality-step.bats",
     "schemas/dotbabel.criteria-evidence.schema.json",
+    "schemas/dotbabel.criteria-list.schema.json",
+    "schemas/dotbabel.smoke-report.schema.json",
     "schemas/dotbabel.config.schema.json",
     "schemas/dotbabel.quality-report.schema.json",
     "skills/spec/**",
@@ -34,12 +57,22 @@
     "skills/deploy-status/**",
     "skills/smoke-test/**",
     "commands/merge-pr.md",
+    ".github/prompts/merge-pr.prompt.md",
     "docs/quality.md",
     "docs/hooks.md",
     "docs/templates.md",
+    "docs/quickstart.md",
+    "docs/troubleshooting.md",
     "docs/repo-facts.json",
     "docs/specs/README.md",
     "CLAUDE.md",
+    "AGENTS.md",
+    "GEMINI.md",
+    ".github/copilot-instructions.md",
+    "package.json",
+    ".gitignore",
+    ".dotbabel.json",
+    "stryker.config.mjs",
     "examples/minimal-consumer/docs/repo-facts.json"
   ],
   "acceptance_commands": [
@@ -56,6 +89,7 @@
   "acceptance_criteria": [
     {
       "id": "AC-1",
+      "status": "planned",
       "given": "a spec.json without acceptance_criteria",
       "when": "dotbabel-validate-specs runs",
       "then": "the spec stays valid",
@@ -77,6 +111,7 @@
     },
     {
       "id": "AC-2",
+      "status": "planned",
       "given": "a criterion without given, when, or then, or with a duplicate id",
       "when": "dotbabel-validate-specs runs",
       "then": "it emits SPEC_CRITERIA_INVALID",
@@ -102,6 +137,7 @@
     },
     {
       "id": "AC-3",
+      "status": "planned",
       "given": "a criterion command that exits 0",
       "when": "a named test is missing from the output",
       "then": "the criterion is unconfirmed and does not pass",
@@ -127,6 +163,7 @@
     },
     {
       "id": "AC-4",
+      "status": "planned",
       "given": "trusted evidence pinned to an older commit",
       "when": "the merge gate runs",
       "then": "it fails with CRITERIA_EVIDENCE_STALE",
@@ -148,6 +185,7 @@
     },
     {
       "id": "AC-5",
+      "status": "planned",
       "given": "a marker comment from an author outside the trusted associations",
       "when": "the merge gate runs",
       "then": "it fails with CRITERIA_EVIDENCE_UNTRUSTED",
@@ -169,6 +207,7 @@
     },
     {
       "id": "AC-6",
+      "status": "planned",
       "given": "an evidence payload that does not decode",
       "when": "the merge gate runs",
       "then": "it fails closed with CRITERIA_EVIDENCE_INVALID",
@@ -190,6 +229,7 @@
     },
     {
       "id": "AC-7",
+      "status": "planned",
       "given": "criteria verification running inside review-pr",
       "when": "the conductor phase list is read",
       "then": "the six phases keep their order",
@@ -211,6 +251,7 @@
     },
     {
       "id": "AC-8",
+      "status": "planned",
       "given": "a quality tool that declares paths",
       "when": "no changed file matches those paths",
       "then": "the tool does not run and the report shows not_triggered with an info verdict",
@@ -237,6 +278,7 @@
     },
     {
       "id": "AC-9",
+      "status": "planned",
       "given": "a changed file under critical_paths",
       "when": "the fast quality profile runs",
       "then": "the test plan of every component runs",
@@ -258,6 +300,7 @@
     },
     {
       "id": "AC-10",
+      "status": "planned",
       "given": "a Stryker report with mutants on changed and unchanged lines",
       "when": "dotbabel parses the report",
       "then": "the score counts only mutants on changed lines",
@@ -279,6 +322,7 @@
     },
     {
       "id": "AC-11",
+      "status": "planned",
       "given": "the consumer workflow templates",
       "when": "the template security tests run",
       "then": "every action is pinned to a full commit SHA and contents permission is read-only",
@@ -304,6 +348,7 @@
     },
     {
       "id": "AC-12",
+      "status": "planned",
       "given": "a failing http smoke check",
       "when": "deploy-ops.mjs smoke runs",
       "then": "it retries 3 times with backoff and exits 1",
@@ -329,6 +374,7 @@
     },
     {
       "id": "AC-13",
+      "status": "planned",
       "given": "the shipped templates, docs, and rule floor",
       "when": "the removed-key test runs",
       "then": "no file mentions regression_paths or verification_commands",
@@ -350,6 +396,7 @@
     },
     {
       "id": "AC-14",
+      "status": "planned",
       "given": "a push whose fast quality profile exits 1",
       "when": "the pre-push hook runs",
       "then": "the push is blocked",
@@ -359,10 +406,15 @@
           "name": "pre-push: blocks the push when the fast profile exits 1"
         }
       ],
-      "argv": ["bats", "plugins/dotbabel/tests/bats/pre-push-hook.bats"]
+      "argv": [
+        "bash",
+        "plugins/dotbabel/scripts/run-bats.sh",
+        "plugins/dotbabel/tests/bats/pre-push-hook.bats"
+      ]
     },
     {
       "id": "AC-15",
+      "status": "planned",
       "given": "a pull request whose spec has a failing criterion",
       "when": "review-pr runs in conductor mode",
       "then": "it reports BLOCKED and the conductor stops before local-attest",
@@ -372,10 +424,15 @@
           "name": "review-pr: a failing criterion reports BLOCKED and stops the conductor before local-attest"
         }
       ],
-      "argv": ["bats", "plugins/dotbabel/tests/bats/review-pr-criteria.bats"]
+      "argv": [
+        "bash",
+        "plugins/dotbabel/scripts/run-bats.sh",
+        "plugins/dotbabel/tests/bats/review-pr-criteria.bats"
+      ]
     },
     {
       "id": "AC-16",
+      "status": "planned",
       "given": "criterion output that contains a secret and exceeds the size limits",
       "when": "the evidence payload is built",
       "then": "the output is redacted before it is truncated to 40 lines and 2000 characters",

@@ -23,7 +23,7 @@ The metadata status in `spec.json` stays `draft` until the owner approves the sp
 
 1. **Why:** [`spec/1-problem-motivation.md`](spec/1-problem-motivation.md) explains the 6/10 assessment and its six gaps.
 2. **What is in and out:** [`spec/2-scope.md`](spec/2-scope.md) lists the nine items and the five settled decisions.
-3. **How it fits together:** [`spec/3-high-level-architecture.md`](spec/3-high-level-architecture.md) and [`spec/4-data-flow-components.md`](spec/4-data-flow-components.md) cover the layers, six flows, and key decisions KD-1 through KD-14.
+3. **How it fits together:** [`spec/3-high-level-architecture.md`](spec/3-high-level-architecture.md) and [`spec/4-data-flow-components.md`](spec/4-data-flow-components.md) cover the layers, six flows, and key decisions KD-1 through KD-16.
 4. **Exact contracts:** [`spec/5-interfaces-apis.md`](spec/5-interfaces-apis.md) defines the criterion schema, the `dotbabel criteria` command, the evidence comment, and the new reason codes.
 5. **How to build it:** [`spec/6-implementation-plan.md`](spec/6-implementation-plan.md) holds seventeen prompts in six phases, each with its failing tests listed first.
 6. **Limits and risks:** [`spec/7-non-functional-requirements.md`](spec/7-non-functional-requirements.md) and [`spec/8-risks-alternatives.md`](spec/8-risks-alternatives.md).
