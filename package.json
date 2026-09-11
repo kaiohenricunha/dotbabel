@@ -68,10 +68,10 @@
     "js-yaml": "^4.3.1"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.0",
     "bats": "^1.11.1",
     "markdownlint-cli2": "^0.23.2",
-    "vitest": "^4.1.4"
+    "vitest": "^5.0.0"
   },
   "repository": {
     "type": "git",
