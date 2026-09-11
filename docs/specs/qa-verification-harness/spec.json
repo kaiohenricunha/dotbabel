@@ -1,0 +1,399 @@
+{
+  "id": "qa-verification-harness",
+  "title": "QA verification harness — executed-behavior gates from spec to production",
+  "status": "draft",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "plugins/dotbabel/src/validate-specs.mjs",
+    "plugins/dotbabel/src/lib/errors.mjs",
+    "plugins/dotbabel/src/lib/pr-markers.mjs",
+    "plugins/dotbabel/src/criteria/**",
+    "plugins/dotbabel/src/pr-gates.mjs",
+    "plugins/dotbabel/src/local-attest-lib.mjs",
+    "plugins/dotbabel/src/project-sync.mjs",
+    "plugins/dotbabel/src/quality/**",
+    "plugins/dotbabel/src/index.mjs",
+    "plugins/dotbabel/bin/dotbabel.mjs",
+    "plugins/dotbabel/bin/dotbabel-criteria.mjs",
+    "plugins/dotbabel/bin/dotbabel-pr-stack.mjs",
+    "plugins/dotbabel/bin/dotbabel-doctor.mjs",
+    "plugins/dotbabel/hooks/check-on-stop.sh",
+    "plugins/dotbabel/templates/workflows/**",
+    "plugins/dotbabel/templates/githooks/**",
+    "plugins/dotbabel/templates/docs/repo-facts.json",
+    "plugins/dotbabel/tests/criteria-*.test.mjs",
+    "plugins/dotbabel/tests/evals/test-quality-judgment/**",
+    "schemas/dotbabel.criteria-evidence.schema.json",
+    "schemas/dotbabel.config.schema.json",
+    "schemas/dotbabel.quality-report.schema.json",
+    "skills/spec/**",
+    "skills/validate-spec/**",
+    "skills/pr-conductor/**",
+    "skills/review-pr/**",
+    "skills/release-conductor/**",
+    "skills/deploy-status/**",
+    "skills/smoke-test/**",
+    "commands/merge-pr.md",
+    "docs/quality.md",
+    "docs/hooks.md",
+    "docs/templates.md",
+    "docs/repo-facts.json",
+    "docs/specs/README.md",
+    "CLAUDE.md",
+    "examples/minimal-consumer/docs/repo-facts.json"
+  ],
+  "acceptance_commands": [
+    "npm test",
+    "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
+    "node plugins/dotbabel/bin/dotbabel-validate-skills.mjs",
+    "node plugins/dotbabel/bin/dotbabel-check-instruction-drift.mjs",
+    "bash plugins/dotbabel/scripts/run-bats.sh",
+    "npm run build-plugin -- --check",
+    "node plugins/dotbabel/bin/dotbabel-criteria.mjs verify --spec qa-verification-harness --allow-project-commands"
+  ],
+  "depends_on_specs": ["dotbabel-core"],
+  "active_prs": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "given": "a spec.json without acceptance_criteria",
+      "when": "dotbabel-validate-specs runs",
+      "then": "the spec stays valid",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/validate-specs.test.mjs",
+          "name": "accepts a spec without acceptance_criteria"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/validate-specs.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-1.junit.xml" }
+    },
+    {
+      "id": "AC-2",
+      "given": "a criterion without given, when, or then, or with a duplicate id",
+      "when": "dotbabel-validate-specs runs",
+      "then": "it emits SPEC_CRITERIA_INVALID",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/validate-specs.test.mjs",
+          "name": "emits SPEC_CRITERIA_INVALID when a criterion lacks given, when, or then"
+        },
+        {
+          "file": "plugins/dotbabel/tests/validate-specs.test.mjs",
+          "name": "emits SPEC_CRITERIA_INVALID for a duplicate criterion id"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/validate-specs.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-2.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-2.junit.xml" }
+    },
+    {
+      "id": "AC-3",
+      "given": "a criterion command that exits 0",
+      "when": "a named test is missing from the output",
+      "then": "the criterion is unconfirmed and does not pass",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/criteria-verify.test.mjs",
+          "name": "passes a criterion only when the command exits 0 and every named test is confirmed"
+        },
+        {
+          "file": "plugins/dotbabel/tests/criteria-verify.test.mjs",
+          "name": "marks a criterion unconfirmed when the command exits 0 but a named test is missing from the output"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/criteria-verify.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-3.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-3.junit.xml" }
+    },
+    {
+      "id": "AC-4",
+      "given": "trusted evidence pinned to an older commit",
+      "when": "the merge gate runs",
+      "then": "it fails with CRITERIA_EVIDENCE_STALE",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "fails with CRITERIA_EVIDENCE_STALE when evidence is pinned to an older commit"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-4.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-4.junit.xml" }
+    },
+    {
+      "id": "AC-5",
+      "given": "a marker comment from an author outside the trusted associations",
+      "when": "the merge gate runs",
+      "then": "it fails with CRITERIA_EVIDENCE_UNTRUSTED",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "fails with CRITERIA_EVIDENCE_UNTRUSTED when only an untrusted author posted the marker"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-5.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-5.junit.xml" }
+    },
+    {
+      "id": "AC-6",
+      "given": "an evidence payload that does not decode",
+      "when": "the merge gate runs",
+      "then": "it fails closed with CRITERIA_EVIDENCE_INVALID",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "fails closed with CRITERIA_EVIDENCE_INVALID when the payload does not decode"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-6.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-6.junit.xml" }
+    },
+    {
+      "id": "AC-7",
+      "given": "criteria verification running inside review-pr",
+      "when": "the conductor phase list is read",
+      "then": "the six phases keep their order",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "declares the six pipeline phases in order"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-7.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-7.junit.xml" }
+    },
+    {
+      "id": "AC-8",
+      "given": "a quality tool that declares paths",
+      "when": "no changed file matches those paths",
+      "then": "the tool does not run and the report shows not_triggered with an info verdict",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/quality-discovery.test.mjs",
+          "name": "keeps a path-triggered tool only when a changed file matches its paths"
+        },
+        {
+          "file": "plugins/dotbabel/tests/quality-evaluate.test.mjs",
+          "name": "reports not_triggered with an info verdict for an unmatched path-triggered tool"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/quality-discovery.test.mjs",
+        "plugins/dotbabel/tests/quality-evaluate.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-8.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-8.junit.xml" }
+    },
+    {
+      "id": "AC-9",
+      "given": "a changed file under critical_paths",
+      "when": "the fast quality profile runs",
+      "then": "the test plan of every component runs",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/quality-discovery.test.mjs",
+          "name": "adds every component test plan to the fast profile when a changed file matches critical_paths"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/quality-discovery.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-9.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-9.junit.xml" }
+    },
+    {
+      "id": "AC-10",
+      "given": "a Stryker report with mutants on changed and unchanged lines",
+      "when": "dotbabel parses the report",
+      "then": "the score counts only mutants on changed lines",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/quality-reports.test.mjs",
+          "name": "scores only mutants on changed lines as detected divided by valid times 100"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/quality-reports.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-10.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-10.junit.xml" }
+    },
+    {
+      "id": "AC-11",
+      "given": "the consumer workflow templates",
+      "when": "the template security tests run",
+      "then": "every action is pinned to a full commit SHA and contents permission is read-only",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/workflow-templates.test.mjs",
+          "name": "pins every action in every workflow template to a full 40-character commit SHA"
+        },
+        {
+          "file": "plugins/dotbabel/tests/workflow-templates.test.mjs",
+          "name": "declares top-level permissions with contents read in every workflow template"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/workflow-templates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-11.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-11.junit.xml" }
+    },
+    {
+      "id": "AC-12",
+      "given": "a failing http smoke check",
+      "when": "deploy-ops.mjs smoke runs",
+      "then": "it retries 3 times with backoff and exits 1",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/deploy-ops.test.mjs",
+          "name": "smoke: retries an http GET check 3 times with 2, 4, and 8 second backoff"
+        },
+        {
+          "file": "plugins/dotbabel/tests/deploy-ops.test.mjs",
+          "name": "smoke: exits 1 when any smoke check fails"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/deploy-ops.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-12.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-12.junit.xml" }
+    },
+    {
+      "id": "AC-13",
+      "given": "the shipped templates, docs, and rule floor",
+      "when": "the removed-key test runs",
+      "then": "no file mentions regression_paths or verification_commands",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/repo-facts-keys.test.mjs",
+          "name": "no template, doc, or rule-floor file mentions regression_paths or verification_commands"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/repo-facts-keys.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-13.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-13.junit.xml" }
+    },
+    {
+      "id": "AC-14",
+      "given": "a push whose fast quality profile exits 1",
+      "when": "the pre-push hook runs",
+      "then": "the push is blocked",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/bats/pre-push-hook.bats",
+          "name": "pre-push: blocks the push when the fast profile exits 1"
+        }
+      ],
+      "argv": ["bats", "plugins/dotbabel/tests/bats/pre-push-hook.bats"]
+    },
+    {
+      "id": "AC-15",
+      "given": "a pull request whose spec has a failing criterion",
+      "when": "review-pr runs in conductor mode",
+      "then": "it reports BLOCKED and the conductor stops before local-attest",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/bats/review-pr-criteria.bats",
+          "name": "review-pr: a failing criterion reports BLOCKED and stops the conductor before local-attest"
+        }
+      ],
+      "argv": ["bats", "plugins/dotbabel/tests/bats/review-pr-criteria.bats"]
+    },
+    {
+      "id": "AC-16",
+      "given": "criterion output that contains a secret and exceeds the size limits",
+      "when": "the evidence payload is built",
+      "then": "the output is redacted before it is truncated to 40 lines and 2000 characters",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/criteria-verify.test.mjs",
+          "name": "truncates each output tail to 40 lines and 2000 characters after redaction"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/criteria-verify.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-16.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-16.junit.xml" }
+    }
+  ]
+}
