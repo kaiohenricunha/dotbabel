@@ -67,8 +67,9 @@ This summary is for project owners and managers.
 **Decisions for the owner:**
 
 - Approve the spec to start phase 1.
-- Confirm the evidence storage choice, which was adopted under delegation (KD-2).
 - Schedule the SLO follow-up spec.
+
+The owner confirmed all key decisions, KD-1 through KD-16, by 2026-09-11.
 
 ## Research Sources
 
