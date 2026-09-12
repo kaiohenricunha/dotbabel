@@ -10,6 +10,22 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.3.1](https://github.com/kaiohenricunha/dotbabel/compare/v3.3.0...v3.3.1) (2026-09-12)
+
+
+### Fixed
+
+* **handoff:** resolve sessions through a symlinked session root ([#345](https://github.com/kaiohenricunha/dotbabel/issues/345)) ([db08ece](https://github.com/kaiohenricunha/dotbabel/commit/db08ece2d88c85250153c708cff18c1fd6fd75b3))
+* **hooks:** stop the destructive-git guard blocking single-file dotfile restores ([#344](https://github.com/kaiohenricunha/dotbabel/issues/344)) ([8c5ac4a](https://github.com/kaiohenricunha/dotbabel/commit/8c5ac4afd7d4d40ff67c6173880c87f4a87255bf))
+* **quality:** fail loudly when Git cannot determine the change scope ([#343](https://github.com/kaiohenricunha/dotbabel/issues/343)) ([4dcaada](https://github.com/kaiohenricunha/dotbabel/commit/4dcaadaccb8ee987e51238f88b92135c242b05d1))
+
+
+### Documentation
+
+* **quality:** present the quality floor across README, docs, and the rule floor ([#341](https://github.com/kaiohenricunha/dotbabel/issues/341)) ([1f3c17d](https://github.com/kaiohenricunha/dotbabel/commit/1f3c17dacca3cde285235c05542adc9588b94c3a))
+* **specs:** add the QA verification harness spec ([#346](https://github.com/kaiohenricunha/dotbabel/issues/346)) ([3c171de](https://github.com/kaiohenricunha/dotbabel/commit/3c171dec09925017b0de05a892c33249ae139bb1))
+* **specs:** record owner confirmation of the QA harness key decisions ([#347](https://github.com/kaiohenricunha/dotbabel/issues/347)) ([0abf40f](https://github.com/kaiohenricunha/dotbabel/commit/0abf40f6fd40d16d546f00101e75104b1fee5110))
+
 ## [3.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.1...v3.3.0) (2026-09-08)
 
 
