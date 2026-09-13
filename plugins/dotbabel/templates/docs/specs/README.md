@@ -23,10 +23,29 @@ docs/specs/
   "owners": ["Person Name"],
   "linked_paths": ["glob", "patterns", "of/files/this/spec/covers/**"],
   "acceptance_commands": ["npm test", "go test ./..."],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "planned | active",
+      "given": "a starting condition",
+      "when": "an action or event",
+      "then": "the expected, testable outcome",
+      "tests": [{ "file": "path/to/test.mjs", "name": "the exact test name" }],
+      "argv": ["the", "command", "that", "runs", "those", "tests"],
+      "report": { "format": "junit-xml", "path": "path/to/report.xml" }
+    }
+  ],
   "depends_on_specs": [],
   "active_prs": []
 }
 ```
+
+`acceptance_criteria` is optional. `status` defaults to `active` when absent; a
+`planned` criterion is recorded and does not run. `report` is optional too.
+`dotbabel-validate-specs` checks only the shape shown above — an id matching
+`AC-<number>`, a non-empty `given`/`when`/`then`, at least one entry in
+`tests`, and a non-empty `argv`. It never reads the named test file or runs
+`argv`; that happens at verification time.
 
 ## Workflow
 

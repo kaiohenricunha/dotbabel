@@ -6,6 +6,7 @@ import {
   readJson,
   readText,
   pathExists,
+  toPosix,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
@@ -27,6 +28,121 @@ const VAGUE_QUANTITY = /\b(fast|slow|quick(?:ly)?|responsive|performant|scalable
 
 // Any digit, or a spelled-out small number, counts as quantified.
 const HAS_NUMBER = /\d|\b(zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/i;
+
+// §5 acceptance_criteria: id must be "AC-<number>" (KD-1).
+const CRITERION_ID = /^AC-\d+$/;
+const VALID_CRITERION_STATUSES = new Set(["planned", "active"]);
+const VALID_REPORT_FORMATS = new Set(["junit-xml"]);
+
+/**
+ * Shape-check one repository-relative path string: non-empty, not absolute,
+ * and does not resolve outside the repository via `..` traversal. This is a
+ * pure string check — it never touches the filesystem, so it never reads a
+ * test file (Q-5). Existence and content are checked at verification time.
+ *
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isSafeRelativePath(value) {
+  if (typeof value !== "string" || !value.trim()) return false;
+  if (path.isAbsolute(value)) return false;
+  if (/^[A-Za-z]:[\\/]/.test(value)) return false; // Windows drive-letter absolute path
+  const VIRTUAL_ROOT = "/__dotbabel_repo_root__";
+  const resolved = path.posix.resolve(VIRTUAL_ROOT, toPosix(value));
+  return resolved === VIRTUAL_ROOT || resolved.startsWith(`${VIRTUAL_ROOT}/`);
+}
+
+/**
+ * Shape-check one `acceptance_criteria[]` entry (KD-1, KD-3, KD-15). Never
+ * reads a named test file and never runs `argv` (Q-5) — only string, array,
+ * and enum shape is checked here.
+ *
+ * @param {unknown} criterion
+ * @param {number} index
+ * @param {Set<string>} seenIds  Ids already seen in this spec's array
+ * @param {string} filePrefix    e.g. "docs/specs/<id>"
+ * @returns {ValidationError[]}
+ */
+function validateCriterion(criterion, index, seenIds, filePrefix) {
+  const errors = [];
+  const base = `/acceptance_criteria/${index}`;
+
+  const push = (pointer, message) => {
+    errors.push(new ValidationError({
+      code: ERROR_CODES.SPEC_CRITERIA_INVALID,
+      category: "spec",
+      file: filePrefix,
+      pointer,
+      message,
+    }));
+  };
+
+  if (typeof criterion !== "object" || criterion === null || Array.isArray(criterion)) {
+    push(base, `acceptance_criteria[${index}] must be an object`);
+    return errors;
+  }
+
+  if (typeof criterion.id !== "string" || !CRITERION_ID.test(criterion.id)) {
+    push(`${base}/id`, `acceptance_criteria[${index}].id must match "AC-<number>"`);
+  } else if (seenIds.has(criterion.id)) {
+    push(`${base}/id`, `acceptance_criteria[${index}].id "${criterion.id}" is a duplicate`);
+  } else {
+    seenIds.add(criterion.id);
+  }
+
+  if (criterion.status !== undefined && !VALID_CRITERION_STATUSES.has(criterion.status)) {
+    push(`${base}/status`, `acceptance_criteria[${index}].status "${criterion.status}" must be "planned" or "active"`);
+  }
+
+  for (const field of ["given", "when", "then"]) {
+    if (typeof criterion[field] !== "string" || !criterion[field].trim()) {
+      push(`${base}/${field}`, `acceptance_criteria[${index}].${field} must be a non-empty string`);
+    }
+  }
+
+  if (!Array.isArray(criterion.tests) || criterion.tests.length === 0) {
+    push(`${base}/tests`, `acceptance_criteria[${index}].tests must be a non-empty array`);
+  } else {
+    criterion.tests.forEach((test, testIndex) => {
+      const testBase = `${base}/tests/${testIndex}`;
+      if (typeof test !== "object" || test === null) {
+        push(testBase, `acceptance_criteria[${index}].tests[${testIndex}] must be an object`);
+        return;
+      }
+      if (!isSafeRelativePath(test.file)) {
+        push(`${testBase}/file`, `acceptance_criteria[${index}].tests[${testIndex}].file must be a non-empty, repository-relative path`);
+      }
+      if (typeof test.name !== "string" || !test.name.trim()) {
+        push(`${testBase}/name`, `acceptance_criteria[${index}].tests[${testIndex}].name must be a non-empty string`);
+      }
+    });
+  }
+
+  if (!Array.isArray(criterion.argv) || criterion.argv.length === 0) {
+    push(`${base}/argv`, `acceptance_criteria[${index}].argv must be a non-empty array`);
+  } else {
+    criterion.argv.forEach((arg, argIndex) => {
+      if (typeof arg !== "string" || !arg.trim()) {
+        push(`${base}/argv/${argIndex}`, `acceptance_criteria[${index}].argv[${argIndex}] must be a non-empty string`);
+      }
+    });
+  }
+
+  if (criterion.report !== undefined) {
+    if (typeof criterion.report !== "object" || criterion.report === null) {
+      push(`${base}/report`, `acceptance_criteria[${index}].report must be an object`);
+    } else {
+      if (!VALID_REPORT_FORMATS.has(criterion.report.format)) {
+        push(`${base}/report/format`, `acceptance_criteria[${index}].report.format must be "junit-xml"`);
+      }
+      if (!isSafeRelativePath(criterion.report.path)) {
+        push(`${base}/report/path`, `acceptance_criteria[${index}].report.path must be a non-empty, repository-relative path`);
+      }
+    }
+  }
+
+  return errors;
+}
 
 /**
  * Find §7 constraints that lean on a vague quantity word without giving a value.
@@ -77,6 +193,7 @@ function findUnquantifiedConstraints(body) {
  *  - id matches the directory name
  *  - linked_paths entries are non-empty strings
  *  - acceptance_commands entries are non-empty strings
+ *  - acceptance_criteria entries match the §5 shape (KD-1, KD-3, KD-15), when present
  *
  *  - §7 constraints do not lean on a comparative without stating its value
  *
@@ -216,6 +333,26 @@ export function validateSpecs(ctx) {
             message: "acceptance_commands entries must be non-empty strings",
           }));
         }
+      }
+    }
+
+    // acceptance_criteria: optional array (KD-1, KD-3, KD-15). Never read a
+    // named test file and never run argv here — that happens at verification
+    // time (Q-5); this validator checks only the shape.
+    if (metadata.acceptance_criteria !== undefined) {
+      if (!Array.isArray(metadata.acceptance_criteria)) {
+        errors.push(new ValidationError({
+          code: ERROR_CODES.SPEC_CRITERIA_INVALID,
+          category: "spec",
+          file: prefix,
+          pointer: "/acceptance_criteria",
+          message: "acceptance_criteria must be an array",
+        }));
+      } else {
+        const seenIds = new Set();
+        metadata.acceptance_criteria.forEach((criterion, index) => {
+          errors.push(...validateCriterion(criterion, index, seenIds, prefix));
+        });
       }
     }
 

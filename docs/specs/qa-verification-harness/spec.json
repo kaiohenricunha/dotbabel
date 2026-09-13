@@ -89,7 +89,7 @@
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "status": "planned",
+      "status": "active",
       "given": "a spec.json without acceptance_criteria",
       "when": "dotbabel-validate-specs runs",
       "then": "the spec stays valid",
@@ -111,7 +111,7 @@
     },
     {
       "id": "AC-2",
-      "status": "planned",
+      "status": "active",
       "given": "a criterion without given, when, or then, or with a duplicate id",
       "when": "dotbabel-validate-specs runs",
       "then": "it emits SPEC_CRITERIA_INVALID",
