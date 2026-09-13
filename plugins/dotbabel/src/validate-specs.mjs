@@ -1,4 +1,3 @@
-import path from "path";
 import {
   anyPathMatches,
   listRepoPaths,
@@ -6,7 +5,7 @@ import {
   readJson,
   readText,
   pathExists,
-  toPosix,
+  isSafeRelativePath,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 
@@ -34,36 +33,6 @@ const CRITERION_ID = /^AC-\d+$/;
 const VALID_CRITERION_STATUSES = new Set(["planned", "active"]);
 const VALID_REPORT_FORMATS = new Set(["junit-xml"]);
 
-/**
- * Shape-check one repository-relative path string: non-empty, not absolute,
- * and does not resolve outside the repository via `..` traversal. This is a
- * pure string check — it never touches the filesystem, so it never reads a
- * test file (Q-5). Existence and content are checked at verification time.
- *
- * @param {unknown} value
- * @returns {boolean}
- */
-function isSafeRelativePath(value) {
-  if (typeof value !== "string" || !value.trim()) return false;
-  // Normalize separators before the drive-letter and containment checks.
-  // toPosix() splits on the host path.sep, which is a no-op on Linux, so a
-  // Windows-style backslash path (or a UNC share) would otherwise pass this
-  // check unconverted here and only turn out to escape the repository once a
-  // Windows consumer resolves it.
-  const candidate = toPosix(value).replace(/\\/g, "/");
-  // Reject any drive-letter form, not only the rooted "C:/..." spelling.
-  // "C:foo" is drive-RELATIVE on Windows — it resolves against that drive's
-  // current directory, not against a supplied base — so a bare separator
-  // check after the colon would still let "C:../../etc/passwd" through.
-  if (/^[A-Za-z]:/.test(candidate)) return false;
-  const VIRTUAL_ROOT = "/__dotbabel_repo_root__";
-  // Resolving against a virtual root also rejects a POSIX-absolute path: a
-  // resolve() whose second argument is itself absolute discards the base, so
-  // "/etc/passwd" resolves to itself and fails the prefix check below —
-  // there is no need for a separate path.isAbsolute() guard.
-  const resolved = path.posix.resolve(VIRTUAL_ROOT, candidate);
-  return resolved === VIRTUAL_ROOT || resolved.startsWith(`${VIRTUAL_ROOT}/`);
-}
 
 /**
  * Shape-check one `acceptance_criteria[]` entry (KD-1, KD-3, KD-15). Never

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites time="0.005">
+<testsuite name="sample.bats" tests="3" failures="1" errors="0" skipped="1" time="0.005" timestamp="2026-09-13T21:11:29" hostname="win11">
+    <testcase classname="sample.bats" name="it passes" time="0.003" />
+    <testcase classname="sample.bats" name="it fails" time="0.002">
+        <failure type="failure">(in test file sample.bats, line 8)
+  `[ 1 -eq 2 ]&#39; failed</failure>
+    </testcase>
+    <testcase classname="sample.bats" name="it is skipped" time="0">
+        <skipped>demonstration</skipped>
+    </testcase>
+
+</testsuite>
+</testsuites>

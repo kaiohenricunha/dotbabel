@@ -29,6 +29,12 @@ node_modules/
 coverage/
 dist/
 
+# dotbabel criteria: reports the criteria core deletes and rewrites on every
+# run (P-B1), and Stryker's own scratch and report directories (IMPL-6).
+.dotbabel/
+.stryker-tmp/
+reports/mutation/
+
 # Editor noise
 .vscode/
 .idea/

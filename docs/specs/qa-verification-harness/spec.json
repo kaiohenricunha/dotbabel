@@ -137,7 +137,7 @@
     },
     {
       "id": "AC-3",
-      "status": "planned",
+      "status": "active",
       "given": "a criterion command that exits 0",
       "when": "a named test is missing from the output",
       "then": "the criterion is unconfirmed and does not pass",
@@ -432,7 +432,7 @@
     },
     {
       "id": "AC-16",
-      "status": "planned",
+      "status": "active",
       "given": "criterion output that contains a secret and exceeds the size limits",
       "when": "the evidence payload is built",
       "then": "the output is redacted before it is truncated to 40 lines and 2000 characters",
