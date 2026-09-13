@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-08T12:15:55.506Z",
+  "generatedAt": "2026-09-13T21:33:58.436Z",
   "version": "3.3.0",
   "artifacts": [
     {
@@ -678,6 +678,21 @@
         "maturity": "draft"
       },
       "version": "1.1.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "pr-tldr",
+      "type": "command",
+      "path": "commands/pr-tldr.md",
+      "name": "pr-tldr",
+      "description": "Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.\n",
+      "facets": {
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
       "owner": "@kaiohenricunha"
     },
     {

@@ -192,6 +192,13 @@
       "lastValidated": null
     },
     {
+      "name": "pr-tldr",
+      "path": ".claude/commands/pr-tldr.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "pre-pr",
       "path": ".claude/commands/pre-pr.md",
       "checksum": "",
