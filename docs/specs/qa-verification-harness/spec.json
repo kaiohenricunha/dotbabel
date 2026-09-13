@@ -1,7 +1,7 @@
 {
   "id": "qa-verification-harness",
   "title": "QA verification harness — executed-behavior gates from spec to production",
-  "status": "draft",
+  "status": "approved",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/validate-specs.mjs",
