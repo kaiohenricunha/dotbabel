@@ -45,9 +45,12 @@ const VALID_REPORT_FORMATS = new Set(["junit-xml"]);
  */
 function isSafeRelativePath(value) {
   if (typeof value !== "string" || !value.trim()) return false;
-  if (path.isAbsolute(value)) return false;
   if (/^[A-Za-z]:[\\/]/.test(value)) return false; // Windows drive-letter absolute path
   const VIRTUAL_ROOT = "/__dotbabel_repo_root__";
+  // Resolving against a virtual root also rejects a POSIX-absolute path: a
+  // resolve() whose second argument is itself absolute discards the base, so
+  // "/etc/passwd" resolves to itself and fails the prefix check below —
+  // there is no need for a separate path.isAbsolute() guard.
   const resolved = path.posix.resolve(VIRTUAL_ROOT, toPosix(value));
   return resolved === VIRTUAL_ROOT || resolved.startsWith(`${VIRTUAL_ROOT}/`);
 }
