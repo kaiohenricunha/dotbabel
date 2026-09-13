@@ -17,7 +17,7 @@
 | 7   | Non-Functional Requirements | [x] done |
 | 8   | Risks and Alternatives      | [x] done |
 
-The metadata status in `spec.json` stays `draft` until the owner approves the spec. This is a brownfield spec. [current-state/analysis.md](current-state/analysis.md) holds the grounded audit of the QA surface that dotbabel ships today.
+The owner approved the spec on 2026-09-13; the metadata status in `spec.json` is `approved`. This is a brownfield spec. [current-state/analysis.md](current-state/analysis.md) holds the grounded audit of the QA surface that dotbabel ships today.
 
 ## Quick Start
 
@@ -66,10 +66,9 @@ This summary is for project owners and managers.
 
 **Decisions for the owner:**
 
-- Approve the spec to start phase 1.
 - Schedule the SLO follow-up spec.
 
-The owner confirmed all key decisions, KD-1 through KD-16, by 2026-09-11.
+The owner confirmed all key decisions, KD-1 through KD-16, by 2026-09-11, and approved the spec on 2026-09-13. Phase 1 (A1, B1, C1) may start.
 
 ## Research Sources
 
