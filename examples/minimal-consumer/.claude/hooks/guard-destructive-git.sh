@@ -29,31 +29,40 @@ TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
 [ "$TOOL" = "Bash" ] || exit 0
 
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
+# Join backslash-newline continuations first: sed and grep below work one line
+# at a time, so a call split across lines would otherwise show each half to
+# the patterns alone — the flag on one line, the `git` token on another.
+CMD=${CMD//$'\\\n'/ }
 # Normalize whitespace: tabs -> space, collapse runs of whitespace so regex
 # anchors only have to reason about single spaces.
 NORM=$(printf '%s' "$CMD" | tr '\t' ' ' | tr -s ' ')
 
-# Boundary before the `git` token is one of: start-of-line, whitespace, or a
-# command-chaining separator (`;`, `&&`, `||`, `|`). This prevents false
+# Boundary before the `git` token is one of: start-of-line, whitespace, a
+# command-chaining separator (`;`, `&&`, `||`, `|`), or the opener of a
+# subshell or command substitution (`(`, backtick). This prevents false
 # positives like `echo git` inside a quoted string while still catching
-# `foo && git reset --hard`.
-BOUNDARY='(^|[[:space:];&|])'
+# `foo && git reset --hard` and `$(git clean -fd)`.
+BOUNDARY='(^|[[:space:];&|(`])'
 
 # The git token, optionally called by path (`/usr/bin/git`), followed by any
 # global options before the verb. git accepts `-C <dir>`, `-c <key=value>`,
 # `--opt=<value>`, `--git-dir <path>`-style pairs, and bare flags such as
 # `--no-pager` in that position, so matching only `git <verb>` let every one of
-# those spellings through. An option value may be quoted to hold spaces.
-ARG="(\"[^\"]*\"|'[^']*'|[^[:space:];&|\"']+)"
-GIT_OPT="(-[Cc][[:space:]]+${ARG}|--(git-dir|work-tree|namespace|config-env|super-prefix)[[:space:]]+${ARG}|--[a-z][a-z-]*(=${ARG})?|-[pP])"
+# those spellings through. An option value is one shell word: a run of bare,
+# double-quoted, and single-quoted pieces, so `key='value with spaces'` is one
+# value and never swallows the verb.
+ARG="(\"[^\"]*\"|'[^']*'|[^[:space:];&|\"']+)+"
+GIT_OPT="(-[Cc][[:space:]]+${ARG}|--(git-dir|work-tree|namespace|config-env|super-prefix|attr-source)[[:space:]]+${ARG}|--[a-z][a-z-]*(=${ARG})?|-[pP])"
 GIT_PATH="([^[:space:];&|\"']*/)?"
 G="${GIT_PATH}git([[:space:]]+${GIT_OPT})*[[:space:]]+"
 
 # Per-call bypass: rewrite each git token that BYPASS_DESTRUCTIVE_GIT=1 directly
 # prefixes (other VAR=value assignments may sit around it) to a placeholder the
 # patterns cannot match. Only that one call is exempt; every other git call in
-# the command is still checked. Capture groups: 1 boundary, 2 and 3 assignment
-# runs, 4 path, 5 the whitespace after `git`.
+# the command is still checked. The replacement keeps group 1 (the boundary)
+# and group 5 (the whitespace after `git`), which is all the patterns anchor
+# on; groups 2 to 4 (assignment runs and the path) are dropped on purpose,
+# because SCAN is read by nothing but the pattern loop below.
 ASSIGN='[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+'
 BYPASSED="${BOUNDARY}(${ASSIGN})*BYPASS_DESTRUCTIVE_GIT=1[[:space:]]+(${ASSIGN})*${GIT_PATH}git([[:space:]])"
 SCAN=$(printf '%s' "$NORM" | sed -E "s#${BYPASSED}#\\1__bypassed_git__\\5#g")

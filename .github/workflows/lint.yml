@@ -24,6 +24,8 @@ jobs:
             plugins/dotbabel/hooks/*.sh \
             plugins/dotbabel/tests/*.sh \
             plugins/dotbabel/templates/claude/hooks/*.sh \
+            .claude/hooks/*.sh \
+            examples/minimal-consumer/.claude/hooks/*.sh \
             plugins/dotbabel/templates/githooks/pre-commit
 
   markdownlint:

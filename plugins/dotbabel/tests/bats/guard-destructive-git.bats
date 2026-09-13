@@ -12,6 +12,23 @@ setup() {
   [ -x "$HOOK" ] || chmod +x "$HOOK"
 }
 
+# ---------------- copies ----------------
+#
+# The hook ships in four places and every case below runs against the
+# canonical copy only, so a copy that drifts is never executed by this suite.
+# A downstream copy once failed open exactly that way (see the pathspec
+# comment in the hook). Pin the copies to the canonical file byte for byte.
+
+@test "every shipped copy of the hook is byte-identical to the canonical file" {
+  for copy in \
+    .claude/hooks/guard-destructive-git.sh \
+    plugins/dotbabel/templates/claude/hooks/guard-destructive-git.sh \
+    examples/minimal-consumer/.claude/hooks/guard-destructive-git.sh; do
+    run cmp "$HOOK" "$REPO_ROOT/$copy"
+    [ "$status" -eq 0 ]
+  done
+}
+
 # ---------------- block paths ----------------
 
 @test "blocks git reset --hard" {
@@ -185,6 +202,58 @@ setup() {
   [ "$status" -eq 2 ]
 }
 
+@test "blocks git --namespace <name> reset --hard" {
+  feed_hook_json "$HOOK" "git --namespace ns reset --hard"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks git --config-env <key>=<var> push --force" {
+  feed_hook_json "$HOOK" "git --config-env core.editor=EDITOR push origin main --force"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks git --super-prefix <path> clean -fd" {
+  feed_hook_json "$HOOK" "git --super-prefix sub/ clean -fd"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks git --attr-source <tree> reset --hard" {
+  feed_hook_json "$HOOK" "git --attr-source HEAD reset --hard"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks git -P branch -D" {
+  feed_hook_json "$HOOK" "git -P branch -D feature-branch"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks git -c with a value that mixes bare and quoted text" {
+  # The common `-c key='value with spaces'` spelling is one shell word that
+  # switches quoting mid-token, so an option-value pattern must accept a run
+  # of quoted and unquoted pieces, not one or the other.
+  feed_hook_json "$HOOK" "git -c core.pager='less -R' reset --hard"
+  [ "$status" -eq 2 ]
+  feed_hook_json "$HOOK" 'git -c core.pager="less -R" reset --hard'
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a destructive git call inside a subshell" {
+  feed_hook_json "$HOOK" "(git reset --hard)"
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a destructive git call inside a command substitution" {
+  feed_hook_json "$HOOK" 'echo "$(git clean -fdx)"'
+  [ "$status" -eq 2 ]
+  feed_hook_json "$HOOK" 'echo `git branch -D feature-branch`'
+  [ "$status" -eq 2 ]
+}
+
+@test "blocks a destructive git call split by a backslash-newline" {
+  feed_hook_json "$HOOK" $'git push origin main \\\n  --force'
+  [ "$status" -eq 2 ]
+}
+
 @test "allows git -C <dir> status" {
   feed_hook_json "$HOOK" "git -C /tmp/repo status"
   [ "$status" -eq 0 ]
@@ -234,6 +303,11 @@ setup() {
 
 @test "a bypass prefix among other variable assignments allows that git call" {
   feed_hook_json "$HOOK" "GIT_TRACE=0 BYPASS_DESTRUCTIVE_GIT=1 git reset --hard"
+  [ "$status" -eq 0 ]
+}
+
+@test "a bypass prefix split from its git call by a backslash-newline still applies" {
+  feed_hook_json "$HOOK" $'BYPASS_DESTRUCTIVE_GIT=1 \\\n  git branch -D feature-branch'
   [ "$status" -eq 0 ]
 }
 

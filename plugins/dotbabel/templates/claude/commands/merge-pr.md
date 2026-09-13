@@ -32,7 +32,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 2. **Verify PR body has required sections.**
    - Must contain `## Summary`
    - Must contain `## Test plan`
-   - If the repo uses spec IDs (check for `specs/` or `docs/specs/` dir), must contain a `## Spec ID` section or a `## No-spec rationale` section. `dotbabel pr-stack gate --gate merge` accepts either one. A Spec ID must name an approved, implementing, or done spec, so a pull request that only edits a draft spec uses the rationale instead.
+   - If the repo uses spec IDs (a `specs/` or `docs/specs/` dir), or the PR changes a protected path from `docs/repo-facts.json`, must contain a `## Spec ID` section or a `## No-spec rationale` section. `dotbabel pr-stack gate --gate merge` accepts either one. A Spec ID must name an approved, implementing, or done spec, and it does not cover a changed protected path that is missing from that spec's `linked_paths`. In both of those cases, use the rationale.
      If any are missing, STOP and ask the user whether to auto-append them via `gh pr edit <N> --body-file`.
 
 3. **Checkout the branch in an isolated worktree.**
