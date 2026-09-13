@@ -45,13 +45,19 @@ const VALID_REPORT_FORMATS = new Set(["junit-xml"]);
  */
 function isSafeRelativePath(value) {
   if (typeof value !== "string" || !value.trim()) return false;
-  if (/^[A-Za-z]:[\\/]/.test(value)) return false; // Windows drive-letter absolute path
+  // Normalize separators before the drive-letter and containment checks.
+  // toPosix() splits on the host path.sep, which is a no-op on Linux, so a
+  // Windows-style backslash path (or a UNC share) would otherwise pass this
+  // check unconverted here and only turn out to escape the repository once a
+  // Windows consumer resolves it.
+  const candidate = toPosix(value).replace(/\\/g, "/");
+  if (/^[A-Za-z]:\//.test(candidate)) return false; // Windows drive-letter absolute path
   const VIRTUAL_ROOT = "/__dotbabel_repo_root__";
   // Resolving against a virtual root also rejects a POSIX-absolute path: a
   // resolve() whose second argument is itself absolute discards the base, so
   // "/etc/passwd" resolves to itself and fails the prefix check below —
   // there is no need for a separate path.isAbsolute() guard.
-  const resolved = path.posix.resolve(VIRTUAL_ROOT, toPosix(value));
+  const resolved = path.posix.resolve(VIRTUAL_ROOT, candidate);
   return resolved === VIRTUAL_ROOT || resolved.startsWith(`${VIRTUAL_ROOT}/`);
 }
 
@@ -70,13 +76,14 @@ function validateCriterion(criterion, index, seenIds, filePrefix) {
   const errors = [];
   const base = `/acceptance_criteria/${index}`;
 
-  const push = (pointer, message) => {
+  const push = (pointer, message, extra = {}) => {
     errors.push(new ValidationError({
       code: ERROR_CODES.SPEC_CRITERIA_INVALID,
       category: "spec",
       file: filePrefix,
       pointer,
       message,
+      ...extra,
     }));
   };
 
@@ -86,15 +93,18 @@ function validateCriterion(criterion, index, seenIds, filePrefix) {
   }
 
   if (typeof criterion.id !== "string" || !CRITERION_ID.test(criterion.id)) {
-    push(`${base}/id`, `acceptance_criteria[${index}].id must match "AC-<number>"`);
+    push(`${base}/id`, `acceptance_criteria[${index}].id must match "AC-<number>"`, { got: JSON.stringify(criterion.id) });
   } else if (seenIds.has(criterion.id)) {
-    push(`${base}/id`, `acceptance_criteria[${index}].id "${criterion.id}" is a duplicate`);
+    push(`${base}/id`, `acceptance_criteria[${index}].id "${criterion.id}" is a duplicate`, { got: criterion.id });
   } else {
     seenIds.add(criterion.id);
   }
 
   if (criterion.status !== undefined && !VALID_CRITERION_STATUSES.has(criterion.status)) {
-    push(`${base}/status`, `acceptance_criteria[${index}].status "${criterion.status}" must be "planned" or "active"`);
+    push(`${base}/status`, `acceptance_criteria[${index}].status "${criterion.status}" must be "planned" or "active"`, {
+      expected: [...VALID_CRITERION_STATUSES].join(", "),
+      got: JSON.stringify(criterion.status),
+    });
   }
 
   for (const field of ["given", "when", "then"]) {
@@ -108,7 +118,7 @@ function validateCriterion(criterion, index, seenIds, filePrefix) {
   } else {
     criterion.tests.forEach((test, testIndex) => {
       const testBase = `${base}/tests/${testIndex}`;
-      if (typeof test !== "object" || test === null) {
+      if (typeof test !== "object" || test === null || Array.isArray(test)) {
         push(testBase, `acceptance_criteria[${index}].tests[${testIndex}] must be an object`);
         return;
       }
@@ -136,7 +146,10 @@ function validateCriterion(criterion, index, seenIds, filePrefix) {
       push(`${base}/report`, `acceptance_criteria[${index}].report must be an object`);
     } else {
       if (!VALID_REPORT_FORMATS.has(criterion.report.format)) {
-        push(`${base}/report/format`, `acceptance_criteria[${index}].report.format must be "junit-xml"`);
+        push(`${base}/report/format`, `acceptance_criteria[${index}].report.format must be "junit-xml"`, {
+          expected: [...VALID_REPORT_FORMATS].join(", "),
+          got: JSON.stringify(criterion.report.format),
+        });
       }
       if (!isSafeRelativePath(criterion.report.path)) {
         push(`${base}/report/path`, `acceptance_criteria[${index}].report.path must be a non-empty, repository-relative path`);

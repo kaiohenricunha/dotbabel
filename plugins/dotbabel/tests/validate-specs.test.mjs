@@ -466,6 +466,74 @@ describe("validateSpecs", () => {
       expect(err).toBeDefined();
     });
 
+    it("rejects a backslash-separated traversal, which a bare host-separator split cannot see on Linux", () => {
+      // toPosix() splits on path.sep, a no-op on this host, so a check that
+      // relied on it alone would let "..\\..\\etc\\passwd" straight through.
+      const root = isolateFixture();
+      const ctx = createHarnessContext({ repoRoot: root });
+      const spec = readSpecJson(root);
+      spec.acceptance_criteria = [
+        wellFormedCriterion({ tests: [{ file: "..\\..\\..\\etc\\passwd", name: "n" }] }),
+      ];
+      writeSpecJson(root, spec);
+      const result = validateSpecs(ctx);
+      expect(result.ok).toBe(false);
+      const err = result.errors.find((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID && e.pointer === "/acceptance_criteria/0/tests/0/file");
+      expect(err).toBeDefined();
+    });
+
+    it("rejects a UNC-style path", () => {
+      const root = isolateFixture();
+      const ctx = createHarnessContext({ repoRoot: root });
+      const spec = readSpecJson(root);
+      spec.acceptance_criteria = [
+        wellFormedCriterion({ tests: [{ file: "\\\\server\\share\\payload.mjs", name: "n" }] }),
+      ];
+      writeSpecJson(root, spec);
+      const result = validateSpecs(ctx);
+      expect(result.ok).toBe(false);
+      const err = result.errors.find((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID && e.pointer === "/acceptance_criteria/0/tests/0/file");
+      expect(err).toBeDefined();
+    });
+
+    it("allows a Windows-style relative path with backslash separators", () => {
+      // The normalization must reject a traversal or a UNC form without also
+      // rejecting an ordinary relative path spelled with backslashes.
+      const root = isolateFixture();
+      const ctx = createHarnessContext({ repoRoot: root });
+      const spec = readSpecJson(root);
+      spec.acceptance_criteria = [
+        wellFormedCriterion({ tests: [{ file: "plugins\\dotbabel\\tests\\criteria-verify.test.mjs", name: "n" }] }),
+      ];
+      writeSpecJson(root, spec);
+      const result = validateSpecs(ctx);
+      expect(result.errors.filter((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID)).toEqual([]);
+    });
+
+    it("emits SPEC_CRITERIA_INVALID when acceptance_criteria is not an array", () => {
+      const root = isolateFixture();
+      const ctx = createHarnessContext({ repoRoot: root });
+      const spec = readSpecJson(root);
+      spec.acceptance_criteria = { "AC-1": {} };
+      writeSpecJson(root, spec);
+      const result = validateSpecs(ctx);
+      expect(result.ok).toBe(false);
+      const err = result.errors.find((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID && e.pointer === "/acceptance_criteria");
+      expect(err).toBeDefined();
+    });
+
+    it("emits a single error, not two, when a tests[] entry is an array rather than an object", () => {
+      const root = isolateFixture();
+      const ctx = createHarnessContext({ repoRoot: root });
+      const spec = readSpecJson(root);
+      spec.acceptance_criteria = [wellFormedCriterion({ tests: [[]] })];
+      writeSpecJson(root, spec);
+      const result = validateSpecs(ctx);
+      const testErrors = result.errors.filter((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID && e.pointer.startsWith("/acceptance_criteria/0/tests/0"));
+      expect(testErrors).toHaveLength(1);
+      expect(testErrors[0].pointer).toBe("/acceptance_criteria/0/tests/0");
+    });
+
     it("emits SPEC_CRITERIA_INVALID when a test file path is missing or empty", () => {
       const root = isolateFixture();
       const ctx = createHarnessContext({ repoRoot: root });
