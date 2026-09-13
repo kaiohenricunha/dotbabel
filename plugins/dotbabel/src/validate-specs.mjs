@@ -51,7 +51,11 @@ function isSafeRelativePath(value) {
   // check unconverted here and only turn out to escape the repository once a
   // Windows consumer resolves it.
   const candidate = toPosix(value).replace(/\\/g, "/");
-  if (/^[A-Za-z]:\//.test(candidate)) return false; // Windows drive-letter absolute path
+  // Reject any drive-letter form, not only the rooted "C:/..." spelling.
+  // "C:foo" is drive-RELATIVE on Windows — it resolves against that drive's
+  // current directory, not against a supplied base — so a bare separator
+  // check after the colon would still let "C:../../etc/passwd" through.
+  if (/^[A-Za-z]:/.test(candidate)) return false;
   const VIRTUAL_ROOT = "/__dotbabel_repo_root__";
   // Resolving against a virtual root also rejects a POSIX-absolute path: a
   // resolve() whose second argument is itself absolute discards the base, so

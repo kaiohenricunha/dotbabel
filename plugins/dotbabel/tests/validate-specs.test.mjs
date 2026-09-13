@@ -466,6 +466,25 @@ describe("validateSpecs", () => {
       expect(err).toBeDefined();
     });
 
+    it("rejects a Windows drive-relative path (no separator after the colon)", () => {
+      // "C:foo" and "C:../../etc/passwd" are drive-RELATIVE on Windows: they
+      // resolve against that drive's current directory, not against any
+      // supplied base path. A guard that requires a separator right after
+      // the colon (matching only the rooted "C:/..." form) would miss this.
+      const root = isolateFixture();
+      const ctx = createHarnessContext({ repoRoot: root });
+      const spec = readSpecJson(root);
+      spec.acceptance_criteria = [
+        wellFormedCriterion({ id: "AC-1", tests: [{ file: "C:../../etc/passwd", name: "n" }] }),
+        wellFormedCriterion({ id: "AC-2", tests: [{ file: "C:payload.mjs", name: "n" }] }),
+      ];
+      writeSpecJson(root, spec);
+      const result = validateSpecs(ctx);
+      expect(result.ok).toBe(false);
+      expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID && e.pointer === "/acceptance_criteria/0/tests/0/file")).toBe(true);
+      expect(result.errors.some((e) => e.code === ERROR_CODES.SPEC_CRITERIA_INVALID && e.pointer === "/acceptance_criteria/1/tests/0/file")).toBe(true);
+    });
+
     it("rejects a backslash-separated traversal, which a bare host-separator split cannot see on Linux", () => {
       // toPosix() splits on path.sep, a no-op on this host, so a check that
       // relied on it alone would let "..\\..\\etc\\passwd" straight through.
