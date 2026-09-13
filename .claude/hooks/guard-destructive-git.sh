@@ -4,9 +4,16 @@
 # Exit 2 = block the tool call (Claude Code hook protocol — NOT the harness
 # validator exit convention). Exit 0 = allow.
 #
-# Bypass: set BYPASS_DESTRUCTIVE_GIT=1 in the command's environment when you
-# genuinely need to run a destructive git invocation. Use sparingly — the
-# block exists because these operations are silently destructive.
+# Bypass, only after the user confirms the destructive call:
+#   - Per call: write BYPASS_DESTRUCTIVE_GIT=1 directly before that git call, as
+#     in `BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers only
+#     that call; another destructive git call in the same command still blocks.
+#     A tool call cannot set this hook's own environment, so the prefix is the
+#     only bypass an agent can act on.
+#   - Session: BYPASS_DESTRUCTIVE_GIT=1 in the hook's own environment (exported
+#     before Claude Code starts) disables the guard for every call.
+# Use sparingly — the block exists because these operations are silently
+# destructive.
 
 # Fail open if jq is not installed (don't break all Bash tool calls).
 if ! command -v jq >/dev/null 2>&1; then
@@ -31,7 +38,25 @@ NORM=$(printf '%s' "$CMD" | tr '\t' ' ' | tr -s ' ')
 # positives like `echo git` inside a quoted string while still catching
 # `foo && git reset --hard`.
 BOUNDARY='(^|[[:space:];&|])'
-G='git[[:space:]]+'
+
+# The git token, optionally called by path (`/usr/bin/git`), followed by any
+# global options before the verb. git accepts `-C <dir>`, `-c <key=value>`,
+# `--opt=<value>`, `--git-dir <path>`-style pairs, and bare flags such as
+# `--no-pager` in that position, so matching only `git <verb>` let every one of
+# those spellings through. An option value may be quoted to hold spaces.
+ARG="(\"[^\"]*\"|'[^']*'|[^[:space:];&|\"']+)"
+GIT_OPT="(-[Cc][[:space:]]+${ARG}|--(git-dir|work-tree|namespace|config-env|super-prefix)[[:space:]]+${ARG}|--[a-z][a-z-]*(=${ARG})?|-[pP])"
+GIT_PATH="([^[:space:];&|\"']*/)?"
+G="${GIT_PATH}git([[:space:]]+${GIT_OPT})*[[:space:]]+"
+
+# Per-call bypass: rewrite each git token that BYPASS_DESTRUCTIVE_GIT=1 directly
+# prefixes (other VAR=value assignments may sit around it) to a placeholder the
+# patterns cannot match. Only that one call is exempt; every other git call in
+# the command is still checked. Capture groups: 1 boundary, 2 and 3 assignment
+# runs, 4 path, 5 the whitespace after `git`.
+ASSIGN='[A-Za-z_][A-Za-z0-9_]*=[^[:space:];&|]*[[:space:]]+'
+BYPASSED="${BOUNDARY}(${ASSIGN})*BYPASS_DESTRUCTIVE_GIT=1[[:space:]]+(${ASSIGN})*${GIT_PATH}git([[:space:]])"
+SCAN=$(printf '%s' "$NORM" | sed -E "s#${BYPASSED}#\\1__bypassed_git__\\5#g")
 
 # Destructive verbs. Each alternative is anchored on the right by at least one
 # flag/keyword that makes the call unambiguously destructive.
@@ -65,10 +90,10 @@ PATTERNS=(
 )
 
 for rx in "${PATTERNS[@]}"; do
-  if printf '%s' "$NORM" | grep -qE "$rx"; then
+  if printf '%s' "$SCAN" | grep -qE "$rx"; then
     {
       echo "BLOCKED: Destructive git operation detected. Get explicit user confirmation first."
-      echo "         Bypass (only with user confirmation): BYPASS_DESTRUCTIVE_GIT=1 <your command>"
+      echo "         Bypass (only with user confirmation): run that one call as BYPASS_DESTRUCTIVE_GIT=1 git <args>"
     } >&2
     exit 2
   fi
