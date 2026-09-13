@@ -114,6 +114,10 @@ export {
   QUALITY_BASELINE_SCHEMA_VERSION,
 } from "./quality/types.mjs";
 
+// --- criteria command (P-B1, P-B2) ---
+export { loadCriteria, verifyCriteria } from "./criteria/index.mjs";
+export { listCriteria } from "./criteria/list.mjs";
+
 // --- package version (read from root package.json) ---
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkgPath = resolve(__dirname, "..", "..", "..", "package.json");

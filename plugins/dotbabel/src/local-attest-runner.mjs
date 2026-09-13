@@ -65,6 +65,7 @@ import {
   toolchainProblems,
 } from "./local-attest-lib.mjs";
 import { GIT_MAX_BUFFER } from "./lib/limits.mjs";
+import { PERM_TO_ASSOC } from "./lib/perm-to-assoc.mjs";
 
 /**
  * Build a `Deps` bundle wired to the real environment. Tests construct their
@@ -483,13 +484,6 @@ export function checkPreconditions(deps, cfg, opts = {}) {
       deps,
       `gh api repos/${repo}/collaborators/${me}/permission --jq .permission`,
     ).toUpperCase();
-    const PERM_TO_ASSOC = {
-      ADMIN: "OWNER",
-      WRITE: "MEMBER",
-      READ: "COLLABORATOR",
-      MAINTAIN: "MEMBER",
-      TRIAGE: "COLLABORATOR",
-    };
     const mapped = PERM_TO_ASSOC[ownerAssoc] ?? ownerAssoc;
     if (!cfg.trustedAssociations.includes(mapped)) {
       deps.warn(

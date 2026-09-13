@@ -1,3 +1,5 @@
+import { createMarker } from "./lib/attest-marker.mjs";
+
 /**
  * local-attest-lib — pure helpers for the local CI attestation skill.
  *
@@ -41,7 +43,7 @@
 
 export const ATTEST_MARKER_PREFIX = "<!-- local-attest verified-sha=";
 
-const SHA_RE = /^[0-9a-f]{7,40}$/i;
+const marker = createMarker(ATTEST_MARKER_PREFIX);
 
 /**
  * Build the hidden marker the CI gate greps for. Throws on a non-SHA so a
@@ -51,10 +53,7 @@ const SHA_RE = /^[0-9a-f]{7,40}$/i;
  * @returns {string}
  */
 export function buildAttestMarker(sha) {
-  if (typeof sha !== "string" || !SHA_RE.test(sha)) {
-    throw new Error(`invalid sha: ${JSON.stringify(sha)}`);
-  }
-  return `${ATTEST_MARKER_PREFIX}${sha} -->`;
+  return marker.build(sha);
 }
 
 /**
@@ -68,23 +67,7 @@ export function buildAttestMarker(sha) {
  * @returns {boolean}
  */
 export function isAttested(comments, headSha, opts = {}) {
-  if (!Array.isArray(comments) || typeof headSha !== "string" || headSha === "") {
-    return false;
-  }
-  let marker;
-  try {
-    marker = buildAttestMarker(headSha);
-  } catch {
-    return false;
-  }
-  const trusted = new Set(opts.trustedAssociations ?? ["OWNER"]);
-  return comments.some(
-    (c) =>
-      c &&
-      trusted.has(c.author_association) &&
-      typeof c.body === "string" &&
-      c.body.split("\n")[0] === marker,
-  );
+  return marker.isAttested(comments, headSha, opts);
 }
 
 /**
@@ -95,12 +78,7 @@ export function isAttested(comments, headSha, opts = {}) {
  * @returns {Comment|null}
  */
 export function findAttestComment(comments) {
-  if (!Array.isArray(comments)) return null;
-  return (
-    comments.find(
-      (c) => c && typeof c.body === "string" && c.body.includes(ATTEST_MARKER_PREFIX),
-    ) ?? null
-  );
+  return marker.find(comments);
 }
 
 /**
