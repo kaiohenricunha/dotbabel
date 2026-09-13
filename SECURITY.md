@@ -54,9 +54,11 @@ Three areas receive explicit attention:
 2. **Destructive-git defense-in-depth.** The PreToolUse hook at
    `plugins/dotbabel/hooks/guard-destructive-git.sh` blocks
    `git reset --hard`, `git push --force`, `git clean -f*`, `git branch -D`,
-   and related calls. The hook is a _safety net_, not an access-control
+   and related calls, including forms with git global options such as
+   `git -C <dir>`. The hook is a _safety net_, not an access-control
    boundary — users can still alias destructive calls around the match.
-   `BYPASS_DESTRUCTIVE_GIT=1` exists as the documented escape.
+   `BYPASS_DESTRUCTIVE_GIT=1`, written directly before the one confirmed git
+   call, is the documented escape.
 3. **Workflow secret handling.** `plugins/dotbabel/templates/workflows/ai-review.yml:19`
    gates the AI-review action on `github.event.pull_request.head.repo.full_name == github.repository`
    — same-repo PRs only, never forks. This prevents a malicious fork PR

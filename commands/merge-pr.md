@@ -9,7 +9,7 @@ task: [review, testing]
 maturity: validated
 owner: "@kaiohenricunha"
 created: 2025-01-01
-updated: 2026-04-17
+updated: 2026-09-13
 description: >
   Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in docs/repo-facts.json.
 argument-hint: "[PR#]"
@@ -35,7 +35,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 2. **Verify PR body has required sections.**
    - Must contain `## Summary`
    - Must contain `## Test plan`
-   - If the repo uses spec IDs (check for `specs/` or `docs/specs/` dir), must contain `Spec ID:`
+   - If the repo uses spec IDs (a `specs/` or `docs/specs/` dir), or the PR changes a protected path from `docs/repo-facts.json`, must contain a `## Spec ID` section or a `## No-spec rationale` section. `dotbabel pr-stack gate --gate merge` accepts either one. A Spec ID must name an approved, implementing, or done spec, and it does not cover a changed protected path that is missing from that spec's `linked_paths`. In both of those cases, use the rationale.
      If any are missing, STOP and ask the user whether to auto-append them via `gh pr edit <N> --body-file`.
 
 3. **Checkout the branch in an isolated worktree.**

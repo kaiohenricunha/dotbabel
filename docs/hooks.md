@@ -188,15 +188,22 @@ outside the allowlisted root is refused, never checked.
 
 ## Tuning and escape hatches
 
-| Variable                     | Applies to     | Effect                            |
-| ---------------------------- | -------------- | --------------------------------- |
-| `BYPASS_CHECK_ON_WRITE=1`    | check-on-write | Disables the hook                 |
-| `BYPASS_CHECK_ON_STOP=1`     | check-on-stop  | Disables the hook                 |
-| `BYPASS_DESTRUCTIVE_GIT=1`   | guard          | Allows one destructive git call   |
-| `CHECK_ON_WRITE_TIMEOUT`     | check-on-write | Seconds per checker (default 5)   |
-| `CHECK_ON_STOP_TIMEOUT`      | check-on-stop  | Seconds per checker (default 120) |
-| `CHECK_ON_STOP_TRUST_ALL`    | check-on-stop  | Bypasses the allowlist            |
-| `CHECK_ON_STOP_TRUSTED_FILE` | check-on-stop  | Overrides the allowlist path      |
+| Variable                     | Applies to     | Effect                              |
+| ---------------------------- | -------------- | ----------------------------------- |
+| `BYPASS_CHECK_ON_WRITE=1`    | check-on-write | Disables the hook                   |
+| `BYPASS_CHECK_ON_STOP=1`     | check-on-stop  | Disables the hook                   |
+| `BYPASS_DESTRUCTIVE_GIT=1`   | guard          | Allows the one git call it prefixes |
+| `CHECK_ON_WRITE_TIMEOUT`     | check-on-write | Seconds per checker (default 5)     |
+| `CHECK_ON_STOP_TIMEOUT`      | check-on-stop  | Seconds per checker (default 120)   |
+| `CHECK_ON_STOP_TRUST_ALL`    | check-on-stop  | Bypasses the allowlist              |
+| `CHECK_ON_STOP_TRUSTED_FILE` | check-on-stop  | Overrides the allowlist path        |
+
+Write the guard bypass directly before the git call that the user confirmed, as in
+`BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers only that call, so
+another destructive git call in the same command is still blocked. Exporting the
+variable into the Claude Code session environment disables the guard for every call.
+The guard also matches git global options such as `-C <dir>` and `-c <key=value>`,
+and git called by a path such as `/usr/bin/git`.
 
 Both checkers fail open. A missing `jq`, a missing toolchain, bash 3.2, an
 unmatched extension, a vendored path or a generated file all produce silence
