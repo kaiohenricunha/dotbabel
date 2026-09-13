@@ -5,21 +5,36 @@
  * Shared work: criteria that declare the identical `argv` run through one
  * execution (`runQualityPlans` already dedups by command key), and the same
  * result confirms every one of those criteria (REL-4). Every configured
- * report path is deleted once before anything runs, so a report a run does
- * not rewrite is unambiguous. Output never reaches the payload as text — only
- * a SHA-256 hash of a redacted, size-capped tail does (SEC-4, OPS-3).
+ * report path is deleted once before its command runs, so a report a run
+ * does not rewrite is unambiguous — but only once this run has passed the
+ * same trust check `runQualityPlans` enforces before it executes anything,
+ * so an untrusted repository's `spec.json` can never cause a delete. Output
+ * never reaches the payload as text — only a SHA-256 hash of a redacted,
+ * size-capped tail does (SEC-4, OPS-3).
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { runQualityPlans } from "../quality/runner.mjs";
-import { redactOutput } from "../lib/redact-output.mjs";
+import { isRepoTrusted } from "../trust-allowlist.mjs";
+import { findPackageJson } from "../lib/package-root.mjs";
 import { loadCriteria } from "./load.mjs";
 import { parseJUnitReport, CriteriaReportError, confirmTest } from "./confirm.mjs";
 
 const TAIL_LINES = 40;
 const TAIL_CHARS = 2000;
-const TOOL_VERSION = "3.4.0";
+
+// Read from the root package.json rather than duplicating a literal here, so
+// the payload's tool.version can never drift from the installed package (as
+// a hardcoded string once did). Resolved independently of `src/index.mjs`'s
+// own copy of this same read, rather than importing it from there, so this
+// module never becomes a circular dependency of the top-level barrel.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// fs.readFileSync without an encoding returns a Buffer, and JSON.parse
+// coerces its argument to a string the same way Buffer#toString() defaults
+// to (utf8) — so the explicit "utf8" here is for clarity only, not behavior.
+const TOOL_VERSION = JSON.parse(fs.readFileSync(findPackageJson(__dirname), "utf8")).version;
 
 /**
  * @param {object} ctx Harness context from `createHarnessContext`.
@@ -38,7 +53,13 @@ export async function verifyCriteria(ctx, opts = {}) {
   const { specId, allowProjectCommands = false, passEnv = [], env, jobs, timeoutSeconds = 600, headSha, pr } = opts;
   const { runnable, resolved } = loadCriteria(ctx, specId);
 
-  deleteConfiguredReports(ctx, runnable);
+  // Mirror the trust check `runQualityPlans` enforces before it executes
+  // anything, so the delete below never runs ahead of it: an untrusted
+  // repository's `spec.json` must not cause an unlink before the run
+  // predictably throws QUALITY_TRUST_REQUIRED.
+  if (allowProjectCommands || isRepoTrusted({ repoRoot: ctx.repoRoot, env: env ?? process.env }).trusted) {
+    deleteConfiguredReports(ctx, runnable);
+  }
 
   const groups = groupByCommand(runnable, ctx.repoRoot);
   const plans = [...groups.values()].map((g) => g.plan);
@@ -107,7 +128,11 @@ function groupByCommand(runnable, repoRoot) {
       groups.set(key, {
         criteria: [],
         plan: {
-          id: key,
+          // A short, readable id — not the NUL-joined `key` itself, which
+          // `runner.mjs` interpolates verbatim into a user-facing message
+          // (e.g. the trust-required error) and which would otherwise show
+          // up there as an unreadable raw command line with embedded NULs.
+          id: `criteria:${createHash("sha256").update(key).digest("hex").slice(0, 12)}`,
           // One "component" per distinct command, not a shared constant —
           // runQualityPlans batches by componentId and only parallelizes
           // across components, so a constant here would silently serialize
@@ -136,9 +161,19 @@ function evaluateCriterion(ctx, criterion, result) {
     return { id: criterion.id, status: "error", error_message: "the command timed out" };
   }
 
-  const rawOutput = dropPartialLastLine(`${result.stdout ?? ""}\n${result.stderr ?? ""}`, result.truncated);
-  const redacted = redactOutput(rawOutput);
-  const tail = computeTail(redacted);
+  // `result.truncated` is one shared flag set when EITHER stream hit the
+  // runner's byte cap, and each stream is cut independently — so the partial
+  // line has to be dropped from each stream on its own, before joining them.
+  // Dropping it from the already-concatenated string instead (the original
+  // approach here) only works when stderr happens to be empty; otherwise the
+  // inserted separator becomes the "last newline" and the actual dangling
+  // fragment survives untouched. `result.stdout`/`result.stderr` are already
+  // redacted by `runQualityPlans` (`quality/runner.mjs`), so no further
+  // `redactOutput` call belongs here.
+  const stdout = dropPartialLastLine(result.stdout ?? "", result.truncated);
+  const stderr = dropPartialLastLine(result.stderr ?? "", result.truncated);
+  const rawOutput = `${stdout}\n${stderr}`;
+  const tail = computeTail(rawOutput);
   const outputSha256 = createHash("sha256").update(tail).digest("hex");
 
   let report = null;
@@ -156,7 +191,10 @@ function evaluateCriterion(ctx, criterion, result) {
     return { id: criterion.id, status: "error", error_message: reportError, exit_code: result.exitCode, truncated: result.truncated === true };
   }
 
-  const confirmed = (criterion.tests ?? []).map((test) => ({
+  // Sorted by file then name (REL-5), independent of spec.json declaration
+  // order, so the payload is deterministic for the same inputs.
+  const sortedTests = [...(criterion.tests ?? [])].sort((a, b) => a.file.localeCompare(b.file) || a.name.localeCompare(b.name));
+  const confirmed = sortedTests.map((test) => ({
     file: test.file,
     name: test.name,
     ...confirmTest(test, report, rawOutput),

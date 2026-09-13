@@ -44,7 +44,7 @@ export function parseJUnitReport(absolutePath) {
  * exercise the parser without touching the filesystem.
  *
  * @param {string} text
- * @returns {{ testcases: { name: string, outcome: string }[] }}
+ * @returns {{ testcases: { name: string, outcome: "passed"|"failed"|"error"|"skipped" }[] }}
  */
 export function parseJUnitText(text) {
   if (/<!DOCTYPE/i.test(text)) {
@@ -112,7 +112,12 @@ function unescapeXml(value) {
         return '"';
       default: {
         const codePoint = entity[1] === "x" ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
-        return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : whole;
+        // String.fromCodePoint throws RangeError outside 0..0x10FFFF; leaving
+        // the reference unresolved (rather than letting that escape as an
+        // uncaught RangeError) keeps every failure inside this module's own
+        // CriteriaReportError contract.
+        const valid = Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff;
+        return valid ? String.fromCodePoint(codePoint) : whole;
       }
     }
   });
@@ -147,8 +152,13 @@ export function junitNameMatches(reportedName, criterionName) {
  *
  * @param {{ file: string, name: string }} test
  * @param {{ testcases: { name: string, outcome: string }[] } | null} report
- * @param {string} outputText  Combined, unredacted stdout+stderr.
- * @returns {{ found_in_file: true, confirmed_by: "junit"|"output", result: "passed"|"failed"|"error"|"skipped"|"absent" }}
+ * @param {string} outputText  Combined stdout+stderr, already redacted by the
+ *   runner (`quality/runner.mjs`) before this module ever sees it — so a test
+ *   name that happens to look secret-shaped (matching a redaction rule) can
+ *   never be confirmed this way; it reports `absent` instead.
+ * @returns {{ found_in_file: true, confirmed_by: "junit", result: "passed"|"failed"|"error"|"skipped"|"absent" } | { found_in_file: true, confirmed_by: "output", result: "passed"|"absent" }}
+ *   Only JUnit-report confirmation can distinguish failed/error/skipped;
+ *   output-only confirmation can only ever say a name was found or not.
  */
 export function confirmTest(test, report, outputText) {
   if (report) {
@@ -156,6 +166,10 @@ export function confirmTest(test, report, outputText) {
     if (!match) return { found_in_file: true, confirmed_by: "junit", result: "absent" };
     return { found_in_file: true, confirmed_by: "junit", result: match.outcome };
   }
-  const found = outputText.split("\n").some((line) => junitNameMatches(line, test.name)) || outputText.includes(test.name);
+  // outputText.includes(test.name) alone is sufficient: any junitNameMatches
+  // match against a line (exact, or a suffix after a separator) is itself a
+  // substring of that line, so it is already a substring of outputText — a
+  // separate per-line scan can never find a match this check would miss.
+  const found = outputText.includes(test.name);
   return { found_in_file: true, confirmed_by: "output", result: found ? "passed" : "absent" };
 }
