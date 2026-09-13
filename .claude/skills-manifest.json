@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-13T14:26:14.292Z",
+  "generatedAt": "2026-09-13T22:17:58.766Z",
   "skills": [
     {
       "name": "agents-search",
@@ -198,6 +198,13 @@
         "local-attest",
         "merge-pr"
       ],
+      "lastValidated": "2026-09-13"
+    },
+    {
+      "name": "pr-tldr",
+      "path": ".claude/commands/pr-tldr.md",
+      "checksum": "sha256:76d1a8313d7a50b86e254e9f894e76da28ca1cce588b57f7dcad4513918c81da",
+      "dependencies": [],
       "lastValidated": "2026-09-13"
     },
     {
