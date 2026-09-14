@@ -55,6 +55,27 @@ function criticalRepository() {
   fs.appendFileSync(path.join(repoRoot, "critical", "value.js"), "export const changed = 2;\n");
   return repoRoot;
 }
+
+function criticalMultiComponentRepository() {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-quality-critical-components-"));
+  dirs.push(repoRoot);
+  fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ quality: {
+    base_ref: "main",
+    critical_paths: ["api/**"],
+  } }));
+  for (const root of ["api", "web"]) {
+    fs.mkdirSync(path.join(repoRoot, root));
+    fs.writeFileSync(path.join(repoRoot, root, "package.json"), JSON.stringify({ scripts: { test: "node --test" } }));
+    fs.writeFileSync(path.join(repoRoot, root, "index.js"), `export const value = "${root}";\n`);
+  }
+  execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
+  execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
+  execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
+  execFileSync("git", ["-C", repoRoot, "add", "."]);
+  execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
+  fs.appendFileSync(path.join(repoRoot, "api", "index.js"), "export const changed = true;\n");
+  return repoRoot;
+}
 afterEach(() => dirs.splice(0).forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })));
 
 describe("quality check orchestration", () => {
@@ -88,6 +109,20 @@ describe("quality check orchestration", () => {
       env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
     });
     expect(result.critical_matches).toEqual(["critical/value.js"]);
+  });
+
+  it("lists every component represented by a critically escalated plan", async () => {
+    const repoRoot = criticalMultiComponentRepository();
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "fast",
+      base: "main",
+      paths: ["api"],
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    expect(result.components.map((component) => component.id)).toEqual(["api:javascript", "web:javascript"]);
+    expect(result.executions.every((execution) => result.components.some((component) => component.id === execution.componentId))).toBe(true);
   });
 
   it("returns immediately for a disabled policy", async () => {

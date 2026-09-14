@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { resolveQualityPolicy } from "./config.mjs";
 import { resolveQualityScope } from "./scope.mjs";
-import { detectQualityCapabilities, filesMatchingQualityPaths, planQualityCheck } from "./discovery.mjs";
+import { detectQualityCapabilities, filesMatchingQualityPaths, planQualityCheck, qualityChangePaths } from "./discovery.mjs";
 import { runQualityPlans } from "./runner.mjs";
 import { calculateChangedCoverage, parseQualityReport, coveragePercent } from "./reports.mjs";
 import { evaluateQuality } from "./evaluate.mjs";
@@ -93,7 +93,7 @@ export async function runQualityCheck(options = {}) {
   const paths = options.paths ?? [];
   const all = Boolean(options.all);
   const fullScope = resolveQualityScope({ repoRoot, base: options.base, head: options.head, env: options.env, configuredBase: policy.base_ref, all });
-  const criticalMatches = filesMatchingQualityPaths(fullScope.changedFiles.map((item) => item.path), policy.critical_paths ?? []);
+  const criticalMatches = filesMatchingQualityPaths(qualityChangePaths(fullScope.changedFiles), policy.critical_paths ?? []);
   const scope = narrowScope(fullScope, paths);
   const detection = detectQualityCapabilities({ repoRoot, policy, paths });
   const planned = planQualityCheck({ repoRoot, policy, changeSet: { ...scope, criticalMatches }, profile, detection, paths });
@@ -106,7 +106,7 @@ export async function runQualityCheck(options = {}) {
     ? loadQualityBaselineAtRevision({ repoRoot, baselineFile: policy.baseline_file, revision: scope.mergeBase })
     : loadQualityBaseline({ repoRoot, baselineFile: policy.baseline_file });
   const evaluation = evaluateQuality({ policy, profile, executions, metrics: [...parsed.metrics, ...native.metrics], findings: [...parsed.findings, ...native.findings], baseline, renames: scope.renames, criticalMatches });
-  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, critical_matches: criticalMatches, components: detection.components, exclusions: detection.exclusions, executions, ...evaluation });
+  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, critical_matches: criticalMatches, components: planned.components, exclusions: detection.exclusions, executions, ...evaluation });
 }
 
 export { resolveQualityPolicy } from "./config.mjs";

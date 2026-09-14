@@ -95,7 +95,10 @@
       "type": "string",
       "minLength": 1,
       "not": {
-        "anyOf": [{ "pattern": "^(?:/|[A-Za-z]:[\\\\/])" }, { "pattern": "(?:^|/)\\.\\.(?:/|$)" }]
+        "anyOf": [
+          { "pattern": "^(?:[\\\\/]|[A-Za-z]:)" },
+          { "pattern": "(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)" }
+        ]
       }
     },
     "qualityRule": {

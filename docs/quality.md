@@ -32,13 +32,13 @@ dotbabel quality baseline --profile pr --base origin/main
 Exit `0` means no error verdict. Exit `1` means a checked policy rule failed.
 Exit `2` means required trust, tooling, a report, or a Git base is unavailable. Exit `64` means invalid CLI use.
 
-The JSON output is one `schema_version: 1` envelope. It is separate from the validator event-array format.
+The JSON output is one `schema_version: 1` envelope. Validate it with [`../schemas/dotbabel.quality-result.schema.json`](../schemas/dotbabel.quality-result.schema.json). It is separate from the validator event-array format.
 
 ## Rule catalog
 
 The policy uses hard, regression, budget, advisory, and semantic classes. A result keeps measurement state separate from its verdict.
 
-These 25 rule ids are the values you use in `quality.rules` and in an exception's `rule` field.
+These 26 rule ids are the values you use in `quality.rules` and in an exception's `rule` field.
 
 | Rule id                                | Class      | Scope     | Profiles     | Level   | Threshold      | On unavailable |
 | -------------------------------------- | ---------- | --------- | ------------ | ------- | -------------- | -------------- |
@@ -46,6 +46,7 @@ These 25 rule ids are the values you use in `quality.rules` and in an exception'
 | `correctness.compile`                  | hard       | component | fast pr deep | error   | —              | error          |
 | `correctness.types`                    | hard       | component | fast pr deep | error   | —              | error          |
 | `correctness.tests`                    | hard       | component | pr deep      | error   | —              | error          |
+| `correctness.regression`               | hard       | component | pr deep      | error   | —              | error          |
 | `correctness.lint`                     | hard       | component | fast pr deep | error   | —              | error          |
 | `security.high_confidence`             | hard       | component | pr deep      | error   | —              | warning        |
 | `coverage.no_regression`               | regression | component | pr deep      | error   | —              | error          |
@@ -70,7 +71,7 @@ These 25 rule ids are the values you use in `quality.rules` and in an exception'
 
 A rule override may set `enabled`, `level`, `threshold`, `scope`, `on_unavailable`, and `profiles`. A `threshold` may only be set on a rule that owns one.
 
-Six rules can never be suppressed by an exception, whatever the config source: `correctness.format`, `correctness.compile`, `correctness.types`, `correctness.tests`, `correctness.lint`, and `security.high_confidence`.
+Seven rules can never be suppressed by an exception, whatever the config source: `correctness.format`, `correctness.compile`, `correctness.types`, `correctness.tests`, `correctness.regression`, `correctness.lint`, and `security.high_confidence`.
 
 The same ids are the enum in [`../schemas/dotbabel.config.schema.json`](../schemas/dotbabel.config.schema.json). Point an editor at it with `"$schema"` for autocompletion.
 
@@ -130,7 +131,7 @@ What a path filter narrows, and what it does not:
 | Scope       | Rules                                                                                                                                                                                               | Narrowed by `--path` |
 | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | `changed`   | `correctness.format`, `complexity.*`, `coverage.changed_*`, `mutation.changed_score`, `size.*`, `maintainability.*`, `semantic.*`, `architecture.speculative_abstraction`, `policy.new_suppression` | Yes                  |
-| `component` | `correctness.compile`, `correctness.types`, `correctness.tests`, `correctness.lint`, `security.high_confidence`, `coverage.no_regression`, `duplication.percent`                                    | No                   |
+| `component` | `correctness.compile`, `correctness.types`, `correctness.tests`, `correctness.regression`, `correctness.lint`, `security.high_confidence`, `coverage.no_regression`, `duplication.percent`          | No                   |
 
 A path filter also drops execution plans for a component with no file in scope, so an unrelated package is not checked at all. It does not rewrite a repository's own command: `npm test`, `go test ./...`, `tsc -p`, and `ruff check .` still cover their whole component. Only the Go and JavaScript adapters build per-file argument lists, so only those two narrow the command itself.
 

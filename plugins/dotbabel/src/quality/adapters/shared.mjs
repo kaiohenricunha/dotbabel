@@ -2,7 +2,7 @@ const FAST_CAPABILITIES = new Set(["format", "compile", "typecheck", "lint", "co
 const PR_CAPABILITIES = new Set([...FAST_CAPABILITIES, "test", "regression", "coverage", "dead-code", "dependencies", "duplication", "security"]);
 const DEEP_CAPABILITIES = new Set([...PR_CAPABILITIES, "mutation", "race"]);
 
-/** Return true when a capability belongs to a fixed profile. */
+/** Return true when a capability belongs to a profile or is an escalated test. */
 export function capabilityInProfile(capability, profile, includeTests = false) {
   const capabilities = profile === "fast" ? FAST_CAPABILITIES : profile === "pr" ? PR_CAPABILITIES : DEEP_CAPABILITIES;
   return capabilities.has(capability) || (includeTests && capability === "test");

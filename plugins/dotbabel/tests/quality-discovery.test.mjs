@@ -100,6 +100,8 @@ describe("quality discovery", () => {
     }
     expect(filesMatchingQualityPaths(files, ["missing/**", "src/**"])).toEqual(["src/a.js", "src/nested/value.mjs"]);
     expect(filesMatchingQualityPaths(["src/value.js"], ["src\\**"])).toEqual(["src/value.js"]);
+    expect(filesMatchingQualityPaths(["src/value.js"], ["./src/**"])).toEqual(["src/value.js"]);
+    expect(filesMatchingQualityPaths(["lib/value.js"], ["src/../lib/**"])).toEqual(["lib/value.js"]);
     expect(filesMatchingQualityPaths()).toEqual([]);
     expect(filesMatchingQualityPaths(files)).toEqual([]);
   });
@@ -382,6 +384,49 @@ describe("quality discovery", () => {
     });
     expect(planned.plans.filter((plan) => plan.componentId === "web:javascript").map((plan) => plan.capability)).toEqual(["test"]);
     expect(planned.plans.filter((plan) => plan.componentId === "api:javascript").map((plan) => plan.capability).sort()).toEqual(["compile", "lint", "test"]);
+  });
+
+  it("lets critical escalation override test tool path triggers", () => {
+    const repoRoot = tempRepo({
+      "api/value.rs": "fn api() {}\n",
+      "web/value.rs": "fn web() {}\n",
+    });
+    const policy = {
+      critical_paths: ["api/**"],
+      components: ["api", "web"].map((root) => ({ root, languages: ["rust"], tools: {
+        test: { argv: ["cargo", "test"], paths: [`${root}/tests/**`] },
+      } })),
+    };
+    const planned = planQualityCheck({
+      repoRoot,
+      policy,
+      profile: "fast",
+      paths: ["api"],
+      changeSet: { changedFiles: [{ path: "api/value.rs" }] },
+    });
+    expect(planned.plans.filter((plan) => plan.capability === "test").map((plan) => plan.availability)).toEqual([
+      "available",
+      "available",
+    ]);
+  });
+
+  it("matches path triggers and critical paths against a rename source", () => {
+    const repoRoot = tempRepo({ "archive/value.rs": "fn value() {}\n" });
+    const policy = {
+      critical_paths: ["data/**"],
+      components: [{ root: ".", languages: ["rust"], tools: {
+        regression: { argv: ["cargo", "test"], paths: ["data/**"] },
+        test: { argv: ["cargo", "test"] },
+      } }],
+    };
+    const planned = planQualityCheck({
+      repoRoot,
+      policy,
+      profile: "pr",
+      changeSet: { changedFiles: [{ path: "archive/value.rs", oldPath: "data/value.rs", status: "renamed" }] },
+    });
+    expect(planned.criticalMatches).toEqual(["data/value.rs"]);
+    expect(planned.plans.find((plan) => plan.capability === "regression")).toMatchObject({ availability: "available" });
   });
 
   it("escalates generic component tests without widening other generic tools", () => {

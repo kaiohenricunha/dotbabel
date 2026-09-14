@@ -34,6 +34,18 @@ describe("quality configuration", () => {
     }, { source: "project" })).toThrow(/repository-relative/);
   });
 
+  it.each([
+    "C:\\tests\\**",
+    "C:tests\\**",
+    "\\\\server\\share\\**",
+  ])("rejects portable absolute tool path %s", (pattern) => {
+    expect(() => validateQualityConfig({
+      components: [{ root: ".", languages: ["javascript"], tools: {
+        test: { argv: ["npm", "test"], paths: [pattern] },
+      } }],
+    }, { source: "project" })).toThrow(/repository-relative/);
+  });
+
   it("merges shipped, user, and project values with provenance", () => {
     const repoRoot = tempDir();
     const configRoot = tempDir();

@@ -53,20 +53,26 @@ function hasTsCheck(repoRoot, file) {
 
 /** Return repository paths that match at least one quality-tool glob. */
 export function filesMatchingQualityPaths(files = [], patterns = []) {
-  const expressions = patterns.map((pattern) => globToRegExp(pattern.replaceAll("\\", "/")));
+  const expressions = patterns.map((pattern) => globToRegExp(path.posix.normalize(pattern.replaceAll("\\", "/"))));
   return files.filter((file) => expressions.some((expression) => expression.test(file)));
+}
+
+/** Return every current and previous path represented by changed files. */
+export function qualityChangePaths(changedFiles = []) {
+  return [...new Set(changedFiles.flatMap((item) => [item.path, item.oldPath].filter(Boolean)))];
 }
 
 function criticalMatches(policy, changeSet) {
   if (changeSet.criticalMatches) return changeSet.criticalMatches;
-  return filesMatchingQualityPaths((changeSet.changedFiles ?? []).map((item) => item.path), policy?.critical_paths ?? []);
+  return filesMatchingQualityPaths(qualityChangePaths(changeSet.changedFiles), policy?.critical_paths ?? []);
 }
 
 function applyPathTriggers(plans, changeSet) {
   if (changeSet.all) return plans;
-  const changed = (changeSet.changedFiles ?? []).map((item) => item.path);
+  const changed = qualityChangePaths(changeSet.changedFiles);
+  const forceTests = (changeSet.criticalMatches ?? []).length > 0;
   return plans.map((plan) => {
-    if (!plan.paths || filesMatchingQualityPaths(changed, plan.paths).length > 0) return plan;
+    if ((forceTests && plan.capability === "test") || !plan.paths || filesMatchingQualityPaths(changed, plan.paths).length > 0) return plan;
     return { ...plan, availability: "not_triggered", evidence: `changed files did not match: ${plan.paths.join(", ")}` };
   });
 }
@@ -140,7 +146,7 @@ export function planQualityCheck({ repoRoot, policy, changeSet, profile, detecti
     const full = detectQualityCapabilities({ repoRoot, policy });
     const testPlans = full.components.flatMap((component) => getQualityAdapter(component.language)?.plan(component, policy, escalatedChangeSet, profile) ?? genericPlans(component, profile, true)).filter((plan) => plan.capability === "test");
     const byId = new Map([...scoped, ...testPlans].map((plan) => [plan.id, plan]));
-    return { ...found, plans: applyPathTriggers([...byId.values()], escalatedChangeSet), criticalMatches: matches };
+    return { ...found, components: full.components, plans: applyPathTriggers([...byId.values()], escalatedChangeSet), criticalMatches: matches };
   }
   return { ...found, plans: applyPathTriggers(scoped, escalatedChangeSet), criticalMatches: matches };
 }

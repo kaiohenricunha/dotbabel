@@ -44,10 +44,11 @@ function rejectKeys(value, allowed, label, source, pointer) {
 }
 
 function relativePath(value, label, source, pointer) {
-  if (typeof value !== "string" || value.length === 0 || value.includes("\0") || path.isAbsolute(value)) {
+  const portable = typeof value === "string" ? value.replaceAll("\\", "/") : value;
+  if (typeof portable !== "string" || portable.length === 0 || portable.includes("\0") || path.posix.isAbsolute(portable) || /^[A-Za-z]:/.test(portable)) {
     throw qualityError(`${label} must be a repository-relative path`, pointer, source);
   }
-  const normalized = path.posix.normalize(value.replaceAll("\\", "/"));
+  const normalized = path.posix.normalize(portable);
   if (normalized === ".." || normalized.startsWith("../")) {
     throw qualityError(`${label} must be a repository-relative path without '..'`, pointer, source);
   }
