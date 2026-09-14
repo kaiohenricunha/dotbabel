@@ -29,6 +29,23 @@ teardown() {
   rm -rf "$TEST_HOME"
 }
 
+@test "shared helpers remove every host-CLI detector signal" {
+  export CLAUDECODE=1 CLAUDE_CODE_SSE_PORT=1234
+  export CODEX_FUTURE_SIGNAL=1 GITHUB_COPILOT_FUTURE_SIGNAL=1 COPILOT_FUTURE_SIGNAL=1
+  export GEMINI_CLI=1 GEMINI_CLI_FUTURE_SIGNAL=1
+  export CLAUDE_OTHER=keep CODEX=keep COPILOT=keep GEMINI=keep
+
+  clear_host_cli_environment
+
+  local env_name
+  for env_name in CLAUDECODE CLAUDE_CODE_SSE_PORT CODEX_FUTURE_SIGNAL GITHUB_COPILOT_FUTURE_SIGNAL COPILOT_FUTURE_SIGNAL GEMINI_CLI GEMINI_CLI_FUTURE_SIGNAL; do
+    [ -z "${!env_name+x}" ]
+  done
+  for env_name in CLAUDE_OTHER CODEX COPILOT GEMINI; do
+    [ "${!env_name}" = "keep" ]
+  done
+}
+
 @test "binary is executable" {
   [ -x "$BIN" ] || chmod +x "$BIN"
   [ -x "$BIN" ]
@@ -137,4 +154,3 @@ teardown() {
   [ "$status" -eq 2 ]
   [[ "$stderr" != *"fetch <id>"* ]]
 }
-
