@@ -7,6 +7,21 @@
   "required": ["schema_version", "metrics", "findings"],
   "properties": {
     "schema_version": { "const": 1 },
+    "state": {
+      "enum": [
+        "checked",
+        "unsupported",
+        "not_configured",
+        "not_triggered",
+        "unavailable",
+        "not_applicable",
+        "skipped"
+      ]
+    },
+    "critical_matches": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "metrics": {
       "type": "array",
       "items": {

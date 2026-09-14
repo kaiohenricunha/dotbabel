@@ -1,11 +1,11 @@
 const FAST_CAPABILITIES = new Set(["format", "compile", "typecheck", "lint", "complexity"]);
-const PR_CAPABILITIES = new Set([...FAST_CAPABILITIES, "test", "coverage", "dead-code", "dependencies", "duplication", "security"]);
+const PR_CAPABILITIES = new Set([...FAST_CAPABILITIES, "test", "regression", "coverage", "dead-code", "dependencies", "duplication", "security"]);
 const DEEP_CAPABILITIES = new Set([...PR_CAPABILITIES, "mutation", "race"]);
 
 /** Return true when a capability belongs to a fixed profile. */
-export function capabilityInProfile(capability, profile) {
+export function capabilityInProfile(capability, profile, includeTests = false) {
   const capabilities = profile === "fast" ? FAST_CAPABILITIES : profile === "pr" ? PR_CAPABILITIES : DEEP_CAPABILITIES;
-  return capabilities.has(capability);
+  return capabilities.has(capability) || (includeTests && capability === "test");
 }
 
 /** Map a tool capability to language-independent policy rules. */
@@ -16,6 +16,7 @@ export function capabilityRules(capability) {
     typecheck: ["correctness.types"],
     lint: ["correctness.lint"],
     test: ["correctness.compile", "correctness.tests"],
+    regression: ["correctness.regression"],
     coverage: [],
     complexity: ["complexity.cognitive", "complexity.cyclomatic"],
     mutation: ["mutation.changed_score"],
@@ -28,9 +29,9 @@ export function capabilityRules(capability) {
 }
 
 /** Build one command plan per project-configured tool capability in scope for a profile. */
-export function projectToolPlans(component, profile) {
+export function projectToolPlans(component, profile, includeTests = false) {
   return Object.entries(component.tools ?? {})
-    .filter(([capability]) => capabilityInProfile(capability, profile))
+    .filter(([capability]) => capabilityInProfile(capability, profile, includeTests))
     .map(([capability, tool]) => ({
       id: `${component.id}:${capability}`,
       componentId: component.id,
@@ -41,6 +42,7 @@ export function projectToolPlans(component, profile) {
       cwd: component.absoluteRoot,
       timeoutSeconds: tool.timeout_seconds,
       report: tool.report,
+      paths: tool.paths,
       availability: "available",
       source: "project",
       requiresTrust: true,

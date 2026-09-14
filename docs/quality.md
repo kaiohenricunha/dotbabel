@@ -84,6 +84,7 @@ A coverage percentage does not prove test quality. Review behavior, failures, an
 
 `checked` means a tool produced usable evidence. `unsupported` means no adapter can measure the rule.
 `not_configured` means a compatible tool exists but the repository did not select one. `unavailable` means a selected tool or report failed.
+`not_triggered` means no changed file matched a configured tool path. Its verdict is always `info`.
 `not_applicable` means no relevant scope exists. `skipped` means the selected profile did not run the rule.
 
 The report always shows these states. An unavailable measurement never becomes an implicit pass.
@@ -162,6 +163,7 @@ Add `quality` to `.dotbabel.json`. The nested object rejects unknown keys.
         "tools": {
           "test": {
             "argv": ["make", "test"],
+            "paths": ["api/**", "shared/contracts/**"],
             "timeout_seconds": 600,
             "report": { "format": "exit-code" }
           }
@@ -173,6 +175,11 @@ Add `quality` to `.dotbabel.json`. The nested object rejects unknown keys.
 ```
 
 Commands use an `argv` array. Shell strings, absolute configured executables, escaping paths, and environment passthrough in configuration are invalid.
+An optional non-empty `paths` array uses repository-relative globs. The tool runs only after a matching change, or with `--all`.
+The report records an unmatched tool as `not_triggered` and names its globs.
+
+When a changed file matches `critical_paths`, all component test plans run in every profile. These plans ignore `--path` narrowing.
+The JSON envelope lists the matched files in `critical_matches`.
 
 The precedence is shipped defaults, `${XDG_CONFIG_HOME}/dotbabel/quality.json`, project configuration, then operational CLI flags.
 The user file contains the quality object without an outer key. It cannot set components, exceptions, critical paths, base references, or baseline paths.
@@ -191,6 +198,7 @@ Each key under `components[].tools` is a capability, and each capability feeds s
 | `lint`         | fast pr deep | `correctness.lint`                                                              |
 | `complexity`   | fast pr deep | `complexity.cognitive`, `complexity.cyclomatic`                                 |
 | `test`         | pr deep      | `correctness.compile`, `correctness.tests`                                      |
+| `regression`   | pr deep      | `correctness.regression`                                                        |
 | `coverage`     | pr deep      | `coverage.no_regression`, `coverage.changed_lines`, `coverage.changed_branches` |
 | `dead-code`    | pr deep      | `maintainability.dead_code`                                                     |
 | `dependencies` | pr deep      | `maintainability.unused_dependencies`                                           |

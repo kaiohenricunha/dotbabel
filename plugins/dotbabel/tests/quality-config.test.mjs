@@ -14,6 +14,26 @@ function tempDir() {
 afterEach(() => dirs.splice(0).forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })));
 
 describe("quality configuration", () => {
+  it("accepts tool paths as non-empty repository-relative globs", () => {
+    expect(() => validateQualityConfig({
+      components: [{ root: ".", languages: ["javascript"], tools: {
+        regression: { argv: ["npm", "run", "regression"], paths: ["src/**", "tests/**/*.test.mjs"] },
+      } }],
+    }, { source: "project" })).not.toThrow();
+  });
+
+  it("rejects empty tool paths", () => {
+    expect(() => validateQualityConfig({
+      components: [{ root: ".", languages: ["javascript"], tools: { test: { argv: ["npm", "test"], paths: [] } } }],
+    }, { source: "project" })).toThrow(/paths/);
+  });
+
+  it("rejects tool paths that escape the repository", () => {
+    expect(() => validateQualityConfig({
+      components: [{ root: ".", languages: ["javascript"], tools: { test: { argv: ["npm", "test"], paths: ["../outside/**"] } } }],
+    }, { source: "project" })).toThrow(/repository-relative/);
+  });
+
   it("merges shipped, user, and project values with provenance", () => {
     const repoRoot = tempDir();
     const configRoot = tempDir();

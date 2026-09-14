@@ -10,7 +10,13 @@ function schema(name) { return JSON.parse(fs.readFileSync(path.join(root, "schem
 describe("quality exchange schemas", () => {
   it("validates a dotbabel-v1 report", () => {
     const validate = new Ajv({ strict: false }).compile(schema("dotbabel.quality-report.schema.json"));
-    expect(validate({ schema_version: 1, metrics: [{ rule: "duplication.percent", actual: 4 }], findings: [] })).toBe(true);
+    expect(validate({
+      schema_version: 1,
+      state: "not_triggered",
+      critical_matches: ["src/critical.mjs"],
+      metrics: [{ rule: "duplication.percent", actual: 4 }],
+      findings: [],
+    })).toBe(true);
     expect(validate({ schema_version: 2, metrics: [], findings: [] })).toBe(false);
   });
 

@@ -15,6 +15,235 @@ function policy(exceptions = []) {
 }
 
 describe("quality evaluation", () => {
+  it("reports an unmatched path-triggered tool as not_triggered with an info verdict", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "pr",
+      executions: [{
+        componentId: ".:javascript",
+        ruleIds: ["correctness.tests"],
+        state: "not_triggered",
+        evidence: "changed files did not match: tests/**, fixtures/**",
+      }],
+    });
+    expect(result.results.find((item) => item.rule === "correctness.tests")).toMatchObject({
+      state: "not_triggered",
+      verdict: "info",
+      message: "changed files did not match: tests/**, fixtures/**",
+    });
+    expect(result.results.at(-1).rule).toBe("correctness.tests");
+    expect(result.results.filter((item) => item.state === "not_triggered")).toHaveLength(1);
+    expect(result.results.filter((item) => item.state === "not_configured").every((item) => item.message === "no authoritative tool is configured")).toBe(true);
+    expect(result.results.filter((item) => item.state === "skipped").every((item) => item.message === "agent review is required")).toBe(true);
+    expect(result.verdict).toBe("pass");
+    expect(result.environment_error).toBe(false);
+  });
+
+  it("counts an escalated test result in the fast profile", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "fast",
+      criticalMatches: ["critical/value.js"],
+      executions: [{
+        componentId: ".:javascript",
+        ruleIds: ["correctness.tests"],
+        state: "checked",
+        exitCode: 1,
+        stdout: "",
+        stderr: "test failed",
+      }],
+    });
+    expect(result.results.find((item) => item.rule === "correctness.tests")).toEqual({
+      rule: "correctness.tests",
+      component: ".:javascript",
+      class: "hard",
+      state: "checked",
+      verdict: "fail",
+      message: "test failed",
+      provenance: { level: "shipped", threshold: "shipped" },
+    });
+    expect(result.verdict).toBe("fail");
+  });
+
+  it("ignores unknown executions and distinguishes output-sensitive checks", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "fast",
+      executions: [
+        { componentId: "unknown", ruleIds: ["unknown.rule"], state: "checked", exitCode: 1, stdout: "", stderr: "unknown" },
+        { componentId: "plain", ruleIds: ["correctness.compile"], state: "checked", exitCode: 0, stdout: "diagnostic", stderr: "" },
+        { componentId: "sensitive", ruleIds: ["correctness.format"], state: "checked", exitCode: 0, stdout: "", stderr: "", stdoutFailure: true },
+      ],
+    });
+    expect(result.results.find((item) => item.component === "unknown")).toBeUndefined();
+    expect(result.results.find((item) => item.component === "plain")).toMatchObject({ verdict: "pass", message: "check passed" });
+    expect(result.results.find((item) => item.component === "sensitive")).toMatchObject({ verdict: "pass", message: "check passed" });
+  });
+
+  it("uses all baseline identity fields and generates stable finding fingerprints", () => {
+    const baseline = { metrics: [
+      { rule: "complexity.cognitive", path: "old.js", symbol: "other", component: "web", actual: 1 },
+      { rule: "complexity.cognitive", path: "old.js", symbol: "target", component: "api", actual: 2 },
+      { rule: "complexity.cognitive", path: "old.js", symbol: "target", component: "web", actual: 20 },
+    ], findings: [] };
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "fast",
+      baseline,
+      renames: [{ from: "old.js", to: "new.js" }],
+      metrics: [{ rule: "complexity.cognitive", path: "new.js", symbol: "target", component: "web", actual: 18 }],
+      findings: [{ rule: "semantic.dynamic_types", path: "new.js", symbol: "target", message: "dynamic value" }],
+    });
+    expect(result.results.find((item) => item.rule === "complexity.cognitive")).toMatchObject({ baseline: 20, verdict: "pass" });
+    expect(result.results.find((item) => item.rule === "semantic.dynamic_types").fingerprint).toBe("sha256:f034699270b30b50274b7c5fc690991f85988a56a853e9298749051621d61840");
+  });
+
+  it("maps unavailable levels to fail, warn, and info", () => {
+    const configured = policy();
+    configured.rules["correctness.compile"].on_unavailable = "error";
+    configured.rules["security.high_confidence"].on_unavailable = "warning";
+    configured.rules["maintainability.dead_code"].on_unavailable = "info";
+    const result = evaluateQuality({
+      policy: configured,
+      profile: "pr",
+      executions: [
+        { componentId: "a", ruleIds: ["correctness.compile"], state: "unavailable" },
+        { componentId: "b", ruleIds: ["security.high_confidence"], state: "unavailable" },
+        { componentId: "c", ruleIds: ["maintainability.dead_code"], state: "unavailable" },
+      ],
+    });
+    expect(result.results.filter((item) => item.component).map((item) => item.verdict)).toEqual(["fail", "warn", "info"]);
+    expect(result.verdict).toBe("fail");
+    expect(result.environment_error).toBe(true);
+  });
+
+  it("skips known rules outside the selected profile", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "fast",
+      executions: [{ componentId: "tests", ruleIds: ["correctness.tests"], state: "checked", exitCode: 1, stdout: "", stderr: "failed" }],
+      metrics: [{ rule: "coverage.changed_lines", actual: 0 }],
+      findings: [{ rule: "maintainability.dead_code", message: "unused" }],
+    });
+    expect(result.results.some((item) => item.component === "tests")).toBe(false);
+    expect(result.results.some((item) => item.actual === 0)).toBe(false);
+    expect(result.results.some((item) => item.message === "unused")).toBe(false);
+    expect(result.verdict).toBe("pass");
+  });
+
+  it("reports every execution failure state with its exact message", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "fast",
+      executions: [
+        { componentId: "a", ruleIds: ["correctness.compile"], state: "unavailable", timedOut: true },
+        { componentId: "b", ruleIds: ["correctness.format"], state: "not_configured", candidates: ["prettier", "biome"] },
+        { componentId: "c", ruleIds: ["correctness.lint"], state: "checked", exitCode: 1, stdout: "stdout failure", stderr: "" },
+        { componentId: "d", ruleIds: ["correctness.types"], state: "checked", exitCode: 1, stdout: "", stderr: "" },
+      ],
+    });
+    expect(result.results.filter((item) => item.component).map(({ component, state, verdict, message }) => ({ component, state, verdict, message }))).toEqual([
+      { component: "a", state: "unavailable", verdict: "fail", message: "tool timed out" },
+      { component: "b", state: "not_configured", verdict: "fail", message: "ambiguous tools: prettier, biome" },
+      { component: "c", state: "checked", verdict: "fail", message: "stdout failure" },
+      { component: "d", state: "checked", verdict: "fail", message: "check failed" },
+    ]);
+  });
+
+  it("uses percentage regression only when both totals are positive", () => {
+    const baseline = { metrics: [
+      { key: "zero-old", rule: "coverage.no_regression", actual: 50, covered: 0, total: 0, report_format: "lcov" },
+      { key: "zero-new", rule: "coverage.no_regression", actual: 50, covered: 1, total: 2, report_format: "lcov" },
+    ], findings: [] };
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "pr",
+      baseline,
+      metrics: [
+        { key: "zero-old", rule: "coverage.no_regression", actual: 40, covered: 0, total: 0, report_format: "lcov" },
+        { key: "zero-new", rule: "coverage.no_regression", actual: 40, covered: 0, total: 0, report_format: "lcov" },
+      ],
+    });
+    expect(result.results.filter((item) => item.rule === "coverage.no_regression").map((item) => item.verdict)).toEqual(["fail", "fail"]);
+  });
+
+  it("requires an exception to match the rule, fingerprint, state, and failing verdict", () => {
+    const configured = policy([
+      { id: "QEX-1", rule: "complexity.cognitive", fingerprint: "sha256:target", expires: "2027-01-01" },
+    ]);
+    const result = evaluateQuality({
+      policy: configured,
+      profile: "fast",
+      now: new Date("2026-01-01T00:00:00Z"),
+      findings: [
+        { rule: "size.file_loc", fingerprint: "sha256:target", message: "wrong rule" },
+        { rule: "complexity.cognitive", fingerprint: "sha256:other", message: "wrong fingerprint" },
+        { rule: "complexity.cognitive", fingerprint: "sha256:target", message: "matching failure" },
+      ],
+    });
+    expect(result.results.find((item) => item.fingerprint === "sha256:target" && item.rule === "complexity.cognitive")).toMatchObject({ verdict: "warn", exception: "QEX-1" });
+    const wrongRule = result.results.find((item) => item.rule === "size.file_loc");
+    expect(wrongRule).toMatchObject({ verdict: "warn" });
+    expect(wrongRule.exception).toBeUndefined();
+  });
+
+  it("reports a warning-only run as warn", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "fast",
+      findings: [{ rule: "semantic.dynamic_types", message: "dynamic" }],
+    });
+    expect(result.verdict).toBe("warn");
+    expect(result.environment_error).toBe(false);
+  });
+
+  it("reports exact metric boundary states", () => {
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "pr",
+      baseline: { metrics: [
+        { key: "format", rule: "coverage.no_regression", actual: 90, report_format: "lcov" },
+      ], findings: [] },
+      metrics: [
+        { key: "format", rule: "coverage.no_regression", actual: 90, report_format: "istanbul-json" },
+        { key: "nan", rule: "coverage.changed_lines", actual: NaN },
+      ],
+    });
+    expect(result.results.find((item) => item.key === "format")).toMatchObject({
+      state: "not_applicable",
+      verdict: "info",
+      message: "coverage baseline format is incompatible",
+    });
+    expect(result.results.find((item) => item.key === "nan")).toMatchObject({
+      state: "unavailable",
+      verdict: "fail",
+      message: "measured value is not a finite number",
+    });
+  });
+
+  it("keeps a passing result unchanged by an exception", () => {
+    const result = evaluateQuality({
+      policy: policy([{ id: "QEX-1", rule: "complexity.cognitive", fingerprint: "sha256:pass", expires: "2027-01-01" }]),
+      profile: "fast",
+      now: new Date("2026-01-01T00:00:00Z"),
+      metrics: [{ rule: "complexity.cognitive", actual: 1, fingerprint: "sha256:pass" }],
+    });
+    const passing = result.results.find((item) => item.fingerprint === "sha256:pass");
+    expect(passing).toMatchObject({ verdict: "pass" });
+    expect(passing.exception).toBeUndefined();
+    expect(result.exceptions).toEqual([{ id: "QEX-1", state: "unused" }]);
+  });
+
+  it("keeps an exception active through the final second of its expiration date", () => {
+    const result = evaluateQuality({
+      policy: policy([{ id: "QEX-1", rule: "complexity.cognitive", fingerprint: "sha256:boundary", expires: "2027-01-01" }]),
+      profile: "fast",
+      now: new Date("2027-01-01T23:59:59Z"),
+      findings: [{ rule: "complexity.cognitive", fingerprint: "sha256:boundary", message: "failure" }],
+    });
+    expect(result.exceptions).toEqual([{ id: "QEX-1", state: "active" }]);
+  });
+
   it("matches a legacy metric across a Git rename", () => {
     const result = evaluateQuality({
       policy: policy(),

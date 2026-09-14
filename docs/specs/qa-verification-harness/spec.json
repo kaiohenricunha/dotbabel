@@ -254,7 +254,7 @@
     },
     {
       "id": "AC-8",
-      "status": "planned",
+      "status": "active",
       "given": "a quality tool that declares paths",
       "when": "no changed file matches those paths",
       "then": "the tool does not run and the report shows not_triggered with an info verdict",
@@ -281,7 +281,7 @@
     },
     {
       "id": "AC-9",
-      "status": "planned",
+      "status": "active",
       "given": "a changed file under critical_paths",
       "when": "the fast quality profile runs",
       "then": "the test plan of every component runs",
