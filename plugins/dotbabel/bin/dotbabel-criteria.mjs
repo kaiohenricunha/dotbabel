@@ -16,11 +16,10 @@ import fs from "node:fs";
 
 import { version } from "../src/index.mjs";
 import { parse, helpText } from "../src/lib/argv.mjs";
-import { ValidationError, formatError } from "../src/lib/errors.mjs";
+import { ValidationError, formatError, ERROR_CODES } from "../src/lib/errors.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
 import { createHarnessContext, extractTemplateSection, isMeaningfulSection, pathExists } from "../src/spec-harness-lib.mjs";
-import { ERROR_CODES } from "../src/lib/errors.mjs";
 import { verifyCriteria } from "../src/criteria/verify.mjs";
 import { listCriteria } from "../src/criteria/list.mjs";
 import { loadCriteriaConfig } from "../src/criteria/config.mjs";
