@@ -38,7 +38,7 @@ function durationCell(criterion) {
 }
 
 function escapeMarkdown(value) {
-  return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\|/g, "\\|");
+  return String(value).replace(/\\/g, "\\\\").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\|/g, "\\|");
 }
 
 function fenced(text) {

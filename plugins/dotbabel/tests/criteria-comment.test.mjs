@@ -104,6 +104,12 @@ describe("renderEvidenceComment", () => {
     expect(body).toContain("<summary>ex\\|&lt;b&gt; AC-1 output</summary>");
   });
 
+  it("escapes backslashes before table pipes", () => {
+    const payload = samplePayload({ specs: [{ id: "ex\\|fake", criteria: [{ id: "AC-1", status: "pass" }] }] });
+    const body = renderEvidenceComment(payload, {});
+    expect(body).toContain("| ex\\\\\\|fake | AC-1 | pass |");
+  });
+
   it("shrinks output tails, not the marker or payload line, to stay at or under 60000 characters", () => {
     const payload = samplePayload({
       specs: [{ id: "example", criteria: [{ id: "AC-1", status: "pass" }, { id: "AC-2", status: "pass" }] }],
