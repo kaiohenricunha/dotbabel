@@ -19,7 +19,7 @@ import { parse, helpText } from "../src/lib/argv.mjs";
 import { ValidationError, formatError, ERROR_CODES } from "../src/lib/errors.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
-import { createHarnessContext, extractTemplateSection, isMeaningfulSection, pathExists } from "../src/spec-harness-lib.mjs";
+import { createHarnessContext, listSpecDirs } from "../src/spec-harness-lib.mjs";
 import { verifyCriteria } from "../src/criteria/verify.mjs";
 import { listCriteria } from "../src/criteria/list.mjs";
 import { loadCriteriaConfig } from "../src/criteria/config.mjs";
@@ -50,23 +50,6 @@ function toArray(value) {
   return Array.isArray(value) ? value : value !== undefined ? [String(value)] : [];
 }
 
-/**
- * Extract the Spec IDs a pull request body names in its `## Spec ID` section,
- * mirroring `check-spec-coverage.mjs`'s own tokenization (whitespace/comma
- * separated, backtick and punctuation trimmed).
- *
- * @param {string} body
- * @returns {string[]}
- */
-function extractSpecIds(body) {
-  const section = extractTemplateSection(body, "Spec ID");
-  if (!isMeaningfulSection(section)) return [];
-  return section
-    .split(/[\s,]+/)
-    .map((token) => token.replace(/^[`*_~]+|[`*_~.,;:]+$/g, "").trim())
-    .filter(Boolean);
-}
-
 function combineVerdicts(verdicts) {
   if (verdicts.every((v) => v === "pass")) return "pass";
   if (verdicts.some((v) => v === "fail")) return "fail";
@@ -92,19 +75,19 @@ function combinePayloads(payloads, { headSha, pr }) {
   };
 }
 
-function realCapture(cmd) {
-  const r = spawnSync(cmd, { shell: true, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: GIT_MAX_BUFFER });
-  if (r.status !== 0) throw new Error(`command failed (${r.status}): ${cmd}\n${r.stderr || ""}`);
+function realCapture(argv) {
+  const r = spawnSync(argv[0], argv.slice(1), { shell: false, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: GIT_MAX_BUFFER });
+  if (r.status !== 0) throw new Error(`command failed (${r.status}): ${JSON.stringify(argv)}\n${r.stderr || ""}`);
   return (r.stdout || "").trim();
 }
 
-function realGhApiWithInput(cmd, payload) {
-  const r = spawnSync(cmd, { shell: true, input: JSON.stringify(payload), encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
-  if (r.status !== 0) throw new Error(`command failed (${r.status}): ${cmd}\n${r.stderr || ""}`);
+function realGhApiWithInput(argv, payload) {
+  const r = spawnSync(argv[0], argv.slice(1), { shell: false, input: JSON.stringify(payload), encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] });
+  if (r.status !== 0) throw new Error(`command failed (${r.status}): ${JSON.stringify(argv)}\n${r.stderr || ""}`);
   return r.stdout;
 }
 
-const deps = { capture: realCapture, ghApiWithInput: realGhApiWithInput, log: (msg) => process.stdout.write(`${msg}\n`) };
+const deps = { capture: realCapture, ghApiWithInput: realGhApiWithInput, log: (msg) => process.stderr.write(`${msg}\n`) };
 
 function writeAll(text) {
   const buffer = Buffer.from(text);
@@ -167,6 +150,17 @@ if (command === "verify") {
       process.exit(EXIT_CODES.USAGE);
     }
   }
+  if (prFlag !== undefined) {
+    const pr = Number(prFlag);
+    if (!Number.isInteger(pr) || pr < 1) {
+      process.stderr.write("dotbabel criteria verify: --pr must be a positive integer\n");
+      process.exit(EXIT_CODES.USAGE);
+    }
+  }
+  if (passEnvFlag.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) {
+    process.stderr.write("dotbabel criteria verify: --pass-env must be an environment-variable-shaped name\n");
+    process.exit(EXIT_CODES.USAGE);
+  }
 }
 
 async function main() {
@@ -195,16 +189,6 @@ async function main() {
 
   // command === "verify"
   let config;
-  try {
-    config = loadCriteriaConfig(repoRoot);
-  } catch (error) {
-    if (error instanceof ValidationError) return exitWithValidationError(error, argv.verbose);
-    throw error;
-  }
-
-  const passEnv = [...new Set([...config.pass_env, ...passEnvFlag])];
-  const timeoutSeconds = argv.flags.timeout !== undefined ? Number(argv.flags.timeout) : config.timeout_seconds;
-
   let specIds;
   let prNumber;
   let headSha;
@@ -213,7 +197,7 @@ async function main() {
   if (prFlag !== undefined) {
     prNumber = Number(prFlag);
     try {
-      repo = deps.capture("gh repo view --json nameWithOwner --jq .nameWithOwner");
+      repo = deps.capture(["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
     } catch (error) {
       process.stderr.write(`dotbabel criteria verify: gh is not available or not authenticated: ${error.message}\n`);
       process.exit(EXIT_CODES.ENV);
@@ -221,11 +205,10 @@ async function main() {
     let pre;
     try {
       pre = checkPrPreconditions(deps, {
-        repoRoot,
+        ctx,
         pr: prNumber,
         repo,
         allowProjectCommands,
-        trustedAssociations: config.trusted_associations,
         env: process.env,
       });
     } catch (error) {
@@ -233,20 +216,43 @@ async function main() {
       throw error;
     }
     headSha = pre.headSha;
-    specIds = extractSpecIds(pre.body);
-    if (specIds.length === 0) {
-      writeAll("no linked spec declares an active criterion\n");
-      process.exit(EXIT_CODES.OK);
-    }
+    specIds = pre.specIds;
+    config = pre.config;
   } else {
     specIds = [specFlag];
-  }
-
-  for (const specId of specIds) {
-    if (!pathExists(ctx, `docs/specs/${specId}/spec.json`)) {
-      return exitWithValidationError(new ValidationError({ code: ERROR_CODES.CRITERIA_UNKNOWN_SPEC, category: "criteria", message: `unknown spec: ${specId}` }), argv.verbose);
+    try {
+      config = loadCriteriaConfig(repoRoot);
+    } catch (error) {
+      if (error instanceof ValidationError) return exitWithValidationError(error, argv.verbose);
+      throw error;
     }
   }
+
+  let knownSpecIds;
+  try {
+    knownSpecIds = new Set(listSpecDirs(ctx));
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    knownSpecIds = new Set();
+  }
+  const unknownSpecId = specIds.find((id) => !knownSpecIds.has(id));
+  if (unknownSpecId) {
+    return exitWithValidationError(new ValidationError({ code: ERROR_CODES.CRITERIA_UNKNOWN_SPEC, category: "criteria", message: `unknown spec: ${unknownSpecId}` }), argv.verbose);
+  }
+
+  if (criterionFlag.length > 0) {
+    const declared = new Set(
+      specIds.flatMap((specId) => listCriteria(ctx, { specId }).specs.flatMap((spec) => spec.criteria.map((criterion) => criterion.id))),
+    );
+    const unknownCriterion = criterionFlag.find((id) => !declared.has(id));
+    if (unknownCriterion) {
+      process.stderr.write(`dotbabel criteria verify: unknown --criterion id: ${unknownCriterion}\n`);
+      process.exit(EXIT_CODES.USAGE);
+    }
+  }
+
+  const passEnv = [...new Set([...config.pass_env, ...passEnvFlag])];
+  const timeoutSeconds = argv.flags.timeout !== undefined ? Number(argv.flags.timeout) : config.timeout_seconds;
 
   const perSpecResults = [];
   for (const specId of specIds) {
@@ -269,11 +275,11 @@ async function main() {
   }
 
   const payload = combinePayloads(perSpecResults.map((r) => r.payload), { headSha, pr: prNumber });
-  const tails = Object.assign({}, ...perSpecResults.map((r) => r.tails));
+  const tails = Object.fromEntries(specIds.map((specId, index) => [specId, perSpecResults[index].tails]));
 
   const anyActiveDeclared = payload.specs.some((spec) => spec.criteria.some((c) => c.status !== "pending"));
   if (!anyActiveDeclared) {
-    writeAll("no linked spec declares an active criterion\n");
+    process.stderr.write("no linked spec declares an active criterion\n");
     if (argv.json) writeAll(`${JSON.stringify(payload, null, 2)}\n`);
     process.exit(EXIT_CODES.OK);
   }

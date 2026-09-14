@@ -6,9 +6,9 @@
  * (specs by id, criteria by number, tests by file then name) so the two
  * outputs stay comparable.
  */
-import { readJson, listSpecDirs } from "../spec-harness-lib.mjs";
-import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
+import { listSpecDirs } from "../spec-harness-lib.mjs";
 import { criterionNumber } from "./verify.mjs";
+import { readCriteriaSpec } from "./spec-file.mjs";
 
 /**
  * @param {object} ctx Harness context from `createHarnessContext`.
@@ -17,22 +17,11 @@ import { criterionNumber } from "./verify.mjs";
  */
 export function listCriteria(ctx, opts = {}) {
   const { specId } = opts;
-  const ids = specId ? [specId] : listSpecDirs(ctx);
-
-  if (specId) {
-    try {
-      readJson(ctx, `docs/specs/${specId}/spec.json`);
-    } catch {
-      throw new ValidationError({
-        code: ERROR_CODES.CRITERIA_UNKNOWN_SPEC,
-        category: "criteria",
-        message: `unknown spec: ${specId}`,
-      });
-    }
-  }
+  const knownIds = listSpecDirs(ctx);
+  const ids = specId ? [specId] : knownIds;
 
   const specs = ids
-    .map((id) => ({ id, spec: readJson(ctx, `docs/specs/${id}/spec.json`) }))
+    .map((id) => ({ id, spec: readCriteriaSpec(ctx, id) }))
     .filter(({ spec }) => Array.isArray(spec.acceptance_criteria) && spec.acceptance_criteria.length > 0)
     .map(({ id, spec }) => ({
       id,

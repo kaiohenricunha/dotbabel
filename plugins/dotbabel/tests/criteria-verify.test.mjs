@@ -540,6 +540,29 @@ describe("verifyCriteria", () => {
     expect(existsSync(path.join(root, "ran.txt"))).toBe(false);
   });
 
+  it("records an unknown criterion status as an error without running it", async () => {
+    const root = makeRepo({
+      criteria: [
+        {
+          id: "AC-1",
+          status: "enabled",
+          given: "g",
+          when: "w",
+          then: "t",
+          tests: [{ file: "t.mjs", name: "passes" }],
+          argv: nodeScriptArgv("require('fs').writeFileSync('ran.txt', '1')"),
+        },
+      ],
+      testFileContents: { "t.mjs": "// passes" },
+    });
+    const result = await verifyCriteria(createHarnessContext({ repoRoot: root }), {
+      specId: "example",
+      allowProjectCommands: true,
+    });
+    expect(result.payload.specs[0].criteria[0]).toMatchObject({ status: "error", error_message: expect.stringMatching(/status/) });
+    expect(existsSync(path.join(root, "ran.txt"))).toBe(false);
+  });
+
   it("runs only the criteria named in criterionIds and leaves the others out of the payload", async () => {
     const root = makeRepo({
       criteria: [

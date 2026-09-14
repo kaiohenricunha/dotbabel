@@ -1,10 +1,8 @@
 /**
  * Reads the `criteria` key of `.dotbabel.json` (P-B2). Only `pass_env`,
  * `timeout_seconds`, and `trusted_associations` are consumed by this unit;
- * `enforcement` and `require_ci_check` are accepted and passed through
- * unvalidated-in-depth because a later unit (the merge gate) owns their
- * semantics — rejecting them here would make this config forward-incompatible
- * with a repository that has already adopted the later unit's keys.
+ * `enforcement` and `require_ci_check` are validated here for configuration
+ * consistency, although a later unit (the merge gate) consumes them.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -12,36 +10,27 @@ import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
 
 const PASS_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/** @returns {{ pass_env: string[], timeout_seconds: number, enforcement: "block"|"warn", trusted_associations: string[], require_ci_check: boolean }} */
-export function loadCriteriaConfig(repoRoot) {
-  const defaults = {
-    pass_env: [],
-    timeout_seconds: 600,
-    enforcement: "block",
-    trusted_associations: ["OWNER"],
-    require_ci_check: false,
-  };
+const DEFAULT_CONFIG = Object.freeze({
+  pass_env: [],
+  timeout_seconds: 600,
+  enforcement: "block",
+  trusted_associations: ["OWNER"],
+  require_ci_check: false,
+});
 
-  const file = path.join(repoRoot, ".dotbabel.json");
-  let parsed;
-  try {
-    parsed = JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") return defaults;
-    throw new ValidationError({
-      code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
-      category: "criteria",
-      file: ".dotbabel.json",
-      message: `.dotbabel.json is not valid JSON: ${error.message}`,
-    });
-  }
+function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
+  const defaults = {
+    ...DEFAULT_CONFIG,
+    pass_env: [...DEFAULT_CONFIG.pass_env],
+    trusted_associations: [...DEFAULT_CONFIG.trusted_associations],
+  };
   const criteria = parsed?.criteria;
   if (criteria === undefined) return defaults;
   if (typeof criteria !== "object" || criteria === null || Array.isArray(criteria)) {
     throw new ValidationError({
       code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
       category: "criteria",
-      file: ".dotbabel.json",
+      file,
       pointer: "/criteria",
       message: "criteria must be an object",
     });
@@ -52,7 +41,7 @@ export function loadCriteriaConfig(repoRoot) {
     throw new ValidationError({
       code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
       category: "criteria",
-      file: ".dotbabel.json",
+      file,
       pointer: "/criteria/pass_env",
       message: "criteria.pass_env must be an array of environment-variable-shaped names",
     });
@@ -63,7 +52,7 @@ export function loadCriteriaConfig(repoRoot) {
     throw new ValidationError({
       code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
       category: "criteria",
-      file: ".dotbabel.json",
+      file,
       pointer: "/criteria/timeout_seconds",
       message: "criteria.timeout_seconds must be an integer from 1 through 3600",
     });
@@ -74,7 +63,7 @@ export function loadCriteriaConfig(repoRoot) {
     throw new ValidationError({
       code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
       category: "criteria",
-      file: ".dotbabel.json",
+      file,
       pointer: "/criteria/enforcement",
       message: 'criteria.enforcement must be "block" or "warn"',
     });
@@ -85,7 +74,7 @@ export function loadCriteriaConfig(repoRoot) {
     throw new ValidationError({
       code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
       category: "criteria",
-      file: ".dotbabel.json",
+      file,
       pointer: "/criteria/trusted_associations",
       message: "criteria.trusted_associations must be a non-empty array of non-empty strings",
     });
@@ -96,7 +85,7 @@ export function loadCriteriaConfig(repoRoot) {
     throw new ValidationError({
       code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
       category: "criteria",
-      file: ".dotbabel.json",
+      file,
       pointer: "/criteria/require_ci_check",
       message: "criteria.require_ci_check must be a boolean",
     });
@@ -109,4 +98,40 @@ export function loadCriteriaConfig(repoRoot) {
     trusted_associations: trustedAssociations,
     require_ci_check: requireCiCheck,
   };
+}
+
+/**
+ * Parse and validate `.dotbabel.json` content from a git object.
+ *
+ * @param {string|null|undefined} text Missing content selects defaults.
+ * @param {string} [file]
+ * @returns {{ pass_env: string[], timeout_seconds: number, enforcement: "block"|"warn", trusted_associations: string[], require_ci_check: boolean }}
+ */
+export function loadCriteriaConfigText(text, file = ".dotbabel.json") {
+  if (text === null || text === undefined || text === "") return validateCriteriaConfig(undefined, file);
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new ValidationError({
+      code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
+      category: "criteria",
+      file,
+      message: `${file} is not valid JSON: ${error.message}`,
+    });
+  }
+  return validateCriteriaConfig(parsed, file);
+}
+
+/** @returns {{ pass_env: string[], timeout_seconds: number, enforcement: "block"|"warn", trusted_associations: string[], require_ci_check: boolean }} */
+export function loadCriteriaConfig(repoRoot) {
+  const file = path.join(repoRoot, ".dotbabel.json");
+  let text;
+  try {
+    text = fs.readFileSync(file, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return loadCriteriaConfigText(null);
+    throw error;
+  }
+  return loadCriteriaConfigText(text);
 }

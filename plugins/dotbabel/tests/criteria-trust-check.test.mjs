@@ -21,10 +21,13 @@ function initRepo() {
   return dir;
 }
 
-function writeSpec(dir, criteria) {
-  const specDir = path.join(dir, "docs", "specs", "example");
-  fs.mkdirSync(specDir, { recursive: true });
-  fs.writeFileSync(path.join(specDir, "spec.json"), JSON.stringify({ id: "example", acceptance_criteria: criteria }));
+function specFile(dir, specId = "example") {
+  return path.join(dir, "docs", "specs", specId, "spec.json");
+}
+
+function writeSpec(dir, criteria, specId = "example") {
+  fs.mkdirSync(path.dirname(specFile(dir, specId)), { recursive: true });
+  fs.writeFileSync(specFile(dir, specId), JSON.stringify({ id: specId, acceptance_criteria: criteria }));
 }
 
 function commit(dir, message) {
@@ -33,118 +36,125 @@ function commit(dir, message) {
   return git(dir, ["rev-parse", "HEAD"]);
 }
 
-/** A capture() that runs real git, and answers `gh api` calls from a fake table. */
-function deps(dir, gh = {}) {
+/** A capture() that runs git with an argument array in the fixture repository and records each call. */
+function gitDeps(dir, calls) {
   return {
-    capture(cmd) {
-      if (cmd.startsWith("gh api")) {
-        for (const [pattern, value] of Object.entries(gh)) {
-          if (new RegExp(pattern).test(cmd)) return value;
-        }
-        throw new Error(`no fake gh response for: ${cmd}`);
-      }
-      return execFileSync(cmd, { cwd: dir, encoding: "utf8", shell: true }).trim();
+    capture(argv) {
+      calls.push(argv);
+      if (!Array.isArray(argv) || argv[0] !== "git") throw new Error(`unexpected command: ${JSON.stringify(argv)}`);
+      return execFileSync("git", argv.slice(1), { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
     },
   };
 }
 
+function check(dir, { base, head, specIds = ["example"], prAssociation = "CONTRIBUTOR", trustedAssociations = ["OWNER"], calls = [] }) {
+  return findUntrustedArgvChange(gitDeps(dir, calls), { baseSha: base, headSha: head, specIds, prAssociation, trustedAssociations });
+}
+
+function repoWithChange(before, after) {
+  const dir = initRepo();
+  writeSpec(dir, before);
+  const base = commit(dir, "base");
+  writeSpec(dir, after);
+  const head = commit(dir, "head");
+  return { dir, base, head };
+}
+
+const SPEC_PATH = "docs/specs/example/spec.json";
+
 describe("findUntrustedArgvChange", () => {
-  it("returns null when spec.json was never touched between base and head", () => {
+  it("returns null without reading git when the pull request author is trusted", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", status: "active", argv: ["a"] }], [{ id: "AC-1", status: "active", argv: ["b"] }]);
+    const calls = [];
+    expect(check(dir, { base, head, prAssociation: "OWNER", calls })).toBeNull();
+    expect(calls).toEqual([]);
+  });
+
+  it("flags an active criterion whose argv changed when the pull request author is not trusted", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", status: "active", argv: ["a"] }], [{ id: "AC-1", status: "active", argv: ["b"] }]);
+    expect(check(dir, { base, head })).toEqual({ specId: "example", specPath: SPEC_PATH, criterionId: "AC-1", reason: "argv changed" });
+  });
+
+  it("treats a criterion without a status field as active", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", argv: ["a"] }], [{ id: "AC-1", argv: ["b"] }]);
+    expect(check(dir, { base, head })).toEqual({ specId: "example", specPath: SPEC_PATH, criterionId: "AC-1", reason: "argv changed" });
+  });
+
+  it("treats an absent pull request association as untrusted", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", argv: ["a"] }], [{ id: "AC-1", argv: ["b"] }]);
+    expect(check(dir, { base, head, prAssociation: null })).toMatchObject({ criterionId: "AC-1", reason: "argv changed" });
+  });
+
+  it("flags a new active criterion that does not exist at the base", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", argv: ["a"] }], [{ id: "AC-1", argv: ["a"] }, { id: "AC-2", argv: ["c"] }]);
+    expect(check(dir, { base, head })).toEqual({ specId: "example", specPath: SPEC_PATH, criterionId: "AC-2", reason: "new active criterion" });
+  });
+
+  it("flags every active criterion of a spec that does not exist at the base", () => {
     const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    fs.writeFileSync(path.join(dir, "README"), "x");
     const base = commit(dir, "base");
-    fs.writeFileSync(path.join(dir, "unrelated.txt"), "x");
-    const head = commit(dir, "unrelated change");
-    const result = findUntrustedArgvChange(deps(dir), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
-    expect(result).toBeNull();
+    writeSpec(dir, [{ id: "AC-1", argv: ["a"] }]);
+    const head = commit(dir, "add spec");
+    expect(check(dir, { base, head })).toEqual({ specId: "example", specPath: SPEC_PATH, criterionId: "AC-1", reason: "new active criterion" });
+  });
+
+  it("flags a planned criterion promoted to active even when its argv is the same", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", status: "planned", argv: ["a"] }], [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    expect(check(dir, { base, head })).toEqual({ specId: "example", specPath: SPEC_PATH, criterionId: "AC-1", reason: "new active criterion" });
   });
 
   it("returns null when only a planned criterion's argv changed", () => {
-    const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "planned", argv: ["a"] }]);
-    const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "planned", argv: ["b"] }]);
-    const head = commit(dir, "change planned argv");
-    const result = findUntrustedArgvChange(deps(dir), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
-    expect(result).toBeNull();
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", status: "planned", argv: ["a"] }], [{ id: "AC-1", status: "planned", argv: ["b"] }]);
+    expect(check(dir, { base, head })).toBeNull();
   });
 
-  it("returns null when a trusted author changed an active criterion's argv", () => {
-    const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
-    const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
-    const head = commit(dir, "change argv");
-    const result = findUntrustedArgvChange(
-      deps(dir, {
-        "commits/[0-9a-f]+ --jq \\.author\\.login": "trusted-owner",
-        "collaborators/trusted-owner/permission": "ADMIN",
-      }),
-      { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] },
-    );
-    expect(result).toBeNull();
+  it("returns null when an active criterion's argv is unchanged even though the spec file changed", () => {
+    const { dir, base, head } = repoWithChange([{ id: "AC-1", argv: ["a"], given: "g1" }], [{ id: "AC-1", argv: ["a"], given: "g2 — only prose changed" }]);
+    expect(check(dir, { base, head })).toBeNull();
   });
 
-  it("flags an untrusted author's argv change, naming the commit and criterion", () => {
+  it("inspects only the linked spec ids", () => {
     const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    writeSpec(dir, [{ id: "AC-1", argv: ["a"] }]);
+    writeSpec(dir, [{ id: "AC-1", argv: ["a"] }], "other");
     const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
-    const head = commit(dir, "change argv");
-    const result = findUntrustedArgvChange(
-      deps(dir, {
-        "commits/[0-9a-f]+ --jq \\.author\\.login": "outside-contributor",
-        "collaborators/outside-contributor/permission": "READ",
-      }),
-      { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] },
-    );
-    expect(result).toEqual({ commit: head, specPath: "docs/specs/example/spec.json", criterionId: "AC-1", login: "outside-contributor", association: "COLLABORATOR" });
+    writeSpec(dir, [{ id: "AC-1", argv: ["b"] }], "other");
+    const head = commit(dir, "change the unlinked spec");
+    expect(check(dir, { base, head, specIds: ["example"] })).toBeNull();
   });
 
-  it("fails closed when the commit's author cannot be attributed to a GitHub login", () => {
+  it("fails closed when spec.json does not parse at the head", () => {
     const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    writeSpec(dir, [{ id: "AC-1", argv: ["a"] }]);
     const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
-    const head = commit(dir, "change argv");
-    const result = findUntrustedArgvChange(deps(dir, { "commits/[0-9a-f]+ --jq \\.author\\.login": "null" }), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
-    expect(result).toMatchObject({ login: null, association: null });
+    fs.writeFileSync(specFile(dir), "not json");
+    const head = commit(dir, "break spec.json");
+    expect(check(dir, { base, head })).toEqual({ specId: "example", specPath: SPEC_PATH, criterionId: null, reason: "spec.json does not parse at head" });
   });
 
-  it("returns null when the active criterion's argv is unchanged even though the spec file changed", () => {
+  it("fails closed for a spec.json that is a symbolic link at the head", () => {
     const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"], given: "g1" }]);
+    writeSpec(dir, [{ id: "AC-1", argv: ["a"] }]);
+    fs.writeFileSync(path.join(dir, "outside.json"), JSON.stringify({ id: "example", acceptance_criteria: [{ id: "AC-1", argv: ["a"] }] }));
     const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"], given: "g2 — only prose changed" }]);
-    const head = commit(dir, "change prose, not argv");
-    const result = findUntrustedArgvChange(deps(dir), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
-    expect(result).toBeNull();
+    fs.rmSync(specFile(dir));
+    fs.symlinkSync("../../../outside.json", specFile(dir));
+    const head = commit(dir, "replace spec.json with a symbolic link");
+    expect(check(dir, { base, head })).toMatchObject({ specId: "example", criterionId: null, reason: "spec.json does not parse at head" });
   });
 
-  it("fails closed when the GitHub commit lookup itself fails", () => {
+  it("runs git with argument arrays, so a spec directory name cannot reach a shell", () => {
+    const specId = "evil;touch>PWNED;#";
     const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    writeSpec(dir, [{ id: "AC-1", argv: ["a"] }], specId);
     const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
-    const head = commit(dir, "change argv");
-    // No fake gh responses, so the commit lookup throws.
-    const result = findUntrustedArgvChange(deps(dir), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
-    expect(result).toEqual({ commit: head, specPath: "docs/specs/example/spec.json", criterionId: "AC-1", login: null, association: null });
-  });
-
-  it("fails closed when the permission lookup fails for an attributed author", () => {
-    const dir = initRepo();
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
-    const base = commit(dir, "base");
-    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
-    const head = commit(dir, "change argv");
-    // The commit resolves to a login, but no fake permission response exists, so that lookup throws.
-    const result = findUntrustedArgvChange(deps(dir, { "commits/[0-9a-f]+ --jq \\.author\\.login": "known-author" }), {
-      baseSha: base,
-      headSha: head,
-      repo: "o/r",
-      trustedAssociations: ["OWNER"],
-    });
-    expect(result).toEqual({ commit: head, specPath: "docs/specs/example/spec.json", criterionId: "AC-1", login: "known-author", association: null });
+    writeSpec(dir, [{ id: "AC-1", argv: ["b"] }], specId);
+    const head = commit(dir, "head");
+    const calls = [];
+    expect(check(dir, { base, head, specIds: [specId], calls })).toMatchObject({ specId, criterionId: "AC-1", reason: "argv changed" });
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((argv) => Array.isArray(argv))).toBe(true);
+    expect(fs.existsSync(path.join(dir, "PWNED"))).toBe(false);
   });
 });

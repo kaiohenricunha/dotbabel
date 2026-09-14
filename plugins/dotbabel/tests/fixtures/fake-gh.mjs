@@ -39,19 +39,18 @@ if (args[0] === "repo" && args[1] === "view") {
   );
 } else if (/^api user\b/.test(joined)) {
   process.stdout.write(`${process.env.FAKE_GH_LOGIN ?? "tester"}\n`);
+} else if (/^api repos\/\S+\/pulls\/\d+ --jq \.author_association$/.test(joined)) {
+  process.stdout.write(`${process.env.FAKE_GH_PR_ASSOCIATION ?? "OWNER"}\n`);
 } else if (/^api repos\/\S+\/issues\/\d+\/comments --paginate$/.test(joined)) {
   process.stdout.write(process.env.FAKE_GH_COMMENTS_JSON ?? "[]");
 } else if (/^api --method POST repos\/\S+\/issues\/\d+\/comments --input -$/.test(joined)) {
-  readStdin();
+  const input = readStdin();
   log(joined);
+  if (process.env.FAKE_GH_POST_BODY) fs.writeFileSync(process.env.FAKE_GH_POST_BODY, JSON.parse(input || "{}").body ?? "");
   process.stdout.write(JSON.stringify({ id: 999, node_id: "IC_fake" }));
 } else if (/^api graphql\b/.test(joined)) {
   log(joined);
   process.stdout.write(JSON.stringify({ data: { minimizeComment: { minimizedComment: { isMinimized: true } } } }));
-} else if (/^api repos\/\S+\/commits\/[0-9a-f]+ --jq \.author\.login$/.test(joined)) {
-  process.stdout.write(`${process.env.FAKE_GH_COMMIT_AUTHOR ?? ""}\n`);
-} else if (/^api repos\/\S+\/collaborators\/\S+\/permission --jq \.permission$/.test(joined)) {
-  process.stdout.write(`${process.env.FAKE_GH_PERMISSION ?? "ADMIN"}\n`);
 } else {
   process.stderr.write(`fake-gh: unhandled invocation: ${joined}\n`);
   process.exit(1);

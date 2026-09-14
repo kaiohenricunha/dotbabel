@@ -8,7 +8,18 @@
  * criterion whose `report.path` escapes the repository must never reach
  * `verify.mjs`'s `fs.unlinkSync`.
  */
-import { readJson, readText, pathExists, isSafeRelativePath } from "../spec-harness-lib.mjs";
+import { readText, pathExists, isSafeRelativePath } from "../spec-harness-lib.mjs";
+import { readCriteriaSpec } from "./spec-file.mjs";
+
+/**
+ * Test whether a criterion has the only status that permits execution.
+ *
+ * @param {object} criterion
+ * @returns {boolean}
+ */
+export function isActiveCriterion(criterion) {
+  return (criterion?.status ?? "active") === "active";
+}
 
 /**
  * @typedef {object} LoadedCriterion
@@ -34,7 +45,7 @@ import { readJson, readText, pathExists, isSafeRelativePath } from "../spec-harn
  * @returns {{ specId: string, runnable: LoadedCriterion[], resolved: LoadedCriterion[] }}
  */
 export function loadCriteria(ctx, specId) {
-  const spec = readJson(ctx, `docs/specs/${specId}/spec.json`);
+  const spec = readCriteriaSpec(ctx, specId);
   const all = spec.acceptance_criteria ?? [];
   const runnable = [];
   const resolved = [];
@@ -43,6 +54,10 @@ export function loadCriteria(ctx, specId) {
     const status = criterion.status ?? "active";
     if (status === "planned") {
       resolved.push({ ...criterion, preStatus: "pending" });
+      continue;
+    }
+    if (!isActiveCriterion(criterion)) {
+      resolved.push({ ...criterion, preStatus: "error", errorMessage: 'status must be "active" or "planned"' });
       continue;
     }
     const error = firstCriterionError(ctx, criterion);
