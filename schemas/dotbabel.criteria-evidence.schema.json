@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.criteria-evidence.schema.json",
+  "title": "dotbabel criteria evidence payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "generated_at", "verdict", "specs"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "head_sha": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+    "pr": { "type": "integer", "minimum": 1 },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "verdict": { "enum": ["pass", "fail", "error", "unconfirmed"] },
+    "specs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "criteria"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "status"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^AC-\\d+$" },
+                "status": { "enum": ["pass", "fail", "unconfirmed", "error", "pending"] },
+                "error_message": { "type": "string" },
+                "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+                "exit_code": { "type": ["integer", "null"] },
+                "duration_ms": { "type": "number", "minimum": 0 },
+                "timed_out": { "type": "boolean" },
+                "truncated": { "type": "boolean" },
+                "output_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["file", "name", "found_in_file", "confirmed_by", "result"],
+                    "properties": {
+                      "file": { "type": "string", "minLength": 1 },
+                      "name": { "type": "string", "minLength": 1 },
+                      "found_in_file": { "const": true },
+                      "confirmed_by": { "enum": ["junit", "output"] },
+                      "result": { "enum": ["passed", "failed", "error", "skipped", "absent"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

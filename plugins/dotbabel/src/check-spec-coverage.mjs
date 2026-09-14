@@ -24,6 +24,16 @@ function normalizeSpecId(v) {
 }
 
 /**
+ * Parse a `## Spec ID` section into normalized, unique identifiers.
+ *
+ * @param {string} section
+ * @returns {string[]}
+ */
+export function parseSpecIds(section) {
+  return [...new Set(String(section ?? "").split(/[\s,]+/).map(normalizeSpecId).filter(Boolean))];
+}
+
+/**
  * Enforce the spec-coverage contract for a PR: every protected-path change
  * must be covered by an approved/implementing/done spec, or the PR body must
  * carry a meaningful `## No-spec rationale` section. Known bot actors bypass
@@ -75,7 +85,7 @@ export function checkSpecCoverage(ctx, input) {
 
   if (isMeaningfulSection(specSection)) {
     const known = new Set(specs.map(({ metadata }) => metadata.id));
-    const requested = specSection.split(/[\s,]+/).map(normalizeSpecId).filter(Boolean);
+    const requested = parseSpecIds(specSection);
     for (const id of requested) {
       if (!known.has(id)) {
         errors.push(new ValidationError({

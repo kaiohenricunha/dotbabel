@@ -14,7 +14,7 @@
  * @property {string} [expected] Text describing what the validator expected.
  * @property {string} [got]      Text describing what was observed.
  * @property {string} [hint]     Actionable remediation suggestion.
- * @property {'spec'|'skill'|'manifest'|'coverage'|'drift'|'scaffold'|'settings'|'env'|'usage'|'agent'|'quality'} [category]
+ * @property {'spec'|'skill'|'manifest'|'coverage'|'drift'|'scaffold'|'settings'|'env'|'usage'|'agent'|'quality'|'criteria'} [category]
  */
 
 /**
@@ -80,6 +80,15 @@ export const ERROR_CODES = Object.freeze({
   QUALITY_BASELINE_INVALID: 'QUALITY_BASELINE_INVALID',
   QUALITY_TRUST_REQUIRED: 'QUALITY_TRUST_REQUIRED',
   QUALITY_EXECUTION_FAILED: 'QUALITY_EXECUTION_FAILED',
+  // criteria CLI (P-B2)
+  CRITERIA_CONFIG_INVALID: 'CRITERIA_CONFIG_INVALID',
+  CRITERIA_UNKNOWN_SPEC: 'CRITERIA_UNKNOWN_SPEC',
+  CRITERIA_TRUST_REQUIRED: 'CRITERIA_TRUST_REQUIRED',
+  CRITERIA_HEAD_MISMATCH: 'CRITERIA_HEAD_MISMATCH',
+  CRITERIA_WORKTREE_DIRTY: 'CRITERIA_WORKTREE_DIRTY',
+  CRITERIA_FORK_PR: 'CRITERIA_FORK_PR',
+  CRITERIA_UNTRUSTED_ARGV_CHANGE: 'CRITERIA_UNTRUSTED_ARGV_CHANGE',
+  CRITERIA_GH_UNAVAILABLE: 'CRITERIA_GH_UNAVAILABLE',
   // env / usage
   ENV_REPO_ROOT_UNKNOWN: 'ENV_REPO_ROOT_UNKNOWN',
   ENV_FACTS_MISSING: 'ENV_FACTS_MISSING',

@@ -47,11 +47,20 @@ const TOOL_VERSION = JSON.parse(fs.readFileSync(findPackageJson(__dirname), "utf
  * @param {number} [opts.timeoutSeconds]
  * @param {string} [opts.headSha]
  * @param {number} [opts.pr]
- * @returns {Promise<{ payload: object }>}
+ * @param {string[]} [opts.criterionIds] Restrict the run to these ids only (P-B2's `--criterion`).
+ *   Every other loaded criterion of this spec is dropped before anything runs.
+ * @returns {Promise<{ payload: object, tails: { [criterionId: string]: string } }>}
+ *   `tails` never reaches the payload itself (SEC-4, OPS-3) — it exists only
+ *   for a caller building a human-readable comment (P-B2).
  */
 export async function verifyCriteria(ctx, opts = {}) {
-  const { specId, allowProjectCommands = false, passEnv = [], env, jobs, timeoutSeconds = 600, headSha, pr } = opts;
-  const { runnable, resolved } = loadCriteria(ctx, specId);
+  const { specId, allowProjectCommands = false, passEnv = [], env, jobs, timeoutSeconds = 600, headSha, pr, criterionIds } = opts;
+  let { runnable, resolved } = loadCriteria(ctx, specId);
+  if (Array.isArray(criterionIds)) {
+    const wanted = new Set(criterionIds);
+    runnable = runnable.filter((c) => wanted.has(c.id));
+    resolved = resolved.filter((c) => wanted.has(c.id));
+  }
 
   // Mirror the trust check `runQualityPlans` enforces before it executes
   // anything, so the delete below never runs ahead of it: an untrusted
@@ -70,10 +79,13 @@ export async function verifyCriteria(ctx, opts = {}) {
   const resultByPlanId = new Map(results.map((r) => [r.id, r]));
 
   const finished = [];
+  const tails = {};
   for (const group of groups.values()) {
     const result = resultByPlanId.get(group.plan.id);
     for (const criterion of group.criteria) {
-      finished.push(evaluateCriterion(ctx, criterion, result));
+      const { criterion: evaluated, tail } = evaluateCriterion(ctx, criterion, result);
+      finished.push(evaluated);
+      if (tail !== null) tails[evaluated.id] = tail;
     }
   }
   for (const criterion of resolved) {
@@ -103,7 +115,7 @@ export async function verifyCriteria(ctx, opts = {}) {
     specs: [{ id: specId, criteria: finished }],
   };
 
-  return { payload };
+  return { payload, tails };
 }
 
 function deleteConfiguredReports(ctx, runnable) {
@@ -153,12 +165,18 @@ function groupByCommand(runnable, repoRoot) {
   return groups;
 }
 
+// Returns `{ criterion, tail }` rather than the criterion object alone: the
+// evidence comment (P-B2) needs each criterion's redacted output tail as
+// human-readable text, but the payload itself must never carry that text
+// (SEC-4, OPS-3) — only its hash. Keeping the tail as a side channel here
+// means the CLI layer can render it without this module ever putting it
+// somewhere a schema or a hash comparison would have to account for.
 function evaluateCriterion(ctx, criterion, result) {
   if (!result || result.state === "unavailable") {
-    return { id: criterion.id, status: "error", error_message: "the command could not be spawned" };
+    return { criterion: { id: criterion.id, status: "error", error_message: "the command could not be spawned" }, tail: null };
   }
   if (result.timedOut) {
-    return { id: criterion.id, status: "error", error_message: "the command timed out" };
+    return { criterion: { id: criterion.id, status: "error", error_message: "the command timed out" }, tail: null };
   }
 
   // `result.truncated` is one shared flag set when EITHER stream hit the
@@ -188,7 +206,7 @@ function evaluateCriterion(ctx, criterion, result) {
   }
 
   if (reportError) {
-    return { id: criterion.id, status: "error", error_message: reportError, exit_code: result.exitCode, truncated: result.truncated === true };
+    return { criterion: { id: criterion.id, status: "error", error_message: reportError, exit_code: result.exitCode, truncated: result.truncated === true }, tail };
   }
 
   // Sorted by file then name (REL-5), independent of spec.json declaration
@@ -207,15 +225,18 @@ function evaluateCriterion(ctx, criterion, result) {
   const status = anyFailed || exitFailed ? "fail" : anyUnconfirmed ? "unconfirmed" : "pass";
 
   return {
-    id: criterion.id,
-    status,
-    argv: criterion.argv,
-    exit_code: result.exitCode,
-    duration_ms: result.durationMs,
-    timed_out: false,
-    truncated: result.truncated === true,
-    tests: confirmed.map(({ file, name, found_in_file, confirmed_by, result: r }) => ({ file, name, found_in_file, confirmed_by, result: r })),
-    output_sha256: outputSha256,
+    criterion: {
+      id: criterion.id,
+      status,
+      argv: criterion.argv,
+      exit_code: result.exitCode,
+      duration_ms: result.durationMs,
+      timed_out: false,
+      truncated: result.truncated === true,
+      tests: confirmed.map(({ file, name, found_in_file, confirmed_by, result: r }) => ({ file, name, found_in_file, confirmed_by, result: r })),
+      output_sha256: outputSha256,
+    },
+    tail,
   };
 }
 

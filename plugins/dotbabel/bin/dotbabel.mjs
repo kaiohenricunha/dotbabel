@@ -45,6 +45,7 @@ const SUBCOMMANDS = [
   "local-attest",
   "pr-stack",
   "quality",
+  "criteria",
 ];
 
 function printUsage() {

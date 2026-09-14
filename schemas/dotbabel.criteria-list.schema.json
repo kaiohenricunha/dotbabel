@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.criteria-list.schema.json",
+  "title": "dotbabel criteria list output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "specs"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "specs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "criteria"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "status", "given", "when", "then", "tests", "argv"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^AC-\\d+$" },
+                "status": { "enum": ["active", "planned"] },
+                "given": { "type": "string" },
+                "when": { "type": "string" },
+                "then": { "type": "string" },
+                "tests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["file", "name"],
+                    "properties": {
+                      "file": { "type": "string", "minLength": 1 },
+                      "name": { "type": "string", "minLength": 1 }
+                    }
+                  }
+                },
+                "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -540,6 +540,52 @@ describe("verifyCriteria", () => {
     expect(existsSync(path.join(root, "ran.txt"))).toBe(false);
   });
 
+  it("records an unknown criterion status as an error without running it", async () => {
+    const root = makeRepo({
+      criteria: [
+        {
+          id: "AC-1",
+          status: "enabled",
+          given: "g",
+          when: "w",
+          then: "t",
+          tests: [{ file: "t.mjs", name: "passes" }],
+          argv: nodeScriptArgv("require('fs').writeFileSync('ran.txt', '1')"),
+        },
+      ],
+      testFileContents: { "t.mjs": "// passes" },
+    });
+    const result = await verifyCriteria(createHarnessContext({ repoRoot: root }), {
+      specId: "example",
+      allowProjectCommands: true,
+    });
+    expect(result.payload.specs[0].criteria[0]).toMatchObject({ status: "error", error_message: expect.stringMatching(/status/) });
+    expect(existsSync(path.join(root, "ran.txt"))).toBe(false);
+  });
+
+  it("runs only the criteria named in criterionIds and leaves the others out of the payload", async () => {
+    const root = makeRepo({
+      criteria: [
+        {
+          id: "AC-1",
+          given: "g",
+          when: "w",
+          then: "t",
+          tests: [{ file: "t.mjs", name: "one" }],
+          argv: nodeScriptArgv("require('fs').writeFileSync('ran-ac1.txt', '1'); process.stdout.write('one\\n')"),
+        },
+        { id: "AC-2", given: "g", when: "w", then: "t", tests: [{ file: "t.mjs", name: "two" }], argv: nodeScriptArgv("process.stdout.write('two\\n')") },
+        { id: "AC-3", status: "planned", given: "g", when: "w", then: "t", tests: [{ file: "t.mjs", name: "three" }], argv: nodeScriptArgv("process.exit(0)") },
+      ],
+      testFileContents: { "t.mjs": "// one\n// two\n// three" },
+    });
+    const ctx = createHarnessContext({ repoRoot: root });
+    const result = await verifyCriteria(ctx, { specId: "example", allowProjectCommands: true, criterionIds: ["AC-2"] });
+    expect(result.payload.specs[0].criteria.map((c) => c.id)).toEqual(["AC-2"]);
+    expect(result.payload.specs[0].criteria[0].status).toBe("pass");
+    expect(existsSync(path.join(root, "ran-ac1.txt"))).toBe(false);
+  });
+
   it("records truncated true when an output stream reaches 1 MiB", async () => {
     const root = makeRepo({
       criteria: [
