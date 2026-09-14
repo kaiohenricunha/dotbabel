@@ -59,17 +59,14 @@ export function renderEvidenceComment(payload, tails) {
 
   const criterionIds = payload.specs.flatMap((spec) => spec.criteria.map((c) => c.id));
 
-  function render(shrinkTo) {
+  function render() {
     const details = criterionIds
       .filter((id) => tails[id] !== undefined)
-      .map((id) => {
-        const text = shrinkTo === null ? tails[id] : tails[id].slice(-shrinkTo);
-        return [`<details><summary>${id} output</summary>`, "", text, "", "</details>"].join("\n");
-      });
+      .map((id) => [`<details><summary>${id} output</summary>`, "", tails[id], "", "</details>"].join("\n"));
     return [markerLine, payloadLine, "### Acceptance criteria evidence", "", "| Spec | Criterion | Status | Tests | Duration |", "| ---- | --------- | ------ | ----- | -------- |", ...rows, "", ...details].join("\n");
   }
 
-  let body = render(null);
+  let body = render();
   // Output tails shrink first when over budget (OPS-3) — shrink in one
   // deterministic step to the remaining budget split evenly across the
   // details blocks that carry a tail, rather than iterating; a body still
@@ -86,7 +83,7 @@ export function renderEvidenceComment(payload, tails) {
       shrunkTails[id] = tails[id].slice(-keep);
     }
     tails = shrunkTails;
-    body = render(null);
+    body = render();
   }
   return body.length > MAX_BODY_CHARS ? body.slice(0, MAX_BODY_CHARS) : body;
 }

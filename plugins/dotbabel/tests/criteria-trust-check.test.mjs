@@ -120,4 +120,31 @@ describe("findUntrustedArgvChange", () => {
     const result = findUntrustedArgvChange(deps(dir), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
     expect(result).toBeNull();
   });
+
+  it("fails closed when the GitHub commit lookup itself fails", () => {
+    const dir = initRepo();
+    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    const base = commit(dir, "base");
+    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
+    const head = commit(dir, "change argv");
+    // No fake gh responses, so the commit lookup throws.
+    const result = findUntrustedArgvChange(deps(dir), { baseSha: base, headSha: head, repo: "o/r", trustedAssociations: ["OWNER"] });
+    expect(result).toEqual({ commit: head, specPath: "docs/specs/example/spec.json", criterionId: "AC-1", login: null, association: null });
+  });
+
+  it("fails closed when the permission lookup fails for an attributed author", () => {
+    const dir = initRepo();
+    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    const base = commit(dir, "base");
+    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["b"] }]);
+    const head = commit(dir, "change argv");
+    // The commit resolves to a login, but no fake permission response exists, so that lookup throws.
+    const result = findUntrustedArgvChange(deps(dir, { "commits/[0-9a-f]+ --jq \\.author\\.login": "known-author" }), {
+      baseSha: base,
+      headSha: head,
+      repo: "o/r",
+      trustedAssociations: ["OWNER"],
+    });
+    expect(result).toEqual({ commit: head, specPath: "docs/specs/example/spec.json", criterionId: "AC-1", login: "known-author", association: null });
+  });
 });
