@@ -27,12 +27,9 @@
 REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../../../.." && pwd)"
 export REPO_ROOT
 
-# Scrub host-CLI detection environment variables to ensure tests are hermetic.
-unset CLAUDECODE CLAUDE_CODE_SSE_PORT
-unset GITHUB_COPILOT_CLI COPILOT_SESSION
-unset CODEX_HOME CODEX_SESSION_ID
-unset GEMINI_CLI GEMINI_CLI_SESSION
-unset GEMINI_CLI_NO_RELAUNCH
+# Scrub the complete host-CLI detection surface to ensure tests are hermetic.
+# The shared helper also keeps fixture generation host-neutral.
+source "$REPO_ROOT/plugins/dotbabel/tests/clear-host-cli-environment.sh"
 # Claude Code exports this into every hook subprocess, and hooks that resolve
 # their project root from it would otherwise evaluate the dotbabel checkout
 # instead of the test's fixture repo — the suite would pass in CI and fail

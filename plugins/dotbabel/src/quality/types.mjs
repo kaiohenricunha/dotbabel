@@ -15,6 +15,7 @@ export const QUALITY_STATES = Object.freeze([
   "checked",
   "unsupported",
   "not_configured",
+  "not_triggered",
   "unavailable",
   "not_applicable",
   "skipped",
@@ -38,6 +39,7 @@ export const QUALITY_CAPABILITIES = Object.freeze([
   "duplication",
   "security",
   "race",
+  "regression",
 ]);
 
 /** Report formats accepted by project configuration. */

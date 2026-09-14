@@ -28,13 +28,13 @@ function readScripts(root) {
  * for candidates (package.json) is the same file that proves the component
  * exists, so a component with no marker yields no scripts.
  */
-export function nodeRepositoryPlans(component, profile, claimed = new Set()) {
+export function nodeRepositoryPlans(component, profile, claimed = new Set(), includeTests = false) {
   const root = component.absoluteRoot;
   const scripts = readScripts(root);
   const executable = manager(root);
   const plans = [];
-  for (const capability of ["format", "typecheck", "lint", "test", "coverage", "complexity", "mutation", "dead-code", "dependencies", "duplication", "security"]) {
-    if (claimed.has(capability) || !capabilityInProfile(capability, profile)) continue;
+  for (const capability of ["format", "typecheck", "lint", "test", "regression", "coverage", "complexity", "mutation", "dead-code", "dependencies", "duplication", "security"]) {
+    if (claimed.has(capability) || !capabilityInProfile(capability, profile, includeTests)) continue;
     const qualityCandidates = [`quality:${capability}`, `quality-${capability}`].filter((name) => scripts[name] !== undefined);
     const candidates = qualityCandidates.length > 0 ? qualityCandidates : (CONVENTIONAL[capability] ?? []).filter((name) => scripts[name] !== undefined);
     if (candidates.length === 0) continue;

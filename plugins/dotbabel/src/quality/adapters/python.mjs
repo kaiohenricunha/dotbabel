@@ -11,7 +11,7 @@ function pythonCommand(root, executable, args) {
   return { executable, argv: args };
 }
 
-function configuredPythonPlans(component, profile, claimed) {
+function configuredPythonPlans(component, profile, claimed, includeTests = false) {
   let text = "";
   try { text = fs.readFileSync(path.join(component.absoluteRoot, "pyproject.toml"), "utf8"); } catch { return []; }
   const candidates = [];
@@ -25,7 +25,7 @@ function configuredPythonPlans(component, profile, claimed) {
     if (typeTools.length > 1) return [...candidates.map(toPlan), { id: `${component.id}:typecheck:ambiguous`, componentId: component.id, capability: "typecheck", ruleIds: ["correctness.types"], availability: "not_configured", candidates: typeTools.map(([name]) => name), evidence: "equal-authority type checkers require a project tool override" }];
     if (typeTools.length === 1) candidates.push({ capability: "typecheck", tool: typeTools[0][0], args: ["."] });
   }
-  return candidates.filter((item) => capabilityInProfile(item.capability, profile)).map(toPlan);
+  return candidates.filter((item) => capabilityInProfile(item.capability, profile, includeTests)).map(toPlan);
 
   function toPlan(item) {
     const command = pythonCommand(component.absoluteRoot, item.tool, item.args);
@@ -42,14 +42,15 @@ export const pythonAdapter = Object.freeze({
     if (markers.length) return markers.map((marker) => ({ root: path.dirname(marker) === "." ? "." : path.dirname(marker), language: "python", markers: [marker] }));
     return files.some((file) => file.endsWith(".py")) ? [{ root: ".", language: "python", markers: [] }] : [];
   },
-  plan(component, _policy, _changeSet, profile) {
-    const plans = projectToolPlans(component, profile);
+  plan(component, _policy, changeSet, profile) {
+    const includeTests = (changeSet.criticalMatches ?? []).length > 0;
+    const plans = projectToolPlans(component, profile, includeTests);
     const claimed = new Set(plans.map((plan) => plan.capability));
     const absoluteRoot = component.absoluteRoot ?? path.resolve(component.root);
     component.absoluteRoot = absoluteRoot;
-    plans.push(...makeRepositoryPlans(component, profile, claimed));
+    plans.push(...makeRepositoryPlans(component, profile, claimed, includeTests));
     for (const plan of plans) claimed.add(plan.capability);
-    plans.push(...configuredPythonPlans(component, profile, claimed));
+    plans.push(...configuredPythonPlans(component, profile, claimed, includeTests));
     return plans;
   },
 });

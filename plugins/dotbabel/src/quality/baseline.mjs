@@ -6,7 +6,7 @@ import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
 import { GIT_MAX_BUFFER } from "../lib/limits.mjs";
 import { QUALITY_BASELINE_SCHEMA_VERSION } from "./types.mjs";
 
-const NEVER_BASELINE = new Set(["correctness.compile", "correctness.types", "correctness.tests", "correctness.format", "correctness.lint", "security.high_confidence"]);
+const NEVER_BASELINE = new Set(["correctness.compile", "correctness.types", "correctness.tests", "correctness.regression", "correctness.format", "correctness.lint", "security.high_confidence"]);
 
 /** Create a deterministic baseline candidate without hard correctness failures. */
 export function createQualityBaseline({ sourceRevision, policyHash, components = {}, toolVersions = {}, metrics = [], findings = [] }) {

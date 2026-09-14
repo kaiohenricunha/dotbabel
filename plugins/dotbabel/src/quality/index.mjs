@@ -3,13 +3,14 @@ import path from "node:path";
 
 import { resolveQualityPolicy } from "./config.mjs";
 import { resolveQualityScope } from "./scope.mjs";
-import { detectQualityCapabilities, planQualityCheck } from "./discovery.mjs";
+import { detectQualityCapabilities, filesMatchingQualityPaths, planQualityCheck, qualityChangePaths } from "./discovery.mjs";
 import { runQualityPlans } from "./runner.mjs";
 import { calculateChangedCoverage, parseQualityReport, coveragePercent } from "./reports.mjs";
 import { evaluateQuality } from "./evaluate.mjs";
 import { loadQualityBaseline, loadQualityBaselineAtRevision } from "./baseline.mjs";
 import { qualityEnvelope } from "./reporters.mjs";
 import { capabilityRules } from "./adapters/shared.mjs";
+import { matchesPathScope } from "./paths.mjs";
 
 function inside(root, candidate) {
   const relative = path.relative(fs.realpathSync(root), fs.realpathSync(candidate));
@@ -75,6 +76,14 @@ function sourceFindings(repoRoot, scope, includedFiles) {
   return { metrics, findings };
 }
 
+function narrowScope(scope, paths) {
+  if (paths.length === 0) return { ...scope, paths };
+  const changedFiles = scope.changedFiles.filter((file) => matchesPathScope(paths, file.path));
+  const changedLines = Object.fromEntries(Object.entries(scope.changedLines).filter(([file]) => matchesPathScope(paths, file)));
+  const renames = scope.renames.filter((item) => matchesPathScope(paths, item.to) || matchesPathScope(paths, item.from));
+  return { ...scope, changedFiles, changedLines, renames, paths };
+}
+
 /** Run the complete quality check data flow. */
 export async function runQualityCheck(options = {}) {
   const repoRoot = path.resolve(options.repoRoot ?? process.cwd());
@@ -83,9 +92,11 @@ export async function runQualityCheck(options = {}) {
   if (!policy.enabled) return qualityEnvelope("check", { state: "disabled", profile, verdict: "pass", results: [] });
   const paths = options.paths ?? [];
   const all = Boolean(options.all);
-  const scope = resolveQualityScope({ repoRoot, base: options.base, head: options.head, env: options.env, configuredBase: policy.base_ref, paths, all });
+  const fullScope = resolveQualityScope({ repoRoot, base: options.base, head: options.head, env: options.env, configuredBase: policy.base_ref, all });
+  const criticalMatches = filesMatchingQualityPaths(qualityChangePaths(fullScope.changedFiles), policy.critical_paths ?? []);
+  const scope = narrowScope(fullScope, paths);
   const detection = detectQualityCapabilities({ repoRoot, policy, paths });
-  const planned = planQualityCheck({ repoRoot, policy, changeSet: scope, profile, detection, paths });
+  const planned = planQualityCheck({ repoRoot, policy, changeSet: { ...scope, criticalMatches }, profile, detection, paths });
   const executions = await runQualityPlans({ repoRoot, plans: planned.plans, allowProjectCommands: options.allowProjectCommands, passEnv: options.passEnv, env: options.env, jobs: options.jobs ?? policy.jobs ?? 2, timeoutSeconds: profile === "deep" ? 1800 : profile === "pr" ? 900 : 120 });
   const parsed = parseExecutionReports(repoRoot, executions, scope);
   const native = sourceFindings(repoRoot, scope, detection.files);
@@ -94,8 +105,8 @@ export async function runQualityCheck(options = {}) {
   const baseline = ["pr", "deep"].includes(profile) && scope.mergeBase
     ? loadQualityBaselineAtRevision({ repoRoot, baselineFile: policy.baseline_file, revision: scope.mergeBase })
     : loadQualityBaseline({ repoRoot, baselineFile: policy.baseline_file });
-  const evaluation = evaluateQuality({ policy, profile, executions, metrics: [...parsed.metrics, ...native.metrics], findings: [...parsed.findings, ...native.findings], baseline, renames: scope.renames });
-  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, components: detection.components, exclusions: detection.exclusions, executions, ...evaluation });
+  const evaluation = evaluateQuality({ policy, profile, executions, metrics: [...parsed.metrics, ...native.metrics], findings: [...parsed.findings, ...native.findings], baseline, renames: scope.renames, criticalMatches });
+  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, critical_matches: criticalMatches, components: planned.components, exclusions: detection.exclusions, executions, ...evaluation });
 }
 
 export { resolveQualityPolicy } from "./config.mjs";

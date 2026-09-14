@@ -16,7 +16,7 @@ const QUALITY_KEYS = new Set([
 ]);
 const RULE_KEYS = new Set(["enabled", "level", "threshold", "scope", "on_unavailable", "profiles"]);
 const COMPONENT_KEYS = new Set(["root", "languages", "tools"]);
-const TOOL_KEYS = new Set(["argv", "timeout_seconds", "report"]);
+const TOOL_KEYS = new Set(["argv", "paths", "timeout_seconds", "report"]);
 const REPORT_KEYS = new Set(["format", "path"]);
 const EXCEPTION_KEYS = new Set(["id", "rule", "fingerprint", "reason", "expires", "tracking"]);
 const PROJECT_ONLY = new Set(["base_ref", "baseline_file", "critical_paths", "components", "exceptions"]);
@@ -44,10 +44,11 @@ function rejectKeys(value, allowed, label, source, pointer) {
 }
 
 function relativePath(value, label, source, pointer) {
-  if (typeof value !== "string" || value.length === 0 || path.isAbsolute(value)) {
+  const portable = typeof value === "string" ? value.replaceAll("\\", "/") : value;
+  if (typeof portable !== "string" || portable.length === 0 || portable.includes("\0") || path.posix.isAbsolute(portable) || /^[A-Za-z]:/.test(portable)) {
     throw qualityError(`${label} must be a repository-relative path`, pointer, source);
   }
-  const normalized = path.posix.normalize(value.replaceAll("\\", "/"));
+  const normalized = path.posix.normalize(portable);
   if (normalized === ".." || normalized.startsWith("../")) {
     throw qualityError(`${label} must be a repository-relative path without '..'`, pointer, source);
   }
@@ -66,6 +67,10 @@ function validateTool(tool, source, pointer) {
   }
   if (tool.timeout_seconds !== undefined && (!Number.isInteger(tool.timeout_seconds) || tool.timeout_seconds < 1 || tool.timeout_seconds > 3600)) {
     throw qualityError("timeout_seconds must be an integer from 1 through 3600", `${pointer}/timeout_seconds`, source);
+  }
+  if (tool.paths !== undefined) {
+    if (!Array.isArray(tool.paths) || tool.paths.length === 0) throw qualityError("tool paths must be a non-empty array", `${pointer}/paths`, source);
+    for (const [index, pattern] of tool.paths.entries()) relativePath(pattern, "tool path", source, `${pointer}/paths/${index}`);
   }
   if (tool.report !== undefined) {
     object(tool.report, "tool report", source, `${pointer}/report`);

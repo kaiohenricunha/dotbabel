@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { isRepoTrusted } from "../trust-allowlist.mjs";
-import { matchesGlob } from "../spec-harness-lib.mjs";
+import { globToRegExp, matchesGlob } from "../spec-harness-lib.mjs";
 import { QUALITY_ADAPTERS, getQualityAdapter } from "./adapters/registry.mjs";
 import { capabilityInProfile, capabilityRules } from "./adapters/shared.mjs";
 import { listRepositoryFiles, matchesPathScope } from "./paths.mjs";
@@ -14,7 +14,7 @@ function applyExclusions(repoRoot, files, patterns, paths = []) {
     // The path filter runs first so an out-of-scope file is attributed to the
     // filter rather than to a policy pattern, and so it skips the per-file
     // generated-marker read below.
-    let reason = paths.length > 0 && !matchesPathScope(paths, file) ? "outside path filter" : undefined;
+    let reason = !matchesPathScope(paths, file) ? "outside path filter" : undefined;
     if (!reason) {
       const pattern = patterns.find((candidate) => matchesGlob(candidate, file));
       reason = pattern ? `policy pattern ${pattern}` : undefined;
@@ -49,6 +49,32 @@ function hasTsCheck(repoRoot, file) {
   } catch {
     return false;
   }
+}
+
+/** Return repository paths that match at least one quality-tool glob. */
+export function filesMatchingQualityPaths(files = [], patterns = []) {
+  const expressions = patterns.map((pattern) => globToRegExp(path.posix.normalize(pattern.replaceAll("\\", "/"))));
+  return files.filter((file) => expressions.some((expression) => expression.test(file)));
+}
+
+/** Return every current and previous path represented by changed files. */
+export function qualityChangePaths(changedFiles = []) {
+  return [...new Set(changedFiles.flatMap((item) => [item.path, item.oldPath].filter(Boolean)))];
+}
+
+function criticalMatches(policy, changeSet) {
+  if (changeSet.criticalMatches) return changeSet.criticalMatches;
+  return filesMatchingQualityPaths(qualityChangePaths(changeSet.changedFiles), policy?.critical_paths ?? []);
+}
+
+function applyPathTriggers(plans, changeSet) {
+  if (changeSet.all) return plans;
+  const changed = qualityChangePaths(changeSet.changedFiles);
+  const forceTests = (changeSet.criticalMatches ?? []).length > 0;
+  return plans.map((plan) => {
+    if ((forceTests && plan.capability === "test") || !plan.paths || filesMatchingQualityPaths(changed, plan.paths).length > 0) return plan;
+    return { ...plan, availability: "not_triggered", evidence: `changed files did not match: ${plan.paths.join(", ")}` };
+  });
 }
 
 /** Detect language components and non-executing capability plans. */
@@ -109,14 +135,22 @@ export function detectQualityCapabilities({ repoRoot, policy = {}, paths = [] } 
 /** Create adapter plans for a detected repository. */
 export function planQualityCheck({ repoRoot, policy, changeSet, profile, detection, paths = [] } = {}) {
   const found = detection ?? detectQualityCapabilities({ repoRoot, policy, paths });
-  const plans = found.components.flatMap((component) => getQualityAdapter(component.language)?.plan(component, policy, changeSet, profile) ?? genericPlans(component, profile));
+  const matches = criticalMatches(policy, changeSet);
+  const escalatedChangeSet = { ...changeSet, criticalMatches: matches };
+  const plans = found.components.flatMap((component) => getQualityAdapter(component.language)?.plan(component, policy, escalatedChangeSet, profile) ?? genericPlans(component, profile, matches.length > 0));
   // A path filter turns a reporting narrowing into an execution narrowing: a
   // component with no in-scope file must not run its package-level tools.
   // Guarded, because a component can hold no file in an unfiltered run.
   const scoped = paths.length === 0 ? plans : plans.filter((plan) => (found.components.find((component) => component.id === plan.componentId)?.files.length ?? 0) > 0);
-  return { ...found, plans: scoped };
+  if (paths.length > 0 && matches.length > 0) {
+    const full = detectQualityCapabilities({ repoRoot, policy });
+    const testPlans = full.components.flatMap((component) => getQualityAdapter(component.language)?.plan(component, policy, escalatedChangeSet, profile) ?? genericPlans(component, profile, true)).filter((plan) => plan.capability === "test");
+    const byId = new Map([...scoped, ...testPlans].map((plan) => [plan.id, plan]));
+    return { ...found, components: full.components, plans: applyPathTriggers([...byId.values()], escalatedChangeSet), criticalMatches: matches };
+  }
+  return { ...found, plans: applyPathTriggers(scoped, escalatedChangeSet), criticalMatches: matches };
 }
 
-function genericPlans(component, profile) {
-  return Object.entries(component.tools ?? {}).filter(([capability]) => capabilityInProfile(capability, profile)).map(([capability, tool]) => ({ id: `${component.id}:${capability}`, componentId: component.id, capability, ruleIds: capabilityRules(capability), executable: tool.argv[0], argv: tool.argv.slice(1), cwd: component.absoluteRoot, timeoutSeconds: tool.timeout_seconds, report: tool.report, availability: "available", source: "project", requiresTrust: true }));
+function genericPlans(component, profile, includeTests = false) {
+  return Object.entries(component.tools ?? {}).filter(([capability]) => capabilityInProfile(capability, profile, includeTests)).map(([capability, tool]) => ({ id: `${component.id}:${capability}`, componentId: component.id, capability, ruleIds: capabilityRules(capability), executable: tool.argv[0], argv: tool.argv.slice(1), cwd: component.absoluteRoot, timeoutSeconds: tool.timeout_seconds, report: tool.report, paths: tool.paths, availability: "available", source: "project", requiresTrust: true }));
 }

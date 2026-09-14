@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.quality-result.schema.json",
+  "title": "dotbabel quality result envelope",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "command", "state"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "enum": ["check", "detect", "explain", "baseline"] },
+    "state": {
+      "enum": ["checked", "configured", "disabled", "candidate", "written", "error"]
+    },
+    "critical_matches": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": { "id": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "executions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["componentId", "state"],
+        "properties": {
+          "componentId": { "type": "string", "minLength": 1 },
+          "state": {
+            "enum": [
+              "checked",
+              "unsupported",
+              "not_configured",
+              "not_triggered",
+              "unavailable",
+              "not_applicable",
+              "skipped"
+            ]
+          }
+        }
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule", "state", "verdict"],
+        "properties": {
+          "rule": { "type": "string", "minLength": 1 },
+          "state": {
+            "enum": [
+              "checked",
+              "unsupported",
+              "not_configured",
+              "not_triggered",
+              "unavailable",
+              "not_applicable",
+              "skipped"
+            ]
+          },
+          "verdict": { "enum": ["pass", "fail", "warn", "info"] }
+        }
+      }
+    }
+  }
+}

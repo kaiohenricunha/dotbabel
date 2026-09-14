@@ -30,12 +30,12 @@ function targets(root) {
  * plan, which would resolve through `on_unavailable` and fail the hard rules
  * where no plan at all is informational.
  */
-export function makeRepositoryPlans(component, profile, claimed = new Set()) {
+export function makeRepositoryPlans(component, profile, claimed = new Set(), includeTests = false) {
   const unowned = (component.markers ?? []).length === 0 && !component.configured;
   const available = targets(component.absoluteRoot);
   const plans = [];
-  for (const capability of ["format", "compile", "typecheck", "lint", "test", "coverage", "complexity", "mutation", "dead-code", "dependencies", "duplication", "security", "race"]) {
-    if (claimed.has(capability) || !capabilityInProfile(capability, profile)) continue;
+  for (const capability of ["format", "compile", "typecheck", "lint", "test", "regression", "coverage", "complexity", "mutation", "dead-code", "dependencies", "duplication", "security", "race"]) {
+    if (claimed.has(capability) || !capabilityInProfile(capability, profile, includeTests)) continue;
     const preferred = `quality-${capability}`;
     const conventional = unowned ? [] : (CONVENTIONAL[capability] ?? []).filter((name) => available.has(name));
     const candidates = available.has(preferred) ? [preferred] : conventional;

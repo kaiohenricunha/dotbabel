@@ -108,14 +108,9 @@ jobs:
 
           # Scrub host-CLI detection markers (dotbabel-handoff.mjs:detectHost).
           # GH Actions runners are clean today, but defending against a future
-          # runner that injects a CODEX_/COPILOT_/CLAUDECODE marker keeps the
+          # runner that injects an agent marker keeps the
           # symmetry contract anchored in the wrapper, not the host.
-          unset CLAUDECODE CLAUDE_CODE_SSE_PORT
-          while IFS='=' read -r _name _; do
-            case "$_name" in
-              CODEX_*|COPILOT_*|GITHUB_COPILOT_*) unset "$_name" ;;
-            esac
-          done < <(env)
+          source "$GITHUB_WORKSPACE/plugins/dotbabel/tests/clear-host-cli-environment.sh"
 
           BIN="$GITHUB_WORKSPACE/plugins/dotbabel/bin/dotbabel-handoff.mjs"
 

@@ -12,25 +12,28 @@ function unavailableVerdict(level) { return level === "error" ? "fail" : level =
 function checkedVerdict(rule, pass) { return pass ? "pass" : rule.level === "error" ? "fail" : rule.level === "warning" ? "warn" : "info"; }
 
 /** Evaluate commands, normalized metrics, baselines, and exact exceptions. */
-export function evaluateQuality({ policy, profile, executions = [], metrics = [], findings = [], baseline = null, renames = [], now = new Date() } = {}) {
-  const selected = selectProfileRules(profile, policy.rules);
+export function evaluateQuality({ policy, profile, executions = [], metrics = [], findings = [], baseline = null, renames = [], criticalMatches = [], now = new Date() } = {}) {
+  const includeTests = criticalMatches.length > 0;
+  const selected = selectProfileRules(profile, policy.rules, { includeTests });
+  const selectedIds = new Set(selected.map((rule) => rule.id));
   const results = [];
   const covered = new Set();
   for (const execution of executions) {
     for (const ruleId of execution.ruleIds ?? []) {
       const rule = policy.rules[ruleId];
-      if (!rule || !rule.profiles.includes(profile) || rule.enabled === false) continue;
+      if (!rule || !selectedIds.has(ruleId)) continue;
       covered.add(ruleId);
       const unavailable = execution.state === "unavailable" || execution.timedOut;
       const notConfigured = execution.state === "not_configured";
+      const notTriggered = execution.state === "not_triggered";
       const pass = execution.exitCode === 0 && !(execution.stdoutFailure && execution.stdout.trim());
       results.push({
         rule: ruleId,
         component: execution.componentId,
         class: rule.class,
-        state: unavailable ? "unavailable" : notConfigured ? "not_configured" : "checked",
-        verdict: unavailable || notConfigured ? unavailableVerdict(rule.on_unavailable) : checkedVerdict(rule, pass),
-        message: unavailable ? (execution.timedOut ? "tool timed out" : "tool is unavailable") : notConfigured ? `ambiguous tools: ${(execution.candidates ?? []).join(", ")}` : pass ? "check passed" : execution.stderr.trim() || execution.stdout.trim() || "check failed",
+        state: unavailable ? "unavailable" : notConfigured ? "not_configured" : notTriggered ? "not_triggered" : "checked",
+        verdict: notTriggered ? "info" : unavailable || notConfigured ? unavailableVerdict(rule.on_unavailable) : checkedVerdict(rule, pass),
+        message: unavailable ? (execution.timedOut ? "tool timed out" : "tool is unavailable") : notConfigured ? `ambiguous tools: ${(execution.candidates ?? []).join(", ")}` : notTriggered ? execution.evidence : pass ? "check passed" : execution.stderr.trim() || execution.stdout.trim() || "check failed",
         provenance: rule.provenance,
       });
     }
@@ -38,7 +41,7 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
   const baselineMetrics = new Map((baseline?.metrics ?? []).map((item) => [item.key, item]));
   for (const metric of metrics) {
     const rule = policy.rules[metric.rule];
-    if (!rule || !rule.profiles.includes(profile) || rule.enabled === false) continue;
+    if (!rule || !selectedIds.has(metric.rule)) continue;
     covered.add(metric.rule);
     const renamedFrom = renames.find((item) => item.to === metric.path)?.from;
     const oldMetric = (metric.key ? baselineMetrics.get(metric.key) : undefined) ?? (baseline?.metrics ?? []).find((item) =>
@@ -65,7 +68,7 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
   const currentFingerprints = new Set();
   for (const finding of findings) {
     const rule = policy.rules[finding.rule];
-    if (!rule || !rule.profiles.includes(profile) || rule.enabled === false) continue;
+    if (!rule || !selectedIds.has(finding.rule)) continue;
     covered.add(finding.rule);
     const findingId = fingerprint(finding);
     currentFingerprints.add(findingId);
@@ -75,7 +78,7 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
   for (const oldFinding of baseline?.findings ?? []) {
     if (currentFingerprints.has(oldFinding.fingerprint) || !covered.has(oldFinding.rule)) continue;
     const rule = policy.rules[oldFinding.rule];
-    if (!rule || !rule.profiles.includes(profile) || rule.enabled === false) continue;
+    if (!rule || !selectedIds.has(oldFinding.rule)) continue;
     results.push({ ...oldFinding, class: rule.class, state: "checked", verdict: "info", resolved: true, message: "baseline finding resolved", provenance: rule.provenance });
   }
   for (const rule of selected) {

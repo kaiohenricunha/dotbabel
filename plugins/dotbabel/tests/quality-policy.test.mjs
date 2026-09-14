@@ -1,14 +1,33 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  FORBIDDEN_EXCEPTION_RULES,
   QUALITY_PROFILES,
   QUALITY_RULES,
   compareThreshold,
   hashQualityPolicy,
   selectProfileRules,
 } from "../src/quality/policy.mjs";
+import { createQualityBaseline } from "../src/quality/baseline.mjs";
 
 describe("quality policy", () => {
+  it("defines an unexceptable and unbaselined hard regression rule for pr and deep", () => {
+    expect(QUALITY_RULES["correctness.regression"]).toMatchObject({
+      class: "hard",
+      scope: "component",
+      profiles: ["pr", "deep"],
+      default_level: "error",
+      on_unavailable: "error",
+    });
+    expect(FORBIDDEN_EXCEPTION_RULES.has("correctness.regression")).toBe(true);
+    const baseline = createQualityBaseline({
+      sourceRevision: "abc",
+      policyHash: "sha256:abc",
+      findings: [{ rule: "correctness.regression", fingerprint: "sha256:regression" }],
+    });
+    expect(baseline.findings).toEqual([]);
+  });
+
   it("defines stable profiles and rule contracts", () => {
     expect(QUALITY_PROFILES).toEqual(["fast", "pr", "deep"]);
     expect(QUALITY_RULES["correctness.compile"]).toMatchObject({

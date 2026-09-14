@@ -30,6 +30,7 @@ export const QUALITY_RULES = Object.freeze(Object.fromEntries([
   rule("correctness.compile", "hard", "component", fast, "error", "error"),
   rule("correctness.types", "hard", "component", fast, "error", "error"),
   rule("correctness.tests", "hard", "component", pr, "error", "error"),
+  rule("correctness.regression", "hard", "component", pr, "error", "error"),
   rule("correctness.lint", "hard", "component", fast, "error", "error"),
   rule("security.high_confidence", "hard", "component", pr, "error", "warning"),
   rule("coverage.no_regression", "regression", "component", pr, "error", "error", undefined, "percent", "min"),
@@ -55,7 +56,7 @@ export const QUALITY_RULES = Object.freeze(Object.fromEntries([
 
 /** Rules an exception can never suppress, regardless of config source. */
 export const FORBIDDEN_EXCEPTION_RULES = Object.freeze(new Set([
-  "correctness.format", "correctness.compile", "correctness.types", "correctness.tests",
+  "correctness.format", "correctness.compile", "correctness.types", "correctness.tests", "correctness.regression",
   "correctness.lint", "security.high_confidence",
 ]));
 
@@ -85,9 +86,9 @@ export function compareThreshold(ruleDefinition, actual) {
 }
 
 /** Return enabled shipped rules that belong to a profile. */
-export function selectProfileRules(profile, rules = QUALITY_RULES) {
+export function selectProfileRules(profile, rules = QUALITY_RULES, { includeTests = false } = {}) {
   if (!PROFILE_NAMES.includes(profile)) throw new Error(`unknown quality profile: ${profile}`);
-  return Object.values(rules).filter((item) => item.enabled !== false && item.profiles.includes(profile));
+  return Object.values(rules).filter((item) => item.enabled !== false && (item.profiles.includes(profile) || (includeTests && item.id === "correctness.tests")));
 }
 
 function stable(value) {

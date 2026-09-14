@@ -10,9 +10,10 @@ export const typescriptAdapter = Object.freeze({
   discover({ files }) {
     return files.filter((file) => /^tsconfig.*\.json$/.test(path.basename(file))).map((marker) => ({ root: path.dirname(marker) === "." ? "." : path.dirname(marker), language: "typescript", markers: [marker] }));
   },
-  plan(component, _policy, _changeSet, profile) {
-    const plans = projectToolPlans(component, profile);
-    plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability))));
+  plan(component, _policy, changeSet, profile) {
+    const includeTests = (changeSet.criticalMatches ?? []).length > 0;
+    const plans = projectToolPlans(component, profile, includeTests);
+    plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability)), includeTests));
     for (const plan of plans.filter((item) => item.capability === "typecheck")) plan.ruleIds = ["correctness.compile", "correctness.types"];
     if (!plans.some((plan) => plan.capability === "typecheck")) {
       const local = "./node_modules/.bin/tsc";

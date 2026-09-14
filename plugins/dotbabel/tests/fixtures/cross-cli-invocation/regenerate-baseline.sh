@@ -51,12 +51,7 @@ unset DOTBABEL_HANDOFF_DEBUG || true
 # step" hint — producing a baseline that does not match the host-agnostic
 # output CI produces. Symmetric scrubbing happens in the workflow's capture
 # step so both producers always agree.
-unset CLAUDECODE CLAUDE_CODE_SSE_PORT
-while IFS='=' read -r _name _; do
-  case "$_name" in
-    CODEX_*|COPILOT_*|GITHUB_COPILOT_*) unset "$_name" ;;
-  esac
-done < <(env)
+source "$repo_root/plugins/dotbabel/tests/clear-host-cli-environment.sh"
 
 # Row format: <section-marker>\t<bin-args>
 # Section markers double as awk extraction keys in the workflow.
