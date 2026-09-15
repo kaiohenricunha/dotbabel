@@ -4,11 +4,11 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
@@ -16,7 +16,7 @@ const BUILD_PLUGIN_BIN = join(REPO_ROOT, "scripts", "build-plugin.mjs");
 const INDEX_BIN = join(REPO_ROOT, "plugins", "dotbabel", "bin", "dotbabel-index.mjs");
 
 function mkRepo() {
-  const root = mkdtempSync(join(tmpdir(), "dc-phase4-"));
+  const root = makeTempDir("dc-phase4-");
   mkdirSync(join(root, "commands"), { recursive: true });
   mkdirSync(join(root, "skills"), { recursive: true });
   mkdirSync(join(root, "agents"), { recursive: true });

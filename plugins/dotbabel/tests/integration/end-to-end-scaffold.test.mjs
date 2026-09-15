@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, existsSync } from "fs";
-import { tmpdir } from "os";
+import { writeFileSync, readFileSync, readdirSync, existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { makeTempDir } from "../fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = path.resolve(__dirname, "..", "..");
@@ -32,7 +32,7 @@ function git(args, cwd) {
 
 describe("end-to-end: dotbabel-init + every validator green", () => {
   it("scaffolds a fresh repo and runs each validator to exit 0", () => {
-    const target = mkdtempSync(path.join(tmpdir(), "e2e-scaffold-"));
+    const target = makeTempDir("e2e-scaffold-");
 
     // 1. init a git repo so createHarnessContext resolves repo root.
     git(["init", "-q", "-b", "main"], target);

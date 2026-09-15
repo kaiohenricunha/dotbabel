@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { fileURLToPath, pathToFileURL } from "url";
 import path from "path";
-import { mkdtempSync } from "fs";
-import { tmpdir } from "os";
 import { execFileSync } from "child_process";
 import {
   createHarnessContext,
@@ -15,6 +13,7 @@ import {
   git,
   isMeaningfulSection,
 } from "../src/spec-harness-lib.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(__dirname, "fixtures", "minimal-repo");
@@ -168,7 +167,7 @@ describe("silent-catch replacement (debug-gated)", () => {
   });
 
   it("createHarnessContext fallback chain surfaces an Error when no repoRoot can be resolved (subprocess run in non-git dir)", () => {
-    const nonGitDir = mkdtempSync(path.join(tmpdir(), "non-git-"));
+    const nonGitDir = makeTempDir("non-git-");
     const libPath = path.resolve(__dirname, "..", "src", "spec-harness-lib.mjs");
     const libUrl = pathToFileURL(libPath).href;
     const probe = `import('${libUrl}').then(m => { try { m.createHarnessContext(); console.log('NO_THROW'); } catch (e) { console.log('THROWN:' + e.message); } });`;
@@ -209,7 +208,7 @@ describe("silent-catch replacement (debug-gated)", () => {
   });
 
   it("getChangedFiles returns [] when git diff fails (subprocess run in non-git dir)", () => {
-    const nonGitDir = mkdtempSync(path.join(tmpdir(), "no-git-diff-"));
+    const nonGitDir = makeTempDir("no-git-diff-");
     const libPath = path.resolve(__dirname, "..", "src", "spec-harness-lib.mjs");
     const libUrl = pathToFileURL(libPath).href;
     const probe = `import('${libUrl}').then(m => { const r = m.getChangedFiles(); console.log('RESULT:' + JSON.stringify(r)); });`;

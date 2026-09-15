@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdtempSync, cpSync, readFileSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
+import { cpSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WRAPPER = path.resolve(__dirname, "..", "scripts", "auto-update-manifest.mjs");
 const FIXTURE = path.resolve(__dirname, "fixtures", "minimal-repo");
 
 function iso() {
-  const d = mkdtempSync(path.join(tmpdir(), "harness-aum-"));
+  const d = makeTempDir("harness-aum-");
   cpSync(FIXTURE, d, { recursive: true });
   return d;
 }

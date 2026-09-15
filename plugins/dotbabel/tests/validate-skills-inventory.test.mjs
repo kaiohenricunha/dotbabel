@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path, { resolve } from "path";
-import { readFileSync, writeFileSync, mkdtempSync, cpSync, unlinkSync, mkdirSync } from "fs";
-import { tmpdir } from "os";
+import { readFileSync, writeFileSync, cpSync, unlinkSync, mkdirSync } from "fs";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import {
   validateManifest,
@@ -11,12 +10,13 @@ import {
   validateAgentTriggerOverlap,
 } from "../src/validate-skills-inventory.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
 function isolateFixture() {
-  const dst = mkdtempSync(path.join(tmpdir(), "harness-test-"));
+  const dst = makeTempDir("harness-test-");
   cpSync(FIXTURE_SRC, dst, { recursive: true });
   return dst;
 }
@@ -127,7 +127,7 @@ describe("refreshChecksums", () => {
 // ---------------------------------------------------------------------------
 
 function makeAgentDir() {
-  const tmp = mkdtempSync(path.join(tmpdir(), "agent-test-"));
+  const tmp = makeTempDir("agent-test-");
   mkdirSync(path.join(tmp, "agents"), { recursive: true });
   return tmp;
 }

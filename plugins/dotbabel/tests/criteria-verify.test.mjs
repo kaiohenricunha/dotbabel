@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
-import { tmpdir } from "os";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { verifyCriteria, parseJUnitText, junitNameMatches, dropPartialLastLine, computeTail, criterionNumber } from "../src/criteria/index.mjs";
 import { ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const NODE = process.execPath;
@@ -16,7 +16,7 @@ const FIXTURES_DIR = path.join(__dirname, "fixtures", "criteria");
 // the named test files those criteria reference (so load.mjs's existence and
 // name-containment checks pass unless a test deliberately omits one).
 function makeRepo({ criteria, testFileContents = {} }) {
-  const root = mkdtempSync(path.join(tmpdir(), "criteria-verify-test-"));
+  const root = makeTempDir("criteria-verify-test-");
   const specDir = path.join(root, "docs", "specs", "example");
   mkdirSync(specDir, { recursive: true });
   writeFileSync(
@@ -274,7 +274,7 @@ describe("verifyCriteria", () => {
   });
 
   it("reports error, rather than deleting outside the repository, for a report.path that traverses out", async () => {
-    const outside = mkdtempSync(path.join(tmpdir(), "criteria-verify-outside-"));
+    const outside = makeTempDir("criteria-verify-outside-");
     const sentinel = path.join(outside, "sentinel.xml");
     writeFileSync(sentinel, "do not delete me");
     const root = makeRepo({
@@ -303,7 +303,6 @@ describe("verifyCriteria", () => {
     expect(result.payload.specs[0].criteria[0].status).toBe("error");
     expect(result.payload.specs[0].criteria[0].error_message).toMatch(/escapes the repository/);
     expect(readFileSync(sentinel, "utf8")).toBe("do not delete me");
-    rmSync(outside, { recursive: true, force: true });
   });
 
   it("reports error, rather than throwing, when a criterion's argv is missing or empty", async () => {
@@ -813,7 +812,6 @@ describe("verifyCriteria", () => {
       const ctx = createHarnessContext({ repoRoot: root });
       const result = await verifyCriteria(ctx, { specId: "example", allowProjectCommands: true });
       expect(result.payload.specs[0].criteria[0].status, `reported="${reported}" criterion="${criterionName}"`).toBe("pass");
-      rmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -909,7 +907,6 @@ describe("verifyCriteria", () => {
         const ctx = createHarnessContext({ repoRoot: root });
         const result = await verifyCriteria(ctx, { specId: "example", allowProjectCommands: true });
         expect(result.payload.specs[0].criteria[0].status, file).toBe("pass");
-        rmSync(root, { recursive: true, force: true });
       }
     });
   });

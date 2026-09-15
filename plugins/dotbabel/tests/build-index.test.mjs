@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
-  mkdtempSync,
   mkdirSync,
   writeFileSync,
   readFileSync,
   existsSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
@@ -20,6 +18,7 @@ import {
   isDirectory,
   SCHEMAS_DIR,
 } from "../src/build-index.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const REPO_ROOT = resolve(__filename, "..", "..", "..", "..");
@@ -32,7 +31,7 @@ const BIN_PATH = join(
 );
 
 function mkRepo() {
-  return mkdtempSync(join(tmpdir(), "taxonomy-phase1-"));
+  return makeTempDir("taxonomy-phase1-");
 }
 
 function writeFile(repoRoot, rel, content) {

@@ -1,16 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { mkdtempSync, cpSync } from "fs";
-import { tmpdir } from "os";
+import { cpSync } from "fs";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkSpecCoverage } from "../src/check-spec-coverage.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
-function iso() { const d = mkdtempSync(path.join(tmpdir(), "h-")); cpSync(FIXTURE_SRC, d, { recursive: true }); return d; }
+function iso() { const d = makeTempDir("h-"); cpSync(FIXTURE_SRC, d, { recursive: true }); return d; }
 
 describe("checkSpecCoverage", () => {
   it("passes when no protected paths changed", () => {
