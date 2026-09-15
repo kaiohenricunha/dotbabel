@@ -30,6 +30,14 @@ Follow conventional commits such as `feat(handoff): ...`, `fix(cli): ...`, `test
 - All projects live at `$HOME/projects/`. Do not search the home directory or default locations.
 - Global dotbabel config lives wherever you cloned `dotbabel` and is symlinked into `your CLI's user-scope config dir`. Edit files in the clone, not `your CLI's user-scope config dir` directly.
 
+## Disk hygiene
+
+- The Windows C: drive on this machine is small. The WSL virtual disk only grows; it never shrinks on its own. Every gigabyte you write inside the distro stays allocated on C: until a manual compact.
+- After you run containerized tests (testcontainers), run `docker volume prune -f`. Anonymous test volumes leak ~70 MB per run and are the main growth driver.
+- Keep large artifacts, datasets, and clones on `/mnt/wsl/storage`, not on the distro disk.
+- Do not download large toolchains or browser bundles (Playwright browsers, Go module trees) unless the task needs them. Prefer existing installed versions.
+- Cleanup is automated on the Windows side: scheduled tasks `WSL Weekly Maintenance` and `WSL Monthly Compact` run `C:\WSL\wsl-maintenance.ps1` (log: `C:\WSL\maintenance.log`). Do not build ad-hoc cleanup scripts; extend that one.
+
 ## Code Changes
 
 - Before proposing fixes, **read the relevant source files**. Use `Grep` + `Glob` + `Read` to locate current behavior.
