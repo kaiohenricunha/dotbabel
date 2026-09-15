@@ -15,7 +15,7 @@ function policy(exceptions = []) {
 }
 
 describe("quality evaluation", () => {
-  it("reports an unmatched path-triggered tool as not_triggered with an info verdict", () => {
+  it("reports not_triggered with an info verdict for an unmatched path-triggered tool", () => {
     const result = evaluateQuality({
       policy: policy(),
       profile: "pr",
