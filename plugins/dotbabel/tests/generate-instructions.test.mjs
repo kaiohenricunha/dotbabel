@@ -4,11 +4,9 @@ import path from "path";
 import {
   readFileSync,
   writeFileSync,
-  mkdtempSync,
   cpSync,
   existsSync,
 } from "fs";
-import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import {
   generateInstructions,
@@ -21,12 +19,13 @@ import {
   MANIFEST_RELATIVE_PATH,
 } from "../src/generate-instructions.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
 function isolateFixture() {
-  const dst = mkdtempSync(path.join(tmpdir(), "harness-generate-test-"));
+  const dst = makeTempDir("harness-generate-test-");
   cpSync(FIXTURE_SRC, dst, { recursive: true });
   return dst;
 }

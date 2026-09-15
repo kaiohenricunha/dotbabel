@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "fs";
-import { tmpdir } from "os";
+import { mkdirSync, writeFileSync, readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { makeTempDir, trackTempPath } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCRIPT = path.resolve(__dirname, "..", "scripts", "detect-branch-drift.mjs");
@@ -18,8 +18,8 @@ function git(args, cwd) {
  *   origin/main: same as main (push+pull to a bare remote)
  */
 function makeRepo({ commandFile = "example.md" } = {}) {
-  const work = mkdtempSync(path.join(tmpdir(), "dbd-work-"));
-  const bare = `${work}-bare.git`;
+  const work = makeTempDir("dbd-work-");
+  const bare = trackTempPath(`${work}-bare.git`);
 
   git(["init", "-q", "-b", "main"], work);
   git(["config", "user.email", "t@t"], work);
@@ -70,7 +70,7 @@ describe("detect-branch-drift.mjs", () => {
   });
 
   it("exits 0 when there are no .claude/commands/ files on HEAD", () => {
-    const work = mkdtempSync(path.join(tmpdir(), "dbd-empty-"));
+    const work = makeTempDir("dbd-empty-");
     git(["init", "-q", "-b", "main"], work);
     git(["config", "user.email", "t@t"], work);
     git(["config", "user.name", "t"], work);

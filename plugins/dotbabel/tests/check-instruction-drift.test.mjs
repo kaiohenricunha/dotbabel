@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
-import { readFileSync, writeFileSync, mkdtempSync, cpSync } from "fs";
-import { tmpdir } from "os";
+import { readFileSync, writeFileSync, cpSync } from "fs";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkInstructionDrift } from "../src/check-instruction-drift.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
 function isolateFixture() {
-  const dst = mkdtempSync(path.join(tmpdir(), "harness-drift-test-"));
+  const dst = makeTempDir("harness-drift-test-");
   cpSync(FIXTURE_SRC, dst, { recursive: true });
   return dst;
 }

@@ -42,12 +42,12 @@
 //   the test enforces the lockstep.
 
 import { describe, it, expect, beforeAll } from "vitest";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { tmpdir } from "node:os";
 import { parseFrontmatter } from "../src/index.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "../../..");
@@ -465,7 +465,7 @@ describe("handoff drift (ARCH-10) — Phase 1", () => {
     // (default `$HOME/.config/...`). Point both HOME and XDG_CONFIG_HOME at
     // a fresh temp dir so a user's persisted handoff.env can't leak into the
     // test, and parallel vitest workers can't collide on the same path.
-    const hermeticHome = mkdtempSync(resolve(tmpdir(), "handoff-drift-"));
+    const hermeticHome = makeTempDir("handoff-drift-");
     const help = execFileSync(process.execPath, [HANDOFF_BIN, "--help"], {
       encoding: "utf8",
       env: { ...process.env, HOME: hermeticHome, XDG_CONFIG_HOME: hermeticHome },

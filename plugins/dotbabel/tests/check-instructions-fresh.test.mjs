@@ -4,11 +4,9 @@ import path from "path";
 import {
   cpSync,
   mkdirSync,
-  mkdtempSync,
   readFileSync,
   writeFileSync,
 } from "fs";
-import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkInstructionsFresh } from "../src/check-instructions-fresh.mjs";
 import {
@@ -17,12 +15,13 @@ import {
   RULE_FLOOR_END,
 } from "../src/generate-instructions.mjs";
 import { ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
 function isolateFixture() {
-  const dst = mkdtempSync(path.join(tmpdir(), "harness-fresh-test-"));
+  const dst = makeTempDir("harness-fresh-test-");
   cpSync(FIXTURE_SRC, dst, { recursive: true });
   writeFacts(dst);
   writeClaude(dst, "## Protected Paths");

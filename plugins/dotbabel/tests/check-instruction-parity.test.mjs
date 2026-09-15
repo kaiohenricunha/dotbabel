@@ -3,11 +3,9 @@ import { fileURLToPath } from "url";
 import path from "path";
 import {
   cpSync,
-  mkdtempSync,
   readFileSync,
   writeFileSync,
 } from "fs";
-import { tmpdir } from "os";
 import { createHarnessContext } from "../src/spec-harness-lib.mjs";
 import { checkInstructionParity } from "../src/check-instruction-parity.mjs";
 import {
@@ -16,12 +14,13 @@ import {
   RULE_FLOOR_END,
 } from "../src/generate-instructions.mjs";
 import { ERROR_CODES } from "../src/lib/errors.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
 function isolateFixture() {
-  const dst = mkdtempSync(path.join(tmpdir(), "harness-parity-test-"));
+  const dst = makeTempDir("harness-parity-test-");
   cpSync(FIXTURE_SRC, dst, { recursive: true });
   writeFacts(dst);
   writeClaude(dst);

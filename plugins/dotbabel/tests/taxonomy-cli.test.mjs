@@ -5,14 +5,13 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  mkdtempSync,
   mkdirSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BIN_DIR = join(__dirname, "..", "bin");
@@ -22,7 +21,7 @@ const SHOW_BIN = join(BIN_DIR, "dotbabel-show.mjs");
 const INDEX_BIN = join(BIN_DIR, "dotbabel-index.mjs");
 
 function mkRepo() {
-  const root = mkdtempSync(join(tmpdir(), "dc-phase3-"));
+  const root = makeTempDir("dc-phase3-");
   mkdirSync(join(root, "skills", "infra-tool"), { recursive: true });
   mkdirSync(join(root, "commands"), { recursive: true });
   mkdirSync(join(root, "agents"), { recursive: true });

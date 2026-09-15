@@ -11,6 +11,15 @@ export default defineConfig({
     // while the same suite passes standalone.
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Tempdir hygiene. Tests that mkdtempSync and never remove the result
+    // leaked a directory per call, and at the rate this suite runs (quality
+    // check, local-attest, Stryker's per-mutant reruns) that became tens of
+    // thousands of directories in /tmp within two days. setupFiles removes
+    // what fixtures/temp-dir.mjs hands out; globalSetup points TMPDIR at one
+    // per-run parent and removes it whole, catching what spawned CLIs and
+    // killed workers leave behind.
+    globalSetup: ["plugins/dotbabel/tests/fixtures/temp-root.mjs"],
+    setupFiles: ["plugins/dotbabel/tests/fixtures/temp-dir-setup.mjs"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "lcov"],

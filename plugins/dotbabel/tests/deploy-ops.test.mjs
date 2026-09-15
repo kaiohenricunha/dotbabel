@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,6 +15,7 @@ import {
   rollbackReport,
   targetLabel,
 } from "../../../skills/deploy-status/scripts/deploy-ops.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 function tempRoot() {
-  return mkdtempSync(join(tmpdir(), "deploy-ops-"));
+  return makeTempDir("deploy-ops-");
 }
 
 function writeJson(root, rel, value) {
