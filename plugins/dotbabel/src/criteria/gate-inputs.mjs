@@ -38,6 +38,22 @@ const COMMENTS_QUERY = [
  */
 
 /**
+ * Quote a value for a `shell: true` command line.
+ *
+ * Single quotes, not `JSON.stringify`: a GraphQL query is full of `$owner`,
+ * `$repo` and `$cursor` variable sigils, and inside double quotes the shell
+ * expands every one of them to the empty string. The query then reaches the
+ * API malformed and the whole comment fetch fails — which the merge gate
+ * correctly, and confusingly, reports as unreadable evidence.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function shQuote(value) {
+  return `'${String(value).replaceAll("'", `'\\''`)}'`;
+}
+
+/**
  * Build the criteria half of the merge-gate input.
  *
  * Returns `{}` — not a set of empty criteria fields — when the pull request
@@ -152,9 +168,9 @@ function prComments(deps, prNumber) {
     // `-F` for owner/repo because only that flag expands the {owner}/{repo}
     // placeholders; `-f` for the cursor so an all-digit cursor is not coerced
     // into a number.
-    const cursorArg = cursor === null ? "" : ` -f cursor=${JSON.stringify(cursor)}`;
+    const cursorArg = cursor === null ? "" : ` -f cursor=${shQuote(cursor)}`;
     const r = deps.sh(
-      `gh api graphql -F owner={owner} -F repo={repo} -F number=${prNumber}${cursorArg} -f query=${JSON.stringify(COMMENTS_QUERY)}`,
+      `gh api graphql -F owner={owner} -F repo={repo} -F number=${prNumber}${cursorArg} -f query=${shQuote(COMMENTS_QUERY)}`,
     );
     if (r.status !== 0) return null;
 

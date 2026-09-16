@@ -8,6 +8,7 @@
  * is the ref each read names, and only the command string shows it.
  */
 import { describe, it, expect } from "vitest";
+import { spawnSync } from "node:child_process";
 import { criteriaGateInputs } from "../src/criteria/gate-inputs.mjs";
 import { checkMergeGate } from "../src/pr-gates.mjs";
 
@@ -145,12 +146,35 @@ describe("criteriaGateInputs", () => {
     // a cursor that never advances would loop on page 1 and still return 300.
     const graphql = calls.filter((c) => c.startsWith("gh api graphql"));
     expect(graphql).toHaveLength(3);
-    expect(graphql[1]).toContain('-f cursor="cursor-1"');
-    expect(graphql[2]).toContain('-f cursor="cursor-2"');
+    expect(graphql[1]).toContain("-f cursor='cursor-1'");
+    expect(graphql[2]).toContain("-f cursor='cursor-2'");
 
     // None of the 300 carries the marker, so the gate blocks on missing
     // evidence rather than passing a PR whose proof was never posted.
     expect(gate.reasons.map((r) => r.code)).toContain("CRITERIA_EVIDENCE_MISSING");
+  });
+
+  it("quotes the GraphQL query so a real shell does not eat its variable sigils", () => {
+    // Regression: the query was built with JSON.stringify, and `sh` runs with
+    // shell:true. Inside double quotes the shell expanded $owner, $repo,
+    // $number and $cursor to empty strings, so every real fetch failed and
+    // the gate reported unreadable evidence on a perfectly good pull request.
+    // A stubbed `sh` cannot see this, so the assertion runs the quoting
+    // through an actual shell.
+    const { deps, calls } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    criteriaGateInputs(deps, VIEW, 42);
+
+    const cmd = calls.find((c) => c.startsWith("gh api graphql"));
+    const quoted = cmd.slice(cmd.indexOf("-f query=") + "-f query=".length);
+    const seen = spawnSync("bash", ["-c", `printf '%s' ${quoted}`], { encoding: "utf8" });
+    expect(seen.status).toBe(0);
+    expect(seen.stdout).toContain("$owner");
+    expect(seen.stdout).toContain("$cursor");
+    expect(seen.stdout).toMatch(/^query\(\$owner:String!/);
   });
 
   it("returns no criteria inputs at all when the body declares no Spec ID", () => {
