@@ -93,7 +93,7 @@ describe("loadProjectConfig", () => {
     const repo = makeTmpDir();
     const cfg = loadProjectConfig(repo);
     expect(cfg.rule_floor_source).toBe("CLAUDE.md");
-    expect(cfg.fan_out).toEqual(["codex", "gemini", "copilot"]);
+    expect(cfg.fan_out).toEqual(["codex", "gemini", "antigravity", "copilot"]);
     expect(cfg.targets).toHaveLength(3);
   });
 
@@ -237,6 +237,75 @@ describe("projectSync", () => {
     expect(fs.realpathSync(cmdLink)).toBe(
       fs.realpathSync(path.join(repo, ".claude", "commands", "review.md")),
     );
+  });
+
+  // Antigravity reads `.agents/skills`, per the bundled agy v1.2.4 guide
+  // ("Workspace Customizations": `.agents/` at the project root). Gemini's
+  // `.gemini/skills` tree is a separate contract and must be left exactly as it
+  // was — dotbabel never migrates one into the other.
+  it("creates Antigravity symlinks at .agents/skills/<id>/", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["antigravity"],
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    const skillLink = path.join(repo, ".agents", "skills", "deploy");
+    expect(fs.lstatSync(skillLink).isSymbolicLink()).toBe(true);
+
+    const wrapper = path.join(repo, ".agents", "skills", "commit", "SKILL.md");
+    expect(fs.lstatSync(wrapper).isSymbolicLink()).toBe(true);
+    expect(fs.readFileSync(wrapper, "utf8")).toBe("# /commit\n");
+
+    // No Gemini tree was created for an Antigravity-only fan-out.
+    expect(fs.existsSync(path.join(repo, ".gemini"))).toBe(false);
+  });
+
+  it("lets .gemini/skills and .agents/skills coexist untouched", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["gemini", "antigravity"],
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    const geminiDir = path.join(repo, ".gemini", "skills");
+    const agDir = path.join(repo, ".agents", "skills");
+    for (const dir of [geminiDir, agDir]) {
+      expect(fs.lstatSync(dir).isDirectory()).toBe(true);
+      expect(fs.existsSync(path.join(dir, "deploy"))).toBe(true);
+      expect(fs.existsSync(path.join(dir, "commit", "SKILL.md"))).toBe(true);
+    }
+
+    // Independent trees: neither is a link into the other, and nothing was moved.
+    expect(fs.lstatSync(geminiDir).isSymbolicLink()).toBe(false);
+    expect(fs.lstatSync(agDir).isSymbolicLink()).toBe(false);
+    expect(fs.realpathSync(geminiDir)).not.toBe(fs.realpathSync(agDir));
+  });
+
+  it("is idempotent for Antigravity: second run adds no backups", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["antigravity"],
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(r.backed_up).toBe(0);
+    const backups = fs
+      .readdirSync(path.join(repo, ".agents", "skills"))
+      .filter((e) => e.includes(".bak-"));
+    expect(backups).toHaveLength(0);
   });
 
   it("creates Copilot artifacts at .github/prompts/<name>.prompt.md and .github/instructions/<id>.instructions.md", async () => {
@@ -804,6 +873,38 @@ describe("projectSync — shared fan-out layout", () => {
     expect(r.ok).toBe(true);
     expect(fs.existsSync(path.join(repo, ".codex", "skills"))).toBe(false);
     expect(fs.existsSync(path.join(repo, ".cli"))).toBe(false);
+  });
+
+  // Antigravity is the first skills-dir runtime that is NOT shareable: it reads
+  // `.agents/skills`, a directory codex and gemini do not read, so pointing it
+  // at the canonical `.cli/skills` tree would hand it a redirect it never
+  // follows. The shared layout must therefore apply per-runtime, not to every
+  // skills-dir runtime.
+  it("gives a non-shareable runtime its own tree under the shared layout", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["codex", "gemini", "antigravity"],
+        fan_out_layout: "shared",
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    // The shareable pair still shares one canonical tree behind a redirect.
+    for (const cli of ["codex", "gemini"]) {
+      const redirect = path.join(repo, `.${cli}`, "skills");
+      expect(fs.lstatSync(redirect).isSymbolicLink()).toBe(true);
+      expect(fs.realpathSync(redirect)).toBe(fs.realpathSync(shared(repo)));
+    }
+
+    // Antigravity gets a real directory of its own, never a redirect.
+    const agDir = path.join(repo, ".agents", "skills");
+    expect(fs.lstatSync(agDir).isSymbolicLink()).toBe(false);
+    expect(fs.lstatSync(agDir).isDirectory()).toBe(true);
+    expect(fs.existsSync(path.join(agDir, "commit", "SKILL.md"))).toBe(true);
+    expect(fs.existsSync(path.join(agDir, "deploy"))).toBe(true);
   });
 });
 

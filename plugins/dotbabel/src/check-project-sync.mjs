@@ -25,7 +25,11 @@ import {
   shouldFanOutCli,
   SHARED_SKILLS_DIR,
 } from "./project-sync.mjs";
-import { RUNTIMES, resolveProjectSkillsDir } from "./agents.mjs";
+import {
+  RUNTIMES,
+  resolveProjectSkillsDir,
+  shareableSkillRuntimes,
+} from "./agents.mjs";
 import {
   composeGeneratedFrontmatter,
   isGeneratedFile,
@@ -310,7 +314,10 @@ export async function checkProjectSync(opts) {
     const fanOutKind = RUNTIMES[cli]?.projectFanOut?.kind;
     if (fanOutKind === "skills-dir") {
       const cliSkillsDir = resolveProjectSkillsDir(cli, repoRoot);
-      if (sharedLayout) {
+      // Mirrors projectSync exactly: a non-shareable skills-dir runtime keeps
+      // its own tree even under "shared", so checking it for a redirect would
+      // report drift on a layout that is correct.
+      if (sharedLayout && shareableSkillRuntimes().includes(cli)) {
         if (!sharedChecked) {
           checkSkillsTree(sharedAbs, excluded);
           sharedChecked = true;

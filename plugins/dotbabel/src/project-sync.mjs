@@ -403,7 +403,11 @@ export async function projectSync(opts) {
   for (const cli of fanOut) {
     if (SKILL_DIR_CLIS.includes(cli)) {
       const cliDir = resolveProjectSkillsDir(cli, repoRoot);
-      if (!sharedLayout) {
+      // The shared tree is only for runtimes that can actually read it. A
+      // skills-dir runtime reading a directory the others do not — Antigravity
+      // reads `.agents/skills` — keeps its own tree even under "shared", since
+      // a redirect would point it at a tree it never follows.
+      if (!sharedLayout || !SHAREABLE_SKILL_CLIS.includes(cli)) {
         fanOutSkillsLayout({ cli, targetDir: cliDir });
       } else if (gateOnCli(cli, `${cli} skills fan-out`)) {
         if (!sharedBuilt) {

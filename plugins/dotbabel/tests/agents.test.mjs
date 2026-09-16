@@ -57,8 +57,8 @@ afterEach(() => {
 // The derived half is kept because it documents the wiring; the literal half is
 // what catches a registry edit that changes the public contract.
 describe("agents registry — equivalence with existing declarations", () => {
-  it("fanOutRuntimes() reproduces the historical fan-out list, order included", () => {
-    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "copilot"]);
+  it("fanOutRuntimes() reproduces the documented fan-out list, order included", () => {
+    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "antigravity", "copilot"]);
     expect([...KNOWN_FAN_OUT_CLIS]).toEqual(fanOutRuntimes());
   });
 
@@ -109,20 +109,33 @@ describe("agents registry — equivalence with existing declarations", () => {
     }
   });
 
-  it("skillDirRuntimes() is the codex/gemini subset with .<id>/skills dirs", () => {
-    expect(skillDirRuntimes()).toEqual(["codex", "gemini"]);
-    for (const id of skillDirRuntimes()) {
-      expect(projectSkillsDir(id)).toBe(`.${id}/skills`);
-    }
+  // The `.<id>/skills` convention held while every skills-dir runtime was named
+  // after its own directory. Antigravity breaks it: its id is `antigravity` but
+  // it reads `.agents/skills`, which is why the directory is registry data
+  // rather than a string built from the id.
+  it("skillDirRuntimes() maps each runtime to its documented skills dir", () => {
+    expect(skillDirRuntimes()).toEqual(["codex", "gemini", "antigravity"]);
+    expect(projectSkillsDir("codex")).toBe(".codex/skills");
+    expect(projectSkillsDir("gemini")).toBe(".gemini/skills");
+    expect(projectSkillsDir("antigravity")).toBe(".agents/skills");
+  });
+
+  // Only the runtimes whose trees are interchangeable may share one. Antigravity
+  // is a skills-dir runtime that is NOT shareable, so this list is now a strict
+  // subset — the case project-sync's shared-layout guard exists for.
+  it("shareableSkillRuntimes() excludes the non-shareable skills-dir runtime", () => {
+    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini"]);
+    expect(skillDirRuntimes()).toContain("antigravity");
+    expect(shareableSkillRuntimes()).not.toContain("antigravity");
   });
 
   // project-sync.mjs used one list, SKILL_DIR_CLIS, to answer two questions:
   // which dispatch branch a runtime takes, and which runtimes can share one
-  // canonical tree under fan_out_layout "shared". They coincide today, which is
-  // why one list worked; they are still separate questions, and the shared-tree
-  // one is destructured as exactly two entries.
-  it("shareableSkillRuntimes() matches SKILL_DIR_CLIS today and is a subset of skillDirRuntimes()", () => {
-    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini"]);
+  // canonical tree under fan_out_layout "shared". Those coincided until
+  // Antigravity, which takes the skills-dir branch but cannot share the tree.
+  // Splitting them in #363 is what let that runtime land without the shared
+  // layout handing it a redirect it never follows.
+  it("every shareable runtime is a skills-dir runtime that declares shareable", () => {
     for (const id of shareableSkillRuntimes()) {
       expect(skillDirRuntimes()).toContain(id);
       expect(RUNTIMES[id].projectFanOut.shareable).toBe(true);

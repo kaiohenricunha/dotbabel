@@ -104,13 +104,19 @@ export const RUNTIMES = Object.freeze({
     globalSkills: Object.freeze({ envVar: "GEMINI_HOME", baseDir: ".gemini", subdir: "skills" }),
     projectFanOut: Object.freeze({ kind: "skills-dir", dir: ".gemini/skills", shareable: true }),
   }),
-  // Antigravity CLI. Detection-only for now: the fan-out and instruction
-  // fields are filled in by later commits, so this entry changes no behaviour
-  // beyond making `agy` a runtime the registry can name.
+  // Antigravity CLI.
   //
   // First runtime whose executable name is not its id — `agy`, not
   // `antigravity`. That is why every gate resolves the name through `detect`
   // rather than probing the id directly.
+  //
+  // It ships no user-scope instruction template of its own: it reads the shared
+  // GEMINI.md, so `globalInstruction` and `substitutionKey` stay null.
+  //
+  // `shareable: false` is the load-bearing field. Antigravity is the first
+  // skills-dir runtime that cannot join the `fan_out_layout: "shared"` tree,
+  // because `.agents/skills` is a directory codex and gemini do not read — a
+  // redirect there would point at a tree nothing follows.
   antigravity: Object.freeze({
     id: "antigravity",
     label: "Antigravity",
@@ -118,7 +124,11 @@ export const RUNTIMES = Object.freeze({
     substitutionKey: null,
     globalInstruction: null,
     globalSkills: null,
-    projectFanOut: null,
+    projectFanOut: Object.freeze({
+      kind: "skills-dir",
+      dir: ".agents/skills",
+      shareable: false,
+    }),
   }),
   // Copilot CLI has no skill auto-discovery dir, and its project artifacts are
   // generated `.prompt.md` / `.instructions.md` files whose filename contract
