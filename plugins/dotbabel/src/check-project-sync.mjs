@@ -297,6 +297,7 @@ export async function checkProjectSync(opts) {
 
   const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
   const sharedLayout = cfg.fan_out_layout === "shared";
+  const shareableClis = shareableSkillRuntimes();
   const sharedAbs = path.join(repoRoot, ...SHARED_SKILLS_DIR.split("/"));
   // Under the shared layout the canonical tree is verified once, not once per
   // CLI, so a single broken entry is reported once (#219, finding C).
@@ -317,7 +318,7 @@ export async function checkProjectSync(opts) {
       // Mirrors projectSync exactly: a non-shareable skills-dir runtime keeps
       // its own tree even under "shared", so checking it for a redirect would
       // report drift on a layout that is correct.
-      if (sharedLayout && shareableSkillRuntimes().includes(cli)) {
+      if (sharedLayout && shareableClis.includes(cli)) {
         if (!sharedChecked) {
           checkSkillsTree(sharedAbs, excluded);
           sharedChecked = true;
