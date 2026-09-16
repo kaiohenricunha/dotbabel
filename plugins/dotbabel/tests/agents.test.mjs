@@ -182,6 +182,7 @@ describe("agents registry — integrity", () => {
       "Claude",
       "Codex",
       "Gemini",
+      "Antigravity",
       "Copilot",
     ]);
   });
@@ -262,6 +263,56 @@ describe("anyRuntimePresent", () => {
 
   it("is false for an empty id list", () => {
     expect(anyRuntimePresent([])).toBe(false);
+  });
+});
+
+// Antigravity is the first runtime whose executable name is not its id: the id
+// is `antigravity`, the binary is `agy`. Every gate resolves the name through
+// the registry's detect list, so probing `commandExists("antigravity")` — which
+// is what the pre-registry code did with the bare cli string — would never find
+// a real install.
+describe("antigravity detection", () => {
+  /** Put the named fake executables on an otherwise CLI-less PATH. */
+  function stubBins(...names) {
+    const bin = makeTmpDir("agents-stub-bin-");
+    fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+    for (const name of names) {
+      fs.writeFileSync(path.join(bin, name), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    }
+    savedPath = process.env.PATH;
+    process.env.PATH = bin;
+  }
+
+  it("detects antigravity by its `agy` binary, not by its id", () => {
+    expect(RUNTIMES.antigravity.detect).toEqual(["agy"]);
+    stubBins("agy");
+    expect(anyRuntimePresent(["antigravity"])).toBe(true);
+  });
+
+  it("agy only: antigravity present, gemini absent", () => {
+    stubBins("agy");
+    expect(anyRuntimePresent(["antigravity"])).toBe(true);
+    expect(anyRuntimePresent(["gemini"])).toBe(false);
+  });
+
+  it("gemini only: gemini present, antigravity absent", () => {
+    stubBins("gemini");
+    expect(anyRuntimePresent(["gemini"])).toBe(true);
+    expect(anyRuntimePresent(["antigravity"])).toBe(false);
+  });
+
+  it("both installed: each detected independently, and together", () => {
+    stubBins("agy", "gemini");
+    expect(anyRuntimePresent(["gemini"])).toBe(true);
+    expect(anyRuntimePresent(["antigravity"])).toBe(true);
+    expect(anyRuntimePresent(["gemini", "antigravity"])).toBe(true);
+  });
+
+  it("neither installed: both absent, and the shared pair is absent", () => {
+    hideAllClisFromPath();
+    expect(anyRuntimePresent(["gemini"])).toBe(false);
+    expect(anyRuntimePresent(["antigravity"])).toBe(false);
+    expect(anyRuntimePresent(["gemini", "antigravity"])).toBe(false);
   });
 });
 
