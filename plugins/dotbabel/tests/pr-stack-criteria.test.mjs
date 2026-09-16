@@ -8,7 +8,6 @@
  * is the ref each read names, and only the command string shows it.
  */
 import { describe, it, expect } from "vitest";
-import { spawnSync } from "node:child_process";
 import { criteriaGateInputs } from "../src/criteria/gate-inputs.mjs";
 import { checkMergeGate } from "../src/pr-gates.mjs";
 
@@ -26,20 +25,26 @@ const ok = (stdout) => ({ status: 0, stdout, stderr: "" });
 const err = (stderr = "boom") => ({ status: 1, stdout: "", stderr });
 
 /**
- * A `deps.sh` stub driven by an ordered [pattern, reply] table, recording every
- * command it is asked to run. An unmatched command is a test bug, not a
- * silently empty result, so it throws.
+ * A `deps.run` stub driven by an ordered [pattern, reply] table, recording
+ * every ARGV ARRAY it is asked to run. An unmatched command is a test bug, not
+ * a silently empty result, so it throws.
+ *
+ * `calls` holds the argv arrays; `joined` holds them flattened for pattern
+ * matching only. Assertions about injection must read `calls`, because that is
+ * where the argument boundaries live — the whole security property is that a
+ * metacharacter stays inside one argv entry instead of becoming syntax.
  */
 function stubSh(replies) {
   const calls = [];
-  const sh = (cmd) => {
-    calls.push(cmd);
+  const run = (argv) => {
+    calls.push(argv);
+    const joined = argv.join(" ");
     for (const [re, reply] of replies) {
-      if (re.test(cmd)) return typeof reply === "function" ? reply(cmd) : reply;
+      if (re.test(joined)) return typeof reply === "function" ? reply(argv) : reply;
     }
-    throw new Error(`unstubbed command: ${cmd}`);
+    throw new Error(`unstubbed command: ${joined}`);
   };
-  return { deps: { sh }, calls };
+  return { deps: { run }, calls, joined: () => calls.map((a) => a.join(" ")) };
 }
 
 /** One GraphQL page of `count` comments, chained to `next` when given. */
@@ -71,7 +76,8 @@ const VIEW = {
 
 describe("criteriaGateInputs", () => {
   it("reads the criteria configuration from the base ref, not the pull request head", () => {
-    const { deps, calls } = stubSh([
+    const { deps, calls, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*:docs\/specs\/alpha\/spec\.json/, ok(SPEC_AT_HEAD)],
       [new RegExp(`git show ${BASE}:\\.dotbabel\\.json`), ok(JSON.stringify({ criteria: { enforcement: "warn" } }))],
       [new RegExp(`git show ${HEAD}:\\.dotbabel\\.json`), ok(JSON.stringify({ criteria: { enforcement: "block" } }))],
@@ -84,18 +90,19 @@ describe("criteriaGateInputs", () => {
     // that flips enforcement to "warn" in its own branch must not be judged
     // by that edit (KD-14).
     expect(out.criteriaEnforcement).toBe("warn");
-    expect(calls).toContain(`git show ${BASE}:.dotbabel.json`);
-    expect(calls.some((c) => c === `git show ${HEAD}:.dotbabel.json`)).toBe(false);
+    expect(joined()).toContain(`git show ${BASE}:.dotbabel.json`);
+    expect(joined().some((c) => c === `git show ${HEAD}:.dotbabel.json`)).toBe(false);
 
     // Specs, by contrast, are read at BOTH refs: the head supplies what must
     // be proven, the base supplies what may not be quietly dropped.
-    expect(calls).toContain(`git show ${HEAD}:docs/specs/alpha/spec.json`);
-    expect(calls).toContain(`git show ${BASE}:docs/specs/alpha/spec.json`);
+    expect(joined()).toContain(`git show ${HEAD}:docs/specs/alpha/spec.json`);
+    expect(joined()).toContain(`git show ${BASE}:docs/specs/alpha/spec.json`);
     expect(out.requiredCriteria).toEqual({ alpha: ["AC-1"] });
   });
 
   it("fails the gate when the comment fetch errors", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [/gh api graphql/, err("HTTP 502")],
@@ -113,6 +120,7 @@ describe("criteriaGateInputs", () => {
 
   it("returns null rather than a truncated list when a GraphQL error arrives with HTTP 200", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [/gh api graphql/, ok(JSON.stringify({ data: { repository: null }, errors: [{ message: "NOT_FOUND" }] }))],
@@ -122,7 +130,8 @@ describe("criteriaGateInputs", () => {
 
   it("gates a pull request with 300 stubbed comments across several pages within 10 seconds", () => {
     let page = 0;
-    const { deps, calls } = stubSh([
+    const { deps, calls, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [
@@ -144,37 +153,89 @@ describe("criteriaGateInputs", () => {
 
     // Three pages, and each after the first carries the previous endCursor —
     // a cursor that never advances would loop on page 1 and still return 300.
-    const graphql = calls.filter((c) => c.startsWith("gh api graphql"));
+    const graphql = joined().filter((c) => c.startsWith("gh api graphql"));
     expect(graphql).toHaveLength(3);
-    expect(graphql[1]).toContain("-f cursor='cursor-1'");
-    expect(graphql[2]).toContain("-f cursor='cursor-2'");
+    expect(graphql[1]).toContain("cursor=cursor-1");
+    expect(graphql[2]).toContain("cursor=cursor-2");
 
     // None of the 300 carries the marker, so the gate blocks on missing
     // evidence rather than passing a PR whose proof was never posted.
     expect(gate.reasons.map((r) => r.code)).toContain("CRITERIA_EVIDENCE_MISSING");
   });
 
-  it("quotes the GraphQL query so a real shell does not eat its variable sigils", () => {
-    // Regression: the query was built with JSON.stringify, and `sh` runs with
-    // shell:true. Inside double quotes the shell expanded $owner, $repo,
-    // $number and $cursor to empty strings, so every real fetch failed and
-    // the gate reported unreadable evidence on a perfectly good pull request.
-    // A stubbed `sh` cannot see this, so the assertion runs the quoting
-    // through an actual shell.
+  it("never lets a Spec ID from the body reach a shell", () => {
+    // Regression, and the most serious defect this unit had. `deps.run` was
+    // once `deps.sh`, a string run with shell:true, and the spec id is raw
+    // pull-request-body text. A body whose `## Spec ID` section read
+    // `alpha;touch${IFS}/tmp/pwned;` executed on the machine of whoever ran
+    // the merge gate — remote code execution from an unprivileged pull
+    // request. Two independent properties keep it shut, and both are asserted:
+    // the id is rejected before use, and nothing is built as a shell string.
     const { deps, calls } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    const evil = "alpha;touch${IFS}/tmp/pwned;";
+    const body = `## Summary\n\nx\n\n## Spec ID\n\n${evil}\n`;
+
+    const out = criteriaGateInputs(deps, { ...VIEW, body }, 42);
+
+    // Rejected as a spec id, so it blocks the merge instead of running.
+    expect(out.unknownSpecIds).toEqual([evil]);
+    expect(checkMergeGate({ ...VIEW, body, ...out }).reasons.map((r) => r.code)).toContain("CRITERIA_SPEC_UNKNOWN");
+    // And it never reached a command at all.
+    expect(calls.some((argv) => argv.some((a) => a.includes(evil)))).toBe(false);
+  });
+
+  it("passes every command as an argv array, never as a shell string", () => {
+    // The structural half of the fix: even a value that passes SPEC_ID_RE must
+    // not be able to become shell syntax, so `run` receives arrays and the bin
+    // spawns them with shell:false.
+    const { deps, calls } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [/gh api graphql/, ok(commentPage(0))],
     ]);
     criteriaGateInputs(deps, VIEW, 42);
 
-    const cmd = calls.find((c) => c.startsWith("gh api graphql"));
-    const quoted = cmd.slice(cmd.indexOf("-f query=") + "-f query=".length);
-    const seen = spawnSync("bash", ["-c", `printf '%s' ${quoted}`], { encoding: "utf8" });
-    expect(seen.status).toBe(0);
-    expect(seen.stdout).toContain("$owner");
-    expect(seen.stdout).toContain("$cursor");
-    expect(seen.stdout).toMatch(/^query\(\$owner:String!/);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const argv of calls) {
+      expect(Array.isArray(argv)).toBe(true);
+      expect(["git", "gh"]).toContain(argv[0]);
+    }
+    // The GraphQL query keeps its sigils verbatim: as an argv entry no shell
+    // ever sees it, so it needs no quoting and gets no expansion.
+    const query = calls.flat().find((a) => a.startsWith("query="));
+    expect(query).toContain("$owner");
+    expect(query).toContain("$cursor");
+  });
+
+  it("rejects a path-shaped Spec ID rather than reading outside docs/specs", () => {
+    const { deps, calls } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    const body = "## Summary\n\nx\n\n## Spec ID\n\n../../../../etc/passwd\n";
+    const out = criteriaGateInputs(deps, { ...VIEW, body }, 42);
+    expect(out.unknownSpecIds).toEqual(["../../../../etc/passwd"]);
+    expect(calls.some((argv) => argv.some((a) => a.includes("passwd")))).toBe(false);
+  });
+
+  it("fails closed when the base commit is not in this clone", () => {
+    // A shallow checkout or an un-fetched base made every base read fail, which
+    // used to look identical to "the base has no such file": baseActiveCriteria
+    // went empty so weakening stopped being visible, and require_ci_check fell
+    // back to its default of false. Both are fail-open, which REL-3 forbids.
+    const { deps } = stubSh([[/git cat-file -e/, err("not a valid object name")]]);
+    const out = criteriaGateInputs(deps, VIEW, 42);
+    expect(out.criteriaBaseUnreadable).toBe(BASE);
+
+    const gate = checkMergeGate({ ...VIEW, ...out });
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.map((r) => r.code)).toContain("CRITERIA_BASE_UNREADABLE");
   });
 
   it("returns no criteria inputs at all when the body declares no Spec ID", () => {
@@ -186,7 +247,8 @@ describe("criteriaGateInputs", () => {
   });
 
   it("reports a Spec ID with no spec at the head as unknown, and skips the check run unless required", () => {
-    const { deps, calls } = stubSh([
+    const { deps, calls, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
       [new RegExp(`git show ${HEAD}:docs/specs/alpha/spec\\.json`), err("path does not exist")],
       [new RegExp(`git show ${BASE}:docs/specs/alpha/spec\\.json`), ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
@@ -199,11 +261,12 @@ describe("criteriaGateInputs", () => {
     expect(out.baseActiveCriteria).toEqual({ alpha: ["AC-1"] });
     // require_ci_check defaults to false, so the check-run lookup is not paid for.
     expect(out.ciCriteriaCheck).toBeNull();
-    expect(calls.some((c) => c.includes("check-runs"))).toBe(false);
+    expect(joined().some((c) => c.includes("check-runs"))).toBe(false);
   });
 
   it("reads the check run on the head SHA and takes the newest run of that name", () => {
-    const { deps, calls } = stubSh([
+    const { deps, calls, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
       [/gh api graphql/, ok(commentPage(0))],
@@ -224,10 +287,10 @@ describe("criteriaGateInputs", () => {
     const out = criteriaGateInputs(deps, VIEW, 42);
     expect(out.requireCiCheck).toBe(true);
     expect(out.ciCriteriaCheck).toBe("success");
-    expect(calls.some((c) => c.includes(`commits/${HEAD}/check-runs`))).toBe(true);
+    expect(joined().some((c) => c.includes(`commits/${HEAD}/check-runs`))).toBe(true);
     // `--paginate` on this object endpoint emits one JSON object per page,
     // which JSON.parse rejects — the lookup would then always answer null.
-    expect(calls.some((c) => c.includes("--paginate"))).toBe(false);
+    expect(joined().some((c) => c.includes("--paginate"))).toBe(false);
   });
 
   // The branches below are the fail-closed ones: each turns a broken read into
@@ -236,6 +299,7 @@ describe("criteriaGateInputs", () => {
 
   it("treats an unparseable spec.json as an absent spec rather than throwing", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok("{ not json")],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [/gh api graphql/, ok(commentPage(0))],
@@ -247,6 +311,7 @@ describe("criteriaGateInputs", () => {
 
   it("returns null when a comment page is not JSON", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [/gh api graphql/, ok("<html>502 Bad Gateway</html>")],
@@ -257,7 +322,8 @@ describe("criteriaGateInputs", () => {
   it("returns null rather than a truncated list when the page cap is reached", () => {
     // Every page claims another follows, so the fetch can never complete.
     let page = 0;
-    const { deps, calls } = stubSh([
+    const { deps, calls, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [
@@ -270,11 +336,12 @@ describe("criteriaGateInputs", () => {
     ]);
     expect(criteriaGateInputs(deps, VIEW, 42).comments).toBeNull();
     // Bounded: it stops rather than paging forever.
-    expect(calls.filter((c) => c.startsWith("gh api graphql"))).toHaveLength(100);
+    expect(joined().filter((c) => c.startsWith("gh api graphql"))).toHaveLength(100);
   });
 
   it("answers null for the check run when the check-runs response is not JSON", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
       [/gh api graphql/, ok(commentPage(0))],
@@ -288,6 +355,7 @@ describe("criteriaGateInputs", () => {
 
   it("answers null for the check run when the lookup itself fails", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
       [/gh api graphql/, ok(commentPage(0))],
@@ -298,6 +366,7 @@ describe("criteriaGateInputs", () => {
 
   it("answers null when no check run carries the criteria name", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
       [/gh api graphql/, ok(commentPage(0))],
@@ -308,6 +377,7 @@ describe("criteriaGateInputs", () => {
 
   it("falls back to configuration defaults when the base ref has no .dotbabel.json", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, err("does not exist")],
       [/gh api graphql/, ok(commentPage(0))],
@@ -326,6 +396,7 @@ describe("criteriaGateInputs", () => {
 
   it("detects the Criteria change rationale heading in the body", () => {
     const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
       [/git show .*\.dotbabel\.json/, ok("{}")],
       [/gh api graphql/, ok(commentPage(0))],

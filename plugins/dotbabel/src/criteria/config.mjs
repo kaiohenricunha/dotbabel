@@ -50,6 +50,25 @@ export function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
     });
   }
 
+  // Reject unknown keys, exactly as the schema's `additionalProperties: false`
+  // says and as `validateQualityConfig` does. Without this a typo such as
+  // `enforcment` or `trusted_assocations` loads cleanly and the merge gate
+  // then judges every pull request under a default nobody chose — the silent
+  // wrong verdict this validation exists to prevent.
+  for (const key of Object.keys(criteria)) {
+    if (!Object.hasOwn(DEFAULT_CONFIG, key)) {
+      throw new ValidationError({
+        code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
+        category: "criteria",
+        file,
+        pointer: `/criteria/${key}`,
+        message: `unknown criteria key: ${key}`,
+        expected: `one of: ${Object.keys(DEFAULT_CONFIG).join(", ")}`,
+        got: key,
+      });
+    }
+  }
+
   const passEnv = criteria.pass_env ?? defaults.pass_env;
   if (!Array.isArray(passEnv) || passEnv.some((name) => typeof name !== "string" || !PASS_ENV_NAME_RE.test(name))) {
     throw new ValidationError({

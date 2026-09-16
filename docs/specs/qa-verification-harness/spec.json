@@ -6,7 +6,6 @@
   "linked_paths": [
     "plugins/dotbabel/src/validate-specs.mjs",
     "plugins/dotbabel/src/lib/errors.mjs",
-    "plugins/dotbabel/src/lib/pr-markers.mjs",
     "plugins/dotbabel/src/lib/attest-marker.mjs",
     "plugins/dotbabel/src/lib/spec-ids.mjs",
     "plugins/dotbabel/src/lib/perm-to-assoc.mjs",
@@ -37,6 +36,7 @@
     "plugins/dotbabel/tests/pr-gates.test.mjs",
     "plugins/dotbabel/tests/pr-stack-criteria.test.mjs",
     "plugins/dotbabel/tests/spec-ids.test.mjs",
+    "plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
     "plugins/dotbabel/tests/project-sync.test.mjs",
     "plugins/dotbabel/tests/quality-*.test.mjs",
     "plugins/dotbabel/tests/workflow-templates.test.mjs",

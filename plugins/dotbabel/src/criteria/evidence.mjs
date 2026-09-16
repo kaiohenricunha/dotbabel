@@ -54,7 +54,10 @@ export function parseEvidenceComment(body) {
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
     return { state: "undecodable", sha, payload: null, detail: "payload is not an object" };
   }
-  if (payload.head_sha !== undefined && payload.head_sha !== sha) {
+  // No `!== undefined` guard: REL-2 makes head_sha the binding between the
+  // payload and the commit, so a payload that simply omits it must not be
+  // accepted on the strength of the marker line alone.
+  if (payload.head_sha !== sha) {
     return {
       state: "sha-mismatch",
       sha,
@@ -82,6 +85,7 @@ export function evidencePayloadProblem(payload) {
   const p = /** @type {any} */ (payload);
   if (p.schema_version !== 1) return `unsupported schema_version: ${JSON.stringify(p.schema_version)}`;
   if (typeof p.verdict !== "string") return "verdict is missing";
+  if (typeof p.head_sha !== "string" || !/^[0-9a-f]{40}$/i.test(p.head_sha)) return "head_sha is missing or malformed";
   if (!Array.isArray(p.specs)) return "specs is not an array";
   for (const spec of p.specs) {
     if (spec === null || typeof spec !== "object" || Array.isArray(spec)) return "a spec entry is not an object";
@@ -100,8 +104,18 @@ export function evidencePayloadProblem(payload) {
 
 /**
  * The criterion ids a payload reports as having actually run, per spec id.
- * `pending` is excluded: a planned criterion is reported but never executed,
- * so counting it would let a payload satisfy a requirement nothing verified.
+ *
+ * Only `pass` counts. The two vocabularies are easy to conflate: a spec
+ * criterion is `planned` or `active`, while a payload criterion is `pending`,
+ * `pass`, `fail`, `error` or `unconfirmed`. `pending` is what the command
+ * records for a criterion the spec still marks `planned` — listed and
+ * shape-checked, but never executed (KD-15).
+ *
+ * An earlier revision counted every non-`pending` status, which made a
+ * criterion recorded as `fail` or `error` "covered" and left only the
+ * aggregate `verdict` standing between that payload and a pass. Requiring
+ * `pass` per criterion means the gate does not depend on the producer
+ * summarising its own run correctly.
  *
  * @param {object} payload
  * @returns {Map<string, Set<string>>}
@@ -109,7 +123,7 @@ export function evidencePayloadProblem(payload) {
 export function payloadCoverage(payload) {
   const out = new Map();
   for (const spec of payload.specs ?? []) {
-    out.set(spec.id, new Set((spec.criteria ?? []).filter((c) => c.status !== "pending").map((c) => c.id)));
+    out.set(spec.id, new Set((spec.criteria ?? []).filter((c) => c.status === "pass").map((c) => c.id)));
   }
   return out;
 }

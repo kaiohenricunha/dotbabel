@@ -13,8 +13,10 @@
  * accidentally declare a spec.
  */
 
-// A fence opens with at least three backticks or tildes (CommonMark 4.5).
-const FENCE_RE = /^\s{0,3}(`{3,}|~{3,})/;
+// A fence opens with at least three backticks or tildes, then an optional
+// info string (CommonMark 4.5). The info string is captured because only a
+// closing fence may not carry one.
+const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
 // Leading trim includes '#' (e.g. "##spec-id" → "spec-id"); trailing does not,
 // preserving the original behaviour of /^[`'"#]+|[`'"]+$/.
@@ -40,8 +42,14 @@ export function stripFences(body) {
       continue;
     }
     // Per CommonMark 4.5 only a run of the SAME character, at least as long as
-    // the opener, closes the block — so ``` inside a ~~~ block is content.
-    if (m !== null && m[1][0] === open.char && m[1].length >= open.len) open = null;
+    // the opener and carrying no info string, closes the block — so ``` inside
+    // a ~~~ block is content, and so is ```js inside a ``` block. A naive
+    // toggle flips polarity on either and leaks the fenced text back out as
+    // body text, which would let a body that merely documents the template
+    // satisfy the heading rules.
+    if (m !== null && m[1][0] === open.char && m[1].length >= open.len && m[2].trim() === "") {
+      open = null;
+    }
   }
   return out.join("\n");
 }

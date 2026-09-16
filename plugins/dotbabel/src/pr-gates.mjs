@@ -18,6 +18,9 @@
  * @property {boolean} ok
  * @property {string} gate
  * @property {GateReason[]} reasons
+ * @property {GateReason[]} warnings Empty by default; §5 moves criteria
+ *   findings here under `enforcement: "warn"`. Every gate returns it, so
+ *   `result.warnings.length` is safe without a guard.
  * @property {string|null} hint
  *
  * @typedef {object} ConductorPhase
@@ -38,6 +41,11 @@
 import { CRITERIA_MARKER_PREFIX } from "./criteria/comment.mjs";
 import { parseEvidenceComment, evidencePayloadProblem, payloadCoverage } from "./criteria/evidence.mjs";
 import { createMarker } from "./lib/attest-marker.mjs";
+// ARCH-6: one fence stripper, shared with the Spec ID parser. Two copies had
+// already drifted — this module required a closing fence to carry no info
+// string and the other did not, so a body with ```js inside a ``` block was
+// fenced for one gate and not the other.
+import { stripFences } from "./lib/spec-ids.mjs";
 
 const criteriaMarker = createMarker(CRITERIA_MARKER_PREFIX);
 
@@ -93,9 +101,6 @@ const MIN_SHA_PREFIX = 7;
 const SKIP_CI_RE = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/i;
 const SKIP_CHECKS_RE = /^skip-checks:\s*true$/i;
 
-/** A CommonMark fenced-code delimiter: run of >=3 backticks/tildes + info string. */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-
 /**
  * Build a case-insensitive matcher for an exact ATX h2 heading, allowing the
  * CommonMark-legal 0–3 leading spaces and trailing whitespace. Four spaces is
@@ -121,36 +126,6 @@ const RE_TEST_PLAN = h2("Test plan");
 const RE_DEFERRED_TEST_PLAN = /<!--\s*test-plan:\s*deferred\s*-->/i;
 const RE_SPEC_ID = h2("Spec ID");
 const RE_NO_SPEC = h2("No-spec rationale");
-
-/**
- * Remove fenced code blocks so a body that merely *documents* the PR template
- * cannot satisfy the heading requirements.
- *
- * @param {string} body
- * @returns {string}
- */
-function stripFences(body) {
-  const out = [];
-  /** @type {{char: string, len: number}|null} */
-  let open = null;
-
-  for (const line of body.split("\n")) {
-    const m = FENCE_RE.exec(line);
-    if (open === null) {
-      if (m === null) out.push(line);
-      else open = { char: m[1][0], len: m[1].length };
-      continue;
-    }
-    // Per CommonMark 4.5 only a run of the SAME character, at least as long as
-    // the opener and carrying no info string, closes the block. A naive toggle
-    // flips polarity on a nested fence and leaks its contents back out as body
-    // text — which would let a PR that merely documents the template pass.
-    if (m !== null && m[1][0] === open.char && m[1].length >= open.len && m[2].trim() === "") {
-      open = null;
-    }
-  }
-  return out.join("\n");
-}
 
 /**
  * Translate a `docs/repo-facts.json` protected-path glob into a RegExp.
@@ -241,6 +216,9 @@ export function checkLocalAttestGate(input = {}) {
     ok: reasons.length === 0,
     gate: "local-attest",
     reasons,
+    // Always present, so a caller can read `.warnings` off any gate result
+    // without first checking which gate produced it.
+    warnings: [],
     hint: reasons.length === 0 ? null : "commit or stash your changes and push before attesting",
   };
 }
@@ -369,6 +347,18 @@ function evaluateCriteria(input) {
   }
 
   const done = () => ({ blocking: withCi(out, input), warnings });
+
+  // REL-3: the base ref defines the rules. If it could not be read, the gate
+  // has no rules to apply and must say so rather than apply the defaults,
+  // which would silently relax both the weakening check and require_ci_check.
+  if (typeof input.criteriaBaseUnreadable === "string") {
+    out.push({
+      code: "CRITERIA_BASE_UNREADABLE",
+      message: "the base commit is not in this clone, so the criteria rules could not be read",
+      detail: `fetch ${String(input.criteriaBaseUnreadable).slice(0, 8)} and re-run`,
+    });
+    return done();
+  }
 
   // --- Evidence group: only when something actually has to be proven. ---
   const requiredTotal = [...required.values()].reduce((n, ids) => n + ids.size, 0);
