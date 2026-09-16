@@ -35,7 +35,15 @@ function stubBinsOnPath(...names) {
   return stubDir;
 }
 
-function runDoctor({ home, codexHome, geminiHome, extraPath, trustedFile, repoRoot }) {
+function runDoctor({
+  home,
+  codexHome,
+  geminiHome,
+  antigravityHome,
+  extraPath,
+  trustedFile,
+  repoRoot,
+}) {
   // Build a hermetic PATH that does NOT inherit the user's PATH (which on a
   // dev machine likely contains a real codex/gemini install in nvm's bin dir).
   // We invoke node by absolute path so node doesn't need to be on PATH.
@@ -48,6 +56,8 @@ function runDoctor({ home, codexHome, geminiHome, extraPath, trustedFile, repoRo
   else delete env.CODEX_HOME;
   if (geminiHome) env.GEMINI_HOME = geminiHome;
   else delete env.GEMINI_HOME;
+  if (antigravityHome) env.ANTIGRAVITY_CONFIG_HOME = antigravityHome;
+  else delete env.ANTIGRAVITY_CONFIG_HOME;
   // The trust check resolves ${XDG_CONFIG_HOME:-$HOME/.config}, so a temp HOME
   // alone is not enough — an exported XDG_CONFIG_HOME would send the check at
   // the developer's real allowlist and make output machine-dependent.
@@ -131,6 +141,43 @@ describe("dotbabel-doctor fan-out check", () => {
     const result = runDoctor({ home, geminiHome: customGemini, extraPath: stub });
 
     expect(result.stdout).toMatch(/Gemini skills fan-out (present|sentinel)/i);
+  });
+
+  // Antigravity's diagnostics came for free from the registry-driven loop —
+  // doctor gained no Antigravity-specific code. These pin that it reports on the
+  // `agy` binary, not on an `antigravity` one that never exists.
+  it("reports the antigravity fan-out when agy is on PATH", () => {
+    const home = makeTmpDir("home-");
+    const customRoot = makeTmpDir("custom-antigravity-");
+    const stub = stubBinsOnPath("agy");
+
+    const dst = path.join(customRoot, "skills", "changelog");
+    fs.mkdirSync(dst, { recursive: true });
+    fs.symlinkSync(path.join(REPO_ROOT, "commands", "changelog.md"), path.join(dst, "SKILL.md"));
+
+    const result = runDoctor({ home, antigravityHome: customRoot, extraPath: stub });
+
+    expect(result.stdout).toMatch(/Antigravity skills fan-out (present|sentinel)/i);
+  });
+
+  it("stays silent about antigravity when agy is absent", () => {
+    const home = makeTmpDir("home-");
+    const stub = stubBinsOnPath("gemini");
+
+    const result = runDoctor({ home, extraPath: stub });
+
+    expect(result.stdout).not.toMatch(/Antigravity skills fan-out/);
+  });
+
+  it("does not probe for a binary named after the runtime id", () => {
+    const home = makeTmpDir("home-");
+    // An `antigravity` executable exists but `agy` does not: detection keys off
+    // the registry's detect list, so this must NOT count as installed.
+    const stub = stubBinsOnPath("antigravity");
+
+    const result = runDoctor({ home, extraPath: stub });
+
+    expect(result.stdout).not.toMatch(/Antigravity skills fan-out/);
   });
 });
 

@@ -43,7 +43,8 @@ trust allowlist, and when it cannot measure something it says `unsupported`,
 `not_configured`, or `unavailable` rather than quietly passing.
 
 It also runs everywhere you work: one rule floor, fanned out to Claude Code,
-Codex, Gemini CLI, and Copilot CLI, with drift detection so the copies cannot
+Codex, Gemini CLI, Antigravity CLI, and Copilot CLI, with drift detection so
+the copies cannot
 silently disagree.
 
 **Who is this for?**
@@ -367,8 +368,9 @@ support.
 `dotbabel bootstrap` covers your **user scope** (`~/.claude/`, `~/.codex/`,
 `~/.gemini/`). For **per-repo** artifacts — a project's own `CLAUDE.md`,
 `.claude/commands/*.md`, and `.claude/skills/*` — use `project-sync` to fan
-them out to Codex (`.codex/skills/`), Gemini (`.gemini/skills/`), and Copilot
-(`.github/prompts/*.prompt.md` + `.github/instructions/*.instructions.md`):
+them out to Codex (`.codex/skills/`), Gemini (`.gemini/skills/`), Antigravity
+(`.agents/skills/`), and Copilot (`.github/prompts/*.prompt.md` +
+`.github/instructions/*.instructions.md`):
 
 ```bash
 cd ~/projects/my-app
@@ -421,7 +423,7 @@ Point your editor at the config schema for autocomplete and validation:
 ```json
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
-  "fan_out": ["codex", "gemini", "copilot"],
+  "fan_out": ["codex", "gemini", "antigravity", "copilot"],
   "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true,
   "cli_excluded": { "codex": ["review-prs-parallel"], "gemini": ["review-prs-parallel"] }
