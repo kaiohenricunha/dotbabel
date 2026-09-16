@@ -7,6 +7,8 @@ import {
   INSTRUCTION_ARTIFACTS,
   fanOutRuntimes,
   skillDirRuntimes,
+  shareableSkillRuntimes,
+  projectSkillsDir,
   projectArtifactTargets,
   anyRuntimePresent,
   resolveGlobalSkillsDir,
@@ -87,9 +89,26 @@ describe("agents registry — equivalence with existing declarations", () => {
   it("skillDirRuntimes() is the codex/gemini subset with .<id>/skills dirs", () => {
     expect(skillDirRuntimes()).toEqual(["codex", "gemini"]);
     for (const id of skillDirRuntimes()) {
-      expect(RUNTIMES[id].projectFanOut.dir).toBe(`.${id}/skills`);
+      expect(projectSkillsDir(id)).toBe(`.${id}/skills`);
+    }
+  });
+
+  // project-sync.mjs used one list, SKILL_DIR_CLIS, to answer two questions:
+  // which dispatch branch a runtime takes, and which runtimes can share one
+  // canonical tree under fan_out_layout "shared". They coincide today, which is
+  // why one list worked; they are still separate questions, and the shared-tree
+  // one is destructured as exactly two entries.
+  it("shareableSkillRuntimes() matches SKILL_DIR_CLIS today and is a subset of skillDirRuntimes()", () => {
+    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini"]);
+    for (const id of shareableSkillRuntimes()) {
+      expect(skillDirRuntimes()).toContain(id);
       expect(RUNTIMES[id].projectFanOut.shareable).toBe(true);
     }
+  });
+
+  it("projectSkillsDir() is null for runtimes that write no skills tree", () => {
+    expect(projectSkillsDir("copilot")).toBeNull();
+    expect(projectSkillsDir("claude")).toBeNull();
   });
 
   // Global instruction destinations are per-runtime even where the project

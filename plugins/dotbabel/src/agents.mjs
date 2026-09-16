@@ -170,8 +170,11 @@ export function fanOutRuntimes() {
 }
 
 /**
- * Runtimes whose project fan-out is a `<dir>/SKILL.md` tree, and which can
- * therefore share one canonical tree behind a directory redirect.
+ * Runtimes whose project fan-out is a `<dir>/SKILL.md` tree.
+ *
+ * This answers "which dispatch branch does this runtime take", which is not the
+ * same question as {@link shareableSkillRuntimes}: a runtime can write a skills
+ * tree without its tree being interchangeable with another runtime's.
  *
  * @returns {string[]}
  */
@@ -179,6 +182,32 @@ export function skillDirRuntimes() {
   return Object.values(RUNTIMES)
     .filter((runtime) => runtime.projectFanOut?.kind === "skills-dir")
     .map((runtime) => runtime.id);
+}
+
+/**
+ * Runtimes whose skills tree can be shared with the others behind a directory
+ * redirect, under `fan_out_layout: "shared"`.
+ *
+ * Sharing requires every participant to read a byte-identical tree at a path
+ * each one accepts. A runtime reading a differently-named directory keeps its
+ * own tree even though it is also a `skills-dir` runtime.
+ *
+ * @returns {string[]}
+ */
+export function shareableSkillRuntimes() {
+  return Object.values(RUNTIMES)
+    .filter((runtime) => runtime.projectFanOut?.kind === "skills-dir" && runtime.projectFanOut.shareable)
+    .map((runtime) => runtime.id);
+}
+
+/**
+ * A runtime's repo-relative project skills directory.
+ *
+ * @param {string} runtimeId
+ * @returns {string | null} null when the runtime writes no skills tree.
+ */
+export function projectSkillsDir(runtimeId) {
+  return RUNTIMES[runtimeId]?.projectFanOut?.dir ?? null;
 }
 
 /**

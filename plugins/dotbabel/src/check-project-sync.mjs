@@ -25,6 +25,7 @@ import {
   shouldFanOutCli,
   SHARED_SKILLS_DIR,
 } from "./project-sync.mjs";
+import { RUNTIMES, projectSkillsDir } from "./agents.mjs";
 import {
   composeGeneratedFrontmatter,
   isGeneratedFile,
@@ -306,17 +307,19 @@ export async function checkProjectSync(opts) {
       continue;
     }
     const excluded = excludedNamesFor(cli, cfg);
-    if (cli === "codex" || cli === "gemini") {
+    const fanOutKind = RUNTIMES[cli]?.projectFanOut?.kind;
+    if (fanOutKind === "skills-dir") {
+      const cliSkillsDir = path.join(repoRoot, ...projectSkillsDir(cli).split("/"));
       if (sharedLayout) {
         if (!sharedChecked) {
           checkSkillsTree(sharedAbs, excluded);
           sharedChecked = true;
         }
-        checkLink(path.join(repoRoot, `.${cli}`, "skills"), sharedAbs);
+        checkLink(cliSkillsDir, sharedAbs);
       } else {
-        checkSkillsTree(path.join(repoRoot, `.${cli}`, "skills"), excluded);
+        checkSkillsTree(cliSkillsDir, excluded);
       }
-    } else if (cli === "copilot") {
+    } else if (fanOutKind === "copilot-files") {
       const promptsDir = path.join(repoRoot, ".github", "prompts");
       const instructionsDir = path.join(repoRoot, ".github", "instructions");
       if (fs.existsSync(commandsAbs)) {

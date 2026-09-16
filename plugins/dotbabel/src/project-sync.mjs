@@ -20,10 +20,18 @@ import path from "node:path";
 import { createOutput } from "./lib/output.mjs";
 import {
   buildTimestamp,
-  commandExists,
   ensureRealDir,
   linkOne,
 } from "./lib/symlink.mjs";
+import {
+  RUNTIMES,
+  anyRuntimePresent,
+  fanOutRuntimes,
+  projectArtifactTargets,
+  projectSkillsDir,
+  shareableSkillRuntimes,
+  skillDirRuntimes,
+} from "./agents.mjs";
 import {
   RULE_FLOOR_BEGIN,
   RULE_FLOOR_END,
@@ -40,11 +48,11 @@ import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 import { validateQualityConfig } from "./quality/config.mjs";
 
 /**
- * The CLIs `fan_out` may name. Single source of truth: the config validator,
- * the fan-out dispatch below, and `schemas/dotbabel.config.schema.json` all
- * agree with this list.
+ * The CLIs `fan_out` may name. Derived from the agent registry, which the
+ * config validator, the fan-out dispatch below, and
+ * `schemas/dotbabel.config.schema.json` all agree with.
  */
-export const KNOWN_FAN_OUT_CLIS = Object.freeze(["codex", "gemini", "copilot"]);
+export const KNOWN_FAN_OUT_CLIS = Object.freeze(fanOutRuntimes());
 
 /**
  * How Codex and Gemini get their skills trees.
@@ -61,8 +69,17 @@ export const KNOWN_FAN_OUT_LAYOUTS = Object.freeze(["per-cli", "shared"]);
 /** Canonical skills directory used when `fan_out_layout` is `shared`. */
 export const SHARED_SKILLS_DIR = ".cli/skills";
 
-/** CLIs that read `<dir>/SKILL.md` and can therefore share one tree. */
-const SKILL_DIR_CLIS = Object.freeze(["codex", "gemini"]);
+/** CLIs that read `<dir>/SKILL.md`, and take the skills-tree fan-out branch. */
+const SKILL_DIR_CLIS = Object.freeze(skillDirRuntimes());
+
+/**
+ * CLIs whose skills tree can be shared behind one redirect.
+ *
+ * Identical to {@link SKILL_DIR_CLIS} today. It is a separate list because it
+ * answers a different question — sharing needs every participant to accept the
+ * same directory — and the shared-layout warning below reads exactly two.
+ */
+const SHAREABLE_SKILL_CLIS = Object.freeze(shareableSkillRuntimes());
 
 /** Default config returned when `.dotbabel.json` is absent. */
 export const DEFAULT_PROJECT_CONFIG = Object.freeze({
@@ -74,23 +91,11 @@ export const DEFAULT_PROJECT_CONFIG = Object.freeze({
   gate_on_cli_presence: true,
   cli_excluded: Object.freeze({}),
   cli_substitutions: Object.freeze({}),
-  targets: Object.freeze([
-    Object.freeze({
-      relativeOutputPath: "AGENTS.md",
-      cliSet: Object.freeze(["copilot", "codex"]),
-      substitutionKey: "agents",
-    }),
-    Object.freeze({
-      relativeOutputPath: "GEMINI.md",
-      cliSet: Object.freeze(["gemini"]),
-      substitutionKey: "gemini",
-    }),
-    Object.freeze({
-      relativeOutputPath: ".github/copilot-instructions.md",
-      cliSet: Object.freeze(["copilot"]),
-      substitutionKey: "copilot",
-    }),
-  ]),
+  targets: Object.freeze(
+    projectArtifactTargets().map((target) =>
+      Object.freeze({ ...target, cliSet: Object.freeze(target.cliSet) }),
+    ),
+  ),
 });
 
 /**
@@ -228,10 +233,10 @@ function validateCliExcluded(value) {
  */
 export function excludedNamesFor(cli, cfg) {
   const map = cfg.cli_excluded ?? {};
-  if (cfg.fan_out_layout === "shared" && SKILL_DIR_CLIS.includes(cli)) {
+  if (cfg.fan_out_layout === "shared" && SHAREABLE_SKILL_CLIS.includes(cli)) {
     const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
     const union = new Set();
-    for (const sharedCli of SKILL_DIR_CLIS) {
+    for (const sharedCli of SHAREABLE_SKILL_CLIS) {
       if (!fanOut.includes(sharedCli)) continue;
       for (const name of map[sharedCli] ?? []) union.add(name);
     }
@@ -258,7 +263,7 @@ export function excludedNamesFor(cli, cfg) {
 export function shouldFanOutCli(cli, cfg, { allCli = false } = {}) {
   if (allCli) return true;
   if (!cfg.gate_on_cli_presence) return true;
-  return commandExists(cli);
+  return anyRuntimePresent([cli]);
 }
 
 /**
@@ -397,7 +402,7 @@ export async function projectSync(opts) {
 
   for (const cli of fanOut) {
     if (SKILL_DIR_CLIS.includes(cli)) {
-      const cliDir = path.join(repoRoot, `.${cli}`, "skills");
+      const cliDir = path.join(repoRoot, ...projectSkillsDir(cli).split("/"));
       if (!sharedLayout) {
         fanOutSkillsLayout({ cli, targetDir: cliDir });
       } else if (gateOnCli(cli, `${cli} skills fan-out`)) {
@@ -408,7 +413,7 @@ export async function projectSync(opts) {
         doEnsureRealDir(path.dirname(cliDir));
         doLink(sharedAbs, cliDir);
       }
-    } else if (cli === "copilot") {
+    } else if (RUNTIMES[cli]?.projectFanOut?.kind === "copilot-files") {
       fanOutCopilotLayout();
     } else {
       // Defensive only: loadProjectConfig rejects unknown names before we get
@@ -452,7 +457,7 @@ export async function projectSync(opts) {
       }
     }
     if (!sharedLayout) return;
-    const [a, b] = SKILL_DIR_CLIS;
+    const [a, b] = SHAREABLE_SKILL_CLIS;
     if (!fanOut.includes(a) || !fanOut.includes(b)) return;
     for (const [only, other] of [
       [a, b],
