@@ -79,11 +79,16 @@ teardown() {
 }
 
 @test "no-op when the toolchain is absent" {
-  # /usr/bin/python3 exists on most machines, so isolate_path's /usr/bin is not
-  # enough to make the toolchain genuinely absent. Build a PATH holding exactly
-  # the utilities the hook itself depends on — and nothing else — so it can
-  # still parse its input (i.e. this does not vacuously pass via the
-  # jq-missing branch) but finds no Python checker.
+  # Build a PATH holding exactly the utilities the hook itself depends on —
+  # and nothing else — so it can still parse its input (i.e. this does not
+  # vacuously pass via the jq-missing branch) but finds no Python checker.
+  #
+  # isolate_path() no longer grants /usr/bin wholesale, so its own PATH would
+  # now suffice for this; the explicit list below is kept because it pins the
+  # hook's runtime dependency set independently of that helper. The helper's
+  # PATH contract itself is asserted in check-on-stop.bats
+  # ("isolate_path never grants blanket access to /usr/bin or /bin") — this
+  # file relies on it but does not re-test it.
   #
   # This list doubles as the hook's pinned runtime dependency set; `git` is
   # deliberately excluded because the hook guards it with command -v.
