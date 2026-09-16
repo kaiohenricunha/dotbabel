@@ -255,8 +255,7 @@ for (const runtime of Object.values(RUNTIMES)) {
 // from bootstrap.sh:137-145 and bootstrap-global.mjs.
 for (const runtime of Object.values(RUNTIMES)) {
   const fanoutDir = resolveGlobalSkillsDir(runtime.id, homedir(), process.env);
-  if (!fanoutDir) continue;
-  if (!anyRuntimePresent([runtime.id])) continue;
+  if (!fanoutDir || !anyRuntimePresent([runtime.id])) continue;
   const label = runtime.label;
   const sentinel = join(fanoutDir, "changelog", "SKILL.md");
   try {

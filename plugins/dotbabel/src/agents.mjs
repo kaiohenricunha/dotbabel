@@ -211,6 +211,18 @@ export function projectSkillsDir(runtimeId) {
 }
 
 /**
+ * A runtime's absolute project skills directory under `repoRoot`.
+ *
+ * @param {string} runtimeId
+ * @param {string} repoRoot
+ * @returns {string | null} null when the runtime writes no skills tree.
+ */
+export function resolveProjectSkillsDir(runtimeId, repoRoot) {
+  const dir = projectSkillsDir(runtimeId);
+  return dir ? path.join(repoRoot, ...dir.split("/")) : null;
+}
+
+/**
  * The default instruction targets, in the shape consumers already expect.
  *
  * @returns {{ relativeOutputPath: string, cliSet: string[], substitutionKey: string }[]}

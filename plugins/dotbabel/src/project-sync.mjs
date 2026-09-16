@@ -28,7 +28,7 @@ import {
   anyRuntimePresent,
   fanOutRuntimes,
   projectArtifactTargets,
-  projectSkillsDir,
+  resolveProjectSkillsDir,
   shareableSkillRuntimes,
   skillDirRuntimes,
 } from "./agents.mjs";
@@ -402,7 +402,7 @@ export async function projectSync(opts) {
 
   for (const cli of fanOut) {
     if (SKILL_DIR_CLIS.includes(cli)) {
-      const cliDir = path.join(repoRoot, ...projectSkillsDir(cli).split("/"));
+      const cliDir = resolveProjectSkillsDir(cli, repoRoot);
       if (!sharedLayout) {
         fanOutSkillsLayout({ cli, targetDir: cliDir });
       } else if (gateOnCli(cli, `${cli} skills fan-out`)) {

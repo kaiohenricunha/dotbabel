@@ -25,7 +25,7 @@ import {
   shouldFanOutCli,
   SHARED_SKILLS_DIR,
 } from "./project-sync.mjs";
-import { RUNTIMES, projectSkillsDir } from "./agents.mjs";
+import { RUNTIMES, resolveProjectSkillsDir } from "./agents.mjs";
 import {
   composeGeneratedFrontmatter,
   isGeneratedFile,
@@ -309,7 +309,7 @@ export async function checkProjectSync(opts) {
     const excluded = excludedNamesFor(cli, cfg);
     const fanOutKind = RUNTIMES[cli]?.projectFanOut?.kind;
     if (fanOutKind === "skills-dir") {
-      const cliSkillsDir = path.join(repoRoot, ...projectSkillsDir(cli).split("/"));
+      const cliSkillsDir = resolveProjectSkillsDir(cli, repoRoot);
       if (sharedLayout) {
         if (!sharedChecked) {
           checkSkillsTree(sharedAbs, excluded);

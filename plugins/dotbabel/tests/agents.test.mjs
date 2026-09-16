@@ -9,6 +9,7 @@ import {
   skillDirRuntimes,
   shareableSkillRuntimes,
   projectSkillsDir,
+  resolveProjectSkillsDir,
   projectArtifactTargets,
   anyRuntimePresent,
   resolveGlobalSkillsDir,
@@ -111,6 +112,12 @@ describe("agents registry — equivalence with existing declarations", () => {
   it("projectSkillsDir() is null for runtimes that write no skills tree", () => {
     expect(projectSkillsDir("copilot")).toBeNull();
     expect(projectSkillsDir("claude")).toBeNull();
+  });
+
+  it("resolveProjectSkillsDir() joins projectSkillsDir() under repoRoot", () => {
+    expect(resolveProjectSkillsDir("gemini", "/repo")).toBe("/repo/.gemini/skills");
+    expect(resolveProjectSkillsDir("codex", "/repo")).toBe("/repo/.codex/skills");
+    expect(resolveProjectSkillsDir("copilot", "/repo")).toBeNull();
   });
 
   // Global instruction destinations are per-runtime even where the project
