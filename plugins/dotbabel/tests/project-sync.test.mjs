@@ -9,6 +9,7 @@ import {
   KNOWN_FAN_OUT_CLIS,
   extractRuleFloorOrWhole,
 } from "../src/project-sync.mjs";
+import { loadCriteriaConfig } from "../src/criteria/config.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 import { isGeneratedFile } from "../src/copilot-frontmatter.mjs";
 
@@ -167,6 +168,26 @@ describe("loadProjectConfig", () => {
     const cfg = loadProjectConfig(repo);
     expect(cfg.fan_out).toEqual(["codex"]);
     expect(cfg.rule_floor_source).toBe("CLAUDE.md");
+  });
+
+  // KD-14: `criteria` is validated here, beside `quality`, so a typo fails at
+  // config load. Without this the merge gate would read the default instead
+  // and silently judge the PR under rules nobody chose.
+  it("rejects an invalid criteria.enforcement value and defaults trusted_associations to OWNER", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ criteria: { enforcement: "blocc" } }),
+    );
+    expect(() => loadProjectConfig(repo)).toThrow(ValidationError);
+    expect(() => loadProjectConfig(repo)).toThrow(/criteria.enforcement/);
+
+    fs.writeFileSync(path.join(repo, ".dotbabel.json"), JSON.stringify({ criteria: {} }));
+    expect(loadCriteriaConfig(repo)).toMatchObject({
+      enforcement: "block",
+      trusted_associations: ["OWNER"],
+      require_ci_check: false,
+    });
   });
 });
 

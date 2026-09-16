@@ -12,7 +12,15 @@ import { createMarker } from "../lib/attest-marker.mjs";
  * for humans only — the merge gate never reads it.
  */
 export const CRITERIA_MARKER_PREFIX = "<!-- dotbabel-criteria verified-sha=";
-const PAYLOAD_LINE_PREFIX = "<!-- dotbabel-criteria-payload ";
+/**
+ * Opening text of the base64url payload line.
+ *
+ * Exported so `evidence.mjs` parses the exact prefix this module writes. The
+ * producer and the gate that judges it must never drift apart: a mismatch here
+ * would leave the command posting evidence the gate cannot see, and neither
+ * side would look broken on its own.
+ */
+export const PAYLOAD_LINE_PREFIX = "<!-- dotbabel-criteria-payload ";
 const MAX_BODY_CHARS = 60000;
 
 const marker = createMarker(CRITERIA_MARKER_PREFIX);

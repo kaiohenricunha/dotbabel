@@ -8,30 +8,10 @@ import {
   readJson,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
+// One parser for the command and the gate (ARCH-6) — see lib/spec-ids.mjs.
+import { parseSpecIdSection } from "./lib/spec-ids.mjs";
 
 const COVERAGE_STATUSES = new Set(["approved", "implementing", "done"]);
-
-// Leading trim includes '#' (e.g. "##spec-id" → "spec-id"); trailing does not,
-// matching the original regex behaviour: /^[`'"#]+|[`'"]+$/.
-const SPECID_LEADING_TRIM = new Set(["`", "'", '"', "#"]);
-const SPECID_TRAILING_TRIM = new Set(["`", "'", '"']);
-function normalizeSpecId(v) {
-  let start = 0;
-  let end = v.length;
-  while (start < end && SPECID_LEADING_TRIM.has(v[start])) start++;
-  while (end > start && SPECID_TRAILING_TRIM.has(v[end - 1])) end--;
-  return v.slice(start, end).trim();
-}
-
-/**
- * Parse a `## Spec ID` section into normalized, unique identifiers.
- *
- * @param {string} section
- * @returns {string[]}
- */
-export function parseSpecIds(section) {
-  return [...new Set(String(section ?? "").split(/[\s,]+/).map(normalizeSpecId).filter(Boolean))];
-}
 
 /**
  * Enforce the spec-coverage contract for a PR: every protected-path change
@@ -85,7 +65,7 @@ export function checkSpecCoverage(ctx, input) {
 
   if (isMeaningfulSection(specSection)) {
     const known = new Set(specs.map(({ metadata }) => metadata.id));
-    const requested = parseSpecIds(specSection);
+    const requested = parseSpecIdSection(specSection);
     for (const id of requested) {
       if (!known.has(id)) {
         errors.push(new ValidationError({

@@ -18,7 +18,21 @@ const DEFAULT_CONFIG = Object.freeze({
   require_ci_check: false,
 });
 
-function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
+/**
+ * Validate the `criteria` key of an already-parsed `.dotbabel.json` and return
+ * it with defaults filled in. Exported so `project-sync.mjs` rejects a bad
+ * `criteria` block at config-load time, the way it already does for `quality`
+ * (KD-14) — otherwise a typo in `enforcement` would surface only much later,
+ * inside the merge gate, as a silently different verdict.
+ *
+ * Takes the WHOLE parsed object, not the `criteria` sub-object, so the
+ * ValidationError pointers stay rooted at `/criteria/...`.
+ *
+ * @param {unknown} parsed
+ * @param {string} [file]
+ * @returns {{ pass_env: string[], timeout_seconds: number, enforcement: "block"|"warn", trusted_associations: string[], require_ci_check: boolean }}
+ */
+export function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
   const defaults = {
     ...DEFAULT_CONFIG,
     pass_env: [...DEFAULT_CONFIG.pass_env],

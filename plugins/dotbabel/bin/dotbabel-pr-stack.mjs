@@ -44,6 +44,7 @@ import {
   summarizeGates,
 } from "../src/pr-gates.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
+import { criteriaGateInputs } from "../src/criteria/gate-inputs.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -411,7 +412,9 @@ async function main() {
 
   if (which === "merge") {
     const root = repoRoot();
-    const view = ghJson(`gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files`);
+    const view = ghJson(
+      `gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files,headRefOid,baseRefOid`,
+    );
     const result = checkMergeGate({
       body: view.body,
       hasSpecsDir: existsSync(`${root}/docs/specs`),
@@ -419,6 +422,7 @@ async function main() {
       protectedPaths: protectedPaths(root),
       mergeable: view.mergeable,
       mergeStateStatus: view.mergeStateStatus,
+      ...criteriaGateInputs({ sh }, view, prNumber),
     });
     const summary = summarizeGates([result]);
     return emit({

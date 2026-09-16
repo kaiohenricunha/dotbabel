@@ -32,6 +32,20 @@
  * @property {boolean} effective
  */
 
+// Pure imports only: these modules do no I/O, so the "free of I/O"
+// contract at the top of this file still holds. The gate parses evidence
+// with the same code that writes it, so producer and judge cannot drift.
+import { CRITERIA_MARKER_PREFIX } from "./criteria/comment.mjs";
+import { parseEvidenceComment, evidencePayloadProblem, payloadCoverage } from "./criteria/evidence.mjs";
+import { createMarker } from "./lib/attest-marker.mjs";
+
+const criteriaMarker = createMarker(CRITERIA_MARKER_PREFIX);
+
+/** @param {string} body @returns {string|null} */
+function evidenceMarkerSha(body) {
+  return criteriaMarker.parseSha(body);
+}
+
 /**
  * The canonical pipeline order. This is the single source of truth that the
  * bats contract test diffs `skills/pr-conductor/SKILL.md` against, so the
@@ -288,12 +302,206 @@ export function checkMergeGate(input = {}) {
     reasons.push({ code: "BEHIND_BASE", message: "branch is behind its base; rebase before merging" });
   }
 
+  // Criteria evaluation (§5). Every input below is optional, so a caller that
+  // passes none gets exactly the pre-P-B3 result.
+  const criteria = evaluateCriteria(input);
+  /** @type {GateReason[]} */
+  const warnings = [...criteria.warnings];
+  if (input.criteriaEnforcement === "warn") {
+    // `warn` moves the criteria reasons out of the verdict entirely — it does
+    // not soften them into a passing reason list, because `reasons` is what
+    // callers print as blockers.
+    warnings.push(...criteria.blocking);
+  } else {
+    reasons.push(...criteria.blocking);
+  }
+
   return {
     ok: reasons.length === 0,
     gate: "merge",
     reasons,
+    warnings,
     hint: reasons.length === 0 ? null : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
   };
+}
+
+/**
+ * The §5 criteria groups, in order: every spec-level code that holds, then
+ * the FIRST evidence code that holds, then the CI code.
+ *
+ * Evidence stops at the first hit on purpose. The evidence states form a
+ * ladder — missing, untrusted, stale, invalid, incomplete, failed — and each
+ * rung presupposes the one below it passed. Reporting "stale" beside
+ * "untrusted" would describe a comment the gate already refused to believe.
+ *
+ * @param {any} input
+ * @returns {{blocking: GateReason[], warnings: GateReason[]}}
+ */
+function evaluateCriteria(input) {
+  /** @type {GateReason[]} */
+  const out = [];
+  /** @type {GateReason[]} */
+  const warnings = [];
+  const required = toCriteriaMap(input.requiredCriteria);
+  const base = toCriteriaMap(input.baseActiveCriteria);
+
+  // --- Spec group: reported independently of the evidence ladder. ---
+  const unknown = Array.isArray(input.unknownSpecIds) ? input.unknownSpecIds.filter(Boolean) : [];
+  if (unknown.length > 0) {
+    out.push({
+      code: "CRITERIA_SPEC_UNKNOWN",
+      message: `body names ${unknown.length === 1 ? "a Spec ID that is" : "Spec IDs that are"} not a spec at the head commit`,
+      detail: unknown.join(", "),
+    });
+  }
+
+  const weakened = [];
+  for (const [specId, baseIds] of base) {
+    const headIds = required.get(specId) ?? new Set();
+    for (const id of baseIds) if (!headIds.has(id)) weakened.push(`${specId}/${id}`);
+  }
+  if (weakened.length > 0) {
+    // A rationale does not make weakening fine; it makes it a reviewed
+    // decision, so §5 downgrades the code to a warning — which means it must
+    // leave `reasons` entirely, not sit there with a flag and keep blocking.
+    const reason = {
+      code: "CRITERIA_WEAKENED",
+      message: "a criterion active on the base branch is planned or missing at the head",
+      detail: weakened.join(", "),
+    };
+    if (input.criteriaChangeRationale === true) warnings.push({ ...reason, warning: true });
+    else out.push(reason);
+  }
+
+  const done = () => ({ blocking: withCi(out, input), warnings });
+
+  // --- Evidence group: only when something actually has to be proven. ---
+  const requiredTotal = [...required.values()].reduce((n, ids) => n + ids.size, 0);
+  if (requiredTotal === 0) return done();
+
+  if (input.comments === null) {
+    // REL-3: an unreadable comment list is a failing reason, never a pass.
+    // The gate cannot see the evidence, so it refuses rather than assuming
+    // the absence of a marker it simply failed to fetch.
+    out.push({
+      code: "CRITERIA_EVIDENCE_INVALID",
+      message: "the evidence comments could not be read",
+      detail: "comment fetch failed",
+    });
+    return done();
+  }
+
+  const comments = Array.isArray(input.comments) ? input.comments : [];
+  const markerComments = comments.filter((c) => c && typeof c.body === "string" && evidenceMarkerSha(c.body) !== null);
+  if (markerComments.length === 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_MISSING",
+      message: "linked specs declare active criteria, but no evidence comment carries the marker",
+    });
+    return done();
+  }
+
+  const trustedSet = new Set(
+    Array.isArray(input.trustedAssociations) && input.trustedAssociations.length > 0
+      ? input.trustedAssociations
+      : ["OWNER"],
+  );
+  // An edited comment is refused outright rather than re-parsed: the marker
+  // and payload are what the gate trusts, and an edit means the text it is
+  // reading is not the text the tool wrote.
+  const trusted = markerComments.filter(
+    (c) => trustedSet.has(c.authorAssociation) && (c.lastEditedAt === null || c.lastEditedAt === undefined),
+  );
+  if (trusted.length === 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_UNTRUSTED",
+      message: "no evidence comment has both a trusted author association and no edit",
+    });
+    return done();
+  }
+
+  const headSha = typeof input.headRefOid === "string" ? input.headRefOid : "";
+  const current = trusted.filter((c) => evidenceMarkerSha(c.body) === headSha);
+  if (current.length === 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_STALE",
+      message: "every trusted evidence comment names a commit other than the head",
+      detail: `head ${headSha.slice(0, 8)}; evidence ${[...new Set(trusted.map((c) => String(evidenceMarkerSha(c.body)).slice(0, 8)))].join(", ")}`,
+    });
+    return done();
+  }
+
+  // Newest wins: a re-run posts a new comment rather than editing (OPS-4), so
+  // the last matching comment is the most recent verdict for this commit.
+  const parsed = parseEvidenceComment(current[current.length - 1].body);
+  if (parsed.state !== "ok") {
+    out.push({
+      code: "CRITERIA_EVIDENCE_INVALID",
+      message: "the evidence payload could not be read",
+      detail: parsed.detail ?? parsed.state,
+    });
+    return done();
+  }
+  const problem = evidencePayloadProblem(parsed.payload);
+  if (problem !== null) {
+    out.push({ code: "CRITERIA_EVIDENCE_INVALID", message: "the evidence payload is not valid", detail: problem });
+    return done();
+  }
+
+  const covered = payloadCoverage(parsed.payload);
+  const gaps = [];
+  for (const [specId, ids] of required) {
+    const got = covered.get(specId) ?? new Set();
+    for (const id of ids) if (!got.has(id)) gaps.push(`${specId}/${id}`);
+  }
+  if (gaps.length > 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_INCOMPLETE",
+      message: "the evidence payload does not cover every active criterion",
+      detail: gaps.join(", "),
+    });
+    return done();
+  }
+
+  if (parsed.payload.verdict !== "pass") {
+    out.push({
+      code: "CRITERIA_FAILED",
+      message: `the evidence payload verdict is ${parsed.payload.verdict}`,
+    });
+  }
+  return done();
+}
+
+/**
+ * @param {GateReason[]} out
+ * @param {any} input
+ * @returns {GateReason[]}
+ */
+function withCi(out, input) {
+  if (input.requireCiCheck === true && input.ciCriteriaCheck !== "success") {
+    out.push({
+      code: "CRITERIA_CI_CHECK_FAILED",
+      message: `require_ci_check is set and the 'dotbabel criteria' check is ${input.ciCriteriaCheck ?? "absent"}`,
+    });
+  }
+  return out;
+}
+
+/**
+ * Normalize a `{specId: [ids]}` object or Map into a Map of Sets.
+ *
+ * @param {unknown} value
+ * @returns {Map<string, Set<string>>}
+ */
+function toCriteriaMap(value) {
+  const out = new Map();
+  if (value instanceof Map) {
+    for (const [k, v] of value) out.set(k, new Set(v ?? []));
+    return out;
+  }
+  if (value === null || typeof value !== "object") return out;
+  for (const [k, v] of Object.entries(value)) out.set(k, new Set(Array.isArray(v) ? v : []));
+  return out;
 }
 
 /**

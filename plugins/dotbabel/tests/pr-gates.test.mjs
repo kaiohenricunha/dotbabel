@@ -432,3 +432,193 @@ describe("module purity", () => {
     expect(src).not.toMatch(/node:child_process|node:fs|node:os|node:process/);
   });
 });
+
+// --- P-B3: criteria evidence in the merge gate (§5) -------------------------
+//
+// Every input below is optional, so the cases above (which pass none of them)
+// pin the back-compat promise: a caller that knows nothing about criteria gets
+// the pre-P-B3 verdict.
+
+const HEAD = "a".repeat(40);
+const OLDER = "b".repeat(40);
+
+/** Build an evidence comment body for a payload, the way the command writes it. */
+function evidenceBody(sha, payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return [
+    `<!-- dotbabel-criteria verified-sha=${sha} -->`,
+    `<!-- dotbabel-criteria-payload ${encoded} -->`,
+    "### Acceptance criteria evidence",
+  ].join("\n");
+}
+
+function payloadFor(specs, verdict = "pass", extra = {}) {
+  return {
+    schema_version: 1,
+    tool: { name: "dotbabel", version: "3.4.0" },
+    head_sha: HEAD,
+    generated_at: "2026-01-01T00:00:00.000Z",
+    verdict,
+    specs: Object.entries(specs).map(([id, criteria]) => ({
+      id,
+      criteria: criteria.map((c) => (typeof c === "string" ? { id: c, status: "pass" } : c)),
+    })),
+    ...extra,
+  };
+}
+
+function comment(body, over = {}) {
+  return { body, authorAssociation: "OWNER", authorLogin: "owner", lastEditedAt: null, ...over };
+}
+
+/** A gate input with criteria wired up and everything else already passing. */
+function criteriaInput(over = {}) {
+  return {
+    body: `${GOOD_BODY}\n## Spec ID\n\nalpha\n`,
+    headRefOid: HEAD,
+    requiredCriteria: { alpha: ["AC-1"] },
+    comments: [comment(evidenceBody(HEAD, payloadFor({ alpha: ["AC-1"] })))],
+    ...over,
+  };
+}
+
+describe("checkMergeGate — criteria evidence", () => {
+  it("fails with CRITERIA_EVIDENCE_MISSING when the spec declares criteria and no evidence exists", () => {
+    const r = checkMergeGate(criteriaInput({ comments: [comment("just a normal comment")] }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_MISSING");
+    expect(r.ok).toBe(false);
+  });
+
+  it("fails with CRITERIA_EVIDENCE_UNTRUSTED when only an untrusted author posted the marker", () => {
+    const r = checkMergeGate(
+      criteriaInput({
+        comments: [comment(evidenceBody(HEAD, payloadFor({ alpha: ["AC-1"] })), { authorAssociation: "CONTRIBUTOR" })],
+      }),
+    );
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_UNTRUSTED");
+  });
+
+  it("fails with CRITERIA_EVIDENCE_UNTRUSTED when an untrusted user edited a trusted marker comment", () => {
+    const r = checkMergeGate(
+      criteriaInput({
+        comments: [comment(evidenceBody(HEAD, payloadFor({ alpha: ["AC-1"] })), { lastEditedAt: "2026-01-02T00:00:00Z" })],
+      }),
+    );
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_UNTRUSTED");
+  });
+
+  it("accepts any trusted unedited marker whose SHA equals the head SHA", () => {
+    const r = checkMergeGate(criteriaInput());
+    expect(r.reasons).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  it("fails with CRITERIA_EVIDENCE_STALE when evidence is pinned to an older commit", () => {
+    const r = checkMergeGate(
+      criteriaInput({ comments: [comment(evidenceBody(OLDER, payloadFor({ alpha: ["AC-1"] }, "pass", { head_sha: OLDER })))] }),
+    );
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_STALE");
+  });
+
+  it("fails closed with CRITERIA_EVIDENCE_INVALID when the payload does not decode", () => {
+    const body = [`<!-- dotbabel-criteria verified-sha=${HEAD} -->`, `<!-- dotbabel-criteria-payload !!!not-base64!!! -->`].join("\n");
+    const r = checkMergeGate(criteriaInput({ comments: [comment(body)] }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_INVALID");
+  });
+
+  it("fails closed with CRITERIA_EVIDENCE_INVALID when the payload fails the evidence schema", () => {
+    const bad = { ...payloadFor({ alpha: ["AC-1"] }), schema_version: 99 };
+    const r = checkMergeGate(criteriaInput({ comments: [comment(evidenceBody(HEAD, bad))] }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_INVALID");
+  });
+
+  it("fails closed with CRITERIA_EVIDENCE_INVALID when payload head_sha differs from the marker SHA", () => {
+    // The marker is what the gate greps; the payload is what it believes.
+    // Letting them disagree would let a trusted marker vouch for other results.
+    const mismatched = payloadFor({ alpha: ["AC-1"] }, "pass", { head_sha: OLDER });
+    const r = checkMergeGate(criteriaInput({ comments: [comment(evidenceBody(HEAD, mismatched))] }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_INVALID");
+  });
+
+  it("fails with CRITERIA_EVIDENCE_INCOMPLETE when a linked spec is missing from the payload", () => {
+    const r = checkMergeGate(criteriaInput({ requiredCriteria: { alpha: ["AC-1"], beta: ["AC-2"] } }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_INCOMPLETE");
+  });
+
+  it("treats a pending criterion as uncovered, not as evidence", () => {
+    const pendingOnly = payloadFor({ alpha: [{ id: "AC-1", status: "pending" }] });
+    const r = checkMergeGate(criteriaInput({ comments: [comment(evidenceBody(HEAD, pendingOnly))] }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_INCOMPLETE");
+  });
+
+  it("fails with CRITERIA_FAILED when the payload verdict is fail", () => {
+    const r = checkMergeGate(
+      criteriaInput({ comments: [comment(evidenceBody(HEAD, payloadFor({ alpha: ["AC-1"] }, "fail")))] }),
+    );
+    expect(codes(r)).toContain("CRITERIA_FAILED");
+  });
+
+  it("fails with CRITERIA_SPEC_UNKNOWN when a Spec ID names no spec at the head", () => {
+    const r = checkMergeGate(criteriaInput({ unknownSpecIds: ["ghost-spec"] }));
+    expect(codes(r)).toContain("CRITERIA_SPEC_UNKNOWN");
+    expect(r.reasons.find((x) => x.code === "CRITERIA_SPEC_UNKNOWN").detail).toContain("ghost-spec");
+  });
+
+  it("fails with CRITERIA_WEAKENED when an active base criterion is planned or missing at the head", () => {
+    const r = checkMergeGate(
+      criteriaInput({ requiredCriteria: { alpha: ["AC-1"] }, baseActiveCriteria: { alpha: ["AC-1", "AC-2"] } }),
+    );
+    expect(codes(r)).toContain("CRITERIA_WEAKENED");
+    expect(r.reasons.find((x) => x.code === "CRITERIA_WEAKENED").detail).toContain("alpha/AC-2");
+  });
+
+  it("reports CRITERIA_WEAKENED as a warning when the body has a Criteria change rationale section", () => {
+    const r = checkMergeGate(
+      criteriaInput({
+        baseActiveCriteria: { alpha: ["AC-1", "AC-2"] },
+        criteriaChangeRationale: true,
+      }),
+    );
+    // A warning must not block: the code leaves `reasons` entirely, or the
+    // rationale would be a label on a PR that still cannot merge.
+    expect(codes(r)).not.toContain("CRITERIA_WEAKENED");
+    expect(r.warnings.map((w) => w.code)).toContain("CRITERIA_WEAKENED");
+    expect(r.ok).toBe(true);
+  });
+
+  it("fails closed with CRITERIA_EVIDENCE_INVALID when the comment list is unreadable", () => {
+    // REL-3: a `gh` failure must never read as "no marker comment exists".
+    const r = checkMergeGate(criteriaInput({ comments: null }));
+    expect(codes(r)).toContain("CRITERIA_EVIDENCE_INVALID");
+    expect(codes(r)).not.toContain("CRITERIA_EVIDENCE_MISSING");
+  });
+
+  it("fails with CRITERIA_CI_CHECK_FAILED when require_ci_check is true and the check is not successful", () => {
+    const r = checkMergeGate(criteriaInput({ requireCiCheck: true, ciCriteriaCheck: "failure" }));
+    expect(codes(r)).toContain("CRITERIA_CI_CHECK_FAILED");
+    const ok = checkMergeGate(criteriaInput({ requireCiCheck: true, ciCriteriaCheck: "success" }));
+    expect(codes(ok)).not.toContain("CRITERIA_CI_CHECK_FAILED");
+  });
+
+  it("moves criteria reasons to warnings when enforcement is warn", () => {
+    const blocking = checkMergeGate(criteriaInput({ comments: [comment("nothing here")] }));
+    expect(blocking.ok).toBe(false);
+
+    const warned = checkMergeGate(criteriaInput({ comments: [comment("nothing here")], criteriaEnforcement: "warn" }));
+    expect(warned.ok).toBe(true);
+    expect(warned.reasons).toEqual([]);
+    expect(warned.warnings.map((w) => w.code)).toContain("CRITERIA_EVIDENCE_MISSING");
+  });
+
+  it("ignores comments when no linked spec declares an active criterion", () => {
+    const r = checkMergeGate(criteriaInput({ requiredCriteria: {}, comments: [comment("nothing here")] }));
+    expect(codes(r)).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+
+  it("keeps warnings empty and the verdict unchanged when no criteria inputs are passed", () => {
+    const r = checkMergeGate({ body: GOOD_BODY });
+    expect(r.warnings).toEqual([]);
+    expect(r.ok).toBe(true);
+  });
+});

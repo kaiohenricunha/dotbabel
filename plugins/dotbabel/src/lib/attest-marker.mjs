@@ -79,5 +79,25 @@ export function createMarker(prefix) {
     return comments.find((c) => c && typeof c.body === "string" && c.body.includes(prefix)) ?? null;
   }
 
-  return { prefix, build, isAttested, find };
+  /**
+   * The SHA a comment's marker names, or null when line 1 is not this
+   * marker. The gate needs the SHA itself, not just a yes/no — it has to
+   * tell "attests an older commit" (stale) from "attests nothing" (missing),
+   * and those are different reason codes.
+   *
+   * Anchored at line 1 for the same reason `isAttested` is: a marker quoted
+   * later in a body is a quotation, not an attestation.
+   *
+   * @param {string} body
+   * @returns {string|null}
+   */
+  function parseSha(body) {
+    if (typeof body !== "string") return null;
+    const line = body.split("\n")[0];
+    if (!line.startsWith(prefix) || !line.endsWith(" -->")) return null;
+    const sha = line.slice(prefix.length, -" -->".length).trim();
+    return SHA_RE.test(sha) ? sha : null;
+  }
+
+  return { prefix, build, isAttested, find, parseSha };
 }
