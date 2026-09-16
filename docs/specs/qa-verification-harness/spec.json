@@ -377,7 +377,7 @@
     },
     {
       "id": "AC-13",
-      "status": "planned",
+      "status": "active",
       "given": "the shipped templates, docs, and rule floor",
       "when": "the removed-key test runs",
       "then": "no file mentions regression_paths or verification_commands",

@@ -11,12 +11,12 @@ owner: "@kaiohenricunha"
 created: 2025-01-01
 updated: 2026-09-13
 description: >
-  Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in docs/repo-facts.json.
+  Merge a pull request only after full local verification and a passing quality gate.
 argument-hint: "[PR#]"
 model: sonnet
 ---
 
-Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in `docs/repo-facts.json`.
+Merge a pull request only after full local verification and a passing quality gate.
 
 Trigger: when the user asks to merge a PR. Also triggered directly via `/merge-pr <N>`.
 
@@ -56,15 +56,13 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 
    Paste the tail of output (last ~40 lines) regardless of pass/fail.
 
-5. **Data-regression gate.** Read `docs/repo-facts.json` and check for a `regression_paths` array.
-   If the file is absent or `regression_paths` is empty, skip this step and note: "no `regression_paths` configured — skipping data-regression gate".
-   If present, for any changed file that matches a glob in `regression_paths`:
+5. **Quality gate.** Run the PR quality profile against the base branch:
 
    ```bash
-   git diff origin/<baseRefName>...HEAD -- <matched-paths>
+   dotbabel quality check --profile pr --base origin/<baseRefName>
    ```
 
-   Summarize: rows added/removed, numeric deltas >1%, schema changes. If anything looks load-bearing, STOP and surface the diff before proceeding.
+   Exit code `1` means a checked rule failed. Exit code `2` means required evidence, trust, or tooling is unavailable. **STOP** for either exit code and surface the result — do not merge past it. Exit `0` means no error verdict; continue to step 6.
 
 6. **Interpret failures honestly.** If the test suite fails:
 
@@ -86,7 +84,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 
 8. **Request merge confirmation from the user.** Show:
    - Summary of local test result
-   - Data-regression findings
+   - Quality gate result
    - CI status
    - The exact merge command you will run
      Wait for the user to say "merge" (or equivalent).

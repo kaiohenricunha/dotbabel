@@ -41,6 +41,7 @@ import {
   checkInstructionDrift,
   checkInstructionsFresh,
   checkInstructionParity,
+  checkRemovedRepoFactsKeys,
   generateInstructions,
   pathExists,
 } from "../src/index.mjs";
@@ -116,6 +117,8 @@ if (envError) {
 // facts
 if (pathExists(ctx, "docs/repo-facts.json")) {
   out.pass("docs/repo-facts.json present");
+  const removedKeys = checkRemovedRepoFactsKeys(ctx);
+  for (const warning of removedKeys.warnings) out.warn(warning);
 } else {
   out.warn("docs/repo-facts.json missing — coverage/drift checks will be no-ops");
 }
