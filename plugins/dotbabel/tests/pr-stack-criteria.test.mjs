@@ -206,6 +206,100 @@ describe("criteriaGateInputs", () => {
     expect(calls.some((c) => c.includes("--paginate"))).toBe(false);
   });
 
+  // The branches below are the fail-closed ones: each turns a broken read into
+  // "cannot judge" rather than into a quiet pass. They are unreachable from the
+  // happy path, so nothing else exercises them.
+
+  it("treats an unparseable spec.json as an absent spec rather than throwing", () => {
+    const { deps } = stubSh([
+      [/git show .*spec\.json/, ok("{ not json")],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    const out = criteriaGateInputs(deps, VIEW, 42);
+    expect(out.unknownSpecIds).toEqual(["alpha"]);
+    expect(checkMergeGate({ ...VIEW, ...out }).reasons.map((r) => r.code)).toContain("CRITERIA_SPEC_UNKNOWN");
+  });
+
+  it("returns null when a comment page is not JSON", () => {
+    const { deps } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok("<html>502 Bad Gateway</html>")],
+    ]);
+    expect(criteriaGateInputs(deps, VIEW, 42).comments).toBeNull();
+  });
+
+  it("returns null rather than a truncated list when the page cap is reached", () => {
+    // Every page claims another follows, so the fetch can never complete.
+    let page = 0;
+    const { deps, calls } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [
+        /gh api graphql/,
+        () => {
+          page += 1;
+          return ok(commentPage(1, { hasNextPage: true, cursor: `cursor-${page}` }));
+        },
+      ],
+    ]);
+    expect(criteriaGateInputs(deps, VIEW, 42).comments).toBeNull();
+    // Bounded: it stops rather than paging forever.
+    expect(calls.filter((c) => c.startsWith("gh api graphql"))).toHaveLength(100);
+  });
+
+  it("answers null for the check run when the check-runs response is not JSON", () => {
+    const { deps } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
+      [/gh api graphql/, ok(commentPage(0))],
+      [/check-runs/, ok("not json")],
+    ]);
+    const out = criteriaGateInputs(deps, VIEW, 42);
+    expect(out.ciCriteriaCheck).toBeNull();
+    // null is not "success", so require_ci_check still blocks.
+    expect(checkMergeGate({ ...VIEW, ...out }).reasons.map((r) => r.code)).toContain("CRITERIA_CI_CHECK_FAILED");
+  });
+
+  it("answers null for the check run when the lookup itself fails", () => {
+    const { deps } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
+      [/gh api graphql/, ok(commentPage(0))],
+      [/check-runs/, err("HTTP 404")],
+    ]);
+    expect(criteriaGateInputs(deps, VIEW, 42).ciCriteriaCheck).toBeNull();
+  });
+
+  it("answers null when no check run carries the criteria name", () => {
+    const { deps } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, ok(JSON.stringify({ criteria: { require_ci_check: true } }))],
+      [/gh api graphql/, ok(commentPage(0))],
+      [/check-runs/, ok(JSON.stringify({ check_runs: [{ name: "other", conclusion: "success" }] }))],
+    ]);
+    expect(criteriaGateInputs(deps, VIEW, 42).ciCriteriaCheck).toBeNull();
+  });
+
+  it("falls back to configuration defaults when the base ref has no .dotbabel.json", () => {
+    const { deps } = stubSh([
+      [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],
+      [/git show .*\.dotbabel\.json/, err("does not exist")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    const out = criteriaGateInputs(deps, VIEW, 42);
+    expect(out.criteriaEnforcement).toBe("block");
+    expect(out.trustedAssociations).toEqual(["OWNER"]);
+  });
+
+  it("returns no criteria inputs when the pull request has no ref information", () => {
+    const { deps, calls } = stubSh([]);
+    expect(criteriaGateInputs(deps, { ...VIEW, headRefOid: "" }, 42)).toEqual({});
+    expect(criteriaGateInputs(deps, { ...VIEW, baseRefOid: undefined }, 42)).toEqual({});
+    expect(calls).toEqual([]);
+  });
+
   it("detects the Criteria change rationale heading in the body", () => {
     const { deps } = stubSh([
       [/git show .*spec\.json/, ok(SPEC_AT_HEAD)],

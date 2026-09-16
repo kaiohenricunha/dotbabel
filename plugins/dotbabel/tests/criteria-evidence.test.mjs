@@ -137,6 +137,37 @@ describe("evidence payload validation", () => {
     expect(evidencePayloadProblem(payload({ specs: [{ id: "example", criteria: [{ id: "AC-1" }] }] }))).toMatch(/status/);
   });
 
+  it("rejects a payload that decodes to something other than an object", () => {
+    // base64url of `[1,2]` — valid JSON, wrong shape. Without this check the
+    // gate would read `.verdict` off an array and get undefined, which the
+    // schema check would then blame on a missing verdict.
+    const encoded = Buffer.from("[1,2]").toString("base64url");
+    const body = [`${CRITERIA_MARKER_PREFIX}${SHA} -->`, `<!-- dotbabel-criteria-payload ${encoded} -->`].join("\n");
+    expect(parseEvidenceComment(body)).toMatchObject({ state: "undecodable", detail: "payload is not an object" });
+  });
+
+  it("reports a comment whose second line is not the payload", () => {
+    const body = [`${CRITERIA_MARKER_PREFIX}${SHA} -->`, "someone replied here"].join("\n");
+    expect(parseEvidenceComment(body)).toMatchObject({ state: "undecodable", sha: SHA });
+  });
+
+  it("reports a payload whose head_sha disagrees with its marker", () => {
+    // The marker is what the gate greps; the payload is what it believes.
+    // Letting them disagree would let one trusted marker vouch for another
+    // commit's results.
+    const p = payload({ head_sha: "b".repeat(40) });
+    const encoded = Buffer.from(JSON.stringify(p)).toString("base64url");
+    const body = [`${CRITERIA_MARKER_PREFIX}${SHA} -->`, `<!-- dotbabel-criteria-payload ${encoded} -->`].join("\n");
+    expect(parseEvidenceComment(body).state).toBe("sha-mismatch");
+  });
+
+  it("rejects malformed spec and criterion entries", () => {
+    expect(evidencePayloadProblem(payload({ specs: ["nope"] }))).toMatch(/not an object/);
+    expect(evidencePayloadProblem(payload({ specs: [{ criteria: [] }] }))).toMatch(/no id/);
+    expect(evidencePayloadProblem(payload({ specs: [{ id: "x", criteria: "nope" }] }))).toMatch(/criteria array/);
+    expect(evidencePayloadProblem(payload({ specs: [{ id: "x", criteria: [null] }] }))).toMatch(/not an object/);
+  });
+
   it("excludes pending criteria from coverage, because nothing ran for them", () => {
     const covered = payloadCoverage(
       payload({ specs: [{ id: "example", criteria: [{ id: "AC-1", status: "pass" }, { id: "AC-2", status: "pending" }] }] }),

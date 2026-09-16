@@ -41,11 +41,6 @@ import { createMarker } from "./lib/attest-marker.mjs";
 
 const criteriaMarker = createMarker(CRITERIA_MARKER_PREFIX);
 
-/** @param {string} body @returns {string|null} */
-function evidenceMarkerSha(body) {
-  return criteriaMarker.parseSha(body);
-}
-
 /**
  * The canonical pipeline order. This is the single source of truth that the
  * bats contract test diffs `skills/pr-conductor/SKILL.md` against, so the
@@ -392,7 +387,7 @@ function evaluateCriteria(input) {
   }
 
   const comments = Array.isArray(input.comments) ? input.comments : [];
-  const markerComments = comments.filter((c) => c && typeof c.body === "string" && evidenceMarkerSha(c.body) !== null);
+  const markerComments = comments.filter((c) => c && typeof c.body === "string" && criteriaMarker.parseSha(c.body) !== null);
   if (markerComments.length === 0) {
     out.push({
       code: "CRITERIA_EVIDENCE_MISSING",
@@ -421,12 +416,12 @@ function evaluateCriteria(input) {
   }
 
   const headSha = typeof input.headRefOid === "string" ? input.headRefOid : "";
-  const current = trusted.filter((c) => evidenceMarkerSha(c.body) === headSha);
+  const current = trusted.filter((c) => criteriaMarker.parseSha(c.body) === headSha);
   if (current.length === 0) {
     out.push({
       code: "CRITERIA_EVIDENCE_STALE",
       message: "every trusted evidence comment names a commit other than the head",
-      detail: `head ${headSha.slice(0, 8)}; evidence ${[...new Set(trusted.map((c) => String(evidenceMarkerSha(c.body)).slice(0, 8)))].join(", ")}`,
+      detail: `head ${headSha.slice(0, 8)}; evidence ${[...new Set(trusted.map((c) => String(criteriaMarker.parseSha(c.body)).slice(0, 8)))].join(", ")}`,
     });
     return done();
   }
