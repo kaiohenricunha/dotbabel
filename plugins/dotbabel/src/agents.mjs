@@ -123,7 +123,19 @@ export const RUNTIMES = Object.freeze({
     detect: Object.freeze(["agy"]),
     substitutionKey: null,
     globalInstruction: null,
-    globalSkills: null,
+    // Antigravity's global customization root is `~/.gemini/config/` — a
+    // sibling of Gemini CLI's `~/.gemini/`, not a subdirectory of its skills
+    // tree, so the two never collide. Established empirically against agy
+    // v1.2.4 because Google's own doc pages disagreed: the binary embeds the
+    // literal `~/.gemini/config/skills/<name>/SKILL.md` and contains no
+    // `antigravity-cli/skills` string, and a malformed plugin planted in
+    // `~/.gemini/config/plugins/` was read at language-server startup, proving
+    // that root is live.
+    globalSkills: Object.freeze({
+      envVar: "ANTIGRAVITY_CONFIG_HOME",
+      baseDir: ".gemini/config",
+      subdir: "skills",
+    }),
     projectFanOut: Object.freeze({
       kind: "skills-dir",
       dir: ".agents/skills",

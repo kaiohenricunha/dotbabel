@@ -117,8 +117,11 @@ link_cli_instruction() {
 fan_out_skills_to_dir() {
   local cli="$1"
   local dst_dir="$2"
+  # Optional: the executable to probe, when it differs from the CLI name.
+  # Antigravity is installed as `agy`, so probing its id would never find it.
+  local probe_cli="${3:-$cli}"
 
-  if [[ "$ALL" != "1" ]] && ! command -v "$cli" >/dev/null 2>&1; then
+  if [[ "$ALL" != "1" ]] && ! command -v "$probe_cli" >/dev/null 2>&1; then
     say "==> skipping $cli skills (command not found; use --all to force)"
     return 0
   fi
@@ -206,6 +209,11 @@ link_cli_instruction \
   "$CLI_INSTRUCTIONS_SRC/gemini-GEMINI.md" \
   "$HOME/.gemini/GEMINI.md"
 fan_out_skills_to_dir gemini "${GEMINI_HOME:-$HOME/.gemini}/skills"
+# Antigravity reads the shared ~/.gemini/GEMINI.md that the gemini block above
+# already links, so it needs no instruction link of its own — only skills. Its
+# global customization root is ~/.gemini/config/, a sibling of Gemini CLI's own
+# tree. Probed as `agy`, since that is the installed executable name.
+fan_out_skills_to_dir antigravity "${ANTIGRAVITY_CONFIG_HOME:-$HOME/.gemini/config}/skills" agy
 
 if [[ "$QUIET" = "1" ]]; then
   echo "bootstrap complete — target: $TARGET"

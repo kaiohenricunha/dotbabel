@@ -69,6 +69,26 @@ describe("bootstrap.sh mirrors the agent registry", () => {
     }
   });
 
+  // A runtime whose executable differs from its id must be probed by the
+  // executable. bootstrap.sh takes the CLI name as its first argument, so
+  // without an explicit probe it would run `command -v antigravity` and never
+  // find a real `agy` install — the shell-side twin of the id-vs-binary problem
+  // the registry's detect list solves on the JS side.
+  it("probes a runtime by its executable when that differs from its id", () => {
+    for (const runtime of Object.values(RUNTIMES)) {
+      if (!runtime.globalSkills) continue;
+      const [probe] = runtime.detect;
+      if (probe === runtime.id) continue;
+      const call = new RegExp(
+        String.raw`fan_out_skills_to_dir\s+${runtime.id}\s+"[^"]+"\s+${probe}\b`,
+      );
+      expect(
+        bootstrapSh,
+        `bootstrap.sh must probe ${runtime.id} as \`${probe}\``,
+      ).toMatch(call);
+    }
+  });
+
   // Known, accepted divergence between the two bootstrap paths. The shell
   // helper takes a fourth `alt_probe` argument and passes `gh copilot --version`
   // for Copilot, so bootstrap.sh detects Copilot installed as a gh extension.
