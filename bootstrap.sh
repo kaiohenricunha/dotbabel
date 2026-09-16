@@ -117,8 +117,11 @@ link_cli_instruction() {
 fan_out_skills_to_dir() {
   local cli="$1"
   local dst_dir="$2"
+  # Optional: the executable to probe, when it differs from the CLI name.
+  # Antigravity is installed as `agy`, so probing its id would never find it.
+  local probe_cli="${3:-$cli}"
 
-  if [[ "$ALL" != "1" ]] && ! command -v "$cli" >/dev/null 2>&1; then
+  if [[ "$ALL" != "1" ]] && ! command -v "$probe_cli" >/dev/null 2>&1; then
     say "==> skipping $cli skills (command not found; use --all to force)"
     return 0
   fi
@@ -206,6 +209,17 @@ link_cli_instruction \
   "$CLI_INSTRUCTIONS_SRC/gemini-GEMINI.md" \
   "$HOME/.gemini/GEMINI.md"
 fan_out_skills_to_dir gemini "${GEMINI_HOME:-$HOME/.gemini}/skills"
+# Antigravity gets skills but no instruction link, and that asymmetry is
+# deliberate. Its GEMINI.md sharing is PROJECT-scope only: the CLI discovers
+# GEMINI.md by walking up from the CWD to the repo root, which never reaches
+# $HOME. No evidence it reads a user-scope ~/.gemini/GEMINI.md — agy v1.2.4
+# contains no such literal, and its bundled guide lists the global root as
+# ~/.gemini/config/ instead. Linking one here would create a file nothing reads.
+#
+# That root is a separate subtree inside Gemini CLI's ~/.gemini/, so it never
+# collides with Gemini's own ~/.gemini/skills/. Probed as `agy`, since that is
+# the installed executable name.
+fan_out_skills_to_dir antigravity "${ANTIGRAVITY_CONFIG_HOME:-$HOME/.gemini/config}/skills" agy
 
 if [[ "$QUIET" = "1" ]]; then
   echo "bootstrap complete — target: $TARGET"

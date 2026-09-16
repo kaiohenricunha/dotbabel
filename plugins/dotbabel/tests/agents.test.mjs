@@ -57,15 +57,19 @@ afterEach(() => {
 // The derived half is kept because it documents the wiring; the literal half is
 // what catches a registry edit that changes the public contract.
 describe("agents registry — equivalence with existing declarations", () => {
-  it("fanOutRuntimes() reproduces the historical fan-out list, order included", () => {
-    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "copilot"]);
+  it("fanOutRuntimes() reproduces the documented fan-out list, order included", () => {
+    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "antigravity", "copilot"]);
     expect([...KNOWN_FAN_OUT_CLIS]).toEqual(fanOutRuntimes());
   });
 
   it("projectArtifactTargets() reproduces the historical default targets", () => {
     expect(projectArtifactTargets()).toEqual([
       { relativeOutputPath: "AGENTS.md", cliSet: ["copilot", "codex"], substitutionKey: "agents" },
-      { relativeOutputPath: "GEMINI.md", cliSet: ["gemini"], substitutionKey: "gemini" },
+      {
+        relativeOutputPath: "GEMINI.md",
+        cliSet: ["gemini", "antigravity"],
+        substitutionKey: "gemini",
+      },
       {
         relativeOutputPath: ".github/copilot-instructions.md",
         cliSet: ["copilot"],
@@ -105,20 +109,33 @@ describe("agents registry — equivalence with existing declarations", () => {
     }
   });
 
-  it("skillDirRuntimes() is the codex/gemini subset with .<id>/skills dirs", () => {
-    expect(skillDirRuntimes()).toEqual(["codex", "gemini"]);
-    for (const id of skillDirRuntimes()) {
-      expect(projectSkillsDir(id)).toBe(`.${id}/skills`);
-    }
+  // The `.<id>/skills` convention held while every skills-dir runtime was named
+  // after its own directory. Antigravity breaks it: its id is `antigravity` but
+  // it reads `.agents/skills`, which is why the directory is registry data
+  // rather than a string built from the id.
+  it("skillDirRuntimes() maps each runtime to its documented skills dir", () => {
+    expect(skillDirRuntimes()).toEqual(["codex", "gemini", "antigravity"]);
+    expect(projectSkillsDir("codex")).toBe(".codex/skills");
+    expect(projectSkillsDir("gemini")).toBe(".gemini/skills");
+    expect(projectSkillsDir("antigravity")).toBe(".agents/skills");
+  });
+
+  // Only the runtimes whose trees are interchangeable may share one. Antigravity
+  // is a skills-dir runtime that is NOT shareable, so this list is now a strict
+  // subset — the case project-sync's shared-layout guard exists for.
+  it("shareableSkillRuntimes() excludes the non-shareable skills-dir runtime", () => {
+    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini"]);
+    expect(skillDirRuntimes()).toContain("antigravity");
+    expect(shareableSkillRuntimes()).not.toContain("antigravity");
   });
 
   // project-sync.mjs used one list, SKILL_DIR_CLIS, to answer two questions:
   // which dispatch branch a runtime takes, and which runtimes can share one
-  // canonical tree under fan_out_layout "shared". They coincide today, which is
-  // why one list worked; they are still separate questions, and the shared-tree
-  // one is destructured as exactly two entries.
-  it("shareableSkillRuntimes() matches SKILL_DIR_CLIS today and is a subset of skillDirRuntimes()", () => {
-    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini"]);
+  // canonical tree under fan_out_layout "shared". Those coincided until
+  // Antigravity, which takes the skills-dir branch but cannot share the tree.
+  // Splitting them in #363 is what let that runtime land without the shared
+  // layout handing it a redirect it never follows.
+  it("every shareable runtime is a skills-dir runtime that declares shareable", () => {
     for (const id of shareableSkillRuntimes()) {
       expect(skillDirRuntimes()).toContain(id);
       expect(RUNTIMES[id].projectFanOut.shareable).toBe(true);
@@ -132,6 +149,16 @@ describe("agents registry — equivalence with existing declarations", () => {
   // check above so the arity is not relaxed along with the contents.
   it("the shared-layout warning's two-runtime arity assumption still holds", () => {
     expect(shareableSkillRuntimes()).toHaveLength(2);
+  });
+
+  // `.agents/` is an ecosystem-wide convention, not an Antigravity-owned name,
+  // so a future runtime could plausibly claim it too. Two runtimes sharing a
+  // dir would call buildSkillsTree on it twice with different exclusion sets —
+  // last writer wins, silently — and the drift checker would then verify one
+  // directory against two different expectations.
+  it("no two runtimes claim the same project skills directory", () => {
+    const dirs = skillDirRuntimes().map((id) => projectSkillsDir(id));
+    expect(new Set(dirs).size).toBe(dirs.length);
   });
 
   it("projectSkillsDir() is null for runtimes that write no skills tree", () => {
@@ -182,6 +209,7 @@ describe("agents registry — integrity", () => {
       "Claude",
       "Codex",
       "Gemini",
+      "Antigravity",
       "Copilot",
     ]);
   });
@@ -262,6 +290,115 @@ describe("anyRuntimePresent", () => {
 
   it("is false for an empty id list", () => {
     expect(anyRuntimePresent([])).toBe(false);
+  });
+});
+
+// Antigravity is the first runtime whose executable name is not its id: the id
+// is `antigravity`, the binary is `agy`. Every gate resolves the name through
+// the registry's detect list, so probing `commandExists("antigravity")` — which
+// is what the pre-registry code did with the bare cli string — would never find
+// a real install.
+describe("antigravity detection", () => {
+  /** Put the named fake executables on an otherwise CLI-less PATH. */
+  function stubBins(...names) {
+    const bin = makeTmpDir("agents-stub-bin-");
+    fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+    for (const name of names) {
+      fs.writeFileSync(path.join(bin, name), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    }
+    savedPath = process.env.PATH;
+    process.env.PATH = bin;
+  }
+
+  it("detects antigravity by its `agy` binary, not by its id", () => {
+    expect(RUNTIMES.antigravity.detect).toEqual(["agy"]);
+    stubBins("agy");
+    expect(anyRuntimePresent(["antigravity"])).toBe(true);
+  });
+
+  it("agy only: antigravity present, gemini absent", () => {
+    stubBins("agy");
+    expect(anyRuntimePresent(["antigravity"])).toBe(true);
+    expect(anyRuntimePresent(["gemini"])).toBe(false);
+  });
+
+  it("gemini only: gemini present, antigravity absent", () => {
+    stubBins("gemini");
+    expect(anyRuntimePresent(["gemini"])).toBe(true);
+    expect(anyRuntimePresent(["antigravity"])).toBe(false);
+  });
+
+  it("both installed: each detected independently, and together", () => {
+    stubBins("agy", "gemini");
+    expect(anyRuntimePresent(["gemini"])).toBe(true);
+    expect(anyRuntimePresent(["antigravity"])).toBe(true);
+    expect(anyRuntimePresent(["gemini", "antigravity"])).toBe(true);
+  });
+
+  it("neither installed: both absent, and the shared pair is absent", () => {
+    hideAllClisFromPath();
+    expect(anyRuntimePresent(["gemini"])).toBe(false);
+    expect(anyRuntimePresent(["antigravity"])).toBe(false);
+    expect(anyRuntimePresent(["gemini", "antigravity"])).toBe(false);
+  });
+});
+
+// The shared artifact is the whole point of splitting runtimes from artifacts:
+// two runtimes, one GEMINI.md, expressed as set membership rather than an
+// `if (gemini || agy)` repeated per call site.
+describe("GEMINI.md as a shared instruction artifact", () => {
+  it("is owned by exactly one artifact, listing both Google runtimes", () => {
+    const owning = Object.values(INSTRUCTION_ARTIFACTS).filter(
+      (a) => a.relativeOutputPath === "GEMINI.md",
+    );
+    expect(owning).toHaveLength(1);
+    expect(owning[0].runtimes).toEqual(["gemini", "antigravity"]);
+  });
+
+  it("keeps the neutral-vs-own substitution-key split the header describes", () => {
+    // Shared artifact keeps gemini's key rather than inventing a neutral one:
+    // the file name and every path inside it are still Gemini's.
+    expect(INSTRUCTION_ARTIFACTS.gemini.substitutionKey).toBe("gemini");
+    // Antigravity ships no user-scope template of its own, so it has no key.
+    expect(RUNTIMES.antigravity.substitutionKey).toBeNull();
+    expect(RUNTIMES.antigravity.globalInstruction).toBeNull();
+  });
+
+  it("produces one GEMINI.md target, not one per reading runtime", () => {
+    const geminiTargets = projectArtifactTargets().filter(
+      (t) => t.relativeOutputPath === "GEMINI.md",
+    );
+    expect(geminiTargets).toHaveLength(1);
+    expect(geminiTargets[0].cliSet).toEqual(["gemini", "antigravity"]);
+  });
+
+  // The two scopes have different readerships, so their cliSets differ on
+  // purpose. Antigravity finds GEMINI.md by walking CWD up to the repo root,
+  // which never reaches $HOME — agy v1.2.4 embeds no `~/.gemini/GEMINI.md`
+  // literal and documents its global root as `~/.gemini/config/`. Pinned so the
+  // asymmetry reads as a decision, and so widening one scope without the other
+  // has to be deliberate.
+  it("shares GEMINI.md at project scope only, not the user-scope template", () => {
+    expect(INSTRUCTION_ARTIFACTS.gemini.runtimes).toEqual(["gemini", "antigravity"]);
+
+    const userScope = DEFAULT_TARGETS.find(
+      (t) => t.relativeOutputPath.endsWith("cli-instructions/gemini-GEMINI.md"),
+    );
+    expect(userScope, "user-scope gemini template must exist").toBeDefined();
+    expect([...userScope.cliSet]).toEqual(["gemini"]);
+  });
+
+  it("resolves its audience as present when either runtime is installed", () => {
+    const audience = INSTRUCTION_ARTIFACTS.gemini.runtimes;
+    const bin = makeTmpDir("agents-stub-bin-");
+    fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+    fs.writeFileSync(path.join(bin, "agy"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    savedPath = process.env.PATH;
+    process.env.PATH = bin;
+
+    // Gemini CLI absent, Antigravity present — the shared file still has a reader.
+    expect(anyRuntimePresent(["gemini"])).toBe(false);
+    expect(anyRuntimePresent([...audience])).toBe(true);
   });
 });
 

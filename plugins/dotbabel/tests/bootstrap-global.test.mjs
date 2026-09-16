@@ -385,6 +385,54 @@ describe("bootstrapGlobal", () => {
   // Test 7 — returns { ok: false } when source directory does not exist
   // -------------------------------------------------------------------------
 
+  // Antigravity's global customization root is `~/.gemini/config/`, a sibling of
+  // Gemini CLI's `~/.gemini/` rather than a subdirectory of its skills tree.
+  // Establishing that empirically mattered: two of Google's own doc pages
+  // disagreed, and the agy v1.2.4 binary embeds the literal
+  // `~/.gemini/config/skills/<name>/SKILL.md` while containing no
+  // `antigravity-cli/skills` string at all.
+  it("fans out antigravity skills to ~/.gemini/config/skills, beside gemini's own tree", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+
+    const result = await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+    expect(result.ok).toBe(true);
+
+    const agSkill = path.join(tgt, ".gemini", "config", "skills", "alpha");
+    expect(fs.lstatSync(agSkill).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(agSkill)).toBe(path.join(src, "skills", "alpha"));
+
+    // Gemini CLI's own tree is a separate directory and is untouched by it.
+    const geminiSkill = path.join(tgt, ".gemini", "skills", "alpha");
+    expect(fs.lstatSync(geminiSkill).isSymbolicLink()).toBe(true);
+    expect(path.dirname(path.dirname(agSkill))).not.toBe(path.dirname(path.dirname(geminiSkill)));
+  });
+
+  it("honors ANTIGRAVITY_CONFIG_HOME when fanning out antigravity skills", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    const customRoot = makeTmpDir("custom-antigravity-");
+    buildFakeSource(src);
+
+    const prev = process.env.ANTIGRAVITY_CONFIG_HOME;
+    process.env.ANTIGRAVITY_CONFIG_HOME = customRoot;
+    try {
+      const result = await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+      expect(result.ok).toBe(true);
+
+      const overrideSkill = path.join(customRoot, "skills", "alpha");
+      expect(fs.lstatSync(overrideSkill).isSymbolicLink()).toBe(true);
+
+      const defaultDir = path.join(tgt, ".gemini", "config", "skills");
+      const defaultPopulated = fs.existsSync(defaultDir) && fs.readdirSync(defaultDir).length > 0;
+      expect(defaultPopulated).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.ANTIGRAVITY_CONFIG_HOME;
+      else process.env.ANTIGRAVITY_CONFIG_HOME = prev;
+    }
+  });
+
   it("returns { ok: false } when source directory does not exist", async () => {
     const tgt = makeTmpDir("bg-tgt-");
     const nonexistent = path.join(os.tmpdir(), "this-does-not-exist-" + Date.now());

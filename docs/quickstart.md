@@ -118,8 +118,8 @@ enforces it.
 ### 6. Project-scope cross-CLI sync (optional)
 
 If your repo has `.claude/commands/*.md` and `.claude/skills/*` that you want
-visible to Codex, Gemini, and Copilot — not just Claude Code — wire them up
-with `project-sync`. This is repo-local; user-scope artifacts stay in
+visible to Codex, Gemini, Antigravity, and Copilot — not just Claude Code — wire
+them up with `project-sync`. This is repo-local; user-scope artifacts stay in
 `~/.claude/` etc. via `dotbabel bootstrap`.
 
 ```bash
@@ -165,8 +165,8 @@ the full key-by-key table. A generated file that is hand-edited is backed up
 before the next sync overwrites it.
 
 `.dotbabel.json` is optional — without one, project-sync uses defaults
-(`fan_out: ["codex", "gemini", "copilot"]`, the standard target list, no
-`cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
+(`fan_out: ["codex", "gemini", "antigravity", "copilot"]`, the standard target
+list, no `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
 markers, the whole file becomes the rule floor.
 
 Add `$schema` to the top of the file for editor autocomplete and validation:
@@ -174,14 +174,14 @@ Add `$schema` to the top of the file for editor autocomplete and validation:
 ```json
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
-  "fan_out": ["codex", "gemini", "copilot"],
+  "fan_out": ["codex", "gemini", "antigravity", "copilot"],
   "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true
 }
 ```
 
-`fan_out` accepts only `codex`, `gemini`, and `copilot`. A typo such as
-`co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
+`fan_out` accepts only `codex`, `gemini`, `antigravity`, and `copilot`. A typo
+such as `co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
 
 `fan_out_layout` (default `per-cli`) decides whether Codex and Gemini get one
 tree each or share a canonical one. Under `shared`, the table above collapses:
@@ -191,6 +191,19 @@ once instead of twice. Copilot's `.github/` shapes are unchanged. Switching an
 existing repo backs the old trees up to `.codex/skills.bak-<timestamp>`; an
 unknown value fails with `CONFIG_UNKNOWN_LAYOUT`. Revert to `per-cli` if a CLI
 will not follow the redirect.
+
+**Antigravity keeps its own tree even under `shared`.** It reads
+`.agents/skills/`, a directory Codex and Gemini do not read, so a redirect there
+would point at a tree it never follows. Only CLIs that can read the same
+canonical tree share one; Antigravity is fanned out separately in both layouts.
+
+**Antigravity and Gemini CLI coexist.** They are separate runtimes with separate
+skills directories — `.agents/skills/` and `.gemini/skills/` per repo,
+`~/.gemini/config/skills/` and `~/.gemini/skills/` globally — and dotbabel never
+migrates one into the other. What they do share is the instruction file: both
+read `GEMINI.md`, so it is generated once rather than per CLI. Set
+`ANTIGRAVITY_CONFIG_HOME` to relocate the global Antigravity root, exactly as
+`GEMINI_HOME` relocates Gemini's.
 
 `gate_on_cli_presence` (default `true`) skips a CLI's symlink fan-out when its
 binary is absent from `PATH`. `check-project-sync` applies the same gate, so it

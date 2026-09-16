@@ -104,6 +104,50 @@ export const RUNTIMES = Object.freeze({
     globalSkills: Object.freeze({ envVar: "GEMINI_HOME", baseDir: ".gemini", subdir: "skills" }),
     projectFanOut: Object.freeze({ kind: "skills-dir", dir: ".gemini/skills", shareable: true }),
   }),
+  // Antigravity CLI.
+  //
+  // First runtime whose executable name is not its id — `agy`, not
+  // `antigravity`. That is why every gate resolves the name through `detect`
+  // rather than probing the id directly.
+  //
+  // It ships no user-scope instruction template of its own: it reads the shared
+  // GEMINI.md, so `globalInstruction` and `substitutionKey` stay null.
+  //
+  // `shareable: false` is the load-bearing field. Antigravity is the first
+  // skills-dir runtime that cannot join the `fan_out_layout: "shared"` tree,
+  // because `.agents/skills` is a directory codex and gemini do not read — a
+  // redirect there would point at a tree nothing follows.
+  antigravity: Object.freeze({
+    id: "antigravity",
+    label: "Antigravity",
+    detect: Object.freeze(["agy"]),
+    substitutionKey: null,
+    globalInstruction: null,
+    // Antigravity's global customization root is `~/.gemini/config/` — a
+    // separate subtree *inside* Gemini CLI's `~/.gemini/`, never colliding with
+    // Gemini's own `~/.gemini/skills/`. Established empirically against agy
+    // v1.2.4 because Google's own doc pages disagreed: the binary embeds the
+    // literal `~/.gemini/config/skills/<name>/SKILL.md` and contains no
+    // `antigravity-cli/skills` string, and a malformed plugin planted in
+    // `~/.gemini/config/plugins/` was read at language-server startup, proving
+    // that root is live.
+    //
+    // The nesting is incidental, not structural: `GEMINI_HOME` and
+    // `ANTIGRAVITY_CONFIG_HOME` each replace their own root outright, so
+    // setting only the former relocates Gemini's skills and leaves
+    // Antigravity's where they were. They are separate products whose roots
+    // happen to overlap today.
+    globalSkills: Object.freeze({
+      envVar: "ANTIGRAVITY_CONFIG_HOME",
+      baseDir: ".gemini/config",
+      subdir: "skills",
+    }),
+    projectFanOut: Object.freeze({
+      kind: "skills-dir",
+      dir: ".agents/skills",
+      shareable: false,
+    }),
+  }),
   // Copilot CLI has no skill auto-discovery dir, and its project artifacts are
   // generated `.prompt.md` / `.instructions.md` files whose filename contract
   // cannot share a directory with the `SKILL.md` shape.
@@ -144,11 +188,32 @@ export const INSTRUCTION_ARTIFACTS = Object.freeze({
     substitutionKey: "agents",
     runtimes: Object.freeze(["copilot", "codex"]),
   }),
+  // Read by both Google runtimes — at PROJECT scope only. Antigravity discovers
+  // GEMINI.md by walking up from the CWD to the repo root, the same
+  // hierarchical rule Gemini CLI uses, documented in the CLI's own bundled
+  // guide (agy v1.2.4, builtin/skills/agy-customizations/SKILL.md,
+  // "Customization Discovery and Locations") and confirmed against a live
+  // install.
+  //
+  // The user-scope template `gemini-GEMINI.md` deliberately stays
+  // `cliSet: ["gemini"]` (generate-instructions.mjs). That walk-up starts at
+  // the CWD and stops at the repo root, so it never reaches
+  // `~/.gemini/GEMINI.md`; agy v1.2.4 contains no literal for that path, and
+  // its documented global root is `~/.gemini/config/`. The two scopes have
+  // genuinely different readerships, so their cliSets genuinely differ — if
+  // Antigravity is ever shown to read the user-scope file, widen that target
+  // and this one together.
+  //
+  // Membership here is not cosmetic: renderTarget includes a cli-conditional
+  // span only when its tag-set is a superset of this list, so a `gemini`-only
+  // span now stops reaching GEMINI.md. That is the correct reading — content in
+  // a file two runtimes load must hold for both — and it is why this list, not
+  // a disjunction at each call site, is where the sharing lives.
   gemini: Object.freeze({
     key: "gemini",
     relativeOutputPath: "GEMINI.md",
     substitutionKey: "gemini",
-    runtimes: Object.freeze(["gemini"]),
+    runtimes: Object.freeze(["gemini", "antigravity"]),
   }),
   copilot: Object.freeze({
     key: "copilot",
