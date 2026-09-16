@@ -21,15 +21,21 @@ export function checkRemovedRepoFactsKeys(ctx) {
   const warnings = [];
 
   if (isNonEmpty(facts.regression_paths)) {
+    // Names BOTH successors, in the order §6.6 states the migration: the
+    // targeted one first. A consumer told only about critical_paths would
+    // trade a path-scoped check for full-suite escalation, which is not the
+    // same thing.
     warnings.push(
-      "docs/repo-facts.json sets regression_paths, which was removed — the quality system's " +
-        "critical_paths (.dotbabel.json quality.critical_paths) now escalates the full test " +
-        "suite for a matching change, and merge-pr's step 5 runs the PR quality profile in " +
-        "its place. Remove the key.",
+      "docs/repo-facts.json sets regression_paths, which was removed. Replace it in " +
+        ".dotbabel.json: declare a quality tool with `paths` (the regression capability) so the " +
+        "check runs only when a matching file changes, and optionally set quality.critical_paths " +
+        "to escalate the full test suite for those paths. Then remove the key.",
     );
   }
   if (isNonEmpty(facts.verification_commands)) {
-    warnings.push("docs/repo-facts.json sets verification_commands, which was removed and never had a consumer. Remove the key.");
+    warnings.push(
+      "docs/repo-facts.json sets verification_commands, which was removed and never had a consumer. Remove the key.",
+    );
   }
 
   return { ok: warnings.length === 0, warnings };

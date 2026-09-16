@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-16T12:44:20.900Z",
+  "generatedAt": "2026-09-16T14:19:48.224Z",
   "version": "3.3.0",
   "artifacts": [
     {
@@ -610,7 +610,7 @@
       "type": "command",
       "path": "commands/merge-pr.md",
       "name": "merge-pr",
-      "description": "Merge a pull request only after full local verification, with an optional data-regression gate for paths configured in docs/repo-facts.json.\n",
+      "description": "Merge a pull request only after full local verification and a passing quality gate.\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["github-actions"],

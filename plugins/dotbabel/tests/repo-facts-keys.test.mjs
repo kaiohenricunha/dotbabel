@@ -25,22 +25,33 @@ const FIXTURE_SRC = path.join(__dirname, "fixtures", "minimal-repo");
 
 const REMOVED_KEYS_RX = /\bregression_paths\b|\bverification_commands\b/;
 
-// The shipped, real-repo surface P-C5 touches. Not everything under
-// docs/specs/qa-verification-harness/ — that spec's own prose (KD-9 among
-// it) documents the removal by name, which is a legitimate historical
-// reference, not a live one.
+// The shipped, real-repo surface P-C5 touches. The instruction and rule-floor
+// half is DERIVED from repo-facts.json rather than copied: that file is the
+// repo's single source for the set (checkInstructionDrift iterates the same
+// two arrays), so adding a rule-floor file there brings it under this scan
+// automatically instead of silently shrinking coverage.
+//
+// Deliberately NOT scanned: docs/specs/qa-verification-harness/**, whose prose
+// (KD-9 among it) documents the removal by name — a historical reference, not
+// a live one — plus this test and the check module, which must name the keys
+// they guard.
+const facts = JSON.parse(readFileSync(path.join(REPO_ROOT, "docs/repo-facts.json"), "utf8"));
 const SHIPPED_TEXT_FILES = [
-  "CLAUDE.md",
-  "README.md",
-  "AGENTS.md",
-  "GEMINI.md",
-  ".github/copilot-instructions.md",
-  "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
-  "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
-  "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md",
+  ...new Set([...facts.instruction_files, ...facts.rule_floor_files]),
+  // Not in repo-facts.json's own lists: the three merge-pr copies whose step 5
+  // described the removed gate, and the generated artifact index, which
+  // mirrors each command's frontmatter description into a surface
+  // dotbabel-search/list read.
+  //
+  // To be exact about what including the index buys: it catches a literal key
+  // name reappearing there. It does NOT catch the index merely going stale —
+  // the description this PR replaced said "data-regression gate", which no
+  // key-name regex matches. Staleness is owned by `dotbabel-index --check`
+  // (.github/workflows/dogfood.yml:41), which is what actually caught it here.
   "commands/merge-pr.md",
   "plugins/dotbabel/templates/claude/commands/merge-pr.md",
   ".github/prompts/merge-pr.prompt.md",
+  "index/artifacts.json",
 ];
 
 const REPO_FACTS_JSON_COPIES = [

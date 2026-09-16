@@ -53,7 +53,9 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
    dotbabel quality check --profile pr --base origin/<baseRefName>
    ```
 
-   Exit code `1` means a checked rule failed. Exit code `2` means required evidence, trust, or tooling is unavailable. **STOP** for either exit code and surface the result — do not merge past it. Exit `0` means no error verdict; continue to step 6.
+   Exit code `1` means a checked rule failed. Exit code `2` means required evidence, trust, or tooling is unavailable. **STOP** for either exit code and surface the result — do not merge past it. Any other non-zero exit also means the gate did not run — `64` is invalid usage, and `127` is `dotbabel` not installed, which is the normal state on the bootstrap-only install path (see the top of `CLAUDE.md`). **STOP** there too, say which exit you got, and never report an unrun gate as a pass. Exit `0` means no error verdict; continue to step 6.
+
+   Expect exit `2` on the first run: step 3 put you in a throwaway `/tmp/merge-pr-<N>` worktree, and project-command trust matches the repository path exactly, so a fresh worktree is never trusted. Resolve it deliberately, per PR — read the branch's own diff to `.dotbabel.json` and to any `package.json` scripts the tools invoke, then either trust that one path or run this step from your own checkout of the branch. Do not reach for a blanket `--allow-project-commands` here: in this flow it would execute commands defined by the pull request under review.
 
 6. **Interpret failures honestly.** If the test suite fails:
 
