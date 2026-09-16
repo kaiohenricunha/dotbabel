@@ -328,6 +328,20 @@ seed_go() {
   [ -z "$output" ]
 }
 
+@test "isolate_path never grants blanket access to /usr/bin or /bin" {
+  # Regression: isolate_path used to end in "$STUB_BIN:/usr/bin:/bin", which
+  # re-exposes whatever toolchain a given host happens to have installed
+  # system-wide (this host's own /usr/bin/go, from Debian's golang-go
+  # package) and silently defeats every "toolchain absent" test above. This
+  # asserts the PATH contract directly, so the bug class is caught even on a
+  # host that has no such stray binary today.
+  case ":$PATH:" in
+    *:/usr/bin:*) fail "PATH grants /usr/bin wholesale: $PATH" ;;
+    *:/bin:*) fail "PATH grants /bin wholesale: $PATH" ;;
+  esac
+  [ "$STUB_BIN" = "${PATH%%:*}" ]
+}
+
 # A stub that records the directory it ran in. The monorepo tests care about
 # WHERE the check runs, which argv alone cannot show.
 stub_cwd_recorder() {

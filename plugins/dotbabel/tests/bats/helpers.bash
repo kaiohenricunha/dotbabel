@@ -418,12 +418,27 @@ feed_stop_json() {
   run bash -c "printf '%s' \"\$1\" | '$hook'" _ "$payload"
 }
 
-# Replace PATH with a hermetic stub dir plus the minimal system dirs.
+# Replace PATH with a hermetic stub dir holding only named essentials.
 #
 # Use this — NOT with_fake_tool_bin — whenever a test asserts "toolchain
 # absent" behavior. Prepending is not enough: ruff/go/cargo/node/gcc are
 # really installed on dev machines and would shadow-win, so the absent-path
 # tests would pass by accident locally and behave differently in CI.
+#
+# A blanket `/usr/bin:/bin` grant is not enough either — that used to be this
+# function's whole implementation, and it broke the same way: this repo's own
+# dev host has a real `go` at /usr/bin/go (Debian's golang-go package,
+# separate from the gvm install actually used to build), so "toolchain
+# absent" tests silently ran the real toolchain instead of finding nothing.
+# Any host can hit this for any of go/cargo/tsc/mvn/dotnet/shellcheck/gofmt/
+# ruff/python3/node/Rscript depending on what else happens to be installed
+# system-wide, so the isolation has to be an allowlist of the specific
+# system utilities check-on-stop.sh, check-on-write.sh, and this file
+# actually call — never the language toolchains those hooks themselves probe
+# for with `have`/`command -v`. Each name is resolved via `command -v` (not
+# hardcoded to /usr/bin) so this stays portable across hosts; a builtin
+# (`command -v` returning a bare name, not an absolute path) is skipped since
+# it needs no PATH entry at all.
 #
 # Exports STUB_BIN (shim dir), STUB_LOG (call log written by stub shims), and
 # REAL_NODE (node's path before the swap — it usually lives under nvm, so a
@@ -433,17 +448,35 @@ feed_stop_json() {
 isolate_path() {
   REAL_NODE=$(command -v node 2>/dev/null || true)
   export REAL_NODE
+  # rm_stub_path deletes STUB_BIN — the directory the isolated PATH now
+  # points at exclusively — so every caller's teardown() that runs more
+  # commands after rm_stub_path (nearly all of them: they rm -rf their own
+  # STATE_DIR/TRUST_DIR/REPO right after it) needs PATH restored first.
+  STUB_PREV_PATH="$PATH"
+  export STUB_PREV_PATH
   STUB_BIN=$(mktemp -d)
   export STUB_BIN
   STUB_LOG="$STUB_BIN/.calls"
   export STUB_LOG
   : > "$STUB_LOG"
+
+  local essential=(bash env jq git mktemp chmod rm sleep date cat dirname
+    basename sed cksum sort wc grep head tail mkdir mv ln touch find tr cut
+    realpath timeout gtimeout)
+  local name target
+  for name in "${essential[@]}"; do
+    target=$(command -v "$name" 2>/dev/null) || continue
+    case "$target" in
+      /*) ln -s "$target" "$STUB_BIN/$name" 2>/dev/null || true ;;
+    esac
+  done
+
   # Keep bats' own libexec reachable so the harness itself keeps working.
   local keep=""
   if [ -n "${BATS_LIBEXEC:-}" ]; then
     keep=":$BATS_LIBEXEC"
   fi
-  PATH="$STUB_BIN:/usr/bin:/bin${keep}"
+  PATH="$STUB_BIN${keep}"
   export PATH
 }
 
@@ -487,10 +520,19 @@ stub_calls() {
   grep -F "$(printf '%s\t' "$name")" "$STUB_LOG" 2>/dev/null || true
 }
 
-# Remove the stub dir created by isolate_path. Safe to call unconditionally.
+# Remove the stub dir created by isolate_path, and restore the PATH it
+# replaced. Safe to call unconditionally. Restoring PATH matters: STUB_BIN
+# held every command isolate_path made reachable (including `rm` itself), so
+# a caller's teardown() that runs more cleanup after this — as every consumer
+# of isolate_path does — would otherwise find nothing on PATH at all.
 rm_stub_path() {
   if [ -n "${STUB_BIN:-}" ] && [ -d "$STUB_BIN" ]; then
     rm -rf "$STUB_BIN"
+  fi
+  if [ -n "${STUB_PREV_PATH:-}" ]; then
+    PATH="$STUB_PREV_PATH"
+    export PATH
+    unset STUB_PREV_PATH
   fi
   return 0
 }
