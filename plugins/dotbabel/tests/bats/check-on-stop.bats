@@ -335,10 +335,10 @@ seed_go() {
   # package) and silently defeats every "toolchain absent" test above. This
   # asserts the PATH contract directly, so the bug class is caught even on a
   # host that has no such stray binary today.
-  case ":$PATH:" in
-    *:/usr/bin:*) fail "PATH grants /usr/bin wholesale: $PATH" ;;
-    *:/bin:*) fail "PATH grants /bin wholesale: $PATH" ;;
-  esac
+  # Builtins only: this test runs under the isolated PATH, so an external
+  # assertion helper would not be resolvable here even if one existed.
+  [[ ":$PATH:" != *:/usr/bin:* ]]
+  [[ ":$PATH:" != *:/bin:* ]]
   [ "$STUB_BIN" = "${PATH%%:*}" ]
 }
 
