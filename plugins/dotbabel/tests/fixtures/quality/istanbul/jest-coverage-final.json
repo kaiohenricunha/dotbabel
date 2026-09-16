@@ -1,0 +1,23 @@
+{
+  "/repo/src/format.ts": {
+    "path": "/repo/src/format.ts",
+    "statementMap": {
+      "0": { "start": { "line": 2, "column": 0 }, "end": { "line": 2, "column": 24 } },
+      "1": { "start": { "line": 5, "column": 4 }, "end": { "line": 5, "column": 30 } }
+    },
+    "fnMap": {},
+    "branchMap": {
+      "0": {
+        "type": "binary-expr",
+        "line": 5,
+        "locations": [
+          { "start": { "line": 5, "column": 4 }, "end": { "line": 5, "column": 12 } },
+          { "start": { "line": 5, "column": 16 }, "end": { "line": 5, "column": 30 } }
+        ]
+      }
+    },
+    "s": { "0": 12, "1": 12 },
+    "f": {},
+    "b": { "0": [12, 4] }
+  }
+}

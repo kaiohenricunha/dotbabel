@@ -160,3 +160,186 @@ describe("quality adapters", () => {
     expect(plan.argv[2]).toMatch(/^\.\//);
   });
 });
+
+// --- P-C2 / P-C3: built-in test and coverage plans for DECLARED tools -------
+//
+// KD-8 draws one line through both units: a plan exists only when the
+// repository already declares the tool. `dotbabel quality` never installs a
+// checker, so planning `pytest` in a repository that does not use it produces
+// a plan that can only resolve through `on_unavailable` — noise that looks
+// like a finding. Every test below pins either "declared, so planned" or
+// "not declared, so absent".
+
+/** Build a throwaway component root with the given files. */
+function componentRoot(files, prefix = "dotbabel-adapter-") {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  for (const [name, body] of Object.entries(files)) {
+    const target = path.join(root, name);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, body);
+  }
+  return root;
+}
+
+function planFor(language, root, { profile = "pr", markers = ["package.json"], tools = {} } = {}) {
+  return getQualityAdapter(language).plan(
+    { id: `.:${language}`, root: ".", absoluteRoot: root, language, files: [], markers, tools },
+    { rules: {} },
+    { changedFiles: [] },
+    profile,
+  );
+}
+
+const withRoot = (files, prefix, run) => {
+  const root = componentRoot(files, prefix);
+  try { return run(root); } finally { fs.rmSync(root, { recursive: true, force: true }); }
+};
+
+describe("python adapter — pytest and coverage (P-C2)", () => {
+  it("plans pytest when pyproject.toml has tool.pytest.ini_options", () => {
+    withRoot({ "pyproject.toml": "[tool.pytest.ini_options]\naddopts = \"-q\"\n" }, "dotbabel-py-", (root) => {
+      const test = planFor("python", root, { markers: ["pyproject.toml"] }).find((p) => p.capability === "test");
+      expect(test).toBeDefined();
+      expect(test.executable).toBe("pytest");
+    });
+  });
+
+  it("plans pytest when pytest.ini or a root conftest.py exists", () => {
+    for (const files of [{ "pytest.ini": "[pytest]\n" }, { "conftest.py": "" }, { "tox.ini": "[pytest]\n" }, { "setup.cfg": "[tool:pytest]\n" }]) {
+      withRoot(files, "dotbabel-py-", (root) => {
+        const test = planFor("python", root, { markers: Object.keys(files) }).find((p) => p.capability === "test");
+        expect(test, `declared via ${Object.keys(files)[0]}`).toBeDefined();
+      });
+    }
+  });
+
+  it("runs pytest under uv run when uv.lock exists and under poetry run when poetry.lock exists", () => {
+    withRoot({ "pytest.ini": "[pytest]\n", "uv.lock": "" }, "dotbabel-py-", (root) => {
+      const test = planFor("python", root, { markers: ["pytest.ini"] }).find((p) => p.capability === "test");
+      expect(test.executable).toBe("uv");
+      expect(test.argv.slice(0, 2)).toEqual(["run", "pytest"]);
+    });
+    withRoot({ "pytest.ini": "[pytest]\n", "poetry.lock": "" }, "dotbabel-py-", (root) => {
+      const test = planFor("python", root, { markers: ["pytest.ini"] }).find((p) => p.capability === "test");
+      expect(test.executable).toBe("poetry");
+      expect(test.argv.slice(0, 2)).toEqual(["run", "pytest"]);
+    });
+  });
+
+  it("plans coveragepy-json coverage only when pytest-cov is a declared dependency", () => {
+    const declared = "[project]\ndependencies = []\n[dependency-groups]\ndev = [\"pytest\", \"pytest-cov>=5\"]\n[tool.pytest.ini_options]\n";
+    withRoot({ "pyproject.toml": declared }, "dotbabel-py-", (root) => {
+      const cov = planFor("python", root, { markers: ["pyproject.toml"] }).find((p) => p.capability === "coverage");
+      expect(cov).toBeDefined();
+      expect(cov.report).toEqual({ format: "coveragepy-json", path: ".dotbabel/quality/coveragepy.json" });
+      expect(cov.argv.join(" ")).toContain("--cov-report=json:.dotbabel/quality/coveragepy.json");
+    });
+    withRoot({ "pyproject.toml": "[tool.pytest.ini_options]\n" }, "dotbabel-py-", (root) => {
+      expect(planFor("python", root, { markers: ["pyproject.toml"] }).some((p) => p.capability === "coverage")).toBe(false);
+    });
+  });
+
+  it("prefers a quality-test Make target over the built-in pytest plan", () => {
+    withRoot({ "pytest.ini": "[pytest]\n", Makefile: "quality-test:\n\t@true\n" }, "dotbabel-py-", (root) => {
+      const test = planFor("python", root, { markers: ["pytest.ini"] }).find((p) => p.capability === "test");
+      expect(test.executable).toBe("make");
+      expect(test.argv).toEqual(["quality-test"]);
+    });
+  });
+
+  it("never plans pytest when the repository declares no pytest configuration", () => {
+    withRoot({ "pyproject.toml": "[project]\nname = \"x\"\n" }, "dotbabel-py-", (root) => {
+      expect(planFor("python", root, { markers: ["pyproject.toml"] }).some((p) => p.capability === "test")).toBe(false);
+    });
+  });
+});
+
+describe("node adapter — built-in coverage (P-C3)", () => {
+  const vitest = { devDependencies: { vitest: "^4", "@vitest/coverage-v8": "^4" } };
+
+  it("plans Vitest coverage with the JSON reporter when a Vitest coverage provider is a declared dev dependency", () => {
+    withRoot({ "package.json": JSON.stringify(vitest) }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov).toBeDefined();
+      expect(cov.argv.join(" ")).toContain("--coverage.reporter=json");
+      expect(cov.report).toEqual({ format: "istanbul-json", path: ".dotbabel/quality/coverage-final.json" });
+    });
+  });
+
+  it("plans Jest coverage with the JSON reporter when Jest is a declared dev dependency", () => {
+    withRoot({ "package.json": JSON.stringify({ devDependencies: { jest: "^29" } }) }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov.argv.join(" ")).toContain("--coverage");
+      expect(cov.report.format).toBe("istanbul-json");
+    });
+  });
+
+  it("keeps a quality:coverage or coverage script ahead of the built-in coverage plan", () => {
+    for (const script of ["quality:coverage", "coverage"]) {
+      withRoot({ "package.json": JSON.stringify({ ...vitest, scripts: { [script]: "vitest run --coverage" } }) }, "dotbabel-node-", (root) => {
+        const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+        expect(cov.source, script).toBe("repository-script");
+        expect(cov.argv).toEqual(["run", script]);
+      });
+    }
+  });
+
+  it("plans no coverage when no coverage provider is declared", () => {
+    withRoot({ "package.json": JSON.stringify({ devDependencies: { eslint: "^9" } }) }, "dotbabel-node-", (root) => {
+      expect(planFor("javascript", root).some((p) => p.capability === "coverage")).toBe(false);
+    });
+    // Vitest without a coverage provider cannot produce a report, so planning
+    // it would only ever fail at run time.
+    withRoot({ "package.json": JSON.stringify({ devDependencies: { vitest: "^4" } }) }, "dotbabel-node-", (root) => {
+      expect(planFor("javascript", root).some((p) => p.capability === "coverage")).toBe(false);
+    });
+  });
+
+  it("plans coverage from the provider alone, as KD-8 specifies", () => {
+    // The provider is the trigger, not `vitest` itself. In a workspace the
+    // runner is often hoisted to the root or listed as a peer, and requiring
+    // it here produced exactly the silent non-measurement KD-8 avoids.
+    withRoot({ "package.json": JSON.stringify({ devDependencies: { "@vitest/coverage-v8": "^4" } }) }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov).toBeDefined();
+      expect(cov.argv).toContain("--coverage.reporter=json");
+    });
+  });
+
+  it("labels a declared-but-unproven runner as a candidate, not available", () => {
+    // A manifest entry proves the package is declared, not installed, which is
+    // the same evidence class the Go and Python adapters label `candidate`.
+    withRoot({ "package.json": JSON.stringify(vitest) }, "dotbabel-node-", (root) => {
+      expect(planFor("javascript", root).find((p) => p.capability === "coverage").availability).toBe("candidate");
+    });
+  });
+
+  it("wires the built-in coverage plan into the TypeScript adapter too", () => {
+    // P-C3 wires nodeBuiltinCoveragePlans into both Node adapters; without
+    // this case, deleting the typescript.mjs line would fail no test.
+    withRoot({ "package.json": JSON.stringify(vitest), "tsconfig.json": "{}" }, "dotbabel-ts-", (root) => {
+      const cov = planFor("typescript", root, { markers: ["tsconfig.json"] }).find((p) => p.capability === "coverage");
+      expect(cov).toBeDefined();
+      expect(cov.report).toEqual({ format: "istanbul-json", path: ".dotbabel/quality/coverage-final.json" });
+    });
+  });
+
+  it("uses pnpm exec or yarn when the matching lockfile exists", () => {
+    withRoot({ "package.json": JSON.stringify(vitest), "pnpm-lock.yaml": "" }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov.executable).toBe("pnpm");
+      expect(cov.argv.slice(0, 2)).toEqual(["exec", "vitest"]);
+    });
+    withRoot({ "package.json": JSON.stringify(vitest), "yarn.lock": "" }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov.executable).toBe("yarn");
+      // `yarn exec`, not `yarn vitest`: the bare form is `yarn run vitest` on
+      // Yarn 1, which would prefer a same-named package.json script.
+      expect(cov.argv.slice(0, 2)).toEqual(["exec", "vitest"]);
+    });
+    withRoot({ "package.json": JSON.stringify(vitest) }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov.executable).toBe("npx");
+    });
+  });
+});

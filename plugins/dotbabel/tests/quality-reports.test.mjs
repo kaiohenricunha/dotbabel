@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { calculateChangedCoverage, parseQualityReport } from "../src/quality/reports.mjs";
@@ -95,5 +97,43 @@ describe("quality reports", () => {
     expect(parseQualityReport({ format: "exit-code", text: "" })).toEqual({ metrics: [], findings: [] });
     expect(() => parseQualityReport({ format: "dotbabel-v1", text: "{" })).toThrow(/not valid JSON/);
     expect(() => parseQualityReport({ format: "made-up", text: "{}" })).toThrow(/unsupported quality report/);
+  });
+});
+
+// --- P-C2 / P-C3: captured reports from the tools the built-in plans run ----
+//
+// The cases above use hand-written text, which proves the parser's arithmetic
+// but not that it reads what the real tools emit. These read reports captured
+// from pinned versions (see each fixture directory's VERSIONS.md), so a format
+// change in pytest-cov, Vitest or Jest fails here rather than silently
+// producing a coverage result of zero.
+
+describe("captured coverage reports", () => {
+  const fixture = (...parts) =>
+    fs.readFileSync(path.join(import.meta.dirname, "fixtures", "quality", ...parts), "utf8");
+
+  it("parses a captured pytest-cov JSON report", () => {
+    const parsed = parseQualityReport({ format: "coveragepy-json", text: fixture("pytest-cov", "coverage.json") });
+    expect(parsed.coverage.line).toEqual({ covered: 6, total: 8 });
+    expect(parsed.coverage.branch).toEqual({ covered: 3, total: 4 });
+
+    // Per-file detail survives, so changed-line coverage can be computed.
+    const changed = calculateChangedCoverage(parsed.coverage, { "src/calc.py": [4, 8] });
+    expect(changed.line).toEqual({ covered: 1, total: 2 });
+  });
+
+  it("parses captured Vitest and Jest coverage-final.json reports", () => {
+    const vitest = parseQualityReport({ format: "istanbul-json", text: fixture("istanbul", "vitest-coverage-final.json") });
+    expect(vitest.coverage.line).toEqual({ covered: 2, total: 3 });
+    expect(vitest.coverage.branch).toEqual({ covered: 1, total: 2 });
+
+    const jest = parseQualityReport({ format: "istanbul-json", text: fixture("istanbul", "jest-coverage-final.json") });
+    expect(jest.coverage.line).toEqual({ covered: 2, total: 2 });
+    expect(jest.coverage.branch).toEqual({ covered: 2, total: 2 });
+
+    // One parser serves both, which is the reason the plans request this
+    // format from either runner.
+    const changed = calculateChangedCoverage(vitest.coverage, { "/repo/src/calc.js": [4, 7] });
+    expect(changed.line).toEqual({ covered: 1, total: 2 });
   });
 });

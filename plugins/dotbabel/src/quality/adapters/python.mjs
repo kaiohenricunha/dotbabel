@@ -33,6 +33,84 @@ function configuredPythonPlans(component, profile, claimed, includeTests = false
   }
 }
 
+/** Where a built-in pytest coverage plan writes its report. */
+const COVERAGE_REPORT_PATH = ".dotbabel/quality/coveragepy.json";
+
+function read(root, name) {
+  try { return fs.readFileSync(path.join(root, name), "utf8"); } catch { return null; }
+}
+
+/**
+ * True when the component declares pytest configuration (KD-8).
+ *
+ * Declaration is the gate, not the presence of test files: `dotbabel quality`
+ * never installs a checker, so planning pytest for a repository that does not
+ * use it produces a plan that can only resolve through `on_unavailable`, which
+ * reads as a finding rather than as "nothing to measure here".
+ *
+ * @param {string} root
+ * @returns {boolean}
+ */
+function declaresPytest(root) {
+  if (has(root, "pytest.ini") || has(root, "conftest.py")) return true;
+  if (/\[tool\.pytest\.ini_options\]/.test(read(root, "pyproject.toml") ?? "")) return true;
+  // `[ \t]*`, not `\s*`: `\s` matches a newline, so pairing it with a
+  // multiline `^` makes the engine re-scan the whole remaining file from every
+  // line start — quadratic. A file of 40,000 blank lines took ~2s, and this
+  // runs before the profile and trust gates on a checkout that may come from
+  // an untrusted fork. A section header's indentation is on its own line
+  // anyway, so the narrower class loses nothing.
+  if (/^[ \t]*\[pytest\]/m.test(read(root, "tox.ini") ?? "")) return true;
+  return /^[ \t]*\[tool:pytest\]/m.test(read(root, "setup.cfg") ?? "");
+}
+
+/**
+ * True when `pytest-cov` is a declared dependency somewhere the component
+ * records its dependencies. Without it `--cov` is an unknown option, so the
+ * coverage plan would fail rather than report.
+ *
+ * @param {string} root
+ * @returns {boolean}
+ */
+function declaresPytestCov(root) {
+  const sources = [read(root, "pyproject.toml"), read(root, "requirements.txt"), read(root, "requirements-dev.txt"), read(root, "setup.cfg")];
+  return sources.some((text) => text !== null && /(?<![\w-])pytest-cov(?![\w-])/.test(text));
+}
+
+/**
+ * Built-in pytest test and coverage plans, for declared configuration only
+ * (KD-8). Runs under `uv run` or `poetry run` when the matching lockfile
+ * exists, so the plan uses the environment the repository actually resolves.
+ *
+ * @param {object} component
+ * @param {string} profile
+ * @param {Set<string>} claimed Capabilities a higher-priority source already planned.
+ * @param {boolean} includeTests
+ * @returns {object[]}
+ */
+function builtinPytestPlans(component, profile, claimed, includeTests) {
+  const root = component.absoluteRoot;
+  if (!declaresPytest(root)) return [];
+  const plans = [];
+
+  const build = (capability, args, report) => {
+    const command = pythonCommand(root, "pytest", args);
+    // `candidate`, not `available`: the gate above proves pytest is CONFIGURED,
+    // not that it is installed. That is the same evidence class as
+    // golangci-lint behind a `.golangci.*` file (go.mjs) and the configured
+    // Python tools above, both of which this codebase labels `candidate`.
+    return { id: `${component.id}:${capability}:pytest`, componentId: component.id, capability, ruleIds: capabilityRules(capability), ...command, cwd: root, ...(report ? { report } : {}), availability: "candidate", source: "built-in", requiresTrust: true };
+  };
+
+  if (!claimed.has("test") && capabilityInProfile("test", profile, includeTests)) {
+    plans.push(build("test", []));
+  }
+  if (!claimed.has("coverage") && capabilityInProfile("coverage", profile, includeTests) && declaresPytestCov(root)) {
+    plans.push(build("coverage", ["--cov", `--cov-report=json:${COVERAGE_REPORT_PATH}`], { format: "coveragepy-json", path: COVERAGE_REPORT_PATH }));
+  }
+  return plans;
+}
+
 /** Built-in Python quality adapter. */
 export const pythonAdapter = Object.freeze({
   id: "python",
@@ -51,6 +129,10 @@ export const pythonAdapter = Object.freeze({
     plans.push(...makeRepositoryPlans(component, profile, claimed, includeTests));
     for (const plan of plans) claimed.add(plan.capability);
     plans.push(...configuredPythonPlans(component, profile, claimed, includeTests));
+    for (const plan of plans) claimed.add(plan.capability);
+    // Last, so a project tool, a Make target, or configured tooling all keep
+    // priority over the built-in pytest plans.
+    plans.push(...builtinPytestPlans(component, profile, claimed, includeTests));
     return plans;
   },
 });

@@ -95,18 +95,53 @@ The report always shows these states. An unavailable measurement never becomes a
 | Language   | Discovery markers                                     | Built-in commands, no configuration required                                                                       | Repository sources scanned                                                              | Reads the change set |
 | ---------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | -------------------- |
 | Go         | `go.mod`                                              | `gofmt -l` on changed files, `go test -run ^$ ./...` for compile, `go vet ./...` for lint, `go test ./...` in `pr` | `Makefile` targets                                                                      | Yes                  |
-| Python     | `pyproject.toml`, `setup.cfg`, `tox.ini`, else `.py`  | none                                                                                                               | `Makefile` targets, then `[tool.ruff]`, `[tool.black]`, `[tool.mypy]`, `[tool.pyright]` | No                   |
-| TypeScript | `tsconfig*.json`                                      | `tsc --noEmit -p <tsconfig>` for typecheck, preferring a project-local binary                                      | `package.json` scripts                                                                  | No                   |
-| JavaScript | `package.json`, a `tsconfig` with sibling JS, else JS | `node --check` per changed file                                                                                    | `package.json` scripts                                                                  | Yes                  |
+| Python     | `pyproject.toml`, `setup.cfg`, `tox.ini`, else `.py`  | `pytest`, and `pytest --cov` for coverage, only for declared configuration                                         | `Makefile` targets, then `[tool.ruff]`, `[tool.black]`, `[tool.mypy]`, `[tool.pyright]` | No                   |
+| TypeScript | `tsconfig*.json`                                      | `tsc --noEmit -p <tsconfig>` for typecheck, plus Vitest or Jest coverage for a declared runner                     | `package.json` scripts                                                                  | No                   |
+| JavaScript | `package.json`, a `tsconfig` with sibling JS, else JS | `node --check` per changed file, plus Vitest or Jest coverage for a declared runner                                | `package.json` scripts                                                                  | Yes                  |
 | any other  | —                                                     | none                                                                                                               | project `tools` only                                                                    | n/a                  |
 
-Go lint uses `golangci-lint run` when a `.golangci.*` file exists, and `go vet` otherwise. A Python tool runs under `uv run` or `poetry run` when the matching lockfile exists. TypeScript claims `.js` files only when `allowJs` or `checkJs` is set, or the file carries `// @ts-check`; otherwise those files belong to the JavaScript component. An unknown language name is valid, and it reports `unsupported` unless a project tool emits `exit-code` or `dotbabel-v1`.
+Go lint uses `golangci-lint run` when a `.golangci.*` file exists, and `go vet` otherwise. A Python tool runs under `uv run` or `poetry run` when the matching lockfile exists.
+
+### Built-in test and coverage plans
+
+Dotbabel never installs a checker, so a built-in plan exists only where the repository already declares the tool. A plan for a tool nobody declared could only ever resolve as unavailable, which reads as a finding rather than as "nothing to measure here".
+
+Python plans `pytest` when the component declares pytest configuration: `[tool.pytest.ini_options]` in `pyproject.toml`, a `pytest.ini` file, `[pytest]` in `tox.ini`, `[tool:pytest]` in `setup.cfg`, or a root `conftest.py`. It adds `pytest --cov --cov-report=json:<path>` for coverage only when `pytest-cov` is a declared dependency, because `--cov` is an unknown option without it. The report parses as `coveragepy-json`.
+
+Node plans coverage only when no repository script already provides it. It runs `vitest run --coverage` with the JSON reporter when a Vitest coverage provider (`@vitest/coverage-v8` or `@vitest/coverage-istanbul`) is declared, and `jest --coverage` with the JSON reporter when Jest is declared. The provider is the trigger, not `vitest` itself: without a provider package Vitest cannot write a report, and in a workspace the runner is often hoisted to the root. Both parse as `istanbul-json`. The command runs through `pnpm exec`, `yarn exec`, or `npx --no-install`, matching the lockfile present.
+
+Both built-in plans report `candidate`, not `available`. A manifest entry or a config section proves the tool is _declared_, not installed, so the plan can still resolve as unavailable on a checkout with no dependencies installed.
+
+A repository script keeps priority over these, because it encodes reporter and threshold choices that inspecting a manifest cannot see. A Make target does **not** take priority for Node, only for Python and Go — Make targets are scanned by those two adapters alone, so a Node component with a `coverage` target and no script still gets the built-in plan.
+
+Warning: a script that claims `coverage` carries no report declaration, so dotbabel runs it but parses nothing from it, and the coverage rules stay `not_configured`. Configure a project tool with an explicit `report` when you want the coverage rules measured:
+
+```json
+{
+  "quality": {
+    "components": [
+      {
+        "root": ".",
+        "languages": ["javascript"],
+        "tools": {
+          "coverage": {
+            "argv": ["npm", "run", "coverage"],
+            "report": { "format": "lcov", "path": "coverage/lcov.info" }
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+TypeScript claims `.js` files only when `allowJs` or `checkJs` is set, or the file carries `// @ts-check`; otherwise those files belong to the JavaScript component. An unknown language name is valid, and it reports `unsupported` unless a project tool emits `exit-code` or `dotbabel-v1`.
 
 Dotbabel prefers an explicit quality name over a conventional one:
 
 | Source                 | Preferred names                                | Conventional fallback                                                         |
 | ---------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| `package.json` scripts | `quality:<capability>`, `quality-<capability>` | `format:check`, `typecheck` or `check:types`, `lint`, `test`                  |
+| `package.json` scripts | `quality:<capability>`, `quality-<capability>` | `format:check`, `typecheck` or `check:types`, `lint`, `test`, `coverage`      |
 | `Makefile` targets     | `quality-<capability>`                         | `format-check`, `lint`, `test`, `coverage`, `security`, `test-race` or `race` |
 
 Two candidates of equal authority produce `not_configured` with both names listed. Dotbabel never guesses. Pin one under `quality.components[].tools`.
