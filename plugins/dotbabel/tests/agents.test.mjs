@@ -16,6 +16,8 @@ import {
 import { KNOWN_FAN_OUT_CLIS, DEFAULT_PROJECT_CONFIG } from "../src/project-sync.mjs";
 import { DEFAULT_TARGETS } from "../src/generate-instructions.mjs";
 
+const REPO_ROOT = path.resolve(import.meta.dirname, "..", "..", "..");
+
 let tmpDirs = [];
 let savedPath = null;
 
@@ -168,6 +170,25 @@ describe("agents registry — integrity", () => {
     for (const artifact of Object.values(INSTRUCTION_ARTIFACTS)) {
       expect(artifact.runtimes).not.toContain("claude");
     }
+  });
+
+  // docs/repo-facts.json is JSON and cannot import the registry, so its
+  // substitution keys are asserted against it instead — the same treatment the
+  // JSON-Schema enum and bootstrap.sh get. The union is the point: `agents` is
+  // an artifact key with no runtime, `codex` is a runtime key with no shared
+  // artifact, and only the two concepts together account for every entry.
+  it("repo-facts cli_substitutions keys are exactly the artifact and runtime keys", () => {
+    const facts = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, "docs", "repo-facts.json"), "utf8"),
+    );
+    const allowed = new Set([
+      "_default_",
+      ...Object.values(INSTRUCTION_ARTIFACTS).map((a) => a.substitutionKey),
+      ...Object.values(RUNTIMES)
+        .map((r) => r.substitutionKey)
+        .filter(Boolean),
+    ]);
+    expect([...Object.keys(facts.cli_substitutions)].sort()).toEqual([...allowed].sort());
   });
 
   it("copilot fans out but owns no skills directory", () => {
