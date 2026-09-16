@@ -257,7 +257,7 @@ export async function bootstrapGlobal(opts = {}) {
    * @param {{ cli: string, src: string, dst: string }} cfg
    */
   function linkCliInstruction({ cli, src, dst }) {
-    if (!anyRuntimePresent([cli], { allCli: opts.allCli })) {
+    if (!opts.allCli && !anyRuntimePresent([cli])) {
       out.info(`skipped ${cli} instructions (command not found; use --all to force)`);
       skipped++;
       return;
@@ -282,7 +282,7 @@ export async function bootstrapGlobal(opts = {}) {
    * @param {{ cli: string, dstDir: string }} cfg
    */
   function fanOutSkillsToDir({ cli, dstDir }) {
-    if (!anyRuntimePresent([cli], { allCli: opts.allCli })) {
+    if (!opts.allCli && !anyRuntimePresent([cli])) {
       out.info(`skipped ${cli} skills (command not found; use --all to force)`);
       skipped++;
       return;

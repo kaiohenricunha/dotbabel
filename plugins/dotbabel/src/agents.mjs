@@ -242,12 +242,15 @@ export function projectArtifactTargets() {
  * file read by several runtimes stays one presence question instead of a
  * disjunction repeated at each call site.
  *
+ * Deliberately a pure detection predicate: force-mode (`--all`) is a caller
+ * policy, not a property of what is installed, and callers already own that
+ * check (`shouldFanOutCli` in project-sync.mjs, the two gates in
+ * bootstrap-global.mjs). Folding it in here gave the flag two meanings.
+ *
  * @param {readonly string[]} runtimeIds
- * @param {{ allCli?: boolean }} [opts]
  * @returns {boolean}
  */
-export function anyRuntimePresent(runtimeIds, { allCli = false } = {}) {
-  if (allCli) return runtimeIds.length > 0;
+export function anyRuntimePresent(runtimeIds) {
   return runtimeIds.some((id) =>
     (RUNTIMES[id]?.detect ?? []).some((command) => commandExists(command)),
   );

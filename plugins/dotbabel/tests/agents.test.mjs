@@ -46,16 +46,32 @@ afterEach(() => {
   tmpDirs = [];
 });
 
-// The registry only earns its place if it reproduces today's scattered
-// declarations exactly. These are equivalence tests against the constants the
-// refactor will delete, so a mismatch fails here rather than in the subsystem
-// that consumes it later.
+// The registry only earns its place if it reproduces today's declarations
+// exactly.
+//
+// Each test below anchors to a LITERAL first, then asserts the consumer agrees.
+// The literal is what gives these teeth: the consumers now derive their values
+// from the registry (KNOWN_FAN_OUT_CLIS is Object.freeze(fanOutRuntimes()),
+// DEFAULT_PROJECT_CONFIG.targets maps projectArtifactTargets()), so a
+// derived-vs-derived assertion compares a value with itself and can never fail.
+// The derived half is kept because it documents the wiring; the literal half is
+// what catches a registry edit that changes the public contract.
 describe("agents registry — equivalence with existing declarations", () => {
-  it("fanOutRuntimes() reproduces KNOWN_FAN_OUT_CLIS, order included", () => {
-    expect(fanOutRuntimes()).toEqual([...KNOWN_FAN_OUT_CLIS]);
+  it("fanOutRuntimes() reproduces the historical fan-out list, order included", () => {
+    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "copilot"]);
+    expect([...KNOWN_FAN_OUT_CLIS]).toEqual(fanOutRuntimes());
   });
 
-  it("projectArtifactTargets() reproduces DEFAULT_PROJECT_CONFIG.targets", () => {
+  it("projectArtifactTargets() reproduces the historical default targets", () => {
+    expect(projectArtifactTargets()).toEqual([
+      { relativeOutputPath: "AGENTS.md", cliSet: ["copilot", "codex"], substitutionKey: "agents" },
+      { relativeOutputPath: "GEMINI.md", cliSet: ["gemini"], substitutionKey: "gemini" },
+      {
+        relativeOutputPath: ".github/copilot-instructions.md",
+        cliSet: ["copilot"],
+        substitutionKey: "copilot",
+      },
+    ]);
     expect(projectArtifactTargets()).toEqual(
       DEFAULT_PROJECT_CONFIG.targets.map((t) => ({
         relativeOutputPath: t.relativeOutputPath,
@@ -107,6 +123,15 @@ describe("agents registry — equivalence with existing declarations", () => {
       expect(skillDirRuntimes()).toContain(id);
       expect(RUNTIMES[id].projectFanOut.shareable).toBe(true);
     }
+  });
+
+  // project-sync.mjs destructures this list as exactly two (`const [a, b]`) to
+  // warn that a `shared` layout drops a cli_excluded entry for both CLIs. A
+  // third shareable runtime would compile, get a shared-tree symlink, and
+  // silently vanish from that warning. Asserted separately from the equivalence
+  // check above so the arity is not relaxed along with the contents.
+  it("the shared-layout warning's two-runtime arity assumption still holds", () => {
+    expect(shareableSkillRuntimes()).toHaveLength(2);
   });
 
   it("projectSkillsDir() is null for runtimes that write no skills tree", () => {
@@ -161,6 +186,19 @@ describe("agents registry — integrity", () => {
     ]);
   });
 
+  // The header states the rule: a shared artifact's key is neutral, a
+  // single-runtime artifact's is its runtime's. Without this, changing
+  // RUNTIMES.gemini.substitutionKey alone would render the project GEMINI.md
+  // under the old key and gemini-GEMINI.md under the new one with the suite
+  // green — the repo-facts test takes the union of both key sets, so it passes
+  // either way.
+  it("a single-runtime artifact reuses that runtime's substitution key", () => {
+    for (const artifact of Object.values(INSTRUCTION_ARTIFACTS)) {
+      if (artifact.runtimes.length !== 1) continue;
+      expect(artifact.substitutionKey).toBe(RUNTIMES[artifact.runtimes[0]].substitutionKey);
+    }
+  });
+
   it("every runtime keys itself consistently", () => {
     for (const [key, runtime] of Object.entries(RUNTIMES)) {
       expect(runtime.id).toBe(key);
@@ -206,11 +244,6 @@ describe("agents registry — integrity", () => {
 });
 
 describe("anyRuntimePresent", () => {
-  it("is true for any id when allCli is set, without probing PATH", () => {
-    hideAllClisFromPath();
-    expect(anyRuntimePresent(["gemini"], { allCli: true })).toBe(true);
-  });
-
   it("is false when no runtime's executable is on PATH", () => {
     hideAllClisFromPath();
     expect(anyRuntimePresent(["gemini", "codex", "copilot"])).toBe(false);
@@ -239,7 +272,7 @@ describe("resolveGlobalSkillsDir", () => {
   });
 
   // GEMINI_HOME / CODEX_HOME replace the whole config dir, not just its parent
-  // (bootstrap-global.mjs:244,253).
+  // (resolveGlobalSkillsDir in agents.mjs).
   it("honors the runtime's env-var override", () => {
     expect(resolveGlobalSkillsDir("gemini", "/home/u", { GEMINI_HOME: "/custom/g" })).toBe(
       "/custom/g/skills",
