@@ -459,6 +459,33 @@ describe("projectSync", () => {
     expect(r.skipped).toBeGreaterThan(0);
   });
 
+  // Instruction artifacts are deliberately NOT gated on CLI presence, while
+  // skills fan-out is. A repo's AGENTS.md / GEMINI.md are committed for
+  // teammates whose toolchains differ, so they must be written on a machine
+  // with no agent CLI installed at all. The pair of assertions below pins both
+  // halves of that asymmetry in one run, because the natural way to centralise
+  // agent metadata is a single presence check applied uniformly — which would
+  // silently stop writing these files.
+  it("writes every instruction artifact even when no CLI is on PATH, while skipping fan-out", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    hideAllClisFromPath();
+
+    const r = await projectSync({ repoRoot: repo, allCli: false, quiet: true });
+    expect(r.ok).toBe(true);
+
+    for (const rel of ["AGENTS.md", "GEMINI.md", ".github/copilot-instructions.md"]) {
+      const abs = path.join(repo, ...rel.split("/"));
+      expect(fs.existsSync(abs)).toBe(true);
+      expect(fs.readFileSync(abs, "utf8")).toContain("be terse");
+    }
+
+    expect(fs.existsSync(path.join(repo, ".codex"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".gemini"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".github", "prompts"))).toBe(false);
+    expect(fs.existsSync(path.join(repo, ".github", "instructions"))).toBe(false);
+  });
+
   // -------------------------------------------------------------------------
   // Branch coverage: error paths, empty fan-out, dry-run wrapper-dir, etc.
   // -------------------------------------------------------------------------

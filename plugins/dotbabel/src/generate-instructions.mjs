@@ -5,6 +5,7 @@ import {
   readText,
 } from "./spec-harness-lib.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
+import { projectArtifactTargets } from "./agents.mjs";
 
 /**
  * @typedef {"synthesize" | "inject"} TargetMode
@@ -43,24 +44,17 @@ import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
  * any CLI-conditional span must cover both for its content to land there.
  */
 export const DEFAULT_TARGETS = Object.freeze([
-  Object.freeze({
-    relativeOutputPath: "AGENTS.md",
-    cliSet: Object.freeze(["copilot", "codex"]),
-    substitutionKey: "agents",
-    mode: "inject",
-  }),
-  Object.freeze({
-    relativeOutputPath: "GEMINI.md",
-    cliSet: Object.freeze(["gemini"]),
-    substitutionKey: "gemini",
-    mode: "inject",
-  }),
-  Object.freeze({
-    relativeOutputPath: ".github/copilot-instructions.md",
-    cliSet: Object.freeze(["copilot"]),
-    substitutionKey: "copilot",
-    mode: "inject",
-  }),
+  // The host files a repo commits. Derived from the agent registry, so a
+  // runtime that starts reading an existing file is one edit there rather than
+  // one here and one in project-sync's defaults.
+  ...projectArtifactTargets().map((target) =>
+    Object.freeze({ ...target, cliSet: Object.freeze(target.cliSet), mode: "inject" }),
+  ),
+  // The user-scope templates, one per runtime, kept literal on purpose. They
+  // are not shared artifacts — each serves exactly the runtime that ships it —
+  // and their order is pinned by the committed .manifest.json, which is written
+  // in target order. agents.test.mjs asserts each one's substitutionKey and
+  // cliSet still match the registry, so drift between the two is caught.
   Object.freeze({
     relativeOutputPath: "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
     cliSet: Object.freeze(["copilot"]),

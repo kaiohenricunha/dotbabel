@@ -52,9 +52,15 @@ describe("dotbabel.config.schema.json", () => {
     expect(validate({ fan_out: ["co-pilot"] })).toBe(false);
   });
 
+  // The schema holds three separate hand-written CLI lists. Pinning only the
+  // item enum let the other two drift: a new runtime would be accepted in
+  // fan_out while cli_excluded kept rejecting it as a key and the scaffolded
+  // default kept advertising the old set.
   it("enumerates exactly the CLIs the code knows about", () => {
     const schema = readJson(SCHEMA_PATH);
     expect(schema.properties.fan_out.items.enum).toEqual([...KNOWN_FAN_OUT_CLIS]);
+    expect(schema.properties.fan_out.default).toEqual([...KNOWN_FAN_OUT_CLIS]);
+    expect(schema.properties.cli_excluded.propertyNames.enum).toEqual([...KNOWN_FAN_OUT_CLIS]);
   });
 
   it("enumerates exactly the layouts the code knows about", () => {

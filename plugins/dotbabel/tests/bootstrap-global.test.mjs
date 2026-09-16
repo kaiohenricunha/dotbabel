@@ -5,6 +5,7 @@ import os from "os";
 import { bootstrapGlobal, resolveSource } from "../src/bootstrap-global.mjs";
 
 let tmpDirs = [];
+let savedPath = null;
 
 function makeTmpDir(prefix = "bootstrap-global-test-") {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -12,7 +13,23 @@ function makeTmpDir(prefix = "bootstrap-global-test-") {
   return dir;
 }
 
+// `commandExists` shells out to `sh -c 'command -v <cli>'`, so a PATH holding
+// only `sh` is what makes "this CLI is not installed" deterministic on a dev
+// box that may well have codex or gemini on the real PATH. Keeping `sh`
+// reachable matters: an entirely empty PATH would fail the probe for the wrong
+// reason.
+function hideAllClisFromPath() {
+  savedPath = process.env.PATH;
+  const bin = makeTmpDir("bootstrap-global-cliless-bin-");
+  fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+  process.env.PATH = bin;
+}
+
 afterEach(() => {
+  if (savedPath !== null) {
+    process.env.PATH = savedPath;
+    savedPath = null;
+  }
   for (const dir of tmpDirs) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -53,6 +70,77 @@ function buildFakeSource(dir) {
   // bootstrap.sh marker (needed for pkgRoot() detection)
   fs.writeFileSync(path.join(dir, "bootstrap.sh"), "#!/usr/bin/env bash\n");
 }
+
+/**
+ * Add the per-CLI instruction templates that `linkCliInstruction` reads.
+ *
+ * Deliberately separate from {@link buildFakeSource}: without these files every
+ * instruction link takes the "missing source" branch, so a test that omits
+ * them cannot observe the CLI-presence gate at all.
+ *
+ * @param {string} dir
+ */
+function buildCliInstructionSources(dir) {
+  const cliInstructions = path.join(dir, "plugins", "dotbabel", "templates", "cli-instructions");
+  fs.mkdirSync(cliInstructions, { recursive: true });
+  fs.writeFileSync(path.join(cliInstructions, "copilot-instructions.md"), "# copilot rules\n");
+  fs.writeFileSync(path.join(cliInstructions, "codex-AGENTS.md"), "# codex rules\n");
+  fs.writeFileSync(path.join(cliInstructions, "gemini-GEMINI.md"), "# gemini rules\n");
+}
+
+// The user-scope instruction links are gated on the host CLI being installed,
+// which is the exact opposite of the project-scope rule in project-sync.test.mjs
+// ("writes every instruction artifact even when no CLI is on PATH"). Global
+// links point into another tool's private config dir, so writing one for a tool
+// that is not installed would litter $HOME. Both halves are pinned because a
+// single shared presence helper is the natural way to centralise this, and
+// applying it uniformly would break one side or the other.
+describe("bootstrapGlobal — user-scope CLI presence gate", () => {
+  const instructionLinks = [
+    [".github", "copilot-instructions.md"],
+    [".codex", "AGENTS.md"],
+    [".gemini", "GEMINI.md"],
+  ];
+
+  it("links no CLI instruction file when no CLI is on PATH", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+    hideAllClisFromPath();
+
+    const result = await bootstrapGlobal({ source: src, target: tgt, allCli: false });
+    expect(result.ok).toBe(true);
+
+    for (const segments of instructionLinks) {
+      expect(fs.existsSync(path.join(tgt, ...segments))).toBe(false);
+    }
+    // Claude itself is never gated — it is the tool dotbabel is configuring.
+    expect(fs.existsSync(path.join(tgt, "CLAUDE.md"))).toBe(true);
+  });
+
+  it("links every CLI instruction file at its documented destination under --all", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+    hideAllClisFromPath();
+
+    const result = await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+    expect(result.ok).toBe(true);
+
+    const expectedTargets = {
+      ".github/copilot-instructions.md": "copilot-instructions.md",
+      ".codex/AGENTS.md": "codex-AGENTS.md",
+      ".gemini/GEMINI.md": "gemini-GEMINI.md",
+    };
+    for (const [rel, sourceName] of Object.entries(expectedTargets)) {
+      const abs = path.join(tgt, ...rel.split("/"));
+      expect(fs.lstatSync(abs).isSymbolicLink()).toBe(true);
+      expect(path.basename(fs.readlinkSync(abs))).toBe(sourceName);
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Test 1 — creates symlinks for CLAUDE.md, commands/, skills/

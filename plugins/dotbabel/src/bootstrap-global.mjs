@@ -16,10 +16,14 @@ import { fileURLToPath } from "node:url";
 import { createOutput } from "./lib/output.mjs";
 import {
   buildTimestamp,
-  commandExists,
   ensureRealDir,
   linkOne,
 } from "./lib/symlink.mjs";
+import {
+  RUNTIMES,
+  anyRuntimePresent,
+  resolveGlobalSkillsDir,
+} from "./agents.mjs";
 import {
   resolveLocalRulesPath,
   writeUserScopeClaudeMd,
@@ -227,31 +231,24 @@ export async function bootstrapGlobal(opts = {}) {
   }
 
   const cliInstructionsSrc = path.join(source, "plugins", "dotbabel", "templates", "cli-instructions");
-  // Copilot CLI has no skill auto-discovery dir (~/.copilot/), so we link only
-  // the instruction file, not skills.
-  linkCliInstruction({
-    cli: "copilot",
-    src: path.join(cliInstructionsSrc, "copilot-instructions.md"),
-    dst: path.join(homeRoot, ".github", "copilot-instructions.md"),
-  });
-  linkCliInstruction({
-    cli: "codex",
-    src: path.join(cliInstructionsSrc, "codex-AGENTS.md"),
-    dst: path.join(homeRoot, ".codex", "AGENTS.md"),
-  });
-  fanOutSkillsToDir({
-    cli: "codex",
-    dstDir: path.join(process.env.CODEX_HOME || path.join(homeRoot, ".codex"), "skills"),
-  });
-  linkCliInstruction({
-    cli: "gemini",
-    src: path.join(cliInstructionsSrc, "gemini-GEMINI.md"),
-    dst: path.join(homeRoot, ".gemini", "GEMINI.md"),
-  });
-  fanOutSkillsToDir({
-    cli: "gemini",
-    dstDir: path.join(process.env.GEMINI_HOME || path.join(homeRoot, ".gemini"), "skills"),
-  });
+  // Every per-CLI destination comes from the registry in agents.mjs. A runtime
+  // that declares no globalSkills gets an instruction link and nothing else,
+  // which is how Copilot's missing skill auto-discovery dir is expressed now.
+  // Claude declares neither, because it is the tool being configured rather
+  // than a fan-out destination.
+  for (const runtime of Object.values(RUNTIMES)) {
+    if (runtime.globalInstruction) {
+      linkCliInstruction({
+        cli: runtime.id,
+        src: path.join(cliInstructionsSrc, runtime.globalInstruction.templateFile),
+        dst: path.join(homeRoot, ...runtime.globalInstruction.dest),
+      });
+    }
+    const skillsDir = resolveGlobalSkillsDir(runtime.id, homeRoot, process.env);
+    if (skillsDir) {
+      fanOutSkillsToDir({ cli: runtime.id, dstDir: skillsDir });
+    }
+  }
 
   out.flush();
   return { ok: true, linked, skipped, backed_up };
@@ -260,7 +257,7 @@ export async function bootstrapGlobal(opts = {}) {
    * @param {{ cli: string, src: string, dst: string }} cfg
    */
   function linkCliInstruction({ cli, src, dst }) {
-    if (!opts.allCli && !commandExists(cli)) {
+    if (!opts.allCli && !anyRuntimePresent([cli])) {
       out.info(`skipped ${cli} instructions (command not found; use --all to force)`);
       skipped++;
       return;
@@ -285,7 +282,7 @@ export async function bootstrapGlobal(opts = {}) {
    * @param {{ cli: string, dstDir: string }} cfg
    */
   function fanOutSkillsToDir({ cli, dstDir }) {
-    if (!opts.allCli && !commandExists(cli)) {
+    if (!opts.allCli && !anyRuntimePresent([cli])) {
       out.info(`skipped ${cli} skills (command not found; use --all to force)`);
       skipped++;
       return;

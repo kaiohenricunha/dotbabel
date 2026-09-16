@@ -27,7 +27,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { parse, helpText } from "../src/lib/argv.mjs";
@@ -46,6 +46,7 @@ import {
 } from "../src/index.mjs";
 import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
 import { isRepoTrusted } from "../src/trust-allowlist.mjs";
+import { RUNTIMES, anyRuntimePresent, resolveGlobalSkillsDir } from "../src/agents.mjs";
 
 const META = {
   name: "dotbabel-doctor",
@@ -232,12 +233,10 @@ if (globalLstat === null) {
   out.pass(`~/.claude/CLAUDE.md is a generated file with overlay support (bootstrap active)`);
 }
 
-for (const link of [
-  ["Copilot", join(homedir(), ".github", "copilot-instructions.md")],
-  ["Codex", join(homedir(), ".codex", "AGENTS.md")],
-  ["Gemini", join(homedir(), ".gemini", "GEMINI.md")],
-]) {
-  const [label, symlinkPath] = link;
+for (const runtime of Object.values(RUNTIMES)) {
+  if (!runtime.globalInstruction) continue;
+  const label = runtime.label;
+  const symlinkPath = join(homedir(), ...runtime.globalInstruction.dest);
   try {
     const l = lstatSync(symlinkPath);
     if (l.isSymbolicLink()) {
@@ -250,16 +249,14 @@ for (const link of [
   }
 }
 
-// Codex / Gemini skill fan-out — only when the host CLI is on PATH (matches
-// the bootstrap on-PATH gate at bootstrap.sh:121 / bootstrap-global.mjs:346).
-// Sentinel: <fanout-dir>/changelog/SKILL.md, which mirrors the wrapped commands/
-// fan-out from bootstrap.sh:137-145 and bootstrap-global.mjs:364-375.
-for (const fanout of [
-  ["Codex", join(process.env.CODEX_HOME || join(homedir(), ".codex"), "skills"), "codex"],
-  ["Gemini", join(process.env.GEMINI_HOME || join(homedir(), ".gemini"), "skills"), "gemini"],
-]) {
-  const [label, fanoutDir, gateCmd] = fanout;
-  if (!commandExists(gateCmd)) continue;
+// User-scope skill fan-out, for every runtime that declares a skills dir —
+// only when that CLI is on PATH, matching the bootstrap gate. Sentinel:
+// <fanout-dir>/changelog/SKILL.md, which mirrors the wrapped commands/ fan-out
+// from bootstrap.sh:137-145 and bootstrap-global.mjs.
+for (const runtime of Object.values(RUNTIMES)) {
+  const fanoutDir = resolveGlobalSkillsDir(runtime.id, homedir(), process.env);
+  if (!fanoutDir || !anyRuntimePresent([runtime.id])) continue;
+  const label = runtime.label;
   const sentinel = join(fanoutDir, "changelog", "SKILL.md");
   try {
     const l = lstatSync(sentinel);
@@ -310,15 +307,6 @@ if (existsSync(projectConfigPath)) {
 out.flush();
 const { fail } = out.counts();
 process.exit(fail > 0 ? EXIT_CODES.VALIDATION : EXIT_CODES.OK);
-
-function commandExists(command) {
-  const result = spawnSync(
-    "sh",
-    ["-c", `command -v '${command.replace(/'/g, "'\\''")}' >/dev/null 2>&1`],
-    { stdio: "ignore" },
-  );
-  return result.status === 0;
-}
 
 function installPreCommitHook(repoRoot) {
   const relativeHookPath = execFileSync(
