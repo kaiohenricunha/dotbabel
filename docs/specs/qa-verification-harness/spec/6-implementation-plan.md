@@ -15,7 +15,7 @@
 
 The order follows leverage. Phases 1 through 3 close the spec-stage and pull-request gaps, which cost the most points in the assessment (DOC-2). P-B3 and P-A2 wait for P-B2, because P-B3 extends the command that P-B2 creates, and P-A2 teaches a skill to call it. Phase 5 depends on no earlier phase, so it can start sooner when people are free.
 
-- **IMPL-1**: Each unit ships as one pull request with `## Spec ID` set to `qa-verification-harness` after the spec is `approved`, and the pull request goes through `/pr-conductor`.
+- **IMPL-1**: Each unit ships as one pull request with `## Spec ID` set to `qa-verification-harness` after the spec is `approved`, and the pull request goes through `/pr-conductor`. Units that share a workstream and a dependency row may ship together in one pull request when every one of their criteria is verified in that pull request.
 - **IMPL-2**: A unit that changes a skill or a template runs prettier, then `node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --update`, then `npm run build-plugin`, all in the same pull request.
 - **IMPL-3**: A unit that changes `CLAUDE.md` regenerates the host instruction files with `npx dotbabel-generate-instructions` in the same pull request.
 - **IMPL-4**: Every unit commits its failing tests before, or together with, the code that makes them pass.
