@@ -23,6 +23,7 @@
  * come from the head.
  */
 import { parseSpecIds, stripFences } from "../lib/spec-ids.mjs";
+import { anyPathMatches } from "../spec-harness-lib.mjs";
 import { loadCriteriaConfigText } from "./config.mjs";
 
 /** The check-run name KD-10 gives the criteria job in the CI templates. */
@@ -83,8 +84,11 @@ export function criteriaGateInputs(deps, view, prNumber) {
   if (!SHA_RE.test(headSha) || !SHA_RE.test(baseSha)) return {};
 
   const body = String(view?.body ?? "");
-  const specIds = parseSpecIds(body);
-  if (specIds.length === 0) return {};
+  const declaredIds = parseSpecIds(body);
+  const changedPaths = (view?.files ?? []).map((f) => String(f?.path ?? "")).filter(Boolean);
+  // Nothing declared and nothing changed means nothing can be in scope, whatever
+  // the base ref says — so exit before paying for any git call at all.
+  if (declaredIds.length === 0 && changedPaths.length === 0) return {};
 
   // Every base-ref read below answers "not there" the same way it answers
   // "could not read", and the two must not be confused. A base commit this
@@ -106,13 +110,23 @@ export function criteriaGateInputs(deps, view, prNumber) {
     };
   }
 
+  // REL-19: scope is the union of what the body declares and what the diff
+  // implicates. Path matching is read at the BASE ref, so a pull request can
+  // neither exclude itself by editing `linked_paths` nor escape the gate by
+  // declaring a criteria-free spec — or no Spec ID at all.
+  const implicatedIds = implicatedSpecIds(deps, baseSha, changedPaths);
+  const scopedIds = [...new Set([...declaredIds, ...implicatedIds])];
+  if (scopedIds.length === 0) return {};
+
+  const declared = new Set(declaredIds);
+
   /** @type {Record<string, string[]>} */
   const requiredCriteria = {};
   /** @type {Record<string, string[]>} */
   const baseActiveCriteria = {};
   const unknownSpecIds = [];
 
-  for (const id of specIds) {
+  for (const id of scopedIds) {
     // Never let an unvalidated id reach a command. An id that is not a plain
     // directory name names no spec, so it belongs in unknownSpecIds — which
     // blocks the merge — rather than in a `git show` argument.
@@ -122,8 +136,14 @@ export function criteriaGateInputs(deps, view, prNumber) {
     }
 
     const head = activeCriteriaAt(deps, headSha, id);
-    if (head === null) unknownSpecIds.push(id);
-    else requiredCriteria[id] = head;
+    // `unknownSpecIds` means the BODY named a spec that does not exist. A spec
+    // reached through path matching was never named, so its absence at the
+    // head is weakening (caught via baseActiveCriteria), not a body error.
+    if (head === null) {
+      if (declared.has(id)) unknownSpecIds.push(id);
+    } else {
+      requiredCriteria[id] = head;
+    }
 
     const base = activeCriteriaAt(deps, baseSha, id);
     if (base !== null) baseActiveCriteria[id] = base;
@@ -176,6 +196,56 @@ function refIsReadable(deps, sha) {
 function hasCriteriaChangeRationale(body) {
   const m = RE_CRITERIA_RATIONALE.exec(stripFences(body));
   return m !== null && m[1].replace(/<!--[\s\S]*?-->/g, "").trim() !== "";
+}
+
+/**
+ * Spec ids whose `linked_paths` at the BASE ref match a changed file (REL-19).
+ *
+ * The base ref is the security property. Reading `linked_paths` at the head
+ * would let a pull request delete the entry covering the files it touches and
+ * so remove itself from the spec that governs them — the same reason the
+ * criteria configuration is read at the base.
+ *
+ * A spec that does not parse at the base contributes nothing. That is the
+ * permissive direction, but the alternative is worse: an unparseable spec on
+ * the TRUNK would block every pull request in the repository until someone
+ * fixed it, and the base ref is already-reviewed code rather than the change
+ * under judgement.
+ *
+ * @param {GateDeps} deps
+ * @param {string} baseSha
+ * @param {string[]} changedPaths
+ * @returns {string[]}
+ */
+function implicatedSpecIds(deps, baseSha, changedPaths) {
+  if (changedPaths.length === 0) return [];
+
+  const listing = deps.run(["git", "ls-tree", "-r", "--name-only", baseSha, "--", "docs/specs/"]);
+  if (listing.status !== 0) return [];
+
+  const ids = [];
+  for (const line of listing.stdout.split("\n")) {
+    const m = /^docs\/specs\/([^/]+)\/spec\.json$/.exec(line.trim());
+    if (m === null || !SPEC_ID_RE.test(m[1])) continue;
+    ids.push(m[1]);
+  }
+
+  const matched = [];
+  for (const id of ids) {
+    const r = deps.run(["git", "show", `${baseSha}:docs/specs/${id}/spec.json`]);
+    if (r.status !== 0) continue;
+    let linked;
+    try {
+      linked = JSON.parse(r.stdout).linked_paths;
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(linked)) continue;
+    if (linked.some((pattern) => typeof pattern === "string" && anyPathMatches(pattern, changedPaths))) {
+      matched.push(id);
+    }
+  }
+  return matched;
 }
 
 /**

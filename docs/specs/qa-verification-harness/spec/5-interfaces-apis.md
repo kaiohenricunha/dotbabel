@@ -130,7 +130,7 @@ The schema is `schemas/dotbabel.criteria-evidence.schema.json`. The example is i
 | ------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `headRefOid`              | string                                                            | `gh pr view --json headRefOid`                                               |
 | `comments`                | array of `{ body, authorAssociation, authorLogin, lastEditedAt }` | Paginated GraphQL pull request comments                                      |
-| `requiredCriteria`        | map of spec id to active criterion ids                            | `spec.json` of each linked spec at `headRefOid`                              |
+| `requiredCriteria`        | map of spec id to active criterion ids                            | `spec.json` at `headRefOid` of each in-scope spec (see below)                |
 | `baseActiveCriteria`      | map of spec id to active criterion ids                            | `spec.json` of the same specs at `baseRefOid`                                |
 | `unknownSpecIds`          | array of strings                                                  | Spec IDs in the body with no `spec.json` at `headRefOid`                     |
 | `criteriaChangeRationale` | boolean                                                           | True when the body has a `## Criteria change rationale` section with content |
@@ -138,6 +138,17 @@ The schema is `schemas/dotbabel.criteria-evidence.schema.json`. The example is i
 | `trustedAssociations`     | array of strings                                                  | `criteria.trusted_associations` in `.dotbabel.json` at `baseRefOid`          |
 | `requireCiCheck`          | boolean                                                           | `criteria.require_ci_check` in `.dotbabel.json` at `baseRefOid`              |
 | `ciCriteriaCheck`         | check run conclusion, or null                                     | The check run named `dotbabel criteria` on `headRefOid`                      |
+
+A spec is **in scope** for a pull request when either holds:
+
+1. the body declares its id under `## Spec ID`, or
+2. its `linked_paths` at `baseRefOid` match a file the pull request changes.
+
+The second rule is what makes the gate non-optional. Deriving scope from the body alone lets an author choose which criteria judge them: naming a spec that declares no criteria leaves `requiredCriteria` empty, the evidence ladder is skipped, and a change to the criteria engine itself merges with no evidence at all. A pull request that declares no Spec ID is gated the same way, by rule 2 alone.
+
+The match is read at `baseRefOid`, never at the head, for the same reason the configuration is: a pull request must not be able to edit `linked_paths` to exclude itself from the spec that governs the files it touches.
+
+Rule 2 never contributes to `unknownSpecIds`. That code reports a body naming a spec that does not exist, and a spec reached through path matching was never named.
 
 The gate evaluates the criteria codes in three groups. It reports each spec-level code whose condition holds, then the first evidence code whose condition holds, then the CI code.
 

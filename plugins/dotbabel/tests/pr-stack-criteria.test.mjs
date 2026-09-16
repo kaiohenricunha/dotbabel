@@ -238,11 +238,13 @@ describe("criteriaGateInputs", () => {
     expect(gate.reasons.map((r) => r.code)).toContain("CRITERIA_BASE_UNREADABLE");
   });
 
-  it("returns no criteria inputs at all when the body declares no Spec ID", () => {
-    // Back-compat: `{}` leaves checkMergeGate on its pre-criteria behaviour,
-    // and nothing is shelled out for a repository that never adopted criteria.
+  it("returns no criteria inputs, and shells out nothing, when the diff is empty", () => {
+    // Back-compat: `{}` leaves checkMergeGate on its pre-criteria behaviour.
+    // A body with no Spec ID no longer suffices on its own — REL-19 still has
+    // to consult the diff — so the cheap exit is now an empty changed-file
+    // list, which no spec's linked_paths can match.
     const { deps, calls } = stubSh([]);
-    expect(criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n" }, 42)).toEqual({});
+    expect(criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n", files: [] }, 42)).toEqual({});
     expect(calls).toEqual([]);
   });
 
@@ -404,5 +406,116 @@ describe("criteriaGateInputs", () => {
     const body = `${VIEW.body}\n## Criteria change rationale\n\nAC-2 moved to planned.\n`;
     expect(criteriaGateInputs(deps, { ...VIEW, body }, 42).criteriaChangeRationale).toBe(true);
     expect(criteriaGateInputs(deps, VIEW, 42).criteriaChangeRationale).toBe(false);
+  });
+});
+
+// --- #367 / REL-19: scope is derived from the diff, not only the body -------
+//
+// The gate used to take `requiredCriteria` from the declared Spec IDs alone,
+// which let an author choose which criteria judged them. Naming a spec with no
+// criteria — or naming none at all — emptied `requiredCriteria`, skipped the
+// whole evidence ladder, and merged a change to the criteria engine itself with
+// no evidence. These cases pin the union that closes it.
+
+/** A spec.json with the given linked_paths and one active criterion. */
+function specWith(linkedPaths, criteria = [{ id: "AC-1", status: "active" }]) {
+  return JSON.stringify({ linked_paths: linkedPaths, acceptance_criteria: criteria });
+}
+
+/** `git ls-tree` output naming the spec directories present at a ref. */
+const lsTree = (...ids) => ok(ids.map((id) => `docs/specs/${id}/spec.json`).join("\n") + "\n");
+
+describe("criteriaGateInputs — scope from changed files (REL-19)", () => {
+  const CHANGED = [{ path: "plugins/dotbabel/src/criteria/evidence.mjs" }];
+
+  it("requires the criteria of a spec whose linked_paths match a changed file, though the body never names it", () => {
+    // The #367 bypass: the body declares `bare`, which has no criteria, while
+    // the diff touches files `governed` owns.
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("bare", "governed")],
+      [/git show .*:docs\/specs\/bare\/spec\.json/, ok(specWith(["docs/**"], []))],
+      [/git show .*:docs\/specs\/governed\/spec\.json/, ok(specWith(["plugins/dotbabel/src/criteria/**"]))],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+
+    const view = { ...VIEW, body: "## Summary\n\nx\n\n## Spec ID\n\nbare\n", files: CHANGED };
+    const out = criteriaGateInputs(deps, view, 42);
+
+    expect(out.requiredCriteria).toHaveProperty("governed", ["AC-1"]);
+    const gate = checkMergeGate({ ...view, ...out });
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.map((r) => r.code)).toContain("CRITERIA_EVIDENCE_MISSING");
+  });
+
+  it("gates a pull request that declares no Spec ID at all", () => {
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [/git show .*:docs\/specs\/governed\/spec\.json/, ok(specWith(["plugins/dotbabel/src/criteria/**"]))],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+
+    const view = { ...VIEW, body: "## Summary\n\nno spec id here\n", files: CHANGED };
+    const out = criteriaGateInputs(deps, view, 42);
+
+    expect(out.requiredCriteria).toEqual({ governed: ["AC-1"] });
+    expect(checkMergeGate({ ...view, ...out }).reasons.map((r) => r.code)).toContain("CRITERIA_EVIDENCE_MISSING");
+  });
+
+  it("reads linked_paths at the base ref, so a pull request cannot exclude itself", () => {
+    // At the base, `governed` owns the changed file. The head edits its
+    // linked_paths to drop it. The base reading is the one that counts.
+    const { deps, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [new RegExp(`git show ${BASE}:docs/specs/governed/spec\\.json`), ok(specWith(["plugins/dotbabel/src/criteria/**"]))],
+      [new RegExp(`git show ${HEAD}:docs/specs/governed/spec\\.json`), ok(specWith(["docs/**"]))],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+
+    const view = { ...VIEW, body: "## Summary\n\nx\n", files: CHANGED };
+    const out = criteriaGateInputs(deps, view, 42);
+
+    expect(out.requiredCriteria).toHaveProperty("governed");
+    // The spec directory listing is read at the base ref too.
+    expect(joined().some((c) => c.includes(`ls-tree`) && c.includes(BASE))).toBe(true);
+  });
+
+  it("does not report a path-matched spec as an unknown Spec ID", () => {
+    // unknownSpecIds means "the body named a spec that does not exist". A spec
+    // reached by path matching was never named, so it must not land there even
+    // when it is absent at the head.
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [new RegExp(`git show ${BASE}:docs/specs/governed/spec\\.json`), ok(specWith(["plugins/dotbabel/src/criteria/**"]))],
+      [new RegExp(`git show ${HEAD}:docs/specs/governed/spec\\.json`), err("deleted at head")],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+
+    const view = { ...VIEW, body: "## Summary\n\nx\n", files: CHANGED };
+    const out = criteriaGateInputs(deps, view, 42);
+
+    expect(out.unknownSpecIds).toEqual([]);
+    // It still counts as weakening: active at base, gone at head.
+    expect(out.baseActiveCriteria).toHaveProperty("governed", ["AC-1"]);
+  });
+
+  it("returns no criteria inputs when nothing is declared and nothing is matched", () => {
+    // Back-compat: a repository whose specs govern none of the changed files
+    // still gets exactly the pre-criteria gate.
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [/git show .*:docs\/specs\/governed\/spec\.json/, ok(specWith(["docs/**"]))],
+    ]);
+
+    const view = { ...VIEW, body: "## Summary\n\nx\n", files: [{ path: "README.md" }] };
+    expect(criteriaGateInputs(deps, view, 42)).toEqual({});
   });
 });
