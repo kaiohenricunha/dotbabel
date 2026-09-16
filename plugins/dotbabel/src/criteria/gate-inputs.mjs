@@ -230,22 +230,17 @@ function implicatedSpecIds(deps, baseSha, changedPaths) {
     ids.push(m[1]);
   }
 
-  const matched = [];
-  for (const id of ids) {
+  return ids.filter((id) => {
     const r = deps.run(["git", "show", `${baseSha}:docs/specs/${id}/spec.json`]);
-    if (r.status !== 0) continue;
+    if (r.status !== 0) return false;
     let linked;
     try {
       linked = JSON.parse(r.stdout).linked_paths;
     } catch {
-      continue;
+      return false;
     }
-    if (!Array.isArray(linked)) continue;
-    if (linked.some((pattern) => typeof pattern === "string" && anyPathMatches(pattern, changedPaths))) {
-      matched.push(id);
-    }
-  }
-  return matched;
+    return Array.isArray(linked) && linked.some((pattern) => typeof pattern === "string" && anyPathMatches(pattern, changedPaths));
+  });
 }
 
 /**
