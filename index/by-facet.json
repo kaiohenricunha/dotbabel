@@ -40,6 +40,7 @@
       "rollback-prod",
       "security-review",
       "spec",
+      "tldr",
       "validate-spec",
       "veracity-audit",
       "workflow-orchestrator"
@@ -71,7 +72,7 @@
       "terragrunt-specialist"
     ],
     "backend": ["backend-developer", "test-engineer"],
-    "writing": ["changelog-assistant", "documentation-writer", "markdown", "pr-tldr"],
+    "writing": ["changelog-assistant", "documentation-writer", "markdown", "pr-tldr", "tldr"],
     "security": [
       "compliance-auditor",
       "dependabot-sweep",
@@ -118,6 +119,7 @@
       "security-review",
       "spec",
       "test-engineer",
+      "tldr",
       "validate-spec",
       "veracity-audit",
       "workflow-orchestrator"
@@ -257,7 +259,8 @@
       "handoff",
       "markdown",
       "plan-grader",
-      "spec"
+      "spec",
+      "tldr"
     ],
     "diagnostics": [
       "compliance-auditor",
@@ -360,6 +363,7 @@
       "security-engineer",
       "terragrunt-engineer",
       "test-engineer",
+      "tldr",
       "veracity-audit",
       "workflow-orchestrator"
     ]

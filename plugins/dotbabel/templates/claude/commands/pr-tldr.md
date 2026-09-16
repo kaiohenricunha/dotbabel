@@ -11,6 +11,7 @@ description: >
   Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.
 argument-hint: "[PR number | branch] (default: current branch vs origin/main)"
 model: haiku
+related: [tldr]
 ---
 
 Explain what a pull request gives us, for a reader who is not a developer.

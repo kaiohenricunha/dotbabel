@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-13T21:33:58.436Z",
+  "generatedAt": "2026-09-16T12:44:20.900Z",
   "version": "3.3.0",
   "artifacts": [
     {
@@ -693,7 +693,8 @@
         "maturity": "draft"
       },
       "version": "1.0.0",
-      "owner": "@kaiohenricunha"
+      "owner": "@kaiohenricunha",
+      "related": ["tldr"]
     },
     {
       "id": "pre-pr",
@@ -964,6 +965,22 @@
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "tldr",
+      "type": "command",
+      "path": "commands/tldr.md",
+      "name": "tldr",
+      "description": "Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.\n",
+      "facets": {
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha",
+      "related": ["pr-tldr"]
     },
     {
       "id": "validate-spec",
