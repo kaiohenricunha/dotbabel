@@ -290,6 +290,25 @@ describe("projectSync", () => {
     expect(fs.realpathSync(geminiDir)).not.toBe(fs.realpathSync(agDir));
   });
 
+  // Back-compat: a config written before Antigravity existed names gemini and
+  // means gemini. Adding a runtime to the registry must not retroactively widen
+  // an explicit fan_out list, or an existing repo would silently grow a
+  // `.agents/` directory its author never asked for.
+  it("does not reinterpret an existing gemini-only config as including antigravity", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out: ["gemini"],
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    expect(fs.existsSync(path.join(repo, ".gemini", "skills", "deploy"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".agents"))).toBe(false);
+  });
+
   it("is idempotent for Antigravity: second run adds no backups", async () => {
     const repo = makeTmpDir();
     buildFakeRepo(repo, {
