@@ -290,6 +290,13 @@
       "lastValidated": null
     },
     {
+      "name": "tldr",
+      "path": ".claude/commands/tldr.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "validate-spec",
       "path": ".claude/skills/validate-spec/SKILL.md",
       "checksum": "",
