@@ -43,9 +43,8 @@ trust allowlist, and when it cannot measure something it says `unsupported`,
 `not_configured`, or `unavailable` rather than quietly passing.
 
 It also runs everywhere you work: one rule floor, fanned out to Claude Code,
-Codex, Gemini CLI, Antigravity CLI, and Copilot CLI, with drift detection so
-the copies cannot
-silently disagree.
+Codex, Gemini CLI, Antigravity CLI, and Copilot CLI, with drift detection so the
+copies cannot silently disagree.
 
 **Who is this for?**
 

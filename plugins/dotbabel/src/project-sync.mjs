@@ -233,7 +233,7 @@ function validateCliExcluded(value) {
  */
 export function excludedNamesFor(cli, cfg) {
   const map = cfg.cli_excluded ?? {};
-  if (cfg.fan_out_layout === "shared" && SHAREABLE_SKILL_CLIS.includes(cli)) {
+  if (usesSharedSkillsTree(cli, cfg)) {
     const fanOut = Array.isArray(cfg.fan_out) ? cfg.fan_out : [];
     const union = new Set();
     for (const sharedCli of SHAREABLE_SKILL_CLIS) {
@@ -243,6 +243,23 @@ export function excludedNamesFor(cli, cfg) {
     return union;
   }
   return new Set(map[cli] ?? []);
+}
+
+/**
+ * Whether `cli`'s skills tree is served by the canonical shared tree.
+ *
+ * The single answer to that question. `projectSync` writes the layout,
+ * `checkProjectSync` verifies it, and `excludedNamesFor` unions exclusions
+ * across it — three call sites that must agree or a correctly-synced repo gets
+ * reported as drift (#219, finding D). Keeping the predicate here makes that
+ * agreement structural rather than three comments promising to stay in step.
+ *
+ * @param {string} cli
+ * @param {typeof DEFAULT_PROJECT_CONFIG} cfg
+ * @returns {boolean}
+ */
+export function usesSharedSkillsTree(cli, cfg) {
+  return cfg.fan_out_layout === "shared" && SHAREABLE_SKILL_CLIS.includes(cli);
 }
 
 /**
@@ -407,7 +424,7 @@ export async function projectSync(opts) {
       // skills-dir runtime reading a directory the others do not — Antigravity
       // reads `.agents/skills` — keeps its own tree even under "shared", since
       // a redirect would point it at a tree it never follows.
-      if (!sharedLayout || !SHAREABLE_SKILL_CLIS.includes(cli)) {
+      if (!usesSharedSkillsTree(cli, cfg)) {
         fanOutSkillsLayout({ cli, targetDir: cliDir });
       } else if (gateOnCli(cli, `${cli} skills fan-out`)) {
         if (!sharedBuilt) {

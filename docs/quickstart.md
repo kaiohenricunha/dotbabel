@@ -118,9 +118,8 @@ enforces it.
 ### 6. Project-scope cross-CLI sync (optional)
 
 If your repo has `.claude/commands/*.md` and `.claude/skills/*` that you want
-visible to Codex, Gemini, Antigravity, and Copilot — not just Claude Code —
-wire them up
-with `project-sync`. This is repo-local; user-scope artifacts stay in
+visible to Codex, Gemini, Antigravity, and Copilot — not just Claude Code — wire
+them up with `project-sync`. This is repo-local; user-scope artifacts stay in
 `~/.claude/` etc. via `dotbabel bootstrap`.
 
 ```bash
@@ -167,8 +166,7 @@ before the next sync overwrites it.
 
 `.dotbabel.json` is optional — without one, project-sync uses defaults
 (`fan_out: ["codex", "gemini", "antigravity", "copilot"]`, the standard target
-list, no
-`cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
+list, no `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
 markers, the whole file becomes the rule floor.
 
 Add `$schema` to the top of the file for editor autocomplete and validation:
@@ -183,8 +181,7 @@ Add `$schema` to the top of the file for editor autocomplete and validation:
 ```
 
 `fan_out` accepts only `codex`, `gemini`, `antigravity`, and `copilot`. A typo
-such as
-`co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
+such as `co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
 
 `fan_out_layout` (default `per-cli`) decides whether Codex and Gemini get one
 tree each or share a canonical one. Under `shared`, the table above collapses:

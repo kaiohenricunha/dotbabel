@@ -151,6 +151,16 @@ describe("agents registry — equivalence with existing declarations", () => {
     expect(shareableSkillRuntimes()).toHaveLength(2);
   });
 
+  // `.agents/` is an ecosystem-wide convention, not an Antigravity-owned name,
+  // so a future runtime could plausibly claim it too. Two runtimes sharing a
+  // dir would call buildSkillsTree on it twice with different exclusion sets —
+  // last writer wins, silently — and the drift checker would then verify one
+  // directory against two different expectations.
+  it("no two runtimes claim the same project skills directory", () => {
+    const dirs = skillDirRuntimes().map((id) => projectSkillsDir(id));
+    expect(new Set(dirs).size).toBe(dirs.length);
+  });
+
   it("projectSkillsDir() is null for runtimes that write no skills tree", () => {
     expect(projectSkillsDir("copilot")).toBeNull();
     expect(projectSkillsDir("claude")).toBeNull();
@@ -360,6 +370,22 @@ describe("GEMINI.md as a shared instruction artifact", () => {
     );
     expect(geminiTargets).toHaveLength(1);
     expect(geminiTargets[0].cliSet).toEqual(["gemini", "antigravity"]);
+  });
+
+  // The two scopes have different readerships, so their cliSets differ on
+  // purpose. Antigravity finds GEMINI.md by walking CWD up to the repo root,
+  // which never reaches $HOME — agy v1.2.4 embeds no `~/.gemini/GEMINI.md`
+  // literal and documents its global root as `~/.gemini/config/`. Pinned so the
+  // asymmetry reads as a decision, and so widening one scope without the other
+  // has to be deliberate.
+  it("shares GEMINI.md at project scope only, not the user-scope template", () => {
+    expect(INSTRUCTION_ARTIFACTS.gemini.runtimes).toEqual(["gemini", "antigravity"]);
+
+    const userScope = DEFAULT_TARGETS.find(
+      (t) => t.relativeOutputPath.endsWith("cli-instructions/gemini-GEMINI.md"),
+    );
+    expect(userScope, "user-scope gemini template must exist").toBeDefined();
+    expect([...userScope.cliSet]).toEqual(["gemini"]);
   });
 
   it("resolves its audience as present when either runtime is installed", () => {
