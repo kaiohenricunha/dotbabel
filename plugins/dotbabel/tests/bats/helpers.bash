@@ -452,19 +452,60 @@ isolate_path() {
   # points at exclusively — so every caller's teardown() that runs more
   # commands after rm_stub_path (nearly all of them: they rm -rf their own
   # STATE_DIR/TRUST_DIR/REPO right after it) needs PATH restored first.
-  STUB_PREV_PATH="$PATH"
-  export STUB_PREV_PATH
+  #
+  # Saved only on the FIRST isolation, and deliberately not exported. A second
+  # isolate_path in one test process would otherwise save the already-isolated
+  # PATH and later "restore" a deleted STUB_BIN; and exporting would hand the
+  # host's real PATH to every hook subprocess these tests spawn, which is a
+  # hole in the very thing this function exists to close. Both isolate_path
+  # and rm_stub_path run in the same bats test process, so a plain shell
+  # variable is enough.
+  if [ -z "${STUB_PREV_PATH:-}" ]; then
+    STUB_PREV_PATH="$PATH"
+  fi
   STUB_BIN=$(mktemp -d)
   export STUB_BIN
   STUB_LOG="$STUB_BIN/.calls"
   export STUB_LOG
   : > "$STUB_LOG"
 
-  local essential=(bash env jq git mktemp chmod rm sleep date cat dirname
-    basename sed cksum sort wc grep head tail mkdir mv ln touch find tr cut
-    realpath timeout gtimeout)
+  # REQUIRED vs OPTIONAL is load-bearing, not tidiness. A silently missing
+  # utility produces an isolated PATH that is quietly short one tool, and the
+  # resulting failures are invisible:
+  #
+  #   - `jq` and `git` are the hooks' own fail-open guards
+  #     (check-on-stop.sh:76, :155; check-on-write.sh:44 all `exit 0` when
+  #     they are unreachable), so losing one turns every
+  #     `[ "$status" -eq 0 ]` / `[ -z "$output" ]` assertion into a pass that
+  #     verifies nothing.
+  #   - `ls` is used by the test bodies rather than the hooks
+  #     (check-on-stop.bats:71 pipes `ls -A "$STATE_DIR" 2>/dev/null` into
+  #     `wc -l`). With `ls` absent that pipeline prints 0 for a NON-empty
+  #     directory too, so the recursion-guard assertion passes whether or not
+  #     the hook wrote state — measured, not theorised.
+  #
+  # So the required set aborts loudly instead of degrading, and the optional
+  # set (things whose absence a caller can survive, plus the timeout pair the
+  # hooks already probe for and degrade on) stays best-effort.
+  local required=(bash env jq git ls wc)
+  local optional=(mktemp chmod rm sleep date cat dirname basename sed cksum
+    sort grep head tail mkdir mv ln touch find tr cut realpath
+    timeout gtimeout)
   local name target
-  for name in "${essential[@]}"; do
+  for name in "${required[@]}"; do
+    target=$(command -v "$name" 2>/dev/null) || {
+      printf 'isolate_path: required tool not found: %s\n' "$name" >&2
+      return 1
+    }
+    case "$target" in
+      /*) ln -s "$target" "$STUB_BIN/$name" || return 1 ;;
+      *)
+        printf 'isolate_path: required tool is not an executable on disk: %s\n' "$name" >&2
+        return 1
+        ;;
+    esac
+  done
+  for name in "${optional[@]}"; do
     target=$(command -v "$name" 2>/dev/null) || continue
     case "$target" in
       /*) ln -s "$target" "$STUB_BIN/$name" 2>/dev/null || true ;;
@@ -534,5 +575,25 @@ rm_stub_path() {
     export PATH
     unset STUB_PREV_PATH
   fi
+  return 0
+}
+
+# Assert that no project toolchain is reachable on the current PATH. Call from
+# a test that ran isolate_path in setup(); no test stubs these in setup(), so
+# any hit is a real host toolchain leaking through the isolation.
+#
+# The list mirrors what check-on-stop.sh and check-on-write.sh probe for with
+# `have`/`command -v`. Adding a language to either hook means adding it here —
+# that coupling is the point: it fails loudly rather than silently widening
+# what an "absent toolchain" test can see.
+assert_no_toolchain_on_path() {
+  local tool
+  for tool in go cargo tsc mvn dotnet shellcheck gofmt ruff python3 node Rscript; do
+    if command -v "$tool" >/dev/null 2>&1; then
+      printf 'toolchain leaked into the isolated PATH: %s (%s)\n' \
+        "$tool" "$(command -v "$tool")" >&2
+      return 1
+    fi
+  done
   return 0
 }

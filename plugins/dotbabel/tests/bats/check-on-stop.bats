@@ -340,6 +340,12 @@ seed_go() {
   [[ ":$PATH:" != *:/usr/bin:* ]]
   [[ ":$PATH:" != *:/bin:* ]]
   [ "$STUB_BIN" = "${PATH%%:*}" ]
+  # The PATH shape above is the mechanism; this is the property it exists to
+  # guarantee. Asserting only the shape would let a future regression that
+  # re-exposes /usr/local/bin, $HOME/go/bin, or a homebrew prefix pass while
+  # reintroducing exactly this bug. (`command -v` is a builtin, so this stays
+  # within the builtins-only constraint above.)
+  assert_no_toolchain_on_path
 }
 
 # A stub that records the directory it ran in. The monorepo tests care about
