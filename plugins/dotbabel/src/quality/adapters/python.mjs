@@ -54,8 +54,14 @@ function read(root, name) {
 function declaresPytest(root) {
   if (has(root, "pytest.ini") || has(root, "conftest.py")) return true;
   if (/\[tool\.pytest\.ini_options\]/.test(read(root, "pyproject.toml") ?? "")) return true;
-  if (/^\s*\[pytest\]/m.test(read(root, "tox.ini") ?? "")) return true;
-  return /^\s*\[tool:pytest\]/m.test(read(root, "setup.cfg") ?? "");
+  // `[ \t]*`, not `\s*`: `\s` matches a newline, so pairing it with a
+  // multiline `^` makes the engine re-scan the whole remaining file from every
+  // line start — quadratic. A file of 40,000 blank lines took ~2s, and this
+  // runs before the profile and trust gates on a checkout that may come from
+  // an untrusted fork. A section header's indentation is on its own line
+  // anyway, so the narrower class loses nothing.
+  if (/^[ \t]*\[pytest\]/m.test(read(root, "tox.ini") ?? "")) return true;
+  return /^[ \t]*\[tool:pytest\]/m.test(read(root, "setup.cfg") ?? "");
 }
 
 /**
@@ -89,7 +95,11 @@ function builtinPytestPlans(component, profile, claimed, includeTests) {
 
   const build = (capability, args, report) => {
     const command = pythonCommand(root, "pytest", args);
-    return { id: `${component.id}:${capability}:pytest`, componentId: component.id, capability, ruleIds: capabilityRules(capability), ...command, cwd: root, ...(report ? { report } : {}), availability: "available", source: "built-in", requiresTrust: true };
+    // `candidate`, not `available`: the gate above proves pytest is CONFIGURED,
+    // not that it is installed. That is the same evidence class as
+    // golangci-lint behind a `.golangci.*` file (go.mjs) and the configured
+    // Python tools above, both of which this codebase labels `candidate`.
+    return { id: `${component.id}:${capability}:pytest`, componentId: component.id, capability, ruleIds: capabilityRules(capability), ...command, cwd: root, ...(report ? { report } : {}), availability: "candidate", source: "built-in", requiresTrust: true };
   };
 
   if (!claimed.has("test") && capabilityInProfile("test", profile, includeTests)) {

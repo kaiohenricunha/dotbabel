@@ -1,7 +1,8 @@
 # Captured pytest-cov report
 
-`coverage.json` is a `coverage.py` JSON report as `pytest --cov --cov-report=json:<path>`
-writes it (KD-8). Captured from:
+`coverage.json` is a `coverage.py` JSON report as
+`pytest --cov --cov-report=json:.dotbabel/quality/coveragepy.json` writes it
+(KD-8) — the exact argv the Python adapter builds. Captured from:
 
 - `pytest` 8.3.3
 - `pytest-cov` 5.0.0

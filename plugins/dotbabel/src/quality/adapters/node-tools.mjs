@@ -48,7 +48,12 @@ const VITEST_PROVIDERS = ["@vitest/coverage-v8", "@vitest/coverage-istanbul"];
 function exec(root, binary, args) {
   const pm = manager(root);
   if (pm === "pnpm") return { executable: "pnpm", argv: ["exec", binary, ...args] };
-  if (pm === "yarn") return { executable: "yarn", argv: [binary, ...args] };
+  // `yarn exec`, never `yarn <binary>`: on Yarn 1 the bare form is shorthand
+  // for `yarn run <binary>`, which resolves package.json `scripts` BEFORE
+  // node_modules/.bin. A repository with a script named `vitest` would have it
+  // run instead of the binary, silently, and no report would appear at the
+  // path this plan declares.
+  if (pm === "yarn") return { executable: "yarn", argv: ["exec", binary, ...args] };
   return { executable: "npx", argv: ["--no-install", binary, ...args] };
 }
 
@@ -59,8 +64,13 @@ function exec(root, binary, args) {
  * Declaration is the whole gate. `dotbabel quality` never installs a checker,
  * so planning coverage for a repository that does not declare a runner yields
  * a plan that can only resolve through `on_unavailable` — which reads as a
- * finding rather than as "nothing to measure here". A repository script or
- * Make target keeps priority, because those encode choices this cannot see.
+ * finding rather than as "nothing to measure here". A repository script keeps
+ * priority, because it encodes choices this cannot see.
+ *
+ * Note that a Make target does NOT take priority here, unlike in the Python
+ * and Go adapters: `makeRepositoryPlans` is wired into those two only, so a
+ * Node component with a `coverage` Make target and no script still gets this
+ * built-in plan.
  *
  * @param {object} component
  * @param {string} profile
@@ -84,13 +94,15 @@ export function nodeBuiltinCoveragePlans(component, profile, claimed = new Set()
       ...command,
       cwd: root,
       report: { format: "istanbul-json", path: COVERAGE_REPORT_PATH },
-      availability: "available",
+      // `candidate`, not `available`: a manifest entry proves the package is
+      // DECLARED, not installed. `node_modules` may be absent entirely.
+      availability: "candidate",
       source: "built-in",
       requiresTrust: true,
     }];
   };
 
-  if (declared.vitest !== undefined && VITEST_PROVIDERS.some((name) => declared[name] !== undefined)) {
+  if (VITEST_PROVIDERS.some((name) => declared[name] !== undefined)) {
     return plan("vitest", ["run", "--coverage", "--coverage.reporter=json", `--coverage.reportsDirectory=${path.posix.dirname(COVERAGE_REPORT_PATH)}`]);
   }
   if (declared.jest !== undefined) {

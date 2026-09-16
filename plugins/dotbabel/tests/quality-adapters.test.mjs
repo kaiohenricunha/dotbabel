@@ -295,6 +295,35 @@ describe("node adapter — built-in coverage (P-C3)", () => {
     });
   });
 
+  it("plans coverage from the provider alone, as KD-8 specifies", () => {
+    // The provider is the trigger, not `vitest` itself. In a workspace the
+    // runner is often hoisted to the root or listed as a peer, and requiring
+    // it here produced exactly the silent non-measurement KD-8 avoids.
+    withRoot({ "package.json": JSON.stringify({ devDependencies: { "@vitest/coverage-v8": "^4" } }) }, "dotbabel-node-", (root) => {
+      const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
+      expect(cov).toBeDefined();
+      expect(cov.argv).toContain("--coverage.reporter=json");
+    });
+  });
+
+  it("labels a declared-but-unproven runner as a candidate, not available", () => {
+    // A manifest entry proves the package is declared, not installed, which is
+    // the same evidence class the Go and Python adapters label `candidate`.
+    withRoot({ "package.json": JSON.stringify(vitest) }, "dotbabel-node-", (root) => {
+      expect(planFor("javascript", root).find((p) => p.capability === "coverage").availability).toBe("candidate");
+    });
+  });
+
+  it("wires the built-in coverage plan into the TypeScript adapter too", () => {
+    // P-C3 wires nodeBuiltinCoveragePlans into both Node adapters; without
+    // this case, deleting the typescript.mjs line would fail no test.
+    withRoot({ "package.json": JSON.stringify(vitest), "tsconfig.json": "{}" }, "dotbabel-ts-", (root) => {
+      const cov = planFor("typescript", root, { markers: ["tsconfig.json"] }).find((p) => p.capability === "coverage");
+      expect(cov).toBeDefined();
+      expect(cov.report).toEqual({ format: "istanbul-json", path: ".dotbabel/quality/coverage-final.json" });
+    });
+  });
+
   it("uses pnpm exec or yarn when the matching lockfile exists", () => {
     withRoot({ "package.json": JSON.stringify(vitest), "pnpm-lock.yaml": "" }, "dotbabel-node-", (root) => {
       const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
@@ -304,7 +333,9 @@ describe("node adapter — built-in coverage (P-C3)", () => {
     withRoot({ "package.json": JSON.stringify(vitest), "yarn.lock": "" }, "dotbabel-node-", (root) => {
       const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
       expect(cov.executable).toBe("yarn");
-      expect(cov.argv[0]).toBe("vitest");
+      // `yarn exec`, not `yarn vitest`: the bare form is `yarn run vitest` on
+      // Yarn 1, which would prefer a same-named package.json script.
+      expect(cov.argv.slice(0, 2)).toEqual(["exec", "vitest"]);
     });
     withRoot({ "package.json": JSON.stringify(vitest) }, "dotbabel-node-", (root) => {
       const cov = planFor("javascript", root).find((p) => p.capability === "coverage");
