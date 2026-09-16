@@ -28,6 +28,11 @@ preserved verbatim because they describe state at the time of release.
 * **specs:** add the acceptance_criteria shape check (P-A1) ([#350](https://github.com/kaiohenricunha/dotbabel/issues/350)) ([9c45cd9](https://github.com/kaiohenricunha/dotbabel/commit/9c45cd9f167e76904e9156cfbe002a3d5113bbcd))
 
 
+### Upgrade notes
+
+* **agents:** the default `fan_out` widened to include `antigravity` and `opencode`. A repo with no `fan_out` key in `.dotbabel.json`, synced before this release, will see `check-project-sync` fail with missing `.agents/` and `.opencode/` entries until it re-runs `dotbabel project-sync`. A repo with an explicit `fan_out` array is unaffected — that list is never widened automatically.
+
+
 ### Fixed
 
 * **handoff:** resolve sessions through a symlinked session root ([#345](https://github.com/kaiohenricunha/dotbabel/issues/345)) ([db08ece](https://github.com/kaiohenricunha/dotbabel/commit/db08ece2d88c85250153c708cff18c1fd6fd75b3))
