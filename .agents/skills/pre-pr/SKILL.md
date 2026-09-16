@@ -1,0 +1,1 @@
+../../../.claude/commands/pre-pr.md
