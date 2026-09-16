@@ -10,6 +10,49 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [3.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.3.0...v3.4.0) (2026-09-16)
+
+
+### Added
+
+* **agents:** add Antigravity CLI support ([#365](https://github.com/kaiohenricunha/dotbabel/issues/365)) ([56896e3](https://github.com/kaiohenricunha/dotbabel/commit/56896e35a61fb1edd824f364f655e49ed6b5b6a6))
+* **agents:** add OpenCode CLI support ([#374](https://github.com/kaiohenricunha/dotbabel/issues/374)) ([4c6a5b6](https://github.com/kaiohenricunha/dotbabel/commit/4c6a5b67684d17fefbd32065038d8048733f389d))
+* **commands:** add /pr-tldr for plain-language PR summaries ([#352](https://github.com/kaiohenricunha/dotbabel/issues/352)) ([abf1426](https://github.com/kaiohenricunha/dotbabel/commit/abf1426ddc5cd7858bac570e2312bf5df9bcbb10))
+* **commands:** add generic /tldr command ([#361](https://github.com/kaiohenricunha/dotbabel/issues/361)) ([9780073](https://github.com/kaiohenricunha/dotbabel/commit/978007318de2af49b0f9b8fa50b3527b7b4845a1))
+* **criteria:** add the criteria core library (P-B1) ([#351](https://github.com/kaiohenricunha/dotbabel/issues/351)) ([d7c4d1d](https://github.com/kaiohenricunha/dotbabel/commit/d7c4d1de932442ebe336848befc00c3959cfc814))
+* **criteria:** add the dotbabel criteria command (P-B2) ([#353](https://github.com/kaiohenricunha/dotbabel/issues/353)) ([c4e3319](https://github.com/kaiohenricunha/dotbabel/commit/c4e33190c3fbd49313a2043584271f7b12262c09))
+* **criteria:** enforce acceptance-criteria evidence in the merge gate (P-B3) ([#366](https://github.com/kaiohenricunha/dotbabel/issues/366)) ([2b4d078](https://github.com/kaiohenricunha/dotbabel/commit/2b4d07862d13737a4283bab18c7c00f2d0282738))
+* **quality:** add path-triggered verification ([#355](https://github.com/kaiohenricunha/dotbabel/issues/355)) ([3212914](https://github.com/kaiohenricunha/dotbabel/commit/3212914691ef85d5b6431502800918ad04ff6f8f))
+* **quality:** plan pytest and Node coverage for declared tools (P-C2, P-C3) ([#369](https://github.com/kaiohenricunha/dotbabel/issues/369)) ([a1c8bca](https://github.com/kaiohenricunha/dotbabel/commit/a1c8bca7abf62a43d36a5513e0d93770c864e598))
+* **quality:** remove regression_paths and verification_commands (P-C5) ([#364](https://github.com/kaiohenricunha/dotbabel/issues/364)) ([64703c3](https://github.com/kaiohenricunha/dotbabel/commit/64703c375df0e77930480e6e5fee9c4902aac2e2))
+* **specs:** add the acceptance_criteria shape check (P-A1) ([#350](https://github.com/kaiohenricunha/dotbabel/issues/350)) ([9c45cd9](https://github.com/kaiohenricunha/dotbabel/commit/9c45cd9f167e76904e9156cfbe002a3d5113bbcd))
+
+
+### Fixed
+
+* **handoff:** resolve sessions through a symlinked session root ([#345](https://github.com/kaiohenricunha/dotbabel/issues/345)) ([db08ece](https://github.com/kaiohenricunha/dotbabel/commit/db08ece2d88c85250153c708cff18c1fd6fd75b3))
+* **hooks:** catch git global options, honor a per-call bypass, and let merge-pr accept a No-spec rationale ([#348](https://github.com/kaiohenricunha/dotbabel/issues/348)) ([60a4815](https://github.com/kaiohenricunha/dotbabel/commit/60a481542441f98c06c968f71a6066165cf15b6f))
+* **hooks:** stop the destructive-git guard blocking single-file dotfile restores ([#344](https://github.com/kaiohenricunha/dotbabel/issues/344)) ([8c5ac4a](https://github.com/kaiohenricunha/dotbabel/commit/8c5ac4afd7d4d40ff67c6173880c87f4a87255bf))
+* **quality:** align AC-8 test name ([#357](https://github.com/kaiohenricunha/dotbabel/issues/357)) ([b84f7a3](https://github.com/kaiohenricunha/dotbabel/commit/b84f7a38d08e2c925303bd6e34a2e5f2c8467aca))
+* **quality:** fail loudly when Git cannot determine the change scope ([#343](https://github.com/kaiohenricunha/dotbabel/issues/343)) ([4dcaada](https://github.com/kaiohenricunha/dotbabel/commit/4dcaadaccb8ee987e51238f88b92135c242b05d1))
+* **tests:** make bats isolate_path hermetic instead of exposing /usr/bin:/bin ([#360](https://github.com/kaiohenricunha/dotbabel/issues/360)) ([619a231](https://github.com/kaiohenricunha/dotbabel/commit/619a231e4a951dba64d8a757bf909e9258438b9a))
+* **tests:** remove test tempdirs in teardown ([#358](https://github.com/kaiohenricunha/dotbabel/issues/358)) ([8c4a0c9](https://github.com/kaiohenricunha/dotbabel/commit/8c4a0c9fc889e1aa6d9851056b1c99b9e1ad61ff))
+
+
+### Changed
+
+* **agents:** introduce single-source-of-truth agent registry ([#363](https://github.com/kaiohenricunha/dotbabel/issues/363)) ([578bd8b](https://github.com/kaiohenricunha/dotbabel/commit/578bd8b5b70023b000a6b4f8c3114ab510145656))
+
+
+### Documentation
+
+* **quality:** present the quality floor across README, docs, and the rule floor ([#341](https://github.com/kaiohenricunha/dotbabel/issues/341)) ([1f3c17d](https://github.com/kaiohenricunha/dotbabel/commit/1f3c17dacca3cde285235c05542adc9588b94c3a))
+* **rules:** add disk-hygiene section to the global rule floor ([#359](https://github.com/kaiohenricunha/dotbabel/issues/359)) ([6c1661b](https://github.com/kaiohenricunha/dotbabel/commit/6c1661bb7493a9c4b901d8042dad5cede9e874a0))
+* **spec:** let related work units share one pull request (IMPL-1) ([#368](https://github.com/kaiohenricunha/dotbabel/issues/368)) ([5bb432b](https://github.com/kaiohenricunha/dotbabel/commit/5bb432b863f84c5632ce0d9c96ec03d2186d5920))
+* **specs:** add the QA verification harness spec ([#346](https://github.com/kaiohenricunha/dotbabel/issues/346)) ([3c171de](https://github.com/kaiohenricunha/dotbabel/commit/3c171dec09925017b0de05a892c33249ae139bb1))
+* **specs:** approve the QA verification harness spec ([#349](https://github.com/kaiohenricunha/dotbabel/issues/349)) ([9ee9581](https://github.com/kaiohenricunha/dotbabel/commit/9ee95810441e1dfbfef1bc9e7fd2f6c678b4edfd))
+* **specs:** record owner confirmation of the QA harness key decisions ([#347](https://github.com/kaiohenricunha/dotbabel/issues/347)) ([0abf40f](https://github.com/kaiohenricunha/dotbabel/commit/0abf40f6fd40d16d546f00101e75104b1fee5110))
+
 ## [3.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.2.1...v3.3.0) (2026-09-08)
 
 
