@@ -22,6 +22,7 @@ import {
 import {
   RUNTIMES,
   anyRuntimePresent,
+  resolveGlobalInstructionPath,
   resolveGlobalSkillsDir,
 } from "./agents.mjs";
 import {
@@ -241,7 +242,7 @@ export async function bootstrapGlobal(opts = {}) {
       linkCliInstruction({
         cli: runtime.id,
         src: path.join(cliInstructionsSrc, runtime.globalInstruction.templateFile),
-        dst: path.join(homeRoot, ...runtime.globalInstruction.dest),
+        dst: resolveGlobalInstructionPath(runtime.id, homeRoot, process.env),
       });
     }
     const skillsDir = resolveGlobalSkillsDir(runtime.id, homeRoot, process.env);

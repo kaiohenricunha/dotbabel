@@ -273,14 +273,14 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 > **Platform note:** Windows is not supported (symlinks require elevated
 > permissions). Use WSL or run `bootstrap.sh` from Git Bash instead.
 
-| Flag              | Default     |                                                                                             |
-| ----------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode)                                             |
-| `--target <dir>`  | `~/.claude` | Override destination directory                                                              |
-| `--all`           | false       | Link Copilot/Codex/Gemini instructions and fan out skills to `~/.codex/`, `~/.gemini/`.[^1] |
-| `--quiet`         | false       | Suppress per-file progress; print summary only                                              |
+| Flag              | Default     |                                                                                               |
+| ----------------- | ----------- | --------------------------------------------------------------------------------------------- |
+| `--source <path>` | npm install | Path to a local dotbabel git clone (clone mode)                                               |
+| `--target <dir>`  | `~/.claude` | Override destination directory                                                                |
+| `--all`           | false       | Link every CLI's instruction file and fan out skills to each CLI's user-scope skills dir.[^1] |
+| `--quiet`         | false       | Suppress per-file progress; print summary only                                                |
 
-[^1]: Skills fan out to `~/.codex/skills/` and `~/.gemini/skills/`. Copilot has no skill auto-discovery directory, so only its instruction file is linked.
+[^1]: Skills fan out to `~/.codex/skills/`, `~/.gemini/skills/`, `~/.gemini/config/skills/` (Antigravity), and `~/.config/opencode/skills/`. Copilot has no skill auto-discovery directory, so only its instruction file is linked.
 
 **Typical invocations:**
 
@@ -424,8 +424,8 @@ Exit 1 if the artifact is not found. Exit 2 if the index is missing.
 ## `dotbabel-project-sync`
 
 Fan out this repo's `CLAUDE.md`, `.claude/commands` and `.claude/skills` into
-Codex / Gemini / Copilot project-scope analogues. Repo-local; user-scope
-artifacts are `dotbabel bootstrap`'s job.
+Codex / Gemini / Antigravity / OpenCode / Copilot project-scope analogues.
+Repo-local; user-scope artifacts are `dotbabel bootstrap`'s job.
 
 | Flag            | Default |                                        |
 | --------------- | ------- | -------------------------------------- |
@@ -437,12 +437,13 @@ artifacts are `dotbabel bootstrap`'s job.
 Gated on CLI presence by default: a target is skipped when its CLI is not on
 PATH. `.dotbabel.json` `gate_on_cli_presence` controls that; `--all` overrides.
 
-`.dotbabel.json` `fan_out_layout` chooses the Codex/Gemini shape:
+`.dotbabel.json` `fan_out_layout` chooses the shape for the runtimes whose
+skills trees are interchangeable — Codex, Gemini, and OpenCode:
 
-| Value               | Result                                                         |
-| ------------------- | -------------------------------------------------------------- |
-| `per-cli` (default) | `.codex/skills/` and `.gemini/skills/` are two identical trees |
-| `shared`            | one `.cli/skills/` tree; both CLI paths become symlinks to it  |
+| Value               | Result                                                                       |
+| ------------------- | ---------------------------------------------------------------------------- |
+| `per-cli` (default) | `.codex/skills/`, `.gemini/skills/`, `.opencode/skills/` are identical trees |
+| `shared`            | one `.cli/skills/` tree; each of those paths becomes a symlink to it         |
 
 Switching to `shared` backs the old trees up to `.codex/skills.bak-<timestamp>`.
 Copilot's `.github/prompts/` and `.github/instructions/` are unaffected.
@@ -451,7 +452,7 @@ Copilot's `.github/prompts/` and `.github/instructions/` are unaffected.
 it must not receive, for commands that describe a Claude-only flow. An excluded
 link written by an earlier run is removed (`removed: <path>`; `would remove:`
 under `--dry-run`). Under `shared`, an exclusion for `codex` or `gemini`
-applies to both.
+applies to every runtime sharing that tree.
 
 Limitation (Codex/Gemini): targets are symlinks to the Claude source, never
 per-CLI translations. Claude-shaped frontmatter (`allowed-tools`, `model`,

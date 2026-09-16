@@ -9,6 +9,7 @@ import {
   KNOWN_FAN_OUT_CLIS,
   extractRuleFloorOrWhole,
 } from "../src/project-sync.mjs";
+import { shareableSkillRuntimes } from "../src/agents.mjs";
 import { loadCriteriaConfig } from "../src/criteria/config.mjs";
 import { ValidationError, ERROR_CODES } from "../src/lib/errors.mjs";
 import { isGeneratedFile } from "../src/copilot-frontmatter.mjs";
@@ -30,6 +31,23 @@ function hideAllClisFromPath() {
   savedPath = process.env.PATH;
   const bin = makeTmpDir("project-sync-cliless-bin-");
   fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+  process.env.PATH = bin;
+}
+
+/**
+ * The inverse of {@link hideAllClisFromPath}: exactly `names` are installed and
+ * nothing else is, so a presence gate can be tested in both directions without
+ * depending on what the dev box happens to have.
+ *
+ * @param {...string} names  Executable names to fake.
+ */
+function stubClisOnPath(...names) {
+  savedPath = process.env.PATH;
+  const bin = makeTmpDir("project-sync-stub-bin-");
+  fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+  for (const name of names) {
+    fs.writeFileSync(path.join(bin, name), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  }
   process.env.PATH = bin;
 }
 
@@ -94,7 +112,7 @@ describe("loadProjectConfig", () => {
     const repo = makeTmpDir();
     const cfg = loadProjectConfig(repo);
     expect(cfg.rule_floor_source).toBe("CLAUDE.md");
-    expect(cfg.fan_out).toEqual(["codex", "gemini", "antigravity", "copilot"]);
+    expect(cfg.fan_out).toEqual(["codex", "gemini", "antigravity", "opencode", "copilot"]);
     expect(cfg.targets).toHaveLength(3);
   });
 
@@ -109,6 +127,24 @@ describe("loadProjectConfig", () => {
     expect(cfg.gate_on_cli_presence).toBe(false);
     // Defaults still come through for unspecified keys.
     expect(cfg.rule_floor_source).toBe("CLAUDE.md");
+  });
+
+  // Adding a runtime to the registry widens the DEFAULT fan-out — that is the
+  // public contract, and the upgrade note in #365 describes it. It must never
+  // widen a fan_out the consumer wrote down. A config predating OpenCode keeps
+  // exactly the CLIs it names, so an existing repo does not silently start
+  // emitting .opencode/skills on upgrade.
+  it("does not widen an explicit legacy fan_out with a newly supported runtime", () => {
+    const repo = makeTmpDir();
+    fs.writeFileSync(
+      path.join(repo, ".dotbabel.json"),
+      JSON.stringify({ fan_out: ["codex", "gemini", "copilot"] }),
+    );
+    const cfg = loadProjectConfig(repo);
+    expect(cfg.fan_out).toEqual(["codex", "gemini", "copilot"]);
+    expect(cfg.fan_out).not.toContain("opencode");
+    // ...while the default, which the consumer did not write, does include it.
+    expect(loadProjectConfig(makeTmpDir()).fan_out).toContain("opencode");
   });
 
   it("throws on malformed JSON", () => {
@@ -1134,9 +1170,14 @@ describe("projectSync — cli_excluded", () => {
     expect(warnings.some((w) => /shared.*review.*gemini/.test(w))).toBe(true);
   });
 
-  it("shared layout: identical exclusions for codex and gemini do not warn", async () => {
+  // "Identical" has to mean identical across EVERY runtime sharing the tree,
+  // not just the first two. Derived from the registry so that adding a sharer
+  // keeps this test honest instead of turning it red for the wrong reason: with
+  // OpenCode in the list, naming only codex and gemini is a genuine mismatch
+  // and the warning below is correct to fire.
+  it("shared layout: exclusions identical across every sharer do not warn", async () => {
     const repo = buildExcludedRepo(
-      { codex: ["review"], gemini: ["review"] },
+      Object.fromEntries(shareableSkillRuntimes().map((cli) => [cli, ["review"]])),
       { fan_out_layout: "shared" },
     );
     const warnings = [];
@@ -1152,5 +1193,115 @@ describe("projectSync — cli_excluded", () => {
     await projectSync({ repoRoot: repo, allCli: true, out });
     expect(fs.existsSync(path.join(repo, ".cli", "skills", "review"))).toBe(false);
     expect(warnings).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenCode project fan-out.
+//
+// OpenCode reads `.claude/skills` through its compatibility layer, so a native
+// tree is not strictly required for it to see dotbabel's skills. It gets one
+// anyway: compatibility is OpenCode's accommodation of another tool, not a
+// contract dotbabel can rely on, and a native `.opencode/skills` keeps the
+// wiring working regardless of what that layer does. Both trees are read by
+// v2.0.5 today, and a duplicate skill id resolves to one entry.
+// ---------------------------------------------------------------------------
+
+describe("projectSync — opencode", () => {
+  it("per-cli: writes a native .opencode/skills tree", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    // Skills fan out as whole-directory symlinks; commands are wrapped as
+    // <name>/SKILL.md. v2.0.5 resolves both shapes.
+    expect(fs.existsSync(path.join(repo, ".opencode", "skills", "deploy"))).toBe(true);
+    expect(fs.existsSync(path.join(repo, ".opencode", "skills", "commit", "SKILL.md"))).toBe(true);
+    expect(fs.lstatSync(path.join(repo, ".opencode", "skills")).isSymbolicLink()).toBe(false);
+  });
+
+  it("per-cli: stores relative symlink targets like every other runtime (#218)", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    for (const link of [
+      path.join(repo, ".opencode", "skills", "deploy"),
+      path.join(repo, ".opencode", "skills", "commit", "SKILL.md"),
+    ]) {
+      expect(path.isAbsolute(fs.readlinkSync(link))).toBe(false);
+      expect(fs.existsSync(link)).toBe(true);
+    }
+  });
+
+  // `shareable: true` is not an inherited assumption — v2.0.5 was observed
+  // resolving a skills root that is itself a symlink, which is exactly the
+  // shape the shared layout produces.
+  it("shared: takes a redirect into the canonical tree", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [...DEFAULT_PROJECT_CONFIG.targets],
+        fan_out_layout: "shared",
+      },
+    });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+
+    const redirect = path.join(repo, ".opencode", "skills");
+    expect(fs.lstatSync(redirect).isSymbolicLink()).toBe(true);
+    expect(fs.realpathSync(redirect)).toBe(
+      fs.realpathSync(path.join(repo, ".cli", "skills")),
+    );
+    // Both hops still resolve to the canonical file in .claude/.
+    expect(
+      fs.realpathSync(path.join(redirect, "commit", "SKILL.md")),
+    ).toBe(fs.realpathSync(path.join(repo, ".claude", "commands", "commit.md")));
+  });
+
+  it("is skipped when the opencode executable is absent and gating is on", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [],
+        fan_out: ["opencode"],
+        gate_on_cli_presence: true,
+      },
+    });
+    hideAllClisFromPath();
+    await projectSync({ repoRoot: repo, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".opencode"))).toBe(false);
+  });
+
+  it("is materialized when the opencode executable is on PATH", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [],
+        fan_out: ["opencode"],
+        gate_on_cli_presence: true,
+      },
+    });
+    stubClisOnPath("opencode");
+    await projectSync({ repoRoot: repo, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".opencode", "skills", "deploy"))).toBe(true);
+  });
+
+  // --all is the escape hatch for wiring a machine that does not have the CLI
+  // installed yet; it must not depend on detection at all.
+  it("--all forces the tree without the executable present", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, {
+      withDotbabelJson: {
+        ...DEFAULT_PROJECT_CONFIG,
+        targets: [],
+        fan_out: ["opencode"],
+        gate_on_cli_presence: true,
+      },
+    });
+    hideAllClisFromPath();
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    expect(fs.existsSync(path.join(repo, ".opencode", "skills", "deploy"))).toBe(true);
   });
 });

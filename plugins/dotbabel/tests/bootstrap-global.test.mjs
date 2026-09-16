@@ -86,6 +86,32 @@ function buildCliInstructionSources(dir) {
   fs.writeFileSync(path.join(cliInstructions, "copilot-instructions.md"), "# copilot rules\n");
   fs.writeFileSync(path.join(cliInstructions, "codex-AGENTS.md"), "# codex rules\n");
   fs.writeFileSync(path.join(cliInstructions, "gemini-GEMINI.md"), "# gemini rules\n");
+  fs.writeFileSync(path.join(cliInstructions, "opencode-AGENTS.md"), "# opencode rules\n");
+}
+
+/**
+ * Run `fn` with `vars` applied to process.env, restoring the previous values
+ * afterwards. OpenCode's config root is resolved from up to two env vars, so a
+ * precedence test has to set and unset several at once.
+ *
+ * @param {Record<string, string | undefined>} vars
+ * @param {() => Promise<void>} fn
+ */
+async function withEnv(vars, fn) {
+  const prev = {};
+  for (const [key, value] of Object.entries(vars)) {
+    prev[key] = process.env[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    await fn();
+  } finally {
+    for (const [key, value] of Object.entries(prev)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 // The user-scope instruction links are gated on the host CLI being installed,
@@ -601,5 +627,119 @@ describe("resolveSource", () => {
     // return a path that actually contains bootstrap.sh (the repo root).
     const resolved = resolveSource(undefined, {});
     expect(fs.existsSync(path.join(resolved, "bootstrap.sh"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenCode user scope.
+//
+// Unlike every other runtime, both global artifacts live under one XDG config
+// root: `AGENTS.md` sits directly beside the `skills/` tree. The root is
+// `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else
+// `~/.config/opencode` — read off `opencode debug paths` on v2.0.5 under an
+// isolated HOME.
+// ---------------------------------------------------------------------------
+
+describe("bootstrapGlobal — opencode user scope", () => {
+  /** Both env vars cleared, so the default branch is what actually runs. */
+  const NO_OPENCODE_ENV = { OPENCODE_CONFIG_DIR: undefined, XDG_CONFIG_HOME: undefined };
+
+  it("links AGENTS.md and the skills tree under ~/.config/opencode", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+
+    await withEnv(NO_OPENCODE_ENV, async () => {
+      const result = await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+      expect(result.ok).toBe(true);
+
+      const instruction = path.join(tgt, ".config", "opencode", "AGENTS.md");
+      expect(fs.lstatSync(instruction).isSymbolicLink()).toBe(true);
+      expect(fs.readFileSync(instruction, "utf8")).toBe("# opencode rules\n");
+
+      // Skills fan out as whole-dir symlinks; commands are wrapped as
+      // <name>/SKILL.md, the shape v2.0.5 discovers.
+      const skill = path.join(tgt, ".config", "opencode", "skills", "alpha");
+      expect(fs.lstatSync(skill).isSymbolicLink()).toBe(true);
+      expect(fs.readlinkSync(skill)).toBe(path.join(src, "skills", "alpha"));
+      expect(
+        fs.existsSync(path.join(tgt, ".config", "opencode", "skills", "foo", "SKILL.md")),
+      ).toBe(true);
+    });
+  });
+
+  it("honors XDG_CONFIG_HOME by appending its own name to it", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    const xdg = makeTmpDir("custom-xdg-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+
+    await withEnv({ OPENCODE_CONFIG_DIR: undefined, XDG_CONFIG_HOME: xdg }, async () => {
+      expect((await bootstrapGlobal({ source: src, target: tgt, allCli: true })).ok).toBe(true);
+
+      // The base var names the PARENT, so `opencode/` is appended.
+      expect(fs.lstatSync(path.join(xdg, "opencode", "AGENTS.md")).isSymbolicLink()).toBe(true);
+      expect(fs.lstatSync(path.join(xdg, "opencode", "skills", "alpha")).isSymbolicLink()).toBe(
+        true,
+      );
+      expect(fs.existsSync(path.join(tgt, ".config", "opencode"))).toBe(false);
+    });
+  });
+
+  it("lets OPENCODE_CONFIG_DIR replace the root outright, beating XDG_CONFIG_HOME", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    const xdg = makeTmpDir("custom-xdg-");
+    const root = makeTmpDir("custom-opencode-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+
+    await withEnv({ OPENCODE_CONFIG_DIR: root, XDG_CONFIG_HOME: xdg }, async () => {
+      expect((await bootstrapGlobal({ source: src, target: tgt, allCli: true })).ok).toBe(true);
+
+      // Named outright: no `opencode/` segment is appended.
+      expect(fs.lstatSync(path.join(root, "AGENTS.md")).isSymbolicLink()).toBe(true);
+      expect(fs.lstatSync(path.join(root, "skills", "alpha")).isSymbolicLink()).toBe(true);
+      expect(fs.existsSync(path.join(xdg, "opencode"))).toBe(false);
+      expect(fs.existsSync(path.join(tgt, ".config", "opencode"))).toBe(false);
+    });
+  });
+
+  it("skips both artifacts when opencode is not on PATH", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+    hideAllClisFromPath();
+
+    await withEnv(NO_OPENCODE_ENV, async () => {
+      expect((await bootstrapGlobal({ source: src, target: tgt })).ok).toBe(true);
+      expect(fs.existsSync(path.join(tgt, ".config", "opencode", "AGENTS.md"))).toBe(false);
+      const skills = path.join(tgt, ".config", "opencode", "skills");
+      expect(fs.existsSync(skills) && fs.readdirSync(skills).length > 0).toBe(false);
+    });
+  });
+
+  it("is idempotent: a second run relinks to the same targets", async () => {
+    const src = makeTmpDir("bg-src-");
+    const tgt = makeTmpDir("bg-tgt-");
+    buildFakeSource(src);
+    buildCliInstructionSources(src);
+
+    await withEnv(NO_OPENCODE_ENV, async () => {
+      await bootstrapGlobal({ source: src, target: tgt, allCli: true });
+      const instruction = path.join(tgt, ".config", "opencode", "AGENTS.md");
+      const skill = path.join(tgt, ".config", "opencode", "skills", "alpha");
+      const before = [fs.readlinkSync(instruction), fs.readlinkSync(skill)];
+
+      expect((await bootstrapGlobal({ source: src, target: tgt, allCli: true })).ok).toBe(true);
+      expect([fs.readlinkSync(instruction), fs.readlinkSync(skill)]).toEqual(before);
+      // No `.bak-*` churn from re-running over our own links.
+      expect(
+        fs.readdirSync(path.join(tgt, ".config", "opencode")).filter((e) => e.includes(".bak-")),
+      ).toEqual([]);
+    });
   });
 });

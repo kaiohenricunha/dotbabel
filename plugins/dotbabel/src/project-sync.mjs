@@ -480,18 +480,24 @@ export async function projectSync(opts) {
       }
     }
     if (!sharedLayout) return;
-    const [a, b] = SHAREABLE_SKILL_CLIS;
-    if (!fanOut.includes(a) || !fanOut.includes(b)) return;
-    for (const [only, other] of [
-      [a, b],
-      [b, a],
-    ]) {
-      const otherSet = new Set(map[other] ?? []);
-      for (const name of map[only] ?? []) {
-        if (otherSet.has(name)) continue;
-        out.warn(
-          `cli_excluded: fan_out_layout "shared" drops "${name}" for ${other} too (excluded for ${only} only)`,
-        );
+    // Every sharer reads the same canonical tree, so an exclusion naming one of
+    // them silently applies to all of them. Warn once per (excluded-for,
+    // also-dropped-for) pair. This walks all ordered pairs rather than the two
+    // it used to destructure as `const [a, b]`: OpenCode made the list three
+    // long, and a third sharer would otherwise have taken the redirect while
+    // vanishing from this warning entirely.
+    const sharers = SHAREABLE_SKILL_CLIS.filter((cli) => fanOut.includes(cli));
+    if (sharers.length < 2) return;
+    for (const only of sharers) {
+      for (const other of sharers) {
+        if (other === only) continue;
+        const otherSet = new Set(map[other] ?? []);
+        for (const name of map[only] ?? []) {
+          if (otherSet.has(name)) continue;
+          out.warn(
+            `cli_excluded: fan_out_layout "shared" drops "${name}" for ${other} too (excluded for ${only} only)`,
+          );
+        }
       }
     }
   }

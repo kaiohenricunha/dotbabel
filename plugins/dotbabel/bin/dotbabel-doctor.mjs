@@ -47,7 +47,12 @@ import {
 } from "../src/index.mjs";
 import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
 import { isRepoTrusted } from "../src/trust-allowlist.mjs";
-import { RUNTIMES, anyRuntimePresent, resolveGlobalSkillsDir } from "../src/agents.mjs";
+import {
+  RUNTIMES,
+  anyRuntimePresent,
+  resolveGlobalInstructionPath,
+  resolveGlobalSkillsDir,
+} from "../src/agents.mjs";
 
 const META = {
   name: "dotbabel-doctor",
@@ -248,7 +253,7 @@ if (globalLstat === null) {
 for (const runtime of Object.values(RUNTIMES)) {
   if (!runtime.globalInstruction) continue;
   const label = runtime.label;
-  const symlinkPath = join(homedir(), ...runtime.globalInstruction.dest);
+  const symlinkPath = resolveGlobalInstructionPath(runtime.id, homedir(), process.env);
   try {
     const l = lstatSync(symlinkPath);
     if (l.isSymbolicLink()) {

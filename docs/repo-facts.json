@@ -24,7 +24,8 @@
     ".github/copilot-instructions.md",
     "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
     "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
-    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md",
+    "plugins/dotbabel/templates/cli-instructions/opencode-AGENTS.md"
   ],
   "rule_floor_files": [
     "CLAUDE.md",
@@ -33,7 +34,8 @@
     ".github/copilot-instructions.md",
     "plugins/dotbabel/templates/cli-instructions/copilot-instructions.md",
     "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
-    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
+    "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md",
+    "plugins/dotbabel/templates/cli-instructions/opencode-AGENTS.md"
   ],
   "cli_substitutions": {
     "_default_": {},
@@ -68,6 +70,14 @@
       "~/.claude/CLAUDE.md": "~/.gemini/GEMINI.md",
       "~/.claude/": "~/.gemini/",
       "~/.claude": "~/.gemini"
+    },
+    "opencode": {
+      "# CLAUDE.md — Global Claude Code Rules": "# Global OpenCode CLI rules",
+      "every Claude Code session": "every OpenCode CLI session",
+      "Global Claude config": "Global OpenCode config",
+      "~/.claude/CLAUDE.md": "~/.config/opencode/AGENTS.md",
+      "~/.claude/": "~/.config/opencode/",
+      "~/.claude": "~/.config/opencode"
     }
   }
 }
