@@ -160,11 +160,22 @@ export const INSTRUCTION_ARTIFACTS = Object.freeze({
     substitutionKey: "agents",
     runtimes: Object.freeze(["copilot", "codex"]),
   }),
+  // Read by both Google runtimes. Antigravity discovers GEMINI.md by walking up
+  // from the CWD to the repo root, the same hierarchical rule Gemini CLI uses —
+  // documented in the CLI's own bundled guide (agy v1.2.4,
+  // builtin/skills/agy-customizations/SKILL.md, "Customization Discovery and
+  // Locations") and confirmed against a live install.
+  //
+  // Membership here is not cosmetic: renderTarget includes a cli-conditional
+  // span only when its tag-set is a superset of this list, so a `gemini`-only
+  // span now stops reaching GEMINI.md. That is the correct reading — content in
+  // a file two runtimes load must hold for both — and it is why this list, not
+  // a disjunction at each call site, is where the sharing lives.
   gemini: Object.freeze({
     key: "gemini",
     relativeOutputPath: "GEMINI.md",
     substitutionKey: "gemini",
-    runtimes: Object.freeze(["gemini"]),
+    runtimes: Object.freeze(["gemini", "antigravity"]),
   }),
   copilot: Object.freeze({
     key: "copilot",

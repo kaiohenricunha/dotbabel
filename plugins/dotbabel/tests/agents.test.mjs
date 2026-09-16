@@ -65,7 +65,11 @@ describe("agents registry — equivalence with existing declarations", () => {
   it("projectArtifactTargets() reproduces the historical default targets", () => {
     expect(projectArtifactTargets()).toEqual([
       { relativeOutputPath: "AGENTS.md", cliSet: ["copilot", "codex"], substitutionKey: "agents" },
-      { relativeOutputPath: "GEMINI.md", cliSet: ["gemini"], substitutionKey: "gemini" },
+      {
+        relativeOutputPath: "GEMINI.md",
+        cliSet: ["gemini", "antigravity"],
+        substitutionKey: "gemini",
+      },
       {
         relativeOutputPath: ".github/copilot-instructions.md",
         cliSet: ["copilot"],
@@ -313,6 +317,49 @@ describe("antigravity detection", () => {
     expect(anyRuntimePresent(["gemini"])).toBe(false);
     expect(anyRuntimePresent(["antigravity"])).toBe(false);
     expect(anyRuntimePresent(["gemini", "antigravity"])).toBe(false);
+  });
+});
+
+// The shared artifact is the whole point of splitting runtimes from artifacts:
+// two runtimes, one GEMINI.md, expressed as set membership rather than an
+// `if (gemini || agy)` repeated per call site.
+describe("GEMINI.md as a shared instruction artifact", () => {
+  it("is owned by exactly one artifact, listing both Google runtimes", () => {
+    const owning = Object.values(INSTRUCTION_ARTIFACTS).filter(
+      (a) => a.relativeOutputPath === "GEMINI.md",
+    );
+    expect(owning).toHaveLength(1);
+    expect(owning[0].runtimes).toEqual(["gemini", "antigravity"]);
+  });
+
+  it("keeps the neutral-vs-own substitution-key split the header describes", () => {
+    // Shared artifact keeps gemini's key rather than inventing a neutral one:
+    // the file name and every path inside it are still Gemini's.
+    expect(INSTRUCTION_ARTIFACTS.gemini.substitutionKey).toBe("gemini");
+    // Antigravity ships no user-scope template of its own, so it has no key.
+    expect(RUNTIMES.antigravity.substitutionKey).toBeNull();
+    expect(RUNTIMES.antigravity.globalInstruction).toBeNull();
+  });
+
+  it("produces one GEMINI.md target, not one per reading runtime", () => {
+    const geminiTargets = projectArtifactTargets().filter(
+      (t) => t.relativeOutputPath === "GEMINI.md",
+    );
+    expect(geminiTargets).toHaveLength(1);
+    expect(geminiTargets[0].cliSet).toEqual(["gemini", "antigravity"]);
+  });
+
+  it("resolves its audience as present when either runtime is installed", () => {
+    const audience = INSTRUCTION_ARTIFACTS.gemini.runtimes;
+    const bin = makeTmpDir("agents-stub-bin-");
+    fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+    fs.writeFileSync(path.join(bin, "agy"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    savedPath = process.env.PATH;
+    process.env.PATH = bin;
+
+    // Gemini CLI absent, Antigravity present — the shared file still has a reader.
+    expect(anyRuntimePresent(["gemini"])).toBe(false);
+    expect(anyRuntimePresent([...audience])).toBe(true);
   });
 });
 

@@ -8,7 +8,7 @@
       "omittedHeadings": []
     },
     "GEMINI.md": {
-      "cliSet": ["gemini"],
+      "cliSet": ["gemini", "antigravity"],
       "mode": "inject",
       "omittedHeadings": []
     },
