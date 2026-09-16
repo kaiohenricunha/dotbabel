@@ -220,6 +220,17 @@ fan_out_skills_to_dir gemini "${GEMINI_HOME:-$HOME/.gemini}/skills"
 # collides with Gemini's own ~/.gemini/skills/. Probed as `agy`, since that is
 # the installed executable name.
 fan_out_skills_to_dir antigravity "${ANTIGRAVITY_CONFIG_HOME:-$HOME/.gemini/config}/skills" agy
+# OpenCode keeps both user-scope artifacts under one XDG config root: AGENTS.md
+# sits beside the skills/ tree. The root is $OPENCODE_CONFIG_DIR, else
+# $XDG_CONFIG_HOME/opencode, else ~/.config/opencode — verified with
+# `opencode debug paths` under an isolated HOME on v2.0.5. OPENCODE_CONFIG names
+# a config FILE and is deliberately not consulted here.
+OPENCODE_ROOT="${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}"
+link_cli_instruction \
+  opencode \
+  "$CLI_INSTRUCTIONS_SRC/opencode-AGENTS.md" \
+  "$OPENCODE_ROOT/AGENTS.md"
+fan_out_skills_to_dir opencode "$OPENCODE_ROOT/skills"
 
 if [[ "$QUIET" = "1" ]]; then
   echo "bootstrap complete — target: $TARGET"

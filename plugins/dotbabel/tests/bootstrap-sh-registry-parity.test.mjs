@@ -32,15 +32,21 @@ describe("bootstrap.sh mirrors the agent registry", () => {
   it("uses each runtime's template file and destination", () => {
     for (const runtime of Object.values(RUNTIMES)) {
       if (!runtime.globalInstruction) continue;
-      const { templateFile, dest } = runtime.globalInstruction;
+      const { templateFile, dest, relativeTo } = runtime.globalInstruction;
       expect(
         bootstrapSh,
         `bootstrap.sh must link ${runtime.id} from ${templateFile}`,
       ).toContain(`"$CLI_INSTRUCTIONS_SRC/${templateFile}"`);
+      // A `configDir`-relative dest hangs off the runtime's resolved config
+      // root, which the shell holds in a variable, so only the tail is literal.
+      // A $HOME-relative dest stays fully literal, as every pre-OpenCode
+      // runtime's is.
+      const expected =
+        relativeTo === "configDir" ? `/${dest.join("/")}"` : `"$HOME/${dest.join("/")}"`;
       expect(
         bootstrapSh,
-        `bootstrap.sh must link ${runtime.id} to $HOME/${dest.join("/")}`,
-      ).toContain(`"$HOME/${dest.join("/")}"`);
+        `bootstrap.sh must link ${runtime.id} to a path ending ${expected}`,
+      ).toContain(expected);
     }
   });
 
@@ -51,14 +57,27 @@ describe("bootstrap.sh mirrors the agent registry", () => {
     expect(calledIds("fan_out_skills_to_dir").sort()).toEqual([...expected].sort());
   });
 
-  it("honors each runtime's skills env-var override and default dir", () => {
+  // The shell must reproduce resolveGlobalConfigDir's precedence for each
+  // runtime, since it cannot call it. Two shapes exist: a plain root named
+  // outright by one env var, and OpenCode's XDG root whose base var names the
+  // root's PARENT. Asserting the exact expansion for each shape is what stops
+  // the npm-less path from resolving a different directory than the npm one.
+  it("honors each runtime's config-root precedence and skills subdir", () => {
     for (const runtime of Object.values(RUNTIMES)) {
       if (!runtime.globalSkills) continue;
-      const { envVar, baseDir, subdir } = runtime.globalSkills;
+      const { envVar, xdgBaseVar, xdgSubdir, baseDir } = runtime.configDir;
+      const { subdir } = runtime.globalSkills;
+      const root = xdgBaseVar
+        ? `\${${envVar}:-\${${xdgBaseVar}:-$HOME/${path.dirname(baseDir)}}/${xdgSubdir}}`
+        : `\${${envVar}:-$HOME/${baseDir}}`;
       expect(
         bootstrapSh,
-        `bootstrap.sh must resolve ${runtime.id} skills via ${envVar}`,
-      ).toContain(`\${${envVar}:-$HOME/${baseDir}}/${subdir}`);
+        `bootstrap.sh must resolve ${runtime.id}'s config root via ${envVar}`,
+      ).toContain(root);
+      expect(
+        bootstrapSh,
+        `bootstrap.sh must fan ${runtime.id} skills out to <root>/${subdir}`,
+      ).toMatch(new RegExp(String.raw`fan_out_skills_to_dir\s+${runtime.id}\s+\S*/${subdir}`));
     }
   });
 

@@ -12,6 +12,8 @@ import {
   resolveProjectSkillsDir,
   projectArtifactTargets,
   anyRuntimePresent,
+  resolveGlobalConfigDir,
+  resolveGlobalInstructionPath,
   resolveGlobalSkillsDir,
 } from "../src/agents.mjs";
 import { KNOWN_FAN_OUT_CLIS, DEFAULT_PROJECT_CONFIG } from "../src/project-sync.mjs";
@@ -58,13 +60,17 @@ afterEach(() => {
 // what catches a registry edit that changes the public contract.
 describe("agents registry — equivalence with existing declarations", () => {
   it("fanOutRuntimes() reproduces the documented fan-out list, order included", () => {
-    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "antigravity", "copilot"]);
+    expect(fanOutRuntimes()).toEqual(["codex", "gemini", "antigravity", "opencode", "copilot"]);
     expect([...KNOWN_FAN_OUT_CLIS]).toEqual(fanOutRuntimes());
   });
 
   it("projectArtifactTargets() reproduces the historical default targets", () => {
     expect(projectArtifactTargets()).toEqual([
-      { relativeOutputPath: "AGENTS.md", cliSet: ["copilot", "codex"], substitutionKey: "agents" },
+      {
+        relativeOutputPath: "AGENTS.md",
+        cliSet: ["copilot", "codex", "opencode"],
+        substitutionKey: "agents",
+      },
       {
         relativeOutputPath: "GEMINI.md",
         cliSet: ["gemini", "antigravity"],
@@ -114,17 +120,18 @@ describe("agents registry — equivalence with existing declarations", () => {
   // it reads `.agents/skills`, which is why the directory is registry data
   // rather than a string built from the id.
   it("skillDirRuntimes() maps each runtime to its documented skills dir", () => {
-    expect(skillDirRuntimes()).toEqual(["codex", "gemini", "antigravity"]);
+    expect(skillDirRuntimes()).toEqual(["codex", "gemini", "antigravity", "opencode"]);
     expect(projectSkillsDir("codex")).toBe(".codex/skills");
     expect(projectSkillsDir("gemini")).toBe(".gemini/skills");
     expect(projectSkillsDir("antigravity")).toBe(".agents/skills");
+    expect(projectSkillsDir("opencode")).toBe(".opencode/skills");
   });
 
   // Only the runtimes whose trees are interchangeable may share one. Antigravity
   // is a skills-dir runtime that is NOT shareable, so this list is now a strict
   // subset — the case project-sync's shared-layout guard exists for.
   it("shareableSkillRuntimes() excludes the non-shareable skills-dir runtime", () => {
-    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini"]);
+    expect(shareableSkillRuntimes()).toEqual(["codex", "gemini", "opencode"]);
     expect(skillDirRuntimes()).toContain("antigravity");
     expect(shareableSkillRuntimes()).not.toContain("antigravity");
   });
@@ -142,13 +149,15 @@ describe("agents registry — equivalence with existing declarations", () => {
     }
   });
 
-  // project-sync.mjs destructures this list as exactly two (`const [a, b]`) to
-  // warn that a `shared` layout drops a cli_excluded entry for both CLIs. A
-  // third shareable runtime would compile, get a shared-tree symlink, and
-  // silently vanish from that warning. Asserted separately from the equivalence
-  // check above so the arity is not relaxed along with the contents.
-  it("the shared-layout warning's two-runtime arity assumption still holds", () => {
-    expect(shareableSkillRuntimes()).toHaveLength(2);
+  // project-sync.mjs used to destructure this list as exactly two
+  // (`const [a, b]`) when warning that a `shared` layout drops a cli_excluded
+  // entry for every sharer. OpenCode made it three, so that warning now walks
+  // every ordered pair instead. This test is what keeps the generalization
+  // honest: it fails if the warning ever silently reverts to covering only the
+  // first two, because a third sharer would then get a shared-tree symlink and
+  // vanish from the warning entirely.
+  it("the shared-layout warning covers every shareable runtime, not just the first two", () => {
+    expect(shareableSkillRuntimes().length).toBeGreaterThanOrEqual(3);
   });
 
   // `.agents/` is an ecosystem-wide convention, not an Antigravity-owned name,
@@ -210,6 +219,7 @@ describe("agents registry — integrity", () => {
       "Codex",
       "Gemini",
       "Antigravity",
+      "OpenCode",
       "Copilot",
     ]);
   });
@@ -422,5 +432,153 @@ describe("resolveGlobalSkillsDir", () => {
   it("returns null for a runtime with no global skills contract", () => {
     expect(resolveGlobalSkillsDir("copilot", "/home/u", {})).toBeNull();
     expect(resolveGlobalSkillsDir("claude", "/home/u", {})).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// OpenCode (v2.0.5)
+//
+// Every claim below was established against the installed binary rather than
+// the docs, because two documented behaviours did not survive the check:
+// `opencode/slash` does not exist in the v2.0.5 bundle (only
+// `opencode/autoinvoke` does), and the Claude-compatibility layer covers skills
+// only — `.claude/commands` is never read. See docs/cli-reference.md.
+// ---------------------------------------------------------------------------
+
+describe("opencode runtime", () => {
+  it("is detected by its own `opencode` executable", () => {
+    expect(RUNTIMES.opencode.detect).toEqual(["opencode"]);
+    const bin = makeTmpDir("agents-stub-bin-");
+    fs.symlinkSync("/bin/sh", path.join(bin, "sh"));
+    fs.writeFileSync(path.join(bin, "opencode"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    savedPath = process.env.PATH;
+    process.env.PATH = bin;
+
+    expect(anyRuntimePresent(["opencode"])).toBe(true);
+    expect(anyRuntimePresent(["codex"])).toBe(false);
+  });
+
+  it("is absent when its executable is not on PATH", () => {
+    hideAllClisFromPath();
+    expect(anyRuntimePresent(["opencode"])).toBe(false);
+  });
+
+  // `opencode debug paths` reports `config` as the single root under which both
+  // the global AGENTS.md and the global skills tree live, so one descriptor
+  // feeds both rather than each restating the resolution.
+  it("resolves its config root: OPENCODE_CONFIG_DIR > XDG_CONFIG_HOME > ~/.config", () => {
+    expect(resolveGlobalConfigDir("opencode", "/home/u", {})).toBe("/home/u/.config/opencode");
+    expect(
+      resolveGlobalConfigDir("opencode", "/home/u", { XDG_CONFIG_HOME: "/xdg" }),
+    ).toBe("/xdg/opencode");
+    expect(
+      resolveGlobalConfigDir("opencode", "/home/u", { OPENCODE_CONFIG_DIR: "/oc" }),
+    ).toBe("/oc");
+    // Proven by `opencode debug paths` with both set: OPENCODE_CONFIG_DIR wins
+    // outright and is NOT joined with the XDG base.
+    expect(
+      resolveGlobalConfigDir("opencode", "/home/u", {
+        OPENCODE_CONFIG_DIR: "/oc",
+        XDG_CONFIG_HOME: "/xdg",
+      }),
+    ).toBe("/oc");
+  });
+
+  // OPENCODE_CONFIG names a config FILE, not the directory; it must not move
+  // either global artifact.
+  it("ignores OPENCODE_CONFIG, which selects a file rather than the root", () => {
+    expect(
+      resolveGlobalConfigDir("opencode", "/home/u", { OPENCODE_CONFIG: "/oc/opencode.json" }),
+    ).toBe("/home/u/.config/opencode");
+  });
+
+  it("puts global skills under <configRoot>/skills", () => {
+    expect(resolveGlobalSkillsDir("opencode", "/home/u", {})).toBe(
+      "/home/u/.config/opencode/skills",
+    );
+    expect(resolveGlobalSkillsDir("opencode", "/home/u", { XDG_CONFIG_HOME: "/xdg" })).toBe(
+      "/xdg/opencode/skills",
+    );
+    expect(resolveGlobalSkillsDir("opencode", "/home/u", { OPENCODE_CONFIG_DIR: "/oc" })).toBe(
+      "/oc/skills",
+    );
+  });
+
+  // The global instruction file is AGENTS.md *inside the config root*, so it
+  // tracks the same env overrides the skills tree does. That is why it declares
+  // `relativeTo: "configDir"` instead of a $HOME-relative dest like Codex's.
+  it("puts the global instruction at <configRoot>/AGENTS.md", () => {
+    expect(RUNTIMES.opencode.globalInstruction.templateFile).toBe("opencode-AGENTS.md");
+    expect(RUNTIMES.opencode.globalInstruction.relativeTo).toBe("configDir");
+    expect(resolveGlobalInstructionPath("opencode", "/home/u", {})).toBe(
+      "/home/u/.config/opencode/AGENTS.md",
+    );
+    expect(
+      resolveGlobalInstructionPath("opencode", "/home/u", { XDG_CONFIG_HOME: "/xdg" }),
+    ).toBe("/xdg/opencode/AGENTS.md");
+    expect(
+      resolveGlobalInstructionPath("opencode", "/home/u", { OPENCODE_CONFIG_DIR: "/oc" }),
+    ).toBe("/oc/AGENTS.md");
+  });
+
+  // Hoisting configDir must not move any existing runtime's artifacts.
+  it("leaves the pre-existing runtimes' global paths byte-identical", () => {
+    expect(resolveGlobalInstructionPath("codex", "/home/u", {})).toBe("/home/u/.codex/AGENTS.md");
+    expect(resolveGlobalInstructionPath("gemini", "/home/u", {})).toBe("/home/u/.gemini/GEMINI.md");
+    expect(resolveGlobalInstructionPath("copilot", "/home/u", {})).toBe(
+      "/home/u/.github/copilot-instructions.md",
+    );
+    // A $HOME-relative dest stays $HOME-relative even when the runtime's own
+    // config-root env var is set — that is today's behaviour and this change
+    // is not the place to alter it.
+    expect(resolveGlobalInstructionPath("codex", "/home/u", { CODEX_HOME: "/custom/c" })).toBe(
+      "/home/u/.codex/AGENTS.md",
+    );
+    expect(resolveGlobalSkillsDir("antigravity", "/home/u", {})).toBe(
+      "/home/u/.gemini/config/skills",
+    );
+    expect(
+      resolveGlobalSkillsDir("antigravity", "/home/u", { ANTIGRAVITY_CONFIG_HOME: "/ag" }),
+    ).toBe("/ag/skills");
+  });
+
+  it("fans out natively to .opencode/skills", () => {
+    expect(projectSkillsDir("opencode")).toBe(".opencode/skills");
+    expect(resolveProjectSkillsDir("opencode", "/repo")).toBe("/repo/.opencode/skills");
+    expect(skillDirRuntimes()).toContain("opencode");
+  });
+
+  // A native tree keeps OpenCode working independently of the Claude-compat
+  // layer: v2.0.5 reads `.claude/skills` today, but that is a compatibility
+  // path, not OpenCode's own contract. `shareable: true` is not assumed from
+  // the sibling runtimes — it was proven by pointing `.opencode/skills` at a
+  // separate tree through a directory symlink and watching v2.0.5 report the
+  // skill from the symlink target.
+  it("can join the shared skills tree", () => {
+    expect(RUNTIMES.opencode.projectFanOut.shareable).toBe(true);
+    expect(shareableSkillRuntimes()).toContain("opencode");
+  });
+
+  // OpenCode reads the project AGENTS.md that Codex and Copilot already read,
+  // so it joins that artifact's readership rather than getting a second
+  // generated instruction file with the same content.
+  it("reads the shared project AGENTS.md rather than its own file", () => {
+    expect(INSTRUCTION_ARTIFACTS.agents.runtimes).toContain("opencode");
+    const agentsTargets = projectArtifactTargets().filter(
+      (t) => t.relativeOutputPath === "AGENTS.md",
+    );
+    expect(agentsTargets).toHaveLength(1);
+    expect(agentsTargets[0].substitutionKey).toBe("agents");
+    // No artifact writes an OpenCode-specific project instruction file.
+    const ownPath = Object.values(INSTRUCTION_ARTIFACTS).filter((a) =>
+      a.relativeOutputPath.toLowerCase().includes("opencode"),
+    );
+    expect(ownPath).toEqual([]);
+  });
+
+  it("is a first-class fan-out runtime", () => {
+    expect(fanOutRuntimes()).toContain("opencode");
+    expect([...KNOWN_FAN_OUT_CLIS]).toContain("opencode");
+    expect(DEFAULT_PROJECT_CONFIG.fan_out).toContain("opencode");
   });
 });

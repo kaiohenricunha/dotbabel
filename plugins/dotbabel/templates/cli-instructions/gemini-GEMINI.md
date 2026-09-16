@@ -184,8 +184,8 @@ enforces this invariant.
 
 - `CLAUDE.md` — canonical rule-floor source.
 - `README.md` — top-level public README.
-- `AGENTS.md` — project-scoped instructions for Codex / Copilot CLI.
-- `GEMINI.md` — project-scoped instructions for Gemini CLI.
+- `AGENTS.md` — project-scoped instructions for Codex / Copilot / OpenCode CLI.
+- `GEMINI.md` — project-scoped instructions for Gemini / Antigravity CLI.
 - `.github/workflows/**` — CI pipelines.
 - `.github/copilot-instructions.md` — project-scoped instructions for GitHub Copilot.
 - `.claude/**` — skill manifest, settings, hooks.

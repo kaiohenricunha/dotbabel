@@ -3,7 +3,7 @@
   "generator": "dotbabel-generate-instructions",
   "targets": {
     "AGENTS.md": {
-      "cliSet": ["copilot", "codex"],
+      "cliSet": ["copilot", "codex", "opencode"],
       "mode": "inject",
       "omittedHeadings": []
     },
@@ -29,6 +29,11 @@
     },
     "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md": {
       "cliSet": ["gemini"],
+      "mode": "synthesize",
+      "omittedHeadings": []
+    },
+    "plugins/dotbabel/templates/cli-instructions/opencode-AGENTS.md": {
+      "cliSet": ["opencode"],
       "mode": "synthesize",
       "omittedHeadings": []
     }

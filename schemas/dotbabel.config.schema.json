@@ -28,10 +28,10 @@
     "fan_out": {
       "type": "array",
       "description": "CLIs to fan commands and skills out to. An unknown name is rejected at config load rather than skipped.",
-      "default": ["codex", "gemini", "antigravity", "copilot"],
+      "default": ["codex", "gemini", "antigravity", "opencode", "copilot"],
       "items": {
         "type": "string",
-        "enum": ["codex", "gemini", "antigravity", "copilot"]
+        "enum": ["codex", "gemini", "antigravity", "opencode", "copilot"]
       }
     },
     "fan_out_layout": {
@@ -50,7 +50,7 @@
       "description": "Per-CLI exclusion list. Maps a CLI name to command basenames (without .md) and skill ids that must not fan out to it, for commands that describe a Claude-only flow. An excluded entry already on disk is removed on the next sync; `dotbabel-check-project-sync` reports it as drift until then. Under fan_out_layout 'shared' an exclusion for codex or gemini applies to both, since they read one tree.",
       "default": {},
       "propertyNames": {
-        "enum": ["codex", "gemini", "antigravity", "copilot"]
+        "enum": ["codex", "gemini", "antigravity", "opencode", "copilot"]
       },
       "additionalProperties": {
         "type": "array",

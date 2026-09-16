@@ -30,16 +30,40 @@ import path from "node:path";
 import { commandExists } from "./lib/symlink.mjs";
 
 /**
+ * A runtime's user-scope config root — the one directory its global artifacts
+ * live under. Hoisted off `globalSkills` so the instruction file and the skills
+ * tree resolve the same root instead of each restating it.
+ *
+ * Resolution order, highest first:
+ *   1. `envVar`                        — replaces the whole root outright.
+ *   2. `<env[xdgBaseVar]>/<xdgSubdir>` — only for runtimes that declare both.
+ *   3. `<homeRoot>/<baseDir>`          — the default.
+ *
+ * Step 2 exists for XDG-based runtimes: OpenCode reads `XDG_CONFIG_HOME` and
+ * appends its own name, so the base var names the *parent* of the root, unlike
+ * `CODEX_HOME` / `GEMINI_HOME` / `ANTIGRAVITY_CONFIG_HOME`, which name the root
+ * itself. Collapsing the two into one field would have meant inventing an
+ * `OPENCODE_HOME` that does not exist.
+ *
+ * @typedef {object} ConfigDir
+ * @property {string} envVar        Env var that replaces the whole root.
+ * @property {string} [xdgBaseVar]  Env var naming the root's PARENT.
+ * @property {string} [xdgSubdir]   Root's name under `xdgBaseVar`.
+ * @property {string} baseDir       Home-relative root when no env var is set.
+ */
+
+/**
  * @typedef {object} GlobalInstruction
  * @property {string} templateFile  Basename under templates/cli-instructions/.
- * @property {readonly string[]} dest  Path segments under the user's home root.
+ * @property {readonly string[]} dest  Path segments under the resolved base.
+ * @property {"homeRoot" | "configDir"} [relativeTo]  Base `dest` resolves
+ *   against. Defaults to `"homeRoot"`, which is what every pre-OpenCode runtime
+ *   used and keeps their destinations byte-identical.
  */
 
 /**
  * @typedef {object} GlobalSkills
- * @property {string} envVar   Env var that replaces the whole config dir.
- * @property {string} baseDir  Home-relative config dir when the env var is unset.
- * @property {string} subdir   Skills directory inside the config dir.
+ * @property {string} subdir   Skills directory inside the runtime's config root.
  */
 
 /**
@@ -55,6 +79,7 @@ import { commandExists } from "./lib/symlink.mjs";
  * @property {string} label  Short display name; rendered in `dotbabel doctor`.
  * @property {readonly string[]} detect  Executable names probed on PATH.
  * @property {string | null} substitutionKey  Key for this runtime's own template.
+ * @property {ConfigDir | null} [configDir]  User-scope config root, when it has one.
  * @property {GlobalInstruction | null} globalInstruction
  * @property {GlobalSkills | null} globalSkills
  * @property {ProjectFanOut | null} projectFanOut
@@ -89,7 +114,8 @@ export const RUNTIMES = Object.freeze({
       templateFile: "codex-AGENTS.md",
       dest: Object.freeze([".codex", "AGENTS.md"]),
     }),
-    globalSkills: Object.freeze({ envVar: "CODEX_HOME", baseDir: ".codex", subdir: "skills" }),
+    configDir: Object.freeze({ envVar: "CODEX_HOME", baseDir: ".codex" }),
+    globalSkills: Object.freeze({ subdir: "skills" }),
     projectFanOut: Object.freeze({ kind: "skills-dir", dir: ".codex/skills", shareable: true }),
   }),
   gemini: Object.freeze({
@@ -101,7 +127,8 @@ export const RUNTIMES = Object.freeze({
       templateFile: "gemini-GEMINI.md",
       dest: Object.freeze([".gemini", "GEMINI.md"]),
     }),
-    globalSkills: Object.freeze({ envVar: "GEMINI_HOME", baseDir: ".gemini", subdir: "skills" }),
+    configDir: Object.freeze({ envVar: "GEMINI_HOME", baseDir: ".gemini" }),
+    globalSkills: Object.freeze({ subdir: "skills" }),
     projectFanOut: Object.freeze({ kind: "skills-dir", dir: ".gemini/skills", shareable: true }),
   }),
   // Antigravity CLI.
@@ -137,16 +164,64 @@ export const RUNTIMES = Object.freeze({
     // setting only the former relocates Gemini's skills and leaves
     // Antigravity's where they were. They are separate products whose roots
     // happen to overlap today.
-    globalSkills: Object.freeze({
+    configDir: Object.freeze({
       envVar: "ANTIGRAVITY_CONFIG_HOME",
       baseDir: ".gemini/config",
-      subdir: "skills",
     }),
+    globalSkills: Object.freeze({ subdir: "skills" }),
     projectFanOut: Object.freeze({
       kind: "skills-dir",
       dir: ".agents/skills",
       shareable: false,
     }),
+  }),
+  // OpenCode CLI (baseline: v2.0.5).
+  //
+  // First runtime whose config root is XDG-based rather than a dotfile dir in
+  // $HOME, which is why `ConfigDir` grew `xdgBaseVar` / `xdgSubdir`. Proven with
+  // `opencode debug paths` under an isolated HOME: the reported `config` root is
+  // `$OPENCODE_CONFIG_DIR`, else `$XDG_CONFIG_HOME/opencode`, else
+  // `~/.config/opencode`. `OPENCODE_CONFIG` is a config *file* and moves
+  // nothing, so it is deliberately absent here.
+  //
+  // Both global artifacts hang off that one root — `AGENTS.md` beside a
+  // `skills/` tree — which is why the instruction declares
+  // `relativeTo: "configDir"`. It is the first runtime to do so; every other
+  // one keeps its historical $HOME-relative dest.
+  //
+  // It reads the project `AGENTS.md` that Codex and Copilot already read, so it
+  // joins that artifact's `runtimes` set below instead of adding a second
+  // generated file with identical content.
+  //
+  // `shareable: true` was proven, not assumed: v2.0.5 resolves a symlinked
+  // skills root and a symlinked skill directory alike, so `.opencode/skills`
+  // can be a redirect into the `fan_out_layout: "shared"` tree.
+  //
+  // Commands stay wrapped as `<name>/SKILL.md` inside the skills tree, the same
+  // shape Codex and Gemini get. OpenCode does have a native
+  // `.opencode/command{,s}/` mechanism, but using it would mean a second copy
+  // of every command and a tree the shared layout cannot redirect. The wrapped
+  // form is discovered correctly, so the native one buys nothing. Note the
+  // Claude-compatibility layer is skills-only: `.claude/skills` is read,
+  // `.claude/commands` is not.
+  opencode: Object.freeze({
+    id: "opencode",
+    label: "OpenCode",
+    detect: Object.freeze(["opencode"]),
+    substitutionKey: "opencode",
+    configDir: Object.freeze({
+      envVar: "OPENCODE_CONFIG_DIR",
+      xdgBaseVar: "XDG_CONFIG_HOME",
+      xdgSubdir: "opencode",
+      baseDir: ".config/opencode",
+    }),
+    globalInstruction: Object.freeze({
+      templateFile: "opencode-AGENTS.md",
+      dest: Object.freeze(["AGENTS.md"]),
+      relativeTo: "configDir",
+    }),
+    globalSkills: Object.freeze({ subdir: "skills" }),
+    projectFanOut: Object.freeze({ kind: "skills-dir", dir: ".opencode/skills", shareable: true }),
   }),
   // Copilot CLI has no skill auto-discovery dir, and its project artifacts are
   // generated `.prompt.md` / `.instructions.md` files whose filename contract
@@ -186,7 +261,10 @@ export const INSTRUCTION_ARTIFACTS = Object.freeze({
     key: "agents",
     relativeOutputPath: "AGENTS.md",
     substitutionKey: "agents",
-    runtimes: Object.freeze(["copilot", "codex"]),
+    // OpenCode joins Codex and Copilot here rather than getting its own file:
+    // v2.0.5 discovers the project `AGENTS.md` by walking up from the CWD, so
+    // the artifact they already share is the one it reads.
+    runtimes: Object.freeze(["copilot", "codex", "opencode"]),
   }),
   // Read by both Google runtimes — at PROJECT scope only. Antigravity discovers
   // GEMINI.md by walking up from the CWD to the repo root, the same
@@ -322,10 +400,55 @@ export function anyRuntimePresent(runtimeIds) {
 }
 
 /**
- * Resolve a runtime's user-scope skills directory.
+ * Resolve a runtime's user-scope config root.
  *
- * The env var replaces the whole config dir, not just its parent, matching
- * `CODEX_HOME` / `GEMINI_HOME` handling in bootstrap-global.mjs.
+ * See the {@link ConfigDir} typedef for the three-step order. This is the one
+ * place that order lives, so the instruction file and the skills tree cannot
+ * drift apart over where a runtime keeps its user-scope state.
+ *
+ * @param {string} runtimeId
+ * @param {string} homeRoot
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null} null when the runtime declares no config root.
+ */
+export function resolveGlobalConfigDir(runtimeId, homeRoot, env) {
+  const configDir = RUNTIMES[runtimeId]?.configDir;
+  if (!configDir) return null;
+  const override = env[configDir.envVar];
+  if (override) return override;
+  if (configDir.xdgBaseVar) {
+    const xdgBase = env[configDir.xdgBaseVar];
+    if (xdgBase) return path.join(xdgBase, configDir.xdgSubdir);
+  }
+  return path.join(homeRoot, configDir.baseDir);
+}
+
+/**
+ * Resolve where a runtime's user-scope instruction file is linked.
+ *
+ * `dest` is relative to `homeRoot` unless the runtime declares
+ * `relativeTo: "configDir"`, which keeps every pre-OpenCode destination exactly
+ * where it has always been — including Codex's `~/.codex/AGENTS.md`, which
+ * stays $HOME-relative even when `CODEX_HOME` is set. That asymmetry is
+ * pre-existing behaviour, preserved here rather than quietly fixed.
+ *
+ * @param {string} runtimeId
+ * @param {string} homeRoot
+ * @param {Record<string, string | undefined>} env
+ * @returns {string | null} null when the runtime links no instruction file.
+ */
+export function resolveGlobalInstructionPath(runtimeId, homeRoot, env) {
+  const globalInstruction = RUNTIMES[runtimeId]?.globalInstruction;
+  if (!globalInstruction) return null;
+  const base =
+    globalInstruction.relativeTo === "configDir"
+      ? resolveGlobalConfigDir(runtimeId, homeRoot, env)
+      : homeRoot;
+  return path.join(base ?? homeRoot, ...globalInstruction.dest);
+}
+
+/**
+ * Resolve a runtime's user-scope skills directory: `<configRoot>/<subdir>`.
  *
  * @param {string} runtimeId
  * @param {string} homeRoot
@@ -335,6 +458,7 @@ export function anyRuntimePresent(runtimeIds) {
 export function resolveGlobalSkillsDir(runtimeId, homeRoot, env) {
   const globalSkills = RUNTIMES[runtimeId]?.globalSkills;
   if (!globalSkills) return null;
-  const configDir = env[globalSkills.envVar] || path.join(homeRoot, globalSkills.baseDir);
+  const configDir = resolveGlobalConfigDir(runtimeId, homeRoot, env);
+  if (!configDir) return null;
   return path.join(configDir, globalSkills.subdir);
 }

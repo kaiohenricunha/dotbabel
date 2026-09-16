@@ -118,8 +118,8 @@ enforces it.
 ### 6. Project-scope cross-CLI sync (optional)
 
 If your repo has `.claude/commands/*.md` and `.claude/skills/*` that you want
-visible to Codex, Gemini, Antigravity, and Copilot — not just Claude Code — wire
-them up with `project-sync`. This is repo-local; user-scope artifacts stay in
+visible to Codex, Gemini, Antigravity, OpenCode, and Copilot — not just Claude
+Code — wire them up with `project-sync`. This is repo-local; user-scope artifacts stay in
 `~/.claude/` etc. via `dotbabel bootstrap`.
 
 ```bash
@@ -138,7 +138,7 @@ npx dotbabel check-project-sync
 
 What lands where:
 
-| Source                         | Codex / Gemini destination                | Copilot destination                                                         |
+| Source                         | Codex / Gemini / OpenCode destination     | Copilot destination                                                         |
 | ------------------------------ | ----------------------------------------- | --------------------------------------------------------------------------- |
 | `.claude/commands/<name>.md`   | `.codex/skills/<name>/SKILL.md` (symlink) | `.github/prompts/<name>.prompt.md` (generated, frontmatter mapped)          |
 | `.claude/skills/<id>/SKILL.md` | `.codex/skills/<id>/` (whole-dir symlink) | `.github/instructions/<id>.instructions.md` (generated, frontmatter mapped) |
@@ -165,8 +165,8 @@ the full key-by-key table. A generated file that is hand-edited is backed up
 before the next sync overwrites it.
 
 `.dotbabel.json` is optional — without one, project-sync uses defaults
-(`fan_out: ["codex", "gemini", "antigravity", "copilot"]`, the standard target
-list, no `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
+(`fan_out: ["codex", "gemini", "antigravity", "opencode", "copilot"]`, the
+standard target list, no `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
 markers, the whole file becomes the rule floor.
 
 Add `$schema` to the top of the file for editor autocomplete and validation:
@@ -174,20 +174,20 @@ Add `$schema` to the top of the file for editor autocomplete and validation:
 ```json
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
-  "fan_out": ["codex", "gemini", "antigravity", "copilot"],
+  "fan_out": ["codex", "gemini", "antigravity", "opencode", "copilot"],
   "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true
 }
 ```
 
-`fan_out` accepts only `codex`, `gemini`, `antigravity`, and `copilot`. A typo
-such as `co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
+`fan_out` accepts only `codex`, `gemini`, `antigravity`, `opencode`, and
+`copilot`. A typo such as `co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
 
-`fan_out_layout` (default `per-cli`) decides whether Codex and Gemini get one
-tree each or share a canonical one. Under `shared`, the table above collapses:
-`.claude/` fans out once to `.cli/skills/`, and `.codex/skills` and
-`.gemini/skills` become symlinks to it, so each command and skill is tracked
-once instead of twice. Copilot's `.github/` shapes are unchanged. Switching an
+`fan_out_layout` (default `per-cli`) decides whether Codex, Gemini, and OpenCode
+get one tree each or share a canonical one. Under `shared`, the table above collapses:
+`.claude/` fans out once to `.cli/skills/`, and `.codex/skills`,
+`.gemini/skills`, and `.opencode/skills` become symlinks to it, so each command
+and skill is tracked once instead of three times. Copilot's `.github/` shapes are unchanged. Switching an
 existing repo backs the old trees up to `.codex/skills.bak-<timestamp>`; an
 unknown value fails with `CONFIG_UNKNOWN_LAYOUT`. Revert to `per-cli` if a CLI
 will not follow the redirect.
@@ -204,6 +204,28 @@ migrates one into the other. What they do share is the instruction file: both
 read `GEMINI.md`, so it is generated once rather than per CLI. Set
 `ANTIGRAVITY_CONFIG_HOME` to relocate the global Antigravity root, exactly as
 `GEMINI_HOME` relocates Gemini's.
+
+**OpenCode gets a native tree even though it can read Claude's.** OpenCode
+v2.0.5 discovers `.claude/skills/` and `.agents/skills/` through a
+compatibility layer, so in principle it needs no fan-out of its own. dotbabel
+writes `.opencode/skills/` anyway: that compatibility layer is OpenCode's
+accommodation of other tools, not a contract dotbabel controls, and the native
+tree keeps the wiring working if it ever narrows. Unlike Antigravity, OpenCode
+_can_ join the `shared` tree — it follows a symlinked skills root — so under
+`shared` it takes a redirect like Codex and Gemini.
+
+**OpenCode's user scope is XDG-based.** Both global artifacts live under one
+root: `AGENTS.md` sits beside `skills/`. The root is `$OPENCODE_CONFIG_DIR`, or
+`$XDG_CONFIG_HOME/opencode`, or `~/.config/opencode`, in that order — note that
+`OPENCODE_CONFIG_DIR` names the root outright while `XDG_CONFIG_HOME` names its
+parent. `OPENCODE_CONFIG` points at a config _file_ and moves nothing. There is
+no `OPENCODE_HOME`.
+
+**OpenCode reads the project `AGENTS.md`.** It is the same file Codex and
+Copilot read, generated once, not a third copy. Commands reach OpenCode as
+`<name>/SKILL.md` inside the skills tree, the same shape Codex and Gemini get;
+dotbabel does not write `.opencode/command/`, and note that OpenCode's
+Claude-compatibility covers skills only — it does not read `.claude/commands/`.
 
 `gate_on_cli_presence` (default `true`) skips a CLI's symlink fan-out when its
 binary is absent from `PATH`. `check-project-sync` applies the same gate, so it

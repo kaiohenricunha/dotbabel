@@ -73,6 +73,12 @@ export const DEFAULT_TARGETS = Object.freeze([
     substitutionKey: "gemini",
     mode: "synthesize",
   }),
+  Object.freeze({
+    relativeOutputPath: "plugins/dotbabel/templates/cli-instructions/opencode-AGENTS.md",
+    cliSet: Object.freeze(["opencode"]),
+    substitutionKey: "opencode",
+    mode: "synthesize",
+  }),
 ]);
 
 /** Repo-relative path for the per-target manifest written alongside outputs. */
