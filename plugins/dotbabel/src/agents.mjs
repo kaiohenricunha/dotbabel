@@ -52,7 +52,7 @@ import { commandExists } from "./lib/symlink.mjs";
 /**
  * @typedef {object} Runtime
  * @property {string} id
- * @property {string} label
+ * @property {string} label  Short display name; rendered in `dotbabel doctor`.
  * @property {readonly string[]} detect  Executable names probed on PATH.
  * @property {string | null} substitutionKey  Key for this runtime's own template.
  * @property {GlobalInstruction | null} globalInstruction
@@ -73,7 +73,7 @@ export const RUNTIMES = Object.freeze({
   // is never gated on presence, which is why every field below is null.
   claude: Object.freeze({
     id: "claude",
-    label: "Claude Code",
+    label: "Claude",
     detect: Object.freeze(["claude"]),
     substitutionKey: null,
     globalInstruction: null,
@@ -82,7 +82,7 @@ export const RUNTIMES = Object.freeze({
   }),
   codex: Object.freeze({
     id: "codex",
-    label: "Codex CLI",
+    label: "Codex",
     detect: Object.freeze(["codex"]),
     substitutionKey: "codex",
     globalInstruction: Object.freeze({
@@ -94,7 +94,7 @@ export const RUNTIMES = Object.freeze({
   }),
   gemini: Object.freeze({
     id: "gemini",
-    label: "Gemini CLI",
+    label: "Gemini",
     detect: Object.freeze(["gemini"]),
     substitutionKey: "gemini",
     globalInstruction: Object.freeze({
@@ -109,7 +109,7 @@ export const RUNTIMES = Object.freeze({
   // cannot share a directory with the `SKILL.md` shape.
   copilot: Object.freeze({
     id: "copilot",
-    label: "GitHub Copilot CLI",
+    label: "Copilot",
     detect: Object.freeze(["copilot"]),
     substitutionKey: "copilot",
     globalInstruction: Object.freeze({

@@ -139,6 +139,19 @@ describe("agents registry — integrity", () => {
     }
   });
 
+  // dotbabel-doctor renders these, and its tests match on phrases like
+  // /Codex skills fan-out/. A longer label would still pass those positive
+  // matches' negative twins (`not.toMatch`) vacuously, so the exact strings are
+  // pinned here rather than left to drift.
+  it("renders the short labels doctor's output matches on", () => {
+    expect(Object.values(RUNTIMES).map((r) => r.label)).toEqual([
+      "Claude",
+      "Codex",
+      "Gemini",
+      "Copilot",
+    ]);
+  });
+
   it("every runtime keys itself consistently", () => {
     for (const [key, runtime] of Object.entries(RUNTIMES)) {
       expect(runtime.id).toBe(key);
