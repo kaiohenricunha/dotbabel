@@ -41,6 +41,7 @@ import {
   checkInstructionDrift,
   checkInstructionsFresh,
   checkInstructionParity,
+  checkRemovedRepoFactsKeys,
   generateInstructions,
   pathExists,
 } from "../src/index.mjs";
@@ -117,6 +118,17 @@ if (envError) {
 // facts
 if (pathExists(ctx, "docs/repo-facts.json")) {
   out.pass("docs/repo-facts.json present");
+  // pathExists proves the file is there, not that it parses, and `loadFacts`
+  // re-throws the raw SyntaxError. Every other facts reader in this file is
+  // wrapped for the same reason (:150, :158) — without this, a malformed
+  // repo-facts.json aborts the run before out.flush(), so `doctor --json`
+  // emits nothing at all for exactly the state doctor is reached for.
+  try {
+    const removedKeys = checkRemovedRepoFactsKeys(ctx);
+    for (const warning of removedKeys.warnings) out.warn(warning);
+  } catch (err) {
+    out.fail(`docs/repo-facts.json does not parse: ${err.message}`);
+  }
 } else {
   out.warn("docs/repo-facts.json missing — coverage/drift checks will be no-ops");
 }

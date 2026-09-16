@@ -35,7 +35,6 @@
     "plugins/dotbabel/templates/cli-instructions/codex-AGENTS.md",
     "plugins/dotbabel/templates/cli-instructions/gemini-GEMINI.md"
   ],
-  "regression_paths": [],
   "cli_substitutions": {
     "_default_": {},
     "agents": {

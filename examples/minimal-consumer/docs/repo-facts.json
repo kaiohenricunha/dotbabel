@@ -12,6 +12,5 @@
     ".claude/skills-manifest.json",
     "docs/repo-facts.json",
     "docs/specs/**/spec.json"
-  ],
-  "verification_commands": []
+  ]
 }

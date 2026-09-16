@@ -46,6 +46,7 @@ export {
 export { checkInstructionDrift } from "./check-instruction-drift.mjs";
 export { checkInstructionsFresh } from "./check-instructions-fresh.mjs";
 export { checkInstructionParity } from "./check-instruction-parity.mjs";
+export { checkRemovedRepoFactsKeys } from "./check-repo-facts-keys.mjs";
 export {
   generateInstructions,
   renderTarget,

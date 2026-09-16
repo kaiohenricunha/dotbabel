@@ -55,7 +55,7 @@ Universal behavior for every Claude Code session in every repo. Project-level `C
 
 ## Testing
 
-- Run the project's **full** test suite locally before merging any PR that modifies files listed in `regression_paths` (see `docs/repo-facts.json`) or anything consumed by downstream consumers.
+- Run the project's **full** test suite locally before merging any PR that modifies a file matching `critical_paths` (see the `quality` key in `.dotbabel.json`) or anything consumed by downstream consumers.
 - Never claim a test failure is "pre-existing" without proving it. Required proof:
   ```bash
   git stash && <test-command> ; git stash pop

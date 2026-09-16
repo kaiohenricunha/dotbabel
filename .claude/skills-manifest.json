@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-16T12:55:35.420Z",
+  "generatedAt": "2026-09-16T14:25:21.317Z",
   "skills": [
     {
       "name": "agents-search",
@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:c45237ac4783e0a755e21cfc3c8164bcc37ceb6eb3361568b046b5555d13a307",
+      "checksum": "sha256:7bafcff17d20b1d0699a934659eee18a187a3c847f67bea419ab79a7bbc29ffc",
       "dependencies": [],
       "lastValidated": "2026-09-16"
     },
