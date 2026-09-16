@@ -46,6 +46,7 @@ import {
 } from "./copilot-frontmatter.mjs";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
 import { validateQualityConfig } from "./quality/config.mjs";
+import { validateCriteriaConfig } from "./criteria/config.mjs";
 
 /**
  * The CLIs `fan_out` may name. Derived from the agent registry, which the
@@ -163,6 +164,7 @@ export function loadProjectConfig(repoRoot) {
   }
   if (raw.cli_excluded !== undefined) validateCliExcluded(raw.cli_excluded);
   if (raw.quality !== undefined) validateQualityConfig(raw.quality, { source: "project" });
+  if (raw.criteria !== undefined) validateCriteriaConfig(raw, ".dotbabel.json");
   return { ...DEFAULT_PROJECT_CONFIG, ...raw };
 }
 

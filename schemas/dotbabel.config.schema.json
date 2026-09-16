@@ -88,9 +88,49 @@
     },
     "quality": {
       "$ref": "#/$defs/quality"
+    },
+    "criteria": {
+      "$ref": "#/$defs/criteria"
     }
   },
   "$defs": {
+    "criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Acceptance-criteria settings (KD-14). The merge gate reads this object from the base ref, so a pull request cannot relax the rules that judge it.",
+      "properties": {
+        "pass_env": {
+          "type": "array",
+          "description": "Environment variable names criterion commands receive.",
+          "default": [],
+          "items": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "Per-criterion command timeout.",
+          "default": 600,
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "enforcement": {
+          "description": "\"warn\" moves criteria findings out of the merge verdict; the documented rollback switch.",
+          "default": "block",
+          "enum": ["block", "warn"]
+        },
+        "trusted_associations": {
+          "type": "array",
+          "description": "GitHub author associations whose evidence comment the merge gate believes.",
+          "default": ["OWNER"],
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "\\S" }
+        },
+        "require_ci_check": {
+          "type": "boolean",
+          "description": "Also require a successful \"dotbabel criteria\" check run on the head commit.",
+          "default": false
+        }
+      }
+    },
     "repositoryPath": {
       "type": "string",
       "minLength": 1,

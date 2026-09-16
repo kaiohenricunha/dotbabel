@@ -18,6 +18,9 @@
  * @property {boolean} ok
  * @property {string} gate
  * @property {GateReason[]} reasons
+ * @property {GateReason[]} warnings Empty by default; §5 moves criteria
+ *   findings here under `enforcement: "warn"`. Every gate returns it, so
+ *   `result.warnings.length` is safe without a guard.
  * @property {string|null} hint
  *
  * @typedef {object} ConductorPhase
@@ -31,6 +34,20 @@
  * @property {"subject"|"last-line"|"body"|"trailer"|null} location
  * @property {boolean} effective
  */
+
+// Pure imports only: these modules do no I/O, so the "free of I/O"
+// contract at the top of this file still holds. The gate parses evidence
+// with the same code that writes it, so producer and judge cannot drift.
+import { CRITERIA_MARKER_PREFIX } from "./criteria/comment.mjs";
+import { parseEvidenceComment, evidencePayloadProblem, payloadCoverage } from "./criteria/evidence.mjs";
+import { createMarker } from "./lib/attest-marker.mjs";
+// ARCH-6: one fence stripper, shared with the Spec ID parser. Two copies had
+// already drifted — this module required a closing fence to carry no info
+// string and the other did not, so a body with ```js inside a ``` block was
+// fenced for one gate and not the other.
+import { stripFences } from "./lib/spec-ids.mjs";
+
+const criteriaMarker = createMarker(CRITERIA_MARKER_PREFIX);
 
 /**
  * The canonical pipeline order. This is the single source of truth that the
@@ -84,9 +101,6 @@ const MIN_SHA_PREFIX = 7;
 const SKIP_CI_RE = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/i;
 const SKIP_CHECKS_RE = /^skip-checks:\s*true$/i;
 
-/** A CommonMark fenced-code delimiter: run of >=3 backticks/tildes + info string. */
-const FENCE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
-
 /**
  * Build a case-insensitive matcher for an exact ATX h2 heading, allowing the
  * CommonMark-legal 0–3 leading spaces and trailing whitespace. Four spaces is
@@ -112,36 +126,6 @@ const RE_TEST_PLAN = h2("Test plan");
 const RE_DEFERRED_TEST_PLAN = /<!--\s*test-plan:\s*deferred\s*-->/i;
 const RE_SPEC_ID = h2("Spec ID");
 const RE_NO_SPEC = h2("No-spec rationale");
-
-/**
- * Remove fenced code blocks so a body that merely *documents* the PR template
- * cannot satisfy the heading requirements.
- *
- * @param {string} body
- * @returns {string}
- */
-function stripFences(body) {
-  const out = [];
-  /** @type {{char: string, len: number}|null} */
-  let open = null;
-
-  for (const line of body.split("\n")) {
-    const m = FENCE_RE.exec(line);
-    if (open === null) {
-      if (m === null) out.push(line);
-      else open = { char: m[1][0], len: m[1].length };
-      continue;
-    }
-    // Per CommonMark 4.5 only a run of the SAME character, at least as long as
-    // the opener and carrying no info string, closes the block. A naive toggle
-    // flips polarity on a nested fence and leaks its contents back out as body
-    // text — which would let a PR that merely documents the template pass.
-    if (m !== null && m[1][0] === open.char && m[1].length >= open.len && m[2].trim() === "") {
-      open = null;
-    }
-  }
-  return out.join("\n");
-}
 
 /**
  * Translate a `docs/repo-facts.json` protected-path glob into a RegExp.
@@ -232,6 +216,9 @@ export function checkLocalAttestGate(input = {}) {
     ok: reasons.length === 0,
     gate: "local-attest",
     reasons,
+    // Always present, so a caller can read `.warnings` off any gate result
+    // without first checking which gate produced it.
+    warnings: [],
     hint: reasons.length === 0 ? null : "commit or stash your changes and push before attesting",
   };
 }
@@ -288,12 +275,218 @@ export function checkMergeGate(input = {}) {
     reasons.push({ code: "BEHIND_BASE", message: "branch is behind its base; rebase before merging" });
   }
 
+  // Criteria evaluation (§5). Every input below is optional, so a caller that
+  // passes none gets exactly the pre-P-B3 result.
+  const criteria = evaluateCriteria(input);
+  /** @type {GateReason[]} */
+  const warnings = [...criteria.warnings];
+  if (input.criteriaEnforcement === "warn") {
+    // `warn` moves the criteria reasons out of the verdict entirely — it does
+    // not soften them into a passing reason list, because `reasons` is what
+    // callers print as blockers.
+    warnings.push(...criteria.blocking);
+  } else {
+    reasons.push(...criteria.blocking);
+  }
+
   return {
     ok: reasons.length === 0,
     gate: "merge",
     reasons,
+    warnings,
     hint: reasons.length === 0 ? null : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
   };
+}
+
+/**
+ * The §5 criteria groups, in order: every spec-level code that holds, then
+ * the FIRST evidence code that holds, then the CI code.
+ *
+ * Evidence stops at the first hit on purpose. The evidence states form a
+ * ladder — missing, untrusted, stale, invalid, incomplete, failed — and each
+ * rung presupposes the one below it passed. Reporting "stale" beside
+ * "untrusted" would describe a comment the gate already refused to believe.
+ *
+ * @param {any} input
+ * @returns {{blocking: GateReason[], warnings: GateReason[]}}
+ */
+function evaluateCriteria(input) {
+  /** @type {GateReason[]} */
+  const out = [];
+  /** @type {GateReason[]} */
+  const warnings = [];
+  const required = toCriteriaMap(input.requiredCriteria);
+  const base = toCriteriaMap(input.baseActiveCriteria);
+
+  // --- Spec group: reported independently of the evidence ladder. ---
+  const unknown = Array.isArray(input.unknownSpecIds) ? input.unknownSpecIds.filter(Boolean) : [];
+  if (unknown.length > 0) {
+    out.push({
+      code: "CRITERIA_SPEC_UNKNOWN",
+      message: `body names ${unknown.length === 1 ? "a Spec ID that is" : "Spec IDs that are"} not a spec at the head commit`,
+      detail: unknown.join(", "),
+    });
+  }
+
+  const weakened = [];
+  for (const [specId, baseIds] of base) {
+    const headIds = required.get(specId) ?? new Set();
+    for (const id of baseIds) if (!headIds.has(id)) weakened.push(`${specId}/${id}`);
+  }
+  if (weakened.length > 0) {
+    // A rationale does not make weakening fine; it makes it a reviewed
+    // decision, so §5 downgrades the code to a warning — which means it must
+    // leave `reasons` entirely, not sit there with a flag and keep blocking.
+    const reason = {
+      code: "CRITERIA_WEAKENED",
+      message: "a criterion active on the base branch is planned or missing at the head",
+      detail: weakened.join(", "),
+    };
+    if (input.criteriaChangeRationale === true) warnings.push({ ...reason, warning: true });
+    else out.push(reason);
+  }
+
+  const done = () => ({ blocking: withCi(out, input), warnings });
+
+  // REL-3: the base ref defines the rules. If it could not be read, the gate
+  // has no rules to apply and must say so rather than apply the defaults,
+  // which would silently relax both the weakening check and require_ci_check.
+  if (typeof input.criteriaBaseUnreadable === "string") {
+    out.push({
+      code: "CRITERIA_BASE_UNREADABLE",
+      message: "the base commit is not in this clone, so the criteria rules could not be read",
+      detail: `fetch ${String(input.criteriaBaseUnreadable).slice(0, 8)} and re-run`,
+    });
+    return done();
+  }
+
+  // --- Evidence group: only when something actually has to be proven. ---
+  const requiredTotal = [...required.values()].reduce((n, ids) => n + ids.size, 0);
+  if (requiredTotal === 0) return done();
+
+  if (input.comments === null) {
+    // REL-3: an unreadable comment list is a failing reason, never a pass.
+    // The gate cannot see the evidence, so it refuses rather than assuming
+    // the absence of a marker it simply failed to fetch.
+    out.push({
+      code: "CRITERIA_EVIDENCE_INVALID",
+      message: "the evidence comments could not be read",
+      detail: "comment fetch failed",
+    });
+    return done();
+  }
+
+  const comments = Array.isArray(input.comments) ? input.comments : [];
+  const markerComments = comments.filter((c) => c && typeof c.body === "string" && criteriaMarker.parseSha(c.body) !== null);
+  if (markerComments.length === 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_MISSING",
+      message: "linked specs declare active criteria, but no evidence comment carries the marker",
+    });
+    return done();
+  }
+
+  const trustedSet = new Set(
+    Array.isArray(input.trustedAssociations) && input.trustedAssociations.length > 0
+      ? input.trustedAssociations
+      : ["OWNER"],
+  );
+  // An edited comment is refused outright rather than re-parsed: the marker
+  // and payload are what the gate trusts, and an edit means the text it is
+  // reading is not the text the tool wrote.
+  const trusted = markerComments.filter(
+    (c) => trustedSet.has(c.authorAssociation) && (c.lastEditedAt === null || c.lastEditedAt === undefined),
+  );
+  if (trusted.length === 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_UNTRUSTED",
+      message: "no evidence comment has both a trusted author association and no edit",
+    });
+    return done();
+  }
+
+  const headSha = typeof input.headRefOid === "string" ? input.headRefOid : "";
+  const current = trusted.filter((c) => criteriaMarker.parseSha(c.body) === headSha);
+  if (current.length === 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_STALE",
+      message: "every trusted evidence comment names a commit other than the head",
+      detail: `head ${headSha.slice(0, 8)}; evidence ${[...new Set(trusted.map((c) => String(criteriaMarker.parseSha(c.body)).slice(0, 8)))].join(", ")}`,
+    });
+    return done();
+  }
+
+  // Newest wins: a re-run posts a new comment rather than editing (OPS-4), so
+  // the last matching comment is the most recent verdict for this commit.
+  const parsed = parseEvidenceComment(current[current.length - 1].body);
+  if (parsed.state !== "ok") {
+    out.push({
+      code: "CRITERIA_EVIDENCE_INVALID",
+      message: "the evidence payload could not be read",
+      detail: parsed.detail ?? parsed.state,
+    });
+    return done();
+  }
+  const problem = evidencePayloadProblem(parsed.payload);
+  if (problem !== null) {
+    out.push({ code: "CRITERIA_EVIDENCE_INVALID", message: "the evidence payload is not valid", detail: problem });
+    return done();
+  }
+
+  const covered = payloadCoverage(parsed.payload);
+  const gaps = [];
+  for (const [specId, ids] of required) {
+    const got = covered.get(specId) ?? new Set();
+    for (const id of ids) if (!got.has(id)) gaps.push(`${specId}/${id}`);
+  }
+  if (gaps.length > 0) {
+    out.push({
+      code: "CRITERIA_EVIDENCE_INCOMPLETE",
+      message: "the evidence payload does not cover every active criterion",
+      detail: gaps.join(", "),
+    });
+    return done();
+  }
+
+  if (parsed.payload.verdict !== "pass") {
+    out.push({
+      code: "CRITERIA_FAILED",
+      message: `the evidence payload verdict is ${parsed.payload.verdict}`,
+    });
+  }
+  return done();
+}
+
+/**
+ * @param {GateReason[]} out
+ * @param {any} input
+ * @returns {GateReason[]}
+ */
+function withCi(out, input) {
+  if (input.requireCiCheck === true && input.ciCriteriaCheck !== "success") {
+    out.push({
+      code: "CRITERIA_CI_CHECK_FAILED",
+      message: `require_ci_check is set and the 'dotbabel criteria' check is ${input.ciCriteriaCheck ?? "absent"}`,
+    });
+  }
+  return out;
+}
+
+/**
+ * Normalize a `{specId: [ids]}` object or Map into a Map of Sets.
+ *
+ * @param {unknown} value
+ * @returns {Map<string, Set<string>>}
+ */
+function toCriteriaMap(value) {
+  const out = new Map();
+  if (value instanceof Map) {
+    for (const [k, v] of value) out.set(k, new Set(v ?? []));
+    return out;
+  }
+  if (value === null || typeof value !== "object") return out;
+  for (const [k, v] of Object.entries(value)) out.set(k, new Set(Array.isArray(v) ? v : []));
+  return out;
 }
 
 /**

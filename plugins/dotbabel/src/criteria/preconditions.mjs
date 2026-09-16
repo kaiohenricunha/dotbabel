@@ -7,8 +7,8 @@
 import { isRepoTrusted } from "../trust-allowlist.mjs";
 import { findUntrustedArgvChange } from "./trust-check.mjs";
 import { loadCriteriaConfigText } from "./config.mjs";
-import { extractTemplateSection, listSpecDirs } from "../spec-harness-lib.mjs";
-import { parseSpecIds } from "../check-spec-coverage.mjs";
+import { listSpecDirs } from "../spec-harness-lib.mjs";
+import { parseSpecIds } from "../lib/spec-ids.mjs";
 import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
 
 function criteriaError(code, message) {
@@ -57,7 +57,7 @@ export function checkPrPreconditions(deps, { ctx, pr, repo, allowProjectCommands
     throw criteriaError(ERROR_CODES.CRITERIA_FORK_PR, `pull request #${pr} comes from a fork (pass --allow-project-commands to override for this run)`);
   }
 
-  const specIds = parseSpecIds(extractTemplateSection(String(prJson.body ?? ""), "Spec ID"));
+  const specIds = parseSpecIds(String(prJson.body ?? ""));
   const knownSpecIds = new Set(listSpecDirs(ctx));
   const unknownSpecId = specIds.find((id) => !knownSpecIds.has(id));
   if (unknownSpecId) throw criteriaError(ERROR_CODES.CRITERIA_UNKNOWN_SPEC, `unknown spec: ${unknownSpecId}`);

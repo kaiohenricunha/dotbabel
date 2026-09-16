@@ -18,7 +18,21 @@ const DEFAULT_CONFIG = Object.freeze({
   require_ci_check: false,
 });
 
-function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
+/**
+ * Validate the `criteria` key of an already-parsed `.dotbabel.json` and return
+ * it with defaults filled in. Exported so `project-sync.mjs` rejects a bad
+ * `criteria` block at config-load time, the way it already does for `quality`
+ * (KD-14) — otherwise a typo in `enforcement` would surface only much later,
+ * inside the merge gate, as a silently different verdict.
+ *
+ * Takes the WHOLE parsed object, not the `criteria` sub-object, so the
+ * ValidationError pointers stay rooted at `/criteria/...`.
+ *
+ * @param {unknown} parsed
+ * @param {string} [file]
+ * @returns {{ pass_env: string[], timeout_seconds: number, enforcement: "block"|"warn", trusted_associations: string[], require_ci_check: boolean }}
+ */
+export function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
   const defaults = {
     ...DEFAULT_CONFIG,
     pass_env: [...DEFAULT_CONFIG.pass_env],
@@ -34,6 +48,25 @@ function validateCriteriaConfig(parsed, file = ".dotbabel.json") {
       pointer: "/criteria",
       message: "criteria must be an object",
     });
+  }
+
+  // Reject unknown keys, exactly as the schema's `additionalProperties: false`
+  // says and as `validateQualityConfig` does. Without this a typo such as
+  // `enforcment` or `trusted_assocations` loads cleanly and the merge gate
+  // then judges every pull request under a default nobody chose — the silent
+  // wrong verdict this validation exists to prevent.
+  for (const key of Object.keys(criteria)) {
+    if (!Object.hasOwn(DEFAULT_CONFIG, key)) {
+      throw new ValidationError({
+        code: ERROR_CODES.CRITERIA_CONFIG_INVALID,
+        category: "criteria",
+        file,
+        pointer: `/criteria/${key}`,
+        message: `unknown criteria key: ${key}`,
+        expected: `one of: ${Object.keys(DEFAULT_CONFIG).join(", ")}`,
+        got: key,
+      });
+    }
   }
 
   const passEnv = criteria.pass_env ?? defaults.pass_env;

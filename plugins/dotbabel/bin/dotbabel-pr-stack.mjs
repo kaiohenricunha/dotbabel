@@ -44,6 +44,7 @@ import {
   summarizeGates,
 } from "../src/pr-gates.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
+import { criteriaGateInputs } from "../src/criteria/gate-inputs.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -111,6 +112,27 @@ function fail(code, msg) {
 function sh(cmd) {
   const r = spawnSync(cmd, {
     shell: true,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: GIT_MAX_BUFFER,
+  });
+  return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+}
+
+/**
+ * Run a command from an ARGV ARRAY, with no shell.
+ *
+ * The criteria gather interpolates Spec IDs that come from the pull-request
+ * body, so nothing it builds may ever reach a shell. `shell: false` is the
+ * property that makes that safe; `sh` above stays for the fixed, internally
+ * built command strings that have no attacker-reachable parts.
+ *
+ * @param {string[]} argv
+ * @returns {{status: number, stdout: string, stderr: string}}
+ */
+function run(argv) {
+  const r = spawnSync(argv[0], argv.slice(1), {
+    shell: false,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: GIT_MAX_BUFFER,
@@ -375,6 +397,7 @@ async function main() {
                 : "commit message carries no [skip ci] marker",
             },
           ],
+      warnings: [],
       hint: verdict.effective ? null : "put [skip ci] on the first or last line of the message",
       verdict,
     };
@@ -411,7 +434,9 @@ async function main() {
 
   if (which === "merge") {
     const root = repoRoot();
-    const view = ghJson(`gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files`);
+    const view = ghJson(
+      `gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files,headRefOid,baseRefOid`,
+    );
     const result = checkMergeGate({
       body: view.body,
       hasSpecsDir: existsSync(`${root}/docs/specs`),
@@ -419,6 +444,7 @@ async function main() {
       protectedPaths: protectedPaths(root),
       mergeable: view.mergeable,
       mergeStateStatus: view.mergeStateStatus,
+      ...criteriaGateInputs({ run }, view, prNumber),
     });
     const summary = summarizeGates([result]);
     return emit({
@@ -426,7 +452,14 @@ async function main() {
       ok: summary.ok,
       result,
       problems: result.reasons,
-      lines: [`gate merge: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      // Warnings print too. Under `enforcement: warn` every criteria finding
+      // moves here, and that mode is the documented rollback switch — if the
+      // findings only reached `--json`, warn mode would look identical to off.
+      lines: [
+        `gate merge: ${result.ok ? "PASS" : "FAIL"}`,
+        ...result.reasons.map((r) => `  ✗ ${r.message}`),
+        ...(result.warnings ?? []).map((w) => `  ⚠ ${w.message}`),
+      ],
       json,
     });
   }
