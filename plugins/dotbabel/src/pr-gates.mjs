@@ -328,10 +328,26 @@ function evaluateCriteria(input) {
     });
   }
 
+  const pathScoped = new Set(Array.isArray(input.pathScopedSpecIds) ? input.pathScopedSpecIds : []);
   const weakened = [];
+  // Weakening a spec the DIFF pulled into scope is not a reviewable decision:
+  // the author would be deleting or planning away the very criteria that
+  // govern the files they are changing, which is the #367 bypass reached
+  // through the head instead of the body. Those stay blocking.
+  const weakenedInScope = [];
   for (const [specId, baseIds] of base) {
     const headIds = required.get(specId) ?? new Set();
-    for (const id of baseIds) if (!headIds.has(id)) weakened.push(`${specId}/${id}`);
+    for (const id of baseIds) {
+      if (headIds.has(id)) continue;
+      (pathScoped.has(specId) ? weakenedInScope : weakened).push(`${specId}/${id}`);
+    }
+  }
+  if (weakenedInScope.length > 0) {
+    out.push({
+      code: "CRITERIA_SCOPE_WEAKENED",
+      message: "a criterion governing the changed files is planned or missing at the head",
+      detail: weakenedInScope.join(", "),
+    });
   }
   if (weakened.length > 0) {
     // A rationale does not make weakening fine; it makes it a reviewed
@@ -347,6 +363,16 @@ function evaluateCriteria(input) {
   }
 
   const done = () => ({ blocking: withCi(out, input), warnings });
+
+  // REL-19: scope is derived from the changed-file list, so a list that could
+  // not be shown complete leaves the gate unable to know what governs the diff.
+  if (input.criteriaFilesUnreadable === true) {
+    out.push({
+      code: "CRITERIA_FILES_UNREADABLE",
+      message: "the pull request's changed-file list could not be read in full, so criteria scope is unknown",
+    });
+    return done();
+  }
 
   // REL-3: the base ref defines the rules. If it could not be read, the gate
   // has no rules to apply and must say so rather than apply the defaults,

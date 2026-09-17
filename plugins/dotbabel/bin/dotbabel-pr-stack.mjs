@@ -220,6 +220,31 @@ function protectedPaths(root) {
 }
 
 /**
+ * Every changed path on a pull request, or null when the list cannot be shown
+ * to be complete.
+ *
+ * `gh pr view --json files` serves one 100-entry page with no error on
+ * truncation. Criteria scope depends on this list, so a short read must not
+ * look like a small pull request.
+ *
+ * @param {number} prNumber
+ * @param {unknown} declaredCount `changedFiles` from the same `gh pr view`.
+ * @returns {Array<{path: string}>|null}
+ */
+function paginatedPrFiles(prNumber, declaredCount) {
+  const r = sh(
+    `gh api repos/{owner}/{repo}/pulls/${prNumber}/files --paginate --jq '.[].filename'`,
+  );
+  if (r.status !== 0) return null;
+  const paths = r.stdout.split("\n").map((line) => line.trim()).filter(Boolean);
+  const declared = Number(declaredCount);
+  // GitHub's Files endpoint itself caps at 3000; at that size neither source
+  // can be trusted to be complete.
+  if (!Number.isFinite(declared) || declared !== paths.length || declared >= 3000) return null;
+  return paths.map((path) => ({ path }));
+}
+
+/**
  * Emit the result envelope and exit with the derived code.
  *
  * @param {{subcommand: string, ok: boolean, trunk?: string, result: unknown,
@@ -435,11 +460,21 @@ async function main() {
   if (which === "merge") {
     const root = repoRoot();
     const view = ghJson(
-      `gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files,headRefOid,baseRefOid`,
+      `gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files,changedFiles,headRefOid,baseRefOid`,
     );
+    // `view.files` is a single unpaginated page that caps at 100 entries, the
+    // same trap local-attest-runner.mjs documents and avoids. Criteria scope is
+    // now derived from this list (REL-19), so a truncated one would silently
+    // drop a governed file out of scope. Re-read it from the paginated Files
+    // endpoint and cross-check the count; a mismatch means unreadable, and the
+    // gate must fail closed rather than judge a partial diff.
+    view.files = paginatedPrFiles(prNumber, view.changedFiles);
     const result = checkMergeGate({
       body: view.body,
       hasSpecsDir: existsSync(`${root}/docs/specs`),
+      // A null list means "could not be proven complete"; the criteria half
+      // turns that into CRITERIA_FILES_UNREADABLE, and an empty array here
+      // keeps the protected-path check from silently passing on it.
       changedPaths: (view.files ?? []).map((f) => f.path),
       protectedPaths: protectedPaths(root),
       mergeable: view.mergeable,

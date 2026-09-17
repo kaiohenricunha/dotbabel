@@ -85,6 +85,20 @@ export function criteriaGateInputs(deps, view, prNumber) {
 
   const body = String(view?.body ?? "");
   const declaredIds = parseSpecIds(body);
+  // `null` means the caller could not prove the file list complete. Scope is
+  // derived from it, so an incomplete list must not read as a small diff.
+  if (view?.files === null) {
+    return {
+      headRefOid: headSha,
+      requiredCriteria: {},
+      baseActiveCriteria: {},
+      unknownSpecIds: [],
+      criteriaChangeRationale: false,
+      criteriaFilesUnreadable: true,
+      comments: [],
+      ciCriteriaCheck: null,
+    };
+  }
   const changedPaths = (view?.files ?? []).map((f) => String(f?.path ?? "")).filter(Boolean);
   // Nothing declared and nothing changed means nothing can be in scope, whatever
   // the base ref says — so exit before paying for any git call at all.
@@ -115,10 +129,26 @@ export function criteriaGateInputs(deps, view, prNumber) {
   // neither exclude itself by editing `linked_paths` nor escape the gate by
   // declaring a criteria-free spec — or no Spec ID at all.
   const implicatedIds = implicatedSpecIds(deps, baseSha, changedPaths);
+  if (implicatedIds === null) {
+    // The base tree could not be read, so scope is unknowable. Fail closed with
+    // the same reason an unfetchable base produces, rather than silently
+    // falling back to the body-declared ids.
+    return {
+      headRefOid: headSha,
+      requiredCriteria: {},
+      baseActiveCriteria: {},
+      unknownSpecIds: [],
+      criteriaChangeRationale: false,
+      criteriaBaseUnreadable: baseSha,
+      comments: [],
+      ciCriteriaCheck: null,
+    };
+  }
   const scopedIds = [...new Set([...declaredIds, ...implicatedIds])];
   if (scopedIds.length === 0) return {};
 
   const declared = new Set(declaredIds);
+  const pathScoped = new Set(implicatedIds);
 
   /** @type {Record<string, string[]>} */
   const requiredCriteria = {};
@@ -156,6 +186,10 @@ export function criteriaGateInputs(deps, view, prNumber) {
     baseActiveCriteria,
     unknownSpecIds,
     criteriaChangeRationale: hasCriteriaChangeRationale(body),
+    // Specs pulled in by the diff rather than named by the author. The gate
+    // refuses to let a self-written rationale downgrade weakening for these:
+    // the author would be deleting the very criteria that govern their change.
+    pathScopedSpecIds: [...pathScoped],
     criteriaEnforcement: config.enforcement,
     trustedAssociations: config.trusted_associations,
     requireCiCheck: config.require_ci_check,
@@ -206,22 +240,33 @@ function hasCriteriaChangeRationale(body) {
  * so remove itself from the spec that governs them — the same reason the
  * criteria configuration is read at the base.
  *
- * A spec that does not parse at the base contributes nothing. That is the
- * permissive direction, but the alternative is worse: an unparseable spec on
- * the TRUNK would block every pull request in the repository until someone
+ * Only a JSON PARSE failure is permissive. An unparseable spec on the trunk
+ * would otherwise block every pull request in the repository until someone
  * fixed it, and the base ref is already-reviewed code rather than the change
  * under judgement.
+ *
+ * A read FAILURE is not the same thing and must not be treated as one. Returns
+ * null when the listing cannot be read, which the caller turns into the same
+ * blocking `CRITERIA_BASE_UNREADABLE` an unfetchable base already produces —
+ * `refIsReadable` proves the base COMMIT exists, but a treeless or blobless
+ * partial clone resolves the commit and still cannot materialise the trees.
+ * Silently returning `[]` there would collapse scope to the declared ids and
+ * restore the very bypass this function exists to close (REL-3).
  *
  * @param {GateDeps} deps
  * @param {string} baseSha
  * @param {string[]} changedPaths
- * @returns {string[]}
+ * @returns {string[]|null} null when the base tree could not be read.
  */
 function implicatedSpecIds(deps, baseSha, changedPaths) {
   if (changedPaths.length === 0) return [];
 
-  const listing = deps.run(["git", "ls-tree", "-r", "--name-only", baseSha, "--", "docs/specs/"]);
-  if (listing.status !== 0) return [];
+  // `--full-tree`: without it `git ls-tree` resolves the pathspec relative to
+  // the CURRENT DIRECTORY and prints nothing — with exit 0 — whenever the gate
+  // runs from a subdirectory, which a CI step with `working-directory:` does
+  // routinely. That silent empty listing reopens the bypass.
+  const listing = deps.run(["git", "ls-tree", "-r", "--full-tree", "--name-only", baseSha, "--", "docs/specs/"]);
+  if (listing.status !== 0) return null;
 
   const ids = [];
   for (const line of listing.stdout.split("\n")) {
@@ -230,9 +275,15 @@ function implicatedSpecIds(deps, baseSha, changedPaths) {
     ids.push(m[1]);
   }
 
-  return ids.filter((id) => {
+  let unreadable = false;
+  const matched = ids.filter((id) => {
     const r = deps.run(["git", "show", `${baseSha}:docs/specs/${id}/spec.json`]);
-    if (r.status !== 0) return false;
+    // The id came from the listing above, so the blob exists at this ref; a
+    // non-zero status here is a read failure, not an absence.
+    if (r.status !== 0) {
+      unreadable = true;
+      return false;
+    }
     let linked;
     try {
       linked = JSON.parse(r.stdout).linked_paths;
@@ -241,6 +292,7 @@ function implicatedSpecIds(deps, baseSha, changedPaths) {
     }
     return Array.isArray(linked) && linked.some((pattern) => typeof pattern === "string" && anyPathMatches(pattern, changedPaths));
   });
+  return unreadable ? null : matched;
 }
 
 /**

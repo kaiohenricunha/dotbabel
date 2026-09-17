@@ -148,7 +148,9 @@ The second rule is what makes the gate non-optional. Deriving scope from the bod
 
 The match is read at `baseRefOid`, never at the head, for the same reason the configuration is: a pull request must not be able to edit `linked_paths` to exclude itself from the spec that governs the files it touches.
 
-Rule 2 never contributes to `unknownSpecIds`. That code reports a body naming a spec that does not exist, and a spec reached through path matching was never named.
+Rule 2 never contributes to `unknownSpecIds`. That code reports a body naming a spec that does not exist, and a spec reached through path matching was never named. Its absence at the head is weakening instead — and weakening a spec that rule 2 pulled in is **not** downgradable by a `## Criteria change rationale` section, because the author would be retiring the very criteria that govern their change. That case reports `CRITERIA_SCOPE_WEAKENED`, which always blocks.
+
+Scope is only as good as its two inputs, so both fail closed rather than narrow silently. A base tree that cannot be listed or read reports `CRITERIA_BASE_UNREADABLE`, and a changed-file list that cannot be shown complete — `gh pr view --json files` serves one 100-entry page and does not error on truncation — reports `CRITERIA_FILES_UNREADABLE`.
 
 The gate evaluates the criteria codes in three groups. It reports each spec-level code whose condition holds, then the first evidence code whose condition holds, then the CI code.
 
@@ -162,6 +164,9 @@ The gate evaluates the criteria codes in three groups. It reports each spec-leve
 | Evidence | `CRITERIA_EVIDENCE_INVALID`    | The payload of the matching comment does not decode, fails its schema, or names a `head_sha` other than its marker |
 | Evidence | `CRITERIA_EVIDENCE_INCOMPLETE` | The payload's spec ids or active criterion ids differ from `requiredCriteria`                                      |
 | Evidence | `CRITERIA_FAILED`              | The payload verdict is not `pass`                                                                                  |
+| Spec     | `CRITERIA_SCOPE_WEAKENED`      | A criterion of a spec rule 2 pulled in is planned or missing at the head. A rationale never downgrades this        |
+| Scope    | `CRITERIA_BASE_UNREADABLE`     | The base tree could not be listed or read, so scope is unknowable                                                  |
+| Scope    | `CRITERIA_FILES_UNREADABLE`    | The changed-file list could not be shown to be complete                                                            |
 | CI       | `CRITERIA_CI_CHECK_FAILED`     | `requireCiCheck` is true, and `ciCriteriaCheck` is not `success`                                                   |
 
 `GateResult` gains `warnings`, an array that is empty by default. With `warn`, the criteria reasons move to `warnings`, and `ok` ignores them.

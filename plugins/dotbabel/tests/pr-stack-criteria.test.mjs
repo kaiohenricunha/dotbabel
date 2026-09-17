@@ -519,3 +519,122 @@ describe("criteriaGateInputs — scope from changed files (REL-19)", () => {
     expect(criteriaGateInputs(deps, view, 42)).toEqual({});
   });
 });
+
+// --- Review fixes: four ways the REL-19 scope rule could be silently voided --
+//
+// Each of these restores the #367 bypass without any error surfacing, which is
+// the worst shape a security control can fail in. All four were found by the
+// phase 3 review fleet on the first revision of this change.
+
+describe("criteriaGateInputs — REL-19 cannot be silently voided", () => {
+  const CHANGED = [{ path: "plugins/dotbabel/src/criteria/evidence.mjs" }];
+  const governed = JSON.stringify({
+    linked_paths: ["plugins/dotbabel/src/criteria/**"],
+    acceptance_criteria: [{ id: "AC-1", status: "active" }],
+  });
+
+  it("lists specs with --full-tree, so running from a subdirectory cannot empty the scope", () => {
+    // `git ls-tree` without --full-tree resolves the pathspec relative to the
+    // CURRENT DIRECTORY and prints nothing, with exit 0, from any subdirectory
+    // — which a CI step with `working-directory:` does routinely.
+    const { deps, joined } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [/git show .*:docs\/specs\/governed\/spec\.json/, ok(governed)],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n", files: CHANGED }, 42);
+    const ls = joined().find((c) => c.includes("ls-tree"));
+    expect(ls).toContain("--full-tree");
+  });
+
+  it("fails closed when the base tree cannot be listed", () => {
+    // A treeless or blobless partial clone resolves the base COMMIT — so
+    // refIsReadable passes — yet cannot materialise the trees.
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, err("fatal: not a tree object")],
+    ]);
+    const out = criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n", files: CHANGED }, 42);
+    expect(out.criteriaBaseUnreadable).toBe(BASE);
+    expect(checkMergeGate({ ...VIEW, ...out }).reasons.map((r) => r.code)).toContain("CRITERIA_BASE_UNREADABLE");
+  });
+
+  it("fails closed when a spec listed at the base cannot be read", () => {
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [/git show .*:docs\/specs\/governed\/spec\.json/, err("fatal: missing blob")],
+    ]);
+    const out = criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n", files: CHANGED }, 42);
+    expect(out.criteriaBaseUnreadable).toBe(BASE);
+  });
+
+  it("fails closed when the changed-file list could not be proven complete", () => {
+    // `gh pr view --json files` serves one 100-entry page and does not error on
+    // truncation, so the caller passes null rather than a list that only looks
+    // complete. Padding a branch past the cap must not drop a governed file.
+    const { deps, calls } = stubSh([]);
+    const out = criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n", files: null }, 42);
+    expect(out.criteriaFilesUnreadable).toBe(true);
+    expect(calls).toEqual([]);
+    expect(checkMergeGate({ ...VIEW, ...out }).reasons.map((r) => r.code)).toContain("CRITERIA_FILES_UNREADABLE");
+  });
+
+  it("reports specs pulled in by the diff, so the gate can refuse to downgrade them", () => {
+    const { deps } = stubSh([
+      [/git cat-file -e/, ok("")],
+      [/git ls-tree/, lsTree("governed")],
+      [/git show .*:docs\/specs\/governed\/spec\.json/, ok(governed)],
+      [/git show .*\.dotbabel\.json/, ok("{}")],
+      [/gh api graphql/, ok(commentPage(0))],
+    ]);
+    const out = criteriaGateInputs(deps, { ...VIEW, body: "## Summary\n\nx\n", files: CHANGED }, 42);
+    expect(out.pathScopedSpecIds).toEqual(["governed"]);
+  });
+});
+
+describe("checkMergeGate — weakening a spec the diff pulled in stays blocking", () => {
+  it("refuses to let a self-written rationale downgrade CRITERIA_SCOPE_WEAKENED", () => {
+    // The bypass this closes: declare a criteria-free spec, delete or empty the
+    // spec.json whose linked_paths govern the changed files, add your own
+    // `## Criteria change rationale`, and the evidence ladder was skipped
+    // entirely with gate.ok true.
+    const body = "## Summary\n\nx\n\n## Test plan\n\n- [x] y\n\n## Criteria change rationale\n\nRetiring it.\n\n## Spec ID\n\nbare\n";
+    const gate = checkMergeGate({
+      body,
+      headRefOid: HEAD,
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      requiredCriteria: { bare: [] },
+      baseActiveCriteria: { governed: ["AC-1"] },
+      pathScopedSpecIds: ["governed"],
+      unknownSpecIds: [],
+      criteriaChangeRationale: true,
+      comments: [],
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.map((r) => r.code)).toContain("CRITERIA_SCOPE_WEAKENED");
+  });
+
+  it("still lets a rationale downgrade weakening for a spec the author merely declared", () => {
+    // The REL-15 escape hatch survives where it was intended: the author is
+    // retiring a criterion of a spec the diff does not implicate.
+    const body = "## Summary\n\nx\n\n## Test plan\n\n- [x] y\n\n## Criteria change rationale\n\nReviewed.\n\n## Spec ID\n\nalpha\n";
+    const gate = checkMergeGate({
+      body,
+      headRefOid: HEAD,
+      mergeable: "MERGEABLE",
+      mergeStateStatus: "CLEAN",
+      requiredCriteria: { alpha: [] },
+      baseActiveCriteria: { alpha: ["AC-2"] },
+      pathScopedSpecIds: [],
+      unknownSpecIds: [],
+      criteriaChangeRationale: true,
+      comments: [],
+    });
+    expect(gate.reasons.map((r) => r.code)).not.toContain("CRITERIA_SCOPE_WEAKENED");
+    expect(gate.warnings.map((r) => r.code)).toContain("CRITERIA_WEAKENED");
+  });
+});
