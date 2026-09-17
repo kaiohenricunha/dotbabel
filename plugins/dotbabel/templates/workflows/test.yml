@@ -1,0 +1,124 @@
+# Pull-request verification: quality policy and acceptance criteria.
+#
+# This workflow VERIFIES and never writes evidence (KD-10). CI's identity is
+# not a trusted author, and a second writer would race the developer's local
+# run, so `dotbabel criteria verify` is called WITHOUT `--post` here. The
+# evidence comment is written by the local run; this job is the independent
+# re-run that confirms it.
+#
+# SEC-7: every action is pinned to a full commit SHA, the top-level token is
+# read-only, each job adds only the scopes it needs, and the trigger is
+# `pull_request` — never `pull_request_target`, which would run this file's
+# code against fork content with a writable token and repository secrets.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Honors a SHA-pinned local attestation from a trusted author so a maintainer
+  # who verified locally is not billed for a redundant remote run. Fail closed:
+  # if the API call errors, grep exits non-zero, attested=false, and the verify
+  # job runs.
+  classify:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+    outputs:
+      attested: ${{ steps.attest.outputs.attested }}
+    steps:
+      - name: Check for a local attestation
+        id: attest
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The marker names THIS head SHA. A marker for any other commit must
+          # not match, or an attestation of older code would wave through new
+          # code pushed after it.
+          MARKER="<!-- local-attest verified-sha=${HEAD_SHA} -->"
+          if gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --paginate \
+               --jq '.[] | select(.author_association == "OWNER") | .body | split("\n")[0]' \
+             | grep -qFx "$MARKER"; then
+            echo "Local attestation found for ${HEAD_SHA} — the verify job will skip."
+            echo "attested=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No local attestation for ${HEAD_SHA} — the verify job will run."
+            echo "attested=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  verify:
+    needs: classify
+    if: needs.classify.outputs.attested != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # EDIT FOR YOUR PROJECT: replace this setup step with your language's.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check the pull-request quality policy
+        env:
+          QUALITY_BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          npx dotbabel quality check \
+            --profile pr \
+            --base "$QUALITY_BASE_REF" \
+            --allow-project-commands \
+            --json > quality-report.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: quality-report-pr
+          path: quality-report.json
+
+  # Deliberately independent of `classify`: a local attestation must never skip
+  # criteria verification (KD-10). This job is the second opinion, so letting
+  # the local run excuse it would make the local run both assert and confirm.
+  dotbabel-criteria:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The PR HEAD, not the default merge commit: `criteria verify` fails
+          # closed unless local HEAD equals the pull request head, and a merge
+          # commit never does.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      # EDIT FOR YOUR PROJECT: replace this setup step with your language's.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify the acceptance criteria
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          npx dotbabel criteria verify \
+            --pr "$PR_NUMBER" \
+            --json > criteria-report.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: criteria-report
+          path: criteria-report.json

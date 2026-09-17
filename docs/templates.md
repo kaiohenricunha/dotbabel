@@ -39,10 +39,13 @@ templates/
 │   └── specs/
 │       └── README.md                     → docs/specs/README.md
 ├── githooks/
-│   └── pre-commit                        → githooks/pre-commit
+│   ├── pre-commit                        → githooks/pre-commit
+│   └── pre-push                          → githooks/pre-push
 └── workflows/
     ├── ai-review.yml                     → .github/workflows/ai-review.yml
     ├── detect-drift.yml                  → .github/workflows/detect-drift.yml
+    ├── quality.yml                       → .github/workflows/quality.yml
+    ├── test.yml                          → .github/workflows/test.yml
     └── validate-skills.yml               → .github/workflows/validate-skills.yml
 ```
 
@@ -67,13 +70,37 @@ templates/
 - **`docs/specs/README.md`** — onboarding doc for the spec workflow.
 - **`githooks/pre-commit`** — auto-refreshes the manifest when a skill
   file changes.
+- **`githooks/pre-push`** — runs the `fast` quality profile against the
+  upstream merge base. Only a policy failure blocks; a missing tool, exit 2,
+  or a timeout prints a notice and allows the push (KD-11). Activation is
+  manual and stays that way, because the hook runs repository code:
+  `git config core.hooksPath githooks`. Bypass with `BYPASS_PRE_PUSH=1`.
 - **`workflows/validate-skills.yml`** — runs every validator on PR + push.
 - **`workflows/detect-drift.yml`** — weekly cron flagging stale commands.
 - **`workflows/ai-review.yml`** — Claude Code review wiring (same-repo PR
   gating).
+- **`workflows/test.yml`** — pull-request verification. A classify job honors
+  a SHA-pinned local attestation from a trusted author; a verify job runs the
+  `pr` quality profile when there is none. A separate `dotbabel-criteria` job
+  always runs, checks out the pull-request head SHA, and verifies acceptance
+  criteria **without** `--post` — CI verifies, it never writes evidence
+  (KD-10).
+- **`workflows/quality.yml`** — the `deep` profile weekly and on manual
+  dispatch. Deep carries mutation and race detection, which is why it is not
+  on the pull-request path.
 
-The quality workflow remains an opt-in example under `examples/quality/`.
-The harness scaffolder copies every file in `templates/workflows/`, so a quality workflow there would execute project commands without an adopter choice.
+**These workflows run project commands in CI, and the scaffolder installs
+them.** `test.yml` and `quality.yml` both pass `--allow-project-commands`, so
+they execute the build and test commands the adopted repository declares. That
+was previously the stated reason to keep a quality workflow out of this
+directory and in `examples/quality/` instead; KD-10 reverses that call,
+because a verification harness nobody installs verifies nothing. The exposure
+is bounded by the same trust boundary GitHub Actions already applies to any CI
+that runs a test suite: the trigger is `pull_request`, never
+`pull_request_target`, so a fork's pull request runs the fork's code with a
+read-only token and no repository secrets. Delete either file after
+`dotbabel init` if you would rather opt in later — nothing else depends on
+them being present.
 
 ## Changing a template
 

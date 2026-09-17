@@ -168,6 +168,10 @@ marker_for() {
     rust)   printf 'Cargo.toml' ;;
     ts)     printf 'tsconfig.json' ;;
     java)   printf 'pom.xml' ;;
+    # Roots for the opt-in tests stage (KD-12). `node` keys on package.json
+    # rather than tsconfig.json because that is where the runner is declared.
+    node)   printf 'package.json' ;;
+    python) printf 'pyproject.toml' ;;
     *)      printf '' ;;
   esac
 }
@@ -225,6 +229,10 @@ find_project_root() {
 # bash variable cannot hold NUL), so it consumes a process substitution —
 # which still runs in the current shell, keeping TOUCHED assignments visible.
 declare -A TOUCHED=()
+# The tests stage needs the FILES, not just the languages: every runner below
+# scopes by file path. Kept separate from TOUCHED so the static checks keep
+# their existing language map and behavior exactly.
+declare -A TEST_TOUCHED=()
 SAW_CHANGE=0
 while IFS= read -r -d '' entry; do
   [ -n "$entry" ] || continue
@@ -256,13 +264,43 @@ while IFS= read -r -d '' entry; do
   TOUCHED["$lang"$'\t'"$proj"]=1
 done < <(git -C "$ROOT" status --porcelain -z --untracked-files=all 2>/dev/null)
 
+# Second pass for the tests stage. It classifies a WIDER set of extensions than
+# the static checks: .js and .py have no static checker here, but they very much
+# have tests, and a turn that only touched them would otherwise reach no stage
+# at all.
+if [ "${CHECK_ON_STOP_TESTS:-0}" = "1" ]; then
+  while IFS= read -r -d '' entry; do
+    [ -n "$entry" ] || continue
+    case "$entry" in
+      ??" "*) path="${entry:3}" ;;
+      *)      path="$entry" ;;
+    esac
+    base="${path##*/}"
+    case "$base" in *.*) ;; *) continue ;; esac
+    ext="${base##*.}"
+    case "${ext,,}" in
+      js|jsx|cjs|mjs|ts|tsx|mts|cts) tlang=node ;;
+      go)                            tlang=go ;;
+      py)                            tlang=python ;;
+      *)                             continue ;;
+    esac
+    tabs="$GIT_TOP/$path"
+    [ -f "$tabs" ] || continue
+    tproj=$(find_project_root "$tlang" "${tabs%/*}") || continue
+    tkey="$tlang"$'\t'"$tproj"
+    TEST_TOUCHED["$tkey"]="${TEST_TOUCHED[$tkey]:+${TEST_TOUCHED[$tkey]}$'\n'}$tabs"
+  done < <(git -C "$ROOT" status --porcelain -z --untracked-files=all 2>/dev/null)
+fi
+
 if [ "$SAW_CHANGE" -eq 0 ]; then
   # Nothing changed this turn — a conversational turn, not an edit turn.
   clear_state
   exit 0
 fi
 
-[ "${#TOUCHED[@]}" -gt 0 ] || exit 0
+# A turn that touched only .js or .py has an empty TOUCHED but a populated
+# TEST_TOUCHED, so exiting on TOUCHED alone would make the tests stage dead.
+[ "${#TOUCHED[@]}" -gt 0 ] || [ "${#TEST_TOUCHED[@]}" -gt 0 ] || exit 0
 
 # ------------------------------------------------------------- runner ----
 
@@ -290,6 +328,66 @@ have() { command -v "$1" >/dev/null 2>&1; }
 # Each takes the project root as $1 — find_project_root already proved the
 # marker is there, so none of them re-tests for it. `cd` happens in a subshell
 # so the caller's working directory is never disturbed between projects.
+
+# ---- related-test runners (KD-12), each scoped by the runner's OWN flag ----
+#
+# Whole-suite runs are deliberately not offered. The point of this stage is
+# feedback on what the turn touched; a full suite at the end of every turn is
+# slow enough that it would be switched off, and then it protects nothing.
+# `review-pr` step 5 uses exactly these flags for the same reason.
+
+# tst_node <proj> <newline-separated files>
+tst_node() {
+  local proj="$1" files="$2" manifest="$1/package.json" runner=""
+  [ -f "$manifest" ] || return 127
+  have npx || return 127
+  # Read the declared runner rather than guessing: running `vitest` in a Jest
+  # repository fails in a way that looks like a test failure, not a misdetect.
+  if grep -q '"vitest"' "$manifest" 2>/dev/null; then runner=vitest
+  elif grep -q '"jest"' "$manifest" 2>/dev/null; then runner=jest
+  else return 127
+  fi
+  local -a list=()
+  while IFS= read -r f; do [ -n "$f" ] && list+=("$f"); done <<< "$files"
+  [ "${#list[@]}" -gt 0 ] || return 127
+  if [ "$runner" = "vitest" ]; then
+    ( cd "$proj" && run_bounded npx vitest related --run "${list[@]}" ) 2>&1
+  else
+    ( cd "$proj" && run_bounded npx jest --findRelatedTests --passWithNoTests "${list[@]}" ) 2>&1
+  fi
+}
+
+# tst_go <proj> <newline-separated files> — scoped to the touched PACKAGES,
+# which for Go is the set of directories holding the changed files.
+tst_go() {
+  local proj="$1" files="$2"
+  have go || return 127
+  local -a pkgs=()
+  local f d
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    d="${f%/*}"
+    case " ${pkgs[*]} " in *" $d "*) ;; *) pkgs+=("$d") ;; esac
+  done <<< "$files"
+  [ "${#pkgs[@]}" -gt 0 ] || return 127
+  ( cd "$proj" && run_bounded go test "${pkgs[@]}" ) 2>&1
+}
+
+# tst_python <proj> <newline-separated files> — pytest takes TEST files, so a
+# changed source file with no matching test contributes nothing here.
+tst_python() {
+  local proj="$1" files="$2"
+  have pytest || return 127
+  local -a list=()
+  local f base
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    base="${f##*/}"
+    case "$base" in test_*.py|*_test.py) list+=("$f") ;; esac
+  done <<< "$files"
+  [ "${#list[@]}" -gt 0 ] || return 127
+  ( cd "$proj" && run_bounded pytest "${list[@]}" ) 2>&1
+}
 
 chk_go() {
   have go || return 127
@@ -377,6 +475,53 @@ for key in "${!TOUCHED[@]}"; do
     REPORT+="  ... (truncated: $MAX_LINES of $total lines shown)"$'\n'
   fi
 done
+
+# ---- tests stage (KD-12): opt-in, trusted-only, runner-scoped -------------
+#
+# Deliberately placed BEFORE the give-up guard below, so a failing test feeds
+# the same signature counter as a failing static check. Without that, a test
+# the model cannot fix would block every turn forever — this hook emits
+# decision:"block", so an unbounded stage is a trap, not a safety net.
+#
+# Trust is already enforced far above: an untrusted repository exits before
+# reaching any of this. The CHECK_ON_STOP_TESTS opt-in is a SECOND lock, not a
+# replacement for it — running a repository's test suite is arbitrary code
+# execution chosen by that repository's author.
+if [ "${CHECK_ON_STOP_TESTS:-0}" = "1" ] && [ "${#TEST_TOUCHED[@]}" -gt 0 ]; then
+  for key in "${!TEST_TOUCHED[@]}"; do
+    tlang="${key%%$'\t'*}"
+    tproj="${key#*$'\t'}"
+    tlabel="${tproj#"$GIT_TOP"}"
+    tlabel="${tlabel#/}"
+    [ -n "$tlabel" ] || tlabel="."
+    tout=""
+    trc=0
+    tout=$("tst_$tlang" "$tproj" "${TEST_TOUCHED[$key]}" 2>/dev/null) || trc=$?
+    [ "$trc" -eq 0 ] && continue
+    # No runner, no toolchain, or nothing in scope — silence, never a finding.
+    [ "$trc" -eq 127 ] && continue
+    # Timed out or killed: a bound was hit, which is not a code defect.
+    { [ "$trc" -eq 124 ] || [ "$trc" -eq 137 ]; } && continue
+    thad_output=0
+    [ -n "${tout//[[:space:]]/}" ] && thad_output=1
+    tout=$(printf '%s\n' "$tout" | grep -viE "$NOISE_RX" || true)
+    if [ "$thad_output" -eq 1 ] && [ -z "${tout//[[:space:]]/}" ]; then
+      continue
+    fi
+    FAILED_LANGS+=("$tlang-tests:$tlabel")
+    tbody=$(printf '%s\n' "$tout" | head -n "$MAX_LINES" || true)
+    ttotal=$(printf '%s\n' "$tout" | wc -l || true)
+    REPORT+="[$tlang tests $tlabel] related tests failed"$'\n'
+    if [ -n "$tbody" ]; then
+      REPORT+="${tbody:0:3000}"$'\n'
+    else
+      REPORT+="  exited $trc with no output"$'\n'
+    fi
+    if [ "$ttotal" -gt "$MAX_LINES" ]; then
+      REPORT+="  ... (truncated: $MAX_LINES of $ttotal lines shown)"$'\n'
+    fi
+  done
+fi
 
 if [ "${#FAILED_LANGS[@]}" -eq 0 ]; then
   clear_state

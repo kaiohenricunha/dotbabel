@@ -1,0 +1,44 @@
+# Scheduled deep quality audit.
+#
+# The `deep` profile carries the expensive capabilities — mutation testing and
+# race detection — which is why it runs weekly and on demand rather than on
+# every pull request. Pull requests use the `pr` profile in test.yml.
+#
+# SEC-7: actions pinned to full commit SHAs, read-only top-level token, and no
+# `pull_request_target`.
+name: Language-aware quality
+
+on:
+  schedule:
+    # Weekly, off the hour, to avoid the top-of-hour scheduling crush.
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      # EDIT FOR YOUR PROJECT: replace this setup step with your language's.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run the deep quality profile
+        run: |
+          npx dotbabel quality check \
+            --profile deep \
+            --base origin/main \
+            --allow-project-commands \
+            --json > quality-report.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: always()
+        with:
+          name: quality-report-deep
+          path: quality-report.json
