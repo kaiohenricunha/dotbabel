@@ -38,9 +38,10 @@
 - **REL-13**: A planned criterion never runs and never fails the verdict, and the evidence records it as `pending`.
 - **REL-14**: The command deletes each criterion's report path before it runs the command, and a report that is missing after the run sets status `error`.
 - **REL-15**: A criterion that is active at the base ref and planned or missing at the head fails the gate with `CRITERIA_WEAKENED`, unless the pull request body has a `## Criteria change rationale` section, which turns the reason into a warning.
-- **REL-16**: The merge gate reads the `criteria` configuration from the base ref and specs from the head ref, and a Spec ID with no spec at the head fails closed with `CRITERIA_SPEC_UNKNOWN`.
+- **REL-16**: The merge gate reads the `criteria` configuration from the base ref, and reads specs at both refs — the head for what must be proven now, the base for what was active before and for the `linked_paths` that set scope (REL-19). A Spec ID with no spec at the head fails closed with `CRITERIA_SPEC_UNKNOWN`.
 - **REL-17**: The gate fails with `CRITERIA_EVIDENCE_INCOMPLETE` when the payload's spec ids or active criterion ids differ from the active criteria of the specs linked at evaluation time.
 - **REL-18**: `review-pr` runs criteria verification after its last push, and `/merge-pr` runs it again when the gate reports `CRITERIA_EVIDENCE_STALE`.
+- **REL-19**: A spec is in scope when the body declares it or when its `linked_paths` at the base ref match a changed file, and the gate requires the criteria of every in-scope spec. The path match is read at the base ref, so a pull request can neither exclude itself by editing `linked_paths` nor escape the gate by declaring a criteria-free spec or no Spec ID at all. Weakening a spec that the diff pulled in blocks with `CRITERIA_SCOPE_WEAKENED` and is never downgradable by a rationale section, and an unreadable base tree or an unprovable changed-file list fails closed rather than narrowing scope.
 
 ## Operational
 

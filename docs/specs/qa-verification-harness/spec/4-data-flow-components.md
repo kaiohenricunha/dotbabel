@@ -63,9 +63,9 @@
 ### Flow 3 — Merge gate
 
 1. `dotbabel pr-stack gate --gate merge` fetches the body, files, mergeability, head and base SHAs, comments with edit metadata, and check runs.
-2. It parses the Spec IDs with the shared parser, reads each spec at the head SHA, and reads the same specs and the `criteria` configuration at the base SHA (REL-16).
-3. It sets the required criteria to the active criteria of the linked specs at the head.
-4. `checkMergeGate` evaluates the existing reasons, `CRITERIA_SPEC_UNKNOWN`, `CRITERIA_WEAKENED`, the evidence reasons in §5, and the CI check when `require_ci_check` is true (KD-16).
+2. It parses the Spec IDs with the shared parser, lists `docs/specs/` at the base SHA and reads each spec's `linked_paths` there to find the specs the diff implicates (REL-19), then reads every in-scope spec at the head SHA and at the base SHA, plus the `criteria` configuration at the base SHA (REL-16).
+3. It sets the required criteria to the active criteria, at the head, of every in-scope spec — the union of those the body declares and those the changed files implicate.
+4. `checkMergeGate` evaluates the existing reasons, `CRITERIA_SPEC_UNKNOWN`, `CRITERIA_WEAKENED`, `CRITERIA_SCOPE_WEAKENED`, the evidence reasons in §5, and the CI check when `require_ci_check` is true (KD-16).
 5. When `criteria.enforcement` at the base is `warn`, criteria reasons appear under `warnings`, and `ok` ignores them (KD-14).
 
 ### Flow 4 — Quality diff run

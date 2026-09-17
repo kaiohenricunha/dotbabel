@@ -68,19 +68,9 @@
     "docs/quality.md",
     "docs/hooks.md",
     "docs/templates.md",
-    "docs/quickstart.md",
-    "docs/troubleshooting.md",
     "docs/repo-facts.json",
     "docs/specs/README.md",
-    "CLAUDE.md",
-    "AGENTS.md",
-    "GEMINI.md",
-    ".github/copilot-instructions.md",
-    "package.json",
-    ".gitignore",
-    ".dotbabel.json",
-    "stryker.config.mjs",
-    "examples/minimal-consumer/docs/repo-facts.json"
+    ".dotbabel.json"
   ],
   "acceptance_commands": [
     "npm test",
