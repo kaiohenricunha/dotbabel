@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { makeRepositoryPlans } from "./make-tools.mjs";
 import { capabilityInProfile, capabilityRules } from "./shared.mjs";
+import { mutationToolPlans } from "./mutation-tools.mjs";
 
 function explicitPlans(component, profile, includeTests = false) {
   return Object.entries(component.tools ?? {}).flatMap(([capability, tool]) => {
@@ -33,6 +34,8 @@ export const goAdapter = Object.freeze({
         ? { id: `${component.id}:golangci-lint`, componentId: component.id, capability: "lint", ruleIds: ["correctness.lint"], executable: "golangci-lint", argv: ["run"], cwd: component.absoluteRoot, availability: "candidate", source: "configured", requiresTrust: true }
         : { id: `${component.id}:vet`, componentId: component.id, capability: "lint", ruleIds: ["correctness.lint"], executable: "go", argv: ["vet", "./..."], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: true });
     }
+    plans.push(...mutationToolPlans(component, profile, claimed));
+    for (const plan of plans) claimed.add(plan.capability);
     if ((profile !== "fast" || includeTests) && !claimed.has("test")) plans.push({ id: `${component.id}:test`, componentId: component.id, capability: "test", ruleIds: ["correctness.compile", "correctness.tests"], executable: "go", argv: ["test", "./..."], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: true });
     return plans;
   },

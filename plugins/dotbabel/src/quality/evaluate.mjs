@@ -56,6 +56,14 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
       results.push({ ...metric, class: rule.class, state: "checked", verdict: checkedVerdict(rule, pass), baseline: old, baseline_covered: oldMetric.covered, baseline_total: oldMetric.total, provenance: rule.provenance });
       continue;
     }
+    // A parser may report that a rule cannot be measured for this change at
+    // all — mutmut emitting no per-mutant lines, or no mutant starting on a
+    // changed line (KD-7, REL-11). That is not the same as an unavailable
+    // tool: there is nothing to measure, not a measurement that went missing.
+    if (metric.not_applicable) {
+      results.push({ ...metric, class: rule.class, state: "not_applicable", verdict: "info", threshold: rule.threshold, baseline: old, message: metric.evidence ?? "not applicable to this change", provenance: rule.provenance });
+      continue;
+    }
     if (!Number.isFinite(metric.actual)) {
       results.push({ ...metric, class: rule.class, state: "unavailable", verdict: unavailableVerdict(rule.on_unavailable), threshold: rule.threshold, baseline: old, message: "measured value is not a finite number", provenance: rule.provenance });
       continue;

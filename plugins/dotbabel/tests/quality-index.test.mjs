@@ -211,3 +211,62 @@ describe("quality check orchestration", () => {
     expect(result.results.find((item) => item.rule === "coverage.changed_lines")).not.toMatchObject({ state: "not_configured" });
   });
 });
+
+// --- P-C4: mutation scoring end to end (KD-7, REL-11) ---------------------
+
+function mutationRepository(mutantLines) {
+  const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-quality-mutation-"));
+  dirs.push(repoRoot);
+  // A project-declared mutation tool: the command writes the report, so this
+  // exercises the real parse → score → evaluate path rather than a stub.
+  const report = JSON.stringify({ schemaVersion: "1.0", files: { "index.js": { mutants: mutantLines.map(([line, status], id) => ({ id: `${id}`, mutatorName: "ArithmeticOperator", status, location: { start: { line, column: 1 }, end: { line, column: 9 } } })) } } });
+  fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ quality: {
+    base_ref: "main",
+    components: [{ root: ".", languages: ["javascript"], tools: {
+      mutation: { argv: ["node", "-e", `require('node:fs').writeFileSync('mutation.json', ${JSON.stringify(report)})`], report: { format: "stryker-json", path: "mutation.json" } },
+    } }],
+  } }));
+  fs.writeFileSync(path.join(repoRoot, "index.js"), "const first = 1;\n");
+  execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
+  execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
+  execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
+  execFileSync("git", ["-C", repoRoot, "add", "."]);
+  execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
+  // Line 2 is the only changed line.
+  fs.appendFileSync(path.join(repoRoot, "index.js"), "const second = 2;\n");
+  return repoRoot;
+}
+
+// Two results carry the `mutation.changed_score` rule: one from the EXECUTION
+// (did the command run and exit 0) and one from the parsed METRIC. Only the
+// metric carries a `key`, so select on that rather than on position.
+const mutationMetric = (result) => result.results.find((item) => item.rule === "mutation.changed_score" && item.key);
+
+const runMutation = (repoRoot) => runQualityCheck({
+  repoRoot,
+  profile: "deep",
+  base: "main",
+  allowProjectCommands: true,
+  env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+});
+
+describe("mutation scoring", () => {
+  it("scores a mutation report against the changed lines only", async () => {
+    // Line 2 changed. Two mutants there (one killed), one on unchanged line 1
+    // — which would lift the score to 66.7 if scope were ignored.
+    const result = await runMutation(mutationRepository([[2, "Killed"], [2, "Survived"], [1, "Killed"]]));
+    const metric = mutationMetric(result);
+    expect(metric).toMatchObject({ state: "checked", actual: 50, detected: 1, valid: 2 });
+    expect(metric.verdict).toBe("fail"); // 50 is under the 85 budget
+  });
+
+  it("reports mutation as not_applicable when no mutant lands on a changed line", async () => {
+    // REL-11: nothing to mutate is not a failed budget. A zero here would
+    // block every pull request whose diff happens to miss the mutated lines.
+    const result = await runMutation(mutationRepository([[1, "Killed"], [1, "Survived"]]));
+    const metric = mutationMetric(result);
+    expect(metric).toMatchObject({ state: "not_applicable", verdict: "info" });
+    expect(metric.actual).toBeUndefined();
+    expect(metric.message).toMatch(/no mutant starts on a changed line/);
+  });
+});

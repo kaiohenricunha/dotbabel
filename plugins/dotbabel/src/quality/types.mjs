@@ -55,6 +55,8 @@ export const QUALITY_REPORT_FORMATS = Object.freeze([
   "ruff-json",
   "jscpd-json",
   "stryker-json",
+  "gremlins-json",
+  "mutmut-json",
   "dotbabel-v1",
 ]);
 

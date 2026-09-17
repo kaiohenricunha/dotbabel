@@ -1,0 +1,29 @@
+{
+  "go_module": "mutsample",
+  "files": [
+    {
+      "file_name": "calc.go",
+      "mutations": [
+        { "type": "CONDITIONALS_BOUNDARY", "status": "LIVED", "line": 10, "column": 7 },
+        { "type": "CONDITIONALS_NEGATION", "status": "KILLED", "line": 10, "column": 7 },
+        { "type": "CONDITIONALS_BOUNDARY", "status": "KILLED", "line": 4, "column": 7 },
+        { "type": "CONDITIONALS_NEGATION", "status": "KILLED", "line": 7, "column": 7 },
+        { "type": "CONDITIONALS_NEGATION", "status": "KILLED", "line": 4, "column": 7 },
+        { "type": "ARITHMETIC_BASE", "status": "KILLED", "line": 17, "column": 11 }
+      ]
+    }
+  ],
+  "test_efficacy": 83.33333333333334,
+  "mutations_coverage": 100,
+  "mutants_total": 6,
+  "mutants_killed": 5,
+  "mutants_lived": 1,
+  "mutants_not_viable": 0,
+  "mutants_not_covered": 0,
+  "elapsed_time": 0.226370982,
+  "mutator_statistics": {
+    "arithmetic_base": 1,
+    "conditionals_negation": 3,
+    "conditionals_boundary": 2
+  }
+}

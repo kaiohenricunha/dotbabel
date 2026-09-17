@@ -1,6 +1,7 @@
 import path from "node:path";
 import { projectToolPlans } from "./shared.mjs";
 import { nodeRepositoryPlans, nodeBuiltinCoveragePlans } from "./node-tools.mjs";
+import { mutationToolPlans } from "./mutation-tools.mjs";
 
 /** Built-in JavaScript quality adapter. */
 export const javascriptAdapter = Object.freeze({
@@ -17,10 +18,12 @@ export const javascriptAdapter = Object.freeze({
     return files.some((file) => /\.[cm]?js$/.test(file)) ? [{ root: ".", language: "javascript", markers: [] }] : [];
   },
   plan(component, _policy, changeSet, profile) {
+    component.absoluteRoot ??= path.resolve(component.root);
     const includeTests = (changeSet.criticalMatches ?? []).length > 0;
     const plans = projectToolPlans(component, profile, includeTests);
     plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability)), includeTests));
     plans.push(...nodeBuiltinCoveragePlans(component, profile, new Set(plans.map((plan) => plan.capability)), includeTests));
+    plans.push(...mutationToolPlans(component, profile, new Set(plans.map((plan) => plan.capability))));
     const changed = changeSet.changedFiles.map((item) => item.path).filter((file) => /\.[cm]?js$/.test(file) && component.files.includes(file));
     for (const file of changed) plans.push({ id: `${component.id}:node-check:${file}`, componentId: component.id, capability: "compile", ruleIds: ["correctness.compile"], executable: "node", argv: ["--check", "--", `./${path.relative(component.root, file)}`], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: false });
     return plans;
