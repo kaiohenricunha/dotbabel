@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-07",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts the fail-closed direction explicitly",
+  "test": "it(\"fails closed when the base ref cannot be read\", () => {\n  const out = gateInputs({ run: () => ({ status: 1 }) }, view, 1);\n  expect(out.criteriaBaseUnreadable).toBe(BASE);\n});\n"
+}

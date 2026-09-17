@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-19",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts the complementary allow case",
+  "test": "it(\"allows the sanctioned writer\", () => {\n  expect(runHook(\"dotbabel criteria verify --pr 1 --post\").status).toBe(0);\n});\n"
+}

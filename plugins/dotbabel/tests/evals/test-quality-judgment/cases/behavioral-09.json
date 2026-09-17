@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-09",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "property-style round trip with a real equality check",
+  "test": "it(\"round-trips a payload through build and parse\", () => {\n  expect(parse(build(payload)).payload).toEqual(payload);\n});\n"
+}

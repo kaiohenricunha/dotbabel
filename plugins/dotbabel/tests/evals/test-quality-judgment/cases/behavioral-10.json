@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-10",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "negative case with a specific message",
+  "test": "it(\"rejects a marker whose sha is not 40 hex characters\", () => {\n  expect(() => buildMarker(\"zz\")).toThrow(/invalid sha/);\n});\n"
+}

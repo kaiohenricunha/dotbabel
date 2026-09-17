@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-05",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "normalisation behaviour with an explicit expectation",
+  "test": "it(\"treats a trailing slash as the same path\", () => {\n  expect(samePath(\"docs/\", \"docs\")).toBe(true);\n});\n"
+}

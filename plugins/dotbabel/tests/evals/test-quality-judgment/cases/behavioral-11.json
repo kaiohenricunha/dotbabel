@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-11",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts a hard numeric limit",
+  "test": "it(\"keeps the comment under the size cap by shrinking tails\", () => {\n  expect(render(big, tails).length).toBeLessThanOrEqual(60000);\n});\n"
+}

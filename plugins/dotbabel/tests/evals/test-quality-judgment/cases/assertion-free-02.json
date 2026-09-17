@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-02",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "asserts only the absence of a throw, so any return value passes",
+  "test": "it(\"does not throw on an empty body\", () => {\n  expect(() => parseSpecIds(\"\")).not.toThrow();\n});\n"
+}

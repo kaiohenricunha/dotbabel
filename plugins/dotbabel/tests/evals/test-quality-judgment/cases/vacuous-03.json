@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-03",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "compares a value to itself; passes for any implementation",
+  "test": "it(\"is always consistent\", () => {\n  const out = normalize(input);\n  expect(out).toEqual(out);\n});\n"
+}

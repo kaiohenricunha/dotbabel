@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-08",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "compares a constant to itself",
+  "test": "it(\"uses the documented cap\", () => {\n  expect(MAX_COMMENT_PAGES).toBe(MAX_COMMENT_PAGES);\n});\n"
+}

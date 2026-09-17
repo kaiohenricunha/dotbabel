@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-06",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "permanently skipped, so it constrains nothing while still being counted",
+  "test": "it.skip(\"rejects an expired token\", () => {\n  expect(() => verify(expired)).toThrow();\n});\n"
+}

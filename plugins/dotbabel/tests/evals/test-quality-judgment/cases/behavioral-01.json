@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-01",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts a specific output for a specific hostile input",
+  "test": "it(\"keeps a lone surrogate intact rather than replacing it\", () => {\n  expect(normalize(\"a\\uD800b\")).toBe(\"a\\uD800b\");\n});\n"
+}

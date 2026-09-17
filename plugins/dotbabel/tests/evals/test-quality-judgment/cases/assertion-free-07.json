@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-07",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "tautological assertion after the call",
+  "test": "it(\"runs the gate\", () => {\n  checkMergeGate(input);\n  expect(true).toBe(true);\n});\n"
+}

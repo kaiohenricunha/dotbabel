@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-07",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "an empty array and an array of errors are both defined",
+  "test": "it(\"matches the schema\", () => {\n  const errors = validate(payload);\n  expect(errors).toBeDefined();\n});\n"
+}

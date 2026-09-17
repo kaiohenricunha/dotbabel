@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-02",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "guarded by an env var that is never set in CI, so the assertion is skipped",
+  "test": "it(\"rejects a bad sha\", () => {\n  if (process.env.RUN_SLOW) expect(() => parseSha(\"zz\")).toThrow();\n});\n"
+}

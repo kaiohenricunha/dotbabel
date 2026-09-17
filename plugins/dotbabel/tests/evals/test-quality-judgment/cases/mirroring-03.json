@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-03",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "pins the implementation's literal rather than any behaviour",
+  "test": "it(\"uses the right pattern\", () => {\n  expect(SPEC_ID_RE.source).toBe(\"^[A-Za-z0-9][A-Za-z0-9._-]*$\");\n});\n"
+}

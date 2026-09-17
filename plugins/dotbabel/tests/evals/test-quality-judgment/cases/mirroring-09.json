@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-09",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "asserts that logging happened, not that the result is right",
+  "test": "it(\"logs the summary\", () => {\n  run();\n  expect(logSpy).toHaveBeenCalled();\n});\n"
+}

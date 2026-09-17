@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-28",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "complementary allow case, pinning the guard is not a blanket block",
+  "test": "it(\"leaves an unrelated comment untouched\", () => {\n  expect(runHook('gh pr comment 1 --body \"lgtm\"')).toBe(0);\n});\n"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-06",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts a computed aggregate against a known fixture",
+  "test": "it(\"counts only executable lines toward coverage\", () => {\n  const c = changedCoverage(report, { \"a.js\": [2, 3] });\n  expect(c.line).toEqual({ covered: 1, total: 2 });\n});\n"
+}

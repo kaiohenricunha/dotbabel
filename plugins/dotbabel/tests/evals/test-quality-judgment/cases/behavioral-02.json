@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-02",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts the error message, not merely that it threw",
+  "test": "it(\"rejects a negative timeout\", () => {\n  expect(() => parseTimeout(\"-1\")).toThrow(/must be a positive integer/);\n});\n"
+}

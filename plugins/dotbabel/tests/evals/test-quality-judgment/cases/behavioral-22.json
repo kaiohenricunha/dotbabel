@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-22",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts a concrete tokenisation result",
+  "test": "it(\"keeps a tab as a separator when splitting ids\", () => {\n  expect(parseSpecIdSection(\"a\\tb\")).toEqual([\"a\", \"b\"]);\n});\n"
+}

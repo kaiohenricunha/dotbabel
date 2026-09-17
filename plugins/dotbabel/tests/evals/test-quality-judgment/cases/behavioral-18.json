@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-18",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts the security-relevant exit code",
+  "test": "it(\"blocks a marker written by hand\", () => {\n  expect(runHook(ghCommentWithMarker).status).toBe(2);\n});\n"
+}

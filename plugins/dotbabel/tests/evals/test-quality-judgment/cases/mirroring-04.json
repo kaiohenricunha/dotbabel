@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-04",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "asserts a call count that any refactor changes",
+  "test": "it(\"reads each spec once\", () => {\n  expect(runSpy.mock.calls.filter(c => c[0][0] === \"git\").length).toBe(3);\n});\n"
+}

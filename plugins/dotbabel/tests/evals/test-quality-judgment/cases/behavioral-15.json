@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-15",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts an absence that matters",
+  "test": "it(\"does not plan coverage without a provider\", () => {\n  expect(plan().some(p => p.capability === \"coverage\")).toBe(false);\n});\n"
+}

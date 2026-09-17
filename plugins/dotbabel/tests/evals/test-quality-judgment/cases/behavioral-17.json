@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-17",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "pins an inclusive boundary",
+  "test": "it(\"treats matching the baseline as no regression\", () => {\n  expect(check(s, s).ok).toBe(true);\n});\n"
+}

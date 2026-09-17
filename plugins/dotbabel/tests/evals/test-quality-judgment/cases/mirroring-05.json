@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-05",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "inspects source text instead of behaviour",
+  "test": "it(\"takes the pnpm branch\", () => {\n  expect(exec.toString()).toContain(\"pnpm\");\n});\n"
+}

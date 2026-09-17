@@ -104,7 +104,7 @@ Worktree already exists: WORKTREE_EXISTS
 Base ref: BASE_REF
 Merge state at dispatch: MERGE_STATE_STATUS
 
-Follow the review-pr command workflow exactly — all 14 steps — with these constraints:
+Follow the review-pr command workflow exactly — all 15 steps — with these constraints:
 
 AUTONOMY
 - Do NOT merge. The user merges explicitly via `/merge-pr N` after reviewing the aggregate table.
@@ -118,7 +118,7 @@ WORKTREE
   (review-pr step 9 covers this — do it first, before step 2, when the branch is conflicting).
 
 OUTPUT
-After completing step 14, emit exactly ONE JSON object to stdout (no other text after it):
+After completing step 15, emit exactly ONE JSON object to stdout (no other text after it):
 
 {
   "pr": N,
@@ -174,7 +174,7 @@ Render one row per PR using the collected JSON:
 
 Status values: `reviewed`, `blocked`, `push-failed`, `test-plan-missing`, `conflicts-unresolved`, `preflight-failed`, `sub-agent-failed`.
 
-A PR may only be marked `reviewed` if: push succeeded, test plan verified, no unresolved CI failures, branch not conflicting (same gate as review-pr step 14).
+A PR may only be marked `reviewed` if: push succeeded, test plan verified, every active criterion passed in review-pr step 14, no unresolved CI failures, branch not conflicting (same gate as review-pr step 15).
 
 If any PRs have `sub-agent-failed`: end the table with — "For failed PRs, run `/review-pr N` individually."
 

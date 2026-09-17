@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-01",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "asserts internal call sequence, not the returned value",
+  "test": "it(\"calls slice then trim in order\", () => {\n  const spy = vi.spyOn(String.prototype, \"trim\");\n  normalizeSpecId(\" a \");\n  expect(spy).toHaveBeenCalledTimes(1);\n});\n"
+}

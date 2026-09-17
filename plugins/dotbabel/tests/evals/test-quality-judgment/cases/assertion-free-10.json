@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-10",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "swallows the error, so the branch is executed but unverified",
+  "test": "it(\"covers the error branch\", () => {\n  try { parseTimeout(\"-1\"); } catch { /* covered */ }\n});\n"
+}

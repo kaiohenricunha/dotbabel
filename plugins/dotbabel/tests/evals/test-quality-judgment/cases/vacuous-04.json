@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-04",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "a length is never negative, so the assertion cannot fail",
+  "test": "it(\"covers the failure branch\", () => {\n  expect(result.errors.length).toBeGreaterThanOrEqual(0);\n});\n"
+}

@@ -45,14 +45,14 @@ Arguments: `$ARGUMENTS`
 
 The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotbabel/src/pr-gates.mjs`. `dotbabel pr-stack phases` prints it, and a bats contract test fails if this document and that array ever disagree.
 
-| #   | Phase            | Delegates to                     | Owns                                                         |
-| --- | ---------------- | -------------------------------- | ------------------------------------------------------------ |
-| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate (full review in phase 3), test suite  |
-| 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                 |
-| 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                              |
-| 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads               |
-| 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation |
-| 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                  |
+| #   | Phase            | Delegates to                     | Owns                                                              |
+| --- | ---------------- | -------------------------------- | ----------------------------------------------------------------- |
+| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate (full review in phase 3), test suite       |
+| 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                      |
+| 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                                   |
+| 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads, verifies criteria |
+| 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation      |
+| 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                       |
 
 > **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
@@ -105,7 +105,9 @@ The fleet sizes itself to the diff profile (`skills/post-pr-review/SKILL.md` ste
 
 ### 4. `review-pr`
 
-Run `/review-pr <N> --conductor` (`skills/review-pr/SKILL.md`) — all 14 steps. It applies fixes in its own worktree, replies, resolves threads, and pushes.
+Run `/review-pr <N> --conductor` (`skills/review-pr/SKILL.md`) — all 15 steps. It applies fixes in its own worktree, replies, resolves threads, pushes, and verifies the acceptance criteria as its last step.
+
+**Stop here on a failing criterion.** Step 14 of that skill runs `dotbabel criteria verify --pr <N> --post`. A non-zero exit means the pull request does not satisfy the criteria its linked specs declare, so it reports **BLOCKED** and this pipeline does **not** advance to `local-attest` — spending the matrix on a change the criteria already reject buys nothing. Report which criteria failed and stop. Never resolve a failing criterion by editing the criterion.
 
 `--conductor` removes the duplicated work: it fast-paths only the mechanical findings this pipeline posted itself (`style`, `comment`, `type`, marker plus matching author — everything else, and every `critical`, still gets validated), scopes its test run and its security pass to the fix delta, and defers test-plan execution to phase 5 behind a marker the merge gate enforces.
 

@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-16",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts completeness of a collected result",
+  "test": "it(\"reports every breach rather than only the first\", () => {\n  expect(check(bad).breaches.length).toBeGreaterThanOrEqual(3);\n});\n"
+}

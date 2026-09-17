@@ -411,7 +411,7 @@
     },
     {
       "id": "AC-15",
-      "status": "planned",
+      "status": "active",
       "given": "a pull request whose spec has a failing criterion",
       "when": "review-pr runs in conductor mode",
       "then": "it reports BLOCKED and the conductor stops before local-attest",

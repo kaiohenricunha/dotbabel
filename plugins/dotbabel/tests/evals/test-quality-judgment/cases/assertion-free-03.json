@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-03",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "smoke call with no expectation",
+  "test": "it(\"renders\", () => {\n  render(payload, {});\n});\n"
+}
