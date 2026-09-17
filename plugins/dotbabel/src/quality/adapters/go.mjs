@@ -35,7 +35,6 @@ export const goAdapter = Object.freeze({
         : { id: `${component.id}:vet`, componentId: component.id, capability: "lint", ruleIds: ["correctness.lint"], executable: "go", argv: ["vet", "./..."], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: true });
     }
     plans.push(...mutationToolPlans(component, profile, claimed));
-    for (const plan of plans) claimed.add(plan.capability);
     if ((profile !== "fast" || includeTests) && !claimed.has("test")) plans.push({ id: `${component.id}:test`, componentId: component.id, capability: "test", ruleIds: ["correctness.compile", "correctness.tests"], executable: "go", argv: ["test", "./..."], cwd: component.absoluteRoot, availability: "available", source: "built-in", requiresTrust: true });
     return plans;
   },

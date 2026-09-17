@@ -28,8 +28,35 @@ const STRYKER_CONFIG_FILES = [
   "stryker.conf.cjs", "stryker.config.cjs",
 ];
 
-/** Where Stryker's `json` reporter writes, per its documented default. */
-const STRYKER_REPORT_PATH = "reports/mutation/mutation.json";
+/** Stryker's `jsonReporter.fileName` default, used when the config sets none. */
+const STRYKER_DEFAULT_REPORT_PATH = "reports/mutation/mutation.json";
+
+/**
+ * The report path this repository's Stryker will actually write to.
+ *
+ * `jsonReporter.fileName` is a configuration key, not a contract — the
+ * captured fixture carries it. Assuming the default for a repository that
+ * overrides it produces no report at the expected path, which resolves
+ * through `on_unavailable: info` and reads as a silent pass rather than as a
+ * missing measurement. Only the JSON config forms can be read this way; a
+ * `.js`/`.mjs` config would have to be executed, so those keep the default and
+ * `docs/quality.md` names the project-tool override as the escape hatch.
+ */
+function strykerReportPath(root) {
+  for (const file of STRYKER_CONFIG_FILES.filter((name) => name.endsWith(".json"))) {
+    const text = read(root, file);
+    if (text === null) continue;
+    try {
+      const name = JSON.parse(text)?.jsonReporter?.fileName;
+      if (typeof name === "string" && name.length > 0) return name;
+    } catch { /* a malformed config is the tool's problem to report, not ours */ }
+  }
+  try {
+    const name = JSON.parse(read(root, "package.json") ?? "{}")?.stryker?.jsonReporter?.fileName;
+    if (typeof name === "string" && name.length > 0) return name;
+  } catch { /* same */ }
+  return STRYKER_DEFAULT_REPORT_PATH;
+}
 
 const GREMLINS_CONFIG_FILES = [".gremlins.yaml", ".gremlins.yml", "gremlins.yaml", "gremlins.yml"];
 
@@ -73,13 +100,27 @@ export function mutationToolPlans(component, profile, claimed) {
   if (!root) return [];
 
   if (["javascript", "typescript"].includes(component.language) && declaresStryker(root)) {
-    // `candidate`, not `available`: the config file proves Stryker is
-    // CONFIGURED, not installed — the same evidence class as golangci-lint
-    // behind a `.golangci.*` file (go.mjs).
+    // The binary must be resolved here rather than deferred to `npx`, because
+    // `npx` ALWAYS spawns successfully. `runner.mjs` derives `unavailable`
+    // from a SPAWN error, which is why a missing `golangci-lint` (ENOENT)
+    // correctly becomes `unavailable` — but `npx stryker` on a repository that
+    // never installed the package exits non-zero instead, landing as `checked`
+    // and HARD-FAILING mutation.changed_score. That turns "nothing to measure"
+    // into a blocking finding, the exact outcome this module exists to avoid.
+    // `typescript.mjs` resolves `tsc` against the local bin for the same reason.
+    if (!has(root, path.join("node_modules", ".bin", "stryker"))) {
+      return [plan(component, {
+        availability: "not_configured",
+        source: "configured",
+        evidence: "Stryker is configured here but is not installed in node_modules — install @stryker-mutator/core, or declare a project mutation tool whose command runs it",
+      })];
+    }
+    // `candidate`, not `available`: the binary exists, but whether it runs is
+    // still the execution's verdict to report.
     return [plan(component, {
-      executable: "npx",
-      argv: ["--no-install", "stryker", "run", "--reporters", "json"],
-      report: { format: "stryker-json", path: STRYKER_REPORT_PATH },
+      executable: "./node_modules/.bin/stryker",
+      argv: ["run", "--reporters", "json"],
+      report: { format: "stryker-json", path: strykerReportPath(root) },
       availability: "candidate",
       source: "configured",
       requiresTrust: true,

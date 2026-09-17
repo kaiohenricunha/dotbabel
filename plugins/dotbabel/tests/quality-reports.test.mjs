@@ -277,6 +277,32 @@ describe("mutation reports", () => {
     expect(calculateChangedMutationScore([{ file: "a.mjs", line: 1 }], { "a.mjs": [1] })).toEqual({ detected: 0, valid: 1, actual: 0 });
   });
 
+  it("stays fast when the CHANGED-LINE count is large, not only the mutant count", () => {
+    // The 20000-mutant case below holds changed lines at 3 per file, so it
+    // only exercises one axis. A linear `includes` scan per mutant is
+    // O(mutants x changed lines), and a large refactor moves the other axis:
+    // 20000 mutants against 5000 changed lines is 10^8 comparisons.
+    // Worst case on purpose: every lookup must walk the WHOLE array. A miss
+    // scans all 5000 entries before failing, and a hit on the last entry
+    // scans all 5000 before succeeding — so a short-circuiting early hit
+    // cannot hide the cost. 20000 x 5000 is 10^8 comparisons.
+    const changedLines = { "src/a.mjs": Array.from({ length: 5000 }, (_, i) => i + 1) };
+    const mutants = Array.from({ length: 20000 }, (_, i) => i % 2
+      ? { file: "src/a.mjs", line: 999999, status: "Killed" }   // miss: full scan
+      : { file: "src/a.mjs", line: 5000, status: "Killed" });   // hit at the end: full scan
+
+    const started = Date.now();
+    const score = calculateChangedMutationScore(mutants, changedLines);
+    const elapsed = Date.now() - started;
+
+    expect(score).toMatchObject({ valid: 10000, detected: 10000, actual: 100 });
+    // Measured on this workload: a per-mutant `includes` scan costs ~230ms at
+    // its fastest and ~600ms under suite load; the Set costs ~3ms. 100ms sits
+    // below the linear floor and leaves the Set a 30x margin, so the bound
+    // separates the two algorithms instead of timing the machine.
+    expect(elapsed).toBeLessThan(100);
+  });
+
   it("parses a report with 20000 mutants in under 2 seconds", () => {
     const files = {};
     for (let i = 0; i < 20; i += 1) {

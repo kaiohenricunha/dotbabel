@@ -358,11 +358,24 @@ mutation budget.
 dotbabel plans a mutation tool only when the repository configures one, and
 only in the `deep` profile:
 
-| Tool     | Detected from                                                               | Planned as                         |
-| -------- | --------------------------------------------------------------------------- | ---------------------------------- |
-| Stryker  | `stryker.conf.*` / `stryker.config.*`, or a `stryker` key in `package.json` | `npx stryker run --reporters json` |
-| Gremlins | `.gremlins.yaml` / `.gremlins.yml` (or unprefixed)                          | `gremlins unleash --output=… .`    |
-| mutmut   | `[tool.mutmut]` in `pyproject.toml`, or `[mutmut]` in `setup.cfg`           | reported, not run — see below      |
+| Tool     | Detected from                                                                                      | Planned as                                         |
+| -------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Stryker  | `stryker.conf.*`, `stryker.config.*` or `.stryker.conf.json`, or a `stryker` key in `package.json` | `./node_modules/.bin/stryker run --reporters json` |
+| Gremlins | `.gremlins.yaml` / `.gremlins.yml` (or unprefixed)                                                 | `gremlins unleash --output=… .`                    |
+| mutmut   | `[tool.mutmut]` in `pyproject.toml`, or `[mutmut]` in `setup.cfg`                                  | reported, not run — see below                      |
+
+**Stryker must be installed, not just configured.** The plan runs the local
+`node_modules/.bin/stryker`, and a repository that configures Stryker without
+installing `@stryker-mutator/core` is reported as not configured, with the
+install named as the remediation. This is deliberate: `npx` always starts
+successfully, so an uninstalled package would exit non-zero and _fail_ the
+mutation rule rather than reporting that there was nothing to measure.
+
+The report path comes from `jsonReporter.fileName` when the configuration is
+one of the JSON forms (or the `stryker` key in `package.json`), and falls back
+to Stryker's default `reports/mutation/mutation.json`. A `.js` or `.mjs`
+config cannot be read without executing it, so those keep the default — set a
+project `mutation` tool explicitly if yours writes somewhere else.
 
 **mutmut reports aggregate counts only.** `mutmut export-cicd-stats` writes
 totals with no per-mutant records, and the `.spans` sidecar indexes the

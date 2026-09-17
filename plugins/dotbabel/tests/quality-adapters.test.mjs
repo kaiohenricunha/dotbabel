@@ -367,17 +367,19 @@ describe("mutation tool detection", () => {
     try {
       fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
       fs.writeFileSync(path.join(root, "stryker.config.json"), JSON.stringify({ testRunner: "vitest" }));
+      fs.mkdirSync(path.join(root, "node_modules", ".bin"), { recursive: true });
+      fs.writeFileSync(path.join(root, "node_modules", ".bin", "stryker"), "#!/bin/sh\n");
 
       expect(mutationPlan("javascript", root, "fast")).toBeUndefined();
       expect(mutationPlan("javascript", root, "pr")).toBeUndefined();
 
       const deep = mutationPlan("javascript", root, "deep");
-      expect(deep.executable).toBe("npx");
-      expect(deep.argv).toContain("stryker");
+      // The LOCAL binary, never bare `npx` — see the not-installed test below
+      // for why that distinction decides pass versus hard fail.
+      expect(deep.executable).toBe("./node_modules/.bin/stryker");
+      expect(deep.argv).toEqual(["run", "--reporters", "json"]);
       expect(deep.report).toEqual({ format: "stryker-json", path: "reports/mutation/mutation.json" });
       expect(deep.ruleIds).toEqual(["mutation.changed_score"]);
-      // Configuration proves Stryker is CONFIGURED, not installed — the same
-      // evidence class as golangci-lint behind a `.golangci.*` file.
       expect(deep.availability).toBe("candidate");
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
@@ -416,6 +418,49 @@ describe("mutation tool detection", () => {
       expect(deep.argv).toEqual(["unleash", "--output=.dotbabel/quality/gremlins.json", "."]);
       expect(deep.report).toEqual({ format: "gremlins-json", path: ".dotbabel/quality/gremlins.json" });
       expect(deep.availability).toBe("candidate");
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("does not plan bare npx when Stryker is configured but not installed", () => {
+    // `npx` ALWAYS exists, so the `candidate` availability contract does not
+    // hold for it the way it does for `golangci-lint`: runner.mjs resolves
+    // `unavailable` from a SPAWN error, and npx never fails to spawn. A repo
+    // with a stryker config but no installed package would therefore exit
+    // non-zero, land as `checked`, and hard-fail mutation.changed_score —
+    // turning "nothing to measure" into a blocking finding.
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+      fs.writeFileSync(path.join(root, "stryker.config.json"), JSON.stringify({ testRunner: "vitest" }));
+
+      const missing = mutationPlan("javascript", root, "deep");
+      expect(missing.availability).toBe("not_configured");
+      expect(missing.executable).toBeUndefined();
+      expect(missing.evidence).toMatch(/not installed/i);
+
+      // With the binary present it is planned, and pinned to the local one.
+      fs.mkdirSync(path.join(root, "node_modules", ".bin"), { recursive: true });
+      fs.writeFileSync(path.join(root, "node_modules", ".bin", "stryker"), "#!/bin/sh\n");
+      const installed = mutationPlan("javascript", root, "deep");
+      expect(installed.availability).toBe("candidate");
+      expect(installed.executable).toBe("./node_modules/.bin/stryker");
+      expect(installed.argv).toEqual(["run", "--reporters", "json"]);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("reads the Stryker report path from the configuration instead of assuming the default", () => {
+    // `jsonReporter.fileName` is a config key, not a contract — the captured
+    // fixture carries it. Assuming the default means a repo that overrides it
+    // produces no report, which resolves through `on_unavailable: info` and
+    // reads as a silent pass rather than a missing measurement.
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+      fs.writeFileSync(path.join(root, "stryker.config.json"), JSON.stringify({ jsonReporter: { fileName: "build/mutants.json" } }));
+      fs.mkdirSync(path.join(root, "node_modules", ".bin"), { recursive: true });
+      fs.writeFileSync(path.join(root, "node_modules", ".bin", "stryker"), "#!/bin/sh\n");
+
+      expect(mutationPlan("javascript", root, "deep").report).toEqual({ format: "stryker-json", path: "build/mutants.json" });
     } finally { fs.rmSync(root, { recursive: true, force: true }); }
   });
 

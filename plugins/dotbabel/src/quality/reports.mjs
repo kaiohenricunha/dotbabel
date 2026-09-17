@@ -198,17 +198,21 @@ const INVALID_MUTANT_STATUSES = new Set(["compileerror", "compile_error", "ignor
  */
 export function calculateChangedMutationScore(mutants, changedLines, componentRoot = ".") {
   const changedPaths = Object.keys(changedLines ?? {});
-  // One path resolution per distinct report path, not per mutant: a deep run
-  // carries tens of thousands of mutants across a handful of files.
+  // One path resolution AND one Set per distinct report path, not per mutant.
+  // A deep run carries tens of thousands of mutants, and a large refactor
+  // carries thousands of changed lines; `includes` on the raw array would make
+  // the loop O(mutants x changed lines). `calculateChangedCoverage` below
+  // builds the same Set for the same reason.
   const resolved = new Map();
+  const changedSets = new Map();
   let detected = 0;
   let valid = 0;
   for (const mutant of mutants ?? []) {
     if (!resolved.has(mutant.file)) resolved.set(mutant.file, matchChangedPath(mutant.file, changedPaths, componentRoot));
     const file = resolved.get(mutant.file);
     if (!file) continue;
-    const changed = changedLines[file] ?? [];
-    if (!changed.includes(mutant.line)) continue;
+    if (!changedSets.has(file)) changedSets.set(file, new Set(changedLines[file] ?? []));
+    if (!changedSets.get(file).has(mutant.line)) continue;
     const status = String(mutant.status ?? "").toLowerCase();
     if (INVALID_MUTANT_STATUSES.has(status)) continue;
     valid += 1;

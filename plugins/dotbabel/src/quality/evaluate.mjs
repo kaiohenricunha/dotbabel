@@ -33,7 +33,7 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
         class: rule.class,
         state: unavailable ? "unavailable" : notConfigured ? "not_configured" : notTriggered ? "not_triggered" : "checked",
         verdict: notTriggered ? "info" : unavailable || notConfigured ? unavailableVerdict(rule.on_unavailable) : checkedVerdict(rule, pass),
-        message: unavailable ? (execution.timedOut ? "tool timed out" : "tool is unavailable") : notConfigured ? `ambiguous tools: ${(execution.candidates ?? []).join(", ")}` : notTriggered ? execution.evidence : pass ? "check passed" : execution.stderr.trim() || execution.stdout.trim() || "check failed",
+        message: unavailable ? (execution.timedOut ? "tool timed out" : "tool is unavailable") : notConfigured ? (execution.evidence ?? `ambiguous tools: ${(execution.candidates ?? []).join(", ")}`) : notTriggered ? execution.evidence : pass ? "check passed" : execution.stderr.trim() || execution.stdout.trim() || "check failed",
         provenance: rule.provenance,
       });
     }
