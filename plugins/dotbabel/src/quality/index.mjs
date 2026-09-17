@@ -5,7 +5,7 @@ import { resolveQualityPolicy } from "./config.mjs";
 import { resolveQualityScope } from "./scope.mjs";
 import { detectQualityCapabilities, filesMatchingQualityPaths, planQualityCheck, qualityChangePaths } from "./discovery.mjs";
 import { runQualityPlans } from "./runner.mjs";
-import { calculateChangedCoverage, parseQualityReport, coveragePercent } from "./reports.mjs";
+import { calculateChangedCoverage, calculateChangedMutationScore, parseQualityReport, coveragePercent } from "./reports.mjs";
 import { evaluateQuality } from "./evaluate.mjs";
 import { loadQualityBaseline, loadQualityBaselineAtRevision } from "./baseline.mjs";
 import { qualityEnvelope } from "./reporters.mjs";
@@ -49,6 +49,16 @@ function parseExecutionReports(repoRoot, executions, scope) {
       const parsed = parseQualityReport({ format: report.format, text: fs.readFileSync(reportPath, "utf8") });
       metrics.push(...parsed.metrics.map((item) => ({ ...item, component: execution.componentId })));
       findings.push(...parsed.findings.map((item) => ({ ...item, component: execution.componentId })));
+      if (parsed.mutants) {
+        // Mutation scoring mirrors coverage: the parser stays pure and this is
+        // where the diff is applied. `null` means no valid mutant starts on a
+        // changed line, which REL-11 reports as not_applicable rather than 0 —
+        // a change with nothing to mutate has not failed a mutation budget.
+        const mutation = calculateChangedMutationScore(parsed.mutants, scope.changedLines, componentRoot);
+        metrics.push(mutation === null
+          ? { rule: "mutation.changed_score", component: execution.componentId, not_applicable: true, evidence: "no mutant starts on a changed line", key: `${execution.componentId}:mutation-changed-score`, report_format: report.format }
+          : { rule: "mutation.changed_score", component: execution.componentId, actual: mutation.actual, detected: mutation.detected, valid: mutation.valid, key: `${execution.componentId}:mutation-changed-score`, report_format: report.format });
+      }
       const changed = calculateChangedCoverage(parsed.coverage ?? {}, scope.changedLines, componentRoot);
       const totalCoverage = parsed.coverage?.statement ?? parsed.coverage?.line;
       if (totalCoverage) metrics.push({ rule: "coverage.no_regression", component: execution.componentId, actual: coveragePercent(totalCoverage), covered: totalCoverage.covered, total: totalCoverage.total, key: `${execution.componentId}:repository-coverage`, report_format: report.format });

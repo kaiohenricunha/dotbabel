@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { capabilityInProfile, capabilityRules, projectToolPlans } from "./shared.mjs";
 import { makeRepositoryPlans } from "./make-tools.mjs";
+import { mutationToolPlans } from "./mutation-tools.mjs";
 
 function has(root, name) { return fs.existsSync(path.join(root, name)); }
 
@@ -133,6 +134,7 @@ export const pythonAdapter = Object.freeze({
     // Last, so a project tool, a Make target, or configured tooling all keep
     // priority over the built-in pytest plans.
     plans.push(...builtinPytestPlans(component, profile, claimed, includeTests));
+    plans.push(...mutationToolPlans(component, profile, claimed));
     return plans;
   },
 });

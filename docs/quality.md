@@ -259,7 +259,9 @@ Each tool declares how dotbabel reads its result:
 | `eslint-json`     | required      | Findings from per-file `messages[]`, mapped by `ruleId`                                    |
 | `ruff-json`       | required      | Findings mapped by `code`                                                                  |
 | `jscpd-json`      | required      | `duplication.percent`                                                                      |
-| `stryker-json`    | required      | `mutation.changed_score`                                                                   |
+| `stryker-json`    | required      | Per-mutant status and original-source line, for `mutation.changed_score`                   |
+| `gremlins-json`   | required      | Per-mutant status and original-source line, for `mutation.changed_score`                   |
+| `mutmut-json`     | required      | Aggregate mutant counts; reports `mutation.changed_score` as `not_applicable`              |
 | `dotbabel-v1`     | required      | `metrics[]` and `findings[]` as given                                                      |
 
 A report must be a regular file inside the repository, or the measurement becomes `unavailable`. A coverage command that exits non-zero also makes the three coverage rules `unavailable` rather than failing them.
@@ -339,6 +341,52 @@ Run the `pr` profile on pull requests and the `deep` profile on a schedule. A co
 Fail the job on exit `1` **and** exit `2`. Exit `2` means a tool, report, base, or trust was missing, which is not a pass. Upload `quality-report.json` as an artifact so a reviewer can read the states without re-running anything.
 
 `--allow-project-commands` authorizes project-owned commands for that one run and never persists. Local runs use the exact-path trust allowlist instead.
+
+### Mutation testing
+
+`mutation.changed_score` counts only the mutants that **start on a line the
+change touched**, as detected divided by valid, times 100. A mutant that never
+compiled, or that the tool ignored or found non-viable, is excluded from the
+denominator: it tested nothing, so counting it either way would move the score
+for a reason the author did not cause. A timeout counts as detected — the
+mutant changed behavior enough to hang the suite.
+
+When no valid mutant starts on a changed line, the rule reports
+`not_applicable`, not zero. A change with nothing to mutate has not failed a
+mutation budget.
+
+dotbabel plans a mutation tool only when the repository configures one, and
+only in the `deep` profile:
+
+| Tool     | Detected from                                                                                      | Planned as                                         |
+| -------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Stryker  | `stryker.conf.*`, `stryker.config.*` or `.stryker.conf.json`, or a `stryker` key in `package.json` | `./node_modules/.bin/stryker run --reporters json` |
+| Gremlins | `.gremlins.yaml` / `.gremlins.yml` (or unprefixed)                                                 | `gremlins unleash --output=… .`                    |
+| mutmut   | `[tool.mutmut]` in `pyproject.toml`, or `[mutmut]` in `setup.cfg`                                  | reported, not run — see below                      |
+
+**Stryker must be installed, not just configured.** The plan runs the local
+`node_modules/.bin/stryker`, and a repository that configures Stryker without
+installing `@stryker-mutator/core` is reported as not configured, with the
+install named as the remediation. This is deliberate: `npx` always starts
+successfully, so an uninstalled package would exit non-zero and _fail_ the
+mutation rule rather than reporting that there was nothing to measure.
+
+The report path comes from `jsonReporter.fileName` when the configuration is
+one of the JSON forms (or the `stryker` key in `package.json`), and falls back
+to Stryker's default `reports/mutation/mutation.json`. A `.js` or `.mjs`
+config cannot be read without executing it, so those keep the default — set a
+project `mutation` tool explicitly if yours writes somewhere else.
+
+**mutmut reports aggregate counts only.** `mutmut export-cicd-stats` writes
+totals with no per-mutant records, and the `.spans` sidecar indexes the
+generated mutant module rather than the original source, so no mutant can be
+attributed to a line the change touched. That is architectural, not a missing
+flag. dotbabel therefore reports `mutation.changed_score` as `not_applicable`
+for mutmut and carries the whole-suite score as evidence. It also does not plan
+mutmut itself: the tool needs `mutmut run` and then `mutmut export-cicd-stats`,
+neither of which accepts an output path, and a plan is one command with no
+shell. Declare it as a project `mutation` tool whose command produces
+`mutmut-stats.json` if you want it executed.
 
 Keep mutation and race work out of the pull-request profile; run `--profile deep` on a schedule or on demand. `local-attest` may carry the quality command as a hard leg, and the two workflows stay independent.
 

@@ -131,6 +131,26 @@ describe("quality evaluation", () => {
     expect(result.verdict).toBe("pass");
   });
 
+  it("renders a not_configured execution's own evidence when it has no candidates", () => {
+    // `not_configured` carried one meaning — "equal-authority tools, pick one"
+    // — and its message is composed from `candidates`. A plan that is
+    // not_configured for a DIFFERENT reason (the tool exists but cannot be
+    // expressed as one argv, as mutmut cannot) has no candidates, so the
+    // message rendered as the literal "ambiguous tools: " and the plan's
+    // remediation text was dropped on the floor.
+    const result = evaluateQuality({
+      policy: policy(),
+      profile: "deep",
+      executions: [
+        { componentId: "py", ruleIds: ["mutation.changed_score"], state: "not_configured", evidence: "mutmut needs two commands; declare it as a project mutation tool" },
+        { componentId: "js", ruleIds: ["correctness.format"], state: "not_configured", candidates: ["prettier", "biome"] },
+      ],
+    });
+    expect(result.results.find((item) => item.component === "py").message).toBe("mutmut needs two commands; declare it as a project mutation tool");
+    // The candidates contract is unchanged where candidates exist.
+    expect(result.results.find((item) => item.component === "js").message).toBe("ambiguous tools: prettier, biome");
+  });
+
   it("reports every execution failure state with its exact message", () => {
     const result = evaluateQuality({
       policy: policy(),

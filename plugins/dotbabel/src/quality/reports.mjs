@@ -112,15 +112,113 @@ export function parseQualityReport({ format, text }) {
     return { metrics: actual === undefined ? [] : [{ rule: "duplication.percent", actual }], findings: [] };
   }
   if (format === "stryker-json") {
-    const body = json(text); const killed = body.thresholds ? undefined : body.mutationScore;
-    const actual = killed ?? body.metrics?.mutationScore;
-    return { metrics: actual === undefined ? [] : [{ rule: "mutation.changed_score", actual }], findings: [] };
+    // mutation-testing-elements schema v1.0: files[path].mutants[], each with
+    // a status and a location in the ORIGINAL source. The previous parser read
+    // one top-level `mutationScore`, which this schema does not carry at all —
+    // so a real Stryker report produced no metric, and a hand-written one
+    // produced a repository-wide score wearing the changed-score rule's name.
+    const body = json(text);
+    const mutants = [];
+    for (const [name, file] of Object.entries(body.files ?? {})) {
+      const normalized = normalize(name);
+      for (const mutant of file.mutants ?? []) {
+        const line = mutant.location?.start?.line;
+        if (Number.isInteger(line)) mutants.push({ file: normalized, line, status: mutant.status });
+      }
+    }
+    return { metrics: [], findings: [], mutants };
+  }
+  if (format === "gremlins-json") {
+    // Gremlins: files[].mutations[], each carrying `line` in the original Go
+    // source. Same per-mutant shape as Stryker under a different spelling.
+    const body = json(text);
+    const mutants = [];
+    for (const file of body.files ?? []) {
+      const normalized = normalize(file.file_name ?? "");
+      for (const mutation of file.mutations ?? []) {
+        if (Number.isInteger(mutation.line)) mutants.push({ file: normalized, line: mutation.line, status: mutation.status });
+      }
+    }
+    return { metrics: [], findings: [], mutants };
+  }
+  if (format === "mutmut-json") {
+    // mutmut's `export-cicd-stats` emits totals and nothing else. Its `.spans`
+    // sidecar indexes the GENERATED mutant module, not the original source, so
+    // no mutant can be attributed to a changed line — that is architectural,
+    // not a missing flag (KD-7, and tests/fixtures/quality/mutation/VERSIONS.md).
+    //
+    // The whole-suite score travels as `whole_suite_score`, never as `actual`:
+    // `actual` is what the 85 threshold judges, and judging a repository-wide
+    // number against a changed-code budget is the exact confusion KD-7 removes.
+    const body = json(text);
+    const total = Number(body.total);
+    const killed = Number(body.killed);
+    const metric = {
+      rule: "mutation.changed_score",
+      not_applicable: true,
+      evidence: "mutmut reports aggregate mutant counts only, with no original-source line for any mutant, so no changed-line score exists to measure",
+    };
+    if (Number.isFinite(total) && total > 0 && Number.isFinite(killed)) metric.whole_suite_score = percent(killed, total);
+    return { metrics: [metric], findings: [] };
   }
   if (["sarif", "golangci-json", "eslint-json", "ruff-json"].includes(format)) {
     const body = json(text);
     return { metrics: [], findings: lintFindings(format, body) };
   }
   invalid(`unsupported quality report format: ${format}`);
+}
+
+/**
+ * Mutant statuses that count as DETECTED — the test suite reacted to the
+ * mutation. A timeout counts: the mutant changed observable behavior enough to
+ * hang the suite, which is a detection, not a miss.
+ */
+const DETECTED_MUTANT_STATUSES = new Set(["killed", "timeout", "timed_out"]);
+
+/**
+ * Statuses excluded from the denominator entirely. A mutant that never
+ * compiled tested nothing; an ignored or non-viable one was excluded by the
+ * tool's own configuration. Counting either as survived would charge the
+ * author for the tool's bookkeeping, and counting either as killed would
+ * inflate the score — so neither is valid.
+ */
+const INVALID_MUTANT_STATUSES = new Set(["compileerror", "compile_error", "ignored", "runtimeerror", "runtime_error", "skipped", "notviable", "not_viable"]);
+
+/**
+ * Score only the mutants that START on a changed line (KD-7).
+ *
+ * Returns `null` when no valid mutant lands on the diff. That is
+ * `not_applicable`, not zero: a change with nothing to mutate has not failed a
+ * mutation budget, and REL-11 requires it be reported as such.
+ *
+ * @param {{file: string, line: number, status: string}[]} mutants
+ * @param {Record<string, number[]>} changedLines
+ * @param {string} componentRoot
+ * @returns {{detected: number, valid: number, actual: number} | null}
+ */
+export function calculateChangedMutationScore(mutants, changedLines, componentRoot = ".") {
+  const changedPaths = Object.keys(changedLines ?? {});
+  // One path resolution AND one Set per distinct report path, not per mutant.
+  // A deep run carries tens of thousands of mutants, and a large refactor
+  // carries thousands of changed lines; `includes` on the raw array would make
+  // the loop O(mutants x changed lines). `calculateChangedCoverage` below
+  // builds the same Set for the same reason.
+  const resolved = new Map();
+  const changedSets = new Map();
+  let detected = 0;
+  let valid = 0;
+  for (const mutant of mutants ?? []) {
+    if (!resolved.has(mutant.file)) resolved.set(mutant.file, matchChangedPath(mutant.file, changedPaths, componentRoot));
+    const file = resolved.get(mutant.file);
+    if (!file) continue;
+    if (!changedSets.has(file)) changedSets.set(file, new Set(changedLines[file] ?? []));
+    if (!changedSets.get(file).has(mutant.line)) continue;
+    const status = String(mutant.status ?? "").toLowerCase();
+    if (INVALID_MUTANT_STATUSES.has(status)) continue;
+    valid += 1;
+    if (DETECTED_MUTANT_STATUSES.has(status)) detected += 1;
+  }
+  return valid === 0 ? null : { detected, valid, actual: percent(detected, valid) };
 }
 
 /** Return an unrounded coverage percentage from integer counts. */

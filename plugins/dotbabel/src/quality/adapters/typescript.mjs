@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { projectToolPlans } from "./shared.mjs";
 import { nodeRepositoryPlans, nodeBuiltinCoveragePlans } from "./node-tools.mjs";
+import { mutationToolPlans } from "./mutation-tools.mjs";
 
 /** Built-in TypeScript quality adapter. */
 export const typescriptAdapter = Object.freeze({
@@ -11,10 +12,12 @@ export const typescriptAdapter = Object.freeze({
     return files.filter((file) => /^tsconfig.*\.json$/.test(path.basename(file))).map((marker) => ({ root: path.dirname(marker) === "." ? "." : path.dirname(marker), language: "typescript", markers: [marker] }));
   },
   plan(component, _policy, changeSet, profile) {
+    component.absoluteRoot ??= path.resolve(component.root);
     const includeTests = (changeSet.criticalMatches ?? []).length > 0;
     const plans = projectToolPlans(component, profile, includeTests);
     plans.push(...nodeRepositoryPlans(component, profile, new Set(plans.map((plan) => plan.capability)), includeTests));
     plans.push(...nodeBuiltinCoveragePlans(component, profile, new Set(plans.map((plan) => plan.capability)), includeTests));
+    plans.push(...mutationToolPlans(component, profile, new Set(plans.map((plan) => plan.capability))));
     for (const plan of plans.filter((item) => item.capability === "typecheck")) plan.ruleIds = ["correctness.compile", "correctness.types"];
     if (!plans.some((plan) => plan.capability === "typecheck")) {
       const local = "./node_modules/.bin/tsc";

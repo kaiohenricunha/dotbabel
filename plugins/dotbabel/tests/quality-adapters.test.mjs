@@ -343,3 +343,139 @@ describe("node adapter — built-in coverage (P-C3)", () => {
     });
   });
 });
+
+// --- P-C4: mutation tool detection (KD-7, KD-8) ---------------------------
+//
+// KD-8 governs this: a tool is planned only when the REPOSITORY declares it.
+// `dotbabel quality` never installs a checker, so planning Stryker for a repo
+// that has never configured it produces a plan that can only resolve through
+// `on_unavailable` — which reads as a finding rather than "nothing to measure".
+
+describe("mutation tool detection", () => {
+  const tempRoot = () => fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-mutation-"));
+  const plansFor = (language, root, profile) =>
+    getQualityAdapter(language).plan(
+      { id: `.:${language}`, root: ".", absoluteRoot: root, language, files: [], markers: [], tools: {} },
+      { rules: {} },
+      { changedFiles: [] },
+      profile,
+    );
+  const mutationPlan = (language, root, profile) => plansFor(language, root, profile).find((plan) => plan.capability === "mutation");
+
+  it("detects a Stryker configuration file and plans the tool only in the deep profile", () => {
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+      fs.writeFileSync(path.join(root, "stryker.config.json"), JSON.stringify({ testRunner: "vitest" }));
+      fs.mkdirSync(path.join(root, "node_modules", ".bin"), { recursive: true });
+      fs.writeFileSync(path.join(root, "node_modules", ".bin", "stryker"), "#!/bin/sh\n");
+
+      expect(mutationPlan("javascript", root, "fast")).toBeUndefined();
+      expect(mutationPlan("javascript", root, "pr")).toBeUndefined();
+
+      const deep = mutationPlan("javascript", root, "deep");
+      // The LOCAL binary, never bare `npx` — see the not-installed test below
+      // for why that distinction decides pass versus hard fail.
+      expect(deep.executable).toBe("./node_modules/.bin/stryker");
+      expect(deep.argv).toEqual(["run", "--reporters", "json"]);
+      expect(deep.report).toEqual({ format: "stryker-json", path: "reports/mutation/mutation.json" });
+      expect(deep.ruleIds).toEqual(["mutation.changed_score"]);
+      expect(deep.availability).toBe("candidate");
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("detects mutmut configuration in pyproject.toml or setup.cfg and plans it only in the deep profile", () => {
+    for (const [file, text] of [["pyproject.toml", "[tool.mutmut]\npaths_to_mutate = \"src/\"\n"], ["setup.cfg", "[mutmut]\npaths_to_mutate = src/\n"]]) {
+      const root = tempRoot();
+      try {
+        fs.writeFileSync(path.join(root, file), text);
+        expect(mutationPlan("python", root, "fast")).toBeUndefined();
+        expect(mutationPlan("python", root, "pr")).toBeUndefined();
+
+        // mutmut needs `run` THEN `export-cicd-stats`, and neither accepts an
+        // output flag (verified against mutmut 3.8.0). A plan is one argv, so
+        // the built-in reports the tool and names the remediation instead of
+        // planning a command that could only ever produce a missing report.
+        const deep = mutationPlan("python", root, "deep");
+        expect(deep.availability).toBe("not_configured");
+        expect(deep.executable).toBeUndefined();
+        expect(deep.evidence).toMatch(/export-cicd-stats/);
+      } finally { fs.rmSync(root, { recursive: true, force: true }); }
+    }
+  });
+
+  it("detects a Gremlins configuration file and plans it only in the deep profile", () => {
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "go.mod"), "module x\n\ngo 1.25\n");
+      fs.writeFileSync(path.join(root, ".gremlins.yaml"), "unleash:\n  dry-run: false\n");
+
+      expect(mutationPlan("go", root, "fast")).toBeUndefined();
+      expect(mutationPlan("go", root, "pr")).toBeUndefined();
+
+      const deep = mutationPlan("go", root, "deep");
+      expect(deep.executable).toBe("gremlins");
+      expect(deep.argv).toEqual(["unleash", "--output=.dotbabel/quality/gremlins.json", "."]);
+      expect(deep.report).toEqual({ format: "gremlins-json", path: ".dotbabel/quality/gremlins.json" });
+      expect(deep.availability).toBe("candidate");
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("does not plan bare npx when Stryker is configured but not installed", () => {
+    // `npx` ALWAYS exists, so the `candidate` availability contract does not
+    // hold for it the way it does for `golangci-lint`: runner.mjs resolves
+    // `unavailable` from a SPAWN error, and npx never fails to spawn. A repo
+    // with a stryker config but no installed package would therefore exit
+    // non-zero, land as `checked`, and hard-fail mutation.changed_score —
+    // turning "nothing to measure" into a blocking finding.
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+      fs.writeFileSync(path.join(root, "stryker.config.json"), JSON.stringify({ testRunner: "vitest" }));
+
+      const missing = mutationPlan("javascript", root, "deep");
+      expect(missing.availability).toBe("not_configured");
+      expect(missing.executable).toBeUndefined();
+      expect(missing.evidence).toMatch(/not installed/i);
+
+      // With the binary present it is planned, and pinned to the local one.
+      fs.mkdirSync(path.join(root, "node_modules", ".bin"), { recursive: true });
+      fs.writeFileSync(path.join(root, "node_modules", ".bin", "stryker"), "#!/bin/sh\n");
+      const installed = mutationPlan("javascript", root, "deep");
+      expect(installed.availability).toBe("candidate");
+      expect(installed.executable).toBe("./node_modules/.bin/stryker");
+      expect(installed.argv).toEqual(["run", "--reporters", "json"]);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("reads the Stryker report path from the configuration instead of assuming the default", () => {
+    // `jsonReporter.fileName` is a config key, not a contract — the captured
+    // fixture carries it. Assuming the default means a repo that overrides it
+    // produces no report, which resolves through `on_unavailable: info` and
+    // reads as a silent pass rather than a missing measurement.
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+      fs.writeFileSync(path.join(root, "stryker.config.json"), JSON.stringify({ jsonReporter: { fileName: "build/mutants.json" } }));
+      fs.mkdirSync(path.join(root, "node_modules", ".bin"), { recursive: true });
+      fs.writeFileSync(path.join(root, "node_modules", ".bin", "stryker"), "#!/bin/sh\n");
+
+      expect(mutationPlan("javascript", root, "deep").report).toEqual({ format: "stryker-json", path: "build/mutants.json" });
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it("never plans a mutation tool without repository configuration", () => {
+    // The negative half of KD-8, and the one that matters: a deep run on a
+    // repo with no mutation config must plan nothing, not a hopeful `npx
+    // stryker` that fails and reads as a quality finding.
+    const root = tempRoot();
+    try {
+      fs.writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "x" }));
+      fs.writeFileSync(path.join(root, "pyproject.toml"), "[tool.ruff]\n");
+      fs.writeFileSync(path.join(root, "go.mod"), "module x\n\ngo 1.25\n");
+      for (const language of ["javascript", "typescript", "python", "go"]) {
+        expect(mutationPlan(language, root, "deep")).toBeUndefined();
+      }
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+});

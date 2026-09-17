@@ -297,7 +297,7 @@
     },
     {
       "id": "AC-10",
-      "status": "planned",
+      "status": "active",
       "given": "a Stryker report with mutants on changed and unchanged lines",
       "when": "dotbabel parses the report",
       "then": "the score counts only mutants on changed lines",

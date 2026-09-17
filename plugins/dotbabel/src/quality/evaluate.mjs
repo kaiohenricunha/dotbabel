@@ -33,7 +33,7 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
         class: rule.class,
         state: unavailable ? "unavailable" : notConfigured ? "not_configured" : notTriggered ? "not_triggered" : "checked",
         verdict: notTriggered ? "info" : unavailable || notConfigured ? unavailableVerdict(rule.on_unavailable) : checkedVerdict(rule, pass),
-        message: unavailable ? (execution.timedOut ? "tool timed out" : "tool is unavailable") : notConfigured ? `ambiguous tools: ${(execution.candidates ?? []).join(", ")}` : notTriggered ? execution.evidence : pass ? "check passed" : execution.stderr.trim() || execution.stdout.trim() || "check failed",
+        message: unavailable ? (execution.timedOut ? "tool timed out" : "tool is unavailable") : notConfigured ? (execution.evidence ?? `ambiguous tools: ${(execution.candidates ?? []).join(", ")}`) : notTriggered ? execution.evidence : pass ? "check passed" : execution.stderr.trim() || execution.stdout.trim() || "check failed",
         provenance: rule.provenance,
       });
     }
@@ -54,6 +54,14 @@ export function evaluateQuality({ policy, profile, executions = [], metrics = []
     if (metric.rule === "coverage.no_regression" && oldMetric?.total > 0 && metric.total > 0) {
       const pass = metric.covered * oldMetric.total >= oldMetric.covered * metric.total;
       results.push({ ...metric, class: rule.class, state: "checked", verdict: checkedVerdict(rule, pass), baseline: old, baseline_covered: oldMetric.covered, baseline_total: oldMetric.total, provenance: rule.provenance });
+      continue;
+    }
+    // A parser may report that a rule cannot be measured for this change at
+    // all — mutmut emitting no per-mutant lines, or no mutant starting on a
+    // changed line (KD-7, REL-11). That is not the same as an unavailable
+    // tool: there is nothing to measure, not a measurement that went missing.
+    if (metric.not_applicable) {
+      results.push({ ...metric, class: rule.class, state: "not_applicable", verdict: "info", threshold: rule.threshold, baseline: old, message: metric.evidence ?? "not applicable to this change", provenance: rule.provenance });
       continue;
     }
     if (!Number.isFinite(metric.actual)) {
