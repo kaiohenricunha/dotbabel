@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-27",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts null rather than a truncated array",
+  "test": "it(\"stops at the page cap rather than returning a partial list\", () => {\n  expect(fetchAll()).toBeNull();\n});\n"
+}

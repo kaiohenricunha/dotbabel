@@ -2,7 +2,7 @@
 
 _Last updated: v3.4.0_
 
-dotbabel ships three Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
+dotbabel ships four Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.
 
 | Hook                         | Event         | Fires                 | Purpose                                              |
@@ -32,15 +32,29 @@ that is where it has to be enforced. Without this hook, "post the evidence
 comment" is something an agent can simply do, and the evidence chain collapses
 to the agent's own assertion.
 
-Bypass only after the user confirms, per call:
+**Scope, stated plainly.** This stops the marker reaching a comment through the
+command text or a `--body-file` the hook can read. It does **not** stop an agent
+that assembles the marker out of band — splitting it across shell variables,
+base64, a heredoc, or writing the body with the Write tool (which this
+`PreToolUse` matcher does not cover) and posting it with `--body-file`. Those
+are open by construction: no textual guard on a single Bash call can close
+them. Treat this as a guardrail against the casual path, not a security
+boundary. The durable fix is for the gate to stop trusting comment text — an
+unforgeable value derived from the run, or a check-run artifact the agent
+cannot author.
+
+Bypass only after the user confirms, by exporting the variable in the
+environment Claude Code itself was started with:
 
 ```bash
-BYPASS_CRITERIA_EVIDENCE_GUARD=1 <command>
+BYPASS_CRITERIA_EVIDENCE_GUARD=1 claude
 ```
 
-A tool call cannot set the hook's own environment, so this prefix is the only
-bypass an agent can act on. Exporting the variable before Claude Code starts
-disables the guard for the whole session.
+A `VAR=1 <command>` **prefix does not work**. The prefix is applied by the shell
+the Bash tool spawns _after_ hooks run, while the hook executes earlier with
+Claude Code's own environment — so the variable the hook reads is still unset
+and the call is blocked. That also means an agent cannot self-bypass per call,
+which is the property worth keeping.
 
 ## Why two checkers instead of one
 

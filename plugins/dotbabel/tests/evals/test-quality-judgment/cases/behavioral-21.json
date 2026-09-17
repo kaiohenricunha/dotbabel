@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-21",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "boundary one below the valid length, with a specific message",
+  "test": "it(\"rejects a sha that is 39 characters\", () => {\n  expect(() => buildMarker(\"a\".repeat(39))).toThrow(/invalid sha/);\n});\n"
+}

@@ -14,7 +14,7 @@
  *
  * Usage:
  *   node run.mjs                 # baseline + candidate, write RESULTS.md
- *   node run.mjs --candidate-only  # skip the baseline (no regression check)
+ *   node run.mjs --candidate-only  # skip the baseline; exits 3, never 0
  *   node run.mjs --dry-run       # list what would run, spend nothing
  */
 
@@ -117,7 +117,22 @@ function main() {
   writeFileSync(join(HERE, "RESULTS.md"), md);
   process.stdout.write(md);
 
-  return verdict.ok ? 0 : 1;
+  if (!verdict.ok) return 1;
+  // Exit 0 is what TEST-3 reads as "may ship". A candidate-only run never
+  // measured the no-regression clause, so it reports success without claiming
+  // that authority.
+  if (baseline === null) {
+    process.stderr.write("Baseline skipped: floors met, but OPS-9's no-regression clause is unmeasured. Not a release-gate pass.\n");
+    return 3;
+  }
+  return 0;
 }
 
-process.exit(main());
+try {
+  process.exit(main());
+} catch (err) {
+  // An infrastructure failure must not wear the exit code that means "the
+  // judgment missed OPS-9". 2 is this repo's environment-error code.
+  process.stderr.write(`${err.message}\n`);
+  process.exit(2);
+}

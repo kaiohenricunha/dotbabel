@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-26",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts which of two conflicting sources won",
+  "test": "it(\"prefers the base ref when the head disagrees\", () => {\n  expect(inputs.criteriaEnforcement).toBe(\"warn\");\n});\n"
+}

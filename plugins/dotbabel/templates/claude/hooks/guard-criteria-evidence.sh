@@ -9,22 +9,56 @@
 # is trusted. An agent driving `gh` IS a trusted author, and the gate cannot
 # tell a marker the tool wrote from one an agent typed — the bytes are
 # identical. The distinction only exists at the moment the command is issued,
-# so that is where it has to be enforced. Without this hook, "post the evidence
-# comment" is a thing an agent can do directly, and the whole evidence chain
-# reduces to the agent's own say-so.
+# so that is where it has to be enforced.
 #
-# The sanctioned writer is `dotbabel criteria verify --pr <N> --post`, which
-# runs the criteria and derives the marker from what actually happened. That
-# path is allowed below.
+# THERE IS NO ALLOW-LIST, deliberately. The sanctioned writer,
+# `dotbabel criteria verify --pr <N> --post`, does not carry the marker in its
+# COMMAND TEXT — only in its output. So any command whose text contains the
+# marker is writing it by hand, and needs no exception. An earlier revision did
+# carry allow-rules and they were the whole vulnerability twice over: first the
+# bare token `dotbabel-criteria` matched inside the marker itself, then, after
+# that was narrowed to an invocation shape, merely MENTIONING the bin anywhere
+# in the line still whitelisted it —
+#   gh pr comment 1 --body '<!-- dotbabel-criteria verified-sha=… --> via dotbabel-criteria.mjs'
+# — as did chaining a real invocation in front of a hand-written marker. A
+# guard whose allow-rule the attacker controls is not a guard.
 #
-# Bypass, only after the user confirms:
-#   - Per call: BYPASS_CRITERIA_EVIDENCE_GUARD=1 directly before the command.
-#   - Session: the same variable exported before Claude Code starts.
-# A tool call cannot set this hook's own environment, so the prefix is the only
-# bypass an agent can act on.
+# SCOPE, stated plainly rather than overclaimed. This stops the marker reaching
+# a comment through the command text or a `--body-file` this hook can read. It
+# does NOT stop an agent that assembles the marker out of band — splitting it
+# across shell variables, base64, a heredoc, or writing the body with the Write
+# tool (which this PreToolUse matcher does not cover) and then posting it with
+# `--body-file`. Those remain open by construction: no textual guard on one
+# Bash call can close them.
+#
+# So treat this as a guardrail against the casual and accidental path, not as a
+# security boundary. The durable fix is for the gate to stop trusting comment
+# text at all — an unforgeable value derived from the run, or a check-run
+# artifact the agent cannot author. See docs/hooks.md.
+#
+# Bypass: export BYPASS_CRITERIA_EVIDENCE_GUARD=1 in the environment Claude
+# Code itself was started with, only after the user confirms. A `VAR=1 cmd`
+# PREFIX DOES NOT WORK: the prefix is applied by the shell the Bash tool spawns
+# later, while this hook runs earlier with Claude Code's own environment.
 
-# Fail open if jq is not installed (don't break all Bash tool calls).
+# `jq` is used only to read the tool payload. Do not fail open for the case
+# this hook exists to catch: if jq is missing, fall back to scanning the raw
+# stdin for the marker and refuse when it is there.
+MARKER='dotbabel-criteria verified-sha='
+
+# Slurp stdin with the `read` BUILTIN, not `$(cat)`. The fallback below has to
+# work when PATH is unusable — that is precisely when an external `cat` or
+# `grep` would silently produce nothing and the guard would fail open on the
+# one case it exists to catch. `read -d ''` returns non-zero at EOF while still
+# setting the variable, so the `|| true` is expected, not an error.
+IFS= read -r -d '' INPUT || true
+
 if ! command -v jq >/dev/null 2>&1; then
+  # `[[ == * *]]` is a builtin too, so this branch needs no external command.
+  if [[ "$INPUT" == *"$MARKER"* ]]; then
+    echo "BLOCKED: jq is unavailable, so this hook cannot parse the tool payload, and the input carries a dotbabel-criteria evidence marker. Refusing rather than failing open." >&2
+    exit 2
+  fi
   exit 0
 fi
 
@@ -32,38 +66,18 @@ if [ "${BYPASS_CRITERIA_EVIDENCE_GUARD:-0}" = "1" ]; then
   exit 0
 fi
 
-INPUT=$(cat)
 TOOL=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty')
 [ "$TOOL" = "Bash" ] || exit 0
 
 CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
-# Join backslash-newline continuations first: the patterns below work one line
-# at a time, so a call split across lines would otherwise show each half alone.
+# Join backslash-newline continuations: the checks below work on one string, so
+# a call split across lines would otherwise hide the marker from them.
 CMD=${CMD//$'\\\n'/ }
 NORM=$(printf '%s' "$CMD" | tr '\t' ' ' | tr -s ' ')
 
-# The sanctioned writer runs the criteria and derives the marker from the run.
-# Allow it before looking for the marker at all, since its own `--post` output
-# legitimately contains one.
-#
-# Match an INVOCATION, not the bare token: the marker text itself begins
-# `dotbabel-criteria verified-sha=`, so a loose `dotbabel[- ]criteria` pattern
-# lets the marker whitelist itself and the guard never fires. The bin always
-# carries `.mjs`, and the subcommand form is space-separated followed by a
-# real subcommand.
-if printf '%s' "$NORM" | grep -qE '(^|[[:space:];&|(`])(node[[:space:]]+)?[^[:space:]]*dotbabel-criteria\.mjs([[:space:]]|$)'; then
-  exit 0
-fi
-if printf '%s' "$NORM" | grep -qE '(^|[[:space:];&|(`])dotbabel[[:space:]]+criteria[[:space:]]+(verify|list)([[:space:]]|$)'; then
-  exit 0
-fi
-
-# Anything else that carries the marker text is an agent writing evidence by
-# hand. Matching the marker itself rather than a command shape keeps this
-# robust across `gh pr comment`, `gh api`, `--body-file`, and a heredoc.
-if printf '%s' "$NORM" | grep -qF 'dotbabel-criteria verified-sha='; then
-  cat >&2 <<'MSG'
-BLOCKED: this command writes a dotbabel-criteria evidence marker by hand.
+block() {
+  cat >&2 <<MSG
+BLOCKED: this command writes a dotbabel-criteria evidence marker by hand${1}.
 
 The merge gate trusts that marker because the tool derived it from a real
 criteria run. A hand-written one is indistinguishable to the gate, so writing
@@ -73,10 +87,37 @@ Post evidence with the sanctioned writer instead:
 
   dotbabel criteria verify --pr <N> --post
 
-If you genuinely need to bypass this (the user must confirm first), prefix the
-call: BYPASS_CRITERIA_EVIDENCE_GUARD=1 <command>
+That command does not carry the marker in its own text, so it is never blocked.
+
+To bypass (the user must confirm first), export
+BYPASS_CRITERIA_EVIDENCE_GUARD=1 in the environment Claude Code was started
+with. A \`VAR=1 <command>\` prefix does NOT work — it is applied after hooks run.
 MSG
   exit 2
+}
+
+# 1. The marker inline in the command text.
+if printf '%s' "$NORM" | grep -qF "$MARKER"; then
+  block ""
 fi
+
+# 2. The marker inside a file the command posts with `--body-file <path>` or
+#    `-F body=@<path>`. Reading the file is what keeps the obvious indirection
+#    from being a free pass; `--body-file -` reads stdin and cannot be checked.
+while IFS= read -r candidate; do
+  [ -n "$candidate" ] || continue
+  [ "$candidate" = "-" ] && continue
+  # Strip one layer of surrounding quotes, which the command line usually has.
+  candidate=${candidate%\"}
+  candidate=${candidate#\"}
+  candidate=${candidate%\'}
+  candidate=${candidate#\'}
+  [ -f "$candidate" ] || continue
+  if grep -qF "$MARKER" "$candidate" 2>/dev/null; then
+    block " (via ${candidate})"
+  fi
+done <<EOF
+$(printf '%s' "$NORM" | grep -oE -- '--body-file[= ][^ ]+|-F body=@[^ ]+' | sed -E 's/^--body-file[= ]//; s/^-F body=@//')
+EOF
 
 exit 0

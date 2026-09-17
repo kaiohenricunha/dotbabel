@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-17T14:56:18.277Z",
+  "generatedAt": "2026-09-17T16:16:33.281Z",
   "skills": [
     {
       "name": "agents-search",
@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:7b6d43e32531135d830245d1fd1e7a4d017e64bcbf20aaea45170541cad370bc",
+      "checksum": "sha256:c9902f8d517d5ffe602bd092ff72a77af10120589870a2754795ad5bb76d3d4b",
       "dependencies": [],
       "lastValidated": "2026-09-17"
     },
@@ -254,14 +254,14 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:c376bfa1320a7d4a119372ed12f5ffe8a2aadbbb4e65f96291f0d4d07aea0ee0",
+      "checksum": "sha256:9d5dbf4861424b4c6b280263bee7e57d8f94b10c6f72ed4147d3d4c80815faf2",
       "dependencies": [],
       "lastValidated": "2026-09-17"
     },
     {
       "name": "review-prs",
       "path": ".claude/skills/review-prs/SKILL.md",
-      "checksum": "sha256:6f7c8b4fa94084265a5fae3237225e7ba4b3e225678955ed5f0f1c14c3193733",
+      "checksum": "sha256:d5f394dfb1944956f45231304ddc164f7ddc90142e4a419943b3a7102635f9a7",
       "dependencies": [],
       "lastValidated": "2026-09-17"
     },

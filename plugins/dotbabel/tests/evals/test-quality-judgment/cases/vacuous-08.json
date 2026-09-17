@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-08",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "accepts both the blocked and the allowed outcome",
+  "test": "it(\"blocks the marker\", () => {\n  const status = runHook(cmd);\n  expect([0, 2]).toContain(status);\n});\n"
+}

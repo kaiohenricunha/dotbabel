@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-25",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts the conservative direction explicitly",
+  "test": "it(\"counts a partially covered branch as uncovered\", () => {\n  expect(changedCoverage(report, { \"a.js\": [4] }).branch).toEqual({ covered: 0, total: 1 });\n});\n"
+}

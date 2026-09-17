@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-01",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "loops over an empty fixture, so the body never runs",
+  "test": "it(\"validates every entry\", () => {\n  for (const e of []) expect(validate(e)).toBe(true);\n});\n"
+}

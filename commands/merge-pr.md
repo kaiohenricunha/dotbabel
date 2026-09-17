@@ -38,29 +38,24 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
    - If the repo uses spec IDs (a `specs/` or `docs/specs/` dir), or the PR changes a protected path from `docs/repo-facts.json`, must contain a `## Spec ID` section or a `## No-spec rationale` section. `dotbabel pr-stack gate --gate merge` accepts either one. A Spec ID must name an approved, implementing, or done spec, and it does not cover a changed protected path that is missing from that spec's `linked_paths`. In both of those cases, use the rationale.
      If any are missing, STOP and ask the user whether to auto-append them via `gh pr edit <N> --body-file`.
 
-3. **Run the merge gate, and re-verify criteria if the evidence is stale.**
+3. **Run the merge gate and read every reason.**
 
    ```bash
    dotbabel pr-stack gate --gate merge --pr <N>
    ```
 
-   A `CRITERIA_EVIDENCE_STALE` reason means trusted evidence exists but names an
-   earlier commit — the usual cause is a push after `/review-pr` ran. The
-   evidence is not wrong, just pinned to the wrong SHA, so re-run the
-   verification rather than asking the user to redo the review:
-
-   ```bash
-   dotbabel criteria verify --pr <N> --post
-   dotbabel pr-stack gate --gate merge --pr <N>
-   ```
-
-   Re-verify **once**. If the gate still reports `CRITERIA_EVIDENCE_STALE`, the
-   head is moving under you — stop and say so rather than looping. Any other
-   criteria reason (`CRITERIA_FAILED`, `CRITERIA_EVIDENCE_MISSING`,
-   `CRITERIA_SCOPE_WEAKENED`, …) is a real failure: STOP and report it. Never
-   merge past a criteria reason, and never hand-write the evidence marker —
-   `guard-criteria-evidence.sh` blocks that, because the gate cannot tell a
+   This reads GitHub and the git object store, so it works from your own
+   checkout. Any criteria reason other than `CRITERIA_EVIDENCE_STALE`
+   (`CRITERIA_FAILED`, `CRITERIA_EVIDENCE_MISSING`, `CRITERIA_SCOPE_WEAKENED`,
+   `CRITERIA_BASE_UNREADABLE`, …) is a real failure: **STOP** and report it.
+   Never merge past a criteria reason, and never hand-write the evidence marker
+   — `guard-criteria-evidence.sh` blocks that, because the gate cannot tell a
    hand-written marker from one the tool derived from a real run.
+
+   `CRITERIA_EVIDENCE_STALE` alone is recoverable: trusted evidence exists but
+   names an earlier commit, usually because something pushed after `/review-pr`
+   ran. Carry it to step 5 — re-verifying needs the PR head checked out, which
+   has not happened yet.
 
 4. **Checkout the branch in an isolated worktree.**
 
@@ -72,7 +67,30 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 
    Never mutate the user's active working directory.
 
-5. **Run the full project test suite.** Detect runner:
+5. **Re-verify criteria if step 3 reported `CRITERIA_EVIDENCE_STALE`.**
+
+   Run this from the worktree step 4 created, not from your own checkout:
+   `dotbabel criteria verify` fails closed unless the worktree is clean and
+   local `HEAD` equals the PR head (`plugins/dotbabel/src/criteria/preconditions.mjs`).
+
+   ```bash
+   dotbabel criteria verify --pr <N> --post
+   dotbabel pr-stack gate --gate merge --pr <N>
+   ```
+
+   Read the verify exit code before drawing any conclusion:
+
+   - `0` — evidence re-posted against the current head. Continue.
+   - `1` — a criterion actually fails. **STOP**; this is not a staleness problem.
+   - `2` — an environment problem: missing trust, a dirty worktree, a `HEAD`
+     that still differs from the PR head. Report _that_, and do not describe it
+     as a moving head.
+
+   Re-verify **once**. If the gate still reports `CRITERIA_EVIDENCE_STALE` after
+   a clean `0`, the head really is moving under you — stop and say so rather
+   than looping.
+
+6. **Run the full project test suite.** Detect runner:
    - `Makefile` with `test` → `make test`
    - `package.json` → `npm test` (or `pnpm` / `yarn` based on lockfile)
    - `go.mod` → `go test ./...`
@@ -80,17 +98,17 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 
    Paste the tail of output (last ~40 lines) regardless of pass/fail.
 
-6. **Quality gate.** Run the PR quality profile against the base branch:
+7. **Quality gate.** Run the PR quality profile against the base branch:
 
    ```bash
    dotbabel quality check --profile pr --base origin/<baseRefName>
    ```
 
-   Exit code `1` means a checked rule failed. Exit code `2` means required evidence, trust, or tooling is unavailable. **STOP** for either exit code and surface the result — do not merge past it. Any other non-zero exit also means the gate did not run — `64` is invalid usage, and `127` is `dotbabel` not installed, which is the normal state on the bootstrap-only install path (see the top of `CLAUDE.md`). **STOP** there too, say which exit you got, and never report an unrun gate as a pass. Exit `0` means no error verdict; continue to step 7.
+   Exit code `1` means a checked rule failed. Exit code `2` means required evidence, trust, or tooling is unavailable. **STOP** for either exit code and surface the result — do not merge past it. Any other non-zero exit also means the gate did not run — `64` is invalid usage, and `127` is `dotbabel` not installed, which is the normal state on the bootstrap-only install path (see the top of `CLAUDE.md`). **STOP** there too, say which exit you got, and never report an unrun gate as a pass. Exit `0` means no error verdict; continue to step 8.
 
    Expect exit `2` on the first run: step 4 put you in a throwaway `/tmp/merge-pr-<N>` worktree, and project-command trust matches the repository path exactly, so a fresh worktree is never trusted. Resolve it deliberately, per PR — read the branch's own diff to `.dotbabel.json` and to any `package.json` scripts the tools invoke, then either trust that one path or run this step from your own checkout of the branch. Do not reach for a blanket `--allow-project-commands` here: in this flow it would execute commands defined by the pull request under review.
 
-7. **Interpret failures honestly.** If the test suite fails:
+8. **Interpret failures honestly.** If the test suite fails:
 
    ```bash
    git stash
@@ -100,7 +118,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 
    Report whether the failure is pre-existing on `origin/<baseRefName>` or introduced by this PR. **Do not assert "pre-existing" without running this proof.**
 
-8. **Verify CI is green.**
+9. **Verify CI is green.**
 
    ```bash
    gh pr checks <N>
@@ -108,14 +126,26 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 
    If any check is `failing` or `pending`, STOP and wait or ask the user.
 
-9. **Request merge confirmation from the user.** Show:
-   - Summary of local test result
-   - Quality gate result
-   - CI status
-   - The exact merge command you will run
-     Wait for the user to say "merge" (or equivalent).
+10. **Re-run the merge gate, then request confirmation from the user.**
 
-10. **Merge — with an explicit, marker-free squash subject AND body.**
+    Steps 6-9 can legitimately push — a test fix, a CI fix, a rebase for
+    `BEHIND`. Criteria evidence is pinned to a SHA, so the step 3 verdict only
+    ever described the head it saw. Re-gate immediately before the
+    irreversible action rather than trusting a verdict several steps old:
+
+    ```bash
+    dotbabel pr-stack gate --gate merge --pr <N>
+    ```
+
+    Then show:
+
+- Summary of local test result
+- Quality gate result
+- CI status
+- The exact merge command you will run
+  Wait for the user to say "merge" (or equivalent).
+
+11. **Merge — with an explicit, marker-free squash subject AND body.**
     The default squash body concatenates the branch's commit messages, and —
     the sneakier half — on a **single-commit PR** the default squash _subject_
     is that commit's subject line, not the PR title. Every intermediate commit
@@ -152,7 +182,7 @@ Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user
 ## Rules
 
 - Never skip the full test suite, even if CI is green — CI config drift is real.
-- Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 10's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
+- Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 11's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
 - Never claim a failure is "pre-existing" without the `git stash` proof.
 - Never merge without explicit user confirmation. CI green alone is not authorization.
 - Never force-push; never merge into `main`/`master` with failing local tests.

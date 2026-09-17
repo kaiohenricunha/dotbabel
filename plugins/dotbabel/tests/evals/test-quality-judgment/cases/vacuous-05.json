@@ -1,0 +1,7 @@
+{
+  "id": "vacuous-05",
+  "low_quality": true,
+  "kind": "vacuously-true",
+  "rationale": "the disjunction admits every possible return value",
+  "test": "it(\"handles both branches\", () => {\n  const r = classify(undefined);\n  expect(typeof r === \"string\" || r === undefined).toBe(true);\n});\n"
+}

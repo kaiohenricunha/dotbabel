@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-24",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts the exact blocking exit code for an indirect path",
+  "test": "it(\"blocks a marker carried in a body file\", () => {\n  expect(runHook(`gh pr comment 1 --body-file ${file}`)).toBe(2);\n});\n"
+}

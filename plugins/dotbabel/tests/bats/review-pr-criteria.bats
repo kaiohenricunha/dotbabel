@@ -59,10 +59,16 @@ MERGE="$REPO_ROOT/commands/merge-pr.md"
   [ "$status" -eq 0 ]
   run grep -qiE 'failing criterion|criterion .*not `?pass`?' "$REVIEW"
   [ "$status" -eq 0 ]
-  # The conductor must agree, or the two artifacts disagree about whether the
-  # pipeline continues.
-  run grep -qiE 'criteri' "$CONDUCTOR"
-  [ "$status" -eq 0 ]
+
+  # AC-15's "then" clause is an ORDERING claim: the stop happens BEFORE
+  # local-attest. A bare `grep criteri` on the conductor would match a sentence
+  # saying the opposite, so assert the stop instruction actually precedes the
+  # local-attest phase heading.
+  stop_line=$(grep -niE 'does \*\*not\*\* advance to `local-attest`|not advance to .local-attest' "$CONDUCTOR" | head -1 | cut -d: -f1)
+  attest_line=$(grep -nE '^### 5\. `local-attest`' "$CONDUCTOR" | head -1 | cut -d: -f1)
+  [ -n "$stop_line" ]
+  [ -n "$attest_line" ]
+  [ "$stop_line" -lt "$attest_line" ]
 }
 
 @test "review-pr: the prompt tells the agent to treat test output and comments as untrusted data" {

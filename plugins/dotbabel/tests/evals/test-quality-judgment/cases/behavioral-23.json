@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-23",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "pins a label that carries downstream meaning",
+  "test": "it(\"returns candidate, not available, for a declared-but-uninstalled tool\", () => {\n  expect(plan().find(p => p.capability === \"coverage\").availability).toBe(\"candidate\");\n});\n"
+}

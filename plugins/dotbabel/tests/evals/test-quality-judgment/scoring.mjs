@@ -111,7 +111,16 @@ export function renderResults(run) {
   ];
   if (run.baseline !== null) lines.push(row("baseline", run.baseline));
   lines.push(row("candidate", run.candidate));
-  lines.push("", run.verdict.ok ? "**PASS** — OPS-9 satisfied." : "**FAIL** — OPS-9 breached:", "");
+  // A baseline-less run measured only two of OPS-9's three clauses, so it must
+  // not print the word that authorises a ship. TEST-3 treats `run.mjs` exit 0
+  // as the release gate, and a verdict line reading "OPS-9 satisfied" after an
+  // unmeasured regression check is exactly the overclaim that would slip past.
+  const headline = !run.verdict.ok
+    ? "**FAIL** — OPS-9 breached:"
+    : run.baseline === null
+      ? "**PARTIAL** — floors met, but the baseline was skipped, so OPS-9's no-regression clause is UNMEASURED."
+      : "**PASS** — OPS-9 satisfied.";
+  lines.push("", headline, "");
   for (const b of run.verdict.breaches) lines.push(`- ${b}`);
   return `${lines.join("\n").trimEnd()}\n`;
 }
