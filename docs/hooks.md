@@ -5,17 +5,42 @@ _Last updated: v3.4.0_
 dotbabel ships three Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.
 
-| Hook                       | Event         | Fires                 | Purpose                                              |
-| -------------------------- | ------------- | --------------------- | ---------------------------------------------------- |
-| `guard-destructive-git.sh` | `PreToolUse`  | before each Bash call | Blocks destructive git commands                      |
-| `check-on-write.sh`        | `PostToolUse` | after each file edit  | Per-file syntax check of the edited file             |
-| `check-on-stop.sh`         | `Stop`        | once per turn         | Project-wide checks when the build graph is coherent |
+| Hook                         | Event         | Fires                 | Purpose                                              |
+| ---------------------------- | ------------- | --------------------- | ---------------------------------------------------- |
+| `guard-destructive-git.sh`   | `PreToolUse`  | before each Bash call | Blocks destructive git commands                      |
+| `guard-criteria-evidence.sh` | `PreToolUse`  | before each Bash call | Blocks a hand-written criteria evidence marker       |
+| `check-on-write.sh`          | `PostToolUse` | after each file edit  | Per-file syntax check of the edited file             |
+| `check-on-stop.sh`           | `Stop`        | once per turn         | Project-wide checks when the build graph is coherent |
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
 > See [Registering a hook](#registering-a-hook).
 
 ---
+
+## `guard-criteria-evidence.sh`
+
+Blocks any Bash call that writes a `<!-- dotbabel-criteria verified-sha=… -->`
+marker by hand, and allows `dotbabel criteria verify --pr <N> --post`, which is
+the sanctioned writer.
+
+The merge gate believes that marker when a trusted author posted it. An agent
+driving `gh` **is** a trusted author, and the gate cannot tell a marker the tool
+derived from a real criteria run from one an agent typed — the bytes are
+identical. The distinction only exists at the moment the command is issued, so
+that is where it has to be enforced. Without this hook, "post the evidence
+comment" is something an agent can simply do, and the evidence chain collapses
+to the agent's own assertion.
+
+Bypass only after the user confirms, per call:
+
+```bash
+BYPASS_CRITERIA_EVIDENCE_GUARD=1 <command>
+```
+
+A tool call cannot set the hook's own environment, so this prefix is the only
+bypass an agent can act on. Exporting the variable before Claude Code starts
+disables the guard for the whole session.
 
 ## Why two checkers instead of one
 

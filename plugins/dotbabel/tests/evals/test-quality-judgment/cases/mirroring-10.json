@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-10",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "ordering of internal reads is an implementation detail here",
+  "test": "it(\"reads base before head\", () => {\n  expect(order).toEqual([\"base\", \"head\"]);\n});\n"
+}

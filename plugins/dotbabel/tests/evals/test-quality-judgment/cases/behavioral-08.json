@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-08",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "pins a bound that a regression would exceed",
+  "test": "it(\"stops paginating at the documented cap\", () => {\n  expect(joined().filter(c => c.startsWith(\"gh api\")).length).toBe(100);\n});\n"
+}

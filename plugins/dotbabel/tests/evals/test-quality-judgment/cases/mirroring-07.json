@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-07",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "restates the implementation, so it cannot fail",
+  "test": "it(\"computes precision\", () => {\n  const s = score(cases);\n  expect(s.precision).toBe(s.tp / (s.tp + s.fp));\n});\n"
+}

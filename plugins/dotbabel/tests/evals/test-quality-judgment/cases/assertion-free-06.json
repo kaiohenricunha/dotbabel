@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-06",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "snapshot committed without ever being reviewed constrains nothing",
+  "test": "it(\"matches the snapshot\", () => {\n  expect(render(payload, {})).toMatchSnapshot();\n});\n"
+}

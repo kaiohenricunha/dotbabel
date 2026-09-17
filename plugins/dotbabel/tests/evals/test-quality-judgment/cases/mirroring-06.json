@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-06",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "pins key order, which is not a contract",
+  "test": "it(\"keeps the internal shape\", () => {\n  expect(Object.keys(gateInputs(deps, view, 1))).toEqual(INTERNAL_KEY_ORDER);\n});\n"
+}

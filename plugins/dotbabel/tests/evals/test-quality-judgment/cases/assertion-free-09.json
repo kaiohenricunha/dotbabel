@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-09",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "async call with no assertion and no rejection check",
+  "test": "it(\"posts a comment\", async () => {\n  await postEvidenceComment(deps, args);\n});\n"
+}

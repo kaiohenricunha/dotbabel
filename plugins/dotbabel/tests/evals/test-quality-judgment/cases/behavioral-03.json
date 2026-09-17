@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-03",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "boundary case with a concrete expected value",
+  "test": "it(\"returns an empty list for an empty input\", () => {\n  expect(parseSpecIds(\"\")).toEqual([]);\n});\n"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-08",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "no expectation on the parsed result",
+  "test": "it(\"accepts a config\", () => {\n  loadCriteriaConfigText(\"{}\");\n});\n"
+}

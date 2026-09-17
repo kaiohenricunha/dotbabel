@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-04",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "logs instead of asserting",
+  "test": "it(\"builds a plan\", () => {\n  const plans = adapter.plan(component, {}, changeSet, \"pr\");\n  console.log(plans.length);\n});\n"
+}

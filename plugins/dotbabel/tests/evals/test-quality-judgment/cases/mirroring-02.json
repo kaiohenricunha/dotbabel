@@ -1,0 +1,7 @@
+{
+  "id": "mirroring-02",
+  "low_quality": true,
+  "kind": "implementation-mirroring",
+  "rationale": "expectation recomputed with the implementation's own expression",
+  "test": "it(\"normalises the id\", () => {\n  const input = \"`alpha`\";\n  expect(normalizeSpecId(input)).toBe(input.replace(/[`'\\\"#]+|[`'\\\"]+$/g, \"\"));\n});\n"
+}

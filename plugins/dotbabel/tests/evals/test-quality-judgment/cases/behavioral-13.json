@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-13",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts a precedence rule",
+  "test": "it(\"prefers a repository script over the built-in plan\", () => {\n  expect(plan().find(p => p.capability === \"coverage\").source).toBe(\"repository-script\");\n});\n"
+}

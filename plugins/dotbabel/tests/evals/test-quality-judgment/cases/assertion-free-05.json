@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-05",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "no assertion; passes even if the output is wrong",
+  "test": "it(\"handles a large input\", () => {\n  stripFences(\"x\".repeat(100000));\n});\n"
+}

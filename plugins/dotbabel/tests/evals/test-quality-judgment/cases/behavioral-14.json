@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-14",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "environment-dependent branch with a concrete expectation",
+  "test": "it(\"runs pytest under uv when uv.lock exists\", () => {\n  expect(plan().executable).toBe(\"uv\");\n});\n"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "assertion-free-01",
+  "low_quality": true,
+  "kind": "assertion-free",
+  "rationale": "executes code and asserts nothing at all",
+  "test": "it(\"calls the parser\", () => {\n  parseSpecIds(\"## Spec ID\\n\\nalpha\");\n});\n"
+}

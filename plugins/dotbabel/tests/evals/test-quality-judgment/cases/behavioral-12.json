@@ -1,0 +1,7 @@
+{
+  "id": "behavioral-12",
+  "low_quality": false,
+  "kind": "behavioral",
+  "rationale": "asserts which ids survive a filter",
+  "test": "it(\"excludes pending criteria from coverage\", () => {\n  expect([...coverage(p).get(\"spec\")]).toEqual([\"AC-1\"]);\n});\n"
+}
