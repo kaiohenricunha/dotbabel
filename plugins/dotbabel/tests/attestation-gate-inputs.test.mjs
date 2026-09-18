@@ -167,6 +167,79 @@ describe("attestationGateInputs", () => {
     expect(attestationGateInputs(deps, view(), comments).attestationComments).toBe(comments);
   });
 
+  it("anchors the SHA check at both ends", () => {
+    // Unanchored, a 41-character value or one with a prefix would be accepted
+    // here and then never equal the oid the gate compares against — evidence
+    // that silently matches nothing.
+    for (const bad of [`${HEAD}b`, `x${HEAD}`]) {
+      expect(attestationGateInputs(makeDeps().deps, view({ headRefOid: bad }), [])).toEqual({});
+      expect(attestationGateInputs(makeDeps().deps, view({ baseRefOid: bad }), [])).toEqual({});
+    }
+  });
+
+  it("returns {} when handed no view at all rather than throwing", () => {
+    // The caller passes `gh pr view` output straight through; a failed fetch
+    // must produce a verdict, not a TypeError that reads as a tool bug.
+    const { deps, calls } = makeDeps();
+    for (const v of [undefined, null, {}]) expect(attestationGateInputs(deps, v, [])).toEqual({});
+    expect(calls).toHaveLength(0);
+  });
+
+  it("returns {} when the base config parses to something with no attestation key", () => {
+    // `null` and a bare array both parse fine and have no policy on them.
+    for (const raw of ["null", "[]", '{"quality":{}}']) {
+      expect(attestationGateInputs(makeDeps({ policy: raw }).deps, view(), [])).toEqual({});
+    }
+  });
+
+  it("falls back to the default governed set when the list is present but empty", () => {
+    // An empty array must not mean "govern nothing" — that would hash nothing
+    // and make every attestation match regardless of what the matrix ran.
+    const policy = { attestation: { enforce: true, governance_files: [] } };
+    const { deps, calls } = makeDeps({ policy });
+    attestationGateInputs(deps, view(), []);
+    const shows = calls.filter((c) => c[1] === "show").map((c) => c[2]);
+    expect(shows).toContain(`${BASE}:.local-attest.config.mjs`);
+    expect(shows).toContain(`${BASE}:.dotbabel.json`);
+  });
+
+  it("defaults required_legs to empty rather than inventing one", () => {
+    const policy = { attestation: { enforce: true } };
+    expect(attestationGateInputs(makeDeps({ policy }).deps, view(), []).requiredLegs).toEqual([]);
+    const bad = { attestation: { enforce: true, required_legs: "test" } };
+    expect(attestationGateInputs(makeDeps({ policy: bad }).deps, view(), []).requiredLegs).toEqual([]);
+  });
+
+  it("defaults the trust list to OWNER when the policy gives no usable one", () => {
+    for (const val of [undefined, "OWNER"]) {
+      const policy = { attestation: { enforce: true, ...(val === undefined ? {} : { trusted_associations: val }) } };
+      expect(attestationGateInputs(makeDeps({ policy }).deps, view(), []).attestationTrustedAssociations).toEqual([
+        "OWNER",
+      ]);
+    }
+  });
+
+  it("treats an empty merge-base result as unresolved, not as an empty SHA", () => {
+    // `git merge-base` can exit 0 with nothing on stdout. Passing "" through
+    // would make the gate compare the payload against an empty string.
+    const deps = {
+      run: (argv) =>
+        argv[1] === "merge-base"
+          ? { status: 0, stdout: "   \n", stderr: "" }
+          : makeDeps().deps.run(argv),
+    };
+    expect(attestationGateInputs(deps, view(), []).expectedMergeBase).toBeNull();
+  });
+
+  it("accepts a plain nested path and refuses an empty one", () => {
+    const policy = { attestation: { enforce: true, governance_files: ["plugins/dotbabel/scripts/run-bats.sh", ""] } };
+    const { deps, calls } = makeDeps({ policy });
+    attestationGateInputs(deps, view(), []);
+    const shows = calls.filter((c) => c[1] === "show").map((c) => c[2]);
+    expect(shows).toContain(`${BASE}:plugins/dotbabel/scripts/run-bats.sh`);
+    expect(shows.some((x) => x === `${BASE}:`)).toBe(false);
+  });
+
   it.each([
     ["a missing head", { headRefOid: undefined }],
     ["a missing base", { baseRefOid: undefined }],
