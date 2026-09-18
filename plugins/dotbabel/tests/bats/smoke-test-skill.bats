@@ -1,0 +1,125 @@
+#!/usr/bin/env bats
+# smoke-test-skill.bats — P-E2 contract tests for the smoke-test skill and the
+# release-conductor verify extension (KD-13, Flow 5).
+#
+# These artifacts are prose an agent executes, so nothing but a test like this
+# stops an instruction from being quietly dropped in a later edit. The
+# properties asserted here are the ones whose absence is invisible at run time:
+# a skill that silently rolls back still looks like it verified, and a verify
+# subcommand that omits smoke still prints a confident PASS.
+#
+# `skip` is deliberately not used for a missing artifact — a skipped bats test
+# reports `ok`, so it would make this whole file green with no skill at all.
+
+load helpers
+
+# Markdown prose wraps at 80 columns, so a claim stated in ONE SENTENCE is
+# routinely split across two lines. Line-based grep cannot see such a sentence
+# at all, which makes a sentence-level assertion fail against correct prose (or
+# worse, pass only because of where prettier happened to break the line).
+# Collapse whitespace first and assert against the flowed text.
+flowed() { tr '\n' ' ' < "$1" | tr -s ' '; }
+export -f flowed
+
+# near <file> <anchor> <needle> [window] — true when <needle> appears within
+# <window> characters after <anchor> in the flowed text.
+#
+# Deliberately not a regex. A `[^.]*` "same sentence" proxy is wrong here
+# because the prose cites `.claude/deploy-targets.json`, whose periods end the
+# span before it reaches the needle; and the repo's `grep` is ugrep, which
+# rejects bounded repeats like `.{0,60}` on UTF-8 input as too complex. An
+# index window has neither problem and says what is actually meant: these two
+# things are stated together, not merely both present somewhere in the file.
+near() {
+  flowed "$1" | awk -v anchor="$2" -v needle="$3" -v win="${4:-200}" '{
+    s = tolower($0); i = index(s, tolower(anchor));
+    if (i == 0) exit 1;
+    exit (index(substr(s, i, win), tolower(needle)) > 0) ? 0 : 1;
+  }'
+}
+export -f near
+
+SMOKE="$REPO_ROOT/skills/smoke-test/SKILL.md"
+DEPLOY="$REPO_ROOT/skills/deploy-status/SKILL.md"
+RELEASE="$REPO_ROOT/skills/release-conductor/SKILL.md"
+
+@test "smoke-test: SKILL.md exists with matching id and name" {
+  [ -f "$SMOKE" ]
+  # id and name must agree: the manifest keys on one and the slash command
+  # resolves the other, so a mismatch produces a skill that validates but
+  # cannot be invoked by the name it advertises.
+  run grep -qE '^id: smoke-test$' "$SMOKE"
+  [ "$status" -eq 0 ]
+  run grep -qE '^name: smoke-test$' "$SMOKE"
+  [ "$status" -eq 0 ]
+  run grep -qE '^type: skill$' "$SMOKE"
+  [ "$status" -eq 0 ]
+  # It runs repo-declared commands against production, so it must not be
+  # reachable by model inference alone.
+  run grep -qE '^disable-model-invocation: true$' "$SMOKE"
+  [ "$status" -eq 0 ]
+}
+
+@test "smoke-test: resolves the deploy-ops helper the same way deploy-status does" {
+  [ -f "$SMOKE" ]
+  [ -f "$DEPLOY" ]
+  # Both must check the bootstrapped $HOME copy first, then the in-repo path,
+  # then fail with exit 2. A skill that resolved only one of the two would
+  # work for exactly one install shape and silently fail for the other.
+  for needle in \
+    '\$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs' \
+    'skills/deploy-status/scripts/deploy-ops.mjs'
+  do
+    run grep -q "$needle" "$SMOKE"
+    [ "$status" -eq 0 ]
+  done
+  # And it must actually call the smoke subcommand, not status.
+  run grep -qE 'node "\$DEPLOY_OPS" smoke' "$SMOKE"
+  [ "$status" -eq 0 ]
+}
+
+@test "smoke-test: recommends /rollback-prod on failure and never invokes it" {
+  [ -f "$SMOKE" ]
+  # The recommendation must be present...
+  run grep -q '/rollback-prod' "$SMOKE"
+  [ "$status" -eq 0 ]
+  # ...and the prohibition must be explicit. KD-13 and the rule floor both
+  # forbid a production change without direct instruction, so a skill that
+  # merely omits the invocation is not enough — a later edit would add it back.
+  run near "$SMOKE" "never invoke" "rollback-prod"
+  [ "$status" -eq 0 ]
+  # The skill must not contain a line that actually runs the rollback helper.
+  run grep -nE '^[^#|]*node "\$DEPLOY_OPS" rollback' "$SMOKE"
+  [ "$status" -ne 0 ]
+}
+
+@test "release-conductor: verify reports deploy status and smoke results when a deploy target exists" {
+  [ -f "$RELEASE" ]
+  # Flow 5 step 2: both commands run, and they run inside the verify
+  # subcommand rather than somewhere earlier in the gating flow.
+  verify_line=$(grep -n '^## `verify <tag>` subcommand' "$RELEASE" | head -1 | cut -d: -f1)
+  [ -n "$verify_line" ]
+  status_line=$(grep -nE 'deploy-ops\.mjs status|DEPLOY_OPS" status' "$RELEASE" | head -1 | cut -d: -f1)
+  smoke_line=$(grep -nE 'deploy-ops\.mjs smoke|DEPLOY_OPS" smoke' "$RELEASE" | head -1 | cut -d: -f1)
+  [ -n "$status_line" ]
+  [ -n "$smoke_line" ]
+  [ "$status_line" -gt "$verify_line" ]
+  [ "$smoke_line" -gt "$verify_line" ]
+  # Flow 5 step 3: a failure recommends rollback and stops.
+  run grep -q '/rollback-prod' "$RELEASE"
+  [ "$status" -eq 0 ]
+}
+
+@test "release-conductor: verify reports SKIPPED for smoke when no deploy target exists" {
+  [ -f "$RELEASE" ]
+  # Absent configuration must read as SKIPPED, not as a pass. A verify that
+  # printed PASS for checks it never ran is the failure this whole unit exists
+  # to prevent, and it is invisible in the output.
+  run grep -qE 'SKIPPED' "$RELEASE"
+  [ "$status" -eq 0 ]
+  # The SKIPPED wording must be tied to the absence of a deploy target, in the
+  # same sentence — a floating "SKIPPED" elsewhere in the document would
+  # otherwise satisfy this while the rule it encodes went missing.
+  run near "$RELEASE" "no deploy target" "SKIPPED"
+  [ "$status" -eq 0 ]
+}

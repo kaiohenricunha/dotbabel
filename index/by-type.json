@@ -58,6 +58,7 @@
     "review-prs",
     "rollback-prod",
     "security-review",
+    "smoke-test",
     "spec",
     "terraform-specialist",
     "terragrunt-specialist",

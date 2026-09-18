@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-18T13:31:30.106Z",
+  "generatedAt": "2026-09-18T14:01:08.661Z",
   "skills": [
     {
       "name": "agents-search",
@@ -238,7 +238,7 @@
     {
       "name": "release-conductor",
       "path": ".claude/skills/release-conductor/SKILL.md",
-      "checksum": "sha256:82d522ae0f5296b9eabd935283f6d8b3354d98c36d5f7c3429ed67c60dea302a",
+      "checksum": "sha256:1e78cf36174109030e514d1e59907697efea0e9857d622b0215198ab97ba50e0",
       "dependencies": [
         "deploy-status"
       ],
@@ -278,6 +278,13 @@
       "name": "security-review",
       "path": ".claude/skills/security-review/SKILL.md",
       "checksum": "sha256:c8447582929b315402af24e304acd4addaa9be7120e895ca25d4c897ba84cfda",
+      "dependencies": [],
+      "lastValidated": "2026-09-18"
+    },
+    {
+      "name": "smoke-test",
+      "path": ".claude/skills/smoke-test/SKILL.md",
+      "checksum": "sha256:1287596c3642c94b38ea3eaf474a9dc405b1a6143910c336b5404f0f8476131c",
       "dependencies": [],
       "lastValidated": "2026-09-18"
     },

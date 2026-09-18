@@ -269,6 +269,13 @@
       "lastValidated": null
     },
     {
+      "name": "smoke-test",
+      "path": ".claude/skills/smoke-test/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
       "checksum": "",
