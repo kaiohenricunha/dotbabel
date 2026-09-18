@@ -220,7 +220,8 @@ Conventions used by every prompt:
 1. **Tests first** — `plugins/dotbabel/tests/model-intelligence-domain.test.mjs`
    - `exports frozen enums for workload classes, bindings, modes, support states, result statuses, freshness, refresh states, and enforcement states`
    - `workload classes are ordered mechanical < routine < deep < frontier < exceptional and compare by rank only`
-   - `state vocabularies are disjoint: no value appears in more than one enum`
+   - `each vocabulary has unique values, and support state, adapter status, and freshness are separate vocabularies` (the first draft of this name required disjoint vocabularies, which contradicts §5: `unsupported` and `unknown` occur in more than one dimension on purpose)
+   - `runtime ids come from the RUNTIMES registry and are not redeclared` (ARCH-58)
    - `domain module has no import of node:fs, node:child_process, node:http, or node:os`
    - `Provenance and ResolvedRuntimeConfiguration constructors reject unknown fields`
    - Expected before implementation: the module does not exist; every test fails on import.
