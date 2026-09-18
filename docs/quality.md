@@ -401,6 +401,20 @@ Going through `npm run` is what makes this work from a worktree: npm puts every
 ancestor `node_modules/.bin` on `PATH`, so `stryker` resolves to the main
 checkout's installation.
 
+**Do not give the declared tool a break threshold.** A mutation tool's own
+threshold and a parsed report are mutually exclusive. dotbabel parses a report
+only when the tool exits `0` — `coverage` is the single capability it rescues
+from a non-zero exit — so a tool that exits non-zero on a low score produces no
+metric at all, and the verdict message becomes the tool's stdout instead of a
+number. It also mis-attributes the result: `mutation.changed_score` is a
+changed-scope rule, while a tool threshold judges everything it mutated, so a
+change touching none of those files still fails on pre-existing code.
+
+Let the tool report and let the policy judge. This repository keeps the two
+roles in two config files: `stryker.config.mjs` carries `break: 85` for the
+direct per-unit runs IMPL-6 prescribes, and `stryker.harness.config.mjs`
+inherits it with the threshold removed for the declared tool.
+
 Two values must now agree in two files — `jsonReporter.fileName` in
 `stryker.config.mjs` and `report.path` here. Warning: a divergence is silent. No
 report at the declared path resolves through `on_unavailable: info`, which reads

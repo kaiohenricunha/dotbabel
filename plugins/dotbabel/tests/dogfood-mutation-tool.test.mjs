@@ -20,7 +20,8 @@
 import { describe, it, expect } from "vitest";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
+import { spawnSync } from "child_process";
+import { fileURLToPath, pathToFileURL } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -28,11 +29,30 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 /** Stryker's own default when a config sets no `jsonReporter.fileName`. */
 const STRYKER_DEFAULT_REPORT_PATH = "reports/mutation/mutation.json";
 
-/** The modules TEST-1 puts under a mutation budget (IMPL-6). */
-const TEST_1_ROOT = "plugins/dotbabel/src/criteria/";
+// TEST-1 names six module groups, not one: the criteria tree plus the changed
+// parts of pr-gates.mjs, lib/pr-markers.mjs, quality/discovery.mjs,
+// quality/evaluate.mjs and quality/reports.mjs. Only the criteria tree has a
+// standing mutate scope; the other five were mutation-tested by their own
+// unit's `--mutate` verify step and have no standing enforcement point. That
+// gap is tracked, not asserted here — this constant is deliberately the
+// criteria tree alone, and the test name says so.
+const CRITERIA_ROOT = "plugins/dotbabel/src/criteria";
 
 function readJson(relative) {
   return JSON.parse(fs.readFileSync(path.join(REPO_ROOT, relative), "utf8"));
+}
+
+/**
+ * Import a repository module by path.
+ *
+ * Node's ESM loader wants a URL for an absolute specifier: on Windows a bare
+ * `C:\\...` parses as a `c:` scheme and throws ERR_UNSUPPORTED_ESM_URL_SCHEME.
+ *
+ * @param {string} relative
+ * @returns {Promise<object>}
+ */
+function importRepoModule(relative) {
+  return import(pathToFileURL(path.join(REPO_ROOT, relative)).href);
 }
 
 /** This repository's single JavaScript quality component. */
@@ -64,7 +84,37 @@ function resolveCommand(argv) {
   return argv.join(" ");
 }
 
+/**
+ * The Stryker config file the declared `mutation` tool really loads.
+ *
+ * Reading `stryker.config.mjs` unconditionally would test a file the harness
+ * does not use.
+ *
+ * @returns {string}
+ */
+function harnessConfigPath() {
+  const script = resolveCommand(javascriptComponent().tools.mutation.argv);
+  const named = script.trim().split(/\s+/).find((token) => token.endsWith(".mjs"));
+  return named ?? "stryker.config.mjs";
+}
+
 describe("this repository's declared mutation tool (P-F1)", () => {
+  it("runs Stryker through a config that sets no break threshold", async () => {
+    // `break` and a parsed report are mutually exclusive: quality/index.mjs:25-35
+    // parses a report only on exit 0, so a break threshold would make Stryker's
+    // exit code the verdict and the score would never be computed. The floor
+    // still applies through mutation.changed_score (quality/policy.mjs:41).
+    const config = (await importRepoModule(harnessConfigPath())).default;
+    expect(config.thresholds?.break, "a break threshold here hides the mutation score from the harness").toBeUndefined();
+  });
+
+  it("keeps the per-unit break threshold on the config IMPL-6 prescribes", async () => {
+    // IMPL-6 and docs/specs/model-intelligence TEST-3 both enforce the 85 floor
+    // by running `npx stryker run --mutate '<glob>'` directly and reading the
+    // exit code. That path must keep breaking.
+    const config = (await importRepoModule("stryker.config.mjs")).default;
+    expect(config.thresholds?.break).toBe(85);
+  });
   it("declares a mutation tool on the JavaScript component that reports stryker-json", () => {
     const mutation = javascriptComponent()?.tools?.mutation;
     expect(mutation, "quality.components[javascript].tools.mutation is not declared").toBeDefined();
@@ -77,19 +127,29 @@ describe("this repository's declared mutation tool (P-F1)", () => {
   });
 
   it("enables the json reporter, without which Stryker writes no report at all", async () => {
-    const config = (await import(path.join(REPO_ROOT, "stryker.config.mjs"))).default;
+    const config = (await importRepoModule(harnessConfigPath())).default;
     expect(config.reporters).toContain("json");
   });
 
   it("declares the report path Stryker will really write to", async () => {
-    const config = (await import(path.join(REPO_ROOT, "stryker.config.mjs"))).default;
+    const config = (await importRepoModule(harnessConfigPath())).default;
     const written = config.jsonReporter?.fileName ?? STRYKER_DEFAULT_REPORT_PATH;
     expect(javascriptComponent()?.tools?.mutation?.report?.path).toBe(written);
   });
 
-  it("puts the TEST-1 modules inside Stryker's mutate scope", async () => {
-    const config = (await import(path.join(REPO_ROOT, "stryker.config.mjs"))).default;
-    expect(config.mutate.some((pattern) => pattern.startsWith(TEST_1_ROOT))).toBe(true);
+  it("puts every criteria module inside Stryker's mutate scope", async () => {
+    // Matching each real file beats `mutate.some(p => p.startsWith(root))`:
+    // that predicate stays green after `mutate` narrows to a single file, which
+    // is precisely how a mutation budget gets quietly hollowed out.
+    const config = (await importRepoModule(harnessConfigPath())).default;
+    const modules = fs
+      .readdirSync(path.join(REPO_ROOT, CRITERIA_ROOT))
+      .filter((entry) => entry.endsWith(".mjs"))
+      .map((entry) => `${CRITERIA_ROOT}/${entry}`);
+    expect(modules.length, "no criteria modules found — the root moved").toBeGreaterThan(0);
+    for (const module of modules) {
+      expect(config.mutate.some((pattern) => path.matchesGlob(module, pattern)), `${module} is outside the mutate scope`).toBe(true);
+    }
   });
 
   it("excludes every fan-out skills directory from Stryker's sandbox", async () => {
@@ -97,16 +157,24 @@ describe("this repository's declared mutation tool (P-F1)", () => {
     // unexcluded fan-out target kills the whole run with EISDIR before a single
     // mutant is scored. The list used to be hand-written, and had already
     // fallen behind the registry by two runtimes.
-    const config = (await import(path.join(REPO_ROOT, "stryker.config.mjs"))).default;
-    const { skillDirRuntimes, projectSkillsDir } = await import(path.join(REPO_ROOT, "plugins/dotbabel/src/agents.mjs"));
+    const config = (await importRepoModule(harnessConfigPath())).default;
+    const { skillDirRuntimes, projectSkillsDir } = await importRepoModule("plugins/dotbabel/src/agents.mjs");
     for (const runtime of skillDirRuntimes()) {
-      expect(config.ignorePatterns, `${runtime} fans out to a skills tree Stryker would try to copy`).toContain(projectSkillsDir(runtime));
+      const dir = projectSkillsDir(runtime);
+      // Assert the value is a real path first. `projectSkillsDir` returns null
+      // for a runtime declared without `dir`, and `toContain(null)` would pass
+      // against a list that spliced that same null in.
+      expect(typeof dir, `${runtime} declares no projectFanOut.dir`).toBe("string");
+      expect(config.ignorePatterns, `${runtime} fans out to a skills tree Stryker would try to copy`).toContain(dir);
     }
   });
 
   it("keeps the mutation report out of version control", () => {
+    // Ask git rather than doing prefix arithmetic on .gitignore: a prefix match
+    // cannot see a later `!`-negation un-ignoring the file, and it rejects a
+    // perfectly valid rewrite of the rule into a glob form.
     const written = javascriptComponent()?.tools?.mutation?.report?.path ?? STRYKER_DEFAULT_REPORT_PATH;
-    const ignored = fs.readFileSync(path.join(REPO_ROOT, ".gitignore"), "utf8").split("\n").map((line) => line.trim());
-    expect(ignored.some((line) => line !== "" && !line.startsWith("#") && written.startsWith(line.replace(/^\//, "")))).toBe(true);
+    const result = spawnSync("git", ["check-ignore", "-q", "--no-index", written], { cwd: REPO_ROOT });
+    expect(result.status, `${written} is not ignored by git`).toBe(0);
   });
 });

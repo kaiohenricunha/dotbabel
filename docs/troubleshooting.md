@@ -265,6 +265,18 @@ ignorePatterns: [
 ],
 ```
 
+### `mutation.changed_score` fails with the tool's console output as the message
+
+The verdict message should be a score. A wall of the tool's own output means the
+tool exited non-zero, so dotbabel never parsed its report: report parsing is
+skipped for every capability except `coverage` when the command fails.
+
+The usual cause is a break threshold configured on the mutation tool itself.
+**Fix**: remove it and let `mutation.changed_score` apply the floor. Keep the
+tool's threshold only on a separate config used for direct runs, never on the
+one the declared tool loads. See
+[Declaring the tool yourself](./quality.md#declaring-the-tool-yourself).
+
 ### `mutation.changed_score` reports `not_applicable` on a run you expected to score
 
 The rule scores only mutants that start on a line the change touched (REL-11),

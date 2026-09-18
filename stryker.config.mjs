@@ -20,6 +20,12 @@ export default {
   // as a pass. `dogfood-mutation-tool.test.mjs` pins them together.
   reporters: ["clear-text", "progress", "html", "json"],
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
+  // `break: 85` is IMPL-6's per-unit gate: a unit runs `npx stryker run
+  // --mutate '<glob>'` in its verify step and the floor is enforced by the exit
+  // code. `docs/specs/model-intelligence` TEST-3 relies on the same mechanism.
+  //
+  // The harness cannot use this config for that reason — see
+  // `stryker.harness.config.mjs`.
   thresholds: { high: 90, low: 85, break: 85 },
   mutate: ["plugins/dotbabel/src/criteria/**/*.mjs"],
   tempDirName: ".stryker-tmp",
@@ -36,8 +42,17 @@ export default {
   ignorePatterns: [
     ".claude/commands",
     ".claude/skills",
+    // This repository nests whole checkouts here, each with its own fan-out
+    // symlink trees. Stryker does not read `.gitignore`, so a run started from
+    // the main checkout would copy every active worktree and hit the same
+    // EISDIR on a nested symlink.
+    ".claude/worktrees",
     ".cli",
     ".github/instructions",
-    ...skillDirRuntimes().map((runtime) => projectSkillsDir(runtime)),
+    // `dir` is optional on a `ProjectFanOut` (`agents.mjs:71-74`), so a runtime
+    // declared without one would otherwise splice `null` into this list.
+    ...skillDirRuntimes()
+      .map((runtime) => projectSkillsDir(runtime))
+      .filter(Boolean),
   ],
 };
