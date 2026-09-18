@@ -1,0 +1,35 @@
+{
+  "$comment": "Dotbabel's stable decision framework (spec model-intelligence, §3 component 4). It names no provider model and no artifact: a concrete model belongs to the release snapshot or a runtime-native pin, and an artifact states its own requirement in its frontmatter (ARCH-15). Capability keys are the field-level facts the catalog normalises, never a runtime-native identifier.",
+  "$deferred": "No shipped safety floor is declared yet, and its absence is deliberate rather than an oversight. §3 and §5 place one here (\"Security review requires >= frontier\"), but a floor must be SCOPED to a kind of work, and this document's floor shape is unscoped: a shipped floor today would apply to every artifact in the repository. PB-1 therefore still rests on the legacy strong-model frontmatter of the security artifacts, and the scoped-floor shape plus this floor belong to the migration units P-18 and P-19, which must land the floor before they remove that frontmatter.",
+  "version": 1,
+  "classes": {
+    "mechanical": {
+      "description": "Deterministic transformation with a checkable result: formatting, a rename, a lookup.",
+      "satisfied_by": { "reasoning": "optional" }
+    },
+    "routine": {
+      "description": "Everyday engineering against a known pattern, where a wrong answer is cheap to notice.",
+      "satisfied_by": { "reasoning": "optional", "tool_call": true }
+    },
+    "deep": {
+      "description": "Analysis that must hold several constraints at once and where a plausible wrong answer is expensive.",
+      "satisfied_by": { "reasoning": "required", "tool_call": true }
+    },
+    "frontier": {
+      "description": "Work whose failures are hard to detect by review, such as adversarial analysis or a cross-cutting design decision.",
+      "satisfied_by": { "reasoning": "required", "tool_call": true, "reasoning_effort_tiers": 3 }
+    },
+    "exceptional": {
+      "description": "Work that compounds across delegated turns, where a poor decomposition cascades.",
+      "satisfied_by": { "reasoning": "required", "tool_call": true, "reasoning_effort_tiers": 4 }
+    }
+  },
+  "preferences": {
+    "$comment": "Resolver preferences and invariants. They order candidates that already satisfy the requirement; they never lower a floor.",
+    "representation": "stable-alias",
+    "prefer_locally_verified": true,
+    "prefer_fresher_evidence": true,
+    "allow_stale_evidence": true,
+    "allow_expired_evidence": false
+  }
+}

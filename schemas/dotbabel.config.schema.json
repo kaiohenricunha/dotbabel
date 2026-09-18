@@ -91,6 +91,70 @@
     },
     "criteria": {
       "$ref": "#/$defs/criteria"
+    },
+    "model_intelligence": {
+      "type": "object",
+      "description": "Project-level Model Intelligence policy (spec model-intelligence, §5). Policy and configuration overrides only: never a store for discovered models, resolved recommendations, cache evidence, generated projections, or release snapshot data.",
+      "additionalProperties": false,
+      "properties": {
+        "floor": {
+          "type": "object",
+          "description": "A minimum capability bound for this repository. The strongest applicable floor wins, and no layer may lower a more specific one.",
+          "additionalProperties": false,
+          "required": ["mode", "requirement"],
+          "properties": {
+            "mode": { "const": "floor" },
+            "requirement": {
+              "type": "string",
+              "enum": ["mechanical", "routine", "deep", "frontier", "exceptional"]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why this floor exists. Carried into the explanation so a later maintainer can tell a deliberate safety fence from an experiment."
+            }
+          }
+        },
+        "pin": {
+          "type": "object",
+          "description": "One exact runtime-native configuration for this repository. It is honoured only when it satisfies every effective floor.",
+          "additionalProperties": false,
+          "required": ["mode", "runtime", "config"],
+          "properties": {
+            "mode": { "const": "pin" },
+            "runtime": {
+              "type": "string",
+              "enum": ["claude", "codex", "gemini", "antigravity", "opencode", "copilot"]
+            },
+            "config": {
+              "type": "object",
+              "minProperties": 1,
+              "description": "Opaque runtime-native values; Dotbabel does not parse their spelling."
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why this pin exists, carried into the explanation."
+            }
+          }
+        },
+        "preferences": {
+          "type": "object",
+          "description": "Resolver preferences. They order candidates that already satisfy the requirement; they never lower a floor. Closed to unknown keys, so a misspelled preference fails here instead of becoming inert policy.",
+          "additionalProperties": false,
+          "properties": {
+            "$comment": { "type": "string" },
+            "representation": {
+              "type": "string",
+              "enum": ["stable-alias", "native-id", "opaque-selector"]
+            },
+            "prefer_locally_verified": { "type": "boolean" },
+            "prefer_fresher_evidence": { "type": "boolean" },
+            "allow_stale_evidence": { "type": "boolean" },
+            "allow_expired_evidence": { "type": "boolean" }
+          }
+        }
+      }
     }
   },
   "$defs": {
