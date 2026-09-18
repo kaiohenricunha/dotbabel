@@ -43,8 +43,16 @@ SMOKE="$REPO_ROOT/skills/smoke-test/SKILL.md"
 DEPLOY="$REPO_ROOT/skills/deploy-status/SKILL.md"
 RELEASE="$REPO_ROOT/skills/release-conductor/SKILL.md"
 
-@test "smoke-test: SKILL.md exists with matching id and name" {
+# A setup() failure fails the test the same way an in-body `[ -f ... ]` does —
+# still NOT `skip`, which would report `ok` for a missing artifact. This just
+# removes the same three existence checks repeated at the top of every test.
+setup() {
   [ -f "$SMOKE" ]
+  [ -f "$DEPLOY" ]
+  [ -f "$RELEASE" ]
+}
+
+@test "smoke-test: SKILL.md exists with matching id and name" {
   # id and name must agree: the manifest keys on one and the slash command
   # resolves the other, so a mismatch produces a skill that validates but
   # cannot be invoked by the name it advertises.
@@ -61,8 +69,6 @@ RELEASE="$REPO_ROOT/skills/release-conductor/SKILL.md"
 }
 
 @test "smoke-test: resolves the deploy-ops helper the same way deploy-status does" {
-  [ -f "$SMOKE" ]
-  [ -f "$DEPLOY" ]
   # Both must check the bootstrapped $HOME copy first, then the in-repo path,
   # then fail with exit 2. A skill that resolved only one of the two would
   # work for exactly one install shape and silently fail for the other.
@@ -79,7 +85,6 @@ RELEASE="$REPO_ROOT/skills/release-conductor/SKILL.md"
 }
 
 @test "smoke-test: recommends /rollback-prod on failure and never invokes it" {
-  [ -f "$SMOKE" ]
   # The recommendation must be present...
   run grep -q '/rollback-prod' "$SMOKE"
   [ "$status" -eq 0 ]
@@ -94,7 +99,6 @@ RELEASE="$REPO_ROOT/skills/release-conductor/SKILL.md"
 }
 
 @test "release-conductor: verify reports deploy status and smoke results when a deploy target exists" {
-  [ -f "$RELEASE" ]
   # Flow 5 step 2: both commands run, and they run inside the verify
   # subcommand rather than somewhere earlier in the gating flow.
   verify_line=$(grep -n '^## `verify <tag>` subcommand' "$RELEASE" | head -1 | cut -d: -f1)
@@ -111,7 +115,6 @@ RELEASE="$REPO_ROOT/skills/release-conductor/SKILL.md"
 }
 
 @test "release-conductor: verify reports SKIPPED for smoke when no deploy target exists" {
-  [ -f "$RELEASE" ]
   # Absent configuration must read as SKIPPED, not as a pass. A verify that
   # printed PASS for checks it never ran is the failure this whole unit exists
   # to prevent, and it is invisible in the output.
