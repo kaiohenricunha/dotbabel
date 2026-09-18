@@ -310,6 +310,14 @@ runs repository code:
 git config core.hooksPath githooks
 ```
 
+This repository adopts its own copy at `githooks/pre-push`. It differs from the
+template in one line: it runs `plugins/dotbabel/bin/dotbabel-quality.mjs`
+instead of a bare `dotbabel`. A bare command resolves to whatever is on `PATH`,
+which for a dotbabel developer is a globally installed published release — so
+the template's form would check this working tree with a different version of
+the checker. A consumer has no in-tree bin, which is why the template stays
+generic.
+
 `core.hooksPath` is repository configuration, not per-worktree: it lives in the
 common `.git` directory that every worktree shares, so activating it in one
 worktree activates it in all of them. Keep the value relative. An absolute path

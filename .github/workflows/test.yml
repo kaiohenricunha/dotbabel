@@ -87,3 +87,48 @@ jobs:
           name: coverage
           path: coverage/
           if-no-files-found: warn
+
+  # P-D1 dogfood: this repository runs the criteria gate it ships to consumers.
+  #
+  # Deliberately independent of `classify`. That gate skips the `test` job when
+  # a trusted local-attest marker matches the head SHA, but `.local-attest.config.mjs`
+  # has no criteria leg — so borrowing the gate would mean the criteria are
+  # never verified on any pull request that attests, which is every pull request
+  # here. The job is cheap and it is the one check local-attest does not cover.
+  #
+  # It verifies and never posts (KD-10). The evidence comment the merge gate
+  # reads is produced by a maintainer running `criteria verify --pr N --post`
+  # locally, which `guard-criteria-evidence.sh` is what protects from forgery.
+  dotbabel-criteria:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The PR HEAD, not the default merge commit: `criteria verify` fails
+          # closed unless local HEAD equals the pull request head.
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The in-tree bin, not `npx dotbabel`: this repository must verify itself
+      # with its own working tree rather than the last published release.
+      - name: Verify the acceptance criteria
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          node plugins/dotbabel/bin/dotbabel-criteria.mjs verify \
+            --pr "$PR_NUMBER" \
+            --json > criteria-report.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: criteria-report
+          path: criteria-report.json

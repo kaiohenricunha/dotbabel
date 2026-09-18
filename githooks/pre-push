@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# dotbabel pre-push hook — runs the fast quality profile before a push (KD-11).
+#
+# ADOPTED COPY. This is plugins/dotbabel/templates/githooks/pre-push with one
+# change: it runs the in-tree bin instead of a bare `dotbabel`. A bare command
+# resolves to whatever is on PATH, which for a dotbabel developer is a globally
+# installed published release — so the template's form would check this working
+# tree with a different version of the checker. The template stays generic,
+# because a consumer has no in-tree bin to call.
+#
+# THE HOOK NEVER TRAPS A PUSH. Exactly one condition blocks: the quality check
+# ran to completion and reported a policy failure (exit 1). Every other outcome
+# — dotbabel missing, evidence or tooling unavailable (exit 2), a usage error,
+# or a check that outruns its timeout — prints a notice and allows the push.
+# That asymmetry is the whole design: a hook that can wedge someone's push at a
+# deadline gets deleted, and a deleted hook protects nothing.
+#
+# Activation is manual and stays that way, because this runs repository code:
+#
+#   git config core.hooksPath githooks
+#
+# Bypass:  BYPASS_PRE_PUSH=1 git push     (or git push --no-verify)
+# Tuning:  DOTBABEL_PRE_PUSH_TIMEOUT      (seconds, default 120)
+
+set -uo pipefail
+
+[ "${BYPASS_PRE_PUSH:-0}" = "1" ] && exit 0
+
+readonly TIMEOUT="${DOTBABEL_PRE_PUSH_TIMEOUT:-120}"
+readonly REMOTE="${1:-origin}"
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || repo_root=""
+readonly repo_root
+readonly QUALITY_BIN="$repo_root/plugins/dotbabel/bin/dotbabel-quality.mjs"
+
+notice() { echo "dotbabel pre-push: notice — $* (push allowed)" >&2; }
+
+[ -n "$repo_root" ] && [ -f "$QUALITY_BIN" ] || {
+  notice "in-tree dotbabel quality bin not found"
+  exit 0
+}
+
+# Compare against the merge base with the upstream branch, so the check sees
+# the commits this push actually contributes rather than the whole branch.
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "HEAD")
+base=$(git merge-base "refs/remotes/${REMOTE}/${branch}" HEAD 2>/dev/null \
+    || git merge-base "refs/remotes/${REMOTE}/HEAD" HEAD 2>/dev/null \
+    || echo "")
+
+if [ -z "$base" ]; then
+  notice "no upstream merge base for ${branch} on ${REMOTE}"
+  exit 0
+fi
+
+# `timeout` is not present everywhere (notably a bare macOS without coreutils).
+# Without it the check still runs; it simply is not bounded, which is better
+# than refusing to check at all.
+# `--head HEAD` matters: without it the quality scope is the merge base against
+# the WORKING TREE, with untracked files folded in. Unrelated work in progress,
+# or a stray scratch file, would then block a push over code that is not part
+# of it — the fastest way to get a hook deleted. The working tree is
+# check-on-stop's job; this hook judges the commits being pushed.
+if command -v timeout >/dev/null 2>&1; then
+  timeout "$TIMEOUT" node "$QUALITY_BIN" check --profile fast --base "$base" --head HEAD
+  code=$?
+else
+  node "$QUALITY_BIN" check --profile fast --base "$base" --head HEAD
+  code=$?
+fi
+
+case "$code" in
+  0)
+    exit 0
+    ;;
+  1)
+    echo "dotbabel pre-push: the fast quality profile failed — push blocked." >&2
+    echo "  Re-run locally:  node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile fast --base ${base}" >&2
+    echo "  Override:        BYPASS_PRE_PUSH=1 git push" >&2
+    exit 1
+    ;;
+  124)
+    # `timeout` reports 124 when it fires.
+    notice "the quality check exceeded the ${TIMEOUT}s timeout"
+    exit 0
+    ;;
+  2)
+    notice "required evidence, trust, or tooling is unavailable (exit 2)"
+    exit 0
+    ;;
+  *)
+    notice "the quality check exited ${code}"
+    exit 0
+    ;;
+esac
