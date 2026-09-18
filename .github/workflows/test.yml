@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      pr:
+        description: "Pull request number to verify acceptance criteria for"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -93,15 +98,19 @@ jobs:
   # Deliberately independent of `classify`. That gate skips the `test` job when
   # a trusted local-attest marker matches the head SHA, but `.local-attest.config.mjs`
   # has no criteria leg — so borrowing the gate would mean the criteria are
-  # never verified on any pull request that attests, which is every pull request
-  # here. The job is cheap and it is the one check local-attest does not cover.
+  # never verified on any pull request that attests.
   #
-  # It verifies and never posts (KD-10). The evidence comment the merge gate
-  # reads is produced by a maintainer running `criteria verify --pr N --post`
-  # locally, which `guard-criteria-evidence.sh` is what protects from forgery.
+  # Warning: every commit here carries `[skip ci]`, and GitHub suppresses the
+  # WHOLE workflow run, not one job. So on a maintainer pull request this job
+  # does not fire at all. It gates contributor pull requests that do not use the
+  # convention, and `workflow_dispatch` with a `pr` input exists so a maintainer
+  # can produce a real criteria verdict on demand.
   dotbabel-criteria:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || inputs.pr != ''
     runs-on: ubuntu-latest
+    # KD-10: verify, never post. Read-only is the invariant, not the absence of
+    # a `--post` flag — no write permission means no step in this job can
+    # comment, whatever it is renamed to.
     permissions:
       contents: read
       pull-requests: read
@@ -110,8 +119,11 @@ jobs:
         with:
           # The PR HEAD, not the default merge commit: `criteria verify` fails
           # closed unless local HEAD equals the pull request head.
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || format('refs/pull/{0}/head', inputs.pr) }}
           fetch-depth: 0
+          # The job then runs Node from that same PR-authored tree, so the token
+          # must not be left behind in .git/config for it to read.
+          persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
@@ -119,16 +131,30 @@ jobs:
       - run: npm ci
       # The in-tree bin, not `npx dotbabel`: this repository must verify itself
       # with its own working tree rather than the last published release.
+      #
+      # CHECK_ON_STOP_TRUST_ALL grants project-command trust for this step only.
+      # `--allow-project-commands` would do that too, but it is overloaded: the
+      # same flag disables the fork-PR refusal (criteria/preconditions.mjs) and
+      # the SEC-1 untrusted-argv check, which would let a fork author edit a
+      # criterion's `argv` in spec.json and have it executed here. The env var
+      # relaxes only trust and leaves both guards armed.
+      #
+      # The report is written under `.dotbabel/` because the preconditions
+      # reject a worktree dirty anywhere else — a bare `> criteria-report.json`
+      # creates the file before node starts and fails its own run.
       - name: Verify the acceptance criteria
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
+          CHECK_ON_STOP_TRUST_ALL: "1"
         run: |
+          mkdir -p .dotbabel
           node plugins/dotbabel/bin/dotbabel-criteria.mjs verify \
             --pr "$PR_NUMBER" \
-            --json > criteria-report.json
+            --json > .dotbabel/criteria-report.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: criteria-report
-          path: criteria-report.json
+          path: .dotbabel/criteria-report.json
+          if-no-files-found: warn
