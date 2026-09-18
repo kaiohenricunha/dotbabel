@@ -413,9 +413,8 @@ machine-checkable rather than prose.
         }
       ],
       "argv": [
-        "npx",
-        "vitest",
-        "run",
+        "<the command that runs this test>",
+        "<its arguments>",
         "<path/to/the.test.file>",
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
@@ -443,6 +442,13 @@ change there genuinely needs this spec's criteria to pass.
 Leave `tests[].name` and `argv` as placeholders until the tests exist. The name
 must later match the test **verbatim** — verification looks it up by exact
 string in the JUnit report, so a paraphrase silently never matches.
+
+`argv` is runner-agnostic: the only fixed requirement is that the command emits
+JUnit XML at `report.path`, which every major runner can do. For a Node project
+that is `["npx", "vitest", "run", "<file>", "--reporter=junit",
+"--outputFile=…"]`; Go uses `gotestsum --junitfile`, Python `pytest
+--junitxml`. Write the one your project actually runs rather than copying the
+Node form.
 
 ### README.md
 

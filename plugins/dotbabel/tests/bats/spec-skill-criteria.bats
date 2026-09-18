@@ -50,6 +50,17 @@ setup() {
   [ -f "$VALIDATE" ]
 }
 
+# The fixture directory is removed here, not inline. bats aborts a test body on
+# the first non-zero command, so an inline `rm -rf` after the assertions is
+# skipped in exactly the failure modes this suite exists to hit — verified: one
+# leaked /tmp directory per failing run. Cleaning up in teardown also lets the
+# fixture survive to the assertion, so a maintainer can re-run the validator
+# against it.
+teardown() {
+  [ -n "${probe:-}" ] && [ -d "${probe:-}" ] && rm -rf "$probe"
+  return 0
+}
+
 @test "spec skill: the scaffold creates spec.json with an acceptance_criteria example" {
   # The scaffold tree must list spec.json. Without it the skill produces a
   # spec that dotbabel-validate-specs rejects on the first run — verified:
@@ -87,22 +98,44 @@ setup() {
 
   python3 - "$SPEC" "$probe" <<'EOS'
 import json, re, sys, pathlib
-block = re.search(r'### spec\.json.*?```json\n(.*?)\n```', open(sys.argv[1]).read(), re.S).group(1)
+
+# Anchored to the heading at line start and stopped at the next heading, so a
+# json fence added between the two cannot be silently preferred over the
+# scaffold. A missing block exits with a sentence rather than an AttributeError
+# traceback — this file's whole job is to say WHICH instruction was dropped.
+pattern = re.compile(r'^### spec\.json\s*\n(?:(?!^#{1,3} ).)*?^```json\n(.*?)\n^```', re.S | re.M)
+match = pattern.search(open(sys.argv[1]).read())
+if not match:
+    sys.exit("no '### spec.json' json block found in " + sys.argv[1]
+             + " — the skill no longer documents the spec.json scaffold")
+block = match.group(1)
+
 for a, b in [("<spec-name>", "probe"), ("<Spec Title>", "Probe"), ("<owner>", "someone"),
              ("<path/this/spec/governs>", "src/"),
              ("<the command that proves this spec works>", "npm test"),
+             ("<the command that runs this test>", "npx"),
+             ("<its arguments>", "vitest"),
              ("<path/to/the.test.file>", "tests/probe.test.mjs"),
              ("<the precondition, in the system's own terms>", "a probe"),
              ("<the action taken>", "it runs"),
              ("<the observable outcome — one claim, not a list>", "it passes"),
              ("<the exact test name, copied verbatim from the test>", "probe passes")]:
     block = block.replace(a, b)
+
+# str.replace is a no-op on a missing needle, so a reworded placeholder would
+# leave raw text that still validates (a non-empty string satisfies most
+# fields). That silently downgrades the claim from "the scaffold, filled in,
+# validates" to "the scaffold's raw placeholder text validates". Fail loudly
+# instead — verified: rewording one placeholder used to pass unnoticed.
+leftover = re.findall(r'<[^>"]+>', block)
+if leftover:
+    sys.exit("substitution table is stale — unsubstituted placeholder(s): " + ", ".join(leftover))
+
 pathlib.Path(sys.argv[2], "docs/specs/probe/spec.json").write_text(json.dumps(json.loads(block), indent=2) + "\n")
 EOS
   [ -f "$probe/docs/specs/probe/spec.json" ]
   git -C "$probe" init -q
   run node "$REPO_ROOT/plugins/dotbabel/bin/dotbabel-validate-specs.mjs" --repo-root "$probe"
-  rm -rf "$probe"
   [ "$status" -eq 0 ]
 }
 
@@ -114,8 +147,12 @@ EOS
   [ "$status" -eq 0 ]
   run near "$SPEC" "planned" "active"
   [ "$status" -eq 0 ]
-  # The scaffolded example must not seed a criterion as already active.
-  run grep -qE '"id"\s*:\s*"AC-1".*"status"\s*:\s*"active"' "$SPEC"
+  # No criterion in the scaffold may be seeded `active`. The previous form of
+  # this assertion greped for id and status on ONE line, but the scaffold is
+  # pretty-printed with them on separate lines, so it could never match and
+  # always "passed" — verified by setting the scaffold to active and testing
+  # line by line. `near` exists precisely because a claim spans lines.
+  run near "$SPEC" '"id": "AC-' '"status": "active"' 80
   [ "$status" -ne 0 ]
 }
 
@@ -138,6 +175,53 @@ EOS
   # It must not be escalated to a failure.
   run grep -qiE 'acceptance_criteria[^.]*(CRITICAL|must fail|is an error)' "$VALIDATE"
   [ "$status" -ne 0 ]
+}
+
+@test "validate-spec skill: documents the verdicts the tool actually emits" {
+  # The vocabulary is read from the SCHEMA, not hardcoded here, so this cannot
+  # drift from the tool the way the prose did: the skill originally told the
+  # auditor to look for a `planned` verdict, which `criteria verify` never
+  # emits — it maps a spec.json `status: "planned"` to `pending`
+  # (src/criteria/load.mjs) and the evidence schema's closed set has no
+  # `planned` at all.
+  schema="$REPO_ROOT/schemas/dotbabel.criteria-evidence.schema.json"
+  [ -f "$schema" ]
+  verdicts="$(python3 -c "
+import json, sys
+s = json.load(open(sys.argv[1]))
+found = set()
+def walk(n):
+    if isinstance(n, dict):
+        if isinstance(n.get('enum'), list) and 'pass' in n['enum'] and 'fail' in n['enum']:
+            found.update(n['enum'])
+        for v in n.values(): walk(v)
+    elif isinstance(n, list):
+        for v in n: walk(v)
+walk(s)
+print(' '.join(sorted(found)))
+" "$schema")"
+  [ -n "$verdicts" ]
+
+  # Every verdict the tool can emit must be classified in the skill.
+  for verdict in $verdicts; do
+    run grep -qF "\`$verdict\`" "$VALIDATE"
+    [ "$status" -eq 0 ]
+  done
+
+  # And `planned` must not appear AS a verdict row. Deliberately not "planned
+  # is never mentioned near the word verdict" — the correct prose has to say
+  # that a criterion declared `planned` is reported as `pending`, and an
+  # assertion forbidding that would force the explanation out. What must not
+  # exist is a table row claiming `planned` is something the tool emits.
+  # Leading whitespace is required in the pattern: the table sits inside a
+  # numbered list, so every row is indented three spaces. A `^\|` anchor could
+  # never match and the guard was inert — found by neutering it, which is the
+  # only way an always-passing assertion ever announces itself.
+  run grep -qE '^[[:space:]]*\|[[:space:]]*`planned`' "$VALIDATE"
+  [ "$status" -ne 0 ]
+  # The mapping itself must be stated, so an auditor knows what to expect.
+  run near "$VALIDATE" "planned" "pending" 200
+  [ "$status" -eq 0 ]
 }
 
 @test "validate-spec skill: Phase 4 runs dotbabel criteria verify for a spec with criteria" {

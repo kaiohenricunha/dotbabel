@@ -158,17 +158,38 @@ ground truth. Run them.
 2. **Verify the acceptance criteria**, when the spec declares any:
 
    ```bash
-   dotbabel criteria verify --spec <spec-id>
+   dotbabel criteria verify --spec <spec-id> --json
    ```
+
+   `<spec-id>` is the directory name resolved in Phase 1 — it must match an
+   existing entry under `docs/specs/`. If it does not, stop rather than pass an
+   unverified string to a command line.
+
+   `--json` is not optional here. When every criterion is still `planned` the
+   command short-circuits, prints no per-criterion lines on stdout, and exits
+   0 — which is exactly the shape of a freshly scaffolded spec, so without
+   `--json` there is nothing to record.
 
    This belongs here, beside the acceptance commands, because both are the
    spec's executable ground truth. An audit that ran only the commands could
    report a spec as implemented while the criteria naming its tests fail.
 
-   Record each criterion's verdict in the audit by id. A criterion still
-   `planned` is reported as such and is not a failure — it is a claim whose
-   tests have not landed yet. A criterion that is `active` and fails **is** a
-   CRITICAL finding: the spec asserts something its own tests contradict.
+   Record each criterion's verdict in the audit by id. The tool emits one of
+   five, and **`planned` is not among them** — a criterion declared `planned`
+   in `spec.json` is reported as **`pending`**:
+
+   | Verdict       | Meaning                                                   | Audit                                                          |
+   | ------------- | --------------------------------------------------------- | -------------------------------------------------------------- |
+   | `pass`        | ran, and every named test was confirmed                   | OK                                                             |
+   | `pending`     | declared `planned`; its tests have not landed yet         | INFO, not a failure                                            |
+   | `fail`        | ran and a named test failed                               | **CRITICAL** — the spec asserts what its own tests contradict  |
+   | `unconfirmed` | ran, but a declared test name was not found in the report | **CRITICAL** — usually a paraphrased name; the lookup is exact |
+   | `error`       | could not run: spawn failure, timeout, unreadable report  | INFO, blocked — an environment problem, not a spec problem     |
+
+   **Exit 2 is the environment, not the spec.** Criteria plans require trust,
+   and trust is granted per realpath, so a spec audited from a fresh worktree
+   exits 2 with no verdicts at all. Record that as blocked, label no criterion
+   failed, and re-run after trusting the path.
 
    **Never resolve a failing criterion by editing the criterion.** This skill
    audits a spec against the code; rewriting the claim to match broken code
