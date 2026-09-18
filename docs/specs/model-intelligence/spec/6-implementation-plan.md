@@ -6,7 +6,7 @@
 
 ## 6.1 Phased Rollout
 
-Decided by the owner on 2026-09-18. Model Intelligence implementation begins after the active `feat/qa-harness-p-c4-mutation` workstream lands (§2, `Urgency`). Research that changes adapter contracts may proceed before then because it does not modify the implementation.
+Decided by the owner on 2026-09-18. Model Intelligence implementation begins after the active `feat/qa-harness-p-c4-mutation` workstream lands (§2, `Urgency`). Each unit reaches `main` through the landing pipeline of IMPL-12, grouped into the pull-request sequence that §6.7 plans. Research that changes adapter contracts may proceed before then because it does not modify the implementation.
 
 - **IMPL-1**: Phase 0 produces evidence and adapter-contract updates only. It does not begin the Model Intelligence implementation before the §2 priority gate is satisfied.
 
@@ -213,6 +213,7 @@ Conventions used by every prompt:
 - **Tier 2 and Tier 3 gates.** `vitest.config.mjs` includes every `plugins/dotbabel/tests/**/*.test.mjs`, so a real-runtime test lives at `plugins/dotbabel/tests/integration/model-intelligence-<name>.integration.test.mjs` and reports itself as `skipped` without the relevant variable (TEST-4, TEST-5). `DOTBABEL_MODELS_INTEGRATION=1` enables Tier 2 installed-runtime integration tests. `DOTBABEL_MODELS_TIER3=1` enables Tier 3 network/authenticated/model-executing tests and means that the caller has intentionally opted into the external side effects that TEST-5 describes. The prefix is `MODELS` because `models` is the stable public CLI namespace of §5, while `MI` is an implementation abbreviation. A Tier 3 test may additionally require source/runtime-specific credentials or prerequisites; the switch grants permission to attempt the tier, not proof that those prerequisites exist.
 - **Temp directories.** Every test that writes files takes its directory from `plugins/dotbabel/tests/fixtures/temp-dir.mjs`, as the suite's tempdir hygiene requires.
 - **§7 ownership.** PERF-1 → P-11; PERF-2 → P-13; PERF-3 → P-16; REL-1 → P-5; REL-2, REL-3, REL-4, OPS-2 → P-9; REL-5 → P-9 and P-23; REL-6, REL-7 → P-11; OPS-1, SEC-5 → P-15; OPS-3, SEC-6 → P-23; OPS-4 → P-5 and P-23; SEC-1 → P-6, P-7, P-22; SEC-2, SEC-4 → P-13; SEC-3 → P-8.
+- **Landing.** A unit reaches `main` only through `/pr-conductor` (IMPL-12). IMPL-15 states when two units may share one pull request, and IMPL-13 fixes how the review fleet is chosen, so neither is an implementer's judgement call.
 - **Rules.** TEST-6: each behavior is tested at the lowest deterministic layer that can prove it. IMPL-4: a CLI slice ships in the prompt that makes its verb usable, and the final CLI prompt only consolidates. IMPL-5: a unit may consume a neighbor's contract through fixtures before the neighbor is complete. TEST-1 and TEST-2: no prompt depends on a live provider API or a mutable catalog; live discovery is an integration test only.
 
 ### P-1 — Domain vocabulary (`domain/`) — `/plan`
@@ -592,6 +593,8 @@ Each batch prompt has the same structure and differs in the artifact list. Batch
 4. **Commands** — narrow test; bats file; `npm run lint`; `npm test`; `npx vitest run plugins/dotbabel/tests/bin-symlink.test.mjs`.
 5. **Acceptance evidence** — the five named tests pass; the bin-symlink test still passes; Bats required.
 
+§6.7 groups these units into the planned pull-request sequence and makes `/pr-conductor` the landing pipeline for each one. A prompt stays the unit of TDD and acceptance evidence even when two prompts ship together (IMPL-16).
+
 ## 6.4 Testing Strategy
 
 Constraints set by the owner on 2026-09-17 (§3, `Deployment`, CI):
@@ -730,7 +733,7 @@ Decided by the owner on 2026-09-18. The migration is additive and keeps every in
 5. **Replace shared skill/command symlinks only when projection requires it.** KD-5 changes the edit loop, so the symlink-to-copy transition happens only after projection and drift tooling exists. For migrated artifacts: canonical source remains the editing surface; the generated runtime copy becomes the consumption surface; `project-sync` / bootstrap regenerates it; status/check reports stale copies after canonical edits. Because edits are no longer immediately visible through a symlink, migration documentation and diagnostics explicitly tell the user when synchronization is required. Protected `.claude/**` paths and trust rules remain enforced during this transition.
 6. **Establish release-time baseline generation.** Add the committed release capability snapshot and deterministic generation of the Claude plugin template agents, other plugin runtime projections required by KD-3, and the canonical/generated `ai-review.yml` from KD-6. This happens before removing legacy safety metadata from canonical sources. The build demonstrates that required floors remain satisfiable from the committed release snapshot (ARCH-41, ARCH-55).
 7. **Preserve initialized consumer copies as independent installed state.** Existing consumer repositories may already contain copied workflows such as `.github/workflows/ai-review.yml` (`plugins/dotbabel/src/init-harness-scaffold.mjs:10`). A new Dotbabel release does not claim that those copies changed automatically. Status/drift reporting distinguishes the current shipped baseline from the consumer-installed copy and reports staleness where applicable. Updating an initialized consumer remains an explicit sync/force/migration operation according to the owning scaffold contract. The same rule applies to the example consumer fixture (`examples/minimal-consumer/`): generated examples are refreshed deliberately and checked in CI.
-8. **Migrate canonical artifacts in low-risk batches**, in the Phase 5 order: explicit inherit / neutral cases; unambiguous semantic requirements; dynamic requirements; known floors and intentional pins; coordinator/worker cases; unresolved owner-decision cases. Each batch satisfies IMPL-2 before merge. No batch removes a working native declaration until the replacement runtime projection that preserves its behavior is proven.
+8. **Migrate canonical artifacts in low-risk batches**, in the Phase 5 order: explicit inherit / neutral cases; unambiguous semantic requirements; dynamic requirements; known floors and intentional pins; coordinator/worker cases; unresolved owner-decision cases. Each batch satisfies IMPL-2 before merge, and the three safety-sensitive batches P-19d, P-19e, and P-19f ship one per pull request (IMPL-14). No batch removes a working native declaration until the replacement runtime projection that preserves its behavior is proven.
 9. **Class-F owner-decision gate.**
    - **IMPL-7**: Unresolved DOC-1 class-F entries are never guessed. Immediately before P-19f: (1) enumerate the remaining class-F artifacts; (2) remove entries whose disposition KD-1 through KD-6 or earlier migration work already decided; (3) present each remaining item with its current declaration, observed binding behavior, migration alternatives, preserved behavior affected, and the recommended semantic representation where evidence supports one; (4) require an explicit owner decision; (5) record the decision in the spec/migration mapping before changing the artifact. P-19f is blocked until this list reaches zero unresolved entries. This is an owner-decision gate, not a reason to block Phases 1–4 or the unambiguous Phase 5 migration batches. DOC-1 lists 13 class-F entries today (DOC-1, "Migration Classification").
 10. **Remove legacy declarations only after projection parity.**
@@ -794,3 +797,48 @@ This creates a rollback window in which a failing new semantic path is handled b
 ### Rollback boundary after `compat/` retirement
 
 After IMPL-9 eventually removes legacy compatibility, rollback changes character: old legacy declarations are no longer a guaranteed recovery mechanism; rollback relies on Git/package version rollback plus deterministic regeneration; and the compatibility-removal release must itself define its support/version boundary and recovery procedure. `compat/` retirement is therefore a deliberate compatibility milestone, not ordinary cleanup.
+
+## 6.7 PR Sequence and Landing Pipeline
+
+Decided by the owner on 2026-09-18, after P-1 and P-2 landed. §6.3 defines the implementation units; this subsection defines how they reach `main`. It is an execution layer above the unit contracts and changes none of them.
+
+- **IMPL-12**: Every Model Intelligence pull request intended to land goes through `/pr-conductor` (`skills/pr-conductor/SKILL.md`): `pre-pr → open-pr → post-pr-review → review-pr → local-attest → STOP`. The pipeline is the standard one-PR landing path, not a treatment reserved for high-risk changes. It handles one pull request at a time, and it never merges: merging stays a separate, explicit human action.
+- **IMPL-13**: `post-pr-review` selects its own review fleet from the diff profile. An implementer does not pass `--agents` unless the profile is clearly wrong for the diff. The profiles are: a protected-path change gets the full fleet; a docs-only change gets `documentation-writer` plus `security-auditor`; a small non-protected code diff gets `security-auditor` plus `architect-reviewer`; a larger code diff gets the full fleet. Because `plugins/dotbabel/src/**`, `plugins/dotbabel/bin/**`, and `plugins/dotbabel/templates/**` are protected paths (`docs/repo-facts.json`), most implementation PRs receive the full fleet by rule rather than by choice.
+
+### Planned PR sequence
+
+An implementation unit is not mechanically one pull request. The planning target is ~25 PRs rather than the 32 that one-PR-per-sub-prompt would imply. Ship the §6.3 units in this order:
+
+| PR    | Units       | PR    | Units         |
+| ----- | ----------- | ----- | ------------- |
+| PR-01 | P-1 + P-2   | PR-14 | P-17          |
+| PR-02 | P-3         | PR-15 | P-18          |
+| PR-03 | P-4         | PR-16 | P-19a + P-19b |
+| PR-04 | P-5         | PR-17 | P-19c         |
+| PR-05 | P-6 + P-7   | PR-18 | P-19d         |
+| PR-06 | P-8a + P-8b | PR-19 | P-19e         |
+| PR-07 | P-9         | PR-20 | P-19f         |
+| PR-08 | P-10 + P-11 | PR-21 | P-20          |
+| PR-09 | P-12        | PR-22 | P-21          |
+| PR-10 | P-13        | PR-23 | P-22a + P-22b |
+| PR-11 | P-14        | PR-24 | P-22c + P-22d |
+| PR-12 | P-15        | PR-25 | P-23          |
+| PR-13 | P-16        |       |               |
+
+Why each group exists:
+
+- **P-1 + P-2** — the domain vocabulary and the canonical requirement/schema are one foundation. Landed as PR #387 and PR #389; the split was incidental, not a precedent.
+- **P-6 + P-7** — the Claude and Codex adapters implement the same stabilised adapter contract and keep separate tests.
+- **P-8a + P-8b** — the knowledge-source implementations share one boundary. Split this PR if the official-provider adapter proves materially larger than expected.
+- **P-10 + P-11** — P-10 deliberately leaves enforcement and explanation stubbed, and P-11 completes the resolver. Grouping avoids merging that artificial intermediate state.
+- **P-19a + P-19b** — both are low-risk, unambiguous migration batches.
+- **P-22a + P-22b** and **P-22c + P-22d** — adapter-only runtime coverage under the current scope. These PRs do not introduce cross-runtime agent fan-out, which §2 puts out of scope.
+
+### Deliberately isolated units
+
+- **IMPL-14**: These units ship one per pull request: P-9, P-13, P-14, P-15, P-16, P-17, P-18, P-19d, P-19e, P-19f, P-21, and P-23. Each contains concurrency or state transitions, shell and bootstrap behavior, deterministic release artifacts, a safety-sensitive migration, or a compatibility boundary, and focused review is worth more there than a shorter queue. P-19f may split into several pull requests when the remaining class-F owner decisions (IMPL-7) produce a large or heterogeneous diff.
+
+### Grouping rule
+
+- **IMPL-15**: Two units may share a pull request only while all five of these hold: they share the same dependency boundary; each unit keeps its named TDD tests and acceptance evidence from §6.3; the combined pull request remains one coherent review topic; failure and revert semantics stay understandable; and the grouping does not hide a safety-sensitive migration inside unrelated work. When one stops holding during implementation, split the pull request rather than forcing this table. The number of pull requests is never reduced merely to lower review cost.
+- **IMPL-16**: The §6.3 implementation prompt stays the unit of TDD and acceptance evidence even when two prompts ship in one pull request. A grouped pull request runs both prompts' named tests and reports both sets of evidence; the prompts' contents are not rewritten to merge their tests.
