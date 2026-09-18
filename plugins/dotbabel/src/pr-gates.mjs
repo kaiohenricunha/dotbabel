@@ -103,6 +103,46 @@ export const CONDUCTOR_PHASES = Object.freeze([
   }),
 ]);
 
+/**
+ * Where `/pr-conductor` should start, derived from what the pull request
+ * already is rather than from a flag the operator has to remember.
+ *
+ * Two outcomes, and deliberately only two.
+ *
+ * There is no "already attested, so stop" outcome, and that omission is the
+ * point. An attestation proves a SHA passed the configured matrix. It does not
+ * prove the SHA went through `post-pr-review` and `review-pr` — somebody can
+ * run `dotbabel local-attest` directly and then invoke the conductor. Review
+ * markers are not SHA-pinned, so nothing here can tell a reviewed head from an
+ * unreviewed one, and a READY-and-stop rule would silently skip the entire
+ * review stage on the strength of evidence that says nothing about review.
+ * Until a SHA-pinned review-completion marker exists, the conductor re-enters
+ * the pipeline and lets each phase decide what it can skip.
+ *
+ * `--from` remains an explicit override for resuming a known-good run.
+ *
+ * @param {{prNumber?: number|null}} state
+ * @returns {{phase: string, reason: string, skips: string[]}}
+ */
+export function deriveEntryPhase(state = {}) {
+  const hasPr = state.prNumber !== null && state.prNumber !== undefined;
+  if (!hasPr) {
+    return {
+      phase: "pre-pr",
+      reason: "NO_PR",
+      skips: [],
+    };
+  }
+  return {
+    phase: "pre-pr",
+    reason: "PR_OPEN",
+    // `open-pr` self-skips for an existing pull request, and the preflight is
+    // narrowed rather than dropped: secrets and a fast quality profile are
+    // cheap and catch real problems before the review fleet is dispatched.
+    skips: ["open-pr"],
+  };
+}
+
 const MIN_SHA_PREFIX = 7;
 
 const SKIP_CI_RE = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/i;

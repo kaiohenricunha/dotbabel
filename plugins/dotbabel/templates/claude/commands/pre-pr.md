@@ -8,7 +8,7 @@ platform: [none]
 task: [review, testing]
 maturity: draft
 description: >
-  Pre-PR quality gate: simplify changed code, security-review the diff, run the PR quality
+  Pre-PR quality gate: simplify changed code, security-review the diff, run the quality
   profile, and surface a go/no-go summary before opening a pull request.
 argument-hint: "[base-branch] [--conductor] — default: origin/main"
 model: sonnet
@@ -21,7 +21,18 @@ Trigger: when the user is done with a feature and is about to open a PR, or says
 
 Arguments: `$ARGUMENTS` — optional base branch, defaulting to `origin/main`, plus an optional `--conductor` flag.
 
-`--conductor` is passed only by `/pr-conductor` phase 1. It replaces step 3's full security review with a secrets-only grep, because the conductor runs the authoritative security pass once in phase 3 via the `security-auditor` agent. Everything else is unchanged. Strip `--conductor` out of `$ARGUMENTS` before binding the base branch.
+`--conductor` is passed only by `/pr-conductor` phase 1. It narrows this command to a **pre-review preflight**: cheap checks worth running before the review fleet is dispatched, and nothing the pipeline runs again later. Strip `--conductor` out of `$ARGUMENTS` before binding the base branch.
+
+| Step                | Standalone              | `--conductor`                                                                                                                              |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1 scope             | unchanged               | unchanged                                                                                                                                  |
+| 2 simplify          | unchanged               | unchanged                                                                                                                                  |
+| 3 security          | full `/security-review` | secrets-only grep — the authoritative pass runs once in phase 3 via the `security-auditor` agent                                           |
+| 4 quality           | `--profile pr`          | **`--profile fast`** — the authoritative `pr` profile is a leg of the `local-attest` matrix, pinned to the final head SHA                  |
+| 5 PR body checklist | unchanged               | **skipped** — it is a reminder for authoring a body, and phase 2 verifies the body mechanically with `dotbabel pr-stack gate --gate merge` |
+| 6 go/no-go          | unchanged               | unchanged                                                                                                                                  |
+
+The quality narrowing is what makes the pipeline honest about cost: running tests, coverage and the changed-code rules **before** the review fleet may still mutate the branch grades a tree that is about to change. The profile that decides the merge runs after review fixes land, against the SHA that is attested.
 
 **Lifecycle:**
 
@@ -148,8 +159,14 @@ Classify findings:
 Run the resolved repository commands and normalized policy checks through one entry point:
 
 ```bash
-dotbabel quality check --profile pr --base "$BASE"
+if [ "$CONDUCTOR" = "1" ]; then
+  dotbabel quality check --profile fast --base "$BASE"
+else
+  dotbabel quality check --profile pr --base "$BASE"
+fi
 ```
+
+**Conductor mode runs `--profile fast`.** It is the documented "while you edit" profile and this repository's default, so it still catches a real problem before the review fleet is dispatched — but the authoritative `pr` profile is a leg of the `local-attest` matrix and grades the final head, so running it here would grade a tree the review is about to change.
 
 Do not pass `--allow-project-commands` during a local run. Use the external trust allowlist.
 
@@ -157,6 +174,8 @@ Exit code `1` means a checked rule failed. Exit code `2` means required evidence
 **STOP** for either exit code. Surface each unavailable and not-configured capability in the summary.
 
 ### 5. PR body checklist reminder
+
+**Conductor mode: skip this step.** It is a reminder for a human about to author a body, and the conductor's phase 2 verifies the body mechanically with `dotbabel pr-stack gate --gate merge` instead. Go to step 6.
 
 Do not generate the PR body — that is `/git pr`'s responsibility. Just surface a reminder of required sections so the user can write them before opening:
 
@@ -197,7 +216,7 @@ Status: READY — run `/git pr` to open the pull request.
 - **STOP on CRITICAL security findings.** Do not advance to steps 4–6; surface findings immediately.
 - **STOP if the PR quality profile returns exit code 1 or 2.** Surface the normalized results.
 - **Security-review unavailable is a warning, not a failure.** Warn, skip, continue.
-- **`--conductor` narrows step 3 only.** A secrets hit still stops the run, and every other step behaves exactly as it does standalone.
+- **`--conductor` narrows steps 3, 4 and 5.** A secrets hit still stops the run, step 4 still stops on exit 1 or 2, and steps 1, 2 and 6 behave exactly as they do standalone. A direct `/pre-pr` is unchanged and remains a real pre-PR quality gate on the `pr` profile.
 - **Simplify commits are style commits.** Message: `style: pre-pr simplification pass`. Atomic — do not bundle with feature changes.
 - **Do not modify files outside the changed set.** Simplify is focused on recently modified code; do not widen the scope.
 - **Do not generate or submit the PR body.** Checklist in step 5 is a reminder, not authoring.

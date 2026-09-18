@@ -35,7 +35,7 @@ Arguments: `$ARGUMENTS`
 - (empty) — run the full pipeline for the current branch, opening a PR if none exists.
 - `<PR#>` — run the pipeline for an existing PR.
 - `--stack` — plan the whole stack first, then run the pipeline for the PR that is actionable now.
-- `--from <phase>` — resume at a phase id (see the phase table below).
+- `--from <phase>` — resume at a phase id (see the phase table below). Overrides the derived entry in step 0.
 - `--dry-run` — report what each phase would do; change nothing.
 
 **Lifecycle:**
@@ -50,7 +50,7 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 
 | #   | Phase            | Delegates to                     | Owns                                                              |
 | --- | ---------------- | -------------------------------- | ----------------------------------------------------------------- |
-| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate (full review in phase 3), test suite       |
+| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate, cheap `fast` quality profile              |
 | 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                      |
 | 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                                   |
 | 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads, verifies criteria |
@@ -72,17 +72,34 @@ jq -r '.result.problems[]   | "PROBLEM \(.kind): \(.message)"' /tmp/stack.json
 
 Exit 1 means a structural problem (cycle, orphan base, two open PRs on one head, parent closed unmerged). **Stop and surface it** — these need a human decision, not a retry.
 
+Then derive where to start, rather than asking the operator to remember:
+
+```bash
+dotbabel pr-stack entry --pr <N>    # omit --pr to resolve from the current branch
+```
+
+| Reason    | Entry                                                                 |
+| --------- | --------------------------------------------------------------------- |
+| `NO_PR`   | phase 1 in full, then phase 2 opens the pull request                  |
+| `PR_OPEN` | phase 1 as the narrowed preflight; phase 2 self-skips; then 3 → 4 → 5 |
+
+`--from <phase>` overrides this and stays the way to resume a known-good run.
+
+**There is deliberately no "already attested, so stop" outcome.** An attestation proves a SHA passed the configured matrix; it does not prove the SHA went through `post-pr-review` and `review-pr`. Someone can run `dotbabel local-attest` directly and then invoke this skill, and review markers are not SHA-pinned, so nothing can tell a reviewed head from an unreviewed one. A READY-and-stop rule would skip the entire review stage on evidence that never spoke to it. If you know the conductor already ran, invoke `/merge-pr` directly.
+
 If the target PR appears in `pending`, it is blocked by an unmerged parent. Report which PR must land first and stop; do not start the pipeline on a PR that cannot merge.
 
 ### 1. `pre-pr`
 
-Run `/pre-pr --conductor` (`commands/pre-pr.md`). It already runs `/code-simplifier` and the full test suite.
+Run `/pre-pr --conductor` (`commands/pre-pr.md`). This is a **pre-review preflight**, not the authoritative gate: it simplifies, greps for secrets, and runs the cheap `fast` quality profile.
 
-`--conductor` narrows its security step to a secrets-only grep, because the authoritative security pass runs once in phase 3 via the `security-auditor` agent. Warning: a secrets hit is still a CRITICAL hard stop — phase 3 happens after the push, so secrets must be caught here.
+`--conductor` narrows three steps — the security pass to a secrets-only grep, the quality profile from `pr` to `fast`, and the PR-body checklist away entirely. Each is something the pipeline does properly later: the authoritative security pass runs once in phase 3 via the `security-auditor` agent, the authoritative `pr` quality profile is a leg of the phase 5 matrix pinned to the final head SHA, and phase 2 verifies the body mechanically with the merge gate.
+
+Running the `pr` profile here would grade a tree the review fleet is about to change. Warning: a secrets hit is still a CRITICAL hard stop — phase 3 happens after the push, so secrets must be caught here.
 
 **Do not run `/simplify` or `/code-simplifier` separately** — `commands/pre-pr.md` step 2 already invokes it and commits the result as `style: pre-pr simplification pass`. A second pass produces an empty commit and a confusing diff.
 
-Hard stops from this phase are real stops: a CRITICAL security finding, or a test failure proven branch-introduced by the `git stash` check. Do not advance past them.
+Hard stops from this phase are real stops: a CRITICAL security finding, or a `fast` profile failure proven branch-introduced by the `git stash` check. Do not advance past them.
 
 ### 2. `open-pr`
 
@@ -156,7 +173,7 @@ Print the go/no-go summary and **stop**:
 ```
 PR #<N> — <title>   (base: <base>)
 
-  1 pre-pr          ✓ tests pass · security clean
+  1 pre-pr          ✓ fast profile clean · secrets clean
   2 open-pr         ✓ #<N> · body has Summary + Test plan
   3 post-pr-review  ✓ <k> comments posted (<profile>)
   4 review-pr       ✓ <k> resolved · pushed <sha> [skip ci]

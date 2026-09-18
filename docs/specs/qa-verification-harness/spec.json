@@ -556,7 +556,7 @@
     },
     {
       "id": "AC-19",
-      "status": "planned",
+      "status": "active",
       "given": "conductor-mode and standalone invocations of /pre-pr",
       "when": "the pre-pr scope test runs",
       "then": "conductor mode names --profile fast and standalone still names --profile pr",
@@ -564,6 +564,10 @@
         {
           "file": "plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats",
           "name": "pre-pr: conductor mode runs the fast quality profile"
+        },
+        {
+          "file": "plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats",
+          "name": "pre-pr: standalone still runs the PR quality profile"
         }
       ],
       "argv": [

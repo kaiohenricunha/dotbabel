@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   CONDUCTOR_PHASES,
+  deriveEntryPhase,
   checkLocalAttestGate,
   checkMergeGate,
   hasSkipCi,
@@ -1041,5 +1042,55 @@ describe("checkMergeGate — attestation evidence", () => {
     expect(codes(checkMergeGate(attestInput({ attestationComments: [newer, older] })))).toEqual([
       "ATTESTATION_FAILED",
     ]);
+  });
+});
+
+
+// --- P-G2: the conductor derives its entry phase from PR state --------------
+
+describe("deriveEntryPhase", () => {
+  it("starts a branch with no pull request at the full pre-pr", () => {
+    const out = deriveEntryPhase({ prNumber: null });
+    expect(out).toEqual({ phase: "pre-pr", reason: "NO_PR", skips: [] });
+  });
+
+  it("treats a missing prNumber the same as an explicit null", () => {
+    expect(deriveEntryPhase({}).reason).toBe("NO_PR");
+    expect(deriveEntryPhase().reason).toBe("NO_PR");
+  });
+
+  it("enters an open pull request at the preflight and lets open-pr self-skip", () => {
+    const out = deriveEntryPhase({ prNumber: 400 });
+    expect(out.phase).toBe("pre-pr");
+    expect(out.reason).toBe("PR_OPEN");
+    expect(out.skips).toEqual(["open-pr"]);
+  });
+
+  it("never derives a terminal phase from an existing attestation", () => {
+    // The omission is the contract. An attestation proves a SHA passed the
+    // matrix; it says nothing about whether the SHA was reviewed, and review
+    // markers are not SHA-pinned so nothing here can tell. A READY-and-stop
+    // outcome would let `dotbabel local-attest` run directly, then skip the
+    // whole review stage on evidence that never spoke to it.
+    for (const state of [
+      { prNumber: 400 },
+      { prNumber: 400, attested: true },
+      { prNumber: 400, attestationSha: "a".repeat(40) },
+    ]) {
+      const out = deriveEntryPhase(state);
+      expect(out.phase).toBe("pre-pr");
+      expect(out.phase).not.toBe("stop");
+      expect(out.skips).not.toContain("post-pr-review");
+      expect(out.skips).not.toContain("review-pr");
+    }
+  });
+
+  it("only ever names phases the pipeline actually declares", () => {
+    const ids = new Set(CONDUCTOR_PHASES.map((p) => p.id));
+    for (const state of [{ prNumber: null }, { prNumber: 1 }]) {
+      const out = deriveEntryPhase(state);
+      expect(ids.has(out.phase)).toBe(true);
+      for (const s of out.skips) expect(ids.has(s)).toBe(true);
+    }
   });
 });
