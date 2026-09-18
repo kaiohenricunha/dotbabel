@@ -127,7 +127,17 @@ function assertKnownFields(shape, value, allowed) {
   return /** @type {Record<string, unknown>} */ (value);
 }
 
-const PROVENANCE_FIELDS = Object.freeze(["sourceId", "sourceKind", "sourceVersion", "adapterVersion"]);
+/**
+ * How a requirement came to exist.
+ *
+ * `sourceKind` cannot carry this: an authored `dotbabel.compute` and a requirement
+ * inferred from legacy `model:`/`effort:` are both `artifact`, and a consumer that
+ * must not treat an inference as an authored decision needs its own discriminator
+ * rather than a sentinel smuggled through a version field (ARCH-18).
+ */
+export const DERIVATIONS = Object.freeze(["declared", "legacy-inferred"]);
+
+const PROVENANCE_FIELDS = Object.freeze(["sourceId", "sourceKind", "sourceVersion", "adapterVersion", "derivation"]);
 
 /**
  * @typedef {object} Provenance
@@ -136,6 +146,7 @@ const PROVENANCE_FIELDS = Object.freeze(["sourceId", "sourceKind", "sourceVersio
  * @property {"runtime"|"knowledge-source"|"artifact"} sourceKind
  * @property {string} [sourceVersion]
  * @property {string} [adapterVersion]
+ * @property {"declared"|"legacy-inferred"} [derivation] Defaults to `declared` when absent.
  */
 
 /**
@@ -156,6 +167,9 @@ export function makeProvenance(input) {
     if (fields[key] !== undefined && typeof fields[key] !== "string") {
       throw new TypeError(`Provenance.${key} must be a string when present`);
     }
+  }
+  if (fields.derivation !== undefined && !DERIVATIONS.includes(/** @type {string} */ (fields.derivation))) {
+    throw new TypeError(`Provenance.derivation must be one of ${DERIVATIONS.join(", ")}`);
   }
   return Object.freeze({ ...fields });
 }

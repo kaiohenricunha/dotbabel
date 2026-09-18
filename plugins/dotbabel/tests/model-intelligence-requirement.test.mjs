@@ -123,8 +123,9 @@ describe("dotbabel.compute parsing", () => {
       rationale: "why",
       // `sourceKind: "artifact"`, not `"runtime"`: no adapter observed this, and a
       // consumer that reads `runtime` to mean "observed from a harness" must not
-      // match a declaration.
-      provenance: { sourceId: "skills/probe/SKILL.md", sourceKind: "artifact" },
+      // match a declaration. `derivation: "declared"` separates it from a
+      // requirement that `compat/` inferred from legacy metadata.
+      provenance: { sourceId: "skills/probe/SKILL.md", sourceKind: "artifact", derivation: "declared" },
     });
     expect(Object.isFrozen(result.requirement)).toBe(true);
   });

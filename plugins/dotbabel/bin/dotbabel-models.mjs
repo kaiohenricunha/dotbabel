@@ -18,7 +18,11 @@ import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { version } from "../src/index.mjs";
 import { parseFrontmatter, walkArtifacts } from "../src/build-index.mjs";
-import { analyzeMigration } from "../src/model-intelligence/compat/index.mjs";
+import {
+  LEGACY_DISPOSITIONS,
+  analyzeMigration,
+  canCarryComputeDeclaration,
+} from "../src/model-intelligence/compat/index.mjs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
@@ -80,12 +84,12 @@ function resolveRepoRoot() {
 }
 
 const repoRoot = resolveRepoRoot();
-// Only the three artifact kinds that can carry a compute declaration; a hook or a
-// template has no compute context to describe (§5, KD-1).
-const MIGRATABLE_KINDS = new Set(["agent", "command", "skill"]);
-
+// The library owns which kinds can carry a compute declaration, so this filter and
+// the one `interpretLegacy` applies cannot disagree (IMPL-4).
+// `walkArtifacts` yields no workflow today, so `ai-review.yml` — which KD-6
+// projects — is outside this report until P-17 gives it a canonical source.
 const inputs = walkArtifacts(repoRoot)
-  .filter((artifact) => MIGRATABLE_KINDS.has(artifact.type))
+  .filter((artifact) => canCarryComputeDeclaration(artifact.type))
   .map((artifact) => ({
     sourcePath: artifact.path,
     artifactKind: artifact.type,
@@ -95,17 +99,26 @@ const inputs = walkArtifacts(repoRoot)
 const report = analyzeMigration(inputs);
 
 if (argv.flags.json) {
-  process.stdout.write(`${JSON.stringify({ verb: "migrate", mode: "analysis", ...report }, null, 2)}\n`);
+  // The library owns the envelope, including its name, version, and mode, so the
+  // three modes P-18 adds cannot drift into three shapes assembled here (§5).
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 } else {
-  for (const disposition of ["conflict", "ambiguous", "mapped", "inherit", "absent"]) {
+  // Severity ordering is a rendering concern and lives here; the set of
+  // dispositions is the library's, so a new one still prints.
+  const SEVERITY_FIRST = ["invalid-declaration", "conflict", "ambiguous"];
+  const ordered = [...SEVERITY_FIRST, ...LEGACY_DISPOSITIONS.filter((d) => !SEVERITY_FIRST.includes(d))];
+  for (const disposition of ordered) {
     const entries = report.artifacts.filter((entry) => entry.disposition === disposition);
     if (entries.length === 0) continue;
     out.info(`${disposition}: ${entries.length}`);
     // The two dispositions a human must act on are worth naming; the bulk is not.
-    if (disposition === "conflict" || disposition === "ambiguous") {
+    if (SEVERITY_FIRST.includes(disposition)) {
       for (const entry of entries) {
-        const detail = entry.conflict ? entry.conflict.message : entry.notes[entry.notes.length - 1];
-        out.warn(`  ${entry.sourcePath} — ${detail}`);
+        // Rendered from the codes, which are the contract, rather than from the
+        // last element of `notes`, which the library calls presentation.
+        out.warn(`  ${entry.sourcePath} — ${entry.codes.join(", ")}`);
+        if (entry.conflict) out.warn(`      ${entry.conflict.message}`);
+        for (const error of entry.declarationErrors ?? []) out.warn(`      ${error.pointer}: ${error.message}`);
       }
     }
   }
@@ -114,12 +127,17 @@ if (argv.flags.json) {
   // IMPL-7 gates before P-19f, and every proposal here is a conservative floor
   // that preserves the authored choice rather than relaxing it.
   out.info("mapped means the legacy alias has a known meaning, not that the migration is approved");
+  out.info("every mapped proposal carries MI_PROPOSAL_DEFAULTED: DOC-1 assigns the class per artifact, so an owner decision is still required");
   out.info("analysis only: no artifact was written");
 }
 
 const conflicts = report.totals.conflict ?? 0;
-if (conflicts > 0) {
-  out.fail(`${conflicts} artifact(s) declare a canonical requirement that disagrees with their legacy value`);
+const invalid = report.totals["invalid-declaration"] ?? 0;
+if (conflicts > 0 || invalid > 0) {
+  if (conflicts > 0) out.fail(`${conflicts} artifact(s) declare a canonical requirement that disagrees with their legacy value`);
+  // A declaration that does not parse is a strictly worse case than one that
+  // merely disagrees, so it fails the same gate (§5 exit codes).
+  if (invalid > 0) out.fail(`${invalid} artifact(s) carry a dotbabel.compute block that does not parse`);
   process.exit(EXIT_CODES.VALIDATION);
 }
 out.pass(`analysed ${report.artifacts.length} artifact(s)`);

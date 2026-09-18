@@ -16,14 +16,64 @@
 import { WORKLOAD_CLASSES, compareWorkloadClass, makeProvenance } from "../domain/index.mjs";
 import { parseComputeDeclaration } from "../requirement/index.mjs";
 
-/** An ambiguous legacy declaration that a human must resolve. */
-export const MI_LEGACY_AMBIGUOUS = "MI_LEGACY_AMBIGUOUS";
+/**
+ * Why a legacy declaration could not be read. Three distinct causes, because
+ * `migrate --write` in P-18 must treat them differently: an effort with no model
+ * is safe to drop, an unknown alias is an owner decision, and a known alias with
+ * an unknown effort is an author typo. One code would force a consumer to parse
+ * the prose note, which is presentation and not a contract.
+ */
+export const MI_LEGACY_EFFORT_WITHOUT_MODEL = "MI_LEGACY_EFFORT_WITHOUT_MODEL";
+
+/** The `model:` value is outside the four aliases the shipped gate accepted. */
+export const MI_LEGACY_MODEL_UNKNOWN = "MI_LEGACY_MODEL_UNKNOWN";
+
+/** The `effort:` value is outside the shipped enum, so the pair cannot be read. */
+export const MI_LEGACY_EFFORT_UNKNOWN = "MI_LEGACY_EFFORT_UNKNOWN";
+
+/** The artifact's canonical `dotbabel.compute` does not parse. */
+export const MI_DECLARATION_INVALID = "MI_DECLARATION_INVALID";
+
+/**
+ * The workload class or the mode in a proposal was defaulted from the alias alone,
+ * not taken from an owner decision. DOC-1 assigns a class per artifact from its
+ * authored rationale — `opus` is Deep on one agent, Frontier on another, and
+ * Exceptional on a third — and it keeps six entries pinned and thirteen
+ * undecided. A proposal carrying this code is report-only: `--write` must refuse
+ * it until IMPL-7 resolves the artifact.
+ */
+export const MI_PROPOSAL_DEFAULTED = "MI_PROPOSAL_DEFAULTED";
 
 /** A canonical declaration and a legacy value whose known meanings disagree. */
 export const MI_DUAL_DECLARATION_CONFLICT = "MI_DUAL_DECLARATION_CONFLICT";
 
 /** What the compat layer concluded about one artifact. */
-export const LEGACY_DISPOSITIONS = Object.freeze(["mapped", "inherit", "ambiguous", "conflict", "absent"]);
+export const LEGACY_DISPOSITIONS = Object.freeze([
+  "mapped",
+  "inherit",
+  "ambiguous",
+  "conflict",
+  "invalid-declaration",
+  "absent",
+]);
+
+/**
+ * Artifact kinds that can carry a compute declaration.
+ *
+ * Derived from `KIND_BINDING` so the library holds one answer: a caller that
+ * filters a tree and a caller that interprets one artifact cannot disagree about
+ * whether a kind is in scope (IMPL-4).
+ */
+export const MIGRATABLE_ARTIFACT_KINDS = Object.freeze(["agent", "command", "skill", "workflow"]);
+
+/**
+ * Tell whether an artifact kind can carry a compute declaration.
+ * @param {string} artifactKind
+ * @returns {boolean}
+ */
+export function canCarryComputeDeclaration(artifactKind) {
+  return MIGRATABLE_ARTIFACT_KINDS.includes(artifactKind);
+}
 
 /**
  * The only legacy model aliases whose meaning is known.
@@ -34,11 +84,13 @@ export const LEGACY_DISPOSITIONS = Object.freeze(["mapped", "inherit", "ambiguou
  * a model: `opus` meant "the strongest tier available", which is what `frontier`
  * states without naming a vendor's product.
  */
-const ALIAS_CLASS = Object.freeze({
-  haiku: "mechanical",
-  sonnet: "routine",
-  opus: "frontier",
-});
+const ALIAS_CLASS = Object.freeze(
+  Object.assign(Object.create(null), {
+    haiku: "mechanical",
+    sonnet: "routine",
+    opus: "frontier",
+  }),
+);
 
 /**
  * Where a legacy declaration bound compute, per artifact kind.
@@ -48,18 +100,35 @@ const ALIAS_CLASS = Object.freeze({
  * is `consumer` because the requirement still describes the work (ARCH-37) even
  * though it never bound anything.
  */
-const KIND_BINDING = Object.freeze({
-  agent: "self",
-  command: "session",
-  skill: "consumer",
-  workflow: "session",
-});
+const KIND_BINDING = Object.freeze(
+  Object.assign(Object.create(null), {
+    agent: "self",
+    command: "session",
+    skill: "consumer",
+    workflow: "session",
+  }),
+);
 
 /**
  * Legacy effort values that were legal in the shipped schema.
  * They refine nothing on their own: no workload class follows from an effort.
  */
 const KNOWN_EFFORTS = Object.freeze(["low", "medium", "max"]);
+
+/**
+ * Render an author-controlled value for a human-readable note.
+ *
+ * The value is an arbitrary YAML scalar: it may carry newlines, terminal escapes,
+ * or a secret an author pasted by mistake, and it reaches a terminal and a JSON
+ * report verbatim. The sibling canonical parser already caps and type-reports
+ * rather than echoing (`../requirement/index.mjs`, OPS-4); this is the same
+ * discipline for the layer that handles the less trustworthy input of the two.
+ * @param {string} value
+ * @returns {string} A quoted, escaped, length-bounded rendering.
+ */
+function forDisplay(value) {
+  return JSON.stringify(value.replace(/[\p{Cc}\p{Cf}]/gu, "\uFFFD").slice(0, 80));
+}
 
 /**
  * @typedef {object} LegacyReading
@@ -96,10 +165,13 @@ export function interpretLegacy(frontmatter, options) {
   const model = typeof fields.model === "string" ? fields.model.trim() : undefined;
   const effort = typeof fields.effort === "string" ? fields.effort.trim() : undefined;
 
+  // Bounded and control-character-free, for the same reason as `forDisplay`: this
+  // object is echoed into the JSON report and into a terminal.
+  const bound = (value) => value.replace(/[\p{Cc}\p{Cf}]/gu, "\uFFFD").slice(0, 80);
   /** @type {{model?: string, effort?: string}} */
   const legacyValues = {};
-  if (model !== undefined) legacyValues.model = model;
-  if (effort !== undefined) legacyValues.effort = effort;
+  if (model !== undefined) legacyValues.model = bound(model);
+  if (effort !== undefined) legacyValues.effort = bound(effort);
 
   /** @type {string[]} */
   const codes = [];
@@ -110,13 +182,13 @@ export function interpretLegacy(frontmatter, options) {
     return { disposition: "absent", requirement: null, legacy: legacyValues, codes, notes };
   }
 
-  const binding = KIND_BINDING[artifactKind] ?? "consumer";
+  const binding = Object.hasOwn(KIND_BINDING, artifactKind) ? KIND_BINDING[artifactKind] : "consumer";
   const provenance = makeProvenance({
     sourceId: sourcePath,
     sourceKind: "artifact",
-    // Marks the requirement as derived from legacy metadata rather than declared,
-    // so a later reader can tell an inferred requirement from an authored one.
-    adapterVersion: "legacy",
+    // An inference, not an authored decision. `sourceKind` cannot carry the
+    // difference, because an authored declaration is also `artifact` (ARCH-18).
+    derivation: "legacy-inferred",
   });
 
   if (artifactKind === "skill") {
@@ -125,7 +197,7 @@ export function interpretLegacy(frontmatter, options) {
 
   if (model === "inherit") {
     if (effort !== undefined) {
-      notes.push(`effort "${effort}" accompanies model inherit and states no requirement of its own`);
+      notes.push(`effort ${forDisplay(effort)} accompanies model inherit and states no requirement of its own`);
     }
     return {
       disposition: "inherit",
@@ -137,28 +209,35 @@ export function interpretLegacy(frontmatter, options) {
   }
 
   if (model === undefined) {
-    codes.push(MI_LEGACY_AMBIGUOUS);
-    notes.push(`effort "${effort}" alone states no workload class; no requirement can be derived from it`);
+    codes.push(MI_LEGACY_EFFORT_WITHOUT_MODEL);
+    notes.push(`effort ${forDisplay(effort)} alone states no workload class; no requirement can be derived from it`);
     return { disposition: "ambiguous", requirement: null, legacy: legacyValues, codes, notes };
   }
 
-  const workloadClass = ALIAS_CLASS[model];
+  const workloadClass = Object.hasOwn(ALIAS_CLASS, model) ? ALIAS_CLASS[model] : undefined;
   if (workloadClass === undefined) {
-    codes.push(MI_LEGACY_AMBIGUOUS);
-    notes.push(`model "${model}" is not one of the aliases the shipped gate accepted, so its intended capability level is unknown`);
+    codes.push(MI_LEGACY_MODEL_UNKNOWN);
+    notes.push(`model ${forDisplay(model)} is not one of the aliases the shipped gate accepted, so its intended capability level is unknown`);
     return { disposition: "ambiguous", requirement: null, legacy: legacyValues, codes, notes };
   }
 
   if (effort !== undefined && !KNOWN_EFFORTS.includes(effort)) {
-    codes.push(MI_LEGACY_AMBIGUOUS);
-    notes.push(`effort "${effort}" is outside the shipped enum, so the declaration cannot be read as a whole`);
+    codes.push(MI_LEGACY_EFFORT_UNKNOWN);
+    notes.push(`effort ${forDisplay(effort)} is outside the shipped enum, so the declaration cannot be read as a whole`);
     return { disposition: "ambiguous", requirement: null, legacy: legacyValues, codes, notes };
   }
 
   if (effort !== undefined) {
-    notes.push(`effort "${effort}" is preserved as authoring intent; no workload class follows from an effort value`);
+    notes.push(`effort ${forDisplay(effort)} is preserved as authoring intent; no workload class follows from an effort value`);
   }
 
+  // The class comes from the alias alone and the mode is a conservative default,
+  // so both are flagged: DOC-1 decides the class per artifact and keeps some
+  // entries pinned rather than floored, and only an owner decision settles which.
+  codes.push(MI_PROPOSAL_DEFAULTED);
+  notes.push(
+    `class ${forDisplay(workloadClass)} and mode "floor" are defaulted from the alias; DOC-1 assigns the class per artifact and pins some, so an owner decision is required before this is written`,
+  );
   return {
     disposition: "mapped",
     requirement: Object.freeze({ requirement: workloadClass, binding, mode: "floor", provenance }),
@@ -206,11 +285,9 @@ export function detectDualDeclarationConflict(declared, reading) {
  * Reports only. Nothing here writes an artifact: `migrate --write` arrives with
  * P-18, behind the batching and preserved-behaviour gates of IMPL-2.
  * @param {MigrationInput[]} inputs
- * @param {{parseComputeDeclaration?: Function}} [deps] Injected for testing; defaults to the canonical parser.
- * @returns {{artifacts: object[], totals: Record<string, number>}}
+ * @returns {{envelope: string, version: number, mode: string, artifacts: object[], totals: Record<string, number>}}
  */
-export function analyzeMigration(inputs, deps = {}) {
-  const parse = deps.parseComputeDeclaration ?? parseComputeDeclaration;
+export function analyzeMigration(inputs) {
   /** @type {object[]} */
   const artifacts = [];
   /** @type {Record<string, number>} */
@@ -218,32 +295,45 @@ export function analyzeMigration(inputs, deps = {}) {
 
   for (const input of inputs) {
     const { sourcePath, artifactKind, frontmatter } = input;
-    const canonical = parse(frontmatter, { sourcePath });
+    const canonical = parseComputeDeclaration(frontmatter, { sourcePath });
     const reading = interpretLegacy(frontmatter, { sourcePath, artifactKind });
     const conflict = detectDualDeclarationConflict(canonical.requirement, reading);
+    // A canonical declaration that does not parse is worse than one that merely
+    // disagrees, and it used to read as `mapped` with a proposal: `requirement` is
+    // null, so the conflict check found nothing to compare (KD-1 rule 4).
+    const declarationInvalid = canonical.errors.length > 0;
 
     let disposition = reading.disposition;
     if (conflict) disposition = "conflict";
+    if (declarationInvalid) disposition = "invalid-declaration";
+
+    /** @type {string[]} */
+    const codes = [...reading.codes];
+    if (conflict) codes.push(conflict.code);
+    if (declarationInvalid) codes.push(MI_DECLARATION_INVALID);
 
     /** @type {object} */
     const entry = {
       sourcePath,
       artifactKind,
       disposition,
+      declared: canonical.declared,
       legacy: reading.legacy,
-      codes: conflict ? [...reading.codes, conflict.code] : reading.codes,
+      codes,
       notes: reading.notes,
     };
     if (conflict) entry.conflict = conflict;
-    if (canonical.declared) entry.declared = true;
-    if (!conflict && (disposition === "mapped" || disposition === "inherit")) {
+    if (declarationInvalid) entry.declarationErrors = canonical.errors;
+    // A proposal is emitted only when nothing is contested. It still carries
+    // MI_PROPOSAL_DEFAULTED for a mapped entry, which is what makes it report-only.
+    if (!conflict && !declarationInvalid && (disposition === "mapped" || disposition === "inherit")) {
       entry.proposed = toDeclaration(reading.requirement);
     }
     artifacts.push(entry);
     totals[disposition] += 1;
   }
 
-  return { artifacts, totals };
+  return { envelope: "MigrationReport", version: 1, mode: "analysis", artifacts, totals };
 }
 
 /**

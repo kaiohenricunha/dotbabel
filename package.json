@@ -36,7 +36,7 @@
     "dotbabel-check-project-sync": "./plugins/dotbabel/bin/dotbabel-check-project-sync.mjs",
     "dotbabel-quality": "./plugins/dotbabel/bin/dotbabel-quality.mjs",
     "dotbabel-criteria": "./plugins/dotbabel/bin/dotbabel-criteria.mjs",
-    "dotbabel-models": "plugins/dotbabel/bin/dotbabel-models.mjs"
+    "dotbabel-models": "./plugins/dotbabel/bin/dotbabel-models.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",

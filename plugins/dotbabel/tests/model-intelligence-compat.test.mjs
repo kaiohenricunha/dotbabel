@@ -1,9 +1,17 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
-  MI_LEGACY_AMBIGUOUS,
-  MI_DUAL_DECLARATION_CONFLICT,
   LEGACY_DISPOSITIONS,
+  MIGRATABLE_ARTIFACT_KINDS,
+  MI_DECLARATION_INVALID,
+  MI_DUAL_DECLARATION_CONFLICT,
+  MI_LEGACY_EFFORT_UNKNOWN,
+  MI_LEGACY_EFFORT_WITHOUT_MODEL,
+  MI_LEGACY_MODEL_UNKNOWN,
+  MI_PROPOSAL_DEFAULTED,
   analyzeMigration,
+  canCarryComputeDeclaration,
   detectDualDeclarationConflict,
   interpretLegacy,
 } from "../src/model-intelligence/compat/index.mjs";
@@ -20,7 +28,7 @@ describe("legacy interpretation", () => {
     expect(result.requirement).toMatchObject({
       binding: "self",
       mode: "floor",
-      provenance: { sourceId: "x/agent.md", sourceKind: "artifact", adapterVersion: "legacy" },
+      provenance: { sourceId: "x/agent.md", sourceKind: "artifact", derivation: "legacy-inferred" },
     });
     // The alias is an ordering, not a model name that survives into the requirement.
     expect(JSON.stringify(result.requirement)).not.toContain("opus");
@@ -49,11 +57,18 @@ describe("legacy interpretation", () => {
     expect(inherited.requirement.mode).toBe("inherit");
     expect(inherited.requirement.requirement).toBeUndefined();
 
-    for (const fields of [{ model: "gpt-5" }, { model: "opus-ish" }, { effort: "max" }]) {
+    // Each cause gets its own code, because `migrate --write` must treat them
+    // differently: a typo, an owner decision, and a droppable value.
+    for (const [fields, code] of [
+      [{ model: "gpt-5" }, MI_LEGACY_MODEL_UNKNOWN],
+      [{ model: "opus-ish" }, MI_LEGACY_MODEL_UNKNOWN],
+      [{ effort: "max" }, MI_LEGACY_EFFORT_WITHOUT_MODEL],
+      [{ model: "opus", effort: "ultra" }, MI_LEGACY_EFFORT_UNKNOWN],
+    ]) {
       const result = legacy("agent", fields);
       expect(result.disposition, JSON.stringify(fields)).toBe("ambiguous");
       expect(result.requirement, JSON.stringify(fields)).toBeNull();
-      expect(result.codes, JSON.stringify(fields)).toContain(MI_LEGACY_AMBIGUOUS);
+      expect(result.codes, JSON.stringify(fields)).toEqual([code]);
     }
   });
 
@@ -62,6 +77,17 @@ describe("legacy interpretation", () => {
     expect(result.disposition).toBe("absent");
     expect(result.requirement).toBeNull();
     expect(result.codes).toEqual([]);
+  });
+
+  it("flags every mapped proposal as defaulted, because DOC-1 decides the class per artifact", () => {
+    // DOC-1 maps `opus` to Deep on aws-engineer, Frontier on platform-engineer, and
+    // Exceptional on workflow-orchestrator, and keeps the two security agents
+    // pinned rather than floored. One alias table cannot answer that, so a proposal
+    // derived from the alias alone is report-only until an owner decides (IMPL-7).
+    const result = legacy("agent", { model: "opus" });
+    expect(result.disposition).toBe("mapped");
+    expect(result.codes).toContain(MI_PROPOSAL_DEFAULTED);
+    expect(result.notes.join(" ")).toMatch(/owner decision is required/);
   });
 
   it("never invents a requirement from an effort value alone", () => {
@@ -106,13 +132,14 @@ describe("legacy interpretation edges", () => {
     const result = legacy("agent", { model: "opus", effort: "ultra" });
     expect(result.disposition).toBe("ambiguous");
     expect(result.requirement).toBeNull();
-    expect(result.codes).toContain(MI_LEGACY_AMBIGUOUS);
+    expect(result.codes).toEqual([MI_LEGACY_EFFORT_UNKNOWN]);
     expect(result.notes.join(" ")).toContain("ultra");
   });
 
   it("preserves a legal effort as authoring intent alongside the mapped class", () => {
     const result = legacy("agent", { model: "opus", effort: "max" });
     expect(result.disposition).toBe("mapped");
+    expect(result.codes).toEqual([MI_PROPOSAL_DEFAULTED]);
     expect(result.legacy).toEqual({ model: "opus", effort: "max" });
     expect(result.notes.join(" ")).toMatch(/authoring intent|no workload class follows/);
     // The effort is not smuggled into the requirement as a pin or a stronger class.
@@ -145,9 +172,77 @@ describe("legacy interpretation edges", () => {
   it("marks every legacy-derived requirement so it is distinguishable from an authored one", () => {
     for (const fields of [{ model: "opus" }, { model: "inherit" }]) {
       const result = legacy("agent", fields);
-      expect(result.requirement.provenance.adapterVersion).toBe("legacy");
+      // `sourceKind` is `artifact` for an authored declaration too, so the
+      // discriminator is its own field rather than a sentinel in a version string.
+      expect(result.requirement.provenance.derivation).toBe("legacy-inferred");
       expect(result.requirement.provenance.sourceKind).toBe("artifact");
+      expect(result.requirement.provenance.adapterVersion).toBeUndefined();
     }
+  });
+});
+
+describe("legacy interpretation is not fooled by inherited object keys", () => {
+  // A lookup table written as an object literal answers `Object.prototype` for
+  // `__proto__` and a function for `toString`, which is not `undefined`, so an
+  // `=== undefined` guard lets the value through. That reported an alias that was
+  // never valid as `mapped`, produced a requirement whose class was an object or a
+  // function, and — worst — suppressed the KD-1 rule-3 conflict gate, because the
+  // bogus class is not in WORKLOAD_CLASSES and the comparison bailed out.
+  const INHERITED_KEYS = ["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty", "isPrototypeOf"];
+
+  it("treats every inherited object key as an ambiguous model, not a mapped one", () => {
+    for (const key of INHERITED_KEYS) {
+      const result = legacy("agent", { model: key });
+      expect(result.disposition, key).toBe("ambiguous");
+      expect(result.requirement, key).toBeNull();
+      expect(result.codes, key).toEqual([MI_LEGACY_MODEL_UNKNOWN]);
+    }
+  });
+
+  it("does not let an inherited artifact kind become a non-string binding", () => {
+    for (const key of INHERITED_KEYS) {
+      const result = interpretLegacy(artifact("agent", { model: "opus" }), { sourcePath: "x.md", artifactKind: key });
+      expect(typeof result.requirement.binding, key).toBe("string");
+      expect(result.requirement.binding, key).toBe("consumer");
+    }
+  });
+
+  it("still counts an inherited-key artifact as ambiguous in the migration report", () => {
+    // The report is what a human reads to decide a migration, and what `--write`
+    // will consume in P-18. An inherited key must not arrive there as "mapped".
+    const report = analyzeMigration([
+      { sourcePath: "agents/proto.md", artifactKind: "agent", frontmatter: artifact("agent", { model: "__proto__" }) },
+    ]);
+    expect(report.totals.mapped).toBe(0);
+    expect(report.totals.ambiguous).toBe(1);
+    expect(report.artifacts[0].proposed).toBeUndefined();
+  });
+});
+
+describe("author-controlled values are bounded before they reach a report", () => {
+  it("truncates a long value in both the note and the echoed legacy object", () => {
+    const long = "z".repeat(5000);
+    const result = legacy("agent", { model: long });
+    expect(result.legacy.model.length).toBeLessThanOrEqual(80);
+    for (const note of result.notes) expect(note.length).toBeLessThan(400);
+  });
+
+  it("neutralises control characters so a value cannot rewrite terminal output", () => {
+    // The note reaches a TTY through the CLI with ANSI enabled, and the JSON report
+    // verbatim, so an escape sequence here could hide or forge surrounding lines.
+    const nasty = "opus\u001b[2K\u001b[1Ginjected\nsecond line";
+    const result = legacy("agent", { model: nasty });
+    const rendered = JSON.stringify({ notes: result.notes, legacy: result.legacy });
+    expect(rendered).not.toContain("\u001b");
+    expect(result.legacy.model).not.toContain("\n");
+    expect(result.disposition).toBe("ambiguous");
+  });
+
+  it("quotes an echoed value so it cannot break out of the surrounding message", () => {
+    const result = legacy("agent", { model: 'opus" and then some' });
+    expect(result.disposition).toBe("ambiguous");
+    // JSON.stringify escapes the embedded quote rather than ending the quoted span.
+    expect(result.notes.join(" ")).toContain('\\"');
   });
 });
 
@@ -208,7 +303,7 @@ describe("migration analysis", () => {
       const shouldPropose = entry.disposition === "mapped" || entry.disposition === "inherit";
       expect(Boolean(entry.proposed), entry.sourcePath).toBe(shouldPropose);
     }
-    expect(report.totals).toEqual({ mapped: 2, inherit: 1, ambiguous: 1, conflict: 1, absent: 1 });
+    expect(report.totals).toEqual({ mapped: 2, inherit: 1, ambiguous: 1, conflict: 1, "invalid-declaration": 0, absent: 1 });
     expect(new Set(Object.keys(report.totals))).toEqual(new Set(LEGACY_DISPOSITIONS));
     // Analysis is pure: it is handed frontmatter and returns a report.
     expect(report).not.toHaveProperty("written");
@@ -223,9 +318,75 @@ describe("migration analysis", () => {
     }
   });
 
+  it("reports a canonical declaration that does not parse, and never proposes beside it", () => {
+    // This used to read as `mapped` with a proposal and exit 0: the parse failure left
+    // `requirement` null, so the conflict check had nothing to compare (KD-1 rule 4).
+    const report = analyzeMigration([
+      {
+        sourcePath: "agents/broken.md",
+        artifactKind: "agent",
+        frontmatter: artifact("agent", { model: "opus", dotbabel: { compute: { requrement: "deep", binding: "self", mode: "dynamic" } } }),
+      },
+    ]);
+    const entry = report.artifacts[0];
+    expect(entry.disposition).toBe("invalid-declaration");
+    expect(entry.codes).toContain(MI_DECLARATION_INVALID);
+    expect(entry.declarationErrors.length).toBeGreaterThan(0);
+    expect(entry.declarationErrors[0].pointer).toMatch(/^\/dotbabel/);
+    expect(entry.proposed).toBeUndefined();
+    expect(report.totals["invalid-declaration"]).toBe(1);
+  });
+
+  it("returns a named, versioned envelope so P-18 can add modes without drift", () => {
+    const report = analyzeMigration([]);
+    expect(report.envelope).toBe("MigrationReport");
+    expect(report.version).toBe(1);
+    expect(report.mode).toBe("analysis");
+    expect(report.artifacts).toEqual([]);
+    // Every disposition is present at zero, so a consumer never has to guess.
+    expect(Object.keys(report.totals).sort()).toEqual([...LEGACY_DISPOSITIONS].sort());
+  });
+
+  it("states declared as a boolean on every entry", () => {
+    const report = analyzeMigration(tree);
+    for (const entry of report.artifacts) expect(typeof entry.declared, entry.sourcePath).toBe("boolean");
+    expect(report.artifacts.find((e) => e.sourcePath === "agents/f.md").declared).toBe(true);
+    expect(report.artifacts.find((e) => e.sourcePath === "agents/a.md").declared).toBe(false);
+  });
+
   it("is deterministic and preserves input order", () => {
     const first = analyzeMigration(tree);
     expect(analyzeMigration(tree)).toEqual(first);
     expect(first.artifacts.map((entry) => entry.sourcePath)).toEqual(tree.map((entry) => entry.sourcePath));
+  });
+});
+
+describe("compat module boundaries", () => {
+  it("owns which artifact kinds can carry a compute declaration", () => {
+    // The CLI used to hold a second, narrower table that disagreed about `workflow`
+    // (IMPL-4). One answer now lives here.
+    for (const kind of ["agent", "command", "skill", "workflow"]) {
+      expect(canCarryComputeDeclaration(kind), kind).toBe(true);
+    }
+    for (const kind of ["hook", "template", "nonsense", "__proto__"]) {
+      expect(canCarryComputeDeclaration(kind), kind).toBe(false);
+    }
+    expect(MIGRATABLE_ARTIFACT_KINDS).toEqual(["agent", "command", "skill", "workflow"]);
+  });
+
+  it("imports only the domain and requirement modules, and performs no I/O", () => {
+    // ARCH-56 and ARCH-57 rules 7 and 8. The two neighbouring units guard this the
+    // same way; compat/ was the one Phase 1 module where a future edit could add
+    // filesystem access or a quality/ import and stay green, and IMPL-9 keeps this
+    // module alive for the whole migration window.
+    const source = readFileSync(fileURLToPath(new URL("../src/model-intelligence/compat/index.mjs", import.meta.url)), "utf8");
+    const imports = [...source.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
+    expect(imports.every((specifier) => specifier.startsWith("../domain/") || specifier.startsWith("../requirement/"))).toBe(true);
+    expect(imports.filter((s) => /^(node:)?(fs|fs\/promises|child_process|http|https|os)$/.test(s))).toEqual([]);
+    expect(imports.filter((s) => /quality|sources/.test(s))).toEqual([]);
+    // Skipped under Stryker, which injects a process.env read of its own.
+    if (globalThis.__stryker__ === undefined) {
+      expect(source).not.toMatch(/\bDate\.now\(|\bprocess\.env\b/);
+    }
   });
 });
