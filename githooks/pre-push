@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # dotbabel pre-push hook — runs the fast quality profile before a push (KD-11).
 #
-# ADOPTED COPY. This is plugins/dotbabel/templates/githooks/pre-push with one
-# change: it runs the in-tree bin instead of a bare `dotbabel`. A bare command
+# ADOPTED COPY of plugins/dotbabel/templates/githooks/pre-push. It resolves the
+# checker from the working tree rather than PATH: it derives the bin from
+# `git rev-parse --show-toplevel`, gates on that file existing instead of on
+# `command -v dotbabel`, and qualifies exit 1 with whether a report was
+# produced (see the --json comment below). A bare command
 # resolves to whatever is on PATH, which for a dotbabel developer is a globally
 # installed published release — so the template's form would check this working
 # tree with a different version of the checker. The template stays generic,
@@ -59,19 +62,41 @@ fi
 # or a stray scratch file, would then block a push over code that is not part
 # of it — the fastest way to get a hook deleted. The working tree is
 # check-on-stop's job; this hook judges the commits being pushed.
+# `--json` is what makes exit 1 trustworthy. Running the IN-TREE bin means the
+# checker is the same code under edit, and node exits 1 on an uncaught
+# module-load failure — a syntax error or a missing dependency after a rebase
+# without `npm ci`. Mapping that to the blocking branch would let a broken
+# checker wedge the push it is needed to fix, which is exactly what KD-11
+# forbids. The template did not have this problem: it gated on an installed
+# `dotbabel`, which the change being pushed could not break.
+#
+# `dotbabel-quality.mjs` emits a JSON envelope for every outcome it handles,
+# including its own errors, so a report that starts with `{` proves the checker
+# ran and reached a verdict. No envelope means it never got that far, whatever
+# the exit code says, and the push is allowed with a notice.
+report="$(mktemp)"
+trap 'rm -f "$report"' EXIT
+
 if command -v timeout >/dev/null 2>&1; then
-  timeout "$TIMEOUT" node "$QUALITY_BIN" check --profile fast --base "$base" --head HEAD
+  timeout "$TIMEOUT" node "$QUALITY_BIN" check --profile fast --base "$base" --head HEAD --json >"$report" 2>/dev/null
   code=$?
 else
-  node "$QUALITY_BIN" check --profile fast --base "$base" --head HEAD
+  node "$QUALITY_BIN" check --profile fast --base "$base" --head HEAD --json >"$report" 2>/dev/null
   code=$?
 fi
+
+reported=1
+[ -s "$report" ] && [ "$(head -c 1 "$report")" = "{" ] || reported=0
 
 case "$code" in
   0)
     exit 0
     ;;
   1)
+    if [ "$reported" -eq 0 ]; then
+      notice "the checker exited 1 without producing a report, so it failed to run rather than failing the check"
+      exit 0
+    fi
     echo "dotbabel pre-push: the fast quality profile failed — push blocked." >&2
     echo "  Re-run locally:  node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile fast --base ${base}" >&2
     echo "  Override:        BYPASS_PRE_PUSH=1 git push" >&2
@@ -83,7 +108,9 @@ case "$code" in
     exit 0
     ;;
   2)
-    notice "required evidence, trust, or tooling is unavailable (exit 2)"
+    # Most often an untrusted worktree: trust is keyed on the resolved real
+    # path, so every new worktree needs its own grant.
+    notice "required evidence, trust, or tooling is unavailable (exit 2) — a new worktree needs its own trust grant"
     exit 0
     ;;
   *)

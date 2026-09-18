@@ -227,18 +227,18 @@ outside the allowlisted root is refused, never checked.
 
 ## Tuning and escape hatches
 
-| Variable                     | Applies to     | Effect                              |
-| ---------------------------- | -------------- | ----------------------------------- |
-| `BYPASS_CHECK_ON_WRITE=1`    | check-on-write | Disables the hook                   |
-| `BYPASS_CHECK_ON_STOP=1`     | check-on-stop  | Disables the hook                   |
-| `BYPASS_DESTRUCTIVE_GIT=1`   | guard          | Allows the one git call it prefixes |
-| `CHECK_ON_WRITE_TIMEOUT`     | check-on-write | Seconds per checker (default 5)     |
-| `CHECK_ON_STOP_TIMEOUT`      | check-on-stop  | Seconds per checker (default 120)   |
-| `CHECK_ON_STOP_TRUST_ALL`    | check-on-stop  | Bypasses the allowlist              |
-| `CHECK_ON_STOP_TRUSTED_FILE` | check-on-stop  | Overrides the allowlist path        |
-| `CHECK_ON_STOP_TESTS=1`      | check-on-stop  | Enables the related-tests stage     |
-| `BYPASS_PRE_PUSH=1`          | pre-push       | Skips the pre-push quality check    |
-| `DOTBABEL_PRE_PUSH_TIMEOUT`  | pre-push       | Seconds for the check (default 120) |
+| Variable                     | Applies to     | Effect                                                              |
+| ---------------------------- | -------------- | ------------------------------------------------------------------- |
+| `BYPASS_CHECK_ON_WRITE=1`    | check-on-write | Disables the hook                                                   |
+| `BYPASS_CHECK_ON_STOP=1`     | check-on-stop  | Disables the hook                                                   |
+| `BYPASS_DESTRUCTIVE_GIT=1`   | guard          | Allows the one git call it prefixes                                 |
+| `CHECK_ON_WRITE_TIMEOUT`     | check-on-write | Seconds per checker (default 5)                                     |
+| `CHECK_ON_STOP_TIMEOUT`      | check-on-stop  | Seconds per checker (default 120)                                   |
+| `CHECK_ON_STOP_TRUST_ALL`    | check-on-stop  | Bypasses the allowlist                                              |
+| `CHECK_ON_STOP_TRUSTED_FILE` | check-on-stop  | Overrides the allowlist path                                        |
+| `CHECK_ON_STOP_TESTS=1`      | check-on-stop  | Enables the related-tests stage                                     |
+| `BYPASS_PRE_PUSH=1`          | pre-push       | Skips the pre-push quality check                                    |
+| `DOTBABEL_PRE_PUSH_TIMEOUT`  | pre-push       | Seconds for the check (default 120), when `timeout(1)` is installed |
 
 Write the guard bypass directly before the git call that the user confirmed, as in
 `BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers only that call, so
@@ -310,13 +310,25 @@ runs repository code:
 git config core.hooksPath githooks
 ```
 
-This repository adopts its own copy at `githooks/pre-push`. It differs from the
-template in one line: it runs `plugins/dotbabel/bin/dotbabel-quality.mjs`
-instead of a bare `dotbabel`. A bare command resolves to whatever is on `PATH`,
-which for a dotbabel developer is a globally installed published release — so
-the template's form would check this working tree with a different version of
-the checker. A consumer has no in-tree bin, which is why the template stays
-generic.
+This repository adopts its own copy at `githooks/pre-push`. It resolves the
+checker from the working tree instead of `PATH`, and gates on the in-tree bin
+rather than on `dotbabel` being installed. A bare command resolves to whatever
+is on `PATH`, which for a dotbabel developer is a globally installed published
+release — so the template's form would check this working tree with a different
+version of the checker. A consumer has no in-tree bin, which is why the template
+stays generic.
+
+That swap costs one guarantee, so the adopted copy buys it back. The template's
+checker was an installed package the pushed change could not break, which made
+exit 1 unambiguous. An in-tree checker can be broken by the very change being
+pushed — a syntax error or a missing dependency makes node exit 1 too — so the
+adopted copy runs with `--json` and blocks only when the checker produced a
+report. No report means it failed to run, not that the check failed, and the
+push is allowed with a notice (KD-11).
+
+Warning: trust is keyed on the resolved real path, so a fresh worktree is
+untrusted until granted separately and the hook exits 2 there, prints a notice,
+and allows the push. Grant the worktree before relying on the gate.
 
 `core.hooksPath` is repository configuration, not per-worktree: it lives in the
 common `.git` directory that every worktree shares, so activating it in one
