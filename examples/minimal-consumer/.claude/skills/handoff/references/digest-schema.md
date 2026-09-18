@@ -1,0 +1,152 @@
+# Handoff digest — common schema and rendering
+
+The digest is the normalized payload the skill hands to the target
+agent. It is CLI-agnostic: a Claude transcript and a Codex transcript
+should produce the same shape.
+
+## Fields
+
+```yaml
+origin:
+  cli: claude | copilot | codex | gemini
+  session_id: <full-uuid>
+  short_id: <first-8-chars-of-uuid>
+  cwd: <absolute-path>
+  model: <model-id-or-list>
+  started_at: <ISO-8601>
+  turn_count: <int> # user turns only
+summary: |
+  2–4 sentences, plain English, describing what the session was about
+  and where it left off. No CLI-specific jargon.
+user_prompts:
+  - <verbatim prompt 1>
+  - <verbatim prompt 2>
+key_findings:
+  - <single-sentence claim the assistant established>
+  - ...
+artifacts:
+  files_touched:
+    - <absolute path>
+  commands_run:
+    - <non-read-only shell command>
+next_step_suggestion: |
+  One sentence the target agent should pick up from.
+```
+
+## Rendering: `<handoff>` block (`pull` verb)
+
+```markdown
+<handoff origin="<cli>" session="<short-id>" cwd="<cwd>">
+
+**Summary.** <summary prose>
+
+**User prompts (verbatim, in order).**
+
+1. <prompt 1>
+2. <prompt 2>
+
+**Key findings.**
+
+- <finding 1>
+- <finding 2>
+
+**Artifacts.**
+
+- Files touched: <path1>, <path2>
+- Commands run: `<cmd1>`, `<cmd2>`
+
+**Next step.** <next_step_suggestion>
+
+</handoff>
+```
+
+The `<handoff>` tag is intentional: target agents can detect it
+reliably and distinguish digest content from surrounding commentary.
+
+## Approach A: agent-authored state block (`push --state-file`)
+
+When `--state-file <path>` is passed to `dotbabel handoff push`, the
+file's raw content (typically a `<handoff-state>` YAML block authored by
+the source agent) is **prepended above** the `<handoff ...>` opening
+tag — not inside it. This is intentional:
+
+- Target agents that only want the mechanical block can detect the `<handoff>`
+  boundary without parsing agent-authored content outside it.
+- The state block flows through the same secret scrubber as the rest of the
+  digest before leaving the machine.
+
+Example shape when `--state-file` is used:
+
+```markdown
+<handoff-state version="1">
+goals:
+  - migrate auth middleware
+decisions:
+  - keep JWT expiry at 15 min
+</handoff-state>
+
+<handoff origin="claude" session="abc123ef" cwd="/repo" target="codex">
+...
+</handoff>
+```
+
+## Rendering: `pull --summary` output (terse inline summary)
+
+```markdown
+**<cli>** `<short-id>` — `<cwd>` — <started-at>
+
+**User prompts.**
+
+- <prompt 1>
+- <prompt 2>
+
+**Summary.** <2–4 sentence summary>
+```
+
+No `<handoff>` wrapper. No key findings, artifacts, or next step —
+those belong in `pull` (full block) or `pull -o auto` (file output).
+
+## Rendering: `pull -o <path>` output (markdown doc)
+
+```markdown
+# Handoff: <origin.cli> → <target.cli>
+
+_Generated: <ISO-timestamp>_
+_Origin session: `<full-uuid>` (cwd: `<cwd>`)_
+
+<handoff origin="..." session="..." cwd="...">
+... (same block as digest) ...
+</handoff>
+
+---
+
+## Full user prompt log
+
+1. <prompt 1>
+
+<!-- etc -->
+
+## Notes
+
+- Prompts 1–N verbatim; assistant responses summarized above.
+- Source transcript: `<absolute path to jsonl>`
+```
+
+File path: `docs/handoffs/<YYYY-MM-DD>-<origin.cli>-<short-id>.md` when
+a `docs/` directory exists at the repo root, else
+`~/.claude/handoffs/<YYYY-MM-DD>-<origin.cli>-<short-id>.md`.
+
+## Size bounds
+
+- `summary`: ≤ 400 characters.
+- `key_findings`: ≤ 5 bullets.
+- `user_prompts`: cap at 50 prompts (prompt 1 always pinned + last 49)
+  per the handoff-hardening 2026-05-08 experiment (results at
+  `docs/experiments/handoff-hardening-2026-05-08.md`); note the
+  truncation in `summary`. The cap engages only when the session has
+  > 50 prompts; shorter sessions render the full log unchanged.
+- `assistant_turns`: first turn (initial framing) + last 3 (recent
+  context). Mid-session turns surface via Approach B's TodoWrite
+  extraction (Claude) or `event_msg.agent_message` mirror (Codex).
+- `files_touched`: ≤ 20 paths; dedupe; prefer ones the assistant
+  wrote/edited over ones it merely read.

@@ -319,7 +319,7 @@
     },
     {
       "id": "AC-11",
-      "status": "planned",
+      "status": "active",
       "given": "the consumer workflow templates",
       "when": "the template security tests run",
       "then": "every action is pinned to a full commit SHA and contents permission is read-only",
@@ -393,7 +393,7 @@
     },
     {
       "id": "AC-14",
-      "status": "planned",
+      "status": "active",
       "given": "a push whose fast quality profile exits 1",
       "when": "the pre-push hook runs",
       "then": "the push is blocked",

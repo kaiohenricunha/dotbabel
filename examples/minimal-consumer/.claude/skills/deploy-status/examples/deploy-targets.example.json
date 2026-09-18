@@ -1,0 +1,21 @@
+{
+  "targets": [
+    {
+      "kind": "vercel",
+      "project": "my-app",
+      "projectId": "prj_...",
+      "team": "team_..."
+    },
+    {
+      "kind": "fly",
+      "app": "my-api"
+    },
+    {
+      "kind": "aws-amplify",
+      "appId": "d123...",
+      "branch": "main",
+      "region": "us-east-1"
+    }
+  ],
+  "rollback_order": ["fly", "vercel"]
+}

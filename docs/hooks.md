@@ -236,6 +236,9 @@ outside the allowlisted root is refused, never checked.
 | `CHECK_ON_STOP_TIMEOUT`      | check-on-stop  | Seconds per checker (default 120)   |
 | `CHECK_ON_STOP_TRUST_ALL`    | check-on-stop  | Bypasses the allowlist              |
 | `CHECK_ON_STOP_TRUSTED_FILE` | check-on-stop  | Overrides the allowlist path        |
+| `CHECK_ON_STOP_TESTS=1`      | check-on-stop  | Enables the related-tests stage     |
+| `BYPASS_PRE_PUSH=1`          | pre-push       | Skips the pre-push quality check    |
+| `DOTBABEL_PRE_PUSH_TIMEOUT`  | pre-push       | Seconds for the check (default 120) |
 
 Write the guard bypass directly before the git call that the user confirmed, as in
 `BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers only that call, so
@@ -263,6 +266,69 @@ A checker that fails with no output at all is reported rather than swallowed —
 silence from a failing checker is worth surfacing.
 
 ---
+
+## Related tests at turn end (opt-in)
+
+`check-on-stop.sh` can run the tests related to the files a turn changed. It is
+**off by default** and needs two independent permissions, not one:
+
+```bash
+export CHECK_ON_STOP_TESTS=1          # the opt-in
+echo "$(realpath .)" >> ~/.config/dotbabel/check-on-stop-trusted   # the trust
+```
+
+Both are required. The opt-in alone does nothing in an untrusted repository,
+which matters because a repository can ship a file that sets an environment
+variable but cannot add itself to a user-scope allowlist. Running a test suite
+is executing code the repository's author chose, so it sits behind the same
+allowlist as the build checkers, plus one more switch.
+
+The stage uses each runner's own scoping rather than running everything:
+
+| Language   | Detected from    | Runs                                                                 |
+| ---------- | ---------------- | -------------------------------------------------------------------- |
+| JavaScript | `package.json`   | `npx vitest related --run <files>`, or `npx jest --findRelatedTests` |
+| Go         | `go.mod`         | `go test` on the touched packages                                    |
+| Python     | `pyproject.toml` | `pytest` on the touched test files                                   |
+
+A whole-suite run is deliberately not offered: at the end of every turn it is
+slow enough to get switched off, and a switched-off check protects nothing.
+
+`CHECK_ON_STOP_TIMEOUT` bounds the stage, and a timed-out run never blocks — a
+bound being hit is not a code defect. Failures feed the same give-up counter as
+the static checks, so the same failing test blocks at most twice and then stops
+blocking; this hook emits `decision: "block"`, so an unbounded stage would trap
+the model in a loop rather than protect anything.
+
+## The pre-push hook
+
+`githooks/pre-push` runs `dotbabel quality check --profile fast` against the
+merge base with the upstream branch. Activation is manual, because the hook
+runs repository code:
+
+```bash
+git config core.hooksPath githooks
+```
+
+**It never traps a push.** Exactly one outcome blocks — the check ran and
+reported a policy failure (exit 1). A missing `dotbabel`, unavailable evidence
+or tooling (exit 2), any other exit code, a run that outlives
+`DOTBABEL_PRE_PUSH_TIMEOUT`, or **no resolvable upstream merge base** prints a
+notice and lets the push through. That asymmetry is the design: a hook that can
+wedge a push at a deadline gets deleted, and then it protects nothing.
+
+The merge base comes from `refs/remotes/<remote>/<branch>`, falling back to
+`refs/remotes/<remote>/HEAD`. A normal `git clone` records the latter, so a new
+branch resolves its fork point and the gate works on a first push. Where
+`origin/HEAD` was never recorded — `git init` plus `git remote add`, and some
+CI and worktree setups — there is nothing to diff against and the hook allows
+the push with a notice rather than guessing at a base.
+
+The check is scoped with `--head HEAD`, so it judges the commits being pushed.
+Uncommitted work in the tree is deliberately out of scope here; that is
+`check-on-stop`'s job.
+
+Bypass with `BYPASS_PRE_PUSH=1 git push`, or `git push --no-verify`.
 
 ## Troubleshooting
 

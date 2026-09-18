@@ -48,8 +48,8 @@ This writes:
 - `.claude/settings.json`, `.claude/settings.headless.json`, `.claude/skills-manifest.json`
 - `.claude/hooks/guard-destructive-git.sh`
 - `docs/repo-facts.json`, `docs/specs/README.md`
-- `.github/workflows/{ai-review,detect-drift,validate-skills}.yml`
-- `githooks/pre-commit`
+- `.github/workflows/{ai-review,detect-drift,quality,test,validate-skills}.yml`
+- `githooks/pre-commit`, `githooks/pre-push`
 
 Every placeholder (`{{project_name}}`, `{{project_type}}`, `{{today}}`) is
 substituted at scaffold time.
@@ -105,11 +105,30 @@ Green. You're done.
 
 ### 5. Wire the PR gate
 
-In GitHub branch protection, require the three shipped workflows:
+In GitHub branch protection, require the shipped workflows:
 
 - `validate-skills` — manifest + drift + specs
+- `test` — the `pr` quality profile, plus `dotbabel-criteria` for acceptance
+  criteria. The criteria job runs even when a local attestation lets the
+  verify job skip, because it is the independent second opinion.
 - `detect-drift` — flags stale `.claude/commands/*.md`
 - `ai-review` — PR review (optional)
+
+`quality` is not a PR gate: it runs the `deep` profile weekly and on manual
+dispatch, since mutation and race detection are too slow for every push.
+
+Both `test.yml` and `quality.yml` execute the project commands your repository
+declares. Delete either one if you would rather adopt it later.
+
+To run the same quality check before every push, opt in to the hook — it is
+not enabled by scaffolding, because it runs repository code:
+
+```bash
+git config core.hooksPath githooks
+```
+
+Only a policy failure blocks a push; a missing tool or a timeout prints a
+notice and gets out of the way.
 
 Any PR touching a protected path (see `docs/repo-facts.json`) must now carry
 a `Spec ID:` or `## No-spec rationale` section. `dotbabel-check-spec-coverage`
