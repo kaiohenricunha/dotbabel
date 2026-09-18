@@ -55,7 +55,14 @@ not auditing.
 
 2. **Locate the spec directory.** Look for `docs/specs/<spec-id>/` starting from cwd, walking up to find the project root (the directory containing `docs/specs/`).
 
-3. **Confirm the multi-file `/spec` layout.** Required files:
+3. **Report whether the spec declares `acceptance_criteria`.** If `spec.json`
+   has no `acceptance_criteria` array, record an **INFO** finding: the field is
+   optional in the schema, so a spec written before it existed is not
+   malformed — but its claims are prose only, and nothing machine-checkable
+   backs them. Say so in the audit rather than letting the absence pass
+   unremarked. Never escalate this to a failure.
+
+4. **Confirm the multi-file `/spec` layout.** Required files:
    - `spec.json`
    - `README.md`
    - `spec/1-problem-motivation.md`
@@ -72,7 +79,7 @@ not auditing.
 
    > This skill validates only the structured `/spec` format (8 sections + spec.json). The directory `<path>` is missing: `<list>`. For ad-hoc or single-file specs, run `/create-audit` with the spec file as input instead.
 
-4. **Read everything into context.** `spec.json`, `README.md`, all 8 section files, `research/sources.md`, and `current-state/analysis.md` if present (brownfield).
+5. **Read everything into context.** `spec.json`, `README.md`, all 8 section files, `research/sources.md`, and `current-state/analysis.md` if present (brownfield).
 
 ---
 
@@ -145,7 +152,27 @@ ground truth. Run them.
    - Capture exit code, last 30 lines of stdout, last 30 lines of stderr.
    - Record duration.
 
-2. **On any failure, prove pre-existing vs. introduced.** This is non-negotiable per the user's CLAUDE.md test discipline — never assert "pre-existing" without proof. The required check:
+2. **Verify the acceptance criteria**, when the spec declares any:
+
+   ```bash
+   dotbabel criteria verify --spec <spec-id>
+   ```
+
+   This belongs here, beside the acceptance commands, because both are the
+   spec's executable ground truth. An audit that ran only the commands could
+   report a spec as implemented while the criteria naming its tests fail.
+
+   Record each criterion's verdict in the audit by id. A criterion still
+   `planned` is reported as such and is not a failure — it is a claim whose
+   tests have not landed yet. A criterion that is `active` and fails **is** a
+   CRITICAL finding: the spec asserts something its own tests contradict.
+
+   **Never resolve a failing criterion by editing the criterion.** This skill
+   audits a spec against the code; rewriting the claim to match broken code
+   inverts that, and the audit would then certify exactly the drift it exists
+   to catch.
+
+3. **On any failure, prove pre-existing vs. introduced.** This is non-negotiable per the user's CLAUDE.md test discipline — never assert "pre-existing" without proof. The required check:
 
    ```bash
    git stash --include-untracked
@@ -158,7 +185,7 @@ ground truth. Run them.
    - If `STASHED_EXIT` is zero → label the failure **introduced** (recorded as **CRITICAL** — the spec implementation broke this command).
    - If there is nothing to stash (clean working tree), the failure is in committed code — label **pre-existing**.
 
-3. **Always restore working state.** `git stash pop` after every stash. If `git stash pop` errors (e.g. conflicts), stop the entire skill, surface the situation to the user, and do not write the audit. Losing user work is worse than missing the audit.
+4. **Always restore working state.** `git stash pop` after every stash. If `git stash pop` errors (e.g. conflicts), stop the entire skill, surface the situation to the user, and do not write the audit. Losing user work is worse than missing the audit.
 
 ---
 

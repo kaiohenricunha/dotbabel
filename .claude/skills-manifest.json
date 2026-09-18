@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-18T14:46:58.677Z",
+  "generatedAt": "2026-09-18T15:16:45.062Z",
   "skills": [
     {
       "name": "agents-search",
@@ -291,7 +291,7 @@
     {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
-      "checksum": "sha256:9ec1c67a434bf90512a2dcb5a68c4bb3bffd65c1bee967fa370164ec6ea84002",
+      "checksum": "sha256:1362b6349dfdc0754834e70ecb013cf3a2a9e9e64d0c0fc853866a83a950c3fc",
       "dependencies": [],
       "lastValidated": "2026-09-18"
     },
@@ -319,7 +319,7 @@
     {
       "name": "validate-spec",
       "path": ".claude/skills/validate-spec/SKILL.md",
-      "checksum": "sha256:13320e86060cb9a74d9ee98aecbbb9eff43c6100b47f09debe15f7049f6c050c",
+      "checksum": "sha256:a84e42309b477539cc40821b4ce5391fd8efb916d8e979ec662c0b3239d1dc67",
       "dependencies": [],
       "lastValidated": "2026-09-18"
     },
