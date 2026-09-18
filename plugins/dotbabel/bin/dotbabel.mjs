@@ -46,6 +46,7 @@ const SUBCOMMANDS = [
   "pr-stack",
   "quality",
   "criteria",
+  "models",
 ];
 
 function printUsage() {
