@@ -432,6 +432,26 @@ export function buildIndex(artifacts) {
 }
 
 /**
+ * Schema basenames, in registration order. `dotbabel.compute` precedes the
+ * artifact schemas because they `$ref` it and ajv resolves a reference only
+ * against an already-added schema. Exported so a test builds its ajv instance
+ * from this one list instead of repeating it: a missing entry surfaced as an
+ * ajv "can't resolve reference" error inside an unrelated test.
+ * @type {readonly string[]}
+ */
+export const SCHEMA_FILES = Object.freeze([
+  "facets",
+  "common",
+  "dotbabel.compute",
+  "agent",
+  "skill",
+  "command",
+  "hook",
+  "template",
+  "index-entry",
+]);
+
+/**
  * Load every schema file from `schemasDir` into a single Ajv instance and
  * return it along with the per-type compiled validators.
  *
@@ -441,17 +461,7 @@ export function buildIndex(artifacts) {
 function compileSchemas(schemasDir) {
   const ajv = new Ajv({ strict: false, allErrors: true });
   addFormats(ajv);
-  const files = [
-    "facets",
-    "common",
-    "agent",
-    "skill",
-    "command",
-    "hook",
-    "template",
-    "index-entry",
-  ];
-  for (const f of files) {
+  for (const f of SCHEMA_FILES) {
     const abs = join(schemasDir, `${f}.schema.json`);
     if (!existsSync(abs)) {
       throw new Error(`schema not found: ${abs}`);

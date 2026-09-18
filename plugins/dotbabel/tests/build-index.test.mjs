@@ -15,6 +15,7 @@ import {
   buildIndex,
   validateArtifacts,
   isIndexStale,
+  SCHEMA_FILES,
   isDirectory,
   SCHEMAS_DIR,
 } from "../src/build-index.mjs";
@@ -414,16 +415,7 @@ describe("schema round-trip", () => {
     const { default: addFormats } = await import("ajv-formats");
     const ajv = new Ajv({ strict: false, allErrors: true });
     addFormats(ajv);
-    const schemas = [
-      "facets",
-      "common",
-      "agent",
-      "skill",
-      "command",
-      "hook",
-      "template",
-      "index-entry",
-    ];
+    const schemas = SCHEMA_FILES;
     for (const s of schemas) {
       const raw = JSON.parse(
         readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8"),
@@ -443,16 +435,7 @@ describe("schema round-trip", () => {
     const { default: addFormats } = await import("ajv-formats");
     const ajv = new Ajv({ strict: false, allErrors: true });
     addFormats(ajv);
-    for (const s of [
-      "facets",
-      "common",
-      "agent",
-      "skill",
-      "command",
-      "hook",
-      "template",
-      "index-entry",
-    ]) {
+    for (const s of SCHEMA_FILES) {
       ajv.addSchema(
         JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")),
       );
@@ -490,16 +473,7 @@ describe("schema round-trip", () => {
     const { default: addFormats } = await import("ajv-formats");
     const ajv = new Ajv({ strict: false, allErrors: true });
     addFormats(ajv);
-    for (const s of [
-      "facets",
-      "common",
-      "agent",
-      "skill",
-      "command",
-      "hook",
-      "template",
-      "index-entry",
-    ]) {
+    for (const s of SCHEMA_FILES) {
       ajv.addSchema(
         JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")),
       );
@@ -527,16 +501,7 @@ describe("schema fix: allowed-tools / disable-model-invocation (#324 prerequisit
     const { default: addFormats } = await import("ajv-formats");
     const ajv = new Ajv({ strict: false, allErrors: true });
     addFormats(ajv);
-    for (const s of [
-      "facets",
-      "common",
-      "agent",
-      "skill",
-      "command",
-      "hook",
-      "template",
-      "index-entry",
-    ]) {
+    for (const s of SCHEMA_FILES) {
       ajv.addSchema(
         JSON.parse(readFileSync(join(SCHEMAS_DIR, `${s}.schema.json`), "utf8")),
       );

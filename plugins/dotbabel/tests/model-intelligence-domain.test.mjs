@@ -20,7 +20,7 @@ const VOCABULARIES = {
   ENFORCEMENT_BASES: ["artifact-binding", "session-observation", "invocation", "none"],
   REPRESENTATION_KINDS: ["stable-alias", "native-id", "opaque-selector"],
   ARTIFACT_KINDS: ["agent", "command", "skill", "workflow"],
-  SOURCE_KINDS: ["runtime", "knowledge-source"],
+  SOURCE_KINDS: ["runtime", "knowledge-source", "artifact"],
 };
 
 describe("model-intelligence domain vocabulary", () => {
@@ -100,5 +100,38 @@ describe("model-intelligence domain vocabulary", () => {
       axes: { model: "x" },
       representation: { kind: "native-id", provenance: domain.makeProvenance({ sourceId: "x", sourceKind: "runtime" }) },
     })).toThrow(/runtimeId/);
+  });
+});
+
+describe("model-intelligence domain shape guards", () => {
+  it("rejects a non-object where a shape is required", async () => {
+    const { makeProvenance, makeResolvedRuntimeConfiguration } = await import("../src/model-intelligence/domain/index.mjs");
+    for (const value of [null, "codex", 7, ["codex"]]) {
+      expect(() => makeProvenance(value)).toThrow(/Provenance must be an object/);
+    }
+    const provenance = makeProvenance({ sourceId: "codex", sourceKind: "runtime" });
+    for (const representation of [null, "stable-alias", []]) {
+      expect(() => makeResolvedRuntimeConfiguration({ runtimeId: "codex", axes: { model: "m" }, representation })).toThrow(/representation must be an object/);
+    }
+    for (const axes of [null, "model", ["model"]]) {
+      expect(() => makeResolvedRuntimeConfiguration({ runtimeId: "codex", axes, representation: { kind: "native-id", provenance } })).toThrow(/axes/);
+    }
+  });
+
+  it("carries an artifact source kind so a declaration cannot pose as a runtime observation", async () => {
+    const { SOURCE_KINDS, makeProvenance } = await import("../src/model-intelligence/domain/index.mjs");
+    expect(SOURCE_KINDS).toContain("artifact");
+    // A canonical declaration states its own requirement; no adapter observed it.
+    // Consumers read `runtime` as "observed from a harness", so the two must differ.
+    const declared = makeProvenance({ sourceId: "skills/probe/SKILL.md", sourceKind: "artifact" });
+    expect(declared.sourceKind).toBe("artifact");
+    expect(declared.adapterVersion).toBeUndefined();
+    expect(() => makeProvenance({ sourceId: "x", sourceKind: "declaration" })).toThrow(/sourceKind/);
+  });
+
+  it("rejects a non-string version field in provenance", async () => {
+    const { makeProvenance } = await import("../src/model-intelligence/domain/index.mjs");
+    expect(() => makeProvenance({ sourceId: "codex", sourceKind: "runtime", sourceVersion: 154 })).toThrow(/sourceVersion must be a string/);
+    expect(() => makeProvenance({ sourceId: "codex", sourceKind: "runtime", adapterVersion: {} })).toThrow(/adapterVersion must be a string/);
   });
 });

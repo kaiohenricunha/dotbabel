@@ -46,6 +46,7 @@
     "prerequisites": {
       "type": "array",
       "items": { "$ref": "facets.schema.json#/$defs/slug" }
-    }
+    },
+    "dotbabel": { "$ref": "dotbabel.compute.schema.json" }
   }
 }
