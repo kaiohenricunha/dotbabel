@@ -515,6 +515,8 @@ opencode + skill + model   → unverified
 | **Copilot custom agents**               | Native model binding exists according to current Copilot CLI documentation.                                                                                                                                                            | Candidate for native projection, but add a Dotbabel integration test before declaring the adapter contract verified. |
 | **Copilot command / `.prompt.md` path** | Existing Dotbabel code records `model` in GitHub's `.prompt.md` schema (`plugins/dotbabel/src/copilot-frontmatter.mjs:9-12`) and drops it with a warning (`:46`), but current GitHub documentation describes prompt files as IDE-only. | Treat as unverified and open a research item before Model Intelligence relies on it.                                 |
 
+Phase 0 measured these rows on 2026-09-18 (DOC-3). Codex skills and OpenCode skills are now `unsupported`, confirmed from the source at the installed tags. Antigravity skills stay `unverified`, and the evidence points to `unsupported`. Copilot CLI 1.0.83 does not read `.prompt.md`, so that row is `unsupported` for the CLI. Copilot custom agents accept a `model` key in their schema, and the run-time test is blocked by authentication, so the row stays a candidate. DOC-3 holds the full row set.
+
 - **ARCH-46**: The table is an initial capability snapshot that starts from the measured constraints of DOC-2 (ARCH-11), not permanent policy. Adapter capability tests, not runtime names, determine future behavior.
 
 **Invocation output.** When an artifact has no native binding, Model Intelligence can still resolve to a concrete runtime configuration. Conceptual result:
