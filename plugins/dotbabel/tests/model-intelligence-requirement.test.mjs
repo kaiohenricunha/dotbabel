@@ -264,6 +264,49 @@ describe("dotbabel.compute parsing", () => {
     ).toBe(false);
   });
 
+  it("rejects a malformed declaration shape rather than reading it as policy", () => {
+    // The namespace, the compute block, and pin must each be a mapping. A scalar or a
+    // list is a structural error, never a silently ignored declaration.
+    const namespaceScalar = parseComputeDeclaration({ dotbabel: "deep" }, { sourcePath: "a.md" });
+    expect(namespaceScalar.declared).toBe(true);
+    expect(pointers(namespaceScalar)).toEqual(["/dotbabel"]);
+
+    const computeScalar = parseComputeDeclaration({ dotbabel: { compute: "deep" } }, { sourcePath: "a.md" });
+    expect(pointers(computeScalar)).toEqual(["/dotbabel/compute"]);
+
+    const computeList = parseComputeDeclaration({ dotbabel: { compute: [] } }, { sourcePath: "a.md" });
+    expect(pointers(computeList)).toEqual(["/dotbabel/compute"]);
+
+    const pinScalar = parseComputeDeclaration(fm({ requirement: "deep", binding: "self", mode: "pin", pin: "claude" }), { sourcePath: "a.md" });
+    expect(pointers(pinScalar)).toEqual(["/dotbabel/compute/pin"]);
+
+    const pinExtraKey = parseComputeDeclaration(fm({ requirement: "deep", binding: "self", mode: "pin", pin: { runtime: "claude", config: { model: "opus" }, effort: "max" } }), { sourcePath: "a.md" });
+    expect(pointers(pinExtraKey)).toEqual(["/dotbabel/compute/pin/effort"]);
+  });
+
+  it("reports every invalid field of a declaration, each with its own pointer", () => {
+    const result = parseComputeDeclaration(fm({ requirement: "genius", binding: "agent", mode: "auto", rationale: 7 }), { sourcePath: "a.md" });
+    expect(result.requirement).toBeNull();
+    expect(codes(result)).toEqual(Array(4).fill("MI_COMPUTE_INVALID"));
+    expect(pointers(result)).toEqual([
+      "/dotbabel/compute/binding",
+      "/dotbabel/compute/mode",
+      "/dotbabel/compute/requirement",
+      "/dotbabel/compute/rationale",
+    ]);
+    const requirementError = result.errors.find((error) => error.pointer.endsWith("/requirement"));
+    expect(requirementError.expected).toBe("mechanical, routine, deep, frontier, exceptional");
+    expect(requirementError.got).toBe("genius");
+    // An unusable mode skips the conditional rules rather than adding noise about them.
+    expect(pointers(result)).not.toContain("/dotbabel/compute/pin");
+  });
+
+  it("requires options.sourcePath, because provenance cannot be invented", () => {
+    for (const options of [undefined, {}, { sourcePath: "" }, { sourcePath: "   " }]) {
+      expect(() => parseComputeDeclaration(fm({ binding: "self", mode: "inherit" }), options)).toThrow(/sourcePath/);
+    }
+  });
+
   it("parses over supplied data only: no filesystem, process, or clock use", () => {
     const source = readFileSync(REQUIREMENT_SOURCE, "utf8");
     const imports = [...source.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map(

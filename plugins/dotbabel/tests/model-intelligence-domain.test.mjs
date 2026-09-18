@@ -102,3 +102,25 @@ describe("model-intelligence domain vocabulary", () => {
     })).toThrow(/runtimeId/);
   });
 });
+
+describe("model-intelligence domain shape guards", () => {
+  it("rejects a non-object where a shape is required", async () => {
+    const { makeProvenance, makeResolvedRuntimeConfiguration } = await import("../src/model-intelligence/domain/index.mjs");
+    for (const value of [null, "codex", 7, ["codex"]]) {
+      expect(() => makeProvenance(value)).toThrow(/Provenance must be an object/);
+    }
+    const provenance = makeProvenance({ sourceId: "codex", sourceKind: "runtime" });
+    for (const representation of [null, "stable-alias", []]) {
+      expect(() => makeResolvedRuntimeConfiguration({ runtimeId: "codex", axes: { model: "m" }, representation })).toThrow(/representation must be an object/);
+    }
+    for (const axes of [null, "model", ["model"]]) {
+      expect(() => makeResolvedRuntimeConfiguration({ runtimeId: "codex", axes, representation: { kind: "native-id", provenance } })).toThrow(/axes/);
+    }
+  });
+
+  it("rejects a non-string version field in provenance", async () => {
+    const { makeProvenance } = await import("../src/model-intelligence/domain/index.mjs");
+    expect(() => makeProvenance({ sourceId: "codex", sourceKind: "runtime", sourceVersion: 154 })).toThrow(/sourceVersion must be a string/);
+    expect(() => makeProvenance({ sourceId: "codex", sourceKind: "runtime", adapterVersion: {} })).toThrow(/adapterVersion must be a string/);
+  });
+});
