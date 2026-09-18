@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 
 import { validateConfig } from "../src/local-attest-config.mjs";
+import { parseAttestationComment } from "../src/attestation.mjs";
 import { execute } from "../src/local-attest-runner.mjs";
 import { buildAttestMarker } from "../src/local-attest-lib.mjs";
 
@@ -138,9 +139,15 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
       push: false,
       dryRun: true,
     });
-    const redacted = r.body.replace(/`\d{4}-\d{2}-\d{2}T[^`]+`/g, "`<TS>`");
+    // The payload line carries its own generated_at inside the base64, so it
+    // is redacted wholesale here and asserted by decoding in the case below.
+    // Leaving it in would make this snapshot change on every run.
+    const redacted = r.body
+      .replace(/`\d{4}-\d{2}-\d{2}T[^`]+`/g, "`<TS>`")
+      .replace(/^<!-- local-attest-payload .* -->$/m, "<!-- local-attest-payload <PAYLOAD> -->");
     expect(redacted).toMatchInlineSnapshot(`
       "<!-- local-attest verified-sha=abc1234abc1234abc1234abc1234abc1234abc12 -->
+      <!-- local-attest-payload <PAYLOAD> -->
       ## Local Attestation
 
       The full CI check matrix ran locally and the hard legs passed for \`abc1234a\`.
@@ -169,6 +176,23 @@ describe("local-attest end-to-end smoke (synthetic, no real I/O)", () => {
       - Attested at: \`<TS>\`
       - Verified SHA: \`abc1234abc1234abc1234abc1234abc1234abc12\`"
     `);
+  });
+
+  it("the payload line decodes to the same legs the table shows", async () => {
+    // The merge gate reads the payload and no human reads it, so nothing but a
+    // test like this notices if the machine-readable half stops agreeing with
+    // the half people review.
+    const { deps } = happyDeps();
+    const r = await execute(deps, squadranksShapedConfig(), { prOverride: null, push: false, dryRun: true });
+
+    const parsed = parseAttestationComment(r.body);
+    expect(parsed.state).toBe("ok");
+    expect(parsed.payload.head_sha).toBe("abc1234abc1234abc1234abc1234abc1234abc12");
+    expect(parsed.payload.verdict).toBe("pass");
+    expect(parsed.payload.legs.map((l) => l.name)).toEqual(squadranksShapedConfig().matrix.map((l) => l.name));
+
+    const tableRows = r.body.split("\n").filter((l) => /^\| .+ \| (hard|advisory) \| /.test(l));
+    expect(parsed.payload.legs).toHaveLength(tableRows.length);
   });
 
   it("squadranks-shape compatibility: marker, default label, and audit shape match the gate's expectations", async () => {

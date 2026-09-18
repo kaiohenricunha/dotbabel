@@ -44,7 +44,8 @@ import {
   summarizeGates,
 } from "../src/pr-gates.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
-import { criteriaGateInputs } from "../src/criteria/gate-inputs.mjs";
+import { criteriaGateInputs, prComments } from "../src/criteria/gate-inputs.mjs";
+import { attestationGateInputs } from "../src/attestation-gate-inputs.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -469,9 +470,15 @@ async function main() {
     // endpoint and cross-check the count; a mismatch means unreadable, and the
     // gate must fail closed rather than judge a partial diff.
     view.files = paginatedPrFiles(prNumber, view.changedFiles);
+    // One fetch, both evidence families. `criteriaGateInputs` short-circuits
+    // on several paths without ever fetching comments, so piggybacking the
+    // attestation check on its result would report ATTESTATION_MISSING
+    // whenever criteria happened not to apply.
+    const comments = prComments({ run }, prNumber);
     const result = checkMergeGate({
       body: view.body,
       hasSpecsDir: existsSync(`${root}/docs/specs`),
+      ...attestationGateInputs({ run }, view, comments),
       // A null list means "could not be proven complete"; the criteria half
       // turns that into CRITERIA_FILES_UNREADABLE, and an empty array here
       // keeps the protected-path check from silently passing on it.
@@ -479,7 +486,7 @@ async function main() {
       protectedPaths: protectedPaths(root),
       mergeable: view.mergeable,
       mergeStateStatus: view.mergeStateStatus,
-      ...criteriaGateInputs({ run }, view, prNumber),
+      ...criteriaGateInputs({ run }, view, prNumber, { comments }),
     });
     const summary = summarizeGates([result]);
     return emit({

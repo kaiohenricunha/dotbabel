@@ -9,7 +9,7 @@
  *   1. checkPreconditions — clean tree, branch, PR, head SHA, gh, docker
  *   2. runMatrix          — execute each leg sequentially, capture tails
  *   3. push (optional)    — only after hard legs pass; before posting
- *   4. upsertComment      — PATCH existing attestation comment or POST a new one
+ *   4. postAttestComment  — POST a new attestation comment, minimize older ones
  *   5. applyLabel         — best-effort decoration
  *   6. appendAuditLog     — best-effort jsonl line
  *
@@ -42,6 +42,12 @@
  * @property {string} repo
  * @property {string} pr
  * @property {string} headSha
+ * @property {string|null} [baseRefName]  the branch this PR targets
+ * @property {string|null} [mergeBase]  fork point with the base branch; what the
+ *   quality leg's diff was graded against, and null when the base is unfetched
+ * @property {string} [configHash]  hash of the governance files at this commit;
+ *   the merge gate recomputes it from the base ref, so a pull request that edits
+ *   one cannot attest itself
  * @property {{ node?: string, go?: string }|null} [toolchain]  versions measured
  *   against the config pins; null when no pins are configured
  */
@@ -51,10 +57,10 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { dirname } from "node:path";
 
+import { ATTEST_MARKER_PREFIX, DEFAULT_GOVERNANCE_FILES, hashGovernanceFiles } from "./attestation.mjs";
 import {
   buildAuditEntry,
   filterMatrix,
-  findAttestComment,
   goMajorMinorFromVersion,
   legStatus,
   markSkips,
@@ -66,6 +72,78 @@ import {
 } from "./local-attest-lib.mjs";
 import { GIT_MAX_BUFFER } from "./lib/limits.mjs";
 import { PERM_TO_ASSOC } from "./lib/perm-to-assoc.mjs";
+
+/**
+ * Read the governance-file list the merge gate will judge this run against.
+ *
+ * Deliberately read from `.dotbabel.json` rather than from the local-attest
+ * config: `.dotbabel.json` is plain JSON, so the gate can read the base ref's
+ * copy with `git show` instead of executing a pull request's JavaScript. The
+ * two sides must agree or the hashes differ and the gate blocks — which is the
+ * fail-closed direction.
+ *
+ * @param {Deps} deps
+ * @returns {string[]}
+ */
+/**
+ * A plain git ref name: letters, digits, dot, underscore, slash, hyphen.
+ *
+ * `git check-ref-format` is far more permissive than this — it rejects only
+ * spaces, control characters and a short reserved set, so `;`, `&`, `|`, `$`
+ * and backticks are all legal in a branch name. Anything reaching a shell here
+ * is narrowed to the characters a real branch actually uses.
+ */
+const REF_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._\/-]*$/;
+
+function governanceFileList(deps, rev) {
+  try {
+    const raw = showAtRev(deps, rev, ".dotbabel.json");
+    const parsed = raw === null ? null : JSON.parse(raw);
+    const list = parsed?.attestation?.governance_files;
+    if (Array.isArray(list) && list.length > 0) return list.map(String);
+  } catch {
+    // No `.dotbabel.json`, or not parseable: fall back to the default list.
+    // A repository with no policy at all still records a hash, which simply
+    // never gets compared because the gate is not enforcing.
+  }
+  return [...DEFAULT_GOVERNANCE_FILES];
+}
+
+/**
+ * A file's contents at a revision, or null when it does not exist there.
+ *
+ * `git show`, not the working tree: the merge gate reads the base ref the same
+ * way, and hashing committed bytes on both sides is what makes the two hashes
+ * comparable at all. It also keeps this off `deps.readFile`, which the
+ * `restoreFiles` snapshot owns.
+ *
+ * @param {Deps} deps
+ * @param {string} rev
+ * @param {string} path
+ * @returns {string|null}
+ */
+function showAtRev(deps, rev, path) {
+  const r = deps.run(`git show ${rev}:${path}`, { capture: true });
+  return r.status === 0 ? r.stdout : null;
+}
+
+/**
+ * Hash the governance files as committed at a revision.
+ *
+ * This is what makes the attestation say which matrix ran, not just that a
+ * matrix ran. The gate recomputes the same hash from the BASE ref: if the
+ * pull request rewrote a leg's command, or lowered a quality threshold, the
+ * two hashes differ and the run cannot authorize its own change.
+ *
+ * @param {Deps} deps
+ * @param {string} rev
+ * @returns {string}
+ */
+function computeConfigHash(deps, rev) {
+  return hashGovernanceFiles(
+    governanceFileList(deps, rev).map((path) => ({ path, bytes: showAtRev(deps, rev, path) })),
+  );
+}
 
 /**
  * Build a `Deps` bundle wired to the real environment. Tests construct their
@@ -494,7 +572,42 @@ export function checkPreconditions(deps, cfg, opts = {}) {
     // Permission probe is a courtesy — never block on it.
   }
 
-  return { branch, repo, pr, headSha, toolchain: toolchain.seen };
+  // What the merge gate needs to judge this run later, captured now so the
+  // payload names the same tree the matrix is about to grade.
+  //
+  // The merge base, not the base branch tip: the quality profile grades a
+  // diff, and the fork point is what defines that diff. It does not move when
+  // the trunk gains commits, so recording it cannot invalidate an attestation
+  // every time something else merges. Best-effort — an unfetched base leaves
+  // it null, and the gate simply has one fewer thing to check.
+  const baseRefName = (() => {
+    try {
+      return capture(deps, `gh pr view ${pr} --json baseRefName --jq .baseRefName`);
+    } catch {
+      return "";
+    }
+  })();
+  let mergeBase = null;
+  // Validate before interpolating: `baseRefName` is remote data from the API,
+  // `deps.run` executes with a shell, and git ref names permit `;`, `&`, `|`,
+  // `$` and backticks. This file's own header rule forbids exactly this.
+  if (REF_NAME_RE.test(baseRefName)) {
+    const r = deps.run(`git merge-base HEAD origin/${baseRefName}`, { capture: true });
+    if (r.status === 0) mergeBase = r.stdout.trim() || null;
+  } else if (baseRefName) {
+    deps.warn(`WARNING: refusing to use base ref name ${JSON.stringify(baseRefName)} — not a plain ref name.`);
+  }
+
+  return {
+    branch,
+    repo,
+    pr,
+    headSha,
+    baseRefName: baseRefName || null,
+    mergeBase,
+    configHash: computeConfigHash(deps, headSha),
+    toolchain: toolchain.seen,
+  };
 }
 
 /**
@@ -604,40 +717,68 @@ export async function runMatrix(deps, matrix, { failFast = false } = {}) {
 }
 
 /**
- * Insert or update the attestation comment. Always sends the body via stdin
- * (`gh api --input -`) so multiline markdown can't be mangled by shell quoting.
- * Only PATCHes a comment whose original author is in `trustedAssociations` so
- * the CI gate (which filters by author_association) sees the correct author.
+ * Post the attestation comment and minimize this tool's older ones.
+ *
+ * Deliberately post-then-minimize rather than the PATCH-in-place upsert this
+ * used to do (OPS-4, extended to attestation evidence). The merge gate now
+ * treats an attestation as authorization to skip verification, and it refuses
+ * an edited comment — a comment whose text is not the text the tool wrote is
+ * not evidence. Under the old behaviour every attestation after a pull
+ * request's first one was an edit, so the trust rule and the publication
+ * model contradicted each other and the second attestation on any pull
+ * request would have been refused.
+ *
+ * Only this tool's own comments are minimized: the author filter is the
+ * authenticated login, so a collaborator's attestation is left alone rather
+ * than hidden by someone else's run.
+ *
+ * Always sends the body via stdin (`gh api --input -`) so multiline markdown
+ * cannot be mangled by shell quoting.
  *
  * @param {Deps} deps
- * @param {{ repo: string, pr: string|number, body: string, trustedAssociations?: string[] }} args
- * @returns {{ kind: "post"|"patch", commentId?: number|string }}
+ * @param {{ repo: string, pr: string|number, body: string }} args
+ * @returns {{ kind: "post", minimized: number }}
  */
-export function upsertComment(deps, { repo, pr, body, trustedAssociations }) {
+export function postAttestComment(deps, { repo, pr, body }) {
+  let mine = "";
+  try {
+    mine = capture(deps, "gh api user --jq .login");
+  } catch {
+    // Without a login the minimize step is skipped rather than guessed at.
+    // A stale visible comment is untidy; hiding someone else's is worse.
+  }
+
   const raw = capture(deps, `gh api repos/${repo}/issues/${pr}/comments --paginate`);
   /** @type {Comment[]} */
   const comments = JSON.parse(raw || "[]");
-  const trusted = trustedAssociations ? new Set(trustedAssociations) : null;
-  const candidates = trusted
-    ? comments.filter((c) => c && trusted.has(c.author_association))
-    : comments;
-  const existing = findAttestComment(candidates);
-  if (existing) {
-    const id = Number(existing.id);
-    if (!Number.isFinite(id) || id <= 0) {
-      throw new Error(`unexpected comment id: ${existing.id}`);
-    }
-    deps.ghApiWithInput(`gh api --method PATCH repos/${repo}/issues/comments/${id} --input -`, {
-      body,
-    });
-    deps.log(`Updated existing attestation comment ${id}.`);
-    return { kind: "patch", commentId: id };
-  }
+  const older = mine
+    ? comments.filter(
+        (c) => c && c.user?.login === mine && typeof c.body === "string" && c.body.includes(ATTEST_MARKER_PREFIX),
+      )
+    : [];
+
   deps.ghApiWithInput(`gh api --method POST repos/${repo}/issues/${pr}/comments --input -`, {
     body,
   });
-  deps.log("Posted new attestation comment.");
-  return { kind: "post" };
+
+  let minimized = 0;
+  for (const comment of older) {
+    if (!comment.node_id) continue;
+    // Best-effort: a failed minimize leaves a superseded comment visible, and
+    // that is cosmetic. The gate matches on the head SHA, so an older comment
+    // can never be mistaken for current evidence.
+    const r = deps.run(
+      "gh api graphql -f " +
+        "'query=mutation($id: ID!) { minimizeComment(input: {subjectId: $id, classifier: OUTDATED}) " +
+        "{ minimizedComment { isMinimized } } }' " +
+        `-F id=${comment.node_id}`,
+      { capture: true },
+    );
+    if (r.status === 0) minimized += 1;
+  }
+
+  deps.log(`Posted a new attestation comment and minimized ${minimized} older one(s).`);
+  return { kind: "post", minimized };
 }
 
 /**
@@ -955,6 +1096,15 @@ export async function execute(deps, cfg, flags) {
     }
   }
 
+  // Every leg learns the pull request's real base branch. A diff-scoped leg
+  // that hardcodes `origin/main` grades the wrong diff on a stacked pull
+  // request, whose base is its parent branch — and the merge gate now accepts
+  // that leg's verdict as authoritative, so the error is no longer visible
+  // downstream. Env passing, never shell interpolation.
+  if (pre.baseRefName) {
+    matrix = matrix.map((l) => ({ ...l, env: { ...l.env, DOTBABEL_PR_BASE_REF: pre.baseRefName } }));
+  }
+
   // PR body injection: fetched once, empty on error (the consuming leg treats
   // an empty body as a non-PR context). Env passing, never shell interpolation.
   if (matrix.some((l) => l.passPrBody)) {
@@ -996,6 +1146,8 @@ export async function execute(deps, cfg, flags) {
     headSha: pre.headSha,
     hostname: deps.hostname(),
     toolchain: pre.toolchain,
+    mergeBase: pre.mergeBase,
+    configHash: pre.configHash,
   });
 
   // The mechanical bar: posting is only reachable through this predicate.
@@ -1046,12 +1198,7 @@ export async function execute(deps, cfg, flags) {
   // Post the attestation comment BEFORE pushing so it is visible when the
   // push event fires GitHub Actions.
   try {
-    upsertComment(deps, {
-      repo: pre.repo,
-      pr: pre.pr,
-      body,
-      trustedAssociations: cfg.trustedAssociations,
-    });
+    postAttestComment(deps, { repo: pre.repo, pr: pre.pr, body });
   } catch (err) {
     // A gh outage after a long green matrix must still leave a record — and
     // it is an attestation failure (exit 1), not an environment error: the

@@ -1,3 +1,8 @@
+import {
+  ATTEST_MARKER_PREFIX as SHARED_ATTEST_MARKER_PREFIX,
+  buildAttestationPayload,
+  renderAttestationHeader,
+} from "./attestation.mjs";
 import { createMarker } from "./lib/attest-marker.mjs";
 
 /**
@@ -41,7 +46,13 @@ import { createMarker } from "./lib/attest-marker.mjs";
  * @property {boolean} force  allow --init to overwrite an existing config
  */
 
-export const ATTEST_MARKER_PREFIX = "<!-- local-attest verified-sha=";
+/**
+ * Re-exported from `attestation.mjs`, which now owns both the marker text and
+ * the payload that rides under it (KD-2: the marker helpers live in a shared
+ * module). Kept here so the runner, the tests and any consumer importing it
+ * from this module keep working.
+ */
+export const ATTEST_MARKER_PREFIX = SHARED_ATTEST_MARKER_PREFIX;
 
 const marker = createMarker(ATTEST_MARKER_PREFIX);
 
@@ -305,15 +316,34 @@ export function tail(text, n = 10) {
 }
 
 /**
- * Render the attestation comment body. The marker is guaranteed to be line 1 —
- * the CI gate matches only the first line of each comment.
+ * Render the attestation comment body.
+ *
+ * Line 1 is the marker — the CI gate matches only the first line of each
+ * comment. Line 2 is the evidence payload the merge gate reads. Everything
+ * below is for humans; no gate parses the table.
+ *
+ * The payload and the table are both derived from `results` through
+ * {@link legStatus}, so the machine-readable claim and the readable one cannot
+ * disagree about what happened.
  *
  * @param {LegResult[]} results
- * @param {{ headSha: string, hostname: string, now?: Date }} ctx
+ * @param {{ headSha: string, hostname: string, toolchain?: object|null,
+ *           mergeBase?: string|null, configHash?: string|null,
+ *           toolVersion?: string, now?: Date }} ctx
  * @returns {string}
  */
-export function renderComment(results, { headSha, hostname, toolchain, now }) {
-  const marker = buildAttestMarker(headSha);
+export function renderComment(results, { headSha, hostname, toolchain, mergeBase, configHash, toolVersion, now }) {
+  const header = renderAttestationHeader(
+    buildAttestationPayload({
+      headSha,
+      mergeBase,
+      configHash,
+      legs: results.map((r) => ({ name: r?.name ?? "(unknown)", mode: r?.mode ?? "hard", status: legStatus(r) })),
+      toolchain,
+      toolVersion,
+      now,
+    }),
+  );
   const ts = (now ?? new Date()).toISOString();
   const LABELS = {
     pass: "pass",
@@ -340,7 +370,7 @@ export function renderComment(results, { headSha, hostname, toolchain, now }) {
         "(see .local-attest config; the rules are the config author's mirror of CI's own path filters)."
       : `The full CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`.`;
   return [
-    marker,
+    header,
     "## Local Attestation",
     "",
     headline,

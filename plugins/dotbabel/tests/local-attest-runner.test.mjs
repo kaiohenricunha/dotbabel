@@ -12,7 +12,7 @@ import {
   installInterruptRestore,
   restoreRestoreFiles,
   runMatrix,
-  upsertComment,
+  postAttestComment,
 } from "../src/local-attest-runner.mjs";
 
 /**
@@ -95,6 +95,85 @@ describe("checkPreconditions", () => {
     [/gh api user --jq \.login/, { stdout: "kaio\n" }],
     [/gh api repos\/.*\/collaborators\/.*\/permission/, { stdout: "ADMIN\n" }],
   ];
+
+  // --- P-G1: what the merge gate will judge this run against ---------------
+  //
+  // The marker alone says "the configured matrix passed at this SHA" and
+  // nothing about WHICH matrix. These fields are what let the gate tell a real
+  // run from one whose legs were rewritten to `true` in the same pull request.
+
+  const GOV_REPLIES = [
+    [/gh pr view 42 --json baseRefName/, { stdout: "main\n" }],
+    [/git merge-base HEAD origin\/main/, { stdout: "def5678def5678def5678def5678def5678def56\n" }],
+    [/git show .*:\.dotbabel\.json/, { stdout: '{"attestation":{"governance_files":[".dotbabel.json",".local-attest.config.mjs"]}}' }],
+    [/git show .*:\.local-attest\.config\.mjs/, { stdout: 'export default { matrix: [{ command: "npm test" }] };' }],
+  ];
+
+  it("records the merge base, not the base branch tip", () => {
+    // The quality leg grades a diff, and the fork point defines that diff. The
+    // tip moves whenever anything else merges; the fork point does not.
+    const { deps } = makeDeps({ runReplies: [...GOV_REPLIES, ...HAPPY_REPLIES] });
+    const pre = checkPreconditions(deps, baseConfig());
+    expect(pre.baseRefName).toBe("main");
+    expect(pre.mergeBase).toBe("def5678def5678def5678def5678def5678def56");
+  });
+
+  it("records a config hash over the governed files as committed at HEAD", () => {
+    const { deps, calls } = makeDeps({ runReplies: [...GOV_REPLIES, ...HAPPY_REPLIES] });
+    const pre = checkPreconditions(deps, baseConfig());
+    expect(pre.configHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    // `git show <rev>:<path>`, never the working tree: the gate reads the base
+    // ref the same way, and only committed bytes are comparable on both sides.
+    expect(calls.run.some((c) => /git show abc1234.*:\.local-attest\.config\.mjs/.test(c.cmd))).toBe(true);
+  });
+
+  it("changes the config hash when a leg command changes", () => {
+    // The attack this exists for: a pull request rewrites a leg to `true`, the
+    // matrix passes honestly, and every leg-name check still succeeds.
+    const honest = makeDeps({ runReplies: [...GOV_REPLIES, ...HAPPY_REPLIES] });
+    const tampered = makeDeps({
+      runReplies: [
+        [/git show .*:\.local-attest\.config\.mjs/, { stdout: 'export default { matrix: [{ command: "true" }] };' }],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    const a = checkPreconditions(honest.deps, baseConfig());
+    const b = checkPreconditions(tampered.deps, baseConfig());
+    expect(b.configHash).not.toBe(a.configHash);
+  });
+
+  it("changes the config hash when a quality threshold changes", () => {
+    // .dotbabel.json is governed too: lowering coverage.changed_lines would
+    // otherwise let the quality leg pass under a policy only this pull request
+    // agreed to.
+    const before = makeDeps({ runReplies: [...GOV_REPLIES, ...HAPPY_REPLIES] });
+    const after = makeDeps({
+      runReplies: [
+        [/git show .*:\.dotbabel\.json/, { stdout: '{"attestation":{"governance_files":[".dotbabel.json",".local-attest.config.mjs"]},"quality":{"rules":{"coverage.changed_lines":{"threshold":10}}}}' }],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    expect(checkPreconditions(after.deps, baseConfig()).configHash).not.toBe(
+      checkPreconditions(before.deps, baseConfig()).configHash,
+    );
+  });
+
+  it("leaves the merge base null when the base branch is not fetched", () => {
+    const { deps } = makeDeps({
+      runReplies: [
+        [/git merge-base HEAD origin\/main/, { status: 128, stderr: "not a commit" }],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    const pre = checkPreconditions(deps, baseConfig());
+    expect(pre.mergeBase).toBeNull();
+    // Still attestable: the gate then has one fewer thing to check, and the
+    // head SHA already covers a rebase.
+    expect(pre.configHash).toMatch(/^sha256:/);
+  });
 
   it("succeeds on the happy path", async () => {
     const { deps } = makeDeps({ runReplies: HAPPY_REPLIES });
@@ -217,39 +296,83 @@ describe("runMatrix", () => {
 });
 
 // ---------------------------------------------------------------------------
-// upsertComment / applyLabel / appendAuditLog
+// postAttestComment / applyLabel / appendAuditLog
 // ---------------------------------------------------------------------------
 
-describe("upsertComment", () => {
-  it("POSTs when no existing attestation comment", async () => {
-    const { deps, calls } = makeDeps({
-      runReplies: [[/gh api repos.*\/comments/, { stdout: "[]" }]],
-    });
-    const r = upsertComment(deps, { repo: "kaio/repo", pr: 1, body: "hi" });
-    expect(r.kind).toBe("post");
+describe("postAttestComment", () => {
+  // OPS-4, extended to attestation evidence: every run POSTs a new comment and
+  // minimizes this tool's older ones. It never edits. The merge gate refuses an
+  // edited comment, so under the previous PATCH-in-place upsert the SECOND
+  // attestation on any pull request would have been rejected as untrusted.
+  const MARKER = "<!-- local-attest verified-sha=abc1234 -->";
+
+  const listing = (rows) => [[/gh api repos.*\/comments/, { stdout: JSON.stringify(rows) }], [/gh api user/, { stdout: "kaio" }]];
+
+  it("POSTs when the pull request has no attestation yet", () => {
+    const { deps, calls } = makeDeps({ runReplies: listing([]) });
+    const r = postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "hi" });
+    expect(r).toEqual({ kind: "post", minimized: 0 });
     expect(calls.gh).toHaveLength(1);
     expect(calls.gh[0].cmd).toMatch(/--method POST/);
     expect(calls.gh[0].payload).toEqual({ body: "hi" });
   });
 
-  it("PATCHes the existing attestation comment in place", async () => {
-    const existing = [
-      { id: 999, author_association: "OWNER", body: `<!-- local-attest verified-sha=abc1234 -->` },
-    ];
-    const { deps, calls } = makeDeps({
-      runReplies: [[/gh api repos.*\/comments/, { stdout: JSON.stringify(existing) }]],
-    });
-    const r = upsertComment(deps, { repo: "kaio/repo", pr: 1, body: "new" });
-    expect(r.kind).toBe("patch");
-    expect(r.commentId).toBe(999);
-    expect(calls.gh[0].cmd).toMatch(/--method PATCH .*comments\/999/);
+  it("POSTs a new comment and minimizes the older one instead of editing it", () => {
+    const existing = [{ id: 999, node_id: "IC_1", user: { login: "kaio" }, body: MARKER }];
+    const { deps, calls } = makeDeps({ runReplies: listing(existing) });
+    const r = postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "new" });
+
+    expect(r).toEqual({ kind: "post", minimized: 1 });
+    expect(calls.gh.map((c) => c.cmd).join("\n")).not.toMatch(/--method PATCH/);
+    expect(calls.gh[0].cmd).toMatch(/--method POST/);
+    expect(calls.run.some((c) => /minimizeComment/.test(c.cmd) && /IC_1/.test(c.cmd))).toBe(true);
   });
 
-  it("always sends body via stdin (--input -), never shell-interpolated", async () => {
+  it("never minimizes a comment written by somebody else", () => {
+    // Hiding a collaborator's attestation because your own run happened to
+    // finish is worse than leaving a superseded comment visible.
+    const existing = [{ id: 7, node_id: "IC_other", user: { login: "someone-else" }, body: MARKER }];
+    const { deps, calls } = makeDeps({ runReplies: listing(existing) });
+    const r = postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "new" });
+    expect(r.minimized).toBe(0);
+    expect(calls.run.some((c) => /minimizeComment/.test(c.cmd))).toBe(false);
+  });
+
+  it("leaves unrelated comments alone", () => {
+    const existing = [{ id: 8, node_id: "IC_chat", user: { login: "kaio" }, body: "looks good to me" }];
+    const { deps, calls } = makeDeps({ runReplies: listing(existing) });
+    expect(postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "new" }).minimized).toBe(0);
+    expect(calls.run.some((c) => /minimizeComment/.test(c.cmd))).toBe(false);
+  });
+
+  it("still posts when the login probe fails, and skips minimizing", () => {
     const { deps, calls } = makeDeps({
-      runReplies: [[/gh api repos.*\/comments/, { stdout: "[]" }]],
+      runReplies: [
+        [/gh api user/, { status: 1, stderr: "no auth" }],
+        [/gh api repos.*\/comments/, { stdout: JSON.stringify([{ id: 1, node_id: "IC_1", user: { login: "kaio" }, body: MARKER }]) }],
+      ],
     });
-    upsertComment(deps, { repo: "kaio/repo", pr: 1, body: "line1\nline2 `backticks` $vars" });
+    const r = postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "new" });
+    expect(r).toEqual({ kind: "post", minimized: 0 });
+    expect(calls.gh[0].cmd).toMatch(/--method POST/);
+  });
+
+  it("counts only the minimize calls that succeeded", () => {
+    // A failed minimize is cosmetic: the gate matches on the head SHA, so a
+    // stale visible comment can never read as current evidence.
+    const existing = [
+      { id: 1, node_id: "IC_a", user: { login: "kaio" }, body: MARKER },
+      { id: 2, node_id: "IC_b", user: { login: "kaio" }, body: MARKER },
+    ];
+    const { deps } = makeDeps({
+      runReplies: [...listing(existing), [/minimizeComment.*IC_b/, { status: 1, stderr: "boom" }]],
+    });
+    expect(postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "new" }).minimized).toBe(1);
+  });
+
+  it("always sends body via stdin (--input -), never shell-interpolated", () => {
+    const { deps, calls } = makeDeps({ runReplies: listing([]) });
+    postAttestComment(deps, { repo: "kaio/repo", pr: 1, body: "line1\nline2 `backticks` $vars" });
     expect(calls.gh[0].cmd).toContain("--input -");
     expect(calls.gh[0].cmd).not.toContain("line1");
   });

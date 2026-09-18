@@ -160,3 +160,57 @@ run_hook() {
   run bash -c "printf '%s' '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"BYPASS_CRITERIA_EVIDENCE_GUARD=1 gh pr comment 1 --body \\\"<!-- dotbabel-criteria verified-sha=abc -->\\\"\"}}' | env -u BYPASS_CRITERIA_EVIDENCE_GUARD bash '$HOOK'"
   [ "$status" -eq 2 ]
 }
+
+
+# --- P-G1: the guard covers the local-attest marker family too --------------
+#
+# The merge gate now skips the full test suite AND the quality profile on the
+# strength of a local-attest comment. That makes a forged one strictly worse
+# than a forged criteria marker: the first removes verification, the second
+# only misreports it. The guard covered exactly one family until this change.
+#
+# The markers are assembled from parts here for a reason that is itself the
+# point: a file containing either literal cannot be written by an agent whose
+# Bash calls this hook. $SP keeps them non-contiguous in this source file.
+
+SP=' '
+
+@test "guard-criteria-evidence: denies a gh command that writes the local-attest marker" {
+  marker="local-attest${SP}verified-sha="
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- ${marker}abc1234 -->\\\"\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
+@test "guard-criteria-evidence: denies the local-attest payload line" {
+  # A marker with no payload is refused by the gate as ATTESTATION_INVALID, so
+  # guarding only the marker would leave the shape that actually works open.
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- local-attest-payload eyJhIjoxfQ -->\\\"\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a local-attest marker delivered via --body-file" {
+  marker="local-attest${SP}verified-sha="
+  printf '<!-- %sabc1234 -->\n' "$marker" > "$BATS_TEST_TMPDIR/forged.md"
+  run run_hook "\"gh pr comment 42 --body-file $BATS_TEST_TMPDIR/forged.md\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"forged.md"* ]]
+}
+
+@test "guard-criteria-evidence: allows the sanctioned local-attest writer" {
+  # The real producer never carries either marker in its own command text.
+  run run_hook '"dotbabel local-attest --pr 42"'
+  [ "$status" -eq 0 ]
+}
+
+@test "guard-criteria-evidence: both marker families are guarded, not just one" {
+  # The regression this pins: extending the gate's authority to a second
+  # marker family without extending the write-side guard left the stronger
+  # authorization path as the only unguarded one.
+  crit="dotbabel-criteria${SP}verified-sha="
+  attest="local-attest${SP}verified-sha="
+  for m in "$crit" "$attest"; do
+    run run_hook "\"gh pr comment 42 --body \\\"<!-- ${m}abc -->\\\"\""
+    [ "$status" -eq 2 ]
+  done
+}

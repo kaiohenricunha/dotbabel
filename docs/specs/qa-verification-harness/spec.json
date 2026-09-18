@@ -1,6 +1,6 @@
 {
   "id": "qa-verification-harness",
-  "title": "QA verification harness — executed-behavior gates from spec to production",
+  "title": "QA verification harness \u2014 executed-behavior gates from spec to production",
   "status": "approved",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
@@ -75,7 +75,10 @@
     "package.json",
     "docs/troubleshooting.md",
     "plugins/dotbabel/tests/dogfood-mutation-tool.test.mjs",
-    "stryker.harness.config.mjs"
+    "stryker.harness.config.mjs",
+    "plugins/dotbabel/src/attestation.mjs",
+    "plugins/dotbabel/src/lib/evidence-payload.mjs",
+    "schemas/dotbabel.attestation-evidence.schema.json"
   ],
   "acceptance_commands": [
     "npm test",
@@ -495,6 +498,79 @@
         "format": "junit-xml",
         "path": ".dotbabel/criteria/AC-16.junit.xml"
       }
+    },
+    {
+      "id": "AC-17",
+      "status": "active",
+      "given": "a pull request whose attestation reports every required leg passing",
+      "when": "that attestation was produced under a local-attest configuration the base ref does not have",
+      "then": "the merge gate returns ATTESTATION_CONFIG_CHANGED rather than a pass",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "reports ATTESTATION_CONFIG_CHANGED when the matrix that ran is not the base branch's"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-17.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-17.junit.xml"
+      }
+    },
+    {
+      "id": "AC-18",
+      "status": "active",
+      "given": "a pull request that has been attested more than once",
+      "when": "the merge gate reads the attestation comments",
+      "then": "every attestation is a posted, unedited comment, so the second one is trusted too",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/local-attest-runner.test.mjs",
+          "name": "POSTs a new comment and minimizes the older one instead of editing it"
+        },
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "accepts two successive attestations, which the old upsert model could not produce"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/local-attest-runner.test.mjs",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-18.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-18.junit.xml"
+      }
+    },
+    {
+      "id": "AC-19",
+      "status": "planned",
+      "given": "conductor-mode and standalone invocations of /pre-pr",
+      "when": "the pre-pr scope test runs",
+      "then": "conductor mode names --profile fast and standalone still names --profile pr",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats",
+          "name": "pre-pr: conductor mode runs the fast quality profile"
+        }
+      ],
+      "argv": [
+        "bash",
+        "plugins/dotbabel/scripts/run-bats.sh",
+        "plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats"
+      ]
     }
   ]
 }

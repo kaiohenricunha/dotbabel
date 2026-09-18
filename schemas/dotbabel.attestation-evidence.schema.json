@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.attestation-evidence.schema.json",
+  "title": "dotbabel local-attest evidence payload",
+  "description": "Line 2 of a local-attest comment, base64url-encoded. The merge gate reads this to decide whether the attested run may stand in for re-running the full suite and the PR quality profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "head_sha", "generated_at", "verdict", "legs"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit the matrix ran against. Must equal the SHA in the marker on line 1; the gate refuses a payload that disagrees with its own marker."
+    },
+    "merge_base": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The merge base the quality profile graded its diff against. Recorded because the quality verdict is a property of a diff, not of a tree."
+    },
+    "config_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "Hash of the files that govern what this run proves. The gate recomputes it from the BASE ref, so a pull request that edits a governed file cannot attest itself."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "verdict": { "enum": ["pass", "fail"] },
+    "legs": {
+      "type": "array",
+      "description": "One entry per matrix leg, classified by the same legStatus() the comment table and the audit log use.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "mode": { "enum": ["hard", "advisory"] },
+          "status": { "enum": ["pass", "fail", "advisory-fail", "skipped", "not-run"] }
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "description": "The versions this run certified. An attestation can switch off a multi-version CI matrix, so the record names the one version it covered.",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

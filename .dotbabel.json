@@ -8,6 +8,18 @@
   "gate_on_cli_presence": true,
   "cli_substitutions": {},
   "targets": [],
+  "attestation": {
+    "enforce": true,
+    "governance_files": [
+      ".local-attest.config.mjs",
+      ".dotbabel.json",
+      "package.json",
+      "plugins/dotbabel/scripts/run-bats.sh",
+      "plugins/dotbabel/tests/test_validate_settings.sh"
+    ],
+    "required_legs": ["test", "quality"],
+    "trusted_associations": ["OWNER"]
+  },
   "quality": {
     "enabled": true,
     "default_profile": "fast",
@@ -34,22 +46,32 @@
           "lint": {
             "argv": ["npm", "run", "lint"],
             "timeout_seconds": 600,
-            "report": { "format": "exit-code" }
+            "report": {
+              "format": "exit-code"
+            }
           },
           "test": {
             "argv": ["npm", "test"],
             "timeout_seconds": 900,
-            "report": { "format": "exit-code" }
+            "report": {
+              "format": "exit-code"
+            }
           },
           "coverage": {
             "argv": ["npm", "run", "coverage"],
             "timeout_seconds": 900,
-            "report": { "format": "lcov", "path": "coverage/lcov.info" }
+            "report": {
+              "format": "lcov",
+              "path": "coverage/lcov.info"
+            }
           },
           "mutation": {
             "argv": ["npm", "run", "mutation"],
             "timeout_seconds": 3600,
-            "report": { "format": "stryker-json", "path": "reports/mutation/mutation.json" }
+            "report": {
+              "format": "stryker-json",
+              "path": "reports/mutation/mutation.json"
+            }
           }
         }
       }

@@ -73,9 +73,15 @@ const SHA_RE = /^[0-9a-f]{40}$/i;
  * @param {GateDeps} deps
  * @param {{body?: string, headRefOid?: string, baseRefOid?: string}} view `gh pr view` JSON.
  * @param {number} prNumber
+ * @param {{ comments?: object[]|null }} [opts] `comments` lets the caller pass a
+ *   list it already fetched. The attestation half of the gate needs the same
+ *   list, and this function short-circuits on several paths without ever
+ *   fetching one — so the caller owns the fetch and both halves judge the same
+ *   comments rather than two independently-timed reads.
  * @returns {object}
  */
-export function criteriaGateInputs(deps, view, prNumber) {
+export function criteriaGateInputs(deps, view, prNumber, opts = {}) {
+  const injected = Object.hasOwn(opts, "comments");
   const headSha = String(view?.headRefOid ?? "");
   const baseSha = String(view?.baseRefOid ?? "");
   // Shape-check rather than merely non-empty: these reach argv positions, and
@@ -193,7 +199,7 @@ export function criteriaGateInputs(deps, view, prNumber) {
     criteriaEnforcement: config.enforcement,
     trustedAssociations: config.trusted_associations,
     requireCiCheck: config.require_ci_check,
-    comments: prComments(deps, prNumber),
+    comments: injected ? opts.comments : prComments(deps, prNumber),
     ciCriteriaCheck: config.require_ci_check ? criteriaCheckConclusion(deps, headSha) : null,
   };
 }
@@ -350,7 +356,7 @@ function criteriaConfigAt(deps, sha) {
  * @param {number} prNumber
  * @returns {Array<{body: string, authorAssociation: string, authorLogin: string|null, lastEditedAt: string|null}>|null}
  */
-function prComments(deps, prNumber) {
+export function prComments(deps, prNumber) {
   const out = [];
   let cursor = null;
 
