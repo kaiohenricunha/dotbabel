@@ -57,7 +57,8 @@ dotbabel local-attest --pr 123
 ```
 
 The skill runs every leg of your `.local-attest` matrix, prints a result
-table, posts/PATCHes the attestation comment, pushes (if `pushAfterAttest` —
+table, posts the attestation comment and minimizes its own older ones,
+pushes (if `pushAfterAttest` —
 the comment goes first so the marker is visible when the push event fires),
 applies the label, and appends a line to the audit log.
 

@@ -1,9 +1,18 @@
 #!/usr/bin/env bats
-# merge-pr-quality-step.bats — commands/merge-pr.md step 5 runs the PR
-# quality profile (P-C5, KD-9's replacement for the removed regression_paths
-# gate), and names every stop-worthy exit explicitly, so an agent following
-# the command halts on a policy failure, unavailable tooling, or a missing
-# binary instead of reading past the numbers.
+# merge-pr-quality-step.bats — the PR quality profile still has a home in
+# commands/merge-pr.md, and every stop-worthy exit is still named explicitly,
+# so an agent following the command halts on a policy failure, unavailable
+# tooling, or a missing binary instead of reading past the numbers.
+#
+# What changed (P-G1): the quality verdict is produced at `local-attest`,
+# pinned to the head SHA, and CONSUMED by the merge gate. merge-pr runs the
+# profile itself only on the explicit path — a repository whose base ref has
+# not enabled attestation enforcement. KD-9 still holds ("the merge gate reads
+# that verdict"); it is only now literally true, because before this the
+# command ran the check and the gate never saw the result.
+#
+# These assertions therefore pin the EXPLICIT path. merge-pr-attestation.bats
+# pins the other half: that the attested path does not run it at all.
 #
 # Checked in all three shipped copies. They are not equally exposed, and the
 # redundancy is deliberate:
@@ -60,14 +69,14 @@ check_quality_step() {
   [ "$status" -eq 1 ]
 }
 
-@test "merge-pr: step 5 runs the PR quality profile and stops on exit 1 or 2" {
+@test "merge-pr: the explicit path runs the PR quality profile and stops on exit 1 or 2" {
   check_quality_step "$REPO_ROOT/commands/merge-pr.md"
 }
 
-@test "merge-pr template copy: step 5 runs the PR quality profile and stops on exit 1 or 2" {
+@test "merge-pr template copy: the explicit path runs the PR quality profile and stops on exit 1 or 2" {
   check_quality_step "$REPO_ROOT/plugins/dotbabel/templates/claude/commands/merge-pr.md"
 }
 
-@test "merge-pr prompt copy: step 5 runs the PR quality profile and stops on exit 1 or 2" {
+@test "merge-pr prompt copy: the explicit path runs the PR quality profile and stops on exit 1 or 2" {
   check_quality_step "$REPO_ROOT/.github/prompts/merge-pr.prompt.md"
 }

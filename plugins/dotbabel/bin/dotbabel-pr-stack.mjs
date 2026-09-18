@@ -44,7 +44,8 @@ import {
   summarizeGates,
 } from "../src/pr-gates.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
-import { criteriaGateInputs } from "../src/criteria/gate-inputs.mjs";
+import { criteriaGateInputs, prComments } from "../src/criteria/gate-inputs.mjs";
+import { DEFAULT_GOVERNANCE_FILES, hashGovernanceFiles } from "../src/attestation.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -197,6 +198,77 @@ function repoRoot() {
     return fail(EXIT_CODES.ENV, "not inside a git repository");
   }
   return r.stdout.trim();
+}
+
+/**
+ * A file's contents at a revision, or null when it is not there.
+ *
+ * @param {string} rev
+ * @param {string} path
+ * @returns {string|null}
+ */
+function showAtRev(rev, path) {
+  const r = sh(`git show ${rev}:${path}`);
+  return r.status === 0 ? r.stdout : null;
+}
+
+/**
+ * Build the attestation half of the merge-gate input.
+ *
+ * Every value here is read from the BASE ref, never the head. That is the
+ * whole trust model: a pull request must not be able to switch enforcement
+ * off, widen its own trust list, shrink the governed-file set, or drop a
+ * required leg — all of which it could do by editing its own `.dotbabel.json`
+ * if the gate read the head.
+ *
+ * `.dotbabel.json` is JSON and read with `git show`, so evaluating the policy
+ * never executes a line of the pull request's code. That is also why the
+ * policy does not live in `.local-attest.config.mjs`, which is an executable
+ * module.
+ *
+ * Returns `{}` when the base ref has not opted in, leaving `checkMergeGate` on
+ * exactly its pre-attestation behaviour.
+ *
+ * @param {{headRefOid?: string, baseRefOid?: string}} view
+ * @param {object[]|null} comments
+ * @returns {object}
+ */
+function attestationGateInputs(view, comments) {
+  const headSha = String(view?.headRefOid ?? "");
+  const baseSha = String(view?.baseRefOid ?? "");
+  if (!/^[0-9a-f]{40}$/i.test(headSha) || !/^[0-9a-f]{40}$/i.test(baseSha)) return {};
+
+  let policy = null;
+  try {
+    const raw = showAtRev(baseSha, ".dotbabel.json");
+    policy = raw === null ? null : JSON.parse(raw)?.attestation;
+  } catch {
+    // Unparseable base config: treat as no policy rather than guessing at one.
+    // The base ref is the trunk's own committed state, so this is a repository
+    // bug to fix on the trunk, not something a pull request can exploit.
+    policy = null;
+  }
+  if (!policy || policy.enforce !== true) return {};
+
+  const governed = Array.isArray(policy.governance_files) && policy.governance_files.length > 0
+    ? policy.governance_files.map(String)
+    : [...DEFAULT_GOVERNANCE_FILES];
+
+  // The merge base, not the base tip. It is the fork point, so it is stable
+  // while the trunk advances and only a rebase moves it — and a rebase moves
+  // the head SHA too, which the ladder already catches.
+  const mb = sh(`git merge-base ${baseSha} ${headSha}`);
+
+  return {
+    attestationEnforced: true,
+    attestationComments: comments,
+    attestationTrustedAssociations: Array.isArray(policy.trusted_associations)
+      ? policy.trusted_associations
+      : ["OWNER"],
+    requiredLegs: Array.isArray(policy.required_legs) ? policy.required_legs : [],
+    expectedConfigHash: hashGovernanceFiles(governed.map((path) => ({ path, bytes: showAtRev(baseSha, path) }))),
+    expectedMergeBase: mb.status === 0 && mb.stdout.trim() !== "" ? mb.stdout.trim() : null,
+  };
 }
 
 /**
@@ -469,9 +541,15 @@ async function main() {
     // endpoint and cross-check the count; a mismatch means unreadable, and the
     // gate must fail closed rather than judge a partial diff.
     view.files = paginatedPrFiles(prNumber, view.changedFiles);
+    // One fetch, both evidence families. `criteriaGateInputs` short-circuits
+    // on several paths without ever fetching comments, so piggybacking the
+    // attestation check on its result would report ATTESTATION_MISSING
+    // whenever criteria happened not to apply.
+    const comments = prComments({ run }, prNumber);
     const result = checkMergeGate({
       body: view.body,
       hasSpecsDir: existsSync(`${root}/docs/specs`),
+      ...attestationGateInputs(view, comments),
       // A null list means "could not be proven complete"; the criteria half
       // turns that into CRITERIA_FILES_UNREADABLE, and an empty array here
       // keeps the protected-path check from silently passing on it.
@@ -479,7 +557,7 @@ async function main() {
       protectedPaths: protectedPaths(root),
       mergeable: view.mergeable,
       mergeStateStatus: view.mergeStateStatus,
-      ...criteriaGateInputs({ run }, view, prNumber),
+      ...criteriaGateInputs({ run }, view, prNumber, { comments }),
     });
     const summary = summarizeGates([result]);
     return emit({

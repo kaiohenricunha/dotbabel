@@ -622,3 +622,374 @@ describe("checkMergeGate — criteria evidence", () => {
     expect(r.ok).toBe(true);
   });
 });
+
+// --- P-G1: attestation evidence in the merge gate ---------------------------
+//
+// The merge gate stops re-running the full suite and the PR quality profile
+// and reads local-attest's SHA-pinned evidence instead. That turns an
+// attestation from a CI-skipping convenience into merge authorization, so
+// every rung below is a way the evidence can fail to mean what it appears to
+// mean. As with criteria, all inputs are optional and `attestationEnforced`
+// gates the whole block, so the cases far above still pin the back-compat
+// promise.
+
+const CONFIG_HASH = `sha256:${"c".repeat(64)}`;
+const MERGE_BASE = "d".repeat(40);
+
+function attestPayload(over = {}) {
+  return {
+    schema_version: 1,
+    tool: { name: "dotbabel", version: "4.0.0" },
+    head_sha: HEAD,
+    generated_at: "2026-01-01T00:00:00.000Z",
+    verdict: "pass",
+    legs: [
+      { name: "test", mode: "hard", status: "pass" },
+      { name: "quality", mode: "hard", status: "pass" },
+    ],
+    merge_base: MERGE_BASE,
+    config_hash: CONFIG_HASH,
+    ...over,
+  };
+}
+
+/** An attestation comment body, the way local-attest writes it. */
+function attestBody(sha, payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return [
+    `<!-- local-attest verified-sha=${sha} -->`,
+    `<!-- local-attest-payload ${encoded} -->`,
+    "## Local Attestation",
+  ].join("\n");
+}
+
+/** A gate input with a valid, current attestation and everything else passing. */
+function attestInput(over = {}) {
+  return {
+    body: GOOD_BODY,
+    headRefOid: HEAD,
+    attestationEnforced: true,
+    attestationComments: [comment(attestBody(HEAD, attestPayload()))],
+    expectedConfigHash: CONFIG_HASH,
+    expectedMergeBase: MERGE_BASE,
+    requiredLegs: ["test", "quality"],
+    ...over,
+  };
+}
+
+describe("checkMergeGate — attestation evidence", () => {
+  it("passes on trusted, current, complete evidence", () => {
+    const result = checkMergeGate(attestInput());
+    expect(codes(result)).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("reports nothing when the base ref has not enabled enforcement", () => {
+    // The bootstrap case, and every repository that never opts in: no
+    // attestation, no comments at all, and still a clean gate.
+    const result = checkMergeGate({
+      body: GOOD_BODY,
+      headRefOid: HEAD,
+      attestationComments: [],
+    });
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("reports ATTESTATION_MISSING when no comment carries the marker", () => {
+    const result = checkMergeGate(attestInput({ attestationComments: [comment("just a comment")] }));
+    expect(codes(result)).toEqual(["ATTESTATION_MISSING"]);
+  });
+
+  it("reports ATTESTATION_MISSING rather than a pass when a run failed", () => {
+    // A failed matrix posts no comment at all (`shouldAttest` guards the
+    // publication path), so "it failed" and "it never ran" are the same
+    // observation here. Both must block.
+    const result = checkMergeGate(attestInput({ attestationComments: [] }));
+    expect(codes(result)).toEqual(["ATTESTATION_MISSING"]);
+  });
+
+  it("reports ATTESTATION_UNTRUSTED for a non-trusted author association", () => {
+    const body = attestBody(HEAD, attestPayload());
+    const result = checkMergeGate(
+      attestInput({ attestationComments: [comment(body, { authorAssociation: "CONTRIBUTOR" })] }),
+    );
+    expect(codes(result)).toEqual(["ATTESTATION_UNTRUSTED"]);
+  });
+
+  it("reports ATTESTATION_UNTRUSTED for an edited comment", () => {
+    const body = attestBody(HEAD, attestPayload());
+    const result = checkMergeGate(
+      attestInput({ attestationComments: [comment(body, { lastEditedAt: "2026-01-02T00:00:00Z" })] }),
+    );
+    expect(codes(result)).toEqual(["ATTESTATION_UNTRUSTED"]);
+  });
+
+  it("accepts two successive attestations, which the old upsert model could not produce", () => {
+    // Regression guard for the OPS-4 change: local-attest now posts a new
+    // comment per run and minimizes the older one. Under the previous
+    // PATCH-in-place behaviour the second run set lastEditedAt and every
+    // attestation after a pull request's first would read as UNTRUSTED.
+    const older = comment(attestBody(OLDER, attestPayload({ head_sha: OLDER })));
+    const newer = comment(attestBody(HEAD, attestPayload()));
+    const result = checkMergeGate(attestInput({ attestationComments: [older, newer] }));
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("reports ATTESTATION_STALE when the evidence names an earlier commit", () => {
+    const body = attestBody(OLDER, attestPayload({ head_sha: OLDER }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_STALE"]);
+    expect(result.reasons[0].detail).toContain(OLDER.slice(0, 8));
+    expect(result.reasons[0].detail).toContain(HEAD.slice(0, 8));
+  });
+
+  it("fails closed with ATTESTATION_INVALID when the comment list is unreadable", () => {
+    // A gh failure must never read as "no attestation exists", which a later
+    // comment could then satisfy.
+    const result = checkMergeGate(attestInput({ attestationComments: null }));
+    expect(codes(result)).toEqual(["ATTESTATION_INVALID"]);
+    expect(result.reasons[0].detail).toBe("comment fetch failed");
+  });
+
+  it("reports ATTESTATION_INVALID for a marker with no payload line", () => {
+    const body = `<!-- local-attest verified-sha=${HEAD} -->\n## Local Attestation`;
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_INVALID"]);
+    expect(result.reasons[0].detail).toContain("predates the payload");
+  });
+
+  it("reports ATTESTATION_INVALID when the payload names a different SHA than its marker", () => {
+    // The shape a forgery takes: a trusted-looking marker vouching for
+    // someone else's results.
+    const body = attestBody(HEAD, attestPayload({ head_sha: OLDER }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_INVALID"]);
+  });
+
+  it("reports ATTESTATION_CONFIG_CHANGED when the matrix that ran is not the base branch's", () => {
+    // The load-bearing case. A pull request that rewrites a leg to
+    // `command: "true"` still produces a truthful {"name":"test","status":"pass"}
+    // and still satisfies requiredLegs. Only the configuration hash catches it.
+    const body = attestBody(HEAD, attestPayload({ config_hash: `sha256:${"e".repeat(64)}` }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_CONFIG_CHANGED"]);
+    expect(result.reasons[0].detail).toContain("cannot authorize it");
+  });
+
+  it("reports ATTESTATION_CONFIG_CHANGED when the payload records no config hash at all", () => {
+    const body = attestBody(HEAD, attestPayload({ config_hash: undefined }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_CONFIG_CHANGED"]);
+    expect(result.reasons[0].detail).toContain("no config_hash");
+  });
+
+  it("reports ATTESTATION_BASE_MOVED when the attested merge base is not the current one", () => {
+    const result = checkMergeGate(attestInput({ expectedMergeBase: "f".repeat(40) }));
+    expect(codes(result)).toEqual(["ATTESTATION_BASE_MOVED"]);
+  });
+
+  it("does not report ATTESTATION_BASE_MOVED merely because the base branch advanced", () => {
+    // The merge base is the fork point. It does not move when the trunk gains
+    // commits, so an unrelated merge to main must not invalidate every open
+    // attestation. Only a rebase changes it — and that moves HEAD too.
+    const result = checkMergeGate(attestInput({ expectedMergeBase: MERGE_BASE }));
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("reports ATTESTATION_INCOMPLETE when a required leg did not run", () => {
+    const body = attestBody(HEAD, attestPayload({ legs: [{ name: "test", mode: "hard", status: "pass" }] }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_INCOMPLETE"]);
+    expect(result.reasons[0].detail).toBe("quality");
+  });
+
+  it("counts a diff-skipped required leg as incomplete, never as a pass", () => {
+    // A skipped leg is sound for CI parity, where the same job skips
+    // remotely. It proves nothing ran, and a required leg is required
+    // precisely because the merge gate has stopped checking it itself.
+    const legs = [
+      { name: "test", mode: "hard", status: "pass" },
+      { name: "quality", mode: "hard", status: "skipped" },
+    ];
+    const body = attestBody(HEAD, attestPayload({ legs }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_INCOMPLETE"]);
+  });
+
+  it("reports ATTESTATION_FAILED when the payload verdict is not a pass", () => {
+    const body = attestBody(HEAD, attestPayload({ verdict: "fail" }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_FAILED"]);
+  });
+
+  it("reports criteria and attestation reasons together", () => {
+    // They are independent evidence families. Reporting only the first would
+    // send an operator round the loop twice.
+    const result = checkMergeGate(
+      attestInput({
+        body: `${GOOD_BODY}\n## Spec ID\n\nalpha\n`,
+        requiredCriteria: { alpha: ["AC-1"] },
+        comments: [],
+        attestationComments: [],
+      }),
+    );
+    expect(codes(result)).toEqual(["CRITERIA_EVIDENCE_MISSING", "ATTESTATION_MISSING"]);
+  });
+
+  it("names the recovery command in the hint when only attestation is failing", () => {
+    const result = checkMergeGate(attestInput({ attestationComments: [] }));
+    expect(result.hint).toContain("local-attest");
+  });
+
+  it("fails closed when the head SHA itself could not be read", () => {
+    const result = checkMergeGate(attestInput({ headRefOid: undefined }));
+    expect(codes(result)).toEqual(["ATTESTATION_INVALID"]);
+    expect(result.reasons[0].message).toMatch(/head SHA could not be read/);
+  });
+
+  // Each reason's prose is what an operator acts on, and a wrong message sends
+  // them to the wrong fix — re-running a matrix that cannot help, or editing a
+  // comment the gate will then refuse. Pin the text, not only the code.
+  it.each([
+    ["ATTESTATION_MISSING", { attestationComments: [] }, /no local attestation comment exists/],
+    [
+      "ATTESTATION_UNTRUSTED",
+      { attestationComments: [comment(attestBody(HEAD, attestPayload()), { authorAssociation: "NONE" })] },
+      /trusted author association and no edit/,
+    ],
+    [
+      "ATTESTATION_STALE",
+      { attestationComments: [comment(attestBody(OLDER, attestPayload({ head_sha: OLDER })))] },
+      /names a commit other than the head/,
+    ],
+    ["ATTESTATION_INVALID", { attestationComments: null }, /could not be read/],
+    [
+      "ATTESTATION_CONFIG_CHANGED",
+      { expectedConfigHash: `sha256:${"9".repeat(64)}` },
+      /different local-attest configuration than the base branch/,
+    ],
+    ["ATTESTATION_BASE_MOVED", { expectedMergeBase: "f".repeat(40) }, /graded a different diff/],
+    [
+      "ATTESTATION_INCOMPLETE",
+      { attestationComments: [comment(attestBody(HEAD, attestPayload({ legs: [] })))] },
+      /does not show every required check passing/,
+    ],
+    [
+      "ATTESTATION_FAILED",
+      { attestationComments: [comment(attestBody(HEAD, attestPayload({ verdict: "fail" })))] },
+      /verdict is fail/,
+    ],
+  ])("explains %s in its message", (code, over, pattern) => {
+    const result = checkMergeGate(attestInput(over));
+    expect(codes(result)).toEqual([code]);
+    expect(result.reasons[0].message).toMatch(pattern);
+  });
+
+  it("names the missing legs, so the operator knows which check to look at", () => {
+    const legs = [{ name: "test", mode: "hard", status: "pass" }];
+    const body = attestBody(HEAD, attestPayload({ legs }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(result.reasons[0].detail).toBe("quality");
+  });
+
+  it("names both merge bases when they disagree", () => {
+    const result = checkMergeGate(attestInput({ expectedMergeBase: "f".repeat(40) }));
+    expect(result.reasons[0].detail).toContain(MERGE_BASE.slice(0, 8));
+    expect(result.reasons[0].detail).toContain("f".repeat(8));
+  });
+
+  it("points a missing attestation at the producer command", () => {
+    const result = checkMergeGate(attestInput({ attestationComments: [] }));
+    expect(result.reasons[0].detail).toContain("dotbabel local-attest");
+  });
+
+  it("falls back to OWNER when the trust list is absent or empty", () => {
+    // An empty list must not mean "trust nobody" — that would make the gate
+    // unpassable — nor "trust everyone".
+    for (const over of [{ attestationTrustedAssociations: [] }, { attestationTrustedAssociations: undefined }]) {
+      expect(codes(checkMergeGate(attestInput(over)))).toEqual([]);
+    }
+    const contributor = [comment(attestBody(HEAD, attestPayload()), { authorAssociation: "CONTRIBUTOR" })];
+    expect(codes(checkMergeGate(attestInput({ attestationComments: contributor })))).toEqual([
+      "ATTESTATION_UNTRUSTED",
+    ]);
+  });
+
+  it("honours a widened trust list from the base ref", () => {
+    const body = attestBody(HEAD, attestPayload());
+    const result = checkMergeGate(
+      attestInput({
+        attestationComments: [comment(body, { authorAssociation: "MEMBER" })],
+        attestationTrustedAssociations: ["OWNER", "MEMBER"],
+      }),
+    );
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("treats an absent lastEditedAt as unedited, the same as null", () => {
+    const body = attestBody(HEAD, attestPayload());
+    const c = comment(body);
+    delete c.lastEditedAt;
+    expect(codes(checkMergeGate(attestInput({ attestationComments: [c] })))).toEqual([]);
+  });
+
+  it("skips the configuration check when the caller supplies no expected hash", () => {
+    // A repository that enforces attestation but cannot read its own base-ref
+    // governance files gets the rest of the ladder, not a false accusation.
+    for (const over of [{ expectedConfigHash: null }, { expectedConfigHash: undefined }]) {
+      expect(codes(checkMergeGate(attestInput(over)))).toEqual([]);
+    }
+  });
+
+  it("skips the merge-base check when either side is unknown", () => {
+    expect(codes(checkMergeGate(attestInput({ expectedMergeBase: null })))).toEqual([]);
+    const noBase = attestBody(HEAD, attestPayload({ merge_base: undefined }));
+    expect(codes(checkMergeGate(attestInput({ attestationComments: [comment(noBase)] })))).toEqual([]);
+  });
+
+  it("accepts an abbreviated merge base that prefixes the current one", () => {
+    const shortBase = attestBody(HEAD, attestPayload({ merge_base: MERGE_BASE.slice(0, 12) }));
+    expect(codes(checkMergeGate(attestInput({ attestationComments: [comment(shortBase)] })))).toEqual([]);
+  });
+
+  it("requires no particular leg when the policy names none", () => {
+    const body = attestBody(HEAD, attestPayload({ legs: [] }));
+    for (const over of [{ requiredLegs: [] }, { requiredLegs: undefined }]) {
+      expect(codes(checkMergeGate(attestInput({ ...over, attestationComments: [comment(body)] })))).toEqual([]);
+    }
+  });
+
+  it("ignores an empty entry in the required-leg list", () => {
+    expect(codes(checkMergeGate(attestInput({ requiredLegs: ["test", "", "quality"] })))).toEqual([]);
+  });
+
+  it("stops at the first rung, never reporting two attestation reasons at once", () => {
+    // The states are a ladder: each rung presupposes the one below it passed.
+    // Reporting "stale" beside "untrusted" would describe a comment the gate
+    // already refused to believe.
+    const stale = comment(attestBody(OLDER, attestPayload({ head_sha: OLDER })), {
+      authorAssociation: "CONTRIBUTOR",
+    });
+    const result = checkMergeGate(attestInput({ attestationComments: [stale] }));
+    expect(result.reasons).toHaveLength(1);
+    expect(codes(result)).toEqual(["ATTESTATION_UNTRUSTED"]);
+  });
+
+  it("ignores comments that carry no marker at all when picking the newest", () => {
+    const chatter = comment("looks good");
+    const good = comment(attestBody(HEAD, attestPayload()));
+    expect(codes(checkMergeGate(attestInput({ attestationComments: [chatter, good, chatter] })))).toEqual([]);
+  });
+
+  it("reads the newest matching attestation, not the first", () => {
+    // A re-run posts rather than edits, so the last comment for this commit is
+    // the current verdict. Reading the first would keep believing a superseded
+    // one.
+    const older = comment(attestBody(HEAD, attestPayload({ verdict: "fail" })));
+    const newer = comment(attestBody(HEAD, attestPayload()));
+    expect(codes(checkMergeGate(attestInput({ attestationComments: [older, newer] })))).toEqual([]);
+    expect(codes(checkMergeGate(attestInput({ attestationComments: [newer, older] })))).toEqual([
+      "ATTESTATION_FAILED",
+    ]);
+  });
+});

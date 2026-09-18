@@ -38,6 +38,12 @@
 // Pure imports only: these modules do no I/O, so the "free of I/O"
 // contract at the top of this file still holds. The gate parses evidence
 // with the same code that writes it, so producer and judge cannot drift.
+import {
+  ATTEST_MARKER_PREFIX,
+  attestationPayloadProblem,
+  parseAttestationComment,
+  passedLegs,
+} from "./attestation.mjs";
 import { CRITERIA_MARKER_PREFIX } from "./criteria/comment.mjs";
 import { parseEvidenceComment, evidencePayloadProblem, payloadCoverage } from "./criteria/evidence.mjs";
 import { createMarker } from "./lib/attest-marker.mjs";
@@ -48,6 +54,7 @@ import { createMarker } from "./lib/attest-marker.mjs";
 import { stripFences } from "./lib/spec-ids.mjs";
 
 const criteriaMarker = createMarker(CRITERIA_MARKER_PREFIX);
+const attestMarker = createMarker(ATTEST_MARKER_PREFIX);
 
 /**
  * The canonical pipeline order. This is the single source of truth that the
@@ -289,13 +296,193 @@ export function checkMergeGate(input = {}) {
     reasons.push(...criteria.blocking);
   }
 
+  // Attestation evaluation. Only runs when the BASE ref opted the repository
+  // in, so a repository without the policy — including this one, at the commit
+  // that introduces the policy — behaves exactly as it did before.
+  const attestation = evaluateAttestation(input);
+  reasons.push(...attestation);
+
   return {
     ok: reasons.length === 0,
     gate: "merge",
     reasons,
     warnings,
-    hint: reasons.length === 0 ? null : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
+    hint:
+      reasons.length === 0
+        ? null
+        : attestation.length > 0
+          ? "re-run `dotbabel local-attest --pr <N>` so the evidence names the current head"
+          : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
   };
+}
+
+/**
+ * The attestation ladder: is there trusted, current, complete evidence that
+ * the configured matrix passed at this exact head?
+ *
+ * Structured exactly like {@link evaluateCriteria}'s evidence group, and for
+ * the same reason — the states form a ladder (missing, untrusted, stale,
+ * invalid, config-changed, base-moved, incomplete, failed) where each rung
+ * presupposes the one below it passed. Reporting "stale" beside "untrusted"
+ * would describe a comment the gate already refused to believe, so the first
+ * hit wins.
+ *
+ * Every input is optional. `attestationEnforced` is the switch, and it is read
+ * from the base ref by the caller: a pull request cannot turn its own
+ * enforcement off, and it cannot turn it on for a trunk that never agreed to
+ * it.
+ *
+ * @param {any} input
+ * @returns {GateReason[]}
+ */
+function evaluateAttestation(input) {
+  if (input.attestationEnforced !== true) return [];
+
+  const headSha = typeof input.headRefOid === "string" ? input.headRefOid : "";
+  if (headSha === "") {
+    return [
+      {
+        code: "ATTESTATION_INVALID",
+        message: "the pull request head SHA could not be read, so no evidence can be matched to it",
+      },
+    ];
+  }
+
+  if (input.attestationComments === null || input.attestationComments === undefined) {
+    // REL-3's rule, applied here: the gate cannot see the evidence, so it
+    // refuses rather than assuming the absence of a marker it failed to fetch.
+    return [
+      {
+        code: "ATTESTATION_INVALID",
+        message: "the attestation comments could not be read",
+        detail: "comment fetch failed",
+      },
+    ];
+  }
+
+  const comments = Array.isArray(input.attestationComments) ? input.attestationComments : [];
+  const markerComments = comments.filter(
+    (c) => c && typeof c.body === "string" && attestMarker.parseSha(c.body) !== null,
+  );
+  if (markerComments.length === 0) {
+    return [
+      {
+        code: "ATTESTATION_MISSING",
+        message: "no local attestation comment exists for this pull request",
+        detail: "run `dotbabel local-attest --pr <N>`",
+      },
+    ];
+  }
+
+  const trustedSet = new Set(
+    Array.isArray(input.attestationTrustedAssociations) && input.attestationTrustedAssociations.length > 0
+      ? input.attestationTrustedAssociations
+      : ["OWNER"],
+  );
+  // An edited comment is refused outright. That is only a meaningful rule
+  // because local-attest posts a new comment per run and minimizes the older
+  // ones (OPS-4) — under the previous upsert-in-place behaviour every
+  // attestation after a pull request's first would land here.
+  const trusted = markerComments.filter(
+    (c) => trustedSet.has(c.authorAssociation) && (c.lastEditedAt === null || c.lastEditedAt === undefined),
+  );
+  if (trusted.length === 0) {
+    return [
+      {
+        code: "ATTESTATION_UNTRUSTED",
+        message: "no attestation comment has both a trusted author association and no edit",
+      },
+    ];
+  }
+
+  const current = trusted.filter((c) => attestMarker.parseSha(c.body) === headSha);
+  if (current.length === 0) {
+    const seen = [...new Set(trusted.map((c) => String(attestMarker.parseSha(c.body)).slice(0, 8)))];
+    return [
+      {
+        code: "ATTESTATION_STALE",
+        message: "every trusted attestation names a commit other than the head",
+        detail: `attested ${seen.join(", ")}; current ${headSha.slice(0, 8)}`,
+      },
+    ];
+  }
+
+  // Newest wins, as with criteria: a re-run posts rather than edits, so the
+  // last matching comment is the most recent verdict for this commit.
+  const parsed = parseAttestationComment(current[current.length - 1].body);
+  if (parsed.state === "no-payload") {
+    return [
+      {
+        code: "ATTESTATION_INVALID",
+        message: "the attestation carries no evidence payload",
+        detail: "it was written by a dotbabel version that predates the payload; re-run local-attest",
+      },
+    ];
+  }
+  if (parsed.state !== "ok") {
+    return [
+      {
+        code: "ATTESTATION_INVALID",
+        message: "the attestation payload could not be read",
+        detail: parsed.detail ?? parsed.state,
+      },
+    ];
+  }
+  const problem = attestationPayloadProblem(parsed.payload);
+  if (problem !== null) {
+    return [{ code: "ATTESTATION_INVALID", message: "the attestation payload is not valid", detail: problem }];
+  }
+
+  // The configuration check. Without it the leg list proves only that legs
+  // named `test` and `quality` ran, not that they ran anything.
+  const expectedHash = typeof input.expectedConfigHash === "string" ? input.expectedConfigHash : null;
+  if (expectedHash !== null && parsed.payload.config_hash !== expectedHash) {
+    return [
+      {
+        code: "ATTESTATION_CONFIG_CHANGED",
+        message: "the attestation was produced under a different local-attest configuration than the base branch",
+        detail:
+          parsed.payload.config_hash === undefined
+            ? "the payload records no config_hash"
+            : "this pull request changes a governed file, so its own attestation cannot authorize it",
+      },
+    ];
+  }
+
+  const expectedMergeBase = typeof input.expectedMergeBase === "string" ? input.expectedMergeBase : null;
+  if (
+    expectedMergeBase !== null &&
+    typeof parsed.payload.merge_base === "string" &&
+    !shaMatches(parsed.payload.merge_base, expectedMergeBase)
+  ) {
+    return [
+      {
+        code: "ATTESTATION_BASE_MOVED",
+        message: "the attestation graded a different diff than the one being merged",
+        detail: `attested against ${String(parsed.payload.merge_base).slice(0, 8)}; current merge base ${expectedMergeBase.slice(0, 8)}`,
+      },
+    ];
+  }
+
+  const required = Array.isArray(input.requiredLegs) ? input.requiredLegs.filter(Boolean) : [];
+  if (required.length > 0) {
+    const passed = passedLegs(parsed.payload);
+    const missing = required.filter((name) => !passed.has(name));
+    if (missing.length > 0) {
+      return [
+        {
+          code: "ATTESTATION_INCOMPLETE",
+          message: "the attestation does not show every required check passing",
+          detail: missing.join(", "),
+        },
+      ];
+    }
+  }
+
+  if (parsed.payload.verdict !== "pass") {
+    return [{ code: "ATTESTATION_FAILED", message: `the attestation verdict is ${parsed.payload.verdict}` }];
+  }
+  return [];
 }
 
 /**

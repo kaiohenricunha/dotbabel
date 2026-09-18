@@ -8,6 +8,12 @@
   "gate_on_cli_presence": true,
   "cli_substitutions": {},
   "targets": [],
+  "attestation": {
+    "enforce": true,
+    "governance_files": [".local-attest.config.mjs", ".dotbabel.json"],
+    "required_legs": ["test", "quality"],
+    "trusted_associations": ["OWNER"]
+  },
   "quality": {
     "enabled": true,
     "default_profile": "fast",

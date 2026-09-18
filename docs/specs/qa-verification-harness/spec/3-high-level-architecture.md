@@ -35,7 +35,9 @@ flowchart LR
     SM -->|HTTP GET and argv checks| DT[deployed targets]
   end
   SJ --> RP
-  QC -->|verdict| MP[merge-pr step 5]
+  QC -->|verdict| LA[local-attest matrix]
+  LA -->|SHA-pinned evidence| MG[merge gate]
+  MG -->|reasons| MP[merge-pr]
 ```
 
 ### Architecture Constraints

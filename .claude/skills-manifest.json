@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-18T15:33:21.604Z",
+  "generatedAt": "2026-09-18T21:48:25.277Z",
   "skills": [
     {
       "name": "agents-search",
@@ -152,7 +152,7 @@
     {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
-      "checksum": "sha256:688dc4b8e9c926627c6eab50c6bb836bad6787a4355ba588bbbb22792171d269",
+      "checksum": "sha256:21ec80869ec8637675dc762acb38ff314cba1ef5b661275124d554db78500a17",
       "dependencies": [],
       "lastValidated": "2026-09-18"
     },
@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:c9902f8d517d5ffe602bd092ff72a77af10120589870a2754795ad5bb76d3d4b",
+      "checksum": "sha256:a09d04b20a722c50579730b6f92bafc6ad2e7436f35ffd196f88e26dafa19dff",
       "dependencies": [],
       "lastValidated": "2026-09-18"
     },

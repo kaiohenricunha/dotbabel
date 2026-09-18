@@ -86,6 +86,33 @@
         }
       }
     },
+    "attestation": {
+      "type": "object",
+      "description": "When the merge gate may reuse a local-attest run instead of re-verifying. Read from the BASE ref, never the head, so a pull request cannot relax its own enforcement. Absent means no enforcement, which is how a repository adopts this without its own adopting change being blocked by it.",
+      "additionalProperties": false,
+      "properties": {
+        "enforce": {
+          "type": "boolean",
+          "default": false,
+          "description": "Require trusted, current attestation evidence before a pull request may merge."
+        },
+        "governance_files": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Files whose committed bytes are hashed into every attestation. A pull request that edits one of these cannot attest its own change: the gate recomputes the hash from the base ref and reports ATTESTATION_CONFIG_CHANGED. Defaults to ['.local-attest.config.mjs', '.dotbabel.json']."
+        },
+        "required_legs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Matrix leg names that must be present and passing in the evidence payload. Name the legs that merge-time verification has stopped running itself."
+        },
+        "trusted_associations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "GitHub author associations whose attestation the gate believes. Defaults to ['OWNER']."
+        }
+      }
+    },
     "quality": {
       "$ref": "#/$defs/quality"
     },

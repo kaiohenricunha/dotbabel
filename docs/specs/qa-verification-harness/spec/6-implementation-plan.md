@@ -12,6 +12,7 @@
 | 4. Review step and consumer surface  | P-B4, P-C4, P-D1, P-D2, P-D3 | P-B3 for P-B4 and P-D1, P-C1 for P-D2 | All five         |
 | 5. Post-deploy                       | P-E1, then P-E2              | Nothing from earlier phases           | No               |
 | 6. Dogfood                           | P-F1                         | Every other unit                      | No               |
+| 7. Evidence reuse                    | P-G1, then P-G2              | P-B3 for P-G1, P-G1 for P-G2          | No               |
 
 The order follows leverage. Phases 1 through 3 close the spec-stage and pull-request gaps, which cost the most points in the assessment (DOC-2). P-B3 and P-A2 wait for P-B2, because P-B3 extends the command that P-B2 creates, and P-A2 teaches a skill to call it. Phase 5 depends on no earlier phase, so it can start sooner when people are free.
 
@@ -19,7 +20,7 @@ The order follows leverage. Phases 1 through 3 close the spec-stage and pull-req
 - **IMPL-2**: A unit that changes a skill or a template runs prettier, then `node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --update`, then `npm run build-plugin`, all in the same pull request.
 - **IMPL-3**: A unit that changes `CLAUDE.md` regenerates the host instruction files with `npx dotbabel-generate-instructions` in the same pull request.
 - **IMPL-4**: Every unit commits its failing tests before, or together with, the code that makes them pass.
-- **IMPL-5**: Every criterion in this spec's `spec.json` starts `planned`. Each unit sets its own criteria to `active` in the pull request that adds their tests (KD-15): AC-1 and AC-2 in P-A1, AC-3 and AC-16 in P-B1, AC-8 and AC-9 in P-C1, AC-13 in P-C5, AC-4 through AC-7 in P-B3, AC-15 in P-B4, AC-10 in P-C4, AC-11 in P-D1, AC-14 in P-D2, and AC-12 in P-E1.
+- **IMPL-5**: Every criterion in this spec's `spec.json` starts `planned`. Each unit sets its own criteria to `active` in the pull request that adds their tests (KD-15): AC-1 and AC-2 in P-A1, AC-3 and AC-16 in P-B1, AC-8 and AC-9 in P-C1, AC-13 in P-C5, AC-4 through AC-7 in P-B3, AC-15 in P-B4, AC-10 in P-C4, AC-11 in P-D1, AC-14 in P-D2, AC-12 in P-E1, AC-17 and AC-18 in P-G1, and AC-19 in P-G2.
 - **IMPL-6**: P-B1 adds Stryker and its Vitest runner as dev dependencies with a break threshold of 85. Every unit that adds or changes a module in the TEST-1 scope runs Stryker on those modules in its verify step, so the mutation floor is enforced as each unit lands.
 
 ## 6.2 Workstream Breakdown
@@ -32,6 +33,7 @@ The order follows leverage. Phases 1 through 3 close the spec-stage and pull-req
 | WS-D Consumer surface | P-D1, P-D2, P-D3             | Workflow templates and hooks                                            | §5 hooks, and calls to the WS-B and WS-C commands     |
 | WS-E Post-deploy      | P-E1, P-E2                   | Smoke checks                                                            | §5 deploy targets and the `smoke` command             |
 | WS-F Dogfood          | P-F1                         | This repository adopting the whole harness                              | Every section                                         |
+| WS-G Evidence reuse   | P-G1, P-G2                   | Attestation payload, the attestation merge gate, and conductor entry    | §5 payload, reason codes, and the conductor phases    |
 
 ## 6.3 Prompt Sequence
 
@@ -786,6 +788,104 @@ npm test
 </verify>
 ```
 
+### P-G1 — Attestation evidence, and a merge gate that reads it
+
+```text
+<read-first>
+plugins/dotbabel/src/local-attest-lib.mjs (renderComment, shouldAttest, legStatus)
+plugins/dotbabel/src/local-attest-runner.mjs (checkPreconditions, the publication path)
+plugins/dotbabel/src/pr-gates.mjs (checkMergeGate, evaluateCriteria)
+plugins/dotbabel/src/criteria/comment.mjs (postEvidenceComment: post, never edit)
+plugins/dotbabel/src/criteria/evidence.mjs (the parser this one mirrors)
+commands/merge-pr.md
+.local-attest.config.mjs
+</read-first>
+
+Command: /plan
+
+Stop /merge-pr re-running work that local-attest already did on the same tree.
+Give the attestation comment a machine-readable payload, move the PR quality
+profile into the attested matrix, and teach the merge gate to read the result.
+
+The payload must name the configuration that produced it. A leg list alone
+proves only that a leg named `test` ran, not that it ran anything: a pull
+request that rewrites the leg to `command: "true"` still produces a truthful
+`{"name":"test","status":"pass"}`. So hash the governance files and have the
+gate recompute that hash from the BASE ref.
+
+Change local-attest to post a new comment and minimize its older ones, never
+to edit. The gate refuses an edited comment, and the previous upsert-in-place
+behaviour would have made every second attestation on a pull request untrusted.
+
+Enforcement reads `attestation.enforce` from the base ref. Absent means off —
+which is what lets this pull request land, since its own policy does not exist
+on the trunk yet.
+
+TDD first. These checks must fail before the work and pass after it:
+- a payload whose config_hash differs from the base ref returns ATTESTATION_CONFIG_CHANGED even when every required leg reports pass
+- two successive attestations on one pull request both read as trusted
+- an attestation naming an earlier commit returns ATTESTATION_STALE
+- a base ref with no attestation policy returns no attestation reason at all
+- commands/merge-pr.md runs the suite and the quality profile only below the explicit-path heading
+
+Files:
+- add plugins/dotbabel/src/attestation.mjs, plugins/dotbabel/src/lib/evidence-payload.mjs
+- add schemas/dotbabel.attestation-evidence.schema.json
+- modify plugins/dotbabel/src/local-attest-lib.mjs, plugins/dotbabel/src/local-attest-runner.mjs
+- modify plugins/dotbabel/src/pr-gates.mjs, plugins/dotbabel/src/criteria/gate-inputs.mjs
+- modify plugins/dotbabel/bin/dotbabel-pr-stack.mjs
+- modify commands/merge-pr.md, skills/local-attest/SKILL.md, .dotbabel.json, .local-attest.config.mjs
+- add plugins/dotbabel/tests/attestation.test.mjs, plugins/dotbabel/tests/bats/merge-pr-attestation.bats
+
+<verify>
+npx vitest run plugins/dotbabel/tests/attestation.test.mjs plugins/dotbabel/tests/pr-gates.test.mjs
+bash plugins/dotbabel/scripts/run-bats.sh plugins/dotbabel/tests/bats/merge-pr-attestation.bats
+npm test
+npm run build-plugin -- --check
+</verify>
+```
+
+### P-G2 — A narrowed conductor preflight and a derived entry phase
+
+```text
+<read-first>
+commands/pre-pr.md (step 3 conductor branch, step 4 quality, step 5 checklist)
+skills/pr-conductor/SKILL.md (phase table, step 0, step 2)
+plugins/dotbabel/src/pr-gates.mjs (CONDUCTOR_PHASES)
+</read-first>
+
+Command: /plan
+
+Conductor-mode /pre-pr runs the full PR quality profile before review, and
+P-G1 moved the authoritative run to local-attest at the final head SHA. Narrow
+it: --conductor uses --profile fast and skips the PR body checklist, which is a
+reminder for authoring a body the conductor verifies mechanically in phase 2.
+Standalone /pre-pr is unchanged and keeps --profile pr.
+
+Derive the conductor's entry phase from PR state instead of making the operator
+remember --from. Two outcomes only: no open PR enters at a full pre-pr, an open
+PR enters at the narrowed preflight and lets open-pr self-skip. Do NOT add an
+already-attested outcome: an attestation proves a SHA passed the matrix, not
+that it went through review, and review markers are not SHA-pinned.
+
+TDD first. These checks must fail before the work and pass after it:
+- standalone /pre-pr still names --profile pr
+- conductor-mode /pre-pr names --profile fast and skips the body checklist
+- deriveEntryPhase returns pre-pr for an open PR that already carries a valid attestation
+- the conductor prose no longer claims phase 1 runs the test suite
+
+Files:
+- modify commands/pre-pr.md, skills/pr-conductor/SKILL.md
+- modify plugins/dotbabel/src/pr-gates.mjs, plugins/dotbabel/bin/dotbabel-pr-stack.mjs
+- add plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats
+
+<verify>
+bash plugins/dotbabel/scripts/run-bats.sh plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats plugins/dotbabel/tests/bats/pr-conductor.bats
+npx vitest run plugins/dotbabel/tests/pr-gates.test.mjs
+npm test
+</verify>
+```
+
 ## 6.4 Testing Strategy
 
 | Unit | Kinds applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | N/A + reason                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -807,8 +907,10 @@ npm test
 | P-E1 | unit; property: the backoff schedule for retry counts 0 through 10; contract: exit codes and the smoke report schema; integration: a local HTTP server fixture with same-origin and cross-origin redirects; load/torture: 50 checks inside the 300-second budget with a fake clock                                                                                                                                                                                                                                                                          | mutation: measured at 32.16% and deliberately outside TEST-1, which scopes harness source rather than skill scripts. The gap is real (47% of mutants uncovered, 781 kills to the floor), not a measurement artifact, and is tracked on #390 rather than claimed as covered here. statistical: N/A, deterministic. post-deploy: N/A, dotbabel has no deployed target, and consumers run this check                                                 |
 | P-E2 | contract: bats tests on the skill prose; post-deploy: the next dotbabel release runs `release-conductor verify`, which reports smoke as `SKIPPED`                                                                                                                                                                                                                                                                                                                                                                                                           | unit, property, and mutation: N/A, prose only. integration, statistical, and load/torture: N/A                                                                                                                                                                                                                                                                                                                                                    |
 | P-F1 | integration: `dotbabel criteria verify` on this spec; mutation: the `deep` profile with `--all` over the TEST-1 modules; post-deploy: `release-conductor verify` after the release                                                                                                                                                                                                                                                                                                                                                                          | unit and property: N/A, covered by earlier units. statistical and load/torture: N/A                                                                                                                                                                                                                                                                                                                                                               |
+| P-G1 | unit: the payload codec, the config hash, and the gate ladder; contract: the reason codes, the byte-exact marker, and the payload schema; property: payload round trip through a comment body; integration: `pr-stack gate --gate merge` with a stubbed `gh` and a stubbed `git show` at two revisions; contract (bats): merge-pr prose orders the expensive commands below the disposition step; mutation: Stryker on `attestation.mjs` and the changed part of `pr-gates.mjs` (TEST-1)                                                                    | statistical: N/A, deterministic. load/torture: N/A, covered by P-B3's comment-page cases. post-deploy: N/A                                                                                                                                                                                                                                                                                                                                        |
+| P-G2 | contract: bats on the standalone and conductor `/pre-pr` profiles and the conductor phase table; unit: `deriveEntryPhase` for every outcome, including that an attested head still enters at the preflight                                                                                                                                                                                                                                                                                                                                                  | property, mutation, statistical, load/torture, and post-deploy: N/A, prose plus one pure function                                                                                                                                                                                                                                                                                                                                                 |
 
-- **TEST-1**: The new modules under `plugins/dotbabel/src/criteria/`, and the changed parts of `pr-gates.mjs`, `lib/attest-marker.mjs`, `quality/discovery.mjs`, `quality/evaluate.mjs`, `quality/reports.mjs`, `spec-harness-lib.mjs`, `quality/adapters/python.mjs`, and `quality/adapters/node-tools.mjs`, reach a mutation score of 85 or more. (`lib/pr-markers.mjs` was named here originally and never existed; the marker helpers are in `lib/attest-marker.mjs`. The last three were admitted in step 2 of #390, when measurement showed them to be ordinary in-process modules 13 to 67 kills short of the floor.) Each unit's Stryker run enforces the threshold as the unit lands (IMPL-6), and P-F1 checks again with `--all` over those modules, because a diff-scoped run would score no changed line (REL-11).
+- **TEST-1**: The new modules under `plugins/dotbabel/src/criteria/`, `plugins/dotbabel/src/attestation.mjs`, `plugins/dotbabel/src/lib/evidence-payload.mjs`, and the changed parts of `pr-gates.mjs`, `lib/attest-marker.mjs`, `quality/discovery.mjs`, `quality/evaluate.mjs`, `quality/reports.mjs`, `spec-harness-lib.mjs`, `quality/adapters/python.mjs`, and `quality/adapters/node-tools.mjs`, reach a mutation score of 85 or more. (`lib/pr-markers.mjs` was named here originally and never existed; the marker helpers are in `lib/attest-marker.mjs`. The last three were admitted in step 2 of #390, when measurement showed them to be ordinary in-process modules 13 to 67 kills short of the floor.) Each unit's Stryker run enforces the threshold as the unit lands (IMPL-6), and P-F1 checks again with `--all` over those modules, because a diff-scoped run would score no changed line (REL-11).
 - **TEST-2**: Every golden fixture captured from a third-party tool records the tool name and version beside the fixture.
 - **TEST-3**: The test-quality judgment ships only after `run.mjs` exits 0, and `run.mjs` exits 1 when the eval misses OPS-9.
 - **TEST-4**: No test in this spec sleeps. Timers use fake clocks (`agents/test-engineer.md:48`), and bats timeout tests block a stub on a FIFO read instead of sleeping.
@@ -844,6 +946,8 @@ Each release is a semver minor version, because no step needs a consumer edit (O
 | The pre-push hook blocks work                                                         | Set `BYPASS_PRE_PUSH=1`, use `git push --no-verify`, or run `git config --unset core.hooksPath`     | Activation was manual (KD-11)                                                                                 |
 | Related tests at turn end stall                                                       | Unset `CHECK_ON_STOP_TESTS`                                                                         | The give-up counter already stops after 2 blocks (`plugins/dotbabel/hooks/check-on-stop.sh:80`)               |
 | A smoke check reports a false failure                                                 | Re-run `deploy-ops.mjs smoke`, then fix or remove the check                                         | Smoke never triggers a rollback (SEC-12)                                                                      |
+| The attestation gate blocks valid pull requests                                       | Set `attestation.enforce` to false on the base branch, fix the defect, then set it back             | The gate reads the setting at the base ref, so the switch lands through its own reviewed pull request         |
+| A pull request must change a governance file                                          | Land it through the explicit verification path; later pull requests attest against the new trunk    | `ATTESTATION_CONFIG_CHANGED` is not clearable by re-running, and that is the point (KD-17)                    |
 | A release regresses broadly                                                           | Run `npm dist-tag add @dotbabel/dotbabel@<previous> latest`, and consumers pin the previous version | Old and new versions coexist, because every feature reads optional configuration                              |
 
 Coexistence: an older dotbabel ignores the new optional keys, and a newer dotbabel without those keys behaves like the older one. A consumer can pin the previous version in `package.json` while a fix ships.

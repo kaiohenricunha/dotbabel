@@ -102,12 +102,22 @@ OWNER) whose **first line** is exactly:
 
 ```text
 <!-- local-attest verified-sha=<full-head-sha> -->
+<!-- local-attest-payload <base64url JSON> -->
 ```
 
 The CI workflow reads PR comments, applies a `jq select(.author_association == "OWNER")`
 filter, takes the first line of each, and `grep -qFx`s (exact-line match)
 for the marker that matches `github.event.pull_request.head.sha`. When it matches, every downstream
 job's `if:` evaluates false and skips at zero runner cost.
+
+Line 2 carries the evidence payload the **merge gate** reads
+(`schemas/dotbabel.attestation-evidence.schema.json`): the head SHA, the merge
+base, a hash of the files that govern the run, and each leg's terminal status.
+The CI gate ignores it; `dotbabel pr-stack gate --gate merge` does not. A marker
+alone says a matrix passed, which is enough to skip a redundant remote run but
+not enough to authorize a merge — it does not say WHICH matrix. The
+`config_hash` closes that: the gate recomputes it from the base ref, so a pull
+request that rewrites a leg's command cannot attest its own change.
 
 Freshness is automatic: a new push changes the head SHA, the old comment no
 longer matches, CI runs again. Editing or deleting the comment does **not**
@@ -153,11 +163,19 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
    this the skill would attest the pre-matrix SHA and then push whatever HEAD
    had become — publishing commits it never tested and labelling the PR
    verified on an unrun head.
-5. **Upsert comment.** Existing attestation comment (any SHA) is PATCHed in
-   place; otherwise a new one is POSTed — before the push, so the marker is
-   already visible when the push event fires GitHub Actions. Body always goes
-   via `gh api --input -` so multiline markdown can't be mangled by shell
-   quoting.
+5. **Post comment, minimize older ones.** A new comment is POSTed and this
+   tool's own earlier attestation comments are minimized as `OUTDATED` — before
+   the push, so the marker is already visible when the push event fires GitHub
+   Actions. Body always goes via `gh api --input -` so multiline markdown can't
+   be mangled by shell quoting.
+
+   **This never edits a comment**, which is a deliberate change from the
+   previous PATCH-in-place behaviour and matches what `dotbabel criteria`
+   already does (OPS-4). The merge gate refuses an edited comment — text that is
+   not what the tool wrote is not evidence — so under the old model the second
+   attestation on any pull request would have been rejected as untrusted.
+   Comments written by other users are never minimized.
+
 6. **Push** (if `pushAfterAttest` and not `--no-push`). A failed push records
    `result: "push-fail"`; the comment is already in place, so a bare
    `git push` retry completes the attestation.
@@ -190,7 +208,9 @@ push-fail | post-fail | dry-run | diagnostic`, with per-leg
 - **Skip the Secret-scan job** (or any other gate you didn't put behind the
   attestation `if:`). Configure each workflow's `if:` explicitly.
 - **Merge or deploy.** It only attests and pushes the current branch.
-- **Multiple comments per PR.** One attestation comment, upserted in place.
+- **Edit a comment.** Each run posts a new one and minimizes its own older
+  ones, so at most one attestation is visible per PR and `lastEditedAt` stays
+  null — which is what makes it trustworthy to the merge gate.
 - **Auto-unlabel on stale attestation.** A new push silently invalidates the
   prior attestation by SHA mismatch; the label stays as audit decoration.
 
