@@ -1070,6 +1070,24 @@ export function redactSmokeSecrets(text, secrets) {
 }
 
 /**
+ * Whether an http attempt satisfies the check's expectations.
+ *
+ * Shared by the retry loop (deciding whether to stop early) and the final
+ * verdict below it — both need the identical status/body comparison, and a
+ * second, drifted copy is exactly how a check that "passes" during a retry
+ * could later report as failed, or vice versa.
+ *
+ * @param {object} check
+ * @param {{ ok: boolean, status: number|null, body: string }} attempt
+ * @returns {boolean}
+ */
+function smokeCheckPasses(check, attempt) {
+  const statusOk = attempt.ok && (check.expect_status === undefined || attempt.status === check.expect_status);
+  const textOk = check.expect_text === undefined || String(attempt.body ?? "").includes(String(check.expect_text));
+  return { ok: Boolean(statusOk && textOk), statusOk, textOk };
+}
+
+/**
  * Perform one http attempt, following redirects manually.
  *
  * `redirect: "manual"` is load-bearing. Handing `follow` to fetch would let
@@ -1189,23 +1207,17 @@ export async function smokeReport({ root, targets = [], dryRun = false, deps = {
         } catch (err) {
           last = { ok: false, status: null, body: "", reason: `request failed: ${err?.message ?? err}` };
         }
-        const statusOk = last.ok && (check.expect_status === undefined || last.status === check.expect_status);
-        const textOk = check.expect_text === undefined || String(last.body ?? "").includes(String(check.expect_text));
-        if (statusOk && textOk) break;
+        if (smokeCheckPasses(check, last).ok) break;
         if (last.fatal) break;
         if (attempt < schedule.length) {
           await sleep(schedule[attempt]);
           if (now() - started >= SMOKE_TOTAL_BUDGET_MS) { budgetExceeded = true; break; }
         }
       }
-      const statusOk = last.ok && (check.expect_status === undefined || last.status === check.expect_status);
-      const textOk = check.expect_text === undefined || String(last.body ?? "").includes(String(check.expect_text));
-      const ok = Boolean(statusOk && textOk);
-      // Redacted against the response body too: a failing endpoint echoing the
-      // Authorization header back would otherwise leak it through this message.
+      const { ok, statusOk } = smokeCheckPasses(check, last);
       // A snippet of the failing body is the most useful thing an operator can
-      // see at 3am, and it is also exactly where a secret can come back out:
-      // an endpoint that echoes the Authorization header would otherwise leak
+      // see at 3am, and it is also exactly where a secret can come back out: an
+      // endpoint that echoes the Authorization header back would otherwise leak
       // it through the very message written to report the failure. So the body
       // is included, truncated, and redacted — redaction is load-bearing here,
       // not decorative.

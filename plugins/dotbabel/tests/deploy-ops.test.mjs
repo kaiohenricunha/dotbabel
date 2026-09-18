@@ -502,6 +502,20 @@ describe("smoke checks", () => {
     }
   });
 
+  it("smoke: reports which expectation failed, not the one that matched", async () => {
+    // Caught during simplification: collapsing status/body comparison into a
+    // single boolean lost which half failed, so a status-matches-but-body-
+    // mismatch case reported the self-contradicting "expected status 200, got
+    // 200". The message must name the expectation that actually failed.
+    const report = await smokeReport({
+      root: ".",
+      targets: [target([{ type: "http", url: "https://example.test/health", expect_status: 200, expect_text: "ready" }])],
+      deps: { fetch: stubFetch({ status: 200, body: "unexpected body" }), sleep: async () => {} },
+    });
+    expect(report.results[0].message).toContain("body did not contain");
+    expect(report.results[0].message).not.toMatch(/expected status \d+, got \d+/);
+  });
+
   it("smoke: computes the backoff schedule for any retry count from 0 through 10", () => {
     // Property sweep rather than three fixed cases: the schedule is arithmetic,
     // so an off-by-one shows up at a boundary the examples happen to skip.
