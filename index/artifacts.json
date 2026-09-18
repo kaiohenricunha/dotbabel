@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-16T21:01:59.596Z",
+  "generatedAt": "2026-09-18T14:01:19.750Z",
   "version": "3.4.0",
   "artifacts": [
     {
@@ -887,6 +887,21 @@
         "platform": ["none"],
         "task": ["review"],
         "maturity": "validated"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "smoke-test",
+      "type": "skill",
+      "path": "skills/smoke-test/SKILL.md",
+      "name": "smoke-test",
+      "description": "Run the smoke checks a repository declares for its deploy targets and report whether production actually answers after a release. Use after a deploy, during release verification, and when confirming a rollback landed. Triggers on: \"smoke test\", \"run smoke checks\", \"is production healthy\", \"did the deploy work\", \"verify the release is live\".\n",
+      "facets": {
+        "domain": ["infra", "devex"],
+        "platform": ["vercel", "flyio", "aws"],
+        "task": ["diagnostics", "runtime-ops"],
+        "maturity": "draft"
       },
       "version": "1.0.0",
       "owner": "@kaiohenricunha"

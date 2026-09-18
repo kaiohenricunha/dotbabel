@@ -39,6 +39,7 @@
       "review-prs",
       "rollback-prod",
       "security-review",
+      "smoke-test",
       "spec",
       "tldr",
       "validate-spec",
@@ -67,6 +68,7 @@
       "pulumi-specialist",
       "rollback-prod",
       "security-engineer",
+      "smoke-test",
       "terraform-specialist",
       "terragrunt-engineer",
       "terragrunt-specialist"
@@ -124,7 +126,7 @@
       "veracity-audit",
       "workflow-orchestrator"
     ],
-    "aws": ["aws-engineer", "aws-specialist", "deploy-status", "rollback-prod"],
+    "aws": ["aws-engineer", "aws-specialist", "deploy-status", "rollback-prod", "smoke-test"],
     "azure": ["azure-engineer", "azure-specialist"],
     "docker": ["container-engineer", "docker-engineer"],
     "kubernetes": [
@@ -146,8 +148,8 @@
       "review-pr",
       "review-prs"
     ],
-    "vercel": ["deploy-status", "rollback-prod"],
-    "flyio": ["deploy-status", "flyctl", "rollback-prod"],
+    "vercel": ["deploy-status", "rollback-prod", "smoke-test"],
+    "flyio": ["deploy-status", "flyctl", "rollback-prod", "smoke-test"],
     "gcp": ["gcp-engineer", "gcp-specialist"],
     "terraform": [
       "iac-engineer",
@@ -268,7 +270,8 @@
       "deploy-status",
       "flyctl",
       "kubernetes-specialist",
-      "security-auditor"
+      "security-auditor",
+      "smoke-test"
     ],
     "runtime-ops": [
       "deploy-status",
@@ -277,7 +280,8 @@
       "flyctl",
       "kubernetes-specialist",
       "local-attest",
-      "release-conductor"
+      "release-conductor",
+      "smoke-test"
     ],
     "testing": [
       "detect-flaky",
@@ -361,6 +365,7 @@
       "rollback-prod",
       "security-auditor",
       "security-engineer",
+      "smoke-test",
       "terragrunt-engineer",
       "test-engineer",
       "tldr",
