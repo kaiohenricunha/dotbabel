@@ -18,7 +18,7 @@ All seven capabilities belong to the target architecture. §6 can phase their im
 
 ## Out of Scope
 
-These are boundaries of responsibility, not exclusions from observation. Dotbabel may inspect runtime/provider metadata needed to make and explain a recommendation without taking ownership of execution, billing, authentication, or provider policy. The owner decided all eight exclusions on 2026-09-17.
+These are boundaries of responsibility, not exclusions from observation. Dotbabel may inspect runtime/provider metadata needed to make and explain a recommendation without taking ownership of execution, billing, authentication, or provider policy. The owner decided the first eight exclusions on 2026-09-17 and the ninth on 2026-09-18.
 
 - **Model execution.** Dotbabel does not proxy model traffic, call provider inference APIs on behalf of the runtime, or become a model gateway. The selected runtime remains responsible for executing the model.
 - **Automatic model changes.** Dotbabel may recommend escalation or de-escalation, but it must not silently change the user's active model or reasoning configuration. See in-scope item 6.
@@ -27,6 +27,7 @@ These are boundaries of responsibility, not exclusions from observation. Dotbabe
 - **Credential management.** Dotbabel does not authenticate users to runtimes or providers, copy credentials, manage API keys, or modify credential stores.
 - **Provider entitlement management.** Dotbabel may observe that a model is unavailable or not exposed to the current account, but it does not purchase plans, request access, or manage subscriptions/quotas.
 - **Universal model scoring.** Dotbabel does not assign one global numeric intelligence score or assume model capability, effort, context, latency, and cost can be reduced to a single ordering.
+- **New cross-runtime agent fan-out.** Decided by the owner on 2026-09-18, after Phase 0 (DOC-3). Model Intelligence may discover, resolve, observe, and recommend configurations for all supported runtimes. It projects native agent compute configuration only on agent surfaces that Dotbabel already owns/materializes, which today means Claude Code. The agent `model` support of Copilot, OpenCode, and Antigravity stays recorded as `unverified` until authenticated Tier 3 integration tests prove the runtime binding, and its existence does not by itself make Dotbabel start distributing agents to those runtimes. Adding agent fan-out is a separate product/runtime-distribution capability: it changes artifact topology, installation/sync behavior, ownership, compatibility, and testing beyond the migration of existing fan-out that this spec covers.
 - **Replacing runtime-native configuration.** Dotbabel resolves and recommends runtime-native configurations, but each supported runtime remains authoritative for its own model identifiers, effort/thinking controls, context modes, validation rules, and execution semantics.
 
 ## Boundaries

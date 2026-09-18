@@ -24,6 +24,10 @@ Questions that the evidence base does not answer yet. Each one names the decisio
   5. Keep Copilot skill/instructions compute metadata omitted.
 - **RQ-4**: Skill-level binding on Codex, Antigravity, and OpenCode. DOC-2 left them LIKELY NOT_PARSED, UNCERTAIN, and BLOCKED. Blocks: any change to their rows in KD-4. **Status, 2026-09-18:** closed for Codex and OpenCode as `unsupported`; closed as LIKELY `unsupported` for Antigravity, with the live test blocked (DOC-3).
 
+## Deferred Follow-Ups
+
+- **Deferred: cross-runtime agent fan-out.** Evaluate native Dotbabel agent projection for runtimes with verified agent binding, beginning with Copilot, OpenCode, and Antigravity after Tier 3 binding tests. This requires its own scope/compatibility decision and does not block Model Intelligence. Decided by the owner on 2026-09-18 (§2, `Out of Scope`; DOC-3).
+
 ## Measurement Disposition
 
 Phase 3 content check: each measurement in DOC-1 and DOC-2 either became a §7 constraint or is dropped here with a reason.

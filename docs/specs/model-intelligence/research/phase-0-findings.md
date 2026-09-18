@@ -114,4 +114,4 @@ These rows update the initial capability snapshot of KD-4 (ARCH-46). `supported`
 2. The license and the ownership of the Models.dev data.
 3. Run-time proof that Copilot, OpenCode, and Antigravity honour an agent `model`. Each needs an authenticated runtime, which is a Tier 3 condition under TEST-5.
 4. The load path of Copilot CLI commands, and whether Dotbabel commands belong there.
-5. Whether Dotbabel fans out agents to any runtime other than Claude Code. Today it does not, and four runtimes can bind a model on an agent.
+5. Cross-runtime agent fan-out. Decided by the owner on 2026-09-18: it is out of scope for this spec (§2, `Out of Scope`), and it is recorded as a deferred item in [sources.md](sources.md). Phase 0 therefore closes the research question without widening the implementation scope.
