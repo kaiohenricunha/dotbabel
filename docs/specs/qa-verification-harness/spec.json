@@ -70,7 +70,12 @@
     "docs/templates.md",
     "docs/repo-facts.json",
     "docs/specs/README.md",
-    ".dotbabel.json"
+    ".dotbabel.json",
+    "stryker.config.mjs",
+    "package.json",
+    "docs/troubleshooting.md",
+    "plugins/dotbabel/tests/dogfood-mutation-tool.test.mjs",
+    "stryker.harness.config.mjs"
   ],
   "acceptance_commands": [
     "npm test",
@@ -104,7 +109,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-1.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-1.junit.xml"
+      }
     },
     {
       "id": "AC-2",
@@ -130,7 +138,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-2.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-2.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-2.junit.xml"
+      }
     },
     {
       "id": "AC-3",
@@ -156,7 +167,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-3.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-3.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-3.junit.xml"
+      }
     },
     {
       "id": "AC-4",
@@ -178,7 +192,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-4.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-4.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-4.junit.xml"
+      }
     },
     {
       "id": "AC-5",
@@ -200,7 +217,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-5.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-5.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-5.junit.xml"
+      }
     },
     {
       "id": "AC-6",
@@ -222,7 +242,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-6.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-6.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-6.junit.xml"
+      }
     },
     {
       "id": "AC-7",
@@ -244,7 +267,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-7.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-7.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-7.junit.xml"
+      }
     },
     {
       "id": "AC-8",
@@ -271,7 +297,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-8.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-8.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-8.junit.xml"
+      }
     },
     {
       "id": "AC-9",
@@ -293,7 +322,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-9.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-9.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-9.junit.xml"
+      }
     },
     {
       "id": "AC-10",
@@ -315,7 +347,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-10.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-10.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-10.junit.xml"
+      }
     },
     {
       "id": "AC-11",
@@ -341,7 +376,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-11.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-11.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-11.junit.xml"
+      }
     },
     {
       "id": "AC-12",
@@ -367,7 +405,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-12.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-12.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-12.junit.xml"
+      }
     },
     {
       "id": "AC-13",
@@ -389,7 +430,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-13.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-13.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-13.junit.xml"
+      }
     },
     {
       "id": "AC-14",
@@ -447,7 +491,10 @@
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-16.junit.xml"
       ],
-      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-16.junit.xml" }
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-16.junit.xml"
+      }
     }
   ]
 }

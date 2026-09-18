@@ -310,6 +310,12 @@ runs repository code:
 git config core.hooksPath githooks
 ```
 
+`core.hooksPath` is repository configuration, not per-worktree: it lives in the
+common `.git` directory that every worktree shares, so activating it in one
+worktree activates it in all of them. Keep the value relative. An absolute path
+breaks for every worktree the moment the repository moves, and the failure is
+silent — git finds no hook and pushes anyway.
+
 **It never traps a push.** Exactly one outcome blocks — the check ran and
 reported a policy failure (exit 1). A missing `dotbabel`, unavailable evidence
 or tooling (exit 2), any other exit code, a run that outlives
