@@ -42,6 +42,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
+    "mutation": "stryker run",
     "lint": "prettier --check \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown && markdownlint-cli2 \"**/*.md\" \"#node_modules\" \"#.claude/worktrees\" && node scripts/check-jsdoc-coverage.mjs plugins/dotbabel/src",
     "format": "prettier --write \"**/*.{json,yml,yaml,md}\" --ignore-path .gitignore --ignore-path .prettierignore --ignore-unknown",
     "shellcheck": "shellcheck --severity=warning -x bootstrap.sh sync.sh plugins/dotbabel/scripts/*.sh plugins/dotbabel/hooks/*.sh plugins/dotbabel/tests/*.sh plugins/dotbabel/templates/claude/hooks/*.sh .claude/hooks/*.sh examples/minimal-consumer/.claude/hooks/*.sh plugins/dotbabel/templates/githooks/pre-commit plugins/dotbabel/templates/githooks/pre-push",

@@ -225,6 +225,58 @@ invalid `--pass-env` name.
 **Fix**: use a `PATH` name or a `./`-relative path inside the component root.
 `--pass-env` names must match `[A-Za-z_][A-Za-z0-9_]*`.
 
+### Mutation testing reports `not_configured` although Stryker is installed
+
+Built-in detection plans `./node_modules/.bin/stryker`, relative to the
+component root. A git worktree has no `node_modules` of its own — Node and npm
+resolve upward into the main checkout — so the binary is absent at that exact
+path and the plan is reported as not configured.
+
+**Fix**: declare the tool yourself, going through `npm run` so that npm's
+ancestor `PATH` finds the installed binary. See
+[Declaring the tool yourself](./quality.md#declaring-the-tool-yourself).
+
+The same declaration is the fix when Stryker is configured in a `.js` or `.mjs`
+file and writes its report somewhere other than the default
+`reports/mutation/mutation.json`: those config forms cannot be read without
+executing them, so detection assumes the default path.
+
+### Stryker dies with `EISDIR: illegal operation on a directory, copyfile`
+
+Stryker copies the repository into a sandbox and does not follow a symlinked
+directory. dotbabel fans skills out as symlinks into each CLI's config
+directory, so any of them that Stryker copies kills the run before a single
+mutant is scored.
+
+**Fix**: add every fan-out skills directory to `ignorePatterns` in the Stryker
+config. Derive the list from the agent registry rather than typing it out — a
+hand-written list falls behind silently when a runtime is added, and the next
+run fails on a path nobody changed:
+
+```js
+import { skillDirRuntimes, projectSkillsDir } from "./plugins/dotbabel/src/agents.mjs";
+
+ignorePatterns: [
+  ".claude/commands",
+  ".claude/skills",
+  ".cli",
+  ".github/instructions",
+  ...skillDirRuntimes().map((runtime) => projectSkillsDir(runtime)),
+],
+```
+
+### `mutation.changed_score` reports `not_applicable` on a run you expected to score
+
+The rule scores only mutants that start on a line the change touched (REL-11),
+so a diff-scoped run of a change that touches no mutated module has nothing to
+measure. That is not a failure.
+
+**Fix**: to measure a module's whole score, scope by path and pass `--all`:
+
+```bash
+dotbabel quality check --profile deep --all --path 'plugins/dotbabel/src/criteria/**'
+```
+
 ### Measurement states are not error codes
 
 `not_configured`, `unsupported`, and `unavailable` are measurement states, not

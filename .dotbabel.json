@@ -40,6 +40,11 @@
             "argv": ["npm", "run", "coverage"],
             "timeout_seconds": 900,
             "report": { "format": "lcov", "path": "coverage/lcov.info" }
+          },
+          "mutation": {
+            "argv": ["npm", "run", "mutation"],
+            "timeout_seconds": 3600,
+            "report": { "format": "stryker-json", "path": "reports/mutation/mutation.json" }
           }
         }
       }

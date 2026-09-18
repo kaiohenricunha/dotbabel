@@ -53,3 +53,24 @@ docs/specs/
 2. Approve → `status: approved`; files in `linked_paths` now require this spec (or a `No-spec rationale`) in any PR that touches them.
 3. Implement → `status: implementing`; work in progress, same gating.
 4. Done → `status: done`; spec remains as governance over linked_paths (Böckeler's "spec-anchored" mode — an opt-in steady state for repos that want long-lived PR-time gates, not the default for casual feature work).
+
+### Moving a spec to `done`
+
+`done` is a claim that the spec's criteria hold, so establish it before you
+write it, not after:
+
+```bash
+dotbabel criteria verify --spec <id>
+```
+
+Every criterion must be `active` and must pass. A `planned` criterion is
+recorded but never run (IMPL-5 puts a criterion into `active` only in the pull
+request that adds its tests), so a spec still carrying one has an untested claim
+in it and is not done.
+
+Then run the `/validate-spec <id>` audit and resolve every CRITICAL finding.
+Only then set `"status": "done"`.
+
+Warning: `done` does not retire the spec. Files in `linked_paths` still require
+it in any pull request that touches them, so a `done` spec whose criteria later
+break becomes a gate that fails on unrelated work.

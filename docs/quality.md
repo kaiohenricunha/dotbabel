@@ -371,11 +371,51 @@ install named as the remediation. This is deliberate: `npx` always starts
 successfully, so an uninstalled package would exit non-zero and _fail_ the
 mutation rule rather than reporting that there was nothing to measure.
 
+That path is relative to the component root, so **a git worktree reports the
+same not-configured verdict** even when the dependency is installed. A worktree
+has no `node_modules` of its own; Node and npm resolve upward into the main
+checkout instead. Declare the tool yourself to run mutation testing from a
+worktree.
+
 The report path comes from `jsonReporter.fileName` when the configuration is
 one of the JSON forms (or the `stryker` key in `package.json`), and falls back
 to Stryker's default `reports/mutation/mutation.json`. A `.js` or `.mjs`
 config cannot be read without executing it, so those keep the default — set a
 project `mutation` tool explicitly if yours writes somewhere else.
+
+#### Declaring the tool yourself
+
+This repository hits both cases: it configures Stryker in `stryker.config.mjs`,
+and its spec work happens in worktrees. It therefore declares the tool rather
+than relying on detection:
+
+```json
+"mutation": {
+  "argv": ["npm", "run", "mutation"],
+  "timeout_seconds": 3600,
+  "report": { "format": "stryker-json", "path": "reports/mutation/mutation.json" }
+}
+```
+
+Going through `npm run` is what makes this work from a worktree: npm puts every
+ancestor `node_modules/.bin` on `PATH`, so `stryker` resolves to the main
+checkout's installation.
+
+Two values must now agree in two files — `jsonReporter.fileName` in
+`stryker.config.mjs` and `report.path` here. Warning: a divergence is silent. No
+report at the declared path resolves through `on_unavailable: info`, which reads
+as a pass rather than as a missing measurement. Pin them together with a test;
+`plugins/dotbabel/tests/dogfood-mutation-tool.test.mjs` does that here, and also
+asserts that the config enables the `json` reporter at all.
+
+`mutation.changed_score` scores only changed lines, so a diff-scoped run of a
+change that touches no mutated module correctly reports `not_applicable`. To
+measure a module's whole mutation score, scope the run by path and pass
+`--all`:
+
+```bash
+dotbabel quality check --profile deep --all --path 'plugins/dotbabel/src/criteria/**'
+```
 
 **mutmut reports aggregate counts only.** `mutmut export-cicd-stats` writes
 totals with no per-mutant records, and the `.spans` sidecar indexes the
