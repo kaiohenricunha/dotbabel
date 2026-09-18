@@ -545,6 +545,7 @@
         "vitest",
         "run",
         "plugins/dotbabel/tests/local-attest-runner.test.mjs",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-18.junit.xml"
       ],
