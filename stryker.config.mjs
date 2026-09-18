@@ -27,7 +27,18 @@ export default {
   // The harness cannot use this config for that reason — see
   // `stryker.harness.config.mjs`.
   thresholds: { high: 90, low: 85, break: 85 },
-  mutate: ["plugins/dotbabel/src/criteria/**/*.mjs"],
+  // TEST-1's scope, resolved to paths that exist. The constraint names
+  // `lib/pr-markers.mjs`, which was never created — the marker helpers live in
+  // `lib/attest-marker.mjs`, with the criteria-side half already inside the
+  // criteria tree below.
+  mutate: [
+    "plugins/dotbabel/src/criteria/**/*.mjs",
+    "plugins/dotbabel/src/pr-gates.mjs",
+    "plugins/dotbabel/src/lib/attest-marker.mjs",
+    "plugins/dotbabel/src/quality/discovery.mjs",
+    "plugins/dotbabel/src/quality/evaluate.mjs",
+    "plugins/dotbabel/src/quality/reports.mjs",
+  ],
   tempDirName: ".stryker-tmp",
   // dotbabel fans skills and commands out as symlinks into several CLIs'
   // config directories. Stryker's sandbox copy does not follow a symlinked
