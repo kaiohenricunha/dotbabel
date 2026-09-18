@@ -1,0 +1,24 @@
+{
+  "$comment": "The measured OpenCode case (DOC-2, \"`opencode models` Grammar and Stability\"): the command exits 0 and prints nothing. A successful exit code alone does not imply ok (§5 'Adapter result'), so this classifies as unknown with diagnostic empty_output. Converting it into an empty successful model catalog would let a refresh replace a previously valid cache with nothing, which ARCH-30 forbids.",
+  "process": {
+    "argv": ["opencode", "models"],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "expectedResult": {
+    "status": "unknown",
+    "provenance": {
+      "sourceId": "opencode",
+      "sourceKind": "runtime",
+      "sourceVersion": "2.0.5",
+      "adapterVersion": "1"
+    },
+    "observedAt": "2026-09-18T00:00:00.000Z",
+    "diagnostic": {
+      "code": "empty_output",
+      "message": "`opencode models` exited 0 and produced no output, so the model list cannot be determined",
+      "retryable": true
+    }
+  }
+}

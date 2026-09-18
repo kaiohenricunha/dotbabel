@@ -1,0 +1,46 @@
+{
+  "$comment": "A runtime adapter descriptor. Binding support is evaluated independently per artifact kind (ARCH-50): support for one capability never implies support for another. Observation declares may-execute-model because on this runtime the only way to observe effective state is a billable model turn (DOC-2, 'Discovery Suitability'), and a caller must not treat that like free read-only discovery. The skill binding is unverified rather than unsupported: Dotbabel has no evidence either way, and unverified is never coerced to supported (ARCH-44).",
+  "id": "claude",
+  "kind": "runtime",
+  "capabilities": {
+    "discovery": {
+      "support": "supported",
+      "network": "optional",
+      "auth": "optional-existing",
+      "cacheable": true,
+      "execution": "read-only"
+    },
+    "observation": {
+      "support": "supported",
+      "network": "required",
+      "auth": "required-existing",
+      "cacheable": false,
+      "execution": "may-execute-model"
+    },
+    "binding": {
+      "agent": {
+        "support": "supported",
+        "axes": { "model": "supported", "reasoning": "supported" }
+      },
+      "command": {
+        "support": "supported",
+        "axes": { "model": "supported", "reasoning": "unsupported" }
+      },
+      "skill": {
+        "support": "unverified",
+        "axes": { "model": "unverified", "reasoning": "unverified" }
+      }
+    },
+    "invocation": {
+      "support": "supported",
+      "axes": { "model": "supported", "reasoning": "unsupported" }
+    },
+    "validation": {
+      "support": "supported",
+      "network": "never",
+      "auth": "none",
+      "cacheable": false,
+      "execution": "read-only"
+    }
+  }
+}

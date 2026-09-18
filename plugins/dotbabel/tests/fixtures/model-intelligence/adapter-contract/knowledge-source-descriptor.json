@@ -1,0 +1,25 @@
+{
+  "$comment": "A knowledge-source adapter uses the same descriptor envelope as a runtime (spec model-intelligence, §5 'Knowledge-source adapters'). Capabilities that make no sense for it are explicit rather than absent, and an operation declared unsupported omits the operational axes: there is no network, auth or execution story for something that does not happen.",
+  "id": "models-dev",
+  "kind": "knowledge-source",
+  "capabilities": {
+    "discovery": {
+      "support": "supported",
+      "network": "required",
+      "auth": "none",
+      "cacheable": true,
+      "execution": "read-only"
+    },
+    "observation": {
+      "support": "unsupported"
+    },
+    "binding": {},
+    "invocation": {
+      "support": "unsupported",
+      "axes": {}
+    },
+    "validation": {
+      "support": "unsupported"
+    }
+  }
+}
