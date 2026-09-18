@@ -20,7 +20,7 @@ const VOCABULARIES = {
   ENFORCEMENT_BASES: ["artifact-binding", "session-observation", "invocation", "none"],
   REPRESENTATION_KINDS: ["stable-alias", "native-id", "opaque-selector"],
   ARTIFACT_KINDS: ["agent", "command", "skill", "workflow"],
-  SOURCE_KINDS: ["runtime", "knowledge-source"],
+  SOURCE_KINDS: ["runtime", "knowledge-source", "artifact"],
 };
 
 describe("model-intelligence domain vocabulary", () => {
@@ -116,6 +116,17 @@ describe("model-intelligence domain shape guards", () => {
     for (const axes of [null, "model", ["model"]]) {
       expect(() => makeResolvedRuntimeConfiguration({ runtimeId: "codex", axes, representation: { kind: "native-id", provenance } })).toThrow(/axes/);
     }
+  });
+
+  it("carries an artifact source kind so a declaration cannot pose as a runtime observation", async () => {
+    const { SOURCE_KINDS, makeProvenance } = await import("../src/model-intelligence/domain/index.mjs");
+    expect(SOURCE_KINDS).toContain("artifact");
+    // A canonical declaration states its own requirement; no adapter observed it.
+    // Consumers read `runtime` as "observed from a harness", so the two must differ.
+    const declared = makeProvenance({ sourceId: "skills/probe/SKILL.md", sourceKind: "artifact" });
+    expect(declared.sourceKind).toBe("artifact");
+    expect(declared.adapterVersion).toBeUndefined();
+    expect(() => makeProvenance({ sourceId: "x", sourceKind: "declaration" })).toThrow(/sourceKind/);
   });
 
   it("rejects a non-string version field in provenance", async () => {

@@ -54,8 +54,17 @@ export const REPRESENTATION_KINDS = Object.freeze(["stable-alias", "native-id", 
 /** Canonical artifact kinds that a binding contract is keyed by. */
 export const ARTIFACT_KINDS = Object.freeze(["agent", "command", "skill", "workflow"]);
 
-/** Kinds of source adapter. */
-export const SOURCE_KINDS = Object.freeze(["runtime", "knowledge-source"]);
+/**
+ * Kinds of evidence source. `runtime` and `knowledge-source` are the two adapter
+ * classes of §5. `artifact` is the canonical declaration itself: the artifact
+ * stated the requirement, and no adapter observed it. Consumers that mean "an
+ * adapter observed this from a harness" test for `runtime`, so a declaration must
+ * not borrow that kind.
+ */
+export const SOURCE_KINDS = Object.freeze(["runtime", "knowledge-source", "artifact"]);
+
+/** `$id` of the shipped JSON Schema for the `dotbabel` frontmatter namespace. */
+export const COMPUTE_SCHEMA_ID = "https://dotbabel.dev/schemas/dotbabel.compute.schema.json";
 
 /** Runtime ids, taken from the `RUNTIMES` registry. A runtime is a harness, not a model vendor (ARCH-2). */
 export const RUNTIME_IDS = Object.freeze(Object.keys(RUNTIMES));
@@ -122,8 +131,9 @@ const PROVENANCE_FIELDS = Object.freeze(["sourceId", "sourceKind", "sourceVersio
 
 /**
  * @typedef {object} Provenance
- * @property {string} sourceId Runtime id or knowledge-source id. Never a credential or an account id (OPS-4).
- * @property {"runtime"|"knowledge-source"} sourceKind
+ * @property {string} sourceId Runtime id, knowledge-source id, or — for `sourceKind: "artifact"` —
+ *   the declaring artifact path. Never a credential or an account id (OPS-4).
+ * @property {"runtime"|"knowledge-source"|"artifact"} sourceKind
  * @property {string} [sourceVersion]
  * @property {string} [adapterVersion]
  */
