@@ -58,13 +58,11 @@ setup() {
   [ "$status" -eq 0 ]
   # And the skill must carry a concrete example, not just name the file: the
   # validator requires id, title, status, owners, linked_paths and
-  # acceptance_commands, and an author given only a filename writes none of them.
-  for field in '"id"' '"title"' '"status"' '"owners"' '"linked_paths"' '"acceptance_commands"' '"acceptance_criteria"'; do
-    run grep -qF "$field" "$SPEC"
-    [ "$status" -eq 0 ]
-  done
-  # The criteria example needs the shape the validator actually checks.
-  for field in '"given"' '"when"' '"then"' '"tests"' '"argv"'; do
+  # acceptance_commands, and an author given only a filename writes none of
+  # them. The remaining fields are the criteria shape the validator checks.
+  for field in '"id"' '"title"' '"status"' '"owners"' '"linked_paths"' \
+               '"acceptance_commands"' '"acceptance_criteria"' \
+               '"given"' '"when"' '"then"' '"tests"' '"argv"'; do
     run grep -qF "$field" "$SPEC"
     [ "$status" -eq 0 ]
   done
