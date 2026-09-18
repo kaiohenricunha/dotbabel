@@ -307,12 +307,48 @@ export function checkMergeGate(input = {}) {
     gate: "merge",
     reasons,
     warnings,
+    // Reported explicitly, because "no ATTESTATION_ reason" is ambiguous: a
+    // repository that never opted in produces the same empty list as one whose
+    // evidence the gate fully verified. A caller deciding whether it may skip
+    // verification must be able to tell those apart without re-reading the base
+    // ref itself, and prose is the wrong place to reconstruct it.
+    attestation: attestationStatus(input, attestation),
     hint:
       reasons.length === 0
         ? null
         : attestation.length > 0
           ? "re-run `dotbabel local-attest --pr <N>` so the evidence names the current head"
           : "see .github/PULL_REQUEST_TEMPLATE.md for the required sections",
+  };
+}
+
+/**
+ * Summarize the attestation half for a caller that must decide what to run.
+ *
+ * `off` is a deliberate value, not an absence: it is the bootstrap state, and
+ * it means "this gate checked nothing about evidence, verify explicitly". The
+ * dangerous misreading is to treat it as `verified`.
+ *
+ * @param {any} input
+ * @param {GateReason[]} reasons Whatever {@link evaluateAttestation} returned.
+ * @returns {{state: "verified"|"off"|"failed", sha: string|null, legs: string[], code: string|null}}
+ */
+function attestationStatus(input, reasons) {
+  if (input.attestationEnforced !== true) {
+    return { state: "off", sha: null, legs: [], code: null };
+  }
+  if (reasons.length > 0) {
+    return { state: "failed", sha: null, legs: [], code: reasons[0].code };
+  }
+  const headSha = typeof input.headRefOid === "string" ? input.headRefOid : "";
+  const comments = Array.isArray(input.attestationComments) ? input.attestationComments : [];
+  const current = comments.filter((c) => c && typeof c.body === "string" && attestMarker.parseSha(c.body) === headSha);
+  const parsed = current.length > 0 ? parseAttestationComment(current[current.length - 1].body) : null;
+  return {
+    state: "verified",
+    sha: headSha,
+    legs: parsed?.state === "ok" ? [...passedLegs(parsed.payload)] : [],
+    code: null,
   };
 }
 
@@ -344,6 +380,19 @@ function evaluateAttestation(input) {
       {
         code: "ATTESTATION_INVALID",
         message: "the pull request head SHA could not be read, so no evidence can be matched to it",
+      },
+    ];
+  }
+
+  // REL-21: an unreadable base commit is not "the trunk declares no policy".
+  // The gather probes for it and says so, because conflating the two is what
+  // turns a missing fetch into a silently disabled gate.
+  if (typeof input.attestationBaseUnreadable === "string") {
+    return [
+      {
+        code: "ATTESTATION_BASE_UNREADABLE",
+        message: "the base commit is not in this clone, so the attestation policy could not be read",
+        detail: `fetch ${input.attestationBaseUnreadable.slice(0, 8)} and re-run`,
       },
     ];
   }
@@ -450,18 +499,29 @@ function evaluateAttestation(input) {
   }
 
   const expectedMergeBase = typeof input.expectedMergeBase === "string" ? input.expectedMergeBase : null;
-  if (
-    expectedMergeBase !== null &&
-    typeof parsed.payload.merge_base === "string" &&
-    !shaMatches(parsed.payload.merge_base, expectedMergeBase)
-  ) {
-    return [
-      {
-        code: "ATTESTATION_BASE_MOVED",
-        message: "the attestation graded a different diff than the one being merged",
-        detail: `attested against ${String(parsed.payload.merge_base).slice(0, 8)}; current merge base ${expectedMergeBase.slice(0, 8)}`,
-      },
-    ];
+  if (expectedMergeBase !== null) {
+    // An absent `merge_base` blocks rather than skipping the rung, mirroring
+    // `config_hash` above. The producer omits the field whenever the base was
+    // unfetched, so treating absence as "nothing to check" let an ordinary
+    // environment glitch hand over evidence that graded a different diff.
+    if (typeof parsed.payload.merge_base !== "string") {
+      return [
+        {
+          code: "ATTESTATION_INVALID",
+          message: "the attestation records no merge base, so the diff it graded cannot be confirmed",
+          detail: "re-run local-attest with the base branch fetched",
+        },
+      ];
+    }
+    if (!shaMatches(parsed.payload.merge_base, expectedMergeBase)) {
+      return [
+        {
+          code: "ATTESTATION_BASE_MOVED",
+          message: "the attestation graded a different diff than the one being merged",
+          detail: `attested against ${String(parsed.payload.merge_base).slice(0, 8)}; current merge base ${expectedMergeBase.slice(0, 8)}`,
+        },
+      ];
+    }
   }
 
   const required = Array.isArray(input.requiredLegs) ? input.requiredLegs.filter(Boolean) : [];

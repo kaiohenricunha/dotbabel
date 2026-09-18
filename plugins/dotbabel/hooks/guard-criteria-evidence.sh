@@ -44,7 +44,33 @@
 # `jq` is used only to read the tool payload. Do not fail open for the case
 # this hook exists to catch: if jq is missing, fall back to scanning the raw
 # stdin for the marker and refuse when it is there.
+# Two marker families are gate-authoritative, so both are guarded.
+# `dotbabel-criteria` evidence asserts a criterion result; a forged one turns a
+# machine-checked verdict into an assertion. `local-attest` evidence is stronger
+# still: the merge gate skips the full test suite AND the quality profile on it,
+# so a forged one removes verification rather than misreporting it. The payload
+# line is listed too — a marker without it is refused by the gate as INVALID, so
+# guarding only the marker would leave the working forgery shape open.
 MARKER='dotbabel-criteria verified-sha='
+MARKERS=("$MARKER" 'local-attest verified-sha=' 'local-attest-payload ')
+
+# True when any guarded marker appears in $1.
+has_marker() {
+  local hay=$1 m
+  for m in "${MARKERS[@]}"; do
+    [[ "$hay" == *"$m"* ]] && return 0
+  done
+  return 1
+}
+
+# True when any guarded marker appears in the file named by $1.
+file_has_marker() {
+  local f=$1 m
+  for m in "${MARKERS[@]}"; do
+    grep -qF "$m" "$f" 2>/dev/null && return 0
+  done
+  return 1
+}
 
 # Slurp stdin with the `read` BUILTIN, not `$(cat)`. The fallback below has to
 # work when PATH is unusable — that is precisely when an external `cat` or
@@ -55,7 +81,7 @@ IFS= read -r -d '' INPUT || true
 
 if ! command -v jq >/dev/null 2>&1; then
   # `[[ == * *]]` is a builtin too, so this branch needs no external command.
-  if [[ "$INPUT" == *"$MARKER"* ]]; then
+  if has_marker "$INPUT"; then
     echo "BLOCKED: jq is unavailable, so this hook cannot parse the tool payload, and the input carries a dotbabel-criteria evidence marker. Refusing rather than failing open." >&2
     exit 2
   fi
@@ -97,7 +123,7 @@ MSG
 }
 
 # 1. The marker inline in the command text.
-if printf '%s' "$NORM" | grep -qF "$MARKER"; then
+if has_marker "$NORM"; then
   block ""
 fi
 
@@ -113,7 +139,7 @@ while IFS= read -r candidate; do
   candidate=${candidate%\'}
   candidate=${candidate#\'}
   [ -f "$candidate" ] || continue
-  if grep -qF "$MARKER" "$candidate" 2>/dev/null; then
+  if file_has_marker "$candidate"; then
     block " (via ${candidate})"
   fi
 done <<EOF

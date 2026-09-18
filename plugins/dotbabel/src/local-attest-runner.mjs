@@ -85,6 +85,16 @@ import { PERM_TO_ASSOC } from "./lib/perm-to-assoc.mjs";
  * @param {Deps} deps
  * @returns {string[]}
  */
+/**
+ * A plain git ref name: letters, digits, dot, underscore, slash, hyphen.
+ *
+ * `git check-ref-format` is far more permissive than this — it rejects only
+ * spaces, control characters and a short reserved set, so `;`, `&`, `|`, `$`
+ * and backticks are all legal in a branch name. Anything reaching a shell here
+ * is narrowed to the characters a real branch actually uses.
+ */
+const REF_NAME_RE = /^[A-Za-z0-9._][A-Za-z0-9._\/-]*$/;
+
 function governanceFileList(deps, rev) {
   try {
     const raw = showAtRev(deps, rev, ".dotbabel.json");
@@ -578,9 +588,14 @@ export function checkPreconditions(deps, cfg, opts = {}) {
     }
   })();
   let mergeBase = null;
-  if (baseRefName) {
+  // Validate before interpolating: `baseRefName` is remote data from the API,
+  // `deps.run` executes with a shell, and git ref names permit `;`, `&`, `|`,
+  // `$` and backticks. This file's own header rule forbids exactly this.
+  if (REF_NAME_RE.test(baseRefName)) {
     const r = deps.run(`git merge-base HEAD origin/${baseRefName}`, { capture: true });
     if (r.status === 0) mergeBase = r.stdout.trim() || null;
+  } else if (baseRefName) {
+    deps.warn(`WARNING: refusing to use base ref name ${JSON.stringify(baseRefName)} — not a plain ref name.`);
   }
 
   return {
@@ -1079,6 +1094,15 @@ export async function execute(deps, cfg, flags) {
     if (skippedNames.length > 0) {
       deps.log(`Diff rules skip ${skippedNames.length} leg(s): ${skippedNames.join(", ")}`);
     }
+  }
+
+  // Every leg learns the pull request's real base branch. A diff-scoped leg
+  // that hardcodes `origin/main` grades the wrong diff on a stacked pull
+  // request, whose base is its parent branch — and the merge gate now accepts
+  // that leg's verdict as authoritative, so the error is no longer visible
+  // downstream. Env passing, never shell interpolation.
+  if (pre.baseRefName) {
+    matrix = matrix.map((l) => ({ ...l, env: { ...l.env, DOTBABEL_PR_BASE_REF: pre.baseRefName } }));
   }
 
   // PR body injection: fetched once, empty on error (the consuming leg treats

@@ -135,6 +135,25 @@ describe("hashGovernanceFiles", () => {
     );
   });
 
+  it("frames fields unambiguously, so a path cannot borrow bytes from content", () => {
+    // Separator-joined framing made path "a b" + content "c" digest the same
+    // as path "a" + content "b c". This digest is the only thing preventing a
+    // pull request from authorizing its own weakened check, so the framing is
+    // length-prefixed rather than delimited.
+    expect(hashGovernanceFiles([{ path: "a b", bytes: "c" }])).not.toBe(
+      hashGovernanceFiles([{ path: "a", bytes: "b c" }]),
+    );
+  });
+
+  it("cannot have a file impersonate the absent marker through its contents", () => {
+    // The presence tag is out of band, so no byte sequence a file can contain
+    // collides with "this file does not exist".
+    const sentinel = String.fromCharCode(0) + "absent";
+    expect(hashGovernanceFiles([{ path: "x", bytes: null }])).not.toBe(
+      hashGovernanceFiles([{ path: "x", bytes: sentinel }]),
+    );
+  });
+
   it("hashes the empty list to a stable value distinct from any single file", () => {
     expect(hashGovernanceFiles([])).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(hashGovernanceFiles([])).not.toBe(hashGovernanceFiles([{ path: "a", bytes: "" }]));

@@ -108,8 +108,9 @@
         },
         "trusted_associations": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1 },
-          "description": "GitHub author associations whose attestation the gate believes. Defaults to ['OWNER']."
+          "minItems": 1,
+          "items": { "enum": ["OWNER", "MEMBER", "COLLABORATOR"] },
+          "description": "GitHub author associations whose attestation the gate believes. Defaults to ['OWNER']. Associations weaker than COLLABORATOR are refused: anyone who can open a pull request could then authorize its own merge by skipping the suite and the quality profile."
         }
       }
     },

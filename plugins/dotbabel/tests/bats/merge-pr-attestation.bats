@@ -18,18 +18,34 @@ load helpers
 MERGE="$REPO_ROOT/commands/merge-pr.md"
 TEMPLATE="$REPO_ROOT/plugins/dotbabel/templates/claude/commands/merge-pr.md"
 PROMPT="$REPO_ROOT/.github/prompts/merge-pr.prompt.md"
+# A fourth shipped copy, hand-maintained and gated by nothing — it sat a full
+# major version behind until a review caught it.
+EXAMPLE="$REPO_ROOT/examples/minimal-consumer/.claude/commands/merge-pr.md"
 
 # First line number matching a pattern, or empty when absent.
 line_of() {
   grep -nE "$1" "$2" | head -1 | cut -d: -f1
 }
 
-@test "merge-pr: reads the attestation and names what it covers" {
+@test "merge-pr: reads the gate's attestation field, not the raw comment" {
+  # The gate already parsed the evidence and extracted the SHA and leg names.
+  # Re-deriving them by grepping the comment would be a second parser of a
+  # security-relevant artifact, free to disagree with the one that gated.
   [ -f "$MERGE" ]
-  run grep -qF 'local-attest verified-sha=' "$MERGE"
+  run grep -qF 'result.attestation' "$MERGE"
   [ "$status" -eq 0 ]
   run grep -qiE 'attested (at|legs|SHA)' "$MERGE"
   [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: branches on attestation state, never on the absence of reasons" {
+  # The dangerous misreading: a repository that never enabled attestation
+  # produces an empty reason list too, so "no ATTESTATION_ reason" would skip
+  # the suite and the quality profile with no evidence at all.
+  for state in verified off failed; do
+    run grep -qF "\`$state\`" "$MERGE"
+    [ "$status" -eq 0 ]
+  done
 }
 
 @test "merge-pr: the disposition step precedes every expensive command" {
@@ -140,11 +156,11 @@ line_of() {
 @test "merge-pr: the generated copies carry the attestation contract too" {
   # The template copy is held byte-identical by build-plugin --check; the
   # prompt copy is not gated in CI, so it is the load-bearing one.
-  for file in "$TEMPLATE" "$PROMPT"; do
+  for file in "$TEMPLATE" "$PROMPT" "$EXAMPLE"; do
     [ -f "$file" ]
     run grep -qF 'ATTESTATION_CONFIG_CHANGED' "$file"
     [ "$status" -eq 0 ]
-    run grep -qF 'local-attest verified-sha=' "$file"
+    run grep -qF 'result.attestation' "$file"
     [ "$status" -eq 0 ]
   done
 }

@@ -60,16 +60,27 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    ran. Carry it to step 5 — re-verifying needs the PR head checked out, which
    has not happened yet.
 
-4. **Decide how this pull request gets verified.** Read the gate's attestation
-   reasons, which are the whole basis for skipping steps 6's expensive half.
+4. **Decide how this pull request gets verified.** Read `result.attestation`
+   from the gate's `--json` output. Branch on that field, **not** on the
+   absence of `ATTESTATION_*` reasons — a repository that never enabled
+   attestation produces an empty reason list too, and treating that as
+   "verified" would skip the suite and the quality profile with no evidence at
+   all:
 
-   **No `ATTESTATION_*` reason and the repo enforces attestation** — trusted,
-   current, complete evidence covers this exact head. Skip the worktree, skip
-   the local suite and the quality profile, and report the attested legs in
-   step 6. This is the normal path.
+   ```bash
+   dotbabel pr-stack gate --gate merge --pr <N> --json | jq -r '.result.attestation'
+   ```
 
-   **Any `ATTESTATION_*` reason** — **STOP**. Do not re-run the matrix from
-   here; producing evidence is `/local-attest`'s job and keeping that boundary
+   | `.state`   | Meaning                                           | Do                                                                                             |
+   | ---------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+   | `verified` | trusted, current, complete evidence for this head | skip the worktree, skip the suite and the quality profile; report `.sha` and `.legs` in step 6 |
+   | `off`      | the base ref never enabled `attestation.enforce`  | take the explicit path in step 6                                                               |
+   | `failed`   | evidence is missing, stale, untrusted or invalid  | **STOP** — see the reason codes below                                                          |
+
+   `verified` is the normal path once the policy is on the trunk.
+
+   **`.state` is `failed`** — **STOP**. Do not re-run the matrix from here;
+   producing evidence is `/local-attest`'s job and keeping that boundary
    explicit is the point. Report the reason and the recovery:
 
    ```text
@@ -104,13 +115,16 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
      requests attest against it once it is on the trunk.
    - `ATTESTATION_BASE_MOVED` — the evidence graded a different diff than the
      one merging. Rebase and re-attest.
+   - `ATTESTATION_BASE_UNREADABLE` — **the base commit is not in this clone**,
+     so the policy could not be read at all. This is not "the repo does not
+     enforce": the gate refuses rather than assuming, because a missing fetch
+     must never read as a missing policy. Run `git fetch origin` and re-gate.
    - `ATTESTATION_INCOMPLETE` / `ATTESTATION_FAILED` — a required check is
      missing from the evidence or did not pass. Read the named legs.
 
-   **The repo does not enforce attestation** (no `attestation.enforce` in
-   `.dotbabel.json` at the base ref, so the gate reports nothing either way) —
-   take the explicit verification path in step 6. That is the state of any
-   repository that has not adopted this, and of the pull request that adopts it.
+   **`.state` is `off`** — the base ref has no `attestation.enforce`. Take the
+   explicit verification path in step 6. That is the state of any repository
+   that has not adopted this, and of the pull request that adopts it.
 
 5. **Re-verify criteria if step 3 reported `CRITERIA_EVIDENCE_STALE`.**
 
@@ -145,9 +159,12 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    naming the legs and the SHA. Never restate an attested leg as though this
    command ran it:
 
+   The gate already extracted both, so read them from step 4's output rather
+   than re-parsing the comment:
+
    ```bash
-   gh api repos/{owner}/{repo}/issues/<N>/comments --paginate \
-     --jq '.[] | select(.body | startswith("<!-- local-attest verified-sha=")) | .body' | tail -n +3
+   dotbabel pr-stack gate --gate merge --pr <N> --json \
+     | jq -r '.result.attestation | "attested at \(.sha)\n  legs: \(.legs | join(", "))"'
    ```
 
    Report it in this shape, naming the SHA and every leg:

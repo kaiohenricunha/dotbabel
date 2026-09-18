@@ -635,6 +635,7 @@ describe("checkMergeGate — criteria evidence", () => {
 
 const CONFIG_HASH = `sha256:${"c".repeat(64)}`;
 const MERGE_BASE = "d".repeat(40);
+const BASE_SHA = "e".repeat(40);
 
 function attestPayload(over = {}) {
   return {
@@ -941,10 +942,20 @@ describe("checkMergeGate — attestation evidence", () => {
     }
   });
 
-  it("skips the merge-base check when either side is unknown", () => {
+  it("skips the merge-base check only when the gate itself cannot resolve one", () => {
+    // The gate has nothing to compare against, so there is no claim to refuse.
     expect(codes(checkMergeGate(attestInput({ expectedMergeBase: null })))).toEqual([]);
+  });
+
+  it("blocks when the gate knows the merge base and the payload records none", () => {
+    // Previously this skipped the rung. The producer omits `merge_base`
+    // whenever the base was unfetched, so treating absence as "nothing to
+    // check" let an ordinary environment glitch hand over evidence that graded
+    // a different diff. It now mirrors the config_hash branch and blocks.
     const noBase = attestBody(HEAD, attestPayload({ merge_base: undefined }));
-    expect(codes(checkMergeGate(attestInput({ attestationComments: [comment(noBase)] })))).toEqual([]);
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(noBase)] }));
+    expect(codes(result)).toEqual(["ATTESTATION_INVALID"]);
+    expect(result.reasons[0].message).toMatch(/records no merge base/);
   });
 
   it("accepts an abbreviated merge base that prefixes the current one", () => {
@@ -979,6 +990,45 @@ describe("checkMergeGate — attestation evidence", () => {
     const chatter = comment("looks good");
     const good = comment(attestBody(HEAD, attestPayload()));
     expect(codes(checkMergeGate(attestInput({ attestationComments: [chatter, good, chatter] })))).toEqual([]);
+  });
+
+  it("blocks with ATTESTATION_BASE_UNREADABLE when the base commit is absent", () => {
+    // Distinct from "the trunk declares no policy" on purpose: conflating the
+    // two is what let a shallow clone silently disable the gate.
+    const result = checkMergeGate(attestInput({ attestationBaseUnreadable: BASE_SHA }));
+    expect(codes(result)).toEqual(["ATTESTATION_BASE_UNREADABLE"]);
+    expect(result.reasons[0].detail).toContain(BASE_SHA.slice(0, 8));
+  });
+
+  it("reports attestation state explicitly, so a caller need not infer it", () => {
+    // "No ATTESTATION_ reason" is ambiguous — a repository that never opted in
+    // produces the same empty list as one whose evidence was fully verified.
+    // A caller deciding whether it may skip verification must not have to
+    // reconstruct the difference from prose.
+    const verified = checkMergeGate(attestInput());
+    expect(verified.attestation.state).toBe("verified");
+    expect(verified.attestation.sha).toBe(HEAD);
+    expect(verified.attestation.legs).toEqual(["test", "quality"]);
+
+    const off = checkMergeGate({ body: GOOD_BODY, headRefOid: HEAD });
+    expect(off.attestation.state).toBe("off");
+    expect(off.attestation.legs).toEqual([]);
+
+    const failed = checkMergeGate(attestInput({ attestationComments: [] }));
+    expect(failed.attestation.state).toBe("failed");
+    expect(failed.attestation.code).toBe("ATTESTATION_MISSING");
+  });
+
+  it("never reports verified when the ladder produced any reason", () => {
+    for (const over of [
+      { attestationComments: [] },
+      { attestationComments: null },
+      { expectedMergeBase: "f".repeat(40) },
+      { expectedConfigHash: `sha256:${"9".repeat(64)}` },
+      { attestationBaseUnreadable: BASE_SHA },
+    ]) {
+      expect(checkMergeGate(attestInput(over)).attestation.state).not.toBe("verified");
+    }
   });
 
   it("reads the newest matching attestation, not the first", () => {

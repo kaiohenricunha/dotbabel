@@ -15,6 +15,7 @@ repo OWNER) whose first line is exactly the marker:
 
 ```text
 <!-- local-attest verified-sha=<full-head-sha> -->
+<!-- local-attest-payload <base64url JSON> -->
 ```
 
 The workflow gate (template at

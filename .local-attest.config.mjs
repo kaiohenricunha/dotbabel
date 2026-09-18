@@ -42,7 +42,11 @@ export default {
     {
       name: "quality",
       mode: "hard",
-      command: "node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile pr --base origin/main",
+      // The PR's real base, not a hardcoded trunk: on a stacked pull request the
+      // base is the parent branch, and grading against `main` would measure the
+      // parent's diff too. The runner injects DOTBABEL_PR_BASE_REF for every leg.
+      command:
+        "node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile pr --base \"origin/${DOTBABEL_PR_BASE_REF:-main}\"",
     },
     { name: "dogfood", mode: "hard", command: "npm run dogfood" },
     { name: "build-plugin --check", mode: "hard", command: "npm run build-plugin -- --check" },
