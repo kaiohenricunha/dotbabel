@@ -1,0 +1,679 @@
+{
+  "id": "model-intelligence",
+  "title": "Model Intelligence — provider-neutral compute requirements resolved to runtime-native configurations",
+  "status": "approved",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "plugins/dotbabel/src/model-intelligence/**",
+    "plugins/dotbabel/bin/dotbabel-models.mjs",
+    "plugins/dotbabel/bin/dotbabel.mjs",
+    "plugins/dotbabel/src/validate-skills-inventory.mjs",
+    "plugins/dotbabel/src/agents.mjs",
+    "plugins/dotbabel/src/copilot-frontmatter.mjs",
+    "plugins/dotbabel/src/project-sync.mjs",
+    "plugins/dotbabel/src/check-project-sync.mjs",
+    "plugins/dotbabel/src/build-index.mjs",
+    "plugins/dotbabel/src/bootstrap-global.mjs",
+    "plugins/dotbabel/scripts/handoff-extract.sh",
+    "plugins/dotbabel/templates/workflows/ai-review.yml",
+    "plugins/dotbabel/templates/claude/agents/**",
+    "plugins/dotbabel/tests/model-intelligence-*.test.mjs",
+    "plugins/dotbabel/tests/integration/model-intelligence-*.integration.test.mjs",
+    "plugins/dotbabel/tests/bats/models-*.bats",
+    "plugins/dotbabel/tests/fixtures/model-intelligence/**",
+    "plugins/dotbabel/tests/build-plugin.test.mjs",
+    "plugins/dotbabel/tests/workflow-templates.test.mjs",
+    "scripts/build-plugin.mjs",
+    "bootstrap.sh",
+    "schemas/agent.schema.json",
+    "schemas/skill.schema.json",
+    "schemas/command.schema.json",
+    "schemas/dotbabel.compute.schema.json",
+    "schemas/dotbabel.release-capabilities.schema.json",
+    "schemas/dotbabel.config.schema.json",
+    "examples/minimal-consumer/.github/workflows/ai-review.yml",
+    "skills/agents-search/**",
+    "skills/post-pr-review/**",
+    "docs/audits/model-selection-audit.md",
+    "docs/audits/model-runtime-capability-investigation.md"
+  ],
+  "acceptance_commands": [
+    "npm test",
+    "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
+    "node plugins/dotbabel/bin/dotbabel-validate-skills.mjs",
+    "node plugins/dotbabel/bin/dotbabel-index.mjs --check",
+    "npm run build-plugin -- --check",
+    "node plugins/dotbabel/bin/dotbabel-check-project-sync.mjs",
+    "bash plugins/dotbabel/scripts/run-bats.sh",
+    "node plugins/dotbabel/bin/dotbabel-criteria.mjs verify --spec model-intelligence --allow-project-commands"
+  ],
+  "depends_on_specs": ["dotbabel-core", "dotbabel-agents"],
+  "active_prs": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "planned",
+      "given": "a dotbabel.compute object with an unknown key",
+      "when": "the requirement parser validates it",
+      "then": "it is rejected and never becomes inert policy",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-requirement.test.mjs",
+          "name": "rejects an unknown key inside dotbabel.compute (additionalProperties false)"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-requirement.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-1.junit.xml"
+      }
+    },
+    {
+      "id": "AC-2",
+      "status": "planned",
+      "given": "an artifact whose dotbabel.compute and legacy model disagree in known meaning",
+      "when": "compat compares the two declarations",
+      "then": "it reports a conflict and chooses neither silently",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-compat.test.mjs",
+          "name": "reports a conflict when dotbabel.compute and legacy model disagree in known meaning"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-compat.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-2.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-2.junit.xml"
+      }
+    },
+    {
+      "id": "AC-3",
+      "status": "planned",
+      "given": "a shipped policy file that contains a provider model name",
+      "when": "policy loads",
+      "then": "the policy is rejected",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-policy.test.mjs",
+          "name": "rejects a provider model name inside shipped policy"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-policy.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-3.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-3.junit.xml"
+      }
+    },
+    {
+      "id": "AC-4",
+      "status": "planned",
+      "given": "a runtime command that exits 0 with empty output",
+      "when": "the adapter classifies the result",
+      "then": "the result is unknown and never an empty successful catalog",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs",
+          "name": "contract fixture: exit 0 with empty output is unknown, not ok"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-4.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-4.junit.xml"
+      }
+    },
+    {
+      "id": "AC-5",
+      "status": "planned",
+      "given": "an adapter operation with no declared timeout",
+      "when": "the operation exceeds its limit",
+      "then": "it returns unavailable with code timeout after 10 seconds for a subprocess or 20 seconds for a network call",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs",
+          "name": "an operation with no declared timeout gets 10 seconds for a subprocess and 20 seconds for a network call, and expiry returns unavailable with code timeout and retryable true"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-5.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-5.junit.xml"
+      }
+    },
+    {
+      "id": "AC-6",
+      "status": "planned",
+      "given": "a valid cache entry",
+      "when": "a refresh fails or returns empty output",
+      "then": "the previous entry stays usable and is marked stale",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-catalog.test.mjs",
+          "name": "a failed or empty refresh preserves the previous valid cache and marks it stale"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-catalog.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-6.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-6.junit.xml"
+      }
+    },
+    {
+      "id": "AC-7",
+      "status": "planned",
+      "given": "a refresh in progress for one cache key",
+      "when": "a second process requests a refresh of that key",
+      "then": "no second discovery starts and the caller sees refresh in_progress",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-catalog.test.mjs",
+          "name": "the second concurrent refresh of one key does not start and reports refresh in_progress"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-catalog.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-7.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-7.junit.xml"
+      }
+    },
+    {
+      "id": "AC-8",
+      "status": "planned",
+      "given": "a user pin and an artifact pin",
+      "when": "the resolver composes them",
+      "then": "the artifact pin is effective and the shadowed pin is recorded",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-resolver-composition.test.mjs",
+          "name": "an artifact pin overrides a user or project pin and records the shadowed pin"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-resolver-composition.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-8.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-8.junit.xml"
+      }
+    },
+    {
+      "id": "AC-9",
+      "status": "planned",
+      "given": "an artifact floor and a pin below that floor",
+      "when": "the resolver composes them",
+      "then": "the result is conflict with enforcement unsatisfied",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-resolver-composition.test.mjs",
+          "name": "an invocation pin below an artifact floor returns conflict with enforcement unsatisfied"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-resolver-composition.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-9.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-9.junit.xml"
+      }
+    },
+    {
+      "id": "AC-10",
+      "status": "planned",
+      "given": "an artifact with no native binding on a runtime with no observation",
+      "when": "the resolver computes enforcement",
+      "then": "the state is unknown and is never upgraded",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-resolver-explain.test.mjs",
+          "name": "reports unknown when neither binding nor observation exists, and never upgrades it"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-resolver-explain.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-10.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-10.junit.xml"
+      }
+    },
+    {
+      "id": "AC-11",
+      "status": "planned",
+      "given": "a 500-record catalog across six runtime ids",
+      "when": "resolve() runs 1,000 warmed calls",
+      "then": "p95 is at most 10 ms",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-resolver-explain.test.mjs",
+          "name": "resolve() p95 is at most 10 ms over 1,000 warmed calls on the 500-record six-runtime fixture, explanation included"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-resolver-explain.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-11.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-11.junit.xml"
+      }
+    },
+    {
+      "id": "AC-12",
+      "status": "planned",
+      "given": "identical materialization inputs",
+      "when": "materialize runs twice",
+      "then": "the output is byte-identical and holds no timestamp",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-materialize-core.test.mjs",
+          "name": "produces byte-identical output for identical inputs and contains no timestamp"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-materialize-core.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-12.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-12.junit.xml"
+      }
+    },
+    {
+      "id": "AC-13",
+      "status": "planned",
+      "given": "a canonical skill that carries dotbabel.compute",
+      "when": "a runtime projection is rendered",
+      "then": "the runtime-visible frontmatter has no dotbabel.compute",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-materialize-core.test.mjs",
+          "name": "strips dotbabel.compute from the runtime-visible frontmatter unless the adapter contract permits it"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-materialize-core.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-13.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-13.junit.xml"
+      }
+    },
+    {
+      "id": "AC-14",
+      "status": "planned",
+      "given": "a projection manifest and a projection tree",
+      "when": "the drift check runs",
+      "then": "it separates clean, user drift, stale, diverged, missing, and orphan",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-materialize-drift.test.mjs",
+          "name": "classifies clean, user drift, stale, diverged, missing, and orphan from output and input hashes"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-materialize-drift.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-14.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-14.junit.xml"
+      }
+    },
+    {
+      "id": "AC-15",
+      "status": "planned",
+      "given": "a projection destination that leaves its owning root",
+      "when": "materialize plans the write",
+      "then": "the write is refused before any mutation",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-materialize-drift.test.mjs",
+          "name": "refuses a destination that leaves its owning root through .., an absolute path, a symlink, or a manifest entry, and refuses a file not proven Dotbabel-owned"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-materialize-drift.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-15.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-15.junit.xml"
+      }
+    },
+    {
+      "id": "AC-16",
+      "status": "planned",
+      "given": "a Claude command with a dynamic or floor requirement",
+      "when": "its generated copy is rendered",
+      "then": "the copy has no native model",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-claude-projection.test.mjs",
+          "name": "a dynamic or floor command gets no model in the generated copy"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-claude-projection.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-16.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-16.junit.xml"
+      }
+    },
+    {
+      "id": "AC-17",
+      "status": "planned",
+      "given": "a Claude skill with a requirement",
+      "when": "its generated copy is rendered",
+      "then": "the copy has no model, no effort, and no dotbabel.compute",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-claude-projection.test.mjs",
+          "name": "a skill gets neither model nor effort and loses dotbabel.compute"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-claude-projection.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-17.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-17.junit.xml"
+      }
+    },
+    {
+      "id": "AC-18",
+      "status": "planned",
+      "given": "two snapshot generations with the same facts and different observedAt",
+      "when": "snapshotId is computed",
+      "then": "both ids are identical",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-snapshot.test.mjs",
+          "name": "snapshotId is identical for two generations with the same facts and different observedAt"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-snapshot.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-18.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-18.junit.xml"
+      }
+    },
+    {
+      "id": "AC-19",
+      "status": "planned",
+      "given": "a template agent with a floor that the snapshot cannot satisfy",
+      "when": "build-plugin runs",
+      "then": "the build fails and ships no template without a baseline",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/build-plugin.test.mjs",
+          "name": "fails the build when the snapshot cannot satisfy a floor"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/build-plugin.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-19.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-19.junit.xml"
+      }
+    },
+    {
+      "id": "AC-20",
+      "status": "planned",
+      "given": "an ai-review session requirement that the snapshot cannot satisfy",
+      "when": "the workflow is generated",
+      "then": "the build fails and never omits --model",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-workflow-projection.test.mjs",
+          "name": "the build fails rather than omitting --model when the snapshot cannot satisfy the requirement"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-workflow-projection.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-20.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-20.junit.xml"
+      }
+    },
+    {
+      "id": "AC-21",
+      "status": "planned",
+      "given": "an artifact with an omitted model or inherit",
+      "when": "migrate --write runs",
+      "then": "no concrete requirement is introduced",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-migrate-write.test.mjs",
+          "name": "--write never converts an omitted model or inherit into a concrete requirement"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-migrate-write.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-21.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-21.junit.xml"
+      }
+    },
+    {
+      "id": "AC-22",
+      "status": "planned",
+      "given": "the migrated security agents",
+      "when": "they are resolved and projected for Claude",
+      "then": "each keeps a frontier floor and a strong model in its generated copy",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-migration-batches.test.mjs",
+          "name": "P-19d: the security agents resolve to a floor of frontier and their generated copies still carry a strong model"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-migration-batches.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-22.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-22.junit.xml"
+      }
+    },
+    {
+      "id": "AC-23",
+      "status": "planned",
+      "given": "a recommendation that differs from the current configuration",
+      "when": "models recommend runs",
+      "then": "it exits 0 and changes nothing",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-recommend.test.mjs",
+          "name": "a differing recommendation exits 0 and changes nothing"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-recommend.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-23.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-23.junit.xml"
+      }
+    },
+    {
+      "id": "AC-24",
+      "status": "planned",
+      "given": "an untrusted repository",
+      "when": "a models operation would run a project-controlled command",
+      "then": "it returns a trust-required result, runs nothing, and adds nothing to the allowlist",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-cli.test.mjs",
+          "name": "no verb adds a repository to the trust allowlist, and an operation that would run a project-controlled command without trust returns a structured trust-required result and runs nothing"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-24.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-24.junit.xml"
+      }
+    },
+    {
+      "id": "AC-25",
+      "status": "planned",
+      "given": "no network and no Model Intelligence cache",
+      "when": "a dotbabel subcommand outside models runs",
+      "then": "it exits as it did before",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-cli.test.mjs",
+          "name": "with no network and no cache, every dotbabel subcommand outside models exits as it did before"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-25.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-25.junit.xml"
+      }
+    }
+  ]
+}
