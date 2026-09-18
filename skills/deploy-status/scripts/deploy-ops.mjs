@@ -951,6 +951,296 @@ function confirmRollback() {
  * @param {string[]} argv
  * @returns {Promise<number>}
  */
+// ---------------------------------------------------------------- smoke ----
+//
+// Smoke checks run against PRODUCTION right after a deploy, and an http check
+// may carry a real credential. That makes this the one place in this helper
+// where a mistake leaks a secret rather than merely reporting a wrong number,
+// so the guards below are behavior, not advice (SEC-8).
+//
+// Everything here is self-contained on purpose (KD-13): scaffolded copies of
+// this file sit in consumer repositories with no dotbabel package source to
+// import, so a shared helper would simply be missing there.
+
+/** Total wall-clock bound for one smoke run, in ms (PERF-6). */
+const SMOKE_TOTAL_BUDGET_MS = 300_000;
+
+/** Per-request bound for one http check, in ms (PERF-6). */
+const SMOKE_REQUEST_TIMEOUT_MS = 10_000;
+
+/** Retries for an http GET. A command check never retries (REL-8). */
+const SMOKE_HTTP_RETRIES = 3;
+
+/** At most 3 redirects, and only to the same https origin (SEC-8). */
+const SMOKE_MAX_REDIRECTS = 3;
+
+/**
+ * The wait before each retry: 2s, 4s, 8s (PERF-6).
+ *
+ * Exported so the schedule can be swept across retry counts rather than
+ * checked at the three values the default happens to use.
+ *
+ * @param {number} retries
+ * @returns {number[]}
+ */
+export function smokeBackoffSchedule(retries) {
+  const count = Number.isInteger(retries) && retries > 0 ? retries : 0;
+  return Array.from({ length: count }, (_, index) => 2000 * 2 ** index);
+}
+
+/**
+ * Validate a smoke URL before any request is made (SEC-8).
+ *
+ * @param {string} raw
+ * @returns {{ ok: true, url: URL } | { ok: false, reason: string }}
+ */
+export function validateSmokeUrl(raw) {
+  let url;
+  try {
+    url = new URL(String(raw));
+  } catch {
+    return { ok: false, reason: "not a valid URL" };
+  }
+  // Credentials in a URL end up in logs, in shell history, and in any error
+  // this helper prints. Refuse rather than redact: a config carrying one is a
+  // committed secret, which redaction cannot undo.
+  if (url.username || url.password) return { ok: false, reason: "URL must not embed credentials" };
+  const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol === "https:") return { ok: true, url };
+  // http is allowed only on loopback, which has no network to be intercepted
+  // on and no certificate to offer.
+  if (url.protocol === "http:" && loopback) return { ok: true, url };
+  return { ok: false, reason: `URL must use https (got ${url.protocol.replace(":", "")})` };
+}
+
+/**
+ * Resolve configured headers to values, reading each ONLY from the named
+ * environment variable (SEC-8).
+ *
+ * A literal string is refused: this config is committed, so a literal is a
+ * secret in the repository. A missing variable fails the check rather than
+ * silently sending no header, which would otherwise pass against an endpoint
+ * that happens to allow anonymous access.
+ *
+ * @param {object|undefined} headers
+ * @param {NodeJS.ProcessEnv} env
+ * @returns {{ ok: true, values: Record<string,string>, names: string[], secrets: string[] } | { ok: false, reason: string }}
+ */
+export function resolveSmokeHeaders(headers, env) {
+  const values = {};
+  const names = [];
+  const secrets = [];
+  for (const [name, spec] of Object.entries(headers ?? {})) {
+    names.push(name);
+    if (typeof spec === "string") {
+      return { ok: false, reason: `header ${name} must read from { "env": "VAR" }, not a literal value` };
+    }
+    const variable = spec?.env;
+    if (typeof variable !== "string" || !variable) {
+      return { ok: false, reason: `header ${name} must name an environment variable` };
+    }
+    const value = env?.[variable];
+    if (typeof value !== "string" || value === "") {
+      return { ok: false, reason: `header ${name} reads ${variable}, which is not set` };
+    }
+    values[name] = value;
+    secrets.push(value);
+  }
+  return { ok: true, values, names, secrets };
+}
+
+/**
+ * Replace every known secret with a placeholder.
+ *
+ * Applied to anything that reaches stdout or the JSON payload, including a
+ * RESPONSE BODY: a failing endpoint that echoes the Authorization header back
+ * would otherwise leak it through the very message written to report the
+ * failure.
+ *
+ * @param {string} text
+ * @param {string[]} secrets
+ * @returns {string}
+ */
+export function redactSmokeSecrets(text, secrets) {
+  let out = String(text ?? "");
+  for (const secret of secrets) {
+    if (typeof secret === "string" && secret.length > 0) out = out.split(secret).join("[redacted]");
+  }
+  return out;
+}
+
+/**
+ * Perform one http attempt, following redirects manually.
+ *
+ * `redirect: "manual"` is load-bearing. Handing `follow` to fetch would let
+ * the response decide where the secret header goes; the check below refuses
+ * any hop that changes origin or drops to http (SEC-8).
+ */
+async function smokeHttpAttempt(check, headerValues, deps) {
+  const fetchFn = deps.fetch ?? globalThis.fetch;
+  let current = check.url;
+  for (let hop = 0; hop <= SMOKE_MAX_REDIRECTS; hop += 1) {
+    const validated = validateSmokeUrl(current);
+    // `fatal`: a refusal that a retry can never turn into a pass. Retrying it
+    // would burn the budget, and — worse — a later attempt returning a
+    // different response would MASK the refusal and report the check as
+    // passing. Only transient failures get the backoff.
+    if (!validated.ok) return { ok: false, fatal: true, status: null, body: "", reason: validated.reason };
+    const response = await fetchFn(validated.url.toString(), {
+      method: "GET",
+      redirect: "manual",
+      headers: { ...headerValues },
+      signal: deps.signal ?? undefined,
+      timeoutMs: SMOKE_REQUEST_TIMEOUT_MS,
+    });
+    const status = response.status;
+    if (status >= 300 && status < 400) {
+      const location = response.headers?.get?.("location");
+      if (!location) return { ok: false, fatal: true, status, body: "", reason: "redirect without a location header" };
+      const next = new URL(location, validated.url);
+      if (next.origin !== validated.url.origin || next.protocol !== "https:") {
+        return { ok: false, fatal: true, status, body: "", reason: `refused redirect to ${next.origin}` };
+      }
+      current = next.toString();
+      continue;
+    }
+    const body = typeof response.text === "function" ? await response.text() : "";
+    return { ok: true, status, body, reason: "" };
+  }
+  return { ok: false, fatal: true, status: null, body: "", reason: `more than ${SMOKE_MAX_REDIRECTS} redirects` };
+}
+
+/**
+ * Run every target's smoke checks.
+ *
+ * @param {{ root: string, targets: object[], dryRun?: boolean, deps?: object }} options
+ * @returns {Promise<{ exitCode: number, text: string, json: object, results: object[] }>}
+ */
+export async function smokeReport({ root, targets = [], dryRun = false, deps = {} } = {}) {
+  const env = deps.env ?? process.env;
+  const sleep = deps.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+  const now = deps.now ?? (() => Date.now());
+  const runCommand = deps.runCommand ?? ((argv) => runSync(argv[0], argv.slice(1), { cwd: root, timeoutMs: SMOKE_REQUEST_TIMEOUT_MS }));
+  const started = now();
+  const results = [];
+  const lines = [];
+  let budgetExceeded = false;
+
+  const planned = targets.filter((target) => Array.isArray(target?.smoke) && target.smoke.length > 0);
+  if (planned.length === 0) {
+    // Nothing declared is not a failure: exiting non-zero here would block
+    // every release in a repository that has not adopted smoke checks.
+    const json = { schema_version: 1, command: "smoke", verdict: "not_configured", results: [], elapsed_ms: 0, budget_exceeded: false };
+    return { exitCode: EXIT.OK, text: "smoke: no smoke checks declared in .claude/deploy-targets.json", json, results: [] };
+  }
+
+  outer: for (const target of planned) {
+    const label = targetLabel(target);
+    for (const check of target.smoke) {
+      if (now() - started >= SMOKE_TOTAL_BUDGET_MS) {
+        budgetExceeded = true;
+        lines.push(`  ! stopped: exceeded the ${SMOKE_TOTAL_BUDGET_MS / 1000}s smoke budget`);
+        break outer;
+      }
+      if (dryRun) {
+        lines.push(`  - ${label} ${check.type} (dry run, not executed)`);
+        results.push({ target: label, type: check.type === "command" ? "command" : "http", ok: true, attempts: 0 });
+        continue;
+      }
+
+      if (check.type === "command") {
+        // REL-8: exactly one attempt. A command may not be idempotent, and
+        // retrying could repeat a side effect nobody agreed to.
+        const argv = Array.isArray(check.argv) ? check.argv.map(String) : [];
+        if (argv.length === 0) {
+          results.push({ target: label, type: "command", ok: false, attempts: 1, argv, message: "command check requires argv" });
+          lines.push(`  x ${label} command: requires argv`);
+          continue;
+        }
+        const outcome = runCommand(argv);
+        const ok = Boolean(outcome?.ok) && (outcome?.status ?? 0) === 0;
+        results.push({ target: label, type: "command", ok, attempts: 1, argv, status: outcome?.status ?? null, message: ok ? "" : String(outcome?.stderr || outcome?.stdout || "command failed").trim().slice(0, 500) });
+        lines.push(`  ${ok ? "+" : "x"} ${label} command ${argv.join(" ")}`);
+        continue;
+      }
+
+      const headers = resolveSmokeHeaders(check.headers, env);
+      if (!headers.ok) {
+        results.push({ target: label, type: "http", ok: false, attempts: 1, url: String(check.url ?? ""), header_names: Object.keys(check.headers ?? {}), message: headers.reason });
+        lines.push(`  x ${label} http ${check.url}: ${headers.reason}`);
+        continue;
+      }
+      const validated = validateSmokeUrl(check.url);
+      if (!validated.ok) {
+        // The URL is NOT echoed here: a rejected URL may be rejected precisely
+        // because it embedded credentials.
+        results.push({ target: label, type: "http", ok: false, attempts: 1, header_names: headers.names, message: validated.reason });
+        lines.push(`  x ${label} http: ${validated.reason}`);
+        continue;
+      }
+
+      const schedule = smokeBackoffSchedule(SMOKE_HTTP_RETRIES);
+      let attempts = 0;
+      let last = { ok: false, status: null, body: "", reason: "not attempted" };
+      for (let attempt = 0; attempt <= schedule.length; attempt += 1) {
+        attempts += 1;
+        try {
+          last = await smokeHttpAttempt({ ...check, url: validated.url.toString() }, headers.values, deps);
+        } catch (err) {
+          last = { ok: false, status: null, body: "", reason: `request failed: ${err?.message ?? err}` };
+        }
+        const statusOk = last.ok && (check.expect_status === undefined || last.status === check.expect_status);
+        const textOk = check.expect_text === undefined || String(last.body ?? "").includes(String(check.expect_text));
+        if (statusOk && textOk) break;
+        if (last.fatal) break;
+        if (attempt < schedule.length) {
+          await sleep(schedule[attempt]);
+          if (now() - started >= SMOKE_TOTAL_BUDGET_MS) { budgetExceeded = true; break; }
+        }
+      }
+      const statusOk = last.ok && (check.expect_status === undefined || last.status === check.expect_status);
+      const textOk = check.expect_text === undefined || String(last.body ?? "").includes(String(check.expect_text));
+      const ok = Boolean(statusOk && textOk);
+      // Redacted against the response body too: a failing endpoint echoing the
+      // Authorization header back would otherwise leak it through this message.
+      // A snippet of the failing body is the most useful thing an operator can
+      // see at 3am, and it is also exactly where a secret can come back out:
+      // an endpoint that echoes the Authorization header would otherwise leak
+      // it through the very message written to report the failure. So the body
+      // is included, truncated, and redacted — redaction is load-bearing here,
+      // not decorative.
+      const because = last.reason || (!statusOk ? `expected status ${check.expect_status}, got ${last.status}` : `body did not contain ${check.expect_text}`);
+      const snippet = !ok && last.body ? ` — body: ${String(last.body).trim().slice(0, 200)}` : "";
+      const detail = ok ? "" : redactSmokeSecrets(`${because}${snippet}`, headers.secrets);
+      results.push({ target: label, type: "http", ok, attempts, url: validated.url.toString(), header_names: headers.names, status: last.status ?? null, message: detail });
+      const sent = headers.names.length > 0 ? ` [headers: ${headers.names.join(", ")}]` : "";
+      lines.push(redactSmokeSecrets(`  ${ok ? "+" : "x"} ${label} http ${validated.url}${sent} ${ok ? "ok" : detail}`, headers.secrets));
+      if (budgetExceeded) {
+        lines.push(`  ! stopped: exceeded the ${SMOKE_TOTAL_BUDGET_MS / 1000}s smoke budget`);
+        break outer;
+      }
+    }
+  }
+
+  const failed = results.filter((item) => !item.ok);
+  const verdict = failed.length > 0 || budgetExceeded ? "fail" : "pass";
+  const json = {
+    schema_version: 1,
+    command: "smoke",
+    verdict,
+    budget_exceeded: budgetExceeded,
+    elapsed_ms: Math.max(0, now() - started),
+    results,
+  };
+  const header = verdict === "pass" ? `smoke: ${results.length} check(s) passed` : `smoke: ${failed.length} of ${results.length} check(s) failed`;
+  return {
+    exitCode: verdict === "pass" ? EXIT.OK : EXIT.DRIFT,
+    text: [header, ...lines].join("\n"),
+    json,
+    results,
+  };
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const { command, flags } = parseArgs(argv);
   const cwd = typeof flags.cwd === "string" ? flags.cwd : process.cwd();
@@ -985,8 +1275,18 @@ export async function main(argv = process.argv.slice(2)) {
     return report.exitCode;
   }
 
+  if (command === "smoke") {
+    const report = await smokeReport({
+      root,
+      targets: resolved.targets,
+      dryRun: Boolean(flags["dry-run"]),
+    });
+    process.stdout.write(`${flags.json ? JSON.stringify(report.json, null, 2) : report.text}\n`);
+    return report.exitCode;
+  }
+
   process.stderr.write(
-    "Usage: deploy-ops.mjs <status|rollback> [--dry-run] [--cwd <dir>] [--no-fetch]\n",
+    "Usage: deploy-ops.mjs <status|rollback|smoke> [--dry-run] [--json] [--cwd <dir>] [--no-fetch]\n",
   );
   return EXIT.USAGE;
 }

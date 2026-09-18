@@ -65,6 +65,67 @@ The helper:
 
 Example config: `examples/deploy-targets.example.json`.
 
+## Smoke checks
+
+A target in `.claude/deploy-targets.json` may declare a `smoke` array, run
+after a deploy to confirm the thing actually answers:
+
+```bash
+node "$DEPLOY_OPS" smoke            # human-readable
+node "$DEPLOY_OPS" smoke --json     # machine-readable, see schemas/dotbabel.smoke-report.schema.json
+node "$DEPLOY_OPS" smoke --dry-run  # list the checks without running them
+```
+
+Exit codes match the status command: `0` every check passed (or none is
+declared — nothing to check is not a failure), `1` at least one failed or the
+run hit its time budget, `2` target discovery failed.
+
+Two check types. An `http` check is **GET only** and retries up to 3 times with
+2s, 4s and 8s backoff; a `command` check runs its `argv` **exactly once**,
+because a command may not be idempotent and a retry would repeat a side effect
+nobody agreed to. The whole run stops after 300 seconds.
+
+These requests go to production and may carry a real credential, so the guards
+are enforced rather than advised:
+
+- A URL with embedded credentials is refused, and is **not** echoed back in the
+  error — the config carrying it is already a committed secret.
+- `https` is required for every host except `localhost` and `127.0.0.1`.
+- Redirects are followed manually, at most 3, and only to the **same https
+  origin**. Handing the response the power to choose the next host is how a
+  secret header reaches somewhere it was never meant to go.
+- A header value is read **only** from a named environment variable
+  (`{ "env": "SMOKE_BEARER" }`). A literal in the config is refused, and a
+  variable that is unset fails the check rather than quietly sending no header
+  and passing against an anonymous response.
+- Header **names** are reported; values never are. The failing response body is
+  shown truncated and redacted, because an endpoint that echoes the header back
+  would otherwise leak it through the very message reporting the failure.
+- A refusal from any of these guards is never retried: a retry cannot turn it
+  into a pass, and a differing later response would mask it.
+
+```json
+{
+  "kind": "vercel",
+  "project": "my-app",
+  "smoke": [
+    {
+      "type": "http",
+      "url": "https://my-app.example.com/healthz",
+      "expect_status": 200,
+      "expect_text": "ok"
+    },
+    {
+      "type": "http",
+      "url": "https://my-app.example.com/api/me",
+      "expect_status": 200,
+      "headers": { "Authorization": { "env": "SMOKE_BEARER" } }
+    },
+    { "type": "command", "argv": ["./scripts/smoke-api.sh", "--prod"] }
+  ]
+}
+```
+
 ## Provider References
 
 Load only the provider notes that match discovered targets:
@@ -83,3 +144,6 @@ Load only the provider notes that match discovered targets:
   `git fetch origin main --quiet`.
 - If a provider cannot expose a git SHA, report that target as unknown and exit
   `2` rather than inventing drift data.
+- On a smoke failure, recommend `/rollback-prod` and stop. The rule floor
+  forbids production changes without explicit instruction, so this skill never
+  rolls back on its own.

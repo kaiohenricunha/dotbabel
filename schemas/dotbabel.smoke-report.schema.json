@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.smoke-report.schema.json",
+  "title": "dotbabel smoke report",
+  "description": "Result of `deploy-ops.mjs smoke`. A header value read from the environment never appears in this payload (SEC-8); only the header NAME is reported.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "verdict", "results"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "command": { "const": "smoke" },
+    "verdict": {
+      "enum": ["pass", "fail", "not_configured"],
+      "description": "not_configured when no target declares smoke checks; that is an exit 0 outcome, not a failure."
+    },
+    "budget_exceeded": {
+      "type": "boolean",
+      "description": "True when the run stopped on the 300-second total bound (PERF-6), leaving later checks unrun."
+    },
+    "elapsed_ms": { "type": "integer", "minimum": 0 },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "type", "ok", "attempts"],
+        "properties": {
+          "target": { "type": "string" },
+          "type": { "enum": ["http", "command"] },
+          "ok": { "type": "boolean" },
+          "attempts": { "type": "integer", "minimum": 1 },
+          "url": {
+            "type": "string",
+            "description": "Present for http checks. Credentials are rejected before a request is made, so this never carries a userinfo component."
+          },
+          "argv": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Present for command checks."
+          },
+          "status": { "type": ["integer", "null"] },
+          "header_names": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Names only. Values are read from named environment variables and are never serialized."
+          },
+          "message": {
+            "type": "string",
+            "description": "Redacted: any secret header value is replaced before this is written."
+          }
+        }
+      }
+    }
+  }
+}
