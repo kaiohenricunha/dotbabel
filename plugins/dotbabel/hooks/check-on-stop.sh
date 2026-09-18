@@ -432,6 +432,58 @@ chk_csharp() {
 FAILED_LANGS=()
 REPORT=""
 
+# record_check_result <tag> <label> <phase> <rc> <out>
+#
+# Shared by the static-check loop and the tests stage below — both run a
+# checker, then need the identical skip/noise/truncate/report logic. This used
+# to be duplicated wholesale for the tests stage; one copy means the skip
+# rules (a timeout is not a code defect, toolchain noise is not a finding) can
+# only drift in one place.
+#
+#   tag    the FAILED_LANGS entry and the report line's language token
+#          ("go", or "go-tests" for the related-tests stage)
+#   label  the project's path relative to the repo top, or "."
+#   phase  the report line's verb phrase ("project check" or "related tests")
+#   rc     the checker's exit code
+#   out    the checker's raw combined output
+#
+# Appends to FAILED_LANGS/REPORT on a real failure; otherwise does nothing.
+record_check_result() {
+  local tag="$1" label="$2" phase="$3" rc="$4" out="$5"
+  [ "$rc" -eq 0 ] && return 0
+  [ "$rc" -eq 127 ] && return 0
+  # Timed out, or killed. Not a code defect.
+  { [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; } && return 0
+  # Drop the lines that mean "the toolchain failed to run" and keep the rest.
+  #
+  # This used to discard the ENTIRE output on a single match, which was far too
+  # blunt: a long mvn or dotnet failure containing one incidental
+  # "No such file or directory" lost every genuine compile error with it, and
+  # the hook then reported success on a broken build.
+  local had_output=0
+  [ -n "${out//[[:space:]]/}" ] && had_output=1
+  out=$(printf '%s\n' "$out" | grep -viE "$NOISE_RX" || true)
+  # Output existed but was entirely toolchain noise: nothing to report. This is
+  # distinct from a checker that produced no output at all, which still reports
+  # below — silence from a failing checker is worth surfacing.
+  if [ "$had_output" -eq 1 ] && [ -z "${out//[[:space:]]/}" ]; then
+    return 0
+  fi
+  FAILED_LANGS+=("$tag:$label")
+  local body total
+  body=$(printf '%s\n' "$out" | head -n "$MAX_LINES" || true)
+  total=$(printf '%s\n' "$out" | wc -l || true)
+  REPORT+="[$tag $label] $phase failed"$'\n'
+  if [ -n "$body" ]; then
+    REPORT+="${body:0:3000}"$'\n'
+  else
+    REPORT+="  exited $rc with no output"$'\n'
+  fi
+  if [ "$total" -gt "$MAX_LINES" ]; then
+    REPORT+="  ... (truncated: $MAX_LINES of $total lines shown)"$'\n'
+  fi
+}
+
 for key in "${!TOUCHED[@]}"; do
   lang="${key%%$'\t'*}"
   proj="${key#*$'\t'}"
@@ -443,37 +495,7 @@ for key in "${!TOUCHED[@]}"; do
   out=""
   rc=0
   out=$("chk_$lang" "$proj" 2>/dev/null) || rc=$?
-  [ "$rc" -eq 0 ] && continue
-  [ "$rc" -eq 127 ] && continue
-  # Timed out, or killed. Not a code defect.
-  { [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; } && continue
-  # Drop the lines that mean "the toolchain failed to run" and keep the rest.
-  #
-  # This used to discard the ENTIRE output on a single match, which was far too
-  # blunt: a long mvn or dotnet failure containing one incidental
-  # "No such file or directory" lost every genuine compile error with it, and
-  # the hook then reported success on a broken build.
-  had_output=0
-  [ -n "${out//[[:space:]]/}" ] && had_output=1
-  out=$(printf '%s\n' "$out" | grep -viE "$NOISE_RX" || true)
-  # Output existed but was entirely toolchain noise: nothing to report. This is
-  # distinct from a checker that produced no output at all, which still reports
-  # below — silence from a failing checker is worth surfacing.
-  if [ "$had_output" -eq 1 ] && [ -z "${out//[[:space:]]/}" ]; then
-    continue
-  fi
-  FAILED_LANGS+=("$lang:$label")
-  body=$(printf '%s\n' "$out" | head -n "$MAX_LINES" || true)
-  total=$(printf '%s\n' "$out" | wc -l || true)
-  REPORT+="[$lang $label] project check failed"$'\n'
-  if [ -n "$body" ]; then
-    REPORT+="${body:0:3000}"$'\n'
-  else
-    REPORT+="  exited $rc with no output"$'\n'
-  fi
-  if [ "$total" -gt "$MAX_LINES" ]; then
-    REPORT+="  ... (truncated: $MAX_LINES of $total lines shown)"$'\n'
-  fi
+  record_check_result "$lang" "$label" "project check" "$rc" "$out"
 done
 
 # ---- tests stage (KD-12): opt-in, trusted-only, runner-scoped -------------
@@ -497,29 +519,7 @@ if [ "${CHECK_ON_STOP_TESTS:-0}" = "1" ] && [ "${#TEST_TOUCHED[@]}" -gt 0 ]; the
     tout=""
     trc=0
     tout=$("tst_$tlang" "$tproj" "${TEST_TOUCHED[$key]}" 2>/dev/null) || trc=$?
-    [ "$trc" -eq 0 ] && continue
-    # No runner, no toolchain, or nothing in scope — silence, never a finding.
-    [ "$trc" -eq 127 ] && continue
-    # Timed out or killed: a bound was hit, which is not a code defect.
-    { [ "$trc" -eq 124 ] || [ "$trc" -eq 137 ]; } && continue
-    thad_output=0
-    [ -n "${tout//[[:space:]]/}" ] && thad_output=1
-    tout=$(printf '%s\n' "$tout" | grep -viE "$NOISE_RX" || true)
-    if [ "$thad_output" -eq 1 ] && [ -z "${tout//[[:space:]]/}" ]; then
-      continue
-    fi
-    FAILED_LANGS+=("$tlang-tests:$tlabel")
-    tbody=$(printf '%s\n' "$tout" | head -n "$MAX_LINES" || true)
-    ttotal=$(printf '%s\n' "$tout" | wc -l || true)
-    REPORT+="[$tlang tests $tlabel] related tests failed"$'\n'
-    if [ -n "$tbody" ]; then
-      REPORT+="${tbody:0:3000}"$'\n'
-    else
-      REPORT+="  exited $trc with no output"$'\n'
-    fi
-    if [ "$ttotal" -gt "$MAX_LINES" ]; then
-      REPORT+="  ... (truncated: $MAX_LINES of $ttotal lines shown)"$'\n'
-    fi
+    record_check_result "$tlang-tests" "$tlabel" "related tests" "$trc" "$tout"
   done
 fi
 
