@@ -54,8 +54,16 @@ Use for each step in the implementation plan.
 
 {Brief description of what to implement and where.}
 
-TDD first — write tests before implementation:
-{List specific test function names: TestX_Y, TestA_B, ...}
+TDD first — write tests before implementation, each paired with the criterion
+it proves:
+{List each test name with its criterion id: AC-1 → TestX_Y, AC-2 → TestA_B, ...}
+
+Pair every test name with a criterion id (AC-N) from spec.json. A test name
+with no criterion is a test nothing verifies against; a criterion with no test
+name is a claim nothing proves. The name must match the test verbatim —
+verification looks it up by exact string in the JUnit report, so a paraphrase
+silently never matches. Set those criteria to `active` in this same change,
+since that is the pull request that makes their tests real.
 
 <constraints>
 - Files modified: {explicit list}

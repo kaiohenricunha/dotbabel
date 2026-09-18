@@ -46,6 +46,7 @@ Create the spec directory and empty section files. This gives the user a concret
 
 ```
 docs/specs/<spec-name>/
+├── spec.json
 ├── README.md
 ├── spec/
 │   ├── 1-problem-motivation.md
@@ -63,8 +64,11 @@ docs/specs/<spec-name>/
 ```
 
 3. Each spec section file gets the scaffold template (see "Section Scaffolds" below).
-4. The README gets a status dashboard showing all sections as `[ ] empty`.
-5. Tell the user the scaffold is created.
+4. `spec.json` gets the scaffold below. **This file is not optional** —
+   `dotbabel-validate-specs` rejects a spec directory without one, so a scaffold
+   that omits it produces a spec that fails validation on its first run.
+5. The README gets a status dashboard showing all sections as `[ ] empty`.
+6. Tell the user the scaffold is created.
    - **If `$1` was provided:** "Scaffold created. Based on your description — _{$1}_ — let's start with §1 Problem/Motivation. What specifically is broken or missing that this addresses?"
    - **If no description:** "Scaffold created. Let's fill it in — starting with §1 Problem/Motivation. What problem are we solving?"
 
@@ -377,6 +381,74 @@ An unexplained blank is not an answer.
 
 <!-- Tag each as A-N. Include WHY it was rejected — future readers need the reasoning. -->
 ```
+
+### spec.json
+
+The machine-readable half of the spec. `dotbabel-validate-specs` requires
+`id`, `title`, `status`, `owners`, `linked_paths` and `acceptance_commands`;
+`acceptance_criteria` is optional but is what makes the spec's claims
+machine-checkable rather than prose.
+
+```json
+{
+  "id": "<spec-name>",
+  "title": "<Spec Title>",
+  "status": "draft",
+  "owners": ["@<owner>"],
+  "linked_paths": ["<path/this/spec/governs>"],
+  "acceptance_commands": ["<the command that proves this spec works>"],
+  "depends_on_specs": [],
+  "active_prs": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "planned",
+      "given": "<the precondition, in the system's own terms>",
+      "when": "<the action taken>",
+      "then": "<the observable outcome — one claim, not a list>",
+      "tests": [
+        {
+          "file": "<path/to/the.test.file>",
+          "name": "<the exact test name, copied verbatim from the test>"
+        }
+      ],
+      "argv": [
+        "<the command that runs this test>",
+        "<its arguments>",
+        "<path/to/the.test.file>",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
+      ],
+      "report": { "format": "junit-xml", "path": ".dotbabel/criteria/AC-1.junit.xml" }
+    }
+  ]
+}
+```
+
+**Every new criterion starts `planned`.** A criterion becomes `active` only in
+the pull request that adds the tests it names — seeding `active` at scaffold
+time asserts, from the first commit, that tests exist which do not, and the
+verification command will fail looking for them.
+
+`linked_paths` and `acceptance_commands` must both be **non-empty** — the
+validator rejects an empty array for either, so replace the placeholders rather
+than deleting them. `depends_on_specs` and `active_prs` must be present but may
+stay empty.
+
+Keep `linked_paths` narrow. A broad entry (`package.json`, a whole `src/`)
+drags unrelated changes into this spec's merge gate, so add a path only when a
+change there genuinely needs this spec's criteria to pass.
+
+Leave `tests[].name` and `argv` as placeholders until the tests exist. The name
+must later match the test **verbatim** — verification looks it up by exact
+string in the JUnit report, so a paraphrase silently never matches.
+
+`argv` is runner-agnostic: the only fixed requirement is that the command emits
+JUnit XML at `report.path`, which every major runner can do. For a Node project
+that is `["npx", "vitest", "run", "<file>", "--reporter=junit",
+"--outputFile=…"]`; Go uses `gotestsum --junitfile`, Python `pytest
+--junitxml`. Write the one your project actually runs rather than copying the
+Node form.
 
 ### README.md
 
