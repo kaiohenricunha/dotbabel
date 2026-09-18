@@ -345,7 +345,7 @@
     },
     {
       "id": "AC-12",
-      "status": "planned",
+      "status": "active",
       "given": "a failing http smoke check",
       "when": "deploy-ops.mjs smoke runs",
       "then": "it retries 3 times with backoff and exits 1",

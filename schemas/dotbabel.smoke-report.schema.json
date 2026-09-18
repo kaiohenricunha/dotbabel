@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.smoke-report.schema.json",
+  "title": "dotbabel smoke report",
+  "description": "Result of `deploy-ops.mjs smoke`. A header value read from the environment never appears in this payload (SEC-8); only the header NAME is reported.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "verdict", "dry_run", "results"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "command": {
+      "const": "smoke"
+    },
+    "verdict": {
+      "enum": ["pass", "fail", "not_configured", "not_run"],
+      "description": "not_configured when no target declares smoke checks and not_run for a dry run; both are exit 0 outcomes, not failures. A consumer must read this (or dry_run) rather than inferring success from the exit code alone."
+    },
+    "budget_exceeded": {
+      "type": "boolean",
+      "description": "True when the run stopped on the 300-second total bound (PERF-6), leaving later checks unrun."
+    },
+    "elapsed_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "type", "ok", "attempts"],
+        "properties": {
+          "target": {
+            "type": "string"
+          },
+          "type": {
+            "enum": ["http", "command"]
+          },
+          "ok": {
+            "type": ["boolean", "null"],
+            "description": "null for a check listed by a dry run and never executed \u2014 distinct from false (ran and failed) and true (ran and passed)."
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 only for a dry-run entry, which was planned but never executed."
+          },
+          "url": {
+            "type": "string",
+            "description": "Present for http checks. Credentials are rejected before a request is made, so this never carries a userinfo component."
+          },
+          "argv": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Present for command checks."
+          },
+          "status": {
+            "type": ["integer", "null"]
+          },
+          "header_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Names only. Values are read from named environment variables and are never serialized."
+          },
+          "message": {
+            "type": "string",
+            "description": "Redacted: any secret header value is replaced before this is written."
+          }
+        }
+      }
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "True when --dry-run listed the checks without executing any. Present so a machine consumer can tell 'nothing ran' from 'everything passed' \u2014 without it, a stray --dry-run in a pipeline green-lights a release over zero executed checks."
+    }
+  }
+}
