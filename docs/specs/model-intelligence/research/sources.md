@@ -8,20 +8,21 @@
 
 - **DOC-1**: [Model Selection Audit](../../../audits/model-selection-audit.md) — read-only audit (2026-09-17) of every place Dotbabel selects, hardcodes, recommends, or assumes a model, an effort, or a provider capability: 68 artifacts, 9 independent enum declarations, migration classes A–F. Feeds: §1, §2, §4, §6, §8.
 - **DOC-2**: [Model Runtime Capability Investigation](../../../audits/model-runtime-capability-investigation.md) — controlled empirical investigation (2026-09-17) of how the six runtimes handle model selection, effort, artifact frontmatter, and model discovery. It carries 20 confirmed design constraints and 12 corrections to DOC-1; where the two disagree, DOC-2 governs. Feeds: §1, §3, §4, §5, §7, §8.
+- **DOC-3**: [Phase 0 Findings](phase-0-findings.md) — evidence of 2026-09-18 for RQ-1, RQ-3, and RQ-4: the Models.dev contract, the credential gate of the official model APIs, the Copilot custom-agent schema, and the skill frontmatter loaders of Codex, OpenCode, and Antigravity. Feeds: §4 (KD-4), §5 (`Source Adapter Contract`), §6.1 Phase 0, §8 (R-4, R-6).
 
 ## Open Research Items
 
 Questions that the evidence base does not answer yet. Each one names the decision that waits for it.
 
-- **RQ-1**: Shape, stability, authentication, and limits of the official model/catalog APIs and of Models.dev. Neither DOC-1 nor DOC-2 measured them. Blocks: the knowledge-source adapter contracts in §5 (§3, `External APIs / Dependencies`).
-- **RQ-2**: Whether each of the six runtimes accepts a nested mapping key such as `dotbabel:` in artifact frontmatter. No artifact uses one today, and the DOC-2 probes used flat keys only. KD-5 (§4) changed this from a correctness gate to an optimization/compatibility item: the materializer strips the key, so no decision waits for the answer. A positive result only lets an adapter opt in to keep the key for diagnostics.
-- **RQ-3**: Copilot binding surfaces (§4, KD-4), set by the owner on 2026-09-17:
+- **RQ-1**: Shape, stability, authentication, and limits of the official model/catalog APIs and of Models.dev. Neither DOC-1 nor DOC-2 measured them. Blocks: the knowledge-source adapter contracts in §5 (§3, `External APIs / Dependencies`). **Status, 2026-09-18:** closed for Models.dev and for the availability and documented shape of the Anthropic and Gemini APIs; the OpenAI response shape and the Models.dev license stay open (DOC-3).
+- **RQ-2**: Whether each of the six runtimes accepts a nested mapping key such as `dotbabel:` in artifact frontmatter. No artifact uses one today, and the DOC-2 probes used flat keys only. KD-5 (§4) changed this from a correctness gate to an optimization/compatibility item: the materializer strips the key, so no decision waits for the answer. A positive result only lets an adapter opt in to keep the key for diagnostics. **Status, 2026-09-18:** answered for Codex and OpenCode, which ignore unknown keys without a warning; Copilot custom agents warn (DOC-3).
+- **RQ-3**: Copilot binding surfaces (§4, KD-4), set by the owner on 2026-09-17: **Status, 2026-09-18:** steps 2, 3, and 5 closed; step 1 closed for the schema and blocked for run-time binding by authentication; step 4 stays conditional on a Tier 3 integration test (DOC-3).
   1. Empirically test Copilot CLI custom-agent `model` and `models` binding.
   2. Determine where Dotbabel currently installs/fans out custom agents for Copilot. First finding: no source file under `plugins/dotbabel/src/` writes `.github/agents` or an `.agent.md` file, so today it installs none.
   3. Re-test whether `.prompt.md` is actually consumed by Copilot CLI 1.0.83+; current official documentation describes prompt files as IDE-only.
   4. If custom-agent binding is confirmed, allow Model Intelligence to project a resolved model into generated Copilot agent files.
   5. Keep Copilot skill/instructions compute metadata omitted.
-- **RQ-4**: Skill-level binding on Codex, Antigravity, and OpenCode. DOC-2 left them LIKELY NOT_PARSED, UNCERTAIN, and BLOCKED. Blocks: any change to their rows in KD-4.
+- **RQ-4**: Skill-level binding on Codex, Antigravity, and OpenCode. DOC-2 left them LIKELY NOT_PARSED, UNCERTAIN, and BLOCKED. Blocks: any change to their rows in KD-4. **Status, 2026-09-18:** closed for Codex and OpenCode as `unsupported`; closed as LIKELY `unsupported` for Antigravity, with the live test blocked (DOC-3).
 
 ## Measurement Disposition
 
