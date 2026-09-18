@@ -48,11 +48,17 @@ when a person asks for it, not when a model infers it might be useful.
    fi
    ```
 
-2. Run the smoke command from the consuming project root:
+2. Run the smoke command from the consuming project root, forwarding **only**
+   the flags this skill documents:
 
    ```bash
    node "$DEPLOY_OPS" smoke $ARGUMENTS
    ```
+
+   `$ARGUMENTS` is raw caller text spliced into a command that reaches
+   production, so pass only `--dry-run` and `--json` — drop anything else
+   rather than forwarding it. A value carrying `;`, `|`, `&`, a backtick,
+   `$(`, or a newline is shell syntax, not a flag: refuse it and say so.
 
 3. Preserve the helper's exit code:
    - `0` — every declared check passed, or none is declared, or it was a dry

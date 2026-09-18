@@ -32,9 +32,19 @@ export -f flowed
 # things are stated together, not merely both present somewhere in the file.
 near() {
   flowed "$1" | awk -v anchor="$2" -v needle="$3" -v win="${4:-200}" '{
-    s = tolower($0); i = index(s, tolower(anchor));
-    if (i == 0) exit 1;
-    exit (index(substr(s, i, win), tolower(needle)) > 0) ? 0 : 1;
+    s = tolower($0); a = tolower(anchor); n = tolower(needle);
+    # EVERY occurrence, not just the first. Anchoring on the first match alone
+    # decided the verdict by wherever the phrase happened to appear earliest:
+    # a rule deleted from its real location could still pass against an
+    # unrelated earlier mention, and adding a paragraph above could fail a
+    # correct document. "some mention is near the needle" is what is meant.
+    p = 1;
+    while ((i = index(substr(s, p), a)) > 0) {
+      start = p + i - 1;
+      if (index(substr(s, start, win), n) > 0) exit 0;
+      p = start + 1;
+    }
+    exit 1;
   }'
 }
 export -f near
@@ -69,18 +79,37 @@ setup() {
 }
 
 @test "smoke-test: resolves the deploy-ops helper the same way deploy-status does" {
-  # Both must check the bootstrapped $HOME copy first, then the in-repo path,
-  # then fail with exit 2. A skill that resolved only one of the two would
-  # work for exactly one install shape and silently fail for the other.
-  for needle in \
-    '\$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs' \
-    'skills/deploy-status/scripts/deploy-ops.mjs'
-  do
-    run grep -q "$needle" "$SMOKE"
+  # Asserted across EVERY file that embeds the snippet, not just this one. The
+  # previous version greped only $SMOKE while claiming parity with
+  # deploy-status, so a release-conductor copy that dropped the `exit 2` branch
+  # passed this suite — the exact instruction most likely to be dropped was the
+  # one nothing guarded.
+  #
+  # Three parts: the bootstrapped $HOME copy, the in-repo fallback GUARDED by
+  # its own existence test, and a diagnostic exit 2 when neither resolves.
+  # Without the third, a missing helper is indistinguishable from a broken
+  # deployment; without the guard on the second, an unverified in-tree script
+  # gets executed.
+  for file in "$SMOKE" "$DEPLOY" "$RELEASE"; do
+    run grep -q '\$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs' "$file"
+    [ "$status" -eq 0 ]
+    run grep -qE 'elif \[ -f "skills/deploy-status/scripts/deploy-ops\.mjs" \]' "$file"
+    [ "$status" -eq 0 ]
+    run grep -qE '^\s*exit 2$' "$file"
     [ "$status" -eq 0 ]
   done
-  # And it must actually call the smoke subcommand, not status.
+  # And smoke-test must call the smoke subcommand, not status.
   run grep -qE 'node "\$DEPLOY_OPS" smoke' "$SMOKE"
+  [ "$status" -eq 0 ]
+}
+
+@test "smoke-test: constrains the arguments it forwards to the helper" {
+  # $ARGUMENTS is raw caller text spliced into a command that reaches
+  # production, so the prose must name the surface it forwards rather than
+  # passing whatever was typed.
+  run near "$SMOKE" "ARGUMENTS" "--dry-run"
+  [ "$status" -eq 0 ]
+  run grep -qiE 'only .*(--dry-run|--json)|allowlist|drop anything else' "$SMOKE"
   [ "$status" -eq 0 ]
 }
 
@@ -103,14 +132,38 @@ setup() {
   # subcommand rather than somewhere earlier in the gating flow.
   verify_line=$(grep -n '^## `verify <tag>` subcommand' "$RELEASE" | head -1 | cut -d: -f1)
   [ -n "$verify_line" ]
+  release_line=$(grep -n 'gh release view' "$RELEASE" | head -1 | cut -d: -f1)
   status_line=$(grep -nE 'deploy-ops\.mjs status|DEPLOY_OPS" status' "$RELEASE" | head -1 | cut -d: -f1)
   smoke_line=$(grep -nE 'deploy-ops\.mjs smoke|DEPLOY_OPS" smoke' "$RELEASE" | head -1 | cut -d: -f1)
+  [ -n "$release_line" ]
   [ -n "$status_line" ]
   [ -n "$smoke_line" ]
   [ "$status_line" -gt "$verify_line" ]
   [ "$smoke_line" -gt "$verify_line" ]
-  # Flow 5 step 3: a failure recommends rollback and stops.
-  run grep -q '/rollback-prod' "$RELEASE"
+  # Ordering is declared by Flow 5 and load-bearing, so it is asserted rather
+  # than assumed. Registry checks first: a deploy verdict means little if the
+  # artifact was never published. Then status BEFORE smoke: status establishes
+  # which revision is live, and a smoke pass against a drifted revision is a
+  # pass for the wrong artifact.
+  [ "$status_line" -gt "$release_line" ]
+  [ "$status_line" -lt "$smoke_line" ]
+  # Flow 5 step 3 has TWO obligations — recommend AND stop. A bare grep for
+  # the slash command is satisfied by any mention anywhere, including the
+  # Rules bullet, so "and stop" would be invisible if deleted.
+  run near "$RELEASE" "rollback-prod" "stop"
+  [ "$status" -eq 0 ]
+}
+
+@test "release-conductor: lets the helper decide whether a deploy target exists" {
+  # Flow 5 says "when a deploy target exists", not "when a config file
+  # exists". deploy-ops.mjs auto-discovers from .vercel/project.json and
+  # fly.toml, so gating on .claude/deploy-targets.json reports SKIPPED for a
+  # Vercel or Fly repo that has a real, checkable target — the same dishonesty
+  # the SKIPPED rule forbids, inverted.
+  run grep -qE 'if \[ -f "\.claude/deploy-targets\.json" \]' "$RELEASE"
+  [ "$status" -ne 0 ]
+  # And an unresolvable target must read as SKIPPED, not FAIL.
+  run near "$RELEASE" "exit 2" "SKIPPED"
   [ "$status" -eq 0 ]
 }
 

@@ -243,20 +243,34 @@ npm view "$PKG@$VERSION" version dist.tarball
 gh release view "$TAG" --json url,publishedAt,name
 ```
 
-Then, **only if the repository declares deploy targets** (Flow 5):
+Then deploy status and smoke (Flow 5). **Do not gate this on
+`.claude/deploy-targets.json`** — the helper also auto-discovers targets from
+`.vercel/project.json` and `fly.toml`, so a file-existence gate would report
+SKIPPED for a Vercel or Fly repository that has a real, checkable deployment.
+Let the helper decide what exists and report its verdict:
 
 ```bash
 # 4 + 5. Deploy status, then smoke — the published artifact existing is not
-# the same as the deployed thing answering.
-if [ -f ".claude/deploy-targets.json" ]; then
-  if [ -f "$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs" ]; then
-    DEPLOY_OPS="$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs"
-  else
-    DEPLOY_OPS="skills/deploy-status/scripts/deploy-ops.mjs"
-  fi
-  node "$DEPLOY_OPS" status
-  node "$DEPLOY_OPS" smoke
+# the same as the deployed thing answering. Status runs FIRST: it establishes
+# which revision is live, and a smoke pass against a drifted revision is a
+# pass for the wrong artifact.
+#
+# The same three-branch resolution deploy-status and smoke-test use. The
+# `elif` guard and the `exit 2` branch are both load-bearing: without the
+# guard this would run a CWD-relative script the checked-out repository
+# controls, and without the exit a missing helper would fall through to the
+# FAIL path and recommend rolling back a healthy deployment.
+if [ -f "$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs" ]; then
+  DEPLOY_OPS="$HOME/.claude/skills/deploy-status/scripts/deploy-ops.mjs"
+elif [ -f "skills/deploy-status/scripts/deploy-ops.mjs" ]; then
+  DEPLOY_OPS="skills/deploy-status/scripts/deploy-ops.mjs"
+else
+  echo "deploy-status helper not found; re-run dotbabel bootstrap or dotbabel init" >&2
+  exit 2
 fi
+
+node "$DEPLOY_OPS" status
+node "$DEPLOY_OPS" smoke
 ```
 
 Report PASS / FAIL per check. Specifics:
@@ -264,14 +278,15 @@ Report PASS / FAIL per check. Specifics:
 - **release.yml conclusion** — `success` = PASS. `in_progress` = "still running, retry in ~60s." `failure` = FAIL, print URL.
 - **npm view** — exit 0 = PASS. 404 = "not yet propagated (npm CDN lag, up to ~60s)." Other error = FAIL.
 - **gh release view** — exit 0 = PASS. `release not found` = FAIL.
-- **deploy status** — exit 0 = PASS. Drift (exit 1) = FAIL. Discovery failure (exit 2) = FAIL.
+- **deploy status** — exit 0 = PASS. Drift (exit 1) = FAIL. Discovery finding no target, or the helper itself being unavailable (**exit 2**) = **SKIPPED**, never FAIL: a tool-availability problem is not a production problem, and reporting it as one would recommend rolling back a deployment that is fine.
 - **smoke** — read the `verdict`, not only the exit code. `pass` = PASS. `fail` = FAIL. `not_configured` (no target declares checks) and `not_run` (a dry run) = **SKIPPED**, never PASS: both exit 0 without having verified anything.
 
-**When no deploy target exists (no `.claude/deploy-targets.json`), report
-deploy status and smoke as SKIPPED** — never as PASS. That is the honest
-reading: nothing was checked, so nothing passed. Reporting PASS for a check
-that never ran is the failure mode this whole subcommand exists to avoid, and
-it is invisible in the output.
+**When no deploy target exists, report deploy status and smoke as SKIPPED** —
+never as PASS. The helper decides that, not a file-existence check: it reports
+exit 2 when discovery finds nothing and a `not_configured` verdict when no
+target declares smoke checks. Either way nothing was checked, so nothing
+passed. Reporting PASS for a check that never ran is the failure mode this
+whole subcommand exists to avoid, and it is invisible in the output.
 
 On any FAIL from deploy status or smoke, **recommend `/rollback-prod` and
 stop** (KD-13). Do not invoke it: rolling back is a production change and needs
