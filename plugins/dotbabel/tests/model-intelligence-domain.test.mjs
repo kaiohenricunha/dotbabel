@@ -129,6 +129,17 @@ describe("model-intelligence domain shape guards", () => {
     expect(() => makeProvenance({ sourceId: "x", sourceKind: "declaration" })).toThrow(/sourceKind/);
   });
 
+  it("carries a derivation discriminator so an inference cannot pose as an authored decision", async () => {
+    const { DERIVATIONS, makeProvenance } = await import("../src/model-intelligence/domain/index.mjs");
+    expect(DERIVATIONS).toEqual(["declared", "legacy-inferred"]);
+    // sourceKind is `artifact` for both an authored dotbabel.compute and a
+    // requirement inferred from legacy model:/effort:, so the difference needs its
+    // own field rather than a sentinel smuggled through adapterVersion (ARCH-18).
+    expect(makeProvenance({ sourceId: "a.md", sourceKind: "artifact", derivation: "legacy-inferred" }).derivation).toBe("legacy-inferred");
+    expect(makeProvenance({ sourceId: "a.md", sourceKind: "artifact" }).derivation).toBeUndefined();
+    expect(() => makeProvenance({ sourceId: "a.md", sourceKind: "artifact", derivation: "inferred" })).toThrow(/derivation/);
+  });
+
   it("rejects a non-string version field in provenance", async () => {
     const { makeProvenance } = await import("../src/model-intelligence/domain/index.mjs");
     expect(() => makeProvenance({ sourceId: "codex", sourceKind: "runtime", sourceVersion: 154 })).toThrow(/sourceVersion must be a string/);

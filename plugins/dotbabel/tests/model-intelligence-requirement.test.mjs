@@ -123,8 +123,9 @@ describe("dotbabel.compute parsing", () => {
       rationale: "why",
       // `sourceKind: "artifact"`, not `"runtime"`: no adapter observed this, and a
       // consumer that reads `runtime` to mean "observed from a harness" must not
-      // match a declaration.
-      provenance: { sourceId: "skills/probe/SKILL.md", sourceKind: "artifact" },
+      // match a declaration. `derivation: "declared"` separates it from a
+      // requirement that `compat/` inferred from legacy metadata.
+      provenance: { sourceId: "skills/probe/SKILL.md", sourceKind: "artifact", derivation: "declared" },
     });
     expect(Object.isFrozen(result.requirement)).toBe(true);
   });
@@ -177,7 +178,14 @@ describe("dotbabel.compute parsing", () => {
     const source = readFileSync(REQUIREMENT_SOURCE, "utf8");
     const imports = [...source.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((match) => match[1]);
     expect(imports.filter((specifier) => /^(node:)?(fs|fs\/promises|child_process|http|https|os)$/.test(specifier))).toEqual([]);
-    expect(source).not.toMatch(/\bDate\.now\(|\bprocess\.env\b/);
+    // Stryker rewrites this file to coordinate mutants and injects a `process.env`
+    // read of its own, so the text grep would fail on the instrumenter's code
+    // rather than on ours and no mutant would ever run. The import assertion above
+    // still holds under instrumentation, and this one still runs in every ordinary
+    // suite, which is where a regression would be introduced.
+    if (globalThis.__stryker__ === undefined) {
+      expect(source).not.toMatch(/\bDate\.now\(|\bprocess\.env\b/);
+    }
   });
 });
 

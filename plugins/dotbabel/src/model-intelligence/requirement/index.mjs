@@ -236,7 +236,7 @@ export function parseComputeDeclaration(frontmatter, options) {
     // `sourceKind: "artifact"` records that the artifact declared this itself. A
     // declaration must not borrow `runtime`, which consumers read as "an adapter
     // observed this from a harness".
-    provenance: makeProvenance({ sourceId: sourcePath, sourceKind: "artifact" }),
+    provenance: makeProvenance({ sourceId: sourcePath, sourceKind: "artifact", derivation: "declared" }),
   };
   if (requirement !== undefined) normalised.requirement = requirement;
   if (normalisedPin !== null) normalised.pin = Object.freeze(normalisedPin);
