@@ -1077,12 +1077,23 @@ export function redactSmokeSecrets(text, secrets) {
  * second, drifted copy is exactly how a check that "passes" during a retry
  * could later report as failed, or vice versa.
  *
- * @param {object} check
+ * Returns the two halves alongside the combined verdict, not a bare boolean:
+ * the failure message has to name WHICH expectation failed, and collapsing
+ * them produced the self-contradicting "expected status 200, got 200".
+ *
+ * @param {{ expect_status?: number, expect_text?: string }} check
  * @param {{ ok: boolean, status: number|null, body: string }} attempt
- * @returns {boolean}
+ * @returns {{ ok: boolean, statusOk: boolean, textOk: boolean }}
  */
 function smokeCheckPasses(check, attempt) {
-  const statusOk = attempt.ok && (check.expect_status === undefined || attempt.status === check.expect_status);
+  // `attempt.ok` means "a response arrived", NOT "the response was good". With
+  // no expectation declared, treating that as a pass made a check report green
+  // against a hard 500 — a release gate turning an outage into a green deploy,
+  // through the simplest config anyone would write first. So the default
+  // expectation is 2xx rather than "anything that answers".
+  const statusOk = attempt.ok && (check.expect_status === undefined
+    ? Number(attempt.status) >= 200 && Number(attempt.status) < 300
+    : attempt.status === check.expect_status);
   const textOk = check.expect_text === undefined || String(attempt.body ?? "").includes(String(check.expect_text));
   return { ok: Boolean(statusOk && textOk), statusOk, textOk };
 }
@@ -1096,6 +1107,7 @@ function smokeCheckPasses(check, attempt) {
  */
 async function smokeHttpAttempt(check, headerValues, deps) {
   const fetchFn = deps.fetch ?? globalThis.fetch;
+  const timeoutMs = deps.requestTimeoutMs ?? SMOKE_REQUEST_TIMEOUT_MS;
   let current = check.url;
   for (let hop = 0; hop <= SMOKE_MAX_REDIRECTS; hop += 1) {
     const validated = validateSmokeUrl(current);
@@ -1104,12 +1116,17 @@ async function smokeHttpAttempt(check, headerValues, deps) {
     // different response would MASK the refusal and report the check as
     // passing. Only transient failures get the backoff.
     if (!validated.ok) return { ok: false, fatal: true, status: null, body: "", reason: validated.reason };
+    // A real abort signal, not a `timeoutMs` init key: `RequestInit` has no
+    // such member and unknown keys are silently ignored, so the declared
+    // PERF-6 bound did not exist at all. Verified against a server that
+    // accepts the connection and never answers — the request simply hung, and
+    // the 300s total budget could not save it because that is only read
+    // BETWEEN checks, never mid-request.
     const response = await fetchFn(validated.url.toString(), {
       method: "GET",
       redirect: "manual",
       headers: { ...headerValues },
-      signal: deps.signal ?? undefined,
-      timeoutMs: SMOKE_REQUEST_TIMEOUT_MS,
+      signal: deps.signal ?? AbortSignal.timeout(timeoutMs),
     });
     const status = response.status;
     if (status >= 300 && status < 400) {
@@ -1148,7 +1165,7 @@ export async function smokeReport({ root, targets = [], dryRun = false, deps = {
   if (planned.length === 0) {
     // Nothing declared is not a failure: exiting non-zero here would block
     // every release in a repository that has not adopted smoke checks.
-    const json = { schema_version: 1, command: "smoke", verdict: "not_configured", results: [], elapsed_ms: 0, budget_exceeded: false };
+    const json = { schema_version: 1, command: "smoke", verdict: "not_configured", dry_run: Boolean(dryRun), results: [], elapsed_ms: 0, budget_exceeded: false };
     return { exitCode: EXIT.OK, text: "smoke: no smoke checks declared in .claude/deploy-targets.json", json, results: [] };
   }
 
@@ -1161,8 +1178,12 @@ export async function smokeReport({ root, targets = [], dryRun = false, deps = {
         break outer;
       }
       if (dryRun) {
+        // `ok: null`, never `true`. A dry run that reported every check as
+        // passing produced a payload a machine consumer could not tell from a
+        // real pass, so a stray --dry-run in a pipeline would green-light a
+        // production gate over zero executed checks.
         lines.push(`  - ${label} ${check.type} (dry run, not executed)`);
-        results.push({ target: label, type: check.type === "command" ? "command" : "http", ok: true, attempts: 0 });
+        results.push({ target: label, type: check.type === "command" ? "command" : "http", ok: null, attempts: 0 });
         continue;
       }
 
@@ -1182,18 +1203,24 @@ export async function smokeReport({ root, targets = [], dryRun = false, deps = {
         continue;
       }
 
-      const headers = resolveSmokeHeaders(check.headers, env);
-      if (!headers.ok) {
-        results.push({ target: label, type: "http", ok: false, attempts: 1, url: String(check.url ?? ""), header_names: Object.keys(check.headers ?? {}), message: headers.reason });
-        lines.push(`  x ${label} http ${check.url}: ${headers.reason}`);
-        continue;
-      }
+      // URL FIRST, then headers. The reverse order meant a header failure —
+      // an unset environment variable is the likeliest first-run mistake —
+      // echoed the raw, unvalidated URL into both stdout and the payload,
+      // credentials included. The no-echo rule held on one branch and broke on
+      // its sibling four lines below. Validating first means every later echo
+      // uses `validated.url`, which by construction carries no userinfo.
       const validated = validateSmokeUrl(check.url);
       if (!validated.ok) {
         // The URL is NOT echoed here: a rejected URL may be rejected precisely
         // because it embedded credentials.
-        results.push({ target: label, type: "http", ok: false, attempts: 1, header_names: headers.names, message: validated.reason });
+        results.push({ target: label, type: "http", ok: false, attempts: 1, header_names: Object.keys(check.headers ?? {}), message: validated.reason });
         lines.push(`  x ${label} http: ${validated.reason}`);
+        continue;
+      }
+      const headers = resolveSmokeHeaders(check.headers, env);
+      if (!headers.ok) {
+        results.push({ target: label, type: "http", ok: false, attempts: 1, url: validated.url.toString(), header_names: Object.keys(check.headers ?? {}), message: headers.reason });
+        lines.push(`  x ${label} http ${validated.url} ${headers.reason}`);
         continue;
       }
 
@@ -1234,19 +1261,24 @@ export async function smokeReport({ root, targets = [], dryRun = false, deps = {
     }
   }
 
-  const failed = results.filter((item) => !item.ok);
-  const verdict = failed.length > 0 || budgetExceeded ? "fail" : "pass";
+  const failed = results.filter((item) => item.ok === false);
+  const verdict = dryRun ? "not_run" : failed.length > 0 || budgetExceeded ? "fail" : "pass";
   const json = {
     schema_version: 1,
     command: "smoke",
     verdict,
+    dry_run: Boolean(dryRun),
     budget_exceeded: budgetExceeded,
     elapsed_ms: Math.max(0, now() - started),
     results,
   };
-  const header = verdict === "pass" ? `smoke: ${results.length} check(s) passed` : `smoke: ${failed.length} of ${results.length} check(s) failed`;
+  const header = dryRun
+    ? `smoke: ${results.length} check(s) planned, none executed (dry run)`
+    : verdict === "pass" ? `smoke: ${results.length} check(s) passed` : `smoke: ${failed.length} of ${results.length} check(s) failed`;
   return {
-    exitCode: verdict === "pass" ? EXIT.OK : EXIT.DRIFT,
+    // A dry run exits 0: it asserts nothing and must not block a pipeline. The
+    // verdict and dry_run flag are what a consumer reads to know why.
+    exitCode: verdict === "pass" || verdict === "not_run" ? EXIT.OK : EXIT.DRIFT,
     text: [header, ...lines].join("\n"),
     json,
     results,

@@ -77,13 +77,27 @@ node "$DEPLOY_OPS" smoke --dry-run  # list the checks without running them
 ```
 
 Exit codes match the status command: `0` every check passed (or none is
-declared — nothing to check is not a failure), `1` at least one failed or the
-run hit its time budget, `2` target discovery failed.
+declared, or it was a dry run — neither is a failure), `1` at least one failed
+or the run hit its time budget, `2` target discovery failed.
+
+Read `verdict` rather than inferring success from the exit code: `pass`,
+`fail`, `not_configured` (no target declares checks) and `not_run` (a dry run).
+A dry run also sets `dry_run: true` and reports each planned check with
+`ok: null`, so a stray `--dry-run` in a pipeline cannot be mistaken for a green
+gate over zero executed checks.
 
 Two check types. An `http` check is **GET only** and retries up to 3 times with
 2s, 4s and 8s backoff; a `command` check runs its `argv` **exactly once**,
 because a command may not be idempotent and a retry would repeat a side effect
-nobody agreed to. The whole run stops after 300 seconds.
+nobody agreed to. Each request is aborted after 10 seconds — a timeout is
+transient, so it is retried on the backoff schedule — and the whole run stops
+after 300 seconds.
+
+**A check with no `expect_status` defaults to requiring 2xx.** A response
+arriving is not the same as a response being good: without that default, a
+check declaring no expectations reported green against a hard 500, which turns
+an outage into a passing release gate. Set `expect_status` explicitly when you
+want a specific non-2xx code.
 
 These requests go to production and may carry a real credential, so the guards
 are enforced rather than advised:

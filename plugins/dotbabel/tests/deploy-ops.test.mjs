@@ -516,6 +516,89 @@ describe("smoke checks", () => {
     expect(report.results[0].message).not.toMatch(/expected status \d+, got \d+/);
   });
 
+  it("smoke: aborts a request that never responds, and retries it as transient", async () => {
+    // `timeoutMs` is not a fetch option — unknown init keys are ignored, so the
+    // declared PERF-6 bound did not exist. Verified against a real server that
+    // accepts the connection and never answers: still hanging after 6s.
+    // The stub here rejects only when the signal fires, so a request that is
+    // never aborted hangs this test rather than passing it.
+    let sawSignal = 0;
+    const fetch = async (_url, init) => {
+      sawSignal += init?.signal ? 1 : 0;
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
+      });
+    };
+    const report = await smokeReport({
+      root: ".",
+      targets: [target([{ type: "http", url: "https://example.test/health", expect_status: 200 }])],
+      deps: { fetch, sleep: async () => {}, requestTimeoutMs: 20 },
+    });
+    expect(sawSignal).toBeGreaterThan(0);
+    expect(report.exitCode).toBe(1);
+    // A timeout is transient, not a config refusal, so it uses the full retry
+    // budget rather than failing fatally on the first attempt.
+    expect(report.results[0].attempts).toBe(4);
+    expect(report.results[0].message).toMatch(/abort|timeout|timed out/i);
+  });
+
+  it("smoke: never echoes a credentialed URL, even when header resolution fails first", async () => {
+    // Header resolution ran BEFORE URL validation, and its failure branch
+    // echoed the raw URL — so the no-echo rule held on one branch and broke on
+    // its sibling. An unset env var is the likeliest first-run failure, which
+    // made this the probable path rather than an exotic one.
+    for (const headers of [{ Authorization: { env: "ABSENT_VAR" } }, { Authorization: "Bearer literal" }]) {
+      const report = await smokeReport({
+        root: ".",
+        targets: [target([{ type: "http", url: "https://user:pa55w0rd@api.example.test/me", headers }])],
+        deps: { fetch: stubFetch({ status: 200 }), sleep: async () => {}, env: {} },
+      });
+      expect(report.exitCode).toBe(1);
+      expect(report.text, "password must not reach stdout").not.toContain("pa55w0rd");
+      expect(JSON.stringify(report.json), "password must not reach the payload").not.toContain("pa55w0rd");
+    }
+  });
+
+  it("smoke: fails a check with no declared expectation when the response is not 2xx", async () => {
+    // `ok` from an attempt means "a response arrived", not "the response was
+    // good". With neither expectation declared the check used to pass on a
+    // hard 500 — a release gate turning an outage green, via the simplest
+    // config anyone would write first.
+    const bad = await smokeReport({
+      root: ".",
+      targets: [target([{ type: "http", url: "https://example.test/health" }])],
+      deps: { fetch: stubFetch({ status: 500, body: "INTERNAL ERROR" }), sleep: async () => {} },
+    });
+    expect(bad.exitCode).toBe(1);
+
+    // A 2xx with no declared expectation still passes: the default is "2xx",
+    // not "must declare expectations".
+    const good = await smokeReport({
+      root: ".",
+      targets: [target([{ type: "http", url: "https://example.test/health" }])],
+      deps: { fetch: stubFetch({ status: 204 }), sleep: async () => {} },
+    });
+    expect(good.exitCode).toBe(0);
+  });
+
+  it("smoke: marks a dry run in the payload and does not report it as a pass", async () => {
+    const schema = JSON.parse(fs.readFileSync(join(REPO_ROOT, "schemas", "dotbabel.smoke-report.schema.json"), "utf8"));
+    const report = await smokeReport({
+      root: ".", dryRun: true,
+      targets: [target([{ type: "http", url: "https://example.test/health", expect_status: 200 }])],
+      deps: { sleep: async () => {} },
+    });
+    // A machine consumer must be able to tell "nothing ran" from "everything
+    // passed": a stray --dry-run in a pipeline would otherwise green-light a
+    // production gate over zero executed checks.
+    expect(report.json.dry_run).toBe(true);
+    expect(report.json.verdict).not.toBe("pass");
+    expect(schema.properties.verdict.enum).toContain(report.json.verdict);
+    // And the payload must satisfy the schema it ships with.
+    const min = schema.properties.results.items.properties.attempts.minimum;
+    for (const result of report.json.results) expect(result.attempts).toBeGreaterThanOrEqual(min);
+  });
+
   it("smoke: computes the backoff schedule for any retry count from 0 through 10", () => {
     // Property sweep rather than three fixed cases: the schedule is arithmetic,
     // so an off-by-one shows up at a boundary the examples happen to skip.
