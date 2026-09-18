@@ -4,6 +4,14 @@
 # race detection — which is why it runs weekly and on demand rather than on
 # every pull request. Pull requests use the `pr` profile in test.yml.
 #
+# `--all`, not `--base`: this job only runs on a schedule or a dispatch, so the
+# checkout lands on the default branch and HEAD equals origin/main. A `--base`
+# run would resolve a merge base that IS HEAD and diff it against a clean
+# working tree — an empty change set, so every changed-scope rule (the
+# changed-line mutation score included) would evaluate nothing and the job
+# would exit 0 having audited precisely nothing. `--all` is the
+# whole-repository mode and takes no base.
+#
 # SEC-7: actions pinned to full commit SHAs, read-only top-level token, and no
 # `pull_request_target`.
 name: Language-aware quality
@@ -34,7 +42,7 @@ jobs:
         run: |
           npx dotbabel quality check \
             --profile deep \
-            --base origin/main \
+            --all \
             --allow-project-commands \
             --json > quality-report.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

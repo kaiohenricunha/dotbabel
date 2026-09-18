@@ -77,19 +77,59 @@ seed_js() {
 
 @test "check-on-stop: runs vitest related for changed JavaScript files in a trusted repository" {
   seed_js
-  stub_checker npx 0 "" ""
+  # The INSTALLED binary, recorded so the argv can be asserted. The hook
+  # resolves node_modules/.bin rather than npx, so the stub lives there.
+  mkdir -p "$REPO/node_modules/.bin"
+  cat > "$REPO/node_modules/.bin/vitest" <<EOS
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$REPO/vitest-argv.log"
+exit 0
+EOS
+  chmod +x "$REPO/node_modules/.bin/vitest"
   CHECK_ON_STOP_TESTS=1 feed_stop_json "$HOOK" false "$REPO"
-  run stub_calls npx
+  run cat "$REPO/vitest-argv.log"
   # The runner's OWN scoping, not the whole suite: `vitest related` is what
   # review-pr already uses for exactly this purpose.
-  [[ "$output" == *"vitest"* ]]
   [[ "$output" == *"related"* ]]
   [[ "$output" == *"index.js"* ]]
 }
 
+@test "check-on-stop: never downloads a runner that is declared but not installed" {
+  # Grepping package.json proves the runner is DECLARED, not INSTALLED. Bare
+  # `npx` would fall back to DOWNLOADING it — silently, in a non-interactive
+  # hook, at the end of every turn. P-C4 fixed this same bug class one PR ago
+  # by resolving ./node_modules/.bin/ instead of trusting npx.
+  seed_js   # declares vitest in package.json, but installs no node_modules
+  stub_checker npx 0 "" ""
+  CHECK_ON_STOP_TESTS=1 feed_stop_json "$HOOK" false "$REPO"
+  run stub_calls npx
+  [ -z "$output" ]
+}
+
+@test "check-on-stop: runs the locally installed runner when node_modules has it" {
+  seed_js
+  mkdir -p "$REPO/node_modules/.bin"
+  cat > "$REPO/node_modules/.bin/vitest" <<'EOS'
+#!/usr/bin/env bash
+exit 0
+EOS
+  chmod +x "$REPO/node_modules/.bin/vitest"
+  CHECK_ON_STOP_TESTS=1 feed_stop_json "$HOOK" false "$REPO"
+  # Passing run: the local binary exists, so the stage runs and stays silent.
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"block"* ]]
+}
+
 @test "check-on-stop: blocks at most 2 times for the same failing test signature" {
   seed_js
-  stub_checker npx 1 "FAIL index.test.js  expected 1 to be 2" ""
+  # A failing INSTALLED runner — the hook no longer reaches npx.
+  mkdir -p "$REPO/node_modules/.bin"
+  cat > "$REPO/node_modules/.bin/vitest" <<'EOS'
+#!/usr/bin/env bash
+echo "FAIL index.test.js  expected 1 to be 2"
+exit 1
+EOS
+  chmod +x "$REPO/node_modules/.bin/vitest"
   # Same failure three turns running. The give-up counter must stop blocking
   # on the third, or a model that cannot fix the test is trapped in a loop.
   CHECK_ON_STOP_TESTS=1 feed_stop_json "$HOOK" false "$REPO"

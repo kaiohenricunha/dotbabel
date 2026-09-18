@@ -312,10 +312,21 @@ git config core.hooksPath githooks
 
 **It never traps a push.** Exactly one outcome blocks — the check ran and
 reported a policy failure (exit 1). A missing `dotbabel`, unavailable evidence
-or tooling (exit 2), any other exit code, or a run that outlives
-`DOTBABEL_PRE_PUSH_TIMEOUT` prints a notice and lets the push through. That
-asymmetry is the design: a hook that can wedge a push at a deadline gets
-deleted, and then it protects nothing.
+or tooling (exit 2), any other exit code, a run that outlives
+`DOTBABEL_PRE_PUSH_TIMEOUT`, or **no resolvable upstream merge base** prints a
+notice and lets the push through. That asymmetry is the design: a hook that can
+wedge a push at a deadline gets deleted, and then it protects nothing.
+
+The merge base comes from `refs/remotes/<remote>/<branch>`, falling back to
+`refs/remotes/<remote>/HEAD`. A normal `git clone` records the latter, so a new
+branch resolves its fork point and the gate works on a first push. Where
+`origin/HEAD` was never recorded — `git init` plus `git remote add`, and some
+CI and worktree setups — there is nothing to diff against and the hook allows
+the push with a notice rather than guessing at a base.
+
+The check is scoped with `--head HEAD`, so it judges the commits being pushed.
+Uncommitted work in the tree is deliberately out of scope here; that is
+`check-on-stop`'s job.
 
 Bypass with `BYPASS_PRE_PUSH=1 git push`, or `git push --no-verify`.
 

@@ -51,6 +51,18 @@ EOF
   [[ "$output" == *"quality"* ]] || [[ "$output" == *"blocked"* ]]
 }
 
+@test "pre-push: scopes the check to the pushed commits, not the working tree" {
+  # Without --head, scope.mjs diffs the merge base against the WORKING TREE and
+  # explicitly folds in untracked files. A developer with unrelated work in
+  # progress, or a stray scratch file, would then have a push blocked on code
+  # that is not part of the push — inverting this hook's whole contract and
+  # making it the first thing someone deletes.
+  stub_dotbabel 0
+  run "$HOOK" origin "https://example.test/repo.git"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--head"* ]]
+}
+
 @test "pre-push: allows the push with a notice when the fast profile exits 2" {
   stub_dotbabel 2
   run "$HOOK" origin "https://example.test/repo.git"

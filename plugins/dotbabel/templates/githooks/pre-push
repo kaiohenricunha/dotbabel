@@ -44,11 +44,16 @@ fi
 # `timeout` is not present everywhere (notably a bare macOS without coreutils).
 # Without it the check still runs; it simply is not bounded, which is better
 # than refusing to check at all.
+# `--head HEAD` matters: without it the quality scope is the merge base against
+# the WORKING TREE, with untracked files folded in. Unrelated work in progress,
+# or a stray scratch file, would then block a push over code that is not part
+# of it — the fastest way to get a hook deleted. The working tree is
+# check-on-stop's job; this hook judges the commits being pushed.
 if command -v timeout >/dev/null 2>&1; then
-  timeout "$TIMEOUT" dotbabel quality check --profile fast --base "$base"
+  timeout "$TIMEOUT" dotbabel quality check --profile fast --base "$base" --head HEAD
   code=$?
 else
-  dotbabel quality check --profile fast --base "$base"
+  dotbabel quality check --profile fast --base "$base" --head HEAD
   code=$?
 fi
 

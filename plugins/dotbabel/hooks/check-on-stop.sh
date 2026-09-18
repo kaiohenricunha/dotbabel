@@ -340,20 +340,32 @@ have() { command -v "$1" >/dev/null 2>&1; }
 tst_node() {
   local proj="$1" files="$2" manifest="$1/package.json" runner=""
   [ -f "$manifest" ] || return 127
-  have npx || return 127
   # Read the declared runner rather than guessing: running `vitest` in a Jest
   # repository fails in a way that looks like a test failure, not a misdetect.
   if grep -q '"vitest"' "$manifest" 2>/dev/null; then runner=vitest
   elif grep -q '"jest"' "$manifest" 2>/dev/null; then runner=jest
   else return 127
   fi
+  # Resolve the INSTALLED binary, never bare `npx`. package.json proves the
+  # runner is declared; npx would silently DOWNLOAD it when it is not actually
+  # installed — a network fetch in a non-interactive hook at the end of every
+  # turn. node_modules is often hoisted in a monorepo, so check the project and
+  # then the repo top, exactly as chk_ts does below.
+  local bin=""
+  if [ -x "$proj/node_modules/.bin/$runner" ]; then
+    bin="$proj/node_modules/.bin/$runner"
+  elif [ -x "$GIT_TOP/node_modules/.bin/$runner" ]; then
+    bin="$GIT_TOP/node_modules/.bin/$runner"
+  else
+    return 127
+  fi
   local -a list=()
   while IFS= read -r f; do [ -n "$f" ] && list+=("$f"); done <<< "$files"
   [ "${#list[@]}" -gt 0 ] || return 127
   if [ "$runner" = "vitest" ]; then
-    ( cd "$proj" && run_bounded npx vitest related --run "${list[@]}" ) 2>&1
+    ( cd "$proj" && run_bounded "$bin" related --run "${list[@]}" ) 2>&1
   else
-    ( cd "$proj" && run_bounded npx jest --findRelatedTests --passWithNoTests "${list[@]}" ) 2>&1
+    ( cd "$proj" && run_bounded "$bin" --findRelatedTests --passWithNoTests "${list[@]}" ) 2>&1
   fi
 }
 

@@ -26,6 +26,14 @@ jobs:
   # who verified locally is not billed for a redundant remote run. Fail closed:
   # if the API call errors, grep exits non-zero, attested=false, and the verify
   # job runs.
+  #
+  # LIMITATION: `author_association == "OWNER"` matches only a USER-owned
+  # repository. In an organization-owned repository maintainers comment as
+  # MEMBER or COLLABORATOR, so nothing ever matches, attested stays false, and
+  # this optimization simply never fires — the workflow stays correct, just not
+  # cheaper. Widening to OWNER/MEMBER/COLLABORATOR is a deliberate trust
+  # decision, because this marker is what lets someone skip remote CI: make it
+  # knowingly, not by default.
   classify:
     runs-on: ubuntu-latest
     permissions:

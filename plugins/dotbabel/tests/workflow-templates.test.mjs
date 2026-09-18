@@ -43,6 +43,26 @@ function usesValues(node, found = []) {
  */
 const triggers = (doc) => doc.on ?? doc[true];
 
+/**
+ * Every `run:` script in a parsed workflow.
+ *
+ * Assertions about what a workflow EXECUTES must read this, never the raw
+ * file: these templates explain their own flag choices in header comments, so
+ * a raw-text search for a flag matches the sentence saying the flag is absent
+ * and fails on a correct template. That exact false positive has now been
+ * written twice in this repository — once for `--post`, once for `--base`.
+ */
+function runScripts(node, found = []) {
+  if (Array.isArray(node)) for (const item of node) runScripts(item, found);
+  else if (node && typeof node === "object") {
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "run" && typeof value === "string") found.push(value);
+      else runScripts(value, found);
+    }
+  }
+  return found;
+}
+
 describe("workflow templates", () => {
   it("pins every action in every workflow template to a full 40-character commit SHA", () => {
     for (const name of templateFiles()) {
@@ -126,19 +146,7 @@ describe("workflow templates", () => {
     // comment explains that `--post` is deliberately absent, and a raw-text
     // search matches that sentence and fails on correct templates. Same reason
     // this whole file parses instead of grepping.
-    const doc = yaml.load(readTemplate("test.yml"));
-    const scripts = [];
-    const collect = (node) => {
-      if (Array.isArray(node)) node.forEach(collect);
-      else if (node && typeof node === "object") {
-        for (const [key, value] of Object.entries(node)) {
-          if (key === "run" && typeof value === "string") scripts.push(value);
-          else collect(value);
-        }
-      }
-    };
-    collect(doc);
-    const criteriaScripts = scripts.filter((script) => /criteria\s+verify/.test(script));
+    const criteriaScripts = runScripts(yaml.load(readTemplate("test.yml"))).filter((script) => /criteria\s+verify/.test(script));
     expect(criteriaScripts.length, "test.yml runs criteria verify somewhere").toBeGreaterThan(0);
     for (const script of criteriaScripts) expect(script).not.toMatch(/--post\b/);
   });
@@ -157,6 +165,36 @@ describe("workflow templates", () => {
     expect(Object.keys(on)).toEqual(expect.arrayContaining(["schedule", "workflow_dispatch"]));
     expect(on.schedule[0].cron, "a weekly cron names a single day-of-week").toMatch(/^\S+ \S+ \S+ \S+ [0-6]$/);
     expect(readTemplate("quality.yml")).toMatch(/--profile\s+deep/);
+  });
+
+  it("runs the scheduled deep profile over the whole repository, not an empty diff", () => {
+    // quality.yml runs only on schedule/dispatch, so the checkout lands on the
+    // default branch and HEAD equals origin/main. `--base origin/main` then
+    // resolves a merge base that IS HEAD, and scope.mjs diffs that against a
+    // clean CI working tree — an empty change set. Every changed-scope rule in
+    // the deep profile would evaluate nothing and the job would exit 0 while
+    // appearing to audit the repository, including the changed-line mutation
+    // score. `--all` is the whole-repository mode and needs no base.
+    const quality = runScripts(yaml.load(readTemplate("quality.yml"))).filter((script) => /dotbabel quality check/.test(script));
+    expect(quality.length, "quality.yml runs the quality check somewhere").toBeGreaterThan(0);
+    for (const script of quality) {
+      expect(script).toMatch(/--all\b/);
+      expect(script, "a scheduled whole-repo audit must not scope itself to a diff").not.toMatch(/--base\b/);
+    }
+  });
+
+  it("allows no secret beyond GITHUB_TOKEN in any template, except the declared exception", () => {
+    // Enumerates the directory rather than naming files, so a template added
+    // later fails closed. ai-review.yml genuinely needs ANTHROPIC_API_KEY;
+    // that one exception is declared here instead of the check being narrowed
+    // to a hardcoded pair of filenames that new templates silently escape.
+    const ALLOWED = { "ai-review.yml": new Set(["secrets.ANTHROPIC_API_KEY", "secrets.GITHUB_TOKEN"]) };
+    for (const name of templateFiles()) {
+      const allowed = ALLOWED[name] ?? new Set(["secrets.GITHUB_TOKEN"]);
+      for (const reference of readTemplate(name).match(/secrets\.[A-Za-z_][A-Za-z0-9_]*/g) ?? []) {
+        expect(allowed.has(reference), `${name} references ${reference}`).toBe(true);
+      }
+    }
   });
 
   it("scaffolds test.yml and quality.yml into .github/workflows with dotbabel init", () => {
