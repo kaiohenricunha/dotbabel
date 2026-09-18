@@ -25,6 +25,17 @@ import { fileURLToPath } from "node:url";
 
 import { score, checkThresholds, renderResults } from "./scoring.mjs";
 
+/**
+ * The judge's identity, for the TEST-2 provenance line in RESULTS.md.
+ *
+ * @returns {string}
+ */
+function judgeVersion() {
+  const r = spawnSync("claude", ["--version"], { encoding: "utf8" });
+  const line = String(r.stdout ?? "").trim().split("\n")[0];
+  return line === "" ? "claude (version unavailable)" : `claude ${line}`;
+}
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CASES_DIR = join(HERE, "cases");
 
@@ -113,7 +124,7 @@ function main() {
   const baseline = argv.includes("--candidate-only") ? null : runVariant("baseline", PROMPTS.baseline, cases);
 
   const verdict = checkThresholds(candidate, baseline);
-  const md = renderResults({ candidate, baseline, verdict, generatedAt: new Date().toISOString() });
+  const md = renderResults({ candidate, baseline, verdict, generatedAt: new Date().toISOString(), judge: judgeVersion() });
   writeFileSync(join(HERE, "RESULTS.md"), md);
   process.stdout.write(md);
 
