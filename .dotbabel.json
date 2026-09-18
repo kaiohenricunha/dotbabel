@@ -12,6 +12,11 @@
     "enabled": true,
     "default_profile": "fast",
     "base_ref": "origin/main",
+    "critical_paths": [
+      "plugins/dotbabel/src/**",
+      "plugins/dotbabel/bin/**",
+      "plugins/dotbabel/templates/**"
+    ],
     "exclude": ["plugins/dotbabel/templates/**", "examples/minimal-consumer/**"],
     "rules": {
       "coverage.changed_lines": {
