@@ -8,7 +8,11 @@
  * proves nothing about what a breach does.
  */
 import { describe, it, expect } from "vitest";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import prettier from "prettier";
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 import { score, checkThresholds, renderResults, THRESHOLDS } from "./evals/test-quality-judgment/scoring.mjs";
 
@@ -118,18 +122,45 @@ describe("renderResults", () => {
 });
 
 describe("renderResults formatting", () => {
+  // Format through the SAME config `npm run lint` resolves, not prettier's
+  // defaults. They agree today because .prettierrc.json sets nothing that
+  // affects markdown tables — but adding `proseWrap` would break lint while a
+  // defaults-based assertion stayed green, a silent divergence in the exact
+  // invariant this describe block exists to protect.
+  const RESULTS_PATH = path.join(REPO_ROOT, "plugins/dotbabel/tests/evals/test-quality-judgment/RESULTS.md");
+  const formatAsLintWould = async (md) =>
+    prettier.format(md, { ...(await prettier.resolveConfig(RESULTS_PATH)), filepath: RESULTS_PATH });
+
   // RESULTS.md is committed, and `npm run lint` runs prettier over every
   // markdown file. A renderer that emits a differently-aligned table leaves the
   // repository lint-dirty after every eval run — so the generator, not the
   // artifact, has to match prettier.
+  //
+  // Use the real report's shape. An earlier version of this test built its
+  // cases with a `flagged` key that `score()` never reads (it reads
+  // `predicted`), so every case landed in the true-negative branch and the
+  // table rendered as the degenerate all-zero FAIL — single-digit columns that
+  // never exercised the width calculation the committed RESULTS.md depends on.
+  const realShape = () => score(cases({ tp: 28, fp: 10, fn: 0, tn: 18 }));
+
   it("emits markdown that prettier leaves unchanged", async () => {
-    const s = score([
-      { expected: true, flagged: true },
-      { expected: true, flagged: false },
-      { expected: false, flagged: true },
-      { expected: false, flagged: false },
-    ]);
+    const s = realShape();
     const md = renderResults({ candidate: s, baseline: s, verdict: checkThresholds(s, s), generatedAt: "2026-01-01T00:00:00.000Z" });
-    expect(md).toBe(await prettier.format(md, { parser: "markdown" }));
+    expect(md).toBe(await formatAsLintWould(md));
+  });
+
+  it("renders the multi-digit columns the committed report actually has", async () => {
+    const s = realShape();
+    const md = renderResults({ candidate: s, baseline: s, verdict: checkThresholds(s, s), generatedAt: "2026-01-01T00:00:00.000Z" });
+    // 56 cases, 28 true positives, 10 false positives — the widths that make
+    // the padding non-trivial in the first place.
+    expect(unpadded(md)).toContain("| candidate | 56 | 28 | 10 | 0 | 0.737 | 1.000 |");
+    expect(md).toBe(await formatAsLintWould(md));
+  });
+
+  it("stays prettier-clean for a baseline-less run", async () => {
+    const s = realShape();
+    const md = renderResults({ candidate: s, baseline: null, verdict: checkThresholds(s), generatedAt: "2026-01-01T00:00:00.000Z" });
+    expect(md).toBe(await formatAsLintWould(md));
   });
 });

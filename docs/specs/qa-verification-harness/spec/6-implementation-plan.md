@@ -492,8 +492,10 @@ TDD first. Write these failing tests:
 Keep green: plugins/dotbabel/tests/bats/pr-conductor.bats.
 
 Statistical eval before release (OPS-9, TEST-3):
-- plugins/dotbabel/tests/evals/test-quality-judgment/cases/ holds 40 labeled tests:
-  20 behavioral, 10 assertion-free, and 10 that mirror the implementation.
+- plugins/dotbabel/tests/evals/test-quality-judgment/cases/ holds 56 labeled
+  tests: 28 behavioral, 10 assertion-free, 10 that mirror the implementation,
+  and 8 that are vacuously true. OPS-9's floor of 40 stays the minimum the
+  gate enforces, so a case may be retired without tripping it.
 - run.mjs runs the baseline, which is the current review-pr prose, and the
   candidate through headless claude -p, writes precision and recall to
   RESULTS.md, and exits 1 on any OPS-9 breach.

@@ -118,6 +118,11 @@ export function renderResults(run) {
     "# Test-quality judgment — eval results",
     "",
     `> Generated ${run.generatedAt}. OPS-9 floors: precision ${THRESHOLDS.precision}, recall ${THRESHOLDS.recall}.`,
+    // TEST-2: a fixture derived from a third-party tool records that tool and
+    // its version beside it. An LLM-sampled result is the strongest case for
+    // the rule, not an exception to it — without the version, a future run that
+    // disagrees cannot be told apart from a model rollout.
+    `> Judge: ${run.judge ?? "unrecorded"}. Single sample per case; no seed, so a re-run may differ.`,
     "",
     line(header),
     `| ${widths.map((width) => "-".repeat(width)).join(" | ")} |`,
