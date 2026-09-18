@@ -107,6 +107,11 @@
             "requirement": {
               "type": "string",
               "enum": ["mechanical", "routine", "deep", "frontier", "exceptional"]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why this floor exists. Carried into the explanation so a later maintainer can tell a deliberate safety fence from an experiment."
             }
           }
         },
@@ -125,13 +130,20 @@
               "type": "object",
               "minProperties": 1,
               "description": "Opaque runtime-native values; Dotbabel does not parse their spelling."
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Why this pin exists, carried into the explanation."
             }
           }
         },
         "preferences": {
           "type": "object",
-          "description": "Resolver preferences. They order candidates that already satisfy the requirement; they never lower a floor.",
+          "description": "Resolver preferences. They order candidates that already satisfy the requirement; they never lower a floor. Closed to unknown keys, so a misspelled preference fails here instead of becoming inert policy.",
+          "additionalProperties": false,
           "properties": {
+            "$comment": { "type": "string" },
             "representation": {
               "type": "string",
               "enum": ["stable-alias", "native-id", "opaque-selector"]

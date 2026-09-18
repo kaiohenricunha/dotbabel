@@ -8,7 +8,7 @@ import {
   loadPolicyLayers,
   mergePolicy,
 } from "../src/model-intelligence/policy/index.mjs";
-import { WORKLOAD_CLASSES } from "../src/model-intelligence/domain/index.mjs";
+import { WORKLOAD_CLASSES, RUNTIME_IDS } from "../src/model-intelligence/domain/index.mjs";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const POLICY_SOURCE = fileURLToPath(new URL("../src/model-intelligence/policy/index.mjs", import.meta.url));
@@ -98,9 +98,20 @@ describe("policy layer merge", () => {
 
   it("declares a capability rule for every workload class, and no class without one", () => {
     expect(Object.keys(SHIPPED_POLICY.classes)).toEqual([...WORKLOAD_CLASSES]);
+    // An ALLOWLIST, because the denylist above cannot fail for a model name nobody
+    // has coined yet: `satisfied_by: { model: "some-future-model" }` would pass every
+    // forbidden-token check. Constraining the keys to declared capability facts and
+    // the values to the shapes those facts take rejects an unexpected token whatever
+    // it is spelled, which is what ARCH-15 actually asks for.
+    const CAPABILITY_KEYS = ["reasoning", "tool_call", "reasoning_effort_tiers"];
     for (const [name, rule] of Object.entries(SHIPPED_POLICY.classes)) {
       expect(rule.satisfied_by, name).toBeTypeOf("object");
       expect(Object.keys(rule.satisfied_by).length, name).toBeGreaterThan(0);
+      for (const [key, value] of Object.entries(rule.satisfied_by)) {
+        expect(CAPABILITY_KEYS, `${name}.${key}`).toContain(key);
+        if (typeof value === "string") expect(["optional", "required"], `${name}.${key}`).toContain(value);
+        else expect(["boolean", "number"], `${name}.${key}`).toContain(typeof value);
+      }
     }
   });
 
@@ -148,9 +159,112 @@ describe("policy layer merge", () => {
     expect(() => mergePolicy({ project: { floor: { mode: "floor", requirement: "genius" } } })).toThrow(/project policy: floor\.requirement must be one of mechanical, routine, deep, frontier, exceptional/);
     expect(() => mergePolicy({ artifact: { floor: { mode: "floor" } } })).toThrow(/artifact policy: floor\.requirement/);
     expect(() => mergePolicy({ user: { pin: { mode: "floor", runtime: "claude", config: { a: 1 } } } })).toThrow(/user policy: pin\.mode/);
-    for (const runtime of [undefined, "", 7]) {
-      expect(() => mergePolicy({ project: { pin: { mode: "pin", runtime, config: { a: 1 } } } })).toThrow(/project policy: pin\.runtime is required/);
+    for (const runtime of [undefined, "", 7, "claud", "../../etc/passwd"]) {
+      // The runtime registry is authoritative (§5 `pin`): an unregistered id is
+      // rejected here, not three modules later in an adapter. `assertLayer` is the
+      // only ingest-time gate, because nothing applies the JSON schema at load time.
+      expect(() => mergePolicy({ project: { pin: { mode: "pin", runtime, config: { a: 1 } } } })).toThrow(/project policy: pin\.runtime must be one of/);
     }
+    for (const config of [undefined, {}, [], "x", null]) {
+      expect(() => mergePolicy({ project: { pin: { mode: "pin", runtime: "claude", config } } })).toThrow(/project policy: pin\.config must be a non-empty object/);
+    }
+    // A null or non-object declaration names the layer instead of failing with a bare
+    // "cannot read properties of null".
+    expect(() => mergePolicy({ project: { floor: null } })).toThrow(/project policy: floor must be an object, got null/);
+    expect(() => mergePolicy({ user: { pin: [] } })).toThrow(/user policy: pin must be an object, got array/);
+    for (const layer of [[], "x", 7, true]) {
+      expect(() => mergePolicy({ project: layer })).toThrow(/project policy: expected an object/);
+    }
+  });
+
+  it("refuses a policy key that would set the prototype of the merged preferences", () => {
+    // `JSON.parse` yields `__proto__` as an OWN enumerable key, so a plain
+    // `target[key] = value` invokes the Object.prototype setter (CWE-1321). The
+    // polluted value then reads back through the merged object while staying absent
+    // from Object.keys and JSON.stringify, and carries no provenance — which defeats
+    // the explanation guarantee this module exists to provide.
+    const hostile = JSON.parse(String.raw`{"preferences":{"__proto__":{"future_pref":"attacker"}}}`);
+    expect(() => mergePolicy({ shipped: SHIPPED_POLICY, project: hostile })).toThrow(/project policy: preferences must not contain the key "__proto__"/);
+    for (const key of ["constructor", "prototype"]) {
+      expect(() => mergePolicy({ user: { preferences: { [key]: 1 } } })).toThrow(new RegExp(`must not contain the key "${key}"`));
+    }
+    // Defence in depth: the container has no prototype to reach even if a future
+    // caller writes a key by name.
+    expect(Object.getPrototypeOf(mergePolicy({ shipped: SHIPPED_POLICY }).preferences)).toBeNull();
+  });
+
+  it("rejects a key that is not a policy layer, and points an invocation pin at the resolver", () => {
+    // A misspelled layer would otherwise discard a safety floor in silence, which is
+    // the inert-policy failure the strict `dotbabel.compute` parser exists to prevent.
+    expect(() => mergePolicy({ artifacts: { floor: floor("frontier") } })).toThrow(/unknown policy layer "artifacts"; expected one of shipped, user, project, artifact/);
+    // §5 orders pins `... < artifact pin < explicit invocation pin` and ARCH-66 makes
+    // an invocation pin more specific again. Dropping it silently would let the
+    // artifact pin win, the precedence inversion ARCH-66 forbids.
+    expect(() => mergePolicy({ invocation: { pin: pin("claude", { a: 1 }) } })).toThrow(/"invocation" is not a policy layer; an invocation pin is supplied to the resolver/);
+  });
+
+  it("breaks an equal floor toward the more specific layer so the explanation names the real source", () => {
+    const merged = mergePolicy({ shipped: { floor: floor("frontier") }, artifact: { floor: { ...floor("frontier"), rationale: "adversarial analysis" } } });
+    expect(merged.floor.requirement).toBe("frontier");
+    // The effective class is identical either way. Attributing it to shipped would
+    // credit shipped policy for a floor the artifact author declared, and discard the
+    // rationale that artifact carried.
+    expect(merged.provenance.floor).toBe("artifact");
+    expect(merged.floor.rationale).toBe("adversarial analysis");
+  });
+
+  it("carries the class table through the merge so the resolver needs no back door", () => {
+    // `classes` is the substance of Dotbabel's judgement. If the merge dropped it,
+    // `resolver/` would have to import SHIPPED_POLICY directly and reach around this
+    // layering, losing provenance for the most important policy fact.
+    const merged = mergePolicy({ shipped: SHIPPED_POLICY });
+    expect(Object.keys(merged.classes)).toEqual([...WORKLOAD_CLASSES]);
+    expect(merged.provenance.classes).toBe("shipped");
+    expect(() => mergePolicy({ project: { classes: "nope" } })).toThrow(/project policy: classes must be an object/);
+  });
+
+  it("records a shadowed pin without copying its opaque config values", () => {
+    // `pin.config` may legitimately hold an endpoint or a credential, and `shadowed`
+    // exists to be rendered as a diagnostic (OPS-4). The shadowed pin is usually the
+    // USER's, surfaced because a repository shadowed it, so the value at risk belongs
+    // to the person the repository does not control.
+    const merged = mergePolicy({
+      user: { pin: pin("claude", { apiKey: "s3cret-value", model: "x" }) },
+      artifact: { pin: pin("codex", { model: "y" }) },
+    });
+    expect(merged.shadowed).toHaveLength(1);
+    expect(JSON.stringify(merged.shadowed)).not.toMatch(/s3cret-value/);
+    expect(merged.shadowed[0].declaration).toEqual({ runtime: "claude", configKeys: ["apiKey", "model"] });
+    expect(merged.pin.runtime).toBe("codex");
+  });
+
+  it("reports a pin beside an artifact floor and leaves ARCH-67 to the resolver", () => {
+    // ARCH-67 says a user or project pin cannot override an artifact floor. Judging
+    // whether a runtime-native config satisfies a semantic floor needs catalog
+    // evidence, which P-4 excludes, so the merge reports both declarations with their
+    // layers and `resolver/` (P-10, P-11) owns the conflict. This test pins that
+    // contract so the absence stays deliberate rather than becoming an oversight.
+    const merged = mergePolicy({
+      artifact: { floor: floor("frontier") },
+      project: { pin: pin("claude", { model: "x" }) },
+    });
+    expect(merged.floor.requirement).toBe("frontier");
+    expect(merged.provenance.floor).toBe("artifact");
+    expect(merged.pin.runtime).toBe("claude");
+    expect(merged.provenance.pin).toBe("project");
+    // The merge does not resolve it, and does not pretend to.
+    expect(merged).not.toHaveProperty("conflict");
+  });
+
+  it("deep-freezes the shipped policy and the merged result", () => {
+    // Object.freeze is shallow and `createRequire` caches the document, so a shallow
+    // freeze would leave a process-wide singleton mutable. A single assignment would
+    // weaken every later merge while provenance still reported `shipped`.
+    expect(Object.isFrozen(SHIPPED_POLICY)).toBe(true);
+    expect(Object.isFrozen(SHIPPED_POLICY.classes)).toBe(true);
+    expect(Object.isFrozen(SHIPPED_POLICY.preferences)).toBe(true);
+    expect(Object.isFrozen(SHIPPED_POLICY.classes.frontier.satisfied_by)).toBe(true);
+    expect(Object.isFrozen(mergePolicy({ shipped: SHIPPED_POLICY }))).toBe(true);
   });
 
   it("skips an absent layer and a comment key rather than treating either as a value", () => {
@@ -205,11 +319,27 @@ describe("policy layer merge", () => {
     expect(() => loadPolicyLayers({ repoRoot: makeTempDir("mi-policy-test-"), env: { XDG_CONFIG_HOME: home } })).toThrow(/cannot read/);
   });
 
-  it("merges over supplied layers only: no filesystem, process, or clock use in mergePolicy", () => {
+  it("merges over supplied layers only: the result does not depend on the environment", () => {
+    // Asserted as BEHAVIOR, not as source text. The previous version of this test
+    // sliced the source from `export function mergePolicy` to the end of the file,
+    // which contains none of the helpers the merge actually calls — `assertLayer`,
+    // `strongerFloor` and `readJsonOrNull` are all defined above that point — so it
+    // could not fail for the call graph it claimed to guard. A rename made it worse:
+    // `indexOf` would return -1 and `slice(-1)` would scan a single character.
+    const layers = { shipped: SHIPPED_POLICY, project: { floor: floor("deep") } };
+    const first = mergePolicy(layers);
+    const saved = { env: process.env, cwd: process.cwd };
+    try {
+      process.env = { ...saved.env, XDG_CONFIG_HOME: "/nonexistent", HOME: "/nonexistent" };
+      process.cwd = () => "/nonexistent";
+      expect(mergePolicy(layers)).toEqual(first);
+    } finally {
+      process.env = saved.env;
+      process.cwd = saved.cwd;
+    }
+    // The import boundary is a whole-module property, so it is still checked over the
+    // whole source (ARCH-57 rule 8).
     const source = readFileSync(POLICY_SOURCE, "utf8");
-    // `loadPolicyLayers` owns the only I/O in this module (ARCH-56); the merge is pure.
-    const mergeBody = source.slice(source.indexOf("export function mergePolicy"));
-    expect(mergeBody).not.toMatch(/readFileSync|writeFileSync|existsSync|process\.env|Date\.now\(/);
     const imports = [...source.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map((m) => m[1]);
     expect(imports.filter((s) => /quality|sources|catalog|resolver/.test(s))).toEqual([]);
   });
@@ -225,5 +355,27 @@ describe("policy layer merge", () => {
     // A project may not pin a provider model into shipped-policy shape by mistake:
     // an unknown key inside the namespace is rejected.
     expect(validate({ model_intelligence: { nonsense: true } })).toBe(false);
+
+    const ns = schema.properties.model_intelligence.properties;
+    // Pin the enums to their single authority rather than to two sample points. The
+    // repository already learned this: three hand-written CLI lists in this same file
+    // drifted because only one was pinned. Adding a sixth workload class or a seventh
+    // runtime must fail here, not silently leave the schema rejecting what the code
+    // accepts.
+    expect(ns.floor.properties.requirement.enum).toEqual([...WORKLOAD_CLASSES]);
+    expect(ns.pin.properties.runtime.enum).toEqual([...RUNTIME_IDS]);
+
+    // The pin subschema had no accept or reject case at all.
+    expect(validate({ model_intelligence: { pin: { mode: "pin", runtime: RUNTIME_IDS[0], config: { model: "x" } } } })).toBe(true);
+    expect(validate({ model_intelligence: { pin: { mode: "pin", runtime: "claud", config: { model: "x" } } } })).toBe(false);
+    expect(validate({ model_intelligence: { pin: { mode: "pin", runtime: RUNTIME_IDS[0] } } })).toBe(false);
+    expect(validate({ model_intelligence: { pin: { mode: "pin", runtime: RUNTIME_IDS[0], config: {} } } })).toBe(false);
+
+    // A misspelled preference must fail here instead of becoming inert policy.
+    expect(validate({ model_intelligence: { preferences: { prefer_locally_verified: true } } })).toBe(true);
+    expect(validate({ model_intelligence: { preferences: { prefer_locally_verifed: true } } })).toBe(false);
+
+    // A floor or pin may record why it exists (§5: rationale is permitted in every mode).
+    expect(validate({ model_intelligence: { floor: { mode: "floor", requirement: "deep", rationale: "cross-cutting design work" } } })).toBe(true);
   });
 });
