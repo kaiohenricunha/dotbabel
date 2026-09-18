@@ -38,6 +38,15 @@ export default {
     "plugins/dotbabel/src/quality/discovery.mjs",
     "plugins/dotbabel/src/quality/evaluate.mjs",
     "plugins/dotbabel/src/quality/reports.mjs",
+    // Admitted in step 2 of #390: P-A1, P-C2 and P-C3 each deferred mutation to
+    // "the P-F1 scope", which never contained them. Measurement showed ordinary
+    // in-process modules 13 to 67 kills short, so they join rather than get
+    // written off. The two that did not join are recorded in §6.4:
+    // `bin/dotbabel-criteria.mjs` is subprocess-only and unmeasurable this way,
+    // and `deploy-ops.mjs` is a skill script outside TEST-1's harness scope.
+    "plugins/dotbabel/src/spec-harness-lib.mjs",
+    "plugins/dotbabel/src/quality/adapters/python.mjs",
+    "plugins/dotbabel/src/quality/adapters/node-tools.mjs",
   ],
   tempDirName: ".stryker-tmp",
   // dotbabel fans skills and commands out as symlinks into several CLIs'
