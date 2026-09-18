@@ -444,6 +444,9 @@ function compileSchemas(schemasDir) {
   const files = [
     "facets",
     "common",
+    // The artifact schemas $ref the dotbabel namespace schema, so it must be
+    // registered before they compile (spec model-intelligence, KD-1).
+    "dotbabel.compute",
     "agent",
     "skill",
     "command",

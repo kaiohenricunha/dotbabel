@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.compute.schema.json",
+  "title": "dotbabel namespace: compute requirement",
+  "description": "The canonical, provider-neutral compute requirement of a Dotbabel artifact (spec model-intelligence, KD-1). The `dotbabel` namespace stays extensible; `dotbabel.compute` is strict so a misspelled key cannot become inert policy.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "compute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requirement": {
+          "description": "Semantic workload class, ordered by required reasoning capability. Not a model score.",
+          "type": "string",
+          "enum": ["mechanical", "routine", "deep", "frontier", "exceptional"]
+        },
+        "binding": {
+          "description": "Where the requirement applies: `self` owns a compute context, `session` applies to the coordinator session, `consumer` applies to the context consuming the artifact.",
+          "type": "string",
+          "enum": ["self", "session", "consumer"]
+        },
+        "mode": {
+          "description": "How the requirement resolves.",
+          "type": "string",
+          "enum": ["dynamic", "floor", "pin", "inherit"]
+        },
+        "pin": {
+          "description": "One exact runtime-native configuration. Only for `mode: pin`.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["runtime", "config"],
+          "properties": {
+            "runtime": {
+              "description": "A runtime id of the dotbabel runtime registry. A runtime is an execution harness, not a model vendor.",
+              "type": "string",
+              "enum": ["claude", "codex", "gemini", "antigravity", "opencode", "copilot"]
+            },
+            "config": {
+              "description": "Opaque runtime-native configuration. Dotbabel does not assume that every runtime has a model and an effort axis, and it never derives meaning from the spelling of an identifier.",
+              "type": "object",
+              "minProperties": 1
+            }
+          }
+        },
+        "rationale": {
+          "description": "Human-readable reason for the requirement.",
+          "type": "string"
+        }
+      },
+      "required": ["binding", "mode"],
+      "allOf": [
+        {
+          "if": {
+            "properties": { "mode": { "enum": ["dynamic", "floor"] } },
+            "required": ["mode"]
+          },
+          "then": { "required": ["requirement"], "not": { "required": ["pin"] } }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "pin" } }, "required": ["mode"] },
+          "then": { "required": ["requirement", "pin"] }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "inherit" } }, "required": ["mode"] },
+          "then": { "not": { "anyOf": [{ "required": ["requirement"] }, { "required": ["pin"] }] } }
+        }
+      ]
+    }
+  }
+}

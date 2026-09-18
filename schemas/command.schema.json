@@ -22,6 +22,7 @@
         }
       ]
     },
-    "headless_safe": { "type": "boolean" }
+    "headless_safe": { "type": "boolean" },
+    "dotbabel": { "$ref": "dotbabel.compute.schema.json" }
   }
 }

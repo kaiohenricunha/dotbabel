@@ -417,6 +417,7 @@ describe("schema round-trip", () => {
     const schemas = [
       "facets",
       "common",
+      "dotbabel.compute",
       "agent",
       "skill",
       "command",
@@ -446,6 +447,7 @@ describe("schema round-trip", () => {
     for (const s of [
       "facets",
       "common",
+      "dotbabel.compute",
       "agent",
       "skill",
       "command",
@@ -493,6 +495,7 @@ describe("schema round-trip", () => {
     for (const s of [
       "facets",
       "common",
+      "dotbabel.compute",
       "agent",
       "skill",
       "command",
@@ -530,6 +533,7 @@ describe("schema fix: allowed-tools / disable-model-invocation (#324 prerequisit
     for (const s of [
       "facets",
       "common",
+      "dotbabel.compute",
       "agent",
       "skill",
       "command",

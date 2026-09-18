@@ -24,6 +24,7 @@
     "invocation": {
       "type": "string",
       "enum": ["passive", "explicit"]
-    }
+    },
+    "dotbabel": { "$ref": "dotbabel.compute.schema.json" }
   }
 }
