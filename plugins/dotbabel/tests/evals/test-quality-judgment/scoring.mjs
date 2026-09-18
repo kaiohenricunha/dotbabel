@@ -99,18 +99,30 @@ export function checkThresholds(candidate, baseline = null, minCases = 40) {
  * @returns {string}
  */
 export function renderResults(run) {
-  const row = (label, s) =>
-    `| ${label} | ${s.n} | ${s.tp} | ${s.fp} | ${s.fn} | ${s.precision.toFixed(3)} | ${s.recall.toFixed(3)} |`;
+  const header = ["run", "cases", "TP", "FP", "FN", "precision", "recall"];
+  const cells = (label, s) => [label, s.n, s.tp, s.fp, s.fn, s.precision.toFixed(3), s.recall.toFixed(3)].map(String);
+  const rows = [];
+  if (run.baseline !== null) rows.push(cells("baseline", run.baseline));
+  rows.push(cells("candidate", run.candidate));
+
+  // Pad every column to its widest cell, with a minimum of three so the
+  // separator keeps `---`. This reproduces prettier's own markdown table
+  // layout: RESULTS.md is committed and `npm run lint` runs prettier over it,
+  // so a renderer that emits a different alignment leaves the repository
+  // lint-dirty after every eval run. `eval-thresholds.test.mjs` pins the two
+  // together by formatting this output and asserting it is unchanged.
+  const widths = header.map((name, i) => Math.max(3, name.length, ...rows.map((row) => row[i].length)));
+  const line = (values) => `| ${values.map((value, i) => value.padEnd(widths[i])).join(" | ")} |`;
+
   const lines = [
     "# Test-quality judgment — eval results",
     "",
     `> Generated ${run.generatedAt}. OPS-9 floors: precision ${THRESHOLDS.precision}, recall ${THRESHOLDS.recall}.`,
     "",
-    "| run | cases | TP | FP | FN | precision | recall |",
-    "| --- | ----- | -- | -- | -- | --------- | ------ |",
+    line(header),
+    `| ${widths.map((width) => "-".repeat(width)).join(" | ")} |`,
+    ...rows.map(line),
   ];
-  if (run.baseline !== null) lines.push(row("baseline", run.baseline));
-  lines.push(row("candidate", run.candidate));
   // A baseline-less run measured only two of OPS-9's three clauses, so it must
   // not print the word that authorises a ship. TEST-3 treats `run.mjs` exit 0
   // as the release gate, and a verdict line reading "OPS-9 satisfied" after an

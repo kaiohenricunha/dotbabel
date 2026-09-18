@@ -8,6 +8,8 @@
  * proves nothing about what a breach does.
  */
 import { describe, it, expect } from "vitest";
+import prettier from "prettier";
+
 import { score, checkThresholds, renderResults, THRESHOLDS } from "./evals/test-quality-judgment/scoring.mjs";
 
 /** Build `n` cases with the given confusion-matrix shape. */
@@ -92,6 +94,9 @@ describe("checkThresholds — run.mjs exits 1 when precision is below 0.80, reca
   });
 });
 
+/** Table rows are padded for prettier, so compare values rather than spacing. */
+const unpadded = (md) => md.replace(/[ \t]+\|/g, " |").replace(/\|[ \t]+/g, "| ");
+
 describe("renderResults", () => {
   it("reports the same verdict the exit code is computed from", () => {
     const candidate = score(cases({ tp: 15, fp: 10, fn: 5, tn: 10 }));
@@ -100,14 +105,31 @@ describe("renderResults", () => {
     expect(md).toContain("**FAIL**");
     expect(md).toContain("precision");
     // The table carries the raw counts, so a reader can recompute the metrics.
-    expect(md).toContain("| candidate | 40 | 15 | 10 | 5 |");
+    expect(unpadded(md)).toContain("| candidate | 40 | 15 | 10 | 5 |");
   });
 
   it("shows the baseline row only when a baseline ran", () => {
     const s = passing();
     const withOut = renderResults({ candidate: s, baseline: null, verdict: checkThresholds(s), generatedAt: "x" });
-    expect(withOut).not.toContain("| baseline |");
+    expect(unpadded(withOut)).not.toContain("| baseline |");
     const withIn = renderResults({ candidate: s, baseline: s, verdict: checkThresholds(s, s), generatedAt: "x" });
-    expect(withIn).toContain("| baseline |");
+    expect(unpadded(withIn)).toContain("| baseline |");
+  });
+});
+
+describe("renderResults formatting", () => {
+  // RESULTS.md is committed, and `npm run lint` runs prettier over every
+  // markdown file. A renderer that emits a differently-aligned table leaves the
+  // repository lint-dirty after every eval run — so the generator, not the
+  // artifact, has to match prettier.
+  it("emits markdown that prettier leaves unchanged", async () => {
+    const s = score([
+      { expected: true, flagged: true },
+      { expected: true, flagged: false },
+      { expected: false, flagged: true },
+      { expected: false, flagged: false },
+    ]);
+    const md = renderResults({ candidate: s, baseline: s, verdict: checkThresholds(s, s), generatedAt: "2026-01-01T00:00:00.000Z" });
+    expect(md).toBe(await prettier.format(md, { parser: "markdown" }));
   });
 });
