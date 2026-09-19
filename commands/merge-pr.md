@@ -74,11 +74,12 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    dotbabel pr-stack gate --gate merge --pr <N> --json | jq -r '.result.attestation'
    ```
 
-   | `.state`   | Meaning                                           | Do                                                                                             |
-   | ---------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-   | `verified` | trusted, current, complete evidence for this head | skip the worktree, skip the suite and the quality profile; report `.sha` and `.legs` in step 6 |
-   | `off`      | the base ref never enabled `attestation.enforce`  | take the explicit path in step 6                                                               |
-   | `failed`   | evidence is missing, stale, untrusted or invalid  | **STOP** — see the reason codes below                                                          |
+   | `.state`   | Meaning                                                      | Do                                                                                                    |
+   | ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+   | `verified` | trusted, current, complete evidence for this head            | skip the worktree, skip the suite and the quality profile; report `.sha` and `.legs` in step 6        |
+   | `off`      | the base ref never enabled `attestation.enforce`             | take the explicit path in step 6                                                                      |
+   | `explicit` | this PR edits a file that governs what an attestation proves | show the governed-file diff and get the user's acknowledgement, then take the explicit path in step 6 |
+   | `failed`   | evidence is missing, stale, untrusted or invalid             | **STOP** — see the reason codes below                                                                 |
 
    `verified` is the normal path once the policy is on the trunk.
 
@@ -110,12 +111,14 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    - `ATTESTATION_INVALID` — the payload is absent, unreadable, or names a
      different commit than its own marker. Re-run the producer; if it repeats,
      the comment is not tool-written.
-   - `ATTESTATION_CONFIG_CHANGED` — **re-running does not help.** This pull
-     request edits a governed file (`.local-attest.config.mjs`,
-     `.dotbabel.json`), so its own attestation cannot authorize it — otherwise
-     a PR could weaken a check and then pass under the weakened check. Land the
-     configuration change through explicit verification, and later pull
-     requests attest against it once it is on the trunk.
+   - `ATTESTATION_CONFIG_CHANGED` — the attestation was produced under a
+     different configuration than the base branch has now. This pull request
+     edits no governed file (those are the `explicit` state above), so the
+     **base moved** underneath it: another pull request changed a governed file
+     on the trunk after this was attested. Rebase onto the base and re-run
+     `/local-attest`. If it repeats after a rebase, the detail will say the
+     gate could not attribute the change, and the pull request does edit a
+     governed file.
    - `ATTESTATION_BASE_MOVED` — the evidence graded a different diff than the
      one merging. Rebase and re-attest.
    - `ATTESTATION_BASE_UNREADABLE` — **the base commit is not in this clone**,
@@ -128,6 +131,35 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    **`.state` is `off`** — the base ref has no `attestation.enforce`. Take the
    explicit verification path in step 6. That is the state of any repository
    that has not adopted this, and of the pull request that adopts it.
+
+   **`.state` is `explicit`** — the repository enforces attestation, but this
+   pull request edits a governed file (`.local-attest.config.mjs`,
+   `.dotbabel.json`, `package.json`, or a script the matrix invokes), so its own
+   attestation cannot authorize it. That is the first Dependabot bump of
+   `package.json`, and it is a normal event rather than a failure: the gate
+   passes and reports the files as a warning, `ATTESTATION_GOVERNED_CHANGE`.
+   Re-running `/local-attest` cannot change this state and is not the recovery.
+
+   **Before running anything, read the governed-file diff and show it to the
+   user.** This is the step the whole path depends on, and it is not optional:
+
+   ```bash
+   dotbabel pr-stack gate --gate merge --pr <N> --json | jq -r '.result.warnings[] | select(.code == "ATTESTATION_GOVERNED_CHANGE") | .detail'
+   git fetch origin && git diff origin/<baseRefName>...origin/<headRefName> -- <each file listed>
+   ```
+
+   The explicit path below executes the pull request's own scripts. A pull
+   request that rewrote its `test` script to `true` would pass its own
+   verification, so the automated run cannot be what guards this path. The
+   human reading the diff is. Say plainly what changed, and continue only on the
+   user's explicit acknowledgement that they reviewed it — a green suite is not
+   that acknowledgement, and neither is a clean gate.
+
+   If the user declines, or the diff weakens a check (a leg command replaced by
+   a no-op, a lowered threshold, a removed required leg), **STOP** and report it.
+
+   The pull request lands through the explicit path; later pull requests attest
+   against the new configuration once it is on the trunk.
 
 5. **Re-verify criteria if step 3 reported `CRITERIA_EVIDENCE_STALE`.**
 
@@ -182,7 +214,8 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    branch's own configuration, and that every required leg passed. Go to
    step 8.
 
-   **Explicit path** (step 4 sent you here). Create the worktree from step 5 if
+   **Explicit path** (step 4 sent you here, from `off` or from `explicit` after the
+   user acknowledged the governed-file diff). Create the worktree from step 5 if
    you have not already, then:
 
    - **Install dependencies first.** A fresh worktree has none, and a suite run
@@ -291,6 +324,7 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
 ## Rules
 
 - Never merge past an `ATTESTATION_*` reason, and never re-run the matrix from inside this command to clear one. Producing evidence is `/local-attest`'s job; this command only decides whether existing evidence is current and trustworthy.
+- Never take the explicit path for an `explicit` state without first showing the user the governed-file diff and getting their acknowledgement. On that path the automated run executes the pull request's own scripts, so a change that weakens a check would pass its own verification; the human review of that diff is the only control that cannot be edited away.
 - Never treat an attested leg as something this command verified. Report it as attested, name the SHA, and never report an unrun check as a pass.
 - Never skip the full test suite on the explicit path, even if CI is green — CI config drift is real, and on a conductor-driven PR the remote suite did not run at all.
 - Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 10's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.

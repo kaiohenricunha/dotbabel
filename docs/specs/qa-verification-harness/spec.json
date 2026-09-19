@@ -78,7 +78,8 @@
     "stryker.harness.config.mjs",
     "plugins/dotbabel/src/attestation.mjs",
     "plugins/dotbabel/src/lib/evidence-payload.mjs",
-    "schemas/dotbabel.attestation-evidence.schema.json"
+    "schemas/dotbabel.attestation-evidence.schema.json",
+    "plugins/dotbabel/src/attestation-gate-inputs.mjs"
   ],
   "acceptance_commands": [
     "npm test",
@@ -575,6 +576,35 @@
         "plugins/dotbabel/scripts/run-bats.sh",
         "plugins/dotbabel/tests/bats/pre-pr-conductor-scope.bats"
       ]
+    },
+    {
+      "id": "AC-20",
+      "status": "active",
+      "given": "a pull request that edits a governed file, in a repository whose base ref enforces attestation",
+      "when": "the merge gate runs",
+      "then": "the attestation state is explicit with a warning naming the files and no blocking attestation reason, and a valid attestation is never reported verified",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "reports the explicit state rather than blocking"
+        },
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "never lets evidence authorize a pull request that edits a governed file"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-20.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-20.junit.xml"
+      }
     }
   ]
 }

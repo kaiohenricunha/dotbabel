@@ -122,6 +122,27 @@ export function attestationGateInputs(deps, view, comments) {
   // while the trunk advances and only a rebase moves it — and a rebase moves
   // the head SHA too, which the ladder already catches.
   const mb = deps.run(["git", "merge-base", baseSha, headSha]);
+  const mergeBase = mb.status === 0 && mb.stdout.trim() !== "" ? mb.stdout.trim() : null;
+
+  // Which governed files THIS pull request edits, as opposed to the base
+  // having moved under it. The two look identical to the hash comparison — both
+  // make the recorded hash differ from the base's — but they need opposite
+  // recoveries: a moved base is fixed by rebasing and re-attesting, while an
+  // edited governed file can never be authorized by evidence at all.
+  //
+  // Diffed from the MERGE BASE, so only the pull request's own side counts.
+  // `null` means "cannot tell" and is kept distinct from `[]`, "known none": a
+  // gate that collapsed the two would have to guess which one it was holding.
+  let governedTouched = null;
+  if (mergeBase !== null && governed.length > 0) {
+    const d = deps.run(["git", "diff", "--name-only", mergeBase, headSha, "--", ...governed]);
+    if (d.status === 0) {
+      governedTouched = d.stdout
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l !== "");
+    }
+  }
 
   return {
     attestationEnforced: true,
@@ -138,6 +159,7 @@ export function attestationGateInputs(deps, view, comments) {
     expectedConfigHash: hashGovernanceFiles(
       governed.map((path) => ({ path, bytes: showAtRev(deps, baseSha, path) })),
     ),
-    expectedMergeBase: mb.status === 0 && mb.stdout.trim() !== "" ? mb.stdout.trim() : null,
+    expectedMergeBase: mergeBase,
+    attestationGovernedTouched: governedTouched,
   };
 }

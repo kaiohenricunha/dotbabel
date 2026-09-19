@@ -21,12 +21,13 @@ const POLICY = {
  * a test can assert that nothing reached a shell and that reads came from the
  * base ref rather than the head.
  */
-function makeDeps({ policy = POLICY, files = {}, catFile = 0, mergeBase = MB } = {}) {
+function makeDeps({ policy = POLICY, files = {}, catFile = 0, mergeBase = MB, touched = "", diffStatus = 0 } = {}) {
   const calls = [];
   const run = (argv) => {
     calls.push(argv);
     const [, sub] = argv;
     if (sub === "cat-file") return { status: catFile, stdout: "", stderr: "" };
+    if (sub === "diff") return { status: diffStatus, stdout: touched, stderr: "" };
     if (sub === "merge-base") {
       return mergeBase === null
         ? { status: 128, stdout: "", stderr: "not a commit" }
@@ -249,5 +250,57 @@ describe("attestationGateInputs", () => {
     const { deps, calls } = makeDeps();
     expect(attestationGateInputs(deps, view(over), [])).toEqual({});
     expect(calls).toHaveLength(0);
+  });
+
+  describe("which governed files the pull request itself edits", () => {
+    it("lists the governed files that differ between the merge base and the head", () => {
+      const { deps } = makeDeps({ touched: "package.json\n.dotbabel.json\n" });
+      expect(attestationGateInputs(deps, view(), []).attestationGovernedTouched).toEqual([
+        "package.json",
+        ".dotbabel.json",
+      ]);
+    });
+
+    it("reports a known-empty list when the pull request touches none", () => {
+      // `[]` and `null` mean different things downstream: known-none versus
+      // cannot-tell. Collapsing them would make the gate guess.
+      const { deps } = makeDeps({ touched: "" });
+      expect(attestationGateInputs(deps, view(), []).attestationGovernedTouched).toEqual([]);
+    });
+
+    it("reports null, not an empty list, when no merge base can be resolved", () => {
+      const { deps, calls } = makeDeps({ mergeBase: null });
+      expect(attestationGateInputs(deps, view(), []).attestationGovernedTouched).toBeNull();
+      expect(calls.some((c) => c[1] === "diff")).toBe(false);
+    });
+
+    it("reports null when the diff itself fails", () => {
+      const { deps } = makeDeps({ touched: "package.json", diffStatus: 128 });
+      expect(attestationGateInputs(deps, view(), []).attestationGovernedTouched).toBeNull();
+    });
+
+    it("diffs from the merge base, so a base that moved is not blamed on the pull request", () => {
+      const { deps, calls } = makeDeps();
+      attestationGateInputs(deps, view(), []);
+      const diff = calls.find((c) => c[1] === "diff");
+      expect(diff.slice(0, 5)).toEqual(["git", "diff", "--name-only", MB, HEAD]);
+    });
+
+    it("confines the diff to the governed paths, as argv", () => {
+      const { deps, calls } = makeDeps();
+      attestationGateInputs(deps, view(), []);
+      const diff = calls.find((c) => c[1] === "diff");
+      const sep = diff.indexOf("--");
+      expect(sep).toBeGreaterThan(0);
+      expect(diff.slice(sep + 1)).toEqual([".local-attest.config.mjs", ".dotbabel.json"]);
+    });
+
+    it("never diffs a path the gather refused", () => {
+      const policy = { attestation: { enforce: true, governance_files: ["../outside", "package.json"] } };
+      const { deps, calls } = makeDeps({ policy });
+      attestationGateInputs(deps, view(), []);
+      const diff = calls.find((c) => c[1] === "diff");
+      expect(diff.slice(diff.indexOf("--") + 1)).toEqual(["package.json"]);
+    });
   });
 });

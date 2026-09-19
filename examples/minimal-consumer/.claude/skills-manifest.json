@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:9e0d06d83c633a344376317e565bb5a0df5b9acc9c99f94065f10d6032cbb30d",
+      "checksum": "sha256:19f0de1151e7a591f7071de41c44bc20392e8a4284f973527a69c74f0d28b08c",
       "dependencies": [],
       "lastValidated": "2026-09-19"
     },
@@ -187,7 +187,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:4d3a80dc68dd33ad7213c737ffe6585f7ff0c0eab6fd0cb2c17e2a06c069aca7",
+      "checksum": "sha256:459aca027bb75e0dc186712cf143168bb0073c7f5bb69c9905bf1919018f120c",
       "dependencies": [],
       "lastValidated": "2026-09-19"
     },

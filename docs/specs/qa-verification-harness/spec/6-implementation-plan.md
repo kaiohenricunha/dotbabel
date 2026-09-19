@@ -12,7 +12,7 @@
 | 4. Review step and consumer surface  | P-B4, P-C4, P-D1, P-D2, P-D3 | P-B3 for P-B4 and P-D1, P-C1 for P-D2 | All five         |
 | 5. Post-deploy                       | P-E1, then P-E2              | Nothing from earlier phases           | No               |
 | 6. Dogfood                           | P-F1                         | Every other unit                      | No               |
-| 7. Evidence reuse                    | P-G1, then P-G2              | P-B3 for P-G1, P-G1 for P-G2          | No               |
+| 7. Evidence reuse                    | P-G1, then P-G2, then P-G3   | P-B3 for P-G1, P-G1 for P-G2 and P-G3 | No               |
 
 The order follows leverage. Phases 1 through 3 close the spec-stage and pull-request gaps, which cost the most points in the assessment (DOC-2). P-B3 and P-A2 wait for P-B2, because P-B3 extends the command that P-B2 creates, and P-A2 teaches a skill to call it. Phase 5 depends on no earlier phase, so it can start sooner when people are free.
 
@@ -20,7 +20,7 @@ The order follows leverage. Phases 1 through 3 close the spec-stage and pull-req
 - **IMPL-2**: A unit that changes a skill or a template runs prettier, then `node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --update`, then `npm run build-plugin`, all in the same pull request.
 - **IMPL-3**: A unit that changes `CLAUDE.md` regenerates the host instruction files with `npx dotbabel-generate-instructions` in the same pull request.
 - **IMPL-4**: Every unit commits its failing tests before, or together with, the code that makes them pass.
-- **IMPL-5**: Every criterion in this spec's `spec.json` starts `planned`. Each unit sets its own criteria to `active` in the pull request that adds their tests (KD-15): AC-1 and AC-2 in P-A1, AC-3 and AC-16 in P-B1, AC-8 and AC-9 in P-C1, AC-13 in P-C5, AC-4 through AC-7 in P-B3, AC-15 in P-B4, AC-10 in P-C4, AC-11 in P-D1, AC-14 in P-D2, AC-12 in P-E1, AC-17 and AC-18 in P-G1, and AC-19 in P-G2.
+- **IMPL-5**: Every criterion in this spec's `spec.json` starts `planned`. Each unit sets its own criteria to `active` in the pull request that adds their tests (KD-15): AC-1 and AC-2 in P-A1, AC-3 and AC-16 in P-B1, AC-8 and AC-9 in P-C1, AC-13 in P-C5, AC-4 through AC-7 in P-B3, AC-15 in P-B4, AC-10 in P-C4, AC-11 in P-D1, AC-14 in P-D2, AC-12 in P-E1, AC-17 and AC-18 in P-G1, AC-19 in P-G2, and AC-20 in P-G3.
 - **IMPL-6**: P-B1 adds Stryker and its Vitest runner as dev dependencies with a break threshold of 85. Every unit that adds or changes a module in the TEST-1 scope runs Stryker on those modules in its verify step, so the mutation floor is enforced as each unit lands.
 
 ## 6.2 Workstream Breakdown
@@ -886,6 +886,50 @@ npm test
 </verify>
 ```
 
+### P-G3 — A defined disposition for pull requests that edit a governed file
+
+```text
+<read-first>
+plugins/dotbabel/src/pr-gates.mjs (evaluateAttestation, attestationStatus)
+plugins/dotbabel/src/attestation-gate-inputs.mjs
+commands/merge-pr.md (step 4)
+</read-first>
+
+Command: /plan
+
+P-G1 reported ATTESTATION_CONFIG_CHANGED for a pull request that edits a
+governed file, and /merge-pr said STOP. Nothing routed forward, and re-running
+local-attest cannot clear it, so the first Dependabot bump of package.json would
+have been unmergeable through the sanctioned path. Give that case a state.
+
+Find what the pull request itself edits by diffing the governed paths from the
+MERGE BASE, and report attestation.state as `explicit` with a warning. Keep
+"cannot tell" (null) distinct from "known none" ([]). ATTESTATION_CONFIG_CHANGED
+then means only that the base moved, whose recovery is a rebase.
+
+The explicit path runs the pull request's own scripts, so it is only as
+trustworthy as a human reading the governed-file diff. Make that a precondition
+in merge-pr, and say why.
+
+TDD first. These checks must fail before the work and pass after it:
+- a pull request that edits a governed file reports the explicit state with no blocking attestation reason
+- a valid, current attestation is never reported verified for such a pull request
+- a base that moved under a pull request that touches nothing still reports ATTESTATION_CONFIG_CHANGED
+- an unknown touched set falls back to CONFIG_CHANGED with a detail that says it cannot tell
+- merge-pr shows the governed-file diff before running anything, and a green suite is not the acknowledgement
+
+Files:
+- modify plugins/dotbabel/src/pr-gates.mjs, plugins/dotbabel/src/attestation-gate-inputs.mjs
+- modify commands/merge-pr.md, skills/pr-conductor/SKILL.md
+- modify plugins/dotbabel/tests/pr-gates.test.mjs, plugins/dotbabel/tests/attestation-gate-inputs.test.mjs, plugins/dotbabel/tests/bats/merge-pr-attestation.bats
+
+<verify>
+npx vitest run plugins/dotbabel/tests/pr-gates.test.mjs plugins/dotbabel/tests/attestation-gate-inputs.test.mjs
+bash plugins/dotbabel/scripts/run-bats.sh plugins/dotbabel/tests/bats/merge-pr-attestation.bats
+npm test
+</verify>
+```
+
 ## 6.4 Testing Strategy
 
 | Unit | Kinds applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | N/A + reason                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -909,6 +953,8 @@ npm test
 | P-F1 | integration: `dotbabel criteria verify` on this spec; mutation: the `deep` profile with `--all` over the TEST-1 modules; post-deploy: `release-conductor verify` after the release                                                                                                                                                                                                                                                                                                                                                                          | unit and property: N/A, covered by earlier units. statistical and load/torture: N/A                                                                                                                                                                                                                                                                                                                                                               |
 | P-G1 | unit: the payload codec, the config hash, and the gate ladder; contract: the reason codes, the byte-exact marker, and the payload schema; property: payload round trip through a comment body; integration: `pr-stack gate --gate merge` with a stubbed `gh` and a stubbed `git show` at two revisions; contract (bats): merge-pr prose orders the expensive commands below the disposition step; mutation: Stryker on `attestation.mjs` and the changed part of `pr-gates.mjs` (TEST-1)                                                                    | statistical: N/A, deterministic. load/torture: N/A, covered by P-B3's comment-page cases. post-deploy: N/A                                                                                                                                                                                                                                                                                                                                        |
 | P-G2 | contract: bats on the standalone and conductor `/pre-pr` profiles and the conductor phase table; unit: `deriveEntryPhase` for every outcome, including that an attested head still enters at the preflight                                                                                                                                                                                                                                                                                                                                                  | property, mutation, statistical, load/torture, and post-deploy: N/A, prose plus one pure function                                                                                                                                                                                                                                                                                                                                                 |
+
+| P-G3 | unit: the explicit state, the touched-set gather, and null-versus-empty; contract (bats): merge-pr routes `explicit` to the explicit path and orders the diff review before any command | property, mutation, statistical, load/torture, and post-deploy: N/A |
 
 - **TEST-1**: The new modules under `plugins/dotbabel/src/criteria/`, `plugins/dotbabel/src/attestation.mjs`, `plugins/dotbabel/src/attestation-gate-inputs.mjs`, `plugins/dotbabel/src/lib/evidence-payload.mjs`, and the changed parts of `pr-gates.mjs`, `lib/attest-marker.mjs`, `quality/discovery.mjs`, `quality/evaluate.mjs`, `quality/reports.mjs`, `spec-harness-lib.mjs`, `quality/adapters/python.mjs`, and `quality/adapters/node-tools.mjs`, reach a mutation score of 85 or more. (`lib/pr-markers.mjs` was named here originally and never existed; the marker helpers are in `lib/attest-marker.mjs`. The last three were admitted in step 2 of #390, when measurement showed them to be ordinary in-process modules 13 to 67 kills short of the floor.) Each unit's Stryker run enforces the threshold as the unit lands (IMPL-6), and P-F1 checks again with `--all` over those modules, because a diff-scoped run would score no changed line (REL-11).
 - **TEST-2**: Every golden fixture captured from a third-party tool records the tool name and version beside the fixture.

@@ -339,8 +339,16 @@ export function checkMergeGate(input = {}) {
   // Attestation evaluation. Only runs when the BASE ref opted the repository
   // in, so a repository without the policy — including this one, at the commit
   // that introduces the policy — behaves exactly as it did before.
-  const attestation = evaluateAttestation(input);
+  //
+  // A pull request that edits a governed file is routed to the explicit state
+  // BEFORE any evidence is read. Its attestation was produced under the
+  // configuration it is itself changing, so it can vouch for nothing the change
+  // did not choose to say — and blocking it instead would be a dead end, since
+  // re-running local-attest cannot clear it.
+  const governed = attestationGovernedChange(input);
+  const attestation = governed === null ? evaluateAttestation(input) : [];
   reasons.push(...attestation);
+  if (governed !== null) warnings.push(governed);
 
   return {
     ok: reasons.length === 0,
@@ -352,7 +360,7 @@ export function checkMergeGate(input = {}) {
     // evidence the gate fully verified. A caller deciding whether it may skip
     // verification must be able to tell those apart without re-reading the base
     // ref itself, and prose is the wrong place to reconstruct it.
-    attestation: attestationStatus(input, attestation),
+    attestation: attestationStatus(input, attestation, governed !== null),
     hint:
       reasons.length === 0
         ? null
@@ -369,13 +377,25 @@ export function checkMergeGate(input = {}) {
  * it means "this gate checked nothing about evidence, verify explicitly". The
  * dangerous misreading is to treat it as `verified`.
  *
+ * `explicit` is the third way of not being `verified`, and it is distinct from
+ * `off` on purpose. `off` means the repository never opted in; `explicit` means
+ * it did, and this particular pull request edits a file that governs what an
+ * attestation proves. Both send the caller to explicit verification, but only
+ * the second demands that a human read the governed-file diff first — because
+ * on that path the automated run executes the pull request's own scripts, and
+ * the diff review is the one control that cannot be bypassed by editing them.
+ *
  * @param {any} input
  * @param {GateReason[]} reasons Whatever {@link evaluateAttestation} returned.
- * @returns {{state: "verified"|"off"|"failed", sha: string|null, legs: string[], code: string|null}}
+ * @param {boolean} [governedChange] True when the pull request edits a governed file.
+ * @returns {{state: "verified"|"off"|"explicit"|"failed", sha: string|null, legs: string[], code: string|null}}
  */
-function attestationStatus(input, reasons) {
+function attestationStatus(input, reasons, governedChange = false) {
   if (input.attestationEnforced !== true) {
     return { state: "off", sha: null, legs: [], code: null };
+  }
+  if (governedChange) {
+    return { state: "explicit", sha: null, legs: [], code: "ATTESTATION_GOVERNED_CHANGE" };
   }
   if (reasons.length > 0) {
     return { state: "failed", sha: null, legs: [], code: reasons[0].code };
@@ -389,6 +409,34 @@ function attestationStatus(input, reasons) {
     sha: headSha,
     legs: parsed?.state === "ok" ? [...passedLegs(parsed.payload)] : [],
     code: null,
+  };
+}
+
+/**
+ * Does this pull request edit a file that governs what an attestation proves?
+ *
+ * A warning, not a reason: nothing is wrong with the pull request, and
+ * blocking it would leave the merge command with no legal way forward. What it
+ * changes is HOW the pull request is verified, so it is reported as a state and
+ * a warning rather than as a failure.
+ *
+ * Returns null when enforcement is off, or when the touched set is empty or
+ * unknown — an unknown set falls through to the hash comparison, which still
+ * refuses a mismatch it cannot attribute.
+ *
+ * @param {any} input
+ * @returns {GateReason|null}
+ */
+function attestationGovernedChange(input) {
+  if (input.attestationEnforced !== true) return null;
+  const touched = Array.isArray(input.attestationGovernedTouched) ? input.attestationGovernedTouched : [];
+  if (touched.length === 0) return null;
+  return {
+    code: "ATTESTATION_GOVERNED_CHANGE",
+    message:
+      "this pull request edits a file that governs what an attestation proves, so its own attestation cannot authorize it; verify it explicitly",
+    detail: touched.join(", "),
+    warning: true,
   };
 }
 
@@ -533,7 +581,12 @@ function evaluateAttestation(input) {
         detail:
           parsed.payload.config_hash === undefined
             ? "the payload records no config_hash"
-            : "this pull request changes a governed file, so its own attestation cannot authorize it",
+            : Array.isArray(input.attestationGovernedTouched)
+              ? // Known-none: the pull request edits no governed file, so the BASE
+                // must have moved under it. Rebasing and re-attesting clears it.
+                "the base branch changed a governed file after this was attested; rebase onto it and re-run local-attest"
+              : // No merge base, so which side changed the file is unknowable.
+                "either the base branch changed a governed file since this was attested, or this pull request edits one; rebase and re-run local-attest, and if it repeats the pull request edits a governed file",
       },
     ];
   }
