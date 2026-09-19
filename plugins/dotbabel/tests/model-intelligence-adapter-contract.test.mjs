@@ -25,7 +25,7 @@ const fixture = (name) => JSON.parse(readFileSync(FIXTURES + name, "utf8"));
 const op = (over = {}) => ({ support: "supported", network: "never", auth: "none", cacheable: true, execution: "read-only", ...over });
 
 /** A minimal valid runtime descriptor. */
-const descriptor = (over = {}) => ({
+const descriptor = ({ capabilities, ...rest } = {}) => ({
   id: "claude",
   kind: "runtime",
   capabilities: {
@@ -34,9 +34,9 @@ const descriptor = (over = {}) => ({
     binding: { agent: { support: "supported", axes: { model: "supported" } } },
     invocation: { support: "supported", axes: { model: "supported" } },
     validation: op(),
-    ...(over.capabilities ?? {}),
+    ...capabilities,
   },
-  ...Object.fromEntries(Object.entries(over).filter(([k]) => k !== "capabilities")),
+  ...rest,
 });
 
 describe("source adapter contract", () => {

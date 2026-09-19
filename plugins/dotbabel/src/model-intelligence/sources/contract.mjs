@@ -100,6 +100,19 @@ function typeOf(value) {
 }
 
 /**
+ * Read one own key from a parsed table, or `undefined` when it is absent.
+ *
+ * A prototype name never counts as present: `table.__proto__` would otherwise resolve
+ * to `Object.prototype` and answer for an entry no author wrote (CWE-1321).
+ * @param {unknown} table
+ * @param {string} key
+ * @returns {any}
+ */
+function safeOwn(table, key) {
+  return isPlainObject(table) && Object.hasOwn(/** @type {object} */ (table), key) && !UNSAFE_KEYS.includes(key) ? /** @type {any} */ (table)[key] : undefined;
+}
+
+/**
  * @typedef {object} DescriptorError
  * @property {string} path Dotted path to the offending field.
  * @property {string} message What is wrong with it.
@@ -131,14 +144,15 @@ function checkOperation(block, path, errors) {
     errors.push({ path, message: `must be an object, got ${typeOf(block)}` });
     return;
   }
-  if (!SUPPORT_STATES.includes(/** @type {any} */ (block).support)) {
+  const operation = /** @type {any} */ (block);
+  if (!SUPPORT_STATES.includes(operation.support)) {
     errors.push({ path: `${path}.support`, message: `must be one of ${SUPPORT_STATES.join(", ")}` });
   }
   // An operation declared `unsupported` may omit the operational axes: there is no
   // network, auth or execution story for something that does not happen, and
   // declaring them would be noise a reader could mistake for capability (§5
   // `Knowledge-source adapters`). Any other support state must declare all four.
-  if (/** @type {any} */ (block).support === "unsupported") return;
+  if (operation.support === "unsupported") return;
 
   const enums = [
     ["network", NETWORK_MODES],
@@ -146,11 +160,11 @@ function checkOperation(block, path, errors) {
     ["execution", EXECUTION_MODES],
   ];
   for (const [key, allowed] of enums) {
-    if (!allowed.includes(/** @type {any} */ (block)[key])) {
+    if (!allowed.includes(operation[key])) {
       errors.push({ path: `${path}.${key}`, message: `must be one of ${allowed.join(", ")}` });
     }
   }
-  if (typeof /** @type {any} */ (block).cacheable !== "boolean") {
+  if (typeof operation.cacheable !== "boolean") {
     errors.push({ path: `${path}.cacheable`, message: "must be a boolean" });
   }
 }
@@ -173,10 +187,10 @@ function checkSupportAndAxes(block, path, errors) {
     errors.push({ path, message: `must be an object, got ${typeOf(block)}` });
     return;
   }
-  if (!SUPPORT_STATES.includes(/** @type {any} */ (block).support)) {
+  const { support, axes } = /** @type {any} */ (block);
+  if (!SUPPORT_STATES.includes(support)) {
     errors.push({ path: `${path}.support`, message: `must be one of ${SUPPORT_STATES.join(", ")}` });
   }
-  const axes = /** @type {any} */ (block).axes;
   if (!isPlainObject(axes)) {
     errors.push({ path: `${path}.axes`, message: `must be an object, got ${typeOf(axes)}` });
     return;
@@ -217,14 +231,14 @@ export function validateDescriptor(descriptor) {
     }
   }
 
-  if (typeof /** @type {any} */ (descriptor).id !== "string" || /** @type {any} */ (descriptor).id === "") {
+  const { id, kind, capabilities } = /** @type {any} */ (descriptor);
+  if (typeof id !== "string" || id === "") {
     errors.push({ path: "id", message: "must be a non-empty string" });
   }
-  if (!DESCRIPTOR_KINDS.includes(/** @type {any} */ (descriptor).kind)) {
+  if (!DESCRIPTOR_KINDS.includes(kind)) {
     errors.push({ path: "kind", message: `must be one of ${DESCRIPTOR_KINDS.join(", ")}` });
   }
 
-  const capabilities = /** @type {any} */ (descriptor).capabilities;
   if (!isPlainObject(capabilities)) {
     errors.push({ path: "capabilities", message: `must be an object, got ${typeOf(capabilities)}` });
     return { errors };
@@ -249,16 +263,17 @@ export function validateDescriptor(descriptor) {
     } else {
       // An empty table is valid and meaningful: a knowledge source binds nothing, and
       // says so explicitly rather than by omission (§5 `Knowledge-source adapters`).
-      for (const kind of ownKeys(binding)) {
-        if (UNSAFE_KEYS.includes(kind)) {
-          errors.push({ path: `capabilities.binding.${kind}`, message: "must not be used as an artifact kind" });
+      for (const artifactKind of ownKeys(binding)) {
+        const at = `capabilities.binding.${artifactKind}`;
+        if (UNSAFE_KEYS.includes(artifactKind)) {
+          errors.push({ path: at, message: "must not be used as an artifact kind" });
           continue;
         }
-        if (!ARTIFACT_KINDS.includes(kind)) {
-          errors.push({ path: `capabilities.binding.${kind}`, message: `must be one of the canonical artifact kinds: ${ARTIFACT_KINDS.join(", ")}` });
+        if (!ARTIFACT_KINDS.includes(artifactKind)) {
+          errors.push({ path: at, message: `must be one of the canonical artifact kinds: ${ARTIFACT_KINDS.join(", ")}` });
           continue;
         }
-        checkSupportAndAxes(binding[kind], `capabilities.binding.${kind}`, errors);
+        checkSupportAndAxes(binding[artifactKind], at, errors);
       }
     }
   }
@@ -346,8 +361,8 @@ export function makeAdapterResult(input) {
  * @returns {object}
  */
 export function unavailable({ provenance, code, message, retryable, argv, env }) {
-  const context = argv !== undefined || env !== undefined ? redactForDiagnostic({ argv, env }) : undefined;
-  const text = [message, context].filter((part) => part !== undefined && part !== "").join(": ");
+  // With neither `argv` nor `env`, `redactForDiagnostic` returns "", which the filter drops.
+  const text = [message, redactForDiagnostic({ argv, env })].filter(Boolean).join(": ");
   return makeAdapterResult({
     status: "unavailable",
     provenance,
@@ -437,7 +452,7 @@ export function redactForDiagnostic({ argv, env } = {}) {
     const rendered = [];
     let maskNext = false;
     for (const raw of argv) {
-      const arg = typeof raw === "string" ? raw : String(raw);
+      const arg = String(raw);
       if (maskNext) {
         rendered.push("[redacted]");
         maskNext = false;
@@ -495,8 +510,7 @@ export function resolveTimeoutMs({ channel, timeoutMs }) {
  */
 function codeForError(err) {
   const code = isPlainObject(err) ? /** @type {any} */ (err).code : undefined;
-  if (code === "ENOENT") return "binary_missing";
-  if (code === "EACCES" || code === "EPERM") return "binary_missing";
+  if (code === "ENOENT" || code === "EACCES" || code === "EPERM") return "binary_missing";
   if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ENETUNREACH" || code === "EAI_AGAIN") return "network_unavailable";
   if (code === "ETIMEDOUT") return "timeout";
   return "runtime_error";
@@ -599,10 +613,7 @@ export function createRegistry(descriptors) {
    * @param {string} kind
    * @returns {object | undefined}
    */
-  const bindingFor = (id, kind) => {
-    const binding = /** @type {any} */ (get(id)).capabilities.binding;
-    return Object.hasOwn(binding, kind) && !UNSAFE_KEYS.includes(kind) ? binding[kind] : undefined;
-  };
+  const bindingFor = (id, kind) => safeOwn(/** @type {any} */ (get(id)).capabilities.binding, kind);
 
   /**
    * @param {string} id
@@ -617,20 +628,14 @@ export function createRegistry(descriptors) {
    * @param {string} axis
    * @returns {string}
    */
-  const axisSupport = (id, kind, axis) => {
-    const axes = bindingFor(id, kind)?.axes;
-    return isPlainObject(axes) && Object.hasOwn(axes, axis) && !UNSAFE_KEYS.includes(axis) ? axes[axis] : "unverified";
-  };
+  const axisSupport = (id, kind, axis) => safeOwn(bindingFor(id, kind)?.axes, axis) ?? "unverified";
 
   /**
    * @param {string} id
    * @param {string} axis
    * @returns {string}
    */
-  const invocationAxisSupport = (id, axis) => {
-    const axes = /** @type {any} */ (get(id)).capabilities.invocation.axes;
-    return isPlainObject(axes) && Object.hasOwn(axes, axis) && !UNSAFE_KEYS.includes(axis) ? axes[axis] : "unverified";
-  };
+  const invocationAxisSupport = (id, axis) => safeOwn(/** @type {any} */ (get(id)).capabilities.invocation.axes, axis) ?? "unverified";
 
   /**
    * @param {string} id
