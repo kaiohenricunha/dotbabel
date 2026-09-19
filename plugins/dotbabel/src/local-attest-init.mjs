@@ -33,6 +33,8 @@
 
 import yaml from "js-yaml";
 
+import { usesPackageRunner } from "./check-attestation-adoption.mjs";
+
 /** Steps whose `uses:` is pure CI plumbing with no local equivalent. */
 const PLUMBING = /^actions\/(checkout|setup-|cache|upload-|download-)/;
 
@@ -264,6 +266,41 @@ export function matrixFromWorkflows(fileList) {
 }
 
 /**
+ * Comment block that says how to turn this matrix into merge-authorizing
+ * evidence. Without it a repository can run `--init`, attest for months, and
+ * never learn that `/merge-pr` could reuse those attestations.
+ *
+ * @param {DraftLeg[]} legs
+ * @returns {string[]}
+ */
+function adoptionGuidance(legs) {
+  const q = (v) => JSON.stringify(v);
+  const required = legs.filter((l) => l.mode === "hard").map((l) => l.name);
+  const governed = [".local-attest.config.mjs", ".dotbabel.json"];
+  if (legs.some((l) => usesPackageRunner(l.command))) governed.push("package.json");
+
+  const policy = ['"enforce": true'];
+  if (required.length > 0) policy.push(`"required_legs": ${q(required)}`);
+  policy.push(`"governance_files": ${q(governed)}`);
+
+  return [
+    "// Optional: make an attestation merge-authorizing.",
+    "//",
+    "// Until .dotbabel.json says otherwise this matrix only skips remote CI, and",
+    "// /merge-pr still re-verifies the branch itself. To have it reuse a current,",
+    "// trusted attestation instead, add this to .dotbabel.json (guide:",
+    "// docs/attestation.md), then run `dotbabel doctor` to check the two agree:",
+    "//",
+    '//   "attestation": {',
+    ...policy.map((line, i) => `//     ${line}${i < policy.length - 1 ? "," : ""}`),
+    "//   }",
+    "//",
+    "// Every governance file is hashed into each attestation, so a pull request",
+    "// that edits one cannot attest its own change. List every file a leg executes.",
+  ];
+}
+
+/**
  * Render a draft config as `.local-attest.config.mjs` source.
  *
  * Warnings become TODO comments in the file itself rather than terminal
@@ -326,6 +363,8 @@ export function renderConfig({ legs, warnings, toolchain }) {
   out.push("  // paths here or every run aborts on its own writes.");
   out.push("  restoreFiles: [],");
   out.push("};");
+  out.push("");
+  out.push(...adoptionGuidance(legs));
   out.push("");
 
   return out.join("\n");

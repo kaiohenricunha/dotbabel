@@ -107,21 +107,25 @@ export const CONDUCTOR_PHASES = Object.freeze([
  * Where `/pr-conductor` should start, derived from what the pull request
  * already is rather than from a flag the operator has to remember.
  *
- * Two outcomes, and deliberately only two.
+ * Four outcomes. Two facts about the CURRENT head decide between them, and each
+ * is SHA-pinned evidence rather than a guess:
  *
- * There is no "already attested, so stop" outcome, and that omission is the
- * point. An attestation proves a SHA passed the configured matrix. It does not
- * prove the SHA went through `post-pr-review` and `review-pr` — somebody can
- * run `dotbabel local-attest` directly and then invoke the conductor. Review
- * markers are not SHA-pinned, so nothing here can tell a reviewed head from an
- * unreviewed one, and a READY-and-stop rule would silently skip the entire
- * review stage on the strength of evidence that says nothing about review.
- * Until a SHA-pinned review-completion marker exists, the conductor re-enters
- * the pipeline and lets each phase decide what it can skip.
+ * - `reviewedAtHead`: a trusted review-complete comment names this head
+ *   (`review-evidence.mjs`). The review stage already ran, so it is skipped.
+ * - `attestedAtHead`: a trusted, passing attestation names this head
+ *   (`hasCurrentAttestation`). The attest phase already ran.
  *
- * `--from` remains an explicit override for resuming a known-good run.
+ * The rule that keeps this safe is that neither fact stands in for the other. An
+ * attestation proves a SHA passed the matrix and says nothing about review:
+ * somebody can run `dotbabel local-attest` directly and then invoke the
+ * conductor. So an attestation alone never skips the review stage, and only a
+ * review-complete marker can. Stopping needs both.
  *
- * @param {{prNumber?: number|null}} state
+ * Both flags must be a literal `true`; a truthy value that is not one cannot
+ * skip a stage. `--from` remains an explicit override for resuming a run the
+ * operator knows is good.
+ *
+ * @param {{prNumber?: number|null, reviewedAtHead?: unknown, attestedAtHead?: unknown}} state
  * @returns {{phase: string, reason: string, skips: string[]}}
  */
 export function deriveEntryPhase(state = {}) {
@@ -133,6 +137,15 @@ export function deriveEntryPhase(state = {}) {
       skips: [],
     };
   }
+
+  if (state.reviewedAtHead === true) {
+    const reviewed = ["pre-pr", "open-pr", "post-pr-review", "review-pr"];
+    if (state.attestedAtHead === true) {
+      return { phase: "stop", reason: "REVIEWED_AND_ATTESTED", skips: [...reviewed, "local-attest"] };
+    }
+    return { phase: "local-attest", reason: "REVIEWED_AT_HEAD", skips: reviewed };
+  }
+
   return {
     phase: "pre-pr",
     reason: "PR_OPEN",

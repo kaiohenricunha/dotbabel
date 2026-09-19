@@ -18,6 +18,7 @@
  *   dotbabel pr-stack gate   --gate skip-ci [--sha <rev>]
  *   dotbabel pr-stack phases
  *   dotbabel pr-stack entry   [--pr <N>]
+ *   dotbabel pr-stack review-complete --pr <N> [--dry-run]
  *
  * `next` prints the commands to run; it never executes them. A rebase after a
  * squash-merge needs `--onto`, so the parent's pre-merge head SHA matters —
@@ -48,12 +49,14 @@ import {
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
 import { criteriaGateInputs, prComments } from "../src/criteria/gate-inputs.mjs";
 import { attestationGateInputs } from "../src/attestation-gate-inputs.mjs";
+import { reviewEntryFacts } from "../src/review-gate-inputs.mjs";
+import { postReviewComplete } from "../src/review-complete.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
 const PR_FIELDS = "number,headRefName,baseRefName,state,mergeStateStatus,headRefOid";
 
-const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry"]);
+const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry", "review-complete"]);
 
 const FLAGS = {
   trunk: { type: "string", default: "main" },
@@ -64,6 +67,7 @@ const FLAGS = {
   remote: { type: "string", default: "origin" },
   gate: { type: "string" },
   sha: { type: "string" },
+  "dry-run": { type: "boolean" },
 };
 
 const HELP = `${TOOL} <subcommand> [options]
@@ -78,16 +82,18 @@ Subcommands:
   gate               Evaluate a precondition gate (local-attest | merge | skip-ci)
   phases             Print the canonical pipeline phase order
   entry              Print the phase the conductor should start at for this branch
+  review-complete    Post the SHA-pinned marker that the review stage finished on the head
 
 Options:
   --trunk <ref>      Trunk branch name (default: main)
   --limit <N>        Max PRs to enumerate (default: 100)
-  --pr <N>           PR number (required by: next, gate; optional for entry)
+  --pr <N>           PR number (required by: next, gate, review-complete; optional for entry)
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
   --gate <name>      Gate to evaluate: local-attest | merge | skip-ci
   --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD)
+  --dry-run          review-complete: check and print the comment, post nothing
   --json             Emit a single JSON object on stdout
   --help, -h         Show this help
   --version, -V      Show version
@@ -142,6 +148,38 @@ function run(argv) {
     maxBuffer: GIT_MAX_BUFFER,
   });
   return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+}
+
+/**
+ * Like `run`, but returns stdout and throws on a non-zero exit. The shape
+ * `criteria/comment.mjs` expects of its `capture` dependency.
+ *
+ * @param {string[]} argv
+ * @returns {string}
+ */
+function capture(argv) {
+  const r = run(argv);
+  if (r.status !== 0) throw new Error(`command failed (${r.status}): ${argv.join(" ")}\n${r.stderr.trim()}`);
+  return r.stdout;
+}
+
+/**
+ * POST or mutate through `gh api --input -`, so a multiline comment body is
+ * never subject to shell quoting. Throws on a non-zero exit.
+ *
+ * @param {string[]} argv
+ * @param {object} jsonBody
+ * @returns {void}
+ */
+function ghApiWithInput(argv, jsonBody) {
+  const r = spawnSync(argv[0], argv.slice(1), {
+    shell: false,
+    input: JSON.stringify(jsonBody),
+    encoding: "utf8",
+    stdio: ["pipe", "pipe", "pipe"],
+    maxBuffer: GIT_MAX_BUFFER,
+  });
+  if (r.status !== 0) throw new Error(`command failed (${r.status ?? 1}): ${argv.join(" ")}\n${(r.stderr ?? "").trim()}`);
 }
 
 /**
@@ -246,6 +284,47 @@ function paginatedPrFiles(prNumber, declaredCount) {
   // can be trusted to be complete.
   if (!Number.isFinite(declared) || declared !== paths.length || declared >= 3000) return null;
   return paths.map((path) => ({ path }));
+}
+
+/**
+ * Gather every merge-gate input for a pull request and evaluate the gate.
+ *
+ * Shared by `gate --gate merge` and `review-complete`, which needs the criteria
+ * half of the very same verdict rather than a second reading of it.
+ *
+ * @param {number} prNumber
+ * @returns {ReturnType<typeof checkMergeGate>}
+ */
+function gatherMergeGate(prNumber) {
+  const root = repoRoot();
+  const view = ghJson(
+    `gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files,changedFiles,headRefOid,baseRefOid`,
+  );
+  // `view.files` is a single unpaginated page that caps at 100 entries, the
+  // same trap local-attest-runner.mjs documents and avoids. Criteria scope is
+  // now derived from this list (REL-19), so a truncated one would silently
+  // drop a governed file out of scope. Re-read it from the paginated Files
+  // endpoint and cross-check the count; a mismatch means unreadable, and the
+  // gate must fail closed rather than judge a partial diff.
+  view.files = paginatedPrFiles(prNumber, view.changedFiles);
+  // One fetch, both evidence families. `criteriaGateInputs` short-circuits
+  // on several paths without ever fetching comments, so piggybacking the
+  // attestation check on its result would report ATTESTATION_MISSING
+  // whenever criteria happened not to apply.
+  const comments = prComments({ run }, prNumber);
+  return checkMergeGate({
+    body: view.body,
+    hasSpecsDir: existsSync(`${root}/docs/specs`),
+    ...attestationGateInputs({ run }, view, comments),
+    // A null list means "could not be proven complete"; the criteria half
+    // turns that into CRITERIA_FILES_UNREADABLE, and an empty array here
+    // keeps the protected-path check from silently passing on it.
+    changedPaths: (view.files ?? []).map((f) => f.path),
+    protectedPaths: protectedPaths(root),
+    mergeable: view.mergeable,
+    mergeStateStatus: view.mergeStateStatus,
+    ...criteriaGateInputs({ run }, view, prNumber, { comments }),
+  });
 }
 
 /**
@@ -432,15 +511,96 @@ async function main() {
         fail(EXIT_CODES.ENV, `could not resolve the pull request for this branch:\n${r.stderr.trim()}`);
       }
     }
-    const result = deriveEntryPhase({ prNumber });
+    // Evidence about the CURRENT head decides whether the review and attest
+    // stages can be skipped. Unreadable evidence degrades to "none", never to an
+    // error: the conservative answer is the full pipeline, which is always safe,
+    // and an outage must not stop someone from resuming work.
+    let evidence = null;
+    if (prNumber !== null) {
+      const head = run(["gh", "pr", "view", String(prNumber), "--json", "headRefOid", "--jq", ".headRefOid"]);
+      const headSha = head.status === 0 ? head.stdout.trim() : "";
+      evidence = /^[0-9a-f]{40}$/i.test(headSha)
+        ? reviewEntryFacts({ run }, prNumber, headSha)
+        : {
+            reviewedAtHead: false,
+            attestedAtHead: false,
+            review: {
+              state: "not-reviewed",
+              code: "REVIEW_INVALID",
+              detail: "the pull request head SHA could not be read",
+            },
+          };
+    }
+    const result = deriveEntryPhase({
+      prNumber,
+      reviewedAtHead: evidence?.reviewedAtHead,
+      attestedAtHead: evidence?.attestedAtHead,
+    });
     return emit({
       subcommand: sub,
       ok: true,
-      result: { ...result, prNumber },
+      result: {
+        ...result,
+        prNumber,
+        evidence: evidence && {
+          reviewedAtHead: evidence.reviewedAtHead,
+          attestedAtHead: evidence.attestedAtHead,
+          review: { code: evidence.review.code, detail: evidence.review.detail },
+        },
+      },
       problems: [],
       lines: [
         `entry: ${result.phase} (${result.reason})`,
         ...(result.skips.length > 0 ? [`  skips: ${result.skips.join(", ")}`] : []),
+        ...(evidence
+          ? [
+              `  review: ${evidence.reviewedAtHead ? "complete on this head" : `${evidence.review.code} (${evidence.review.detail})`}`,
+              `  attestation: ${evidence.attestedAtHead ? "current on this head" : "none on this head"}`,
+            ]
+          : []),
+      ],
+      json,
+    });
+  }
+
+  if (sub === "review-complete") {
+    const prNumber = requireNumber(flags.pr, "--pr");
+    const { version } = await import("../src/index.mjs");
+    const outcome = postReviewComplete(
+      { run, capture, ghApiWithInput, log: (msg) => process.stderr.write(`${TOOL}: ${msg}\n`) },
+      {
+        prNumber,
+        // The criteria half of the very verdict `gate --gate merge` reports, so
+        // the two can never disagree about whether criteria are satisfied.
+        criteriaReasons: (n) => gatherMergeGate(n).reasons.filter((r) => String(r.code).startsWith("CRITERIA_")),
+        dryRun: flags["dry-run"] === true,
+        toolVersion: version,
+      },
+    );
+    if (outcome.env) return fail(EXIT_CODES.ENV, outcome.message);
+    const reasons = outcome.reasons ?? [];
+    return emit({
+      subcommand: sub,
+      ok: outcome.ok,
+      result: {
+        posted: outcome.posted,
+        headSha: outcome.headSha ?? null,
+        reviewedSha: outcome.reviewedSha ?? null,
+        counts: outcome.counts ?? null,
+        reasons,
+        ...(flags["dry-run"] === true && outcome.body ? { body: outcome.body } : {}),
+      },
+      problems: reasons,
+      lines: [
+        `review-complete: ${outcome.ok ? (outcome.posted ? "POSTED" : "DRY-RUN") : "BLOCKED"}`,
+        ...reasons.map((r) => `  ✗ ${r.code}: ${r.message}`),
+        ...(outcome.ok && outcome.counts
+          ? [
+              `  head ${outcome.headSha.slice(0, 8)}, reviewed ${outcome.reviewedSha.slice(0, 8)}, ` +
+                `${outcome.counts.findingsPosted} finding(s), ${outcome.counts.otherOpenThreads} other open thread(s)`,
+            ]
+          : []),
+        ...(flags["dry-run"] === true && outcome.body ? ["", outcome.body] : []),
       ],
       json,
     });
@@ -449,30 +609,6 @@ async function main() {
   const which = flags.gate;
 
   // skip-ci inspects a local commit message, so it needs no PR number.
-  if (sub === "entry") {
-    // The conductor used to enter at phase 1 always, so resuming an open pull
-    // request meant remembering `--from post-pr-review`. The state is
-    // observable, so it is derived rather than asked for.
-    let prNumber = argv.flags.pr === undefined ? null : requireNumber(argv.flags.pr, "--pr");
-    if (prNumber === null) {
-      const r = sh("gh pr view --json number --jq .number");
-      const n = Number(r.stdout.trim());
-      prNumber = r.status === 0 && Number.isInteger(n) && n > 0 ? n : null;
-    }
-    const result = deriveEntryPhase({ prNumber });
-    return emit({
-      subcommand: sub,
-      ok: true,
-      result: { ...result, prNumber },
-      problems: [],
-      lines: [
-        `entry: ${result.phase} (${result.reason})`,
-        ...(result.skips.length > 0 ? [`  skips: ${result.skips.join(", ")}`] : []),
-      ],
-      json,
-    });
-  }
-
   if (which === "skip-ci") {
     const rev = typeof flags.sha === "string" && flags.sha !== "" ? assertRev(flags.sha) : "HEAD";
     const msg = sh(`git log -1 --pretty=%B ${rev}`);
@@ -527,35 +663,7 @@ async function main() {
   }
 
   if (which === "merge") {
-    const root = repoRoot();
-    const view = ghJson(
-      `gh pr view ${prNumber} --json body,mergeable,mergeStateStatus,files,changedFiles,headRefOid,baseRefOid`,
-    );
-    // `view.files` is a single unpaginated page that caps at 100 entries, the
-    // same trap local-attest-runner.mjs documents and avoids. Criteria scope is
-    // now derived from this list (REL-19), so a truncated one would silently
-    // drop a governed file out of scope. Re-read it from the paginated Files
-    // endpoint and cross-check the count; a mismatch means unreadable, and the
-    // gate must fail closed rather than judge a partial diff.
-    view.files = paginatedPrFiles(prNumber, view.changedFiles);
-    // One fetch, both evidence families. `criteriaGateInputs` short-circuits
-    // on several paths without ever fetching comments, so piggybacking the
-    // attestation check on its result would report ATTESTATION_MISSING
-    // whenever criteria happened not to apply.
-    const comments = prComments({ run }, prNumber);
-    const result = checkMergeGate({
-      body: view.body,
-      hasSpecsDir: existsSync(`${root}/docs/specs`),
-      ...attestationGateInputs({ run }, view, comments),
-      // A null list means "could not be proven complete"; the criteria half
-      // turns that into CRITERIA_FILES_UNREADABLE, and an empty array here
-      // keeps the protected-path check from silently passing on it.
-      changedPaths: (view.files ?? []).map((f) => f.path),
-      protectedPaths: protectedPaths(root),
-      mergeable: view.mergeable,
-      mergeStateStatus: view.mergeStateStatus,
-      ...criteriaGateInputs({ run }, view, prNumber, { comments }),
-    });
+    const result = gatherMergeGate(prNumber);
     const summary = summarizeGates([result]);
     return emit({
       subcommand: sub,

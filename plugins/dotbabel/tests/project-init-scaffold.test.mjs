@@ -37,6 +37,9 @@ describe("scaffoldProjectInit", () => {
     expect(cfg.fan_out).toEqual(DEFAULT_DOTBABEL_JSON.fan_out);
     expect(cfg.targets).toEqual(DEFAULT_DOTBABEL_JSON.targets);
     expect(cfg.quality).toEqual({ enabled: true });
+    // Spelled out rather than absent: the key is how a repository finds out that
+    // merge-time attestation reuse exists, and `false` is the safe starting state.
+    expect(cfg.attestation).toEqual({ enforce: false });
 
     const claudeMd = fs.readFileSync(path.join(repo, "CLAUDE.md"), "utf8");
     expect(claudeMd).toContain("<!-- dotbabel:rule-floor:begin -->");

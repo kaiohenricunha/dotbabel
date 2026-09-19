@@ -12,6 +12,7 @@
  *   specs        docs/specs/ scanned; validateSpecs clean
  *   drift        checkInstructionDrift + checkInstructionsFresh clean
  *   hook         plugins/dotbabel/hooks/guard-destructive-git.sh present + exec bit
+ *   attestation  .dotbabel.json attestation policy coherent with the local-attest config
  *   bootstrap    ~/.claude/CLAUDE.md and supported CLI symlinks present
  *                (informational — warn only)
  *
@@ -318,6 +319,23 @@ if (existsSync(projectConfigPath)) {
     }
   } catch (err) {
     out.warn(`project-sync check skipped: ${err.message}`);
+  }
+}
+
+// attestation adoption — only when the repo has a .dotbabel.json to hold the policy.
+// Loading an executable .local-attest.config.mjs runs repo code, so it is gated
+// on the same trust allowlist as check-on-stop.
+if (existsSync(projectConfigPath)) {
+  try {
+    const { checkAttestationAdoption } = await import("../src/check-attestation-adoption.mjs");
+    const trust = isRepoTrusted({ repoRoot: ctx.repoRoot, env: process.env });
+    const adoption = await checkAttestationAdoption({
+      repoRoot: ctx.repoRoot,
+      canExecuteConfig: trust.trustAll || trust.trusted,
+    });
+    for (const f of adoption.findings) out[f.level](`attestation: ${f.message}`);
+  } catch (err) {
+    out.warn(`attestation adoption check skipped: ${err.message}`);
   }
 }
 

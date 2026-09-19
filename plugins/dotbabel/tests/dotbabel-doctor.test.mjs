@@ -272,3 +272,120 @@ describe("dotbabel-doctor removed repo-facts keys (OPS-6)", () => {
     expect(res.stdout).toMatch(/guard-destructive-git\.sh|skills-manifest\.json/);
   });
 });
+
+// A repository that turns on `attestation.enforce` gets a merge gate that
+// blocks everything unless its local-attest configuration is coherent, and the
+// ways it can be incoherent (no config, an ungoverned config, a required leg
+// that does not exist) show up only when a real pull request is stuck. Doctor
+// is where they must show up first.
+describe("dotbabel-doctor attestation adoption check", () => {
+  function repoWithPolicy(dotbabel, files = {}) {
+    const root = makeTmpDir("doctor-attest-");
+    if (dotbabel !== null)
+      fs.writeFileSync(path.join(root, ".dotbabel.json"), JSON.stringify(dotbabel));
+    for (const [name, body] of Object.entries(files)) fs.writeFileSync(path.join(root, name), body);
+    return root;
+  }
+
+  function trustFileFor(root) {
+    const file = path.join(makeTmpDir("trust-"), "trusted");
+    fs.writeFileSync(file, `${fs.realpathSync(root)}\n`, "utf8");
+    return file;
+  }
+
+  const untrustedFile = () => {
+    const file = path.join(makeTmpDir("trust-"), "empty");
+    fs.writeFileSync(file, "", "utf8");
+    return file;
+  };
+
+  it("stays informational when enforcement is off", () => {
+    const root = repoWithPolicy({ attestation: { enforce: false } });
+    const res = runDoctor({
+      home: makeTmpDir("home-"),
+      repoRoot: root,
+      trustedFile: untrustedFile(),
+    });
+    expect(res.stdout).toMatch(/attestation enforcement is off/);
+    expect(res.stdout).toMatch(/docs\/attestation\.md/);
+    expect(res.stdout).not.toMatch(/NO_CONFIG|ATTESTATION_MISSING/);
+  });
+
+  it("says nothing about attestation when the repository has no .dotbabel.json", () => {
+    const root = repoWithPolicy(null);
+    const res = runDoctor({
+      home: makeTmpDir("home-"),
+      repoRoot: root,
+      trustedFile: untrustedFile(),
+    });
+    expect(res.stdout).not.toMatch(/attestation enforcement/);
+  });
+
+  it("fails when enforcement is on and nothing can produce evidence", () => {
+    const root = repoWithPolicy({ attestation: { enforce: true, required_legs: ["test"] } });
+    const res = runDoctor({
+      home: makeTmpDir("home-"),
+      repoRoot: root,
+      trustedFile: untrustedFile(),
+    });
+    expect(res.stdout).toMatch(/no local-attest config/);
+    expect(res.status).toBe(1);
+  });
+
+  it("does not execute the repository's config when the repository is not trusted", () => {
+    const sentinel = path.join(makeTmpDir("sentinel-"), "ran");
+    const root = repoWithPolicy(
+      { attestation: { enforce: true, required_legs: ["test"] } },
+      {
+        ".local-attest.config.mjs": `import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(sentinel)}, "ran");
+export default { matrix: [{ name: "test", mode: "hard", command: "true" }] };
+`,
+      },
+    );
+    const res = runDoctor({
+      home: makeTmpDir("home-"),
+      repoRoot: root,
+      trustedFile: untrustedFile(),
+    });
+    expect(fs.existsSync(sentinel)).toBe(false);
+    expect(res.stdout).toMatch(/legs were not inspected/);
+  });
+
+  it("inspects the legs of a trusted repository and reports a required leg that does not exist", () => {
+    const sentinel = path.join(makeTmpDir("sentinel-"), "ran");
+    const root = repoWithPolicy(
+      { attestation: { enforce: true, required_legs: ["test", "quality"] } },
+      {
+        ".local-attest.config.mjs": `import { writeFileSync } from "node:fs";
+writeFileSync(${JSON.stringify(sentinel)}, "ran");
+export default { matrix: [{ name: "test", mode: "hard", command: "true" }] };
+`,
+      },
+    );
+    const res = runDoctor({
+      home: makeTmpDir("home-"),
+      repoRoot: root,
+      trustedFile: trustFileFor(root),
+    });
+    expect(fs.existsSync(sentinel)).toBe(true);
+    expect(res.stdout).toMatch(/"quality"/);
+    expect(res.stdout).toMatch(/ATTESTATION_INCOMPLETE/);
+    expect(res.status).toBe(1);
+  });
+
+  it("passes a coherent configuration", () => {
+    const root = repoWithPolicy(
+      { attestation: { enforce: true, required_legs: ["test"] } },
+      {
+        ".local-attest.config.mjs": `export default { matrix: [{ name: "test", mode: "hard", command: "true" }] };\n`,
+      },
+    );
+    const res = runDoctor({
+      home: makeTmpDir("home-"),
+      repoRoot: root,
+      trustedFile: trustFileFor(root),
+    });
+    expect(res.stdout).toMatch(/attestation enforcement is on and its configuration is coherent/);
+  });
+});

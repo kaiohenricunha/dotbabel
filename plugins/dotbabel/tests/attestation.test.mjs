@@ -6,6 +6,7 @@ import {
   DEFAULT_GOVERNANCE_FILES,
   attestationPayloadProblem,
   buildAttestationPayload,
+  hasCurrentAttestation,
   hashGovernanceFiles,
   isGovernablePath,
   parseAttestationComment,
@@ -498,5 +499,65 @@ describe("isGovernablePath", () => {
 
   it("refuses values that are not strings", () => {
     for (const bad of [null, undefined, 1, {}, ["a"]]) expect(isGovernablePath(bad)).toBe(false);
+  });
+});
+
+describe("hasCurrentAttestation", () => {
+  const passing = () => [{ name: "test", mode: "hard", status: "pass" }];
+  const body = (over = {}) =>
+    `${renderAttestationHeader(payload({ legs: passing(), ...over }))}\n## Local Attestation`;
+  const comment = (over = {}) => ({
+    body: body(),
+    authorAssociation: "OWNER",
+    lastEditedAt: null,
+    ...over,
+  });
+  const has = (comments, opts) => hasCurrentAttestation({ comments, headSha: HEAD, ...opts });
+
+  it("is true for a trusted, unedited, passing attestation of the head", () => {
+    expect(has([comment()])).toBe(true);
+  });
+
+  it("is false when there is none", () => {
+    expect(has([])).toBe(false);
+    expect(has([comment({ body: "hello" })])).toBe(false);
+  });
+
+  it("is false for an attestation of another commit", () => {
+    expect(has([comment({ body: body({ headSha: OLDER }) })])).toBe(false);
+  });
+
+  it("is false for an untrusted or edited comment", () => {
+    expect(has([comment({ authorAssociation: "NONE" })])).toBe(false);
+    expect(has([comment({ lastEditedAt: "2026-01-02T00:00:00Z" })])).toBe(false);
+  });
+
+  it("honors trustedAssociations", () => {
+    const member = comment({ authorAssociation: "MEMBER" });
+    expect(has([member])).toBe(false);
+    expect(has([member], { trustedAssociations: ["OWNER", "MEMBER"] })).toBe(true);
+  });
+
+  it("is false for a payload that is absent, corrupt, mismatched, or not a pass", () => {
+    const failing = [{ name: "test", mode: "hard", status: "fail" }];
+    expect(has([comment({ body: `${ATTEST_MARKER_PREFIX}${HEAD} -->\n## Local Attestation` })])).toBe(false);
+    expect(has([comment({ body: `${ATTEST_MARKER_PREFIX}${HEAD} -->\n${ATTEST_PAYLOAD_LINE_PREFIX}@@@ -->` })])).toBe(false);
+    expect(has([comment({ body: `${ATTEST_MARKER_PREFIX}${OLDER} -->\n${renderAttestationHeader(payload({ legs: passing() })).split("\n")[1]}` })])).toBe(false);
+    expect(has([comment({ body: body({ legs: failing }) })])).toBe(false);
+  });
+
+  it("is true when any one of several comments qualifies", () => {
+    expect(has([comment({ body: body({ headSha: OLDER }) }), comment()])).toBe(true);
+  });
+
+  it("is false for an unreadable list or head", () => {
+    expect(has(null)).toBe(false);
+    expect(has(undefined)).toBe(false);
+    expect(hasCurrentAttestation({ comments: [comment()], headSha: undefined })).toBe(false);
+    expect(hasCurrentAttestation({ comments: [comment()], headSha: "" })).toBe(false);
+  });
+
+  it("ignores null entries without throwing", () => {
+    expect(has([null, undefined, comment()])).toBe(true);
   });
 });

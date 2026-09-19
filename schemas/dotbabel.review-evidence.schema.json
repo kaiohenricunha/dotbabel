@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.review-evidence.schema.json",
+  "title": "dotbabel review-complete evidence payload",
+  "description": "Line 2 of a review-complete comment, base64url-encoded. The conductor reads this to decide whether the review stage already finished on the current head, so it can resume at a later phase instead of re-dispatching the review fleet.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "head_sha", "reviewed_sha", "generated_at", "findings"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit the review stage finished on. Must equal the SHA in the marker on line 1; the reader refuses a payload that disagrees with its own marker."
+    },
+    "reviewed_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The commit the post-pr-review receipt was posted against. An ancestor of head_sha, or head_sha itself: fixes pushed after the review land between the two."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "findings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["posted", "unresolved"],
+      "properties": {
+        "posted": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Threads whose first comment carries a post-pr-review finding marker."
+        },
+        "unresolved": {
+          "const": 0,
+          "description": "Always 0: the producer refuses to post while a finding thread is open."
+        }
+      }
+    },
+    "other_open_threads": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Open threads that are not post-pr-review findings (advisory test-quality threads, human questions). Recorded, never blocking: the review skill leaves the advisory ones open for a person on purpose."
+    }
+  }
+}

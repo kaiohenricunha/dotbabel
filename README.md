@@ -109,6 +109,11 @@ the branch-protection caveat — is in
 the config schema is in
 [`skills/local-attest/references/config.md`](./skills/local-attest/references/config.md).
 
+Once attestations are trustworthy, `/merge-pr` can reuse them instead of running
+the suite a second time. That is opt-in (`attestation.enforce` in `.dotbabel.json`),
+and `dotbabel doctor` checks it is configured coherently. See
+[`docs/attestation.md`](./docs/attestation.md).
+
 ---
 
 ## Language-aware quality

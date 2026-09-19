@@ -136,14 +136,18 @@ export function renderEvidenceComment(payload, tails) {
  * Post a new evidence comment and minimize the tool's own older ones (§5
  * "Evidence comment"; never edits a comment, per OPS-4).
  *
+ * `markerPrefix` names the evidence family being superseded and defaults to the
+ * criteria one. Another family (review-complete) passes its own prefix so that
+ * posting it never hides a criteria comment, and the reverse.
+ *
  * @param {CommentDeps} deps
- * @param {{ repo: string, pr: string|number, body: string }} args
+ * @param {{ repo: string, pr: string|number, body: string, markerPrefix?: string }} args
  */
-export function postEvidenceComment(deps, { repo, pr, body }) {
+export function postEvidenceComment(deps, { repo, pr, body, markerPrefix = CRITERIA_MARKER_PREFIX }) {
   const me = deps.capture(["gh", "api", "user", "--jq", ".login"]).trim();
   const raw = deps.capture(["gh", "api", `repos/${repo}/issues/${pr}/comments`, "--paginate"]);
   const comments = JSON.parse(raw || "[]");
-  const older = comments.filter((c) => c && c.user?.login === me && typeof c.body === "string" && c.body.includes(CRITERIA_MARKER_PREFIX));
+  const older = comments.filter((c) => c && c.user?.login === me && typeof c.body === "string" && c.body.includes(markerPrefix));
 
   deps.ghApiWithInput(["gh", "api", "--method", "POST", `repos/${repo}/issues/${pr}/comments`, "--input", "-"], { body });
 

@@ -44,15 +44,29 @@
 # `jq` is used only to read the tool payload. Do not fail open for the case
 # this hook exists to catch: if jq is missing, fall back to scanning the raw
 # stdin for the marker and refuse when it is there.
-# Two marker families are gate-authoritative, so both are guarded.
+# Three marker families are authoritative, so all are guarded.
 # `dotbabel-criteria` evidence asserts a criterion result; a forged one turns a
 # machine-checked verdict into an assertion. `local-attest` evidence is stronger
 # still: the merge gate skips the full test suite AND the quality profile on it,
 # so a forged one removes verification rather than misreporting it. The payload
 # line is listed too — a marker without it is refused by the gate as INVALID, so
 # guarding only the marker would leave the working forgery shape open.
+# `review-complete` evidence lets `/pr-conductor` skip the review stage on a
+# commit, so a forged one skips a review nobody did. The `post-pr-review`
+# receipt is guarded with it because it is what the sanctioned writer reads to
+# believe a review ran: forging the receipt would launder a forged completion
+# through the honest command. The per-finding idempotency marker
+# (`post-pr-review:v1:<16 hex>`) is deliberately NOT guarded: findings carry it
+# in ordinary use and no skip decision rests on it.
 MARKER='dotbabel-criteria verified-sha='
-MARKERS=("$MARKER" 'local-attest verified-sha=' 'local-attest-payload ')
+MARKERS=(
+  "$MARKER"
+  'local-attest verified-sha='
+  'local-attest-payload '
+  'review-complete verified-sha='
+  'review-complete-payload '
+  'post-pr-review:v1:receipt'
+)
 
 # True when any guarded marker appears in $1.
 has_marker() {
@@ -82,7 +96,7 @@ IFS= read -r -d '' INPUT || true
 if ! command -v jq >/dev/null 2>&1; then
   # `[[ == * *]]` is a builtin too, so this branch needs no external command.
   if has_marker "$INPUT"; then
-    echo "BLOCKED: jq is unavailable, so this hook cannot parse the tool payload, and the input carries a dotbabel-criteria evidence marker. Refusing rather than failing open." >&2
+    echo "BLOCKED: jq is unavailable, so this hook cannot parse the tool payload, and the input carries a dotbabel evidence marker. Refusing rather than failing open." >&2
     exit 2
   fi
   exit 0
@@ -103,17 +117,19 @@ NORM=$(printf '%s' "$CMD" | tr '\t' ' ' | tr -s ' ')
 
 block() {
   cat >&2 <<MSG
-BLOCKED: this command writes a dotbabel-criteria evidence marker by hand${1}.
+BLOCKED: this command writes a dotbabel evidence marker by hand${1}.
 
-The merge gate trusts that marker because the tool derived it from a real
-criteria run. A hand-written one is indistinguishable to the gate, so writing
-it directly turns machine-checked evidence into an assertion.
+The gate and the conductor trust that marker because the tool derived it from a
+real run. A hand-written one is indistinguishable to them, so writing it
+directly turns machine-checked evidence into an assertion.
 
-Post evidence with the sanctioned writer instead:
+Post evidence with the sanctioned writer for its family instead:
 
-  dotbabel criteria verify --pr <N> --post
+  dotbabel criteria verify --pr <N> --post       criteria results
+  dotbabel local-attest --pr <N>                 the CI matrix
+  dotbabel pr-stack review-complete --pr <N>     the review stage finished
 
-That command does not carry the marker in its own text, so it is never blocked.
+None of them carries its marker in its own command text, so none is blocked.
 
 To bypass (the user must confirm first), export
 BYPASS_CRITERIA_EVIDENCE_GUARD=1 in the environment Claude Code was started

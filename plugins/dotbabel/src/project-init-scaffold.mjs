@@ -20,6 +20,7 @@ export const DEFAULT_DOTBABEL_JSON = Object.freeze({
   fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
   quality: Object.freeze({ enabled: true }),
+  attestation: Object.freeze({ enforce: false }),
   cli_substitutions: {},
   // Written verbatim into a consumer's .dotbabel.json, so this is the shape a
   // new repo starts from rather than an internal default.

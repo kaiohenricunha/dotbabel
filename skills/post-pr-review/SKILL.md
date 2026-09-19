@@ -222,11 +222,27 @@ REMAINING=$("$SCRIPTS/post-pr-review-ratelimit.sh" \
 If `REMAINING < 50` → bump sleep to 1s. If `REMAINING < 10` → stop, report
 deferred count, exit 0 with hint at `x-ratelimit-reset`.
 
+### 8b. Leave the receipt
+
+Every run ends here, **including a run that found nothing** and including `--summary-only` and `--mode inline`. A run with no findings posts no comment, so without this a pull request whose review ran clean is indistinguishable from one that was never reviewed, and `/pr-conductor` could not tell the difference on re-entry.
+
+Skip it only under `--dry-run`, or when step 8 failed and the findings never reached the pull request. Pin it to the head SHA bound in step 1:
+
+```bash
+"$SCRIPTS/post-pr-review-post-receipt.sh" "$PR" \
+  --sha "$HEAD_SHA" --posted "$POSTED" --skipped "$SKIPPED" \
+  --agents "$AGENTS_CSV" --profile "$PROFILE" \
+  "${GH_REPO_ARGS[@]}"
+```
+
+It posts one body-only review whose `commit_id` GitHub records. `$POSTED` is the number of findings step 8 posted and `$SKIPPED` the number dropped as duplicates. Never write the receipt marker by hand: the guard hook blocks it, and the script is the only sanctioned writer.
+
 ### 9. Final report
 
 ```
 post-pr-review summary for PR #123 (owner/repo)
   agents dispatched   <csv>  (profile: docs-only | small-code | full | --agents override)
+  receipt             posted | skipped (dry-run)
   posted              N
   skipped (dedup)     M
   skipped (out-diff)  K
@@ -296,18 +312,19 @@ intentionally does not implement locking (out of scope for v0.1).
 
 ## Failure modes
 
-| Mode                         | Detection                                                                   | Behavior                                                              |
-| ---------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| No PR for branch             | `gh pr view` exits non-zero                                                 | Fail with: "No PR found. Pass PR# explicitly: `/post-pr-review 123`." |
-| PR closed/merged             | `state != OPEN`                                                             | Refuse. No `--force` for merged.                                      |
-| PR is draft                  | `isDraft == true`                                                           | Warn + prompt; `--auto` proceeds.                                     |
-| Fork PR                      | `isCrossRepository == true`                                                 | Warn that posting may 403.                                            |
-| Agent returns no findings    | empty `findings[]`                                                          | Note in report, continue.                                             |
-| Agent returns malformed JSON | parse fails                                                                 | Retry once with stricter prompt; on second fail, skip that agent.     |
-| `gh auth missing`            | `gh auth status` non-zero                                                   | Fail at preflight with remediation.                                   |
-| Secondary rate limit hit     | 403 with `secondary rate limit` in body                                     | Stop batch, report deferred, hint at `x-ratelimit-reset`.             |
-| Line not in diff             | pre-validated against postable line set; if it slips and GitHub returns 422 | Skip that comment, log, continue.                                     |
-| Network/transient            | non-2xx, non-422, non-403                                                   | Retry up to 2x with backoff (1s, 3s).                                 |
+| Mode                         | Detection                                                                   | Behavior                                                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| No PR for branch             | `gh pr view` exits non-zero                                                 | Fail with: "No PR found. Pass PR# explicitly: `/post-pr-review 123`."                                                                |
+| PR closed/merged             | `state != OPEN`                                                             | Refuse. No `--force` for merged.                                                                                                     |
+| PR is draft                  | `isDraft == true`                                                           | Warn + prompt; `--auto` proceeds.                                                                                                    |
+| Fork PR                      | `isCrossRepository == true`                                                 | Warn that posting may 403.                                                                                                           |
+| Agent returns no findings    | empty `findings[]`                                                          | Note in report, continue.                                                                                                            |
+| Agent returns malformed JSON | parse fails                                                                 | Retry once with stricter prompt; on second fail, skip that agent.                                                                    |
+| `gh auth missing`            | `gh auth status` non-zero                                                   | Fail at preflight with remediation.                                                                                                  |
+| Secondary rate limit hit     | 403 with `secondary rate limit` in body                                     | Stop batch, report deferred, hint at `x-ratelimit-reset`.                                                                            |
+| Line not in diff             | pre-validated against postable line set; if it slips and GitHub returns 422 | Skip that comment, log, continue.                                                                                                    |
+| Network/transient            | non-2xx, non-422, non-403                                                   | Retry up to 2x with backoff (1s, 3s).                                                                                                |
+| Receipt POST fails           | `post-pr-review-post-receipt.sh` exits 1                                    | Report it. The findings are already posted; the missing receipt only means a later `/pr-conductor` run cannot skip the review stage. |
 
 ## See also
 
