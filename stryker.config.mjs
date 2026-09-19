@@ -36,6 +36,8 @@ export default {
     "plugins/dotbabel/src/pr-gates.mjs",
     "plugins/dotbabel/src/attestation.mjs",
     "plugins/dotbabel/src/attestation-gate-inputs.mjs",
+    "plugins/dotbabel/src/attest-run.mjs",
+    "plugins/dotbabel/src/quality/reuse.mjs",
     "plugins/dotbabel/src/lib/attest-marker.mjs",
     "plugins/dotbabel/src/lib/evidence-payload.mjs",
     "plugins/dotbabel/src/quality/discovery.mjs",

@@ -61,4 +61,107 @@ describe("quality runner", () => {
   it("does not redact the sk-learn package name", () => {
     expect(redactOutput("Use sk-learn and sklearn")).toBe("Use sk-learn and sklearn");
   });
+
+  describe("reusing a result the caller already holds", () => {
+    const HEAD = "a".repeat(40);
+    /** A plan whose command leaves proof on disk that it actually ran. */
+    function markingPlan(repoRoot, id, capability) {
+      const mark = path.join(repoRoot, `ran-${id}`);
+      return {
+        plan: {
+          id, componentId: ".:javascript", cwd: repoRoot, executable: process.execPath,
+          argv: ["-e", `require("node:fs").writeFileSync(${JSON.stringify(mark)}, "x")`],
+          timeoutSeconds: 5, availability: "available", capability, ruleIds: [`correctness.${capability}`],
+          requiresTrust: true, report: { format: "exit-code" },
+        },
+        mark,
+      };
+    }
+    const hit = { leg: "lint", head_sha: HEAD };
+
+    it("does not spawn a plan the resolver accepts", async () => {
+      const repoRoot = tempDir();
+      const { plan, mark } = markingPlan(repoRoot, "lint", "lint");
+      await runQualityPlans({ repoRoot, plans: [plan], allowProjectCommands: true, reuse: () => hit });
+      expect(fs.existsSync(mark)).toBe(false);
+    });
+
+    it("returns a result shaped like an executed one, so nothing downstream must special-case it", async () => {
+      const repoRoot = tempDir();
+      const { plan } = markingPlan(repoRoot, "lint", "lint");
+      const [result] = await runQualityPlans({ repoRoot, plans: [plan], allowProjectCommands: true, reuse: () => hit });
+      expect(result).toMatchObject({
+        id: "lint", componentId: ".:javascript", capability: "lint", ruleIds: ["correctness.lint"],
+        state: "checked", exitCode: 0, signal: null, timedOut: false, truncated: false,
+        stdout: "", stderr: "", durationMs: 0, stdoutFailure: false,
+      });
+      expect(result.capabilities).toEqual(["lint"]);
+    });
+
+    it("says where the result came from, and for which commit", async () => {
+      const repoRoot = tempDir();
+      const { plan } = markingPlan(repoRoot, "lint", "lint");
+      const [result] = await runQualityPlans({ repoRoot, plans: [plan], allowProjectCommands: true, reuse: () => hit });
+      expect(result.reused).toEqual({ leg: "lint", head_sha: HEAD });
+    });
+
+    it("runs a plan the resolver declines, exactly as before", async () => {
+      const repoRoot = tempDir();
+      const { plan, mark } = markingPlan(repoRoot, "lint", "lint");
+      const [result] = await runQualityPlans({ repoRoot, plans: [plan], allowProjectCommands: true, reuse: () => null });
+      expect(fs.existsSync(mark)).toBe(true);
+      expect(result.reused).toBeUndefined();
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("decides per plan, so one refusal does not cost the plans that were accepted", async () => {
+      const repoRoot = tempDir();
+      const a = markingPlan(repoRoot, "lint", "lint");
+      const b = markingPlan(repoRoot, "test", "test");
+      const results = await runQualityPlans({
+        repoRoot, plans: [a.plan, b.plan], allowProjectCommands: true,
+        reuse: (plan) => (plan.capability === "lint" ? hit : null),
+      });
+      expect(fs.existsSync(a.mark)).toBe(false);
+      expect(fs.existsSync(b.mark)).toBe(true);
+      expect(results.map((r) => [r.id, Boolean(r.reused)]).sort()).toEqual([["lint", true], ["test", false]]);
+    });
+
+    it("offers the resolver each executable plan, and only those", async () => {
+      const repoRoot = tempDir();
+      const { plan } = markingPlan(repoRoot, "lint", "lint");
+      const notConfigured = { id: "fmt", componentId: ".:javascript", capability: "format", ruleIds: [], availability: "not_configured" };
+      const offered = [];
+      await runQualityPlans({ repoRoot, plans: [plan, notConfigured], allowProjectCommands: true, reuse: (p) => (offered.push(p.id), null) });
+      expect(offered).toEqual(["lint"]);
+    });
+
+    it("needs no project-command trust for a plan it does not execute", async () => {
+      // Trust exists to gate running repository-defined commands. A reused
+      // result runs none, and demanding trust for it would turn every
+      // untrusted-but-attested worktree into an exit-2 for no safety gain.
+      const repoRoot = tempDir();
+      const untrusted = { CHECK_ON_STOP_TRUSTED_FILE: path.join(repoRoot, "no-such-allowlist") };
+      const { plan } = markingPlan(repoRoot, "lint", "lint");
+      await expect(runQualityPlans({ repoRoot, plans: [plan], env: untrusted, reuse: () => hit })).resolves.toHaveLength(1);
+    });
+
+    it("still demands trust for a plan it does execute in the same run", async () => {
+      const repoRoot = tempDir();
+      const untrusted = { CHECK_ON_STOP_TRUSTED_FILE: path.join(repoRoot, "no-such-allowlist") };
+      const a = markingPlan(repoRoot, "lint", "lint");
+      const b = markingPlan(repoRoot, "test", "test");
+      await expect(
+        runQualityPlans({ repoRoot, plans: [a.plan, b.plan], env: untrusted, reuse: (p) => (p.capability === "lint" ? hit : null) }),
+      ).rejects.toThrow(/trust/);
+      expect(fs.existsSync(b.mark)).toBe(false);
+    });
+
+    it("behaves exactly as before when no resolver is given", async () => {
+      const repoRoot = tempDir();
+      const { plan, mark } = markingPlan(repoRoot, "lint", "lint");
+      await runQualityPlans({ repoRoot, plans: [plan], allowProjectCommands: true });
+      expect(fs.existsSync(mark)).toBe(true);
+    });
+  });
 });

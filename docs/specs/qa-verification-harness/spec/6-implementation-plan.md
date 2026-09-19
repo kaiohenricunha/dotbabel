@@ -12,7 +12,7 @@
 | 4. Review step and consumer surface  | P-B4, P-C4, P-D1, P-D2, P-D3 | P-B3 for P-B4 and P-D1, P-C1 for P-D2 | All five         |
 | 5. Post-deploy                       | P-E1, then P-E2              | Nothing from earlier phases           | No               |
 | 6. Dogfood                           | P-F1                         | Every other unit                      | No               |
-| 7. Evidence reuse                    | P-G1, then P-G2, then P-G3   | P-B3 for P-G1, P-G1 for P-G2 and P-G3 | No               |
+| 7. Evidence reuse                    | P-G1, P-G2, P-G3, then P-G4  | P-B3 for P-G1, P-G1 for the rest      | No               |
 
 The order follows leverage. Phases 1 through 3 close the spec-stage and pull-request gaps, which cost the most points in the assessment (DOC-2). P-B3 and P-A2 wait for P-B2, because P-B3 extends the command that P-B2 creates, and P-A2 teaches a skill to call it. Phase 5 depends on no earlier phase, so it can start sooner when people are free.
 
@@ -20,7 +20,7 @@ The order follows leverage. Phases 1 through 3 close the spec-stage and pull-req
 - **IMPL-2**: A unit that changes a skill or a template runs prettier, then `node plugins/dotbabel/bin/dotbabel-validate-skills.mjs --update`, then `npm run build-plugin`, all in the same pull request.
 - **IMPL-3**: A unit that changes `CLAUDE.md` regenerates the host instruction files with `npx dotbabel-generate-instructions` in the same pull request.
 - **IMPL-4**: Every unit commits its failing tests before, or together with, the code that makes them pass.
-- **IMPL-5**: Every criterion in this spec's `spec.json` starts `planned`. Each unit sets its own criteria to `active` in the pull request that adds their tests (KD-15): AC-1 and AC-2 in P-A1, AC-3 and AC-16 in P-B1, AC-8 and AC-9 in P-C1, AC-13 in P-C5, AC-4 through AC-7 in P-B3, AC-15 in P-B4, AC-10 in P-C4, AC-11 in P-D1, AC-14 in P-D2, AC-12 in P-E1, AC-17 and AC-18 in P-G1, AC-19 in P-G2, and AC-20 in P-G3.
+- **IMPL-5**: Every criterion in this spec's `spec.json` starts `planned`. Each unit sets its own criteria to `active` in the pull request that adds their tests (KD-15): AC-1 and AC-2 in P-A1, AC-3 and AC-16 in P-B1, AC-8 and AC-9 in P-C1, AC-13 in P-C5, AC-4 through AC-7 in P-B3, AC-15 in P-B4, AC-10 in P-C4, AC-11 in P-D1, AC-14 in P-D2, AC-12 in P-E1, AC-17 and AC-18 in P-G1, AC-19 in P-G2, AC-20 in P-G3, and AC-21 and AC-22 in P-G4.
 - **IMPL-6**: P-B1 adds Stryker and its Vitest runner as dev dependencies with a break threshold of 85. Every unit that adds or changes a module in the TEST-1 scope runs Stryker on those modules in its verify step, so the mutation floor is enforced as each unit lands.
 
 ## 6.2 Workstream Breakdown
@@ -930,6 +930,50 @@ npm test
 </verify>
 ```
 
+### P-G4 — Quality reuses what the matrix already ran
+
+```text
+<read-first>
+plugins/dotbabel/src/quality/runner.mjs (runQualityPlans)
+plugins/dotbabel/src/quality/index.mjs
+plugins/dotbabel/src/local-attest-runner.mjs (runMatrix, execute)
+.local-attest.config.mjs
+docs/specs/qa-verification-harness/research/landing-flow-timing.md
+</read-first>
+
+Command: /plan
+
+P-G1 moved the PR quality profile into the attested matrix, where it re-ran lint and the suite that
+the lint and test legs had just run — about 50s of a 53s leg. Remove that without a time-based cache.
+
+local-attest writes a run manifest as each leg settles: head SHA, each leg's status, and a SHA-256 of
+every report a PASSING leg declared it produces. `quality check --reuse <capability>=<leg>` takes a
+capability from a leg only when the manifest names the exact HEAD, the tree is clean, the leg passed,
+and every report still hashes to what the leg recorded. Any other case runs the tool.
+
+Because quality no longer runs lint itself, lint must become a required attestation leg.
+
+TDD first. These checks must fail before the work and pass after it:
+- a passed leg at this commit on a clean tree means quality runs no tool for that capability
+- the coverage rules are still evaluated, from the report the leg wrote
+- a manifest for another commit, a dirty tree, a failed leg, or a changed report each make the tool run
+- a changed coverage report costs coverage its reuse but not lint
+- the result reports every decision and every refusal reason, and the schemas validate real output
+
+Files:
+- add plugins/dotbabel/src/attest-run.mjs, plugins/dotbabel/src/quality/reuse.mjs
+- add schemas/dotbabel.attest-run.schema.json
+- modify plugins/dotbabel/src/quality/runner.mjs, plugins/dotbabel/src/quality/index.mjs, plugins/dotbabel/src/quality/evaluate.mjs
+- modify plugins/dotbabel/src/local-attest-runner.mjs, plugins/dotbabel/src/local-attest-config.mjs, plugins/dotbabel/bin/dotbabel-quality.mjs
+- modify .local-attest.config.mjs, .dotbabel.json, schemas/dotbabel.quality-result.schema.json
+- add plugins/dotbabel/tests/attest-run.test.mjs, plugins/dotbabel/tests/quality-reuse.test.mjs
+
+<verify>
+npx vitest run plugins/dotbabel/tests/attest-run.test.mjs plugins/dotbabel/tests/quality-reuse.test.mjs plugins/dotbabel/tests/quality-runner.test.mjs
+npm test
+</verify>
+```
+
 ## 6.4 Testing Strategy
 
 | Unit | Kinds applied                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | N/A + reason                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -956,7 +1000,9 @@ npm test
 
 | P-G3 | unit: the explicit state, the touched-set gather, and null-versus-empty; contract (bats): merge-pr routes `explicit` to the explicit path and orders the diff review before any command | property, mutation, statistical, load/torture, and post-deploy: N/A |
 
-- **TEST-1**: The new modules under `plugins/dotbabel/src/criteria/`, `plugins/dotbabel/src/attestation.mjs`, `plugins/dotbabel/src/attestation-gate-inputs.mjs`, `plugins/dotbabel/src/lib/evidence-payload.mjs`, and the changed parts of `pr-gates.mjs`, `lib/attest-marker.mjs`, `quality/discovery.mjs`, `quality/evaluate.mjs`, `quality/reports.mjs`, `spec-harness-lib.mjs`, `quality/adapters/python.mjs`, and `quality/adapters/node-tools.mjs`, reach a mutation score of 85 or more. (`lib/pr-markers.mjs` was named here originally and never existed; the marker helpers are in `lib/attest-marker.mjs`. The last three were admitted in step 2 of #390, when measurement showed them to be ordinary in-process modules 13 to 67 kills short of the floor.) Each unit's Stryker run enforces the threshold as the unit lands (IMPL-6), and P-F1 checks again with `--all` over those modules, because a diff-scoped run would score no changed line (REL-11).
+| P-G4 | unit: the manifest codec and `decideReuse`, including every refusal; integration: a real git repository whose tools leave marker files, so a test proves a tool did or did not run; contract: the schemas validate what reuse actually emits; mutation: Stryker on `attest-run.mjs` and `quality/reuse.mjs` (TEST-1) | property, statistical, load/torture, and post-deploy: N/A |
+
+- **TEST-1**: The new modules under `plugins/dotbabel/src/criteria/`, `plugins/dotbabel/src/attestation.mjs`, `plugins/dotbabel/src/attestation-gate-inputs.mjs`, `plugins/dotbabel/src/attest-run.mjs`, `plugins/dotbabel/src/quality/reuse.mjs`, `plugins/dotbabel/src/lib/evidence-payload.mjs`, and the changed parts of `pr-gates.mjs`, `lib/attest-marker.mjs`, `quality/discovery.mjs`, `quality/evaluate.mjs`, `quality/reports.mjs`, `spec-harness-lib.mjs`, `quality/adapters/python.mjs`, and `quality/adapters/node-tools.mjs`, reach a mutation score of 85 or more. (`lib/pr-markers.mjs` was named here originally and never existed; the marker helpers are in `lib/attest-marker.mjs`. The last three were admitted in step 2 of #390, when measurement showed them to be ordinary in-process modules 13 to 67 kills short of the floor.) Each unit's Stryker run enforces the threshold as the unit lands (IMPL-6), and P-F1 checks again with `--all` over those modules, because a diff-scoped run would score no changed line (REL-11).
 - **TEST-2**: Every golden fixture captured from a third-party tool records the tool name and version beside the fixture.
 - **TEST-3**: The test-quality judgment ships only after `run.mjs` exits 0, and `run.mjs` exits 1 when the eval misses OPS-9.
 - **TEST-4**: No test in this spec sleeps. Timers use fake clocks (`agents/test-engineer.md:48`), and bats timeout tests block a stub on a FIFO read instead of sleeping.

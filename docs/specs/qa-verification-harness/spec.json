@@ -79,7 +79,10 @@
     "plugins/dotbabel/src/attestation.mjs",
     "plugins/dotbabel/src/lib/evidence-payload.mjs",
     "schemas/dotbabel.attestation-evidence.schema.json",
-    "plugins/dotbabel/src/attestation-gate-inputs.mjs"
+    "plugins/dotbabel/src/attestation-gate-inputs.mjs",
+    "plugins/dotbabel/src/attest-run.mjs",
+    "plugins/dotbabel/src/quality/reuse.mjs",
+    "schemas/dotbabel.attest-run.schema.json"
   ],
   "acceptance_commands": [
     "npm test",
@@ -604,6 +607,76 @@
       "report": {
         "format": "junit-xml",
         "path": ".dotbabel/criteria/AC-20.junit.xml"
+      }
+    },
+    {
+      "id": "AC-21",
+      "status": "active",
+      "given": "a matrix run whose lint and test legs passed at the current commit on a clean tree",
+      "when": "dotbabel quality check runs with --reuse for those capabilities",
+      "then": "it runs none of those tools, still evaluates the coverage rules from the report the leg wrote, and marks each reused result with its leg and commit",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "runs no tool the matrix already ran at this exact commit"
+        },
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "still evaluates the coverage rules, from the report the leg wrote"
+        },
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "marks every reused execution with the leg and commit it came from"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/quality-reuse.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-21.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-21.junit.xml"
+      }
+    },
+    {
+      "id": "AC-22",
+      "status": "active",
+      "given": "a run manifest that cannot be proven to describe the current tree",
+      "when": "dotbabel quality check runs with --reuse",
+      "then": "the tool runs itself and the refusal reason is reported, and a changed report costs only the capability that reads it",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "for a manifest that belongs to a different commit"
+        },
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "for a dirty working tree"
+        },
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "for a leg that did not pass"
+        },
+        {
+          "file": "plugins/dotbabel/tests/quality-reuse.test.mjs",
+          "name": "decides per capability: a tampered report costs coverage its reuse but not lint"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/quality-reuse.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-22.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-22.junit.xml"
       }
     }
   ]

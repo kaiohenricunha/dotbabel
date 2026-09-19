@@ -284,3 +284,34 @@ describe("validateConfig", () => {
     );
   });
 });
+
+describe("validateConfig — produces", () => {
+  const leg = (produces) => ({ matrix: [{ name: "test", mode: "hard", command: "true", produces }] });
+
+  it("accepts repository-relative report paths", () => {
+    const cfg = validateConfig(leg(["coverage/lcov.info", "reports/junit.xml"]));
+    expect(cfg.matrix[0].produces).toEqual(["coverage/lcov.info", "reports/junit.xml"]);
+  });
+
+  it("treats an absent produces as none", () => {
+    expect(validateConfig(leg(undefined)).matrix[0].produces).toBeUndefined();
+  });
+
+  it.each([
+    ["not an array", "coverage/lcov.info"],
+    ["an empty array", []],
+    ["a non-string entry", [3]],
+    ["an empty entry", [""]],
+    ["an absolute path", ["/etc/passwd"]],
+    ["a path that climbs out of the repository", ["../outside"]],
+    ["a path that climbs out mid-way", ["a/../../outside"]],
+    ["a backslash path", ["coverage\\lcov.info"]],
+    ["a glob", ["coverage/*.info"]],
+  ])("rejects %s", (_label, produces) => {
+    // These paths are hashed and later read back by another process. One that
+    // escapes the repository would turn the manifest into a way to make a
+    // tool read an arbitrary file.
+    expect(() => validateConfig(leg(produces))).toThrow(/produces/);
+  });
+});
+

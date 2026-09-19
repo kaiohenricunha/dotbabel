@@ -13,7 +13,7 @@ import { resolveQualityPolicy } from "../src/quality/config.mjs";
 import { detectQualityCapabilities, planQualityCheck } from "../src/quality/discovery.mjs";
 import { listRepositoryFiles, matchesPathScope, normalizePathScope } from "../src/quality/paths.mjs";
 import { runQualityCheck } from "../src/quality/index.mjs";
-import { QUALITY_PROFILES } from "../src/quality/types.mjs";
+import { QUALITY_CAPABILITIES, QUALITY_PROFILES } from "../src/quality/types.mjs";
 import { qualityEnvelope, renderQualityHuman } from "../src/quality/reporters.mjs";
 import { isRepoTrusted } from "../src/trust-allowlist.mjs";
 
@@ -22,13 +22,13 @@ const FLAGS = {
   repo: { type: "string" }, profile: { type: "string" }, base: { type: "string" },
   head: { type: "string" }, jobs: { type: "string" }, "allow-project-commands": { type: "boolean" },
   "pass-env": { type: "string", multiple: true }, rule: { type: "string" }, write: { type: "boolean" },
-  path: { type: "string", multiple: true }, all: { type: "boolean" },
+  path: { type: "string", multiple: true }, all: { type: "boolean" }, reuse: { type: "string", multiple: true },
 };
 
 function usage() {
   return `dotbabel-quality [check|detect|explain|baseline] [OPTIONS]\n\n` +
     `Commands:\n  check     execute the selected quality profile\n  detect    inspect components and tools without execution\n  explain   show resolved rules and provenance\n  baseline  print a candidate baseline; use --write to save it\n\n` +
-    `Options:\n  --repo <path>\n  --profile <fast|pr|deep>\n  --base <revision>\n  --head <revision>\n  --path <glob>\n  --all\n  --jobs <count>\n  --allow-project-commands\n  --pass-env <name>\n  --rule <id>\n  --write\n  --json\n  --verbose\n  --no-color\n  --help\n  --version\n\n` +
+    `Options:\n  --repo <path>\n  --profile <fast|pr|deep>\n  --base <revision>\n  --head <revision>\n  --path <glob>\n  --all\n  --reuse <capability>=<leg>\n  --jobs <count>\n  --allow-project-commands\n  --pass-env <name>\n  --rule <id>\n  --write\n  --json\n  --verbose\n  --no-color\n  --help\n  --version\n\n` +
     `Exit codes: 0 no error verdict, 1 policy failure, 2 environment failure, 64 invalid usage.\n`;
 }
 
@@ -58,6 +58,21 @@ const rawPaths = Array.isArray(argv.flags.path) ? argv.flags.path : argv.flags.p
 let pathScope = [];
 try { pathScope = normalizePathScope(rawPaths); }
 catch (error) { process.stderr.write(`${error.message}\n`); process.exit(EXIT_CODES.USAGE); }
+// --reuse <capability>=<leg>, repeatable. Validated here, with the other flags,
+// so a malformed request exits with the usage code rather than the environment
+// code — a typo must not read as a broken environment, and must not reach the
+// point where it silently reuses nothing.
+const rawReuse = Array.isArray(argv.flags.reuse) ? argv.flags.reuse : argv.flags.reuse ? [String(argv.flags.reuse)] : [];
+const reuseMap = {};
+for (const entry of rawReuse) {
+  const at = entry.indexOf("=");
+  const capability = at < 0 ? "" : entry.slice(0, at);
+  const leg = at < 0 ? "" : entry.slice(at + 1);
+  if (capability === "" || leg === "") { process.stderr.write(`--reuse expects <capability>=<leg>, got ${JSON.stringify(entry)}\n`); process.exit(EXIT_CODES.USAGE); }
+  if (!QUALITY_CAPABILITIES.includes(capability)) { process.stderr.write(`--reuse: unknown quality capability ${JSON.stringify(capability)} (one of: ${QUALITY_CAPABILITIES.join(", ")})\n`); process.exit(EXIT_CODES.USAGE); }
+  reuseMap[capability] = leg;
+}
+if (rawReuse.length > 0 && command !== "check") { process.stderr.write("--reuse is only valid for check, which is the only command that executes tools\n"); process.exit(EXIT_CODES.USAGE); }
 const allFiles = Boolean(argv.flags.all);
 if (allFiles && (argv.flags.base !== undefined || argv.flags.head !== undefined)) {
   process.stderr.write("--all cannot be combined with --base or --head\n");
@@ -120,7 +135,7 @@ try {
     if (dirty) throw new ValidationError({ code: ERROR_CODES.QUALITY_BASELINE_INVALID, category: "quality", message: "baseline --write requires a clean worktree" });
     if (!argv.flags["allow-project-commands"] && !isRepoTrusted({ repoRoot }).trusted) throw new ValidationError({ code: ERROR_CODES.QUALITY_TRUST_REQUIRED, category: "quality", message: "baseline --write requires explicit project-command trust" });
   }
-  const report = await runQualityCheck({ repoRoot, policy, profile, base: argv.flags.base, head: argv.flags.head, jobs, allowProjectCommands: Boolean(argv.flags["allow-project-commands"]), passEnv, paths: pathScope, all: allFiles });
+  const report = await runQualityCheck({ repoRoot, policy, profile, base: argv.flags.base, head: argv.flags.head, jobs, allowProjectCommands: Boolean(argv.flags["allow-project-commands"]), passEnv, paths: pathScope, reuse: reuseMap, all: allFiles });
   if (command === "baseline") {
     const revision = execFileSync("git", ["-C", repoRoot, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
     const baseline = createQualityBaseline({

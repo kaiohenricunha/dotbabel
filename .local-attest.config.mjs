@@ -14,7 +14,18 @@ export default {
   // rewriting a leg to `true` would produce a truthful "test: pass".
   matrix: [
     { name: "lint", mode: "hard", command: "npm run lint" },
-    { name: "test", mode: "hard", command: "npm test -- --coverage" },
+    // `produces` is what lets the `quality` leg below reuse this run instead of
+    // repeating it. `npm test -- --coverage` is the suite AND the coverage run
+    // (`npm run coverage` is `vitest run --coverage`, the same command), so its
+    // exit code answers quality's `test` capability and the lcov it writes answers
+    // `coverage`. It is hashed after the leg passes, so the quality leg parses
+    // exactly the file this leg wrote and refuses one that is not.
+    {
+      name: "test",
+      mode: "hard",
+      command: "npm test -- --coverage",
+      produces: ["coverage/lcov.info"],
+    },
     {
       name: "validate-settings",
       mode: "hard",
@@ -35,10 +46,17 @@ export default {
     // request either. Locally, from the real checkout, it is the only place
     // the policy actually gets measured.
     //
-    // It re-executes lint and test internally, which the two legs above
-    // already ran. That duplication is accepted: bats dominates the matrix
-    // (~87s of 114s on #393) and the run still sheds more time at merge than
-    // it adds here.
+    // It used to re-execute lint and the suite (twice: `npm test` and `npm run
+    // coverage`), which the `lint` and `test` legs above had just run — measured
+    // at ~50s of a 53s leg. `--reuse` removes that: a capability is taken from
+    // the matching leg ONLY when the run manifest proves it is about this exact
+    // commit, on a clean tree, from a leg that passed, with any report file
+    // still hashing to what that leg wrote. On any doubt the tool simply runs
+    // itself, so this can only ever remove redundant work.
+    //
+    // Consequence for the gate: quality no longer runs lint itself, so `lint`
+    // must be a REQUIRED attestation leg (.dotbabel.json) or lint would stop
+    // being evidence at all.
     {
       name: "quality",
       mode: "hard",
@@ -46,7 +64,7 @@ export default {
       // base is the parent branch, and grading against `main` would measure the
       // parent's diff too. The runner injects DOTBABEL_PR_BASE_REF for every leg.
       command:
-        "node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile pr --base \"origin/${DOTBABEL_PR_BASE_REF:-main}\"",
+        "node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile pr --base \"origin/${DOTBABEL_PR_BASE_REF:-main}\" --reuse lint=lint --reuse test=test --reuse coverage=test",
     },
     { name: "dogfood", mode: "hard", command: "npm run dogfood" },
     { name: "build-plugin --check", mode: "hard", command: "npm run build-plugin -- --check" },
