@@ -20,6 +20,7 @@ settings validator, and a destructive-git PreToolUse hook.
 | Debugging a validator failure                | [troubleshooting.md](./troubleshooting.md) (indexed by `ERROR_CODES`)              |
 | Enabling the editor and turn-end checks      | [hooks.md](./hooks.md) — what each hook does, and the check-on-stop trust model    |
 | Enforcing a language-aware quality floor     | [quality.md](./quality.md) — policies, adapters, baselines, trust, and CI          |
+| Reusing local verification at merge time     | [attestation.md](./attestation.md) — enforcement policy, governance files, doctor  |
 | Upgrading or forking                         | [upgrade-guide.md](./upgrade-guide.md)                                             |
 | Contributing                                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
 

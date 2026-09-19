@@ -210,6 +210,62 @@ describe("renderConfig", () => {
     expect(rendered()).toMatch(/REVIEW THIS FILE/);
   });
 
+  describe("attestation adoption guidance", () => {
+    const draft = (legs) => renderConfig({ legs, warnings: [], toolchain: null });
+    const leg = (name, command, mode = "hard") => ({ name, mode, command, lane: "j", source: "x" });
+
+    it("explains how to make attestation merge-authorizing, and points at the guide", () => {
+      const out = draft([leg("test", "go test ./...")]);
+      expect(out).toContain("docs/attestation.md");
+      expect(out).toMatch(/"enforce": true/);
+      expect(out).toMatch(/dotbabel doctor/);
+    });
+
+    it("lists the hard legs as the suggested required_legs and leaves advisory ones out", () => {
+      const out = draft([
+        leg("lint", "make lint"),
+        leg("test", "make test"),
+        leg("knip", "make knip", "advisory"),
+      ]);
+      const suggested = out.split("\n").find((l) => l.includes('"required_legs"'));
+      expect(suggested).toContain('"lint"');
+      expect(suggested).toContain('"test"');
+      expect(suggested).not.toContain('"knip"');
+    });
+
+    it("suggests governing package.json only when a leg runs a package script", () => {
+      const withPkg = draft([leg("test", "npm test")]);
+      const without = draft([leg("test", "go test ./...")]);
+      const line = (out) => out.split("\n").find((l) => l.includes('"governance_files"'));
+      expect(line(withPkg)).toContain('"package.json"');
+      expect(line(without)).not.toContain("package.json");
+    });
+
+    it("always suggests governing the config file and .dotbabel.json", () => {
+      const line = draft([leg("test", "make test")])
+        .split("\n")
+        .find((l) => l.includes('"governance_files"'));
+      expect(line).toContain('".local-attest.config.mjs"');
+      expect(line).toContain('".dotbabel.json"');
+    });
+
+    it("says why: a governed file cannot be edited by a pull request that attests itself", () => {
+      expect(draft([leg("test", "make test")])).toMatch(/cannot attest its own change/);
+    });
+
+    it("keeps the guidance inside comments, so the file still loads", async () => {
+      const { validateConfig } = await import("../src/local-attest-config.mjs");
+      const out = draft([leg("test", "npm test")]);
+      const mod = await import(`data:text/javascript,${encodeURIComponent(out)}`);
+      expect(() => validateConfig(mod.default)).not.toThrow();
+    });
+
+    it("omits the required_legs example when there is no hard leg to require", () => {
+      const out = draft([leg("knip", "make knip", "advisory")]);
+      expect(out).not.toContain('"required_legs"');
+    });
+  });
+
   it("renders warnings as TODO comments inside the file, where they cannot be missed", () => {
     const out = renderConfig({
       legs: [{ name: "a", mode: "hard", command: "true", lane: "j", source: "x" }],

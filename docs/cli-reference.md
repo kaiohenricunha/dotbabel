@@ -170,7 +170,7 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook → check-on-stop trust. Prints `✓/✗/⚠` per check.
+hook → check-on-stop trust → attestation policy. Prints `✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
@@ -179,6 +179,12 @@ hook → check-on-stop trust. Prints `✓/✗/⚠` per check.
 The trust row reports whether this repo may run turn-end project checks. It
 never fails the run — a repo deliberately left off the allowlist is a valid
 state. See [hooks.md](./hooks.md#check-on-stop-trust).
+
+The attestation rows check `.dotbabel.json`'s `attestation` policy against the
+local-attest config, and fail when enforcement is on but cannot work (no config,
+an ungoverned config, an unknown required leg). They load an executable
+`.local-attest.config.mjs` only when the repo is on the trust allowlist. See
+[attestation.md](./attestation.md#doctor-findings).
 
 **Exits 2** (`ENV`) when env/repo checks fail before validation can run.
 
@@ -525,6 +531,9 @@ Config discovery, in order: `.local-attest.config.mjs`,
 
 The attestation is SHA-pinned, so a push after attesting invalidates it. Commit
 first, attest second.
+
+To let `/merge-pr` reuse an attestation instead of re-running the suite, see
+[attestation.md](./attestation.md).
 
 ---
 
