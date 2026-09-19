@@ -10,6 +10,51 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [4.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.4.0...v4.0.0) (2026-09-19)
+
+
+### ⚠ BREAKING CHANGES
+
+* **criteria:** derive merge-gate scope from the diff, not the body ([#376](https://github.com/kaiohenricunha/dotbabel/issues/376))
+
+### Added
+
+* **ci:** adopt the criteria gate, critical_paths and the pre-push hook ([#394](https://github.com/kaiohenricunha/dotbabel/issues/394)) ([2fde317](https://github.com/kaiohenricunha/dotbabel/commit/2fde317c748f06bfdb9840c4766394b1ef973fa6))
+* **conductor:** narrow the preflight and derive the entry phase (P-G2) ([#401](https://github.com/kaiohenricunha/dotbabel/issues/401)) ([ab91b1d](https://github.com/kaiohenricunha/dotbabel/commit/ab91b1d96ba1b7fbfee70995500860a015d1e58a))
+* **conductor:** skip a finished review on re-entry and let a consumer adopt attestation (P-G5, P-G6) ([#403](https://github.com/kaiohenricunha/dotbabel/issues/403)) ([79c61d8](https://github.com/kaiohenricunha/dotbabel/commit/79c61d89535a5c04b6311763061e481be689033e))
+* **consumer:** ship CI templates, a pre-push hook, and related tests (P-D1..P-D3) ([#382](https://github.com/kaiohenricunha/dotbabel/issues/382)) ([89d42bf](https://github.com/kaiohenricunha/dotbabel/commit/89d42bfe9cd98f50c8abe928a217987e40ae6aa7))
+* **criteria:** verify criteria in review-pr and guard the evidence marker (P-B4) ([#379](https://github.com/kaiohenricunha/dotbabel/issues/379)) ([b84ba63](https://github.com/kaiohenricunha/dotbabel/commit/b84ba639d4e12448d2eba69e21858c59deb3e3cc))
+* **deploy:** add smoke checks to the deploy helper (P-E1) ([#383](https://github.com/kaiohenricunha/dotbabel/issues/383)) ([04cbd14](https://github.com/kaiohenricunha/dotbabel/commit/04cbd14991b23372587e62d4ff24883b2402ff22))
+* **gates:** reuse SHA-pinned attestation evidence at merge time (P-G1) ([#400](https://github.com/kaiohenricunha/dotbabel/issues/400)) ([9fab044](https://github.com/kaiohenricunha/dotbabel/commit/9fab0442d962b5e404d92e3ec1df6cab498e9c08))
+* **models:** add the dotbabel.compute schema and requirement parser (P-2) ([#389](https://github.com/kaiohenricunha/dotbabel/issues/389)) ([79d8884](https://github.com/kaiohenricunha/dotbabel/commit/79d8884e0b6fa50bf0b73860ff1b3537df693a26))
+* **models:** add the Model Intelligence domain vocabulary (P-1) ([#387](https://github.com/kaiohenricunha/dotbabel/issues/387)) ([4ab850e](https://github.com/kaiohenricunha/dotbabel/commit/4ab850ed2ad9edd6c54a9ad7787f52b7d3065c64))
+* **models:** add the Model Intelligence policy layers (P-4) ([#396](https://github.com/kaiohenricunha/dotbabel/issues/396)) ([d73aac1](https://github.com/kaiohenricunha/dotbabel/commit/d73aac18d91382b8f3d783738e3f3712a7badbc6))
+* **models:** add the source adapter contract and its fixtures (P-5) ([#407](https://github.com/kaiohenricunha/dotbabel/issues/407)) ([7b0c379](https://github.com/kaiohenricunha/dotbabel/commit/7b0c3790e1dfabb5d46275b02feb3b2356632b42))
+* **models:** read legacy model/effort and report migration (P-3) ([#393](https://github.com/kaiohenricunha/dotbabel/issues/393)) ([10ab937](https://github.com/kaiohenricunha/dotbabel/commit/10ab93789ff8a0fdece3b70f03e347ba201cff37))
+* **quality:** declare the Stryker mutation tool and repair its sandbox (P-F1) ([#391](https://github.com/kaiohenricunha/dotbabel/issues/391)) ([f42eb1b](https://github.com/kaiohenricunha/dotbabel/commit/f42eb1b974e8275356cf6549b114b74b401fa0a4))
+* **quality:** reuse matrix results and unblock governed-file PRs (P-G3, P-G4) ([#402](https://github.com/kaiohenricunha/dotbabel/issues/402)) ([a234ff3](https://github.com/kaiohenricunha/dotbabel/commit/a234ff3c7abab621738d905654e7d260826d488a))
+* **quality:** score mutation on changed lines only (P-C4) ([#380](https://github.com/kaiohenricunha/dotbabel/issues/380)) ([86efe05](https://github.com/kaiohenricunha/dotbabel/commit/86efe056e48ccfebfa2c40a9b9b8f9c0c8ef05a9))
+* **smoke:** add the smoke-test skill and extend release verification (P-E2) ([#386](https://github.com/kaiohenricunha/dotbabel/issues/386)) ([bab0e23](https://github.com/kaiohenricunha/dotbabel/commit/bab0e23096001dc27c1046f82bd6ca9a50e615fe))
+* **spec:** scaffold spec.json and wire criteria into the authoring skills (P-A2) ([#388](https://github.com/kaiohenricunha/dotbabel/issues/388)) ([9872f11](https://github.com/kaiohenricunha/dotbabel/commit/9872f118bd15b4790f54a342fbd7eb55e3aaf258))
+
+
+### Fixed
+
+* **cli:** stop truncating --json output on a slow pipe reader ([#404](https://github.com/kaiohenricunha/dotbabel/issues/404)) ([2ef2186](https://github.com/kaiohenricunha/dotbabel/commit/2ef218678bb7e056679dd4fd2bcc28099226ae77))
+* **criteria:** derive merge-gate scope from the diff, not the body ([#376](https://github.com/kaiohenricunha/dotbabel/issues/376)) ([0db0221](https://github.com/kaiohenricunha/dotbabel/commit/0db0221b1e11a982a9ffe6a0382f3781d3846d1a))
+* **mutation:** resolve the five orphan units against measurement ([#399](https://github.com/kaiohenricunha/dotbabel/issues/399)) ([a0158f0](https://github.com/kaiohenricunha/dotbabel/commit/a0158f00619f6e7e9a1e490d1d3cf6878bc18757))
+* **mutation:** scope Stryker to all of TEST-1, not just the criteria tree ([#398](https://github.com/kaiohenricunha/dotbabel/issues/398)) ([c6009e8](https://github.com/kaiohenricunha/dotbabel/commit/c6009e896349bd76ff227174ec4ef9e70ca9b8e9))
+
+
+### Documentation
+
+* **changelog:** note the fan_out upgrade caveat for 3.4.0 ([#377](https://github.com/kaiohenricunha/dotbabel/issues/377)) ([c9a2182](https://github.com/kaiohenricunha/dotbabel/commit/c9a218284e09c328decae3380489d68f97a5d88c))
+* **spec:** reconcile qa-verification-harness with what shipped, and fix the TEST-4 timeout test ([#406](https://github.com/kaiohenricunha/dotbabel/issues/406)) ([9357b52](https://github.com/kaiohenricunha/dotbabel/commit/9357b525382d26d6be7649c01ebe6f90a2f2a1eb))
+* **specs:** add the Model Intelligence Phase 0 findings ([#385](https://github.com/kaiohenricunha/dotbabel/issues/385)) ([b6c0ecb](https://github.com/kaiohenricunha/dotbabel/commit/b6c0ecb2a06a58562c90a3d47700f59a2eb2472e))
+* **specs:** add the Model Intelligence PR sequence and landing pipeline ([#392](https://github.com/kaiohenricunha/dotbabel/issues/392)) ([99db64b](https://github.com/kaiohenricunha/dotbabel/commit/99db64bbc7aa6228b80fbcdef4322122820cedf5))
+* **specs:** add the Model Intelligence spec ([#384](https://github.com/kaiohenricunha/dotbabel/issues/384)) ([ed91bcc](https://github.com/kaiohenricunha/dotbabel/commit/ed91bcc8cabdac68a90461cdd6d18448b944b68a))
+* **specs:** record the dual-spec-id landing obligation as IMPL-19 ([#397](https://github.com/kaiohenricunha/dotbabel/issues/397)) ([a842839](https://github.com/kaiohenricunha/dotbabel/commit/a842839aba6a58b0d3c9bdb16446626a25ab32ef))
+
 ## [3.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.3.0...v3.4.0) (2026-09-16)
 
 

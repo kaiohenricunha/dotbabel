@@ -1,6 +1,6 @@
 # Language-aware code quality
 
-_Last updated: v3.4.0_
+_Last updated: v4.0.0_
 
 `dotbabel quality` applies one quality policy across mixed-language repositories. It discovers existing project tools and never installs a checker.
 
