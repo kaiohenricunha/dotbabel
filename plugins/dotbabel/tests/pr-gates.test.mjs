@@ -675,6 +675,7 @@ function attestInput(over = {}) {
     expectedConfigHash: CONFIG_HASH,
     expectedMergeBase: MERGE_BASE,
     requiredLegs: ["test", "quality"],
+    attestationGovernedTouched: [],
     ...over,
   };
 }
@@ -775,7 +776,10 @@ describe("checkMergeGate — attestation evidence", () => {
     const body = attestBody(HEAD, attestPayload({ config_hash: `sha256:${"e".repeat(64)}` }));
     const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
     expect(codes(result)).toEqual(["ATTESTATION_CONFIG_CHANGED"]);
-    expect(result.reasons[0].detail).toContain("cannot authorize it");
+    // The pull request touches no governed file (known-none), so a hash
+    // mismatch means the BASE moved under it. Re-attesting on a rebased head
+    // is the recovery, which is the opposite of the governed-change case.
+    expect(result.reasons[0].detail).toMatch(/rebase/);
   });
 
   it("reports ATTESTATION_CONFIG_CHANGED when the payload records no config hash at all", () => {
@@ -1092,5 +1096,90 @@ describe("deriveEntryPhase", () => {
       expect(ids.has(out.phase)).toBe(true);
       for (const s of out.skips) expect(ids.has(s)).toBe(true);
     }
+  });
+});
+
+
+// --- Governed-file pull requests get a defined disposition -------------------
+//
+// The first version of this gate reported ATTESTATION_CONFIG_CHANGED for a pull
+// request that edits a governed file, and /merge-pr said STOP. Nothing routed
+// forward from there, and re-running local-attest cannot clear it — so the very
+// first Dependabot bump of package.json would have been unmergeable through the
+// sanctioned path. These pin the replacement: an explicit state with a warning,
+// never a dead end, and never a route by which evidence authorizes the change.
+
+describe("checkMergeGate — governed-file pull requests", () => {
+  const touched = { attestationGovernedTouched: [".local-attest.config.mjs"] };
+
+  it("reports the explicit state rather than blocking", () => {
+    const result = checkMergeGate(attestInput({ ...touched, attestationComments: [] }));
+    expect(result.ok).toBe(true);
+    expect(codes(result)).toEqual([]);
+    expect(result.attestation.state).toBe("explicit");
+  });
+
+  it("surfaces the change as a warning that names every touched file", () => {
+    const result = checkMergeGate(
+      attestInput({ attestationGovernedTouched: ["package.json", ".dotbabel.json"], attestationComments: [] }),
+    );
+    expect(result.warnings.map((w) => w.code)).toEqual(["ATTESTATION_GOVERNED_CHANGE"]);
+    expect(result.warnings[0].detail).toBe("package.json, .dotbabel.json");
+  });
+
+  it("never lets evidence authorize a pull request that edits a governed file", () => {
+    // A perfectly valid, current, complete attestation. It must still not be
+    // reported as verified: it was produced under the pull request's own
+    // configuration, so it can say nothing the change did not choose to say.
+    const result = checkMergeGate(attestInput(touched));
+    expect(result.attestation.state).toBe("explicit");
+    expect(result.attestation.sha).toBeNull();
+    expect(result.attestation.legs).toEqual([]);
+  });
+
+  it("reaches the same state whether or not any evidence exists", () => {
+    for (const comments of [[], [comment("chatter")], null]) {
+      const result = checkMergeGate(attestInput({ ...touched, attestationComments: comments }));
+      expect(result.attestation.state).toBe("explicit");
+      expect(codes(result)).toEqual([]);
+    }
+  });
+
+  it("does not let a governed change hide an unrelated gate failure", () => {
+    const result = checkMergeGate(attestInput({ ...touched, body: "" }));
+    expect(result.ok).toBe(false);
+    expect(codes(result)).toContain("EMPTY_BODY");
+    expect(result.attestation.state).toBe("explicit");
+  });
+
+  it("keeps CONFIG_CHANGED for the case where the BASE moved and the PR touched nothing", () => {
+    const result = checkMergeGate(attestInput({ expectedConfigHash: `sha256:${"9".repeat(64)}` }));
+    expect(codes(result)).toEqual(["ATTESTATION_CONFIG_CHANGED"]);
+    expect(result.attestation.state).toBe("failed");
+  });
+
+  it("falls back to CONFIG_CHANGED, with an honest detail, when the touched set is unknown", () => {
+    // No merge base means the gate cannot tell which side changed the file. It
+    // must say so rather than guess, and still refuse.
+    const result = checkMergeGate(
+      attestInput({ attestationGovernedTouched: null, expectedConfigHash: `sha256:${"9".repeat(64)}` }),
+    );
+    expect(codes(result)).toEqual(["ATTESTATION_CONFIG_CHANGED"]);
+    expect(result.reasons[0].detail).toMatch(/either|or this pull request edits/);
+  });
+
+  it("does nothing when enforcement is off, whatever the touched set says", () => {
+    const result = checkMergeGate({
+      body: GOOD_BODY,
+      headRefOid: HEAD,
+      attestationGovernedTouched: ["package.json"],
+    });
+    expect(result.attestation.state).toBe("off");
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("needs no touched set at all from a caller that predates it", () => {
+    const { attestationGovernedTouched, ...legacy } = attestInput();
+    expect(checkMergeGate(legacy).attestation.state).toBe("verified");
   });
 });

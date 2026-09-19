@@ -28,6 +28,10 @@
  * @property {(leg: Leg) => Promise<import("./local-attest-lib.mjs").LegResult>} [runLeg]
  *   async leg executor enabling concurrent lanes; absent in a stub, runMatrix
  *   falls back to a promise-wrapped `run`, preserving fully synchronous tests
+ * @property {(manifest: import("./attest-run.mjs").RunManifest) => void} [writeRunManifest]  persist the run
+ *   manifest; absent in a stub, in which case the run simply records nothing
+ * @property {(repoRelativePath: string) => string} [hashFile]  `sha256:<hex>` of a report a leg produced;
+ *   throws when unreadable
  * @property {() => string} hostname
  * @property {(msg: string) => void} log
  * @property {(msg: string) => void} warn
@@ -57,7 +61,13 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { dirname } from "node:path";
 
-import { ATTEST_MARKER_PREFIX, DEFAULT_GOVERNANCE_FILES, hashGovernanceFiles } from "./attestation.mjs";
+import {
+  ATTEST_MARKER_PREFIX,
+  DEFAULT_GOVERNANCE_FILES,
+  hashGovernanceFiles,
+  isGovernablePath,
+} from "./attestation.mjs";
+import { createRunManifest, recordLeg, sha256File, writeRunManifest } from "./attest-run.mjs";
 import {
   buildAuditEntry,
   filterMatrix,
@@ -123,6 +133,10 @@ function governanceFileList(deps, rev) {
  * @returns {string|null}
  */
 function showAtRev(deps, rev, path) {
+  // `deps.run` takes a shell string, and the path comes from `.dotbabel.json` at
+  // the revision being attested. An entry the shared predicate refuses is never
+  // handed to a shell; it reads as absent, exactly as the gate treats it.
+  if (!isGovernablePath(path)) return null;
   const r = deps.run(`git show ${rev}:${path}`, { capture: true });
   return r.status === 0 ? r.stdout : null;
 }
@@ -190,6 +204,12 @@ export function realDeps() {
     },
     writeFile(path, content) {
       writeFileSync(path, content);
+    },
+    writeRunManifest(manifest) {
+      writeRunManifest(process.cwd(), manifest);
+    },
+    hashFile(repoRelativePath) {
+      return sha256File(repoRelativePath);
     },
     // Async leg executor for concurrent lanes. Differences from the sync
     // `run` are deliberate: stdin is "ignore" because two concurrent children
@@ -611,6 +631,59 @@ export function checkPreconditions(deps, cfg, opts = {}) {
 }
 
 /**
+ * Begin the run manifest for a full attest run and return the per-leg recorder.
+ *
+ * Returns null when the caller supplied no way to persist one (a stub, or a
+ * third-party Deps that predates this) — absence is a no-op, never an error.
+ *
+ * Everything here is best-effort BY DESIGN. The manifest is an optimisation:
+ * losing it costs a later leg a re-run. A failed write must therefore never
+ * turn a green matrix red, so it warns and carries on. Correctness lives on the
+ * reading side, which refuses anything it cannot prove is about this exact tree.
+ *
+ * A leg's declared reports are hashed only if it PASSED. A failed leg's output
+ * describes a run nobody should build on, and recording its hash would let a
+ * later leg "verify" a report from a broken run.
+ *
+ * @param {Deps} deps
+ * @param {Preconditions} pre
+ * @returns {{ onLeg: (leg: Leg, result: LegResult) => void }|null}
+ */
+function startRunManifest(deps, pre) {
+  if (typeof deps.writeRunManifest !== "function") return null;
+  let manifest = createRunManifest({ headSha: pre.headSha });
+  const persist = () => {
+    try {
+      deps.writeRunManifest(manifest);
+    } catch (err) {
+      deps.warn(`WARNING: could not write the run manifest (later legs will re-run instead of reusing): ${err?.message ?? err}`);
+    }
+  };
+  // Written empty first, so a manifest left over from an earlier run at the
+  // same commit cannot survive into this one and vouch for legs that have not
+  // run yet.
+  persist();
+  return {
+    onLeg(leg, result) {
+      const status = legStatus(result);
+      const produces = [];
+      if (status === "pass" && Array.isArray(leg.produces) && typeof deps.hashFile === "function") {
+        for (const path of leg.produces) {
+          try {
+            produces.push({ path, sha256: deps.hashFile(path) });
+          } catch {
+            // Unhashable: leave it out. The reader then finds the report was
+            // never produced and runs the tool itself.
+          }
+        }
+      }
+      manifest = recordLeg(manifest, { name: leg.name, mode: leg.mode, status, produces });
+      persist();
+    },
+  };
+}
+
+/**
  * Execute the matrix as concurrent lanes: legs sharing a `lane` run serially
  * in matrix order; distinct lanes run in parallel; legs without a lane share
  * one default lane, so a lane-less matrix is fully sequential. Results are
@@ -626,10 +699,12 @@ export function checkPreconditions(deps, cfg, opts = {}) {
  *
  * @param {Deps} deps
  * @param {Leg[]} matrix
- * @param {{ failFast?: boolean }} [opts]
+ * @param {{ failFast?: boolean, onLeg?: (leg: Leg, result: LegResult) => void }} [opts]
+ *   `onLeg` is called as each leg SETTLES, not after the whole matrix, so a later
+ *   leg in the same run can read what an earlier one produced.
  * @returns {LegResult[]}
  */
-export async function runMatrix(deps, matrix, { failFast = false } = {}) {
+export async function runMatrix(deps, matrix, { failFast = false, onLeg } = {}) {
   /** @type {import("./local-attest-lib.mjs").LegResult[]} */
   const results = new Array(matrix.length);
   let aborted = false;
@@ -666,6 +741,7 @@ export async function runMatrix(deps, matrix, { failFast = false } = {}) {
           tail: "",
         };
         deps.log(`--- ${leg.name}: SKIPPED (diff-scoped; the matching CI job skips too)`);
+        onLeg?.(leg, results[i]);
         continue;
       }
       if (aborted) {
@@ -678,6 +754,7 @@ export async function runMatrix(deps, matrix, { failFast = false } = {}) {
           tail: "",
         };
         deps.log(`--- ${leg.name}: NOT RUN (fail-fast)`);
+        onLeg?.(leg, results[i]);
         continue;
       }
       deps.log(`\n=== ${leg.name} (${leg.mode}) ===`);
@@ -685,6 +762,7 @@ export async function runMatrix(deps, matrix, { failFast = false } = {}) {
       results[i] = r;
       deps.log(`--- ${leg.name}: ${r.passed ? "PASS" : "FAIL"} (${r.durationS}s)`);
       if (!r.passed) deps.log(r.tail);
+      onLeg?.(leg, r);
       if (failFast && !r.passed && leg.mode === "hard") {
         aborted = true;
         deps.log(`fail-fast: ${leg.name} failed \u2014 remaining legs will not run.`);
@@ -1120,8 +1198,9 @@ export async function execute(deps, cfg, flags) {
   const snapshot = snapshotRestoreFiles(deps, cfg.restoreFiles ?? []);
   const disposeGuard = installInterruptRestore(deps, snapshot);
   let results;
+  const runManifest = startRunManifest(deps, pre);
   try {
-    results = await runMatrix(deps, matrix, { failFast });
+    results = await runMatrix(deps, matrix, { failFast, onLeg: runManifest?.onLeg });
   } finally {
     disposeGuard();
     safeRestore(deps, snapshot);

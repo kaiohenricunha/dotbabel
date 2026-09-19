@@ -17,7 +17,7 @@
       "plugins/dotbabel/scripts/run-bats.sh",
       "plugins/dotbabel/tests/test_validate_settings.sh"
     ],
-    "required_legs": ["test", "quality"],
+    "required_legs": ["lint", "test", "quality"],
     "trusted_associations": ["OWNER"]
   },
   "quality": {

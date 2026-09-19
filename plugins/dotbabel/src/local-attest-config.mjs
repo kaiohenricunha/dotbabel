@@ -31,6 +31,12 @@
  *                                                    classify rule mirrored locally
  * @property {boolean} [passPrBody]                   inject the PR body as env.PR_BODY for
  *                                                    this leg (fetched once, empty on error)
+ * @property {string[]} [produces]                    repository-relative report files this leg
+ *                                                    writes. Once the leg PASSES they are hashed
+ *                                                    into the run manifest so a later leg can
+ *                                                    reuse them (`dotbabel quality --reuse`)
+ *                                                    instead of re-running the tool. Plain
+ *                                                    paths only — no globs, no "..".
  *
  * @typedef {object} Toolchain
  * @property {string} [node]   exact major version pin ("22"); the `node` on PATH
@@ -269,6 +275,24 @@ export function validateConfig(input) {
     if (leg.passPrBody !== undefined && typeof leg.passPrBody !== "boolean") {
       throw new ConfigError(`config.matrix[${i}].passPrBody must be a boolean`);
     }
+    if (leg.produces !== undefined) {
+      // These are hashed after the leg passes and read back by ANOTHER process
+      // (`dotbabel quality --reuse`), so a path that escapes the repository
+      // would let a config make a later tool read an arbitrary file. Plain
+      // repository-relative paths only: no globs, no climbing, no absolutes.
+      const bad = (p) =>
+        typeof p !== "string" ||
+        p === "" ||
+        p.startsWith("/") ||
+        p.includes("\\") ||
+        /[*?[\]{}]/.test(p) ||
+        p.split("/").includes("..");
+      if (!Array.isArray(leg.produces) || leg.produces.length === 0 || leg.produces.some(bad)) {
+        throw new ConfigError(
+          `config.matrix[${i}].produces must be a non-empty array of plain repository-relative file paths (no globs, no "..", no absolute or backslash paths)`,
+        );
+      }
+    }
     matrix.push(
       /** @type {Leg} */ ({
         name,
@@ -288,6 +312,7 @@ export function validateConfig(input) {
           ? { skipWhenDiffOnly: [.../** @type {string[]} */ (leg.skipWhenDiffOnly)] }
           : {}),
         ...(leg.passPrBody !== undefined ? { passPrBody: leg.passPrBody } : {}),
+        ...(leg.produces !== undefined ? { produces: [.../** @type {string[]} */ (leg.produces)] } : {}),
       }),
     );
   });

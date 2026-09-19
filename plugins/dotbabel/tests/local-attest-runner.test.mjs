@@ -160,6 +160,57 @@ describe("checkPreconditions", () => {
     );
   });
 
+  it("never puts a governance path into a shell command line", () => {
+    // `.dotbabel.json` is read at HEAD, so the governed-file list is authored by
+    // the pull request being attested, and `deps.run` hands its argument to a
+    // shell. An entry such as `x;touch pwned` must not reach that shell; it hashes
+    // as absent, which the gate (which drops it) can never match. That is the
+    // fail-closed outcome this design already documents for a bad entry.
+    const hostile = ["x;touch pwned", "$(id)", "a b", "../escape", "-n"];
+    const { deps, calls } = makeDeps({
+      runReplies: [
+        [
+          /git show .*:\.dotbabel\.json/,
+          {
+            stdout: JSON.stringify({
+              attestation: { governance_files: [".dotbabel.json", ...hostile] },
+            }),
+          },
+        ],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    const pre = checkPreconditions(deps, baseConfig());
+    expect(pre.configHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const shown = calls.run.filter((c) => /git show/.test(c.cmd)).map((c) => c.cmd);
+    for (const bad of hostile) {
+      expect(
+        shown.some((cmd) => cmd.includes(bad)),
+        `a command line contained ${JSON.stringify(bad)}`,
+      ).toBe(false);
+    }
+  });
+
+  it("still hashes a governed path that is merely unusual but safe", () => {
+    const { deps, calls } = makeDeps({
+      runReplies: [
+        [
+          /git show .*:\.dotbabel\.json/,
+          {
+            stdout: JSON.stringify({
+              attestation: { governance_files: [".dotbabel.json", "ci/run_tests-2.sh"] },
+            }),
+          },
+        ],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    checkPreconditions(deps, baseConfig());
+    expect(calls.run.some((c) => /git show abc1234\w*:ci\/run_tests-2\.sh/.test(c.cmd))).toBe(true);
+  });
+
   it("leaves the merge base null when the base branch is not fetched", () => {
     const { deps } = makeDeps({
       runReplies: [
@@ -1485,3 +1536,124 @@ describe("dirtyTreeMessage", () => {
     }
   });
 });
+
+describe("execute run manifest (evidence reuse between legs)", () => {
+  const HEAD = "abc1234abc1234abc1234abc1234abc1234abc12";
+  const happy = [
+    [/git rev-parse --abbrev-ref HEAD/, { stdout: "feature\n" }],
+    [/git status --porcelain/, { stdout: "" }],
+    [/gh auth status/, { status: 0 }],
+    [/gh repo view --json nameWithOwner/, { stdout: "k/r\n" }],
+    [/gh pr view --json number/, { stdout: "42\n" }],
+    [/git rev-parse HEAD/, { stdout: `${HEAD}\n` }],
+    [/gh pr view 42 --json headRefOid/, { stdout: `${HEAD}\n` }],
+    [/gh api user --jq \.login/, { stdout: "k\n" }],
+    [/gh api repos\/.*\/collaborators\/.*\/permission/, { stdout: "ADMIN\n" }],
+  ];
+
+  /** Deps that record the manifest as it stood after every write. */
+  function manifestDeps(replies, { hashes = {}, hashThrows = [], writeThrows = false } = {}) {
+    const made = makeDeps({ runReplies: replies });
+    const writes = [];
+    made.deps.writeRunManifest = (m) => {
+      if (writeThrows) throw new Error("disk full");
+      writes.push(JSON.parse(JSON.stringify(m)));
+    };
+    made.deps.hashFile = (rel) => {
+      if (hashThrows.includes(rel)) throw new Error("ENOENT");
+      return hashes[rel] ?? `sha256:${"0".repeat(64)}`;
+    };
+    return { ...made, writes };
+  }
+
+  const attestRun = (deps, matrix) =>
+    execute(deps, validateConfig({ matrix }), { prOverride: null, push: false, dryRun: false });
+
+  it("starts a fresh manifest pinned to the head, before the first leg runs", async () => {
+    const { deps, writes } = manifestDeps(happy);
+    await attestRun(deps, [{ name: "a", mode: "hard", command: "echo a" }]);
+    expect(writes[0]).toMatchObject({ schema_version: 1, head_sha: HEAD, legs: {} });
+  });
+
+  it("records each leg's outcome as it settles, not once at the end", async () => {
+    // The whole point of writing per leg: a later leg in the SAME run reads the
+    // manifest while the run is still going, so it must already hold the
+    // legs that finished before it.
+    const { deps, writes } = manifestDeps(happy);
+    await attestRun(deps, [
+      { name: "lint", mode: "hard", command: "echo lint" },
+      { name: "test", mode: "hard", command: "echo test" },
+    ]);
+    expect(Object.keys(writes[1].legs)).toEqual(["lint"]);
+    expect(Object.keys(writes[2].legs)).toEqual(["lint", "test"]);
+    expect(writes[2].legs.lint).toMatchObject({ mode: "hard", status: "pass" });
+  });
+
+  it("hashes the reports a passing leg declared it produces", async () => {
+    const { deps, writes } = manifestDeps(happy, { hashes: { "coverage/lcov.info": `sha256:${"a".repeat(64)}` } });
+    await attestRun(deps, [{ name: "test", mode: "hard", command: "echo t", produces: ["coverage/lcov.info"] }]);
+    expect(writes.at(-1).legs.test.produces).toEqual([{ path: "coverage/lcov.info", sha256: `sha256:${"a".repeat(64)}` }]);
+  });
+
+  it("records no produced report for a leg that failed, whatever it declared", async () => {
+    // A failed leg's output describes a run nobody should build on. Recording
+    // its hash would let a later leg "verify" a report from a broken run.
+    const failing = makeDeps({ runReplies: [[/echo bad/, { status: 1 }], ...happy] });
+    const writes = [];
+    failing.deps.writeRunManifest = (m) => writes.push(JSON.parse(JSON.stringify(m)));
+    failing.deps.hashFile = () => `sha256:${"a".repeat(64)}`;
+    await attestRun(failing.deps, [{ name: "test", mode: "hard", command: "echo bad", produces: ["coverage/lcov.info"] }]);
+    expect(writes.at(-1).legs.test).toMatchObject({ status: "fail", produces: [] });
+  });
+
+  it("omits a report it cannot hash rather than recording a guess", async () => {
+    const { deps, writes } = manifestDeps(happy, { hashThrows: ["coverage/lcov.info"] });
+    const result = await attestRun(deps, [{ name: "test", mode: "hard", command: "echo t", produces: ["coverage/lcov.info"] }]);
+    expect(writes.at(-1).legs.test.produces).toEqual([]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("never fails a green matrix because the manifest could not be written", async () => {
+    // Reuse is an optimisation. Losing it costs a re-run; failing the
+    // attestation over it would cost a ten-minute matrix for nothing.
+    const { deps, calls } = manifestDeps(happy, { writeThrows: true });
+    const result = await attestRun(deps, [{ name: "a", mode: "hard", command: "echo a" }]);
+    expect(result.exitCode).toBe(0);
+    expect(calls.warn.some((w) => /run manifest/i.test(w))).toBe(true);
+  });
+
+  it("records a diff-skipped leg as skipped, which a reader will refuse to reuse", async () => {
+    // A skipped leg ran nothing, so it can vouch for nothing. It must be
+    // recorded as skipped rather than omitted or, worse, recorded as a pass.
+    const replies = [
+      ...happy,
+      [/pulls\/42\/files/, { stdout: '["docs/a.md"]\n' }],
+      [/--json changedFiles/, { stdout: "1\n" }],
+    ];
+    const { deps, writes } = manifestDeps(replies);
+    await attestRun(deps, [
+      { name: "ran", mode: "hard", command: "echo ran" },
+      { name: "gated", mode: "hard", command: "echo gated", when: { changedPaths: ["api/**"] } },
+    ]);
+    const last = writes.at(-1).legs;
+    expect(last.ran.status).toBe("pass");
+    expect(last.gated.status).toBe("skipped");
+    expect(last.gated.produces).toEqual([]);
+  });
+
+  it("writes nothing when the caller supplied no manifest writer", async () => {
+    // Stubs and third-party Deps predate this. Absence must be a no-op.
+    const { deps } = makeDeps({ runReplies: happy });
+    const result = await attestRun(deps, [{ name: "a", mode: "hard", command: "echo a" }]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it("does not write a manifest for a diagnostic run", async () => {
+    // A subset run tolerates a dirty tree, so it cannot vouch for one head.
+    const { deps, writes } = manifestDeps(happy);
+    const cfg = validateConfig({ matrix: [{ name: "a", mode: "hard", command: "echo a" }, { name: "b", mode: "hard", command: "echo b" }] });
+    await execute(deps, cfg, { prOverride: null, push: false, dryRun: false, only: ["a"] });
+    expect(writes).toEqual([]);
+  });
+});
+

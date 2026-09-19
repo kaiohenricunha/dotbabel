@@ -163,6 +163,8 @@ Phase 4 deferred the test plan to this phase and left a `<!-- test-plan: deferre
 dotbabel pr-stack gate --gate merge --pr <N>
 ```
 
+If the merge gate then reports `attestation.state: explicit`, the pull request edits a governed file and its attestation cannot authorize it. That is not a failure of this phase: the attest still ran the matrix and ticked the plan, and `/merge-pr` will route the pull request through explicit verification after the user reads the governed-file diff. Say so in the summary rather than reporting `READY` as though the evidence were sufficient.
+
 On a failed attest, **leave the marker in place**. `DEFERRED_TEST_PLAN` keeps the merge gate red, which is the correct state for a plan nothing verified. A `WORKTREE_DIRTY` or `HEAD_MISMATCH` precondition failure counts as a failed attest here: fix the precondition and re-enter, or report the test plan as unrun.
 
 ### 6. `stop`

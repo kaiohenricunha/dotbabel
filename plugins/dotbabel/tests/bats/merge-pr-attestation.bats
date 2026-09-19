@@ -42,7 +42,7 @@ line_of() {
   # The dangerous misreading: a repository that never enabled attestation
   # produces an empty reason list too, so "no ATTESTATION_ reason" would skip
   # the suite and the quality profile with no evidence at all.
-  for state in verified off failed; do
+  for state in verified off explicit failed; do
     run grep -qF "\`$state\`" "$MERGE"
     [ "$status" -eq 0 ]
   done
@@ -112,13 +112,15 @@ line_of() {
   [ "$status" -eq 0 ]
 }
 
-@test "merge-pr: says a config-changing PR cannot attest itself" {
-  # Re-running is the wrong advice for this one reason code, and an agent that
-  # treats it like the others loops forever.
-  run grep -qi 'own attestation cannot authorize it' "$MERGE"
-  [ "$status" -eq 0 ]
-  run grep -qi 're-running does not help' "$MERGE"
-  [ "$status" -eq 0 ]
+@test "merge-pr: says a governed-file PR cannot attest itself, and that re-running is not the recovery" {
+  # An agent that treats this like the other reason codes loops forever:
+  # re-running local-attest cannot change the state, because the change is in
+  # the pull request itself rather than in the evidence.
+  # Whitespace-normalised: prettier re-wraps this prose, and a phrase that
+  # happens to straddle a line break must not decide whether the contract holds.
+  flat=$(tr '\n' ' ' < "$MERGE" | tr -s ' ')
+  [[ "$flat" == *"its own attestation cannot authorize it"* ]]
+  [[ "$flat" == *"cannot change this state and is not the recovery"* ]]
 }
 
 @test "merge-pr: never reports an attested leg as something it ran" {
@@ -163,4 +165,69 @@ line_of() {
     run grep -qF 'result.attestation' "$file"
     [ "$status" -eq 0 ]
   done
+}
+
+
+# --- Governed-file pull requests must have a route, not a dead end -----------
+#
+# The first version told the reader "land the change through explicit
+# verification" in one place and STOP in another, with nothing connecting them.
+# A pull request that edits package.json could not be merged by following the
+# document, and re-running local-attest could not fix it. These pin the route.
+
+@test "merge-pr: the explicit state is routed to the explicit path, not to STOP" {
+  run grep -qE '\| `explicit` \|' "$MERGE"
+  [ "$status" -eq 0 ]
+  row=$(grep -E '\| `explicit` \|' "$MERGE")
+  [[ "$row" == *"explicit path"* ]]
+  [[ "$row" != *"STOP"* ]]
+}
+
+@test "merge-pr: the governed-file diff is shown before anything is run" {
+  # Ordering is the property. The explicit path executes the pull request's own
+  # scripts; if the suite were described before the diff review, an agent
+  # reading top to bottom would run a rewritten test script first.
+  review=$(line_of 'read the governed-file diff and show it to the' "$MERGE")
+  suite=$(line_of 'Run the full project test suite' "$MERGE")
+  [ -n "$review" ]
+  [ -n "$suite" ]
+  [ "$review" -lt "$suite" ]
+}
+
+@test "merge-pr: a green suite is explicitly not the acknowledgement" {
+  run grep -qi 'a green suite is not' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: says why the automated run cannot guard this path" {
+  # Without the reason the step reads as ceremony and gets skipped.
+  run grep -qi 'would pass its own' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: stops when the governed-file diff weakens a check" {
+  run grep -qi 'weakens a check' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: CONFIG_CHANGED now means the base moved, and says rebase" {
+  # It used to mean "this PR edits a governed file", which is now its own state.
+  row=$(grep -A6 'ATTESTATION_CONFIG_CHANGED. — the attestation' "$MERGE" | tr '\n' ' ')
+  [[ "$row" == *"base moved"* ]]
+  [[ "$row" == *"Rebase"* ]]
+}
+
+@test "merge-pr: names the warning code the gate emits for a governed change" {
+  run grep -qF 'ATTESTATION_GOVERNED_CHANGE' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: the rule against skipping the diff review is stated as a rule" {
+  run grep -qE '^- Never take the explicit path for an `explicit` state' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "pr-conductor: does not report READY as if evidence sufficed for an explicit PR" {
+  run grep -qF 'attestation.state: explicit' "$REPO_ROOT/skills/pr-conductor/SKILL.md"
+  [ "$status" -eq 0 ]
 }

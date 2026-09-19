@@ -93,12 +93,71 @@ function runOne(plan, options) {
   });
 }
 
-/** Execute validated plans with per-component serialization and bounded concurrency. */
-export async function runQualityPlans({ repoRoot, plans, allowProjectCommands = false, passEnv = [], env = process.env, jobs = 2, timeoutSeconds = 120 } = {}) {
+/**
+ * The result of a plan whose outcome the caller already held.
+ *
+ * Shaped like a real execution — exit 0, empty output, `durationMs: 0` — so the
+ * evaluator and the report parser treat it identically and nothing downstream
+ * needs a special case. `reused` is the one addition, and it is what keeps the
+ * result honest: it names the leg that ran the work and the commit it ran at, so
+ * a reader is never told a tool ran here when it did not.
+ *
+ * @param {any} plan
+ * @param {{ leg: string, head_sha?: string, headSha?: string }} hit
+ * @returns {object}
+ */
+function reusedResult(plan, hit) {
+  return {
+    id: plan.id,
+    componentId: plan.componentId,
+    capability: plan.capability,
+    capabilities: [plan.capability],
+    ruleIds: plan.ruleIds,
+    state: "checked",
+    exitCode: 0,
+    signal: null,
+    timedOut: false,
+    truncated: false,
+    stdout: "",
+    stderr: "",
+    durationMs: 0,
+    report: plan.report,
+    reports: plan.report ? [plan.report] : [],
+    stdoutFailure: false,
+    reused: { leg: hit.leg, head_sha: hit.head_sha ?? hit.headSha },
+  };
+}
+
+/**
+ * Execute validated plans with per-component serialization and bounded concurrency.
+ *
+ * `reuse` lets a caller that already holds a result for a plan — the same
+ * commit, the same tree, a leg that passed — supply it instead of running the
+ * tool again. It is called once per executable plan and returns
+ * `{ leg, head_sha }` to accept or null to decline. Deciding whether a reuse is
+ * SOUND is the resolver's whole job; this function only honours the answer. A
+ * declined plan runs exactly as it always did, so a resolver that refuses
+ * everything is a no-op rather than a hazard.
+ *
+ * A reused plan executes no command, so it needs no project-command trust and
+ * is never validated as a command. Trust is still demanded for every plan that
+ * does run.
+ */
+export async function runQualityPlans({ repoRoot, plans, allowProjectCommands = false, passEnv = [], env = process.env, jobs = 2, timeoutSeconds = 120, reuse = null } = {}) {
   if (passEnv.some((name) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) throw executionError("--pass-env names must be valid environment variable names");
   const trust = isRepoTrusted({ repoRoot, env });
-  const pending = plans.filter((plan) => plan.executable && ["available", "candidate"].includes(plan.availability));
-  const results = plans.filter((plan) => !pending.includes(plan)).map((plan) => ({ id: plan.id, componentId: plan.componentId, capability: plan.capability, ruleIds: plan.ruleIds, state: plan.availability ?? "not_configured", candidates: plan.candidates, evidence: plan.evidence }));
+  const executable = plans.filter((plan) => plan.executable && ["available", "candidate"].includes(plan.availability));
+  const reused = new Map();
+  if (typeof reuse === "function") {
+    for (const plan of executable) {
+      const hit = reuse(plan);
+      if (hit) reused.set(plan, hit);
+    }
+  }
+  const pending = executable.filter((plan) => !reused.has(plan));
+  const results = plans.filter((plan) => !executable.includes(plan) || reused.has(plan)).map((plan) => reused.has(plan)
+    ? reusedResult(plan, reused.get(plan))
+    : ({ id: plan.id, componentId: plan.componentId, capability: plan.capability, ruleIds: plan.ruleIds, state: plan.availability ?? "not_configured", candidates: plan.candidates, evidence: plan.evidence }));
   const byCommand = new Map();
   for (const plan of pending) {
     const key = `${plan.cwd}\0${plan.executable}\0${plan.argv.join("\0")}`;

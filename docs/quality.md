@@ -279,6 +279,42 @@ An analyzer rule name maps onto a dotbabel rule, which is worth knowing when you
 | `E722`, `BLE001`                                              | `semantic.swallowed_errors`     |
 | anything else                                                 | `correctness.lint`              |
 
+## Reusing a local-attest run
+
+A `local-attest` matrix often runs the same tools the quality profile does: a `lint` leg, a
+`test` leg that also writes coverage, and then a `quality` leg that re-runs lint, the suite and
+coverage. On this repository that repeated work was about 50 seconds of a 53-second leg.
+
+```bash
+dotbabel quality check --profile pr --base origin/main \
+  --reuse lint=lint --reuse test=test --reuse coverage=test
+```
+
+`--reuse <capability>=<leg>` (repeatable, `check` only) takes that capability's result from the
+named leg of the current attest run instead of running the tool. Nothing here is a time-based
+cache. A result is reused only when all of these hold, and each is checked:
+
+- the run manifest names the exact `HEAD` you are on. It lives in the worktree's git directory
+  (`<git-dir>/dotbabel/attest-run.json`), never the working tree, so it cannot dirty a repository
+  that does not ignore it;
+- the working tree is clean, so `HEAD` describes what is on disk;
+- the named leg **passed** (a failed, skipped or advisory-failed leg never stands in);
+- every report the capability would parse is one the leg declared in `produces`, and still hashes
+  to the digest the leg recorded — a file at the right path that is not the file the leg wrote is
+  refused.
+
+If any check fails the tool simply runs, so a refusal costs time and never correctness. The
+decision is made per capability: a tampered coverage report costs `coverage` its reuse but not
+`lint`. The result records every decision under `reuse`, with a `reason` for each refusal
+(`NO_MANIFEST`, `HEAD_MISMATCH`, `DIRTY_TREE`, `LEG_MISSING`, `LEG_NOT_PASSED`,
+`REPORT_NOT_PRODUCED`, `REPORT_CHANGED`, `REPORT_UNREADABLE`), and a reused rule passes with the
+message `check passed (reused from local-attest leg "lint" at <sha>)`, never a bare "check
+passed", so a reader is not told a tool ran here when it did not.
+
+Reuse moves the evidence rather than removing it. Because `quality` no longer runs lint itself,
+`lint` must be a **required** attestation leg (`attestation.required_legs`); otherwise lint would
+stop being evidence at all.
+
 ## Tool selection and trust
 
 Project tool mappings have the highest authority. Adapters then inspect repository scripts, targets, configured ecosystem tools, and safe language built-ins.

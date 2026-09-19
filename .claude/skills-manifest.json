@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-19T00:01:08.758Z",
+  "generatedAt": "2026-09-19T01:55:05.905Z",
   "skills": [
     {
       "name": "agents-search",
@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:47d5dcb16f22a416d825396efe5e4ce6c145e3161aafc9b45b9913f764bb1eb0",
+      "checksum": "sha256:52a05b9a790e2fb8565181f5dcf646dfd709fa81a626b20c54f67cdadfffa7e8",
       "dependencies": [],
       "lastValidated": "2026-09-19"
     },
@@ -189,7 +189,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:8d8fa2b9e7e3a973f98dbf40aea22653e71d42b51ddce8895df75b6a7f79950c",
+      "checksum": "sha256:4b30244e422b7a914d6ffca66109bf29cb09d74024e4850b2f24cc094e9af7b9",
       "dependencies": [
         "pre-pr",
         "git",

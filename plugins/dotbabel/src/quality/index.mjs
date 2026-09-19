@@ -11,6 +11,7 @@ import { loadQualityBaseline, loadQualityBaselineAtRevision } from "./baseline.m
 import { qualityEnvelope } from "./reporters.mjs";
 import { capabilityRules } from "./adapters/shared.mjs";
 import { matchesPathScope } from "./paths.mjs";
+import { buildReuseResolver } from "./reuse.mjs";
 
 function inside(root, candidate) {
   const relative = path.relative(fs.realpathSync(root), fs.realpathSync(candidate));
@@ -107,7 +108,10 @@ export async function runQualityCheck(options = {}) {
   const scope = narrowScope(fullScope, paths);
   const detection = detectQualityCapabilities({ repoRoot, policy, paths });
   const planned = planQualityCheck({ repoRoot, policy, changeSet: { ...scope, criticalMatches }, profile, detection, paths });
-  const executions = await runQualityPlans({ repoRoot, plans: planned.plans, allowProjectCommands: options.allowProjectCommands, passEnv: options.passEnv, env: options.env, jobs: options.jobs ?? policy.jobs ?? 2, timeoutSeconds: profile === "deep" ? 1800 : profile === "pr" ? 900 : 120 });
+  // Reuse is opt-in and validated before anything runs, so a typo in the
+  // request fails loudly instead of silently reusing nothing.
+  const reuse = options.reuse && Object.keys(options.reuse).length > 0 ? buildReuseResolver({ repoRoot, reuse: options.reuse }) : null;
+  const executions = await runQualityPlans({ repoRoot, plans: planned.plans, allowProjectCommands: options.allowProjectCommands, passEnv: options.passEnv, env: options.env, jobs: options.jobs ?? policy.jobs ?? 2, timeoutSeconds: profile === "deep" ? 1800 : profile === "pr" ? 900 : 120, reuse: reuse?.resolve ?? null });
   const parsed = parseExecutionReports(repoRoot, executions, scope);
   const native = sourceFindings(repoRoot, scope, detection.files);
   // Whole-repository mode reads no diff, so there is no merge base to read a
@@ -116,7 +120,7 @@ export async function runQualityCheck(options = {}) {
     ? loadQualityBaselineAtRevision({ repoRoot, baselineFile: policy.baseline_file, revision: scope.mergeBase })
     : loadQualityBaseline({ repoRoot, baselineFile: policy.baseline_file });
   const evaluation = evaluateQuality({ policy, profile, executions, metrics: [...parsed.metrics, ...native.metrics], findings: [...parsed.findings, ...native.findings], baseline, renames: scope.renames, criticalMatches });
-  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, critical_matches: criticalMatches, components: planned.components, exclusions: detection.exclusions, executions, ...evaluation });
+  return qualityEnvelope("check", { state: "checked", profile, policy_hash: policy.policy_hash, scope, path_scope: paths, all_files: all, critical_matches: criticalMatches, components: planned.components, exclusions: detection.exclusions, executions, ...(reuse ? { reuse: reuse.decisions } : {}), ...evaluation });
 }
 
 export { resolveQualityPolicy } from "./config.mjs";

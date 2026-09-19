@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.attest-run.schema.json",
+  "title": "dotbabel local-attest run manifest",
+  "description": "What one local-attest matrix run learned, written to <git-dir>/dotbabel/attest-run.json (never the working tree) so a later leg can reuse it. Usable only when it names the reader's exact HEAD, the tree is clean, the leg passed, and every report still hashes to what the leg recorded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "head_sha", "started_at", "legs"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "head_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "legs": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["mode", "status", "finished_at", "produces"],
+        "properties": {
+          "mode": {
+            "enum": ["hard", "advisory"]
+          },
+          "status": {
+            "enum": ["pass", "fail", "advisory-fail", "skipped", "not-run"]
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "produces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "sha256"],
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

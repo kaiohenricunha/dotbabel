@@ -53,6 +53,30 @@ export const ATTEST_PAYLOAD_LINE_PREFIX = "<!-- local-attest-payload ";
 /** Files whose contents define what an attestation actually proves. */
 export const DEFAULT_GOVERNANCE_FILES = Object.freeze([".local-attest.config.mjs", ".dotbabel.json"]);
 
+const GOVERNED_PATH_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
+
+/**
+ * True when a `governance_files` entry is a plain relative path inside the
+ * repository.
+ *
+ * The list is authored in `.dotbabel.json`, which the producer reads at the pull
+ * request's HEAD, and each entry reaches `git show <rev>:<path>`. An entry that
+ * escapes the repository or carries shell metacharacters is a configuration bug,
+ * and on the producer side an injection vector. Both sides apply this one
+ * predicate, so neither can be talked into running an entry the other refuses.
+ *
+ * Refusing is also the fail-closed direction: the gate drops an entry that fails
+ * this test while the producer still hashes it (as absent), so the two hashes
+ * can never match and every merge blocks until the trunk's configuration is
+ * fixed. `dotbabel doctor` reports the entry before that happens.
+ *
+ * @param {unknown} path
+ * @returns {boolean}
+ */
+export function isGovernablePath(path) {
+  return typeof path === "string" && GOVERNED_PATH_RE.test(path) && !path.includes("..");
+}
+
 const marker = createMarker(ATTEST_MARKER_PREFIX);
 
 /**

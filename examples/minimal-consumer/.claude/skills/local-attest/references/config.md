@@ -25,6 +25,7 @@ type Config = {
     when?: { changedPaths: string[] }; // run only when SOME changed PR file matches a glob (CI path filter, mirrored)
     skipWhenDiffOnly?: string[]; // skip when EVERY changed PR file matches a glob (docs-only classify, mirrored)
     passPrBody?: boolean; // inject the PR body as env.PR_BODY for this leg
+    produces?: string[]; // report files this leg writes; hashed after it PASSES so a later leg can reuse them
   }>;
 
   label?: string; // PR label to apply on attest (default: "ci/local-verified")
@@ -175,7 +176,18 @@ export default {
 - `trustedAssociations` must be a non-empty array of strings.
 - `env` values must be strings; `lane` non-empty; `when` exactly
   `{ changedPaths: [globs] }` (non-empty); `skipWhenDiffOnly` a non-empty glob
-  array; `passPrBody` boolean; `restoreFiles` relative paths without `..`.
+  array; `passPrBody` boolean; `produces` a non-empty array of plain repository-relative
+  file paths (no globs, no `..`, no absolute or backslash paths); `restoreFiles` relative
+  paths without `..`.
+- **`produces` and reuse.** A full attest run writes `<git-dir>/dotbabel/attest-run.json` (inside the worktree's git
+  directory, so it can never dirty the working tree) as each leg
+  settles: the head SHA, every leg's status, and a SHA-256 of each file a _passing_ leg
+  declared it `produces`. A later leg can then run
+  `dotbabel quality check --reuse <capability>=<leg>` and take that capability from the leg
+  instead of running the tool again. Reuse applies only when the manifest names the reader's
+  exact HEAD, the working tree is clean, the leg passed, and every report still hashes to
+  what the leg recorded; on any doubt the tool runs itself, so reuse can only remove
+  redundant work. See `docs/quality.md`, "Reusing a local-attest run".
 - Unknown top-level keys are ignored. Defaults are merged from
   `plugins/dotbabel/src/local-attest-config.mjs:DEFAULTS`.
 
