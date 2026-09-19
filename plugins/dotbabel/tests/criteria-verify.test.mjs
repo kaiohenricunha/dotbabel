@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { fileURLToPath } from "url";
 import path from "path";
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "fs";
@@ -514,8 +514,28 @@ describe("verifyCriteria", () => {
       testFileContents: { "t.mjs": "// passes" },
     });
     const ctx = createHarnessContext({ repoRoot: root });
-    const result = await verifyCriteria(ctx, { specId: "example", allowProjectCommands: true, timeoutSeconds: 1 });
-    expect(result.payload.specs[0].criteria[0].status).toBe("error");
+    // TEST-4: the runner's timeout is a real `setTimeout`, so fake that clock and
+    // `Date`. The runner is the only timer on this path and registers it after
+    // spawning the child, so wait for it to exist, jump to it, and read how far the
+    // fake clock moved: that is the timer's delay, whatever the child does next.
+    // `setImmediate` stays real, which is what lets the killed child actually exit.
+    const yieldToIo = () => new Promise((resolve) => setImmediate(resolve));
+    vi.useFakeTimers({ toFake: ["setTimeout", "Date"] });
+    try {
+      let settled = false;
+      const pending = verifyCriteria(ctx, { specId: "example", allowProjectCommands: true, timeoutSeconds: 1 }).finally(() => {
+        settled = true;
+      });
+      while (vi.getTimerCount() === 0) await yieldToIo();
+      const registeredAt = Date.now();
+      await vi.advanceTimersToNextTimerAsync();
+      expect(Date.now() - registeredAt).toBe(1000);
+      while (!settled) await yieldToIo();
+      const result = await pending;
+      expect(result.payload.specs[0].criteria[0].status).toBe("error");
+    } finally {
+      vi.useRealTimers();
+    }
   }, 10000);
 
   it("records a planned criterion as pending without running it", async () => {

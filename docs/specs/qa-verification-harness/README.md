@@ -23,11 +23,11 @@ The owner approved the spec on 2026-09-13; the metadata status in `spec.json` is
 
 1. **Why:** [`spec/1-problem-motivation.md`](spec/1-problem-motivation.md) explains the 6/10 assessment and its six gaps.
 2. **What is in and out:** [`spec/2-scope.md`](spec/2-scope.md) lists the nine items and the five settled decisions.
-3. **How it fits together:** [`spec/3-high-level-architecture.md`](spec/3-high-level-architecture.md) and [`spec/4-data-flow-components.md`](spec/4-data-flow-components.md) cover the layers, six flows, and key decisions KD-1 through KD-16.
+3. **How it fits together:** [`spec/3-high-level-architecture.md`](spec/3-high-level-architecture.md) and [`spec/4-data-flow-components.md`](spec/4-data-flow-components.md) cover the layers, six flows, and key decisions KD-1 through KD-19.
 4. **Exact contracts:** [`spec/5-interfaces-apis.md`](spec/5-interfaces-apis.md) defines the criterion schema, the `dotbabel criteria` command, the evidence comment, and the new reason codes.
-5. **How to build it:** [`spec/6-implementation-plan.md`](spec/6-implementation-plan.md) holds seventeen prompts in six phases, each with its failing tests listed first.
+5. **How to build it:** [`spec/6-implementation-plan.md`](spec/6-implementation-plan.md) holds twenty-three prompts in seven phases, each with its failing tests listed first.
 6. **Limits and risks:** [`spec/7-non-functional-requirements.md`](spec/7-non-functional-requirements.md) and [`spec/8-risks-alternatives.md`](spec/8-risks-alternatives.md).
-7. **Self-test:** `spec.json` declares sixteen acceptance criteria that this spec's own implementation must pass.
+7. **Self-test:** `spec.json` declares twenty-seven acceptance criteria that this spec's own implementation must pass.
 
 ## What to Expect
 
@@ -55,7 +55,7 @@ This summary is for project owners and managers.
 - A post-deploy smoke verdict arrives within 5 minutes.
 - The pre-push check finishes within 2 minutes or steps aside.
 
-**Delivery.** The work is 17 units in 6 phases. Each phase can ship on its own as a minor release. The first phases deliver the highest value, requirements and pull request proof, and post-deploy checks come last. Every unit has a documented way to switch it off.
+**Delivery.** The work is 23 units in 7 phases. Each phase can ship on its own as a minor release. The first phases deliver the highest value, requirements and pull request proof, and post-deploy checks come last. Every unit has a documented way to switch it off.
 
 **Risks to watch:**
 
@@ -68,7 +68,7 @@ This summary is for project owners and managers.
 
 - Schedule the SLO follow-up spec.
 
-The owner confirmed all key decisions, KD-1 through KD-16, by 2026-09-11, and approved the spec on 2026-09-13. Phase 1 (A1, B1, C1) may start.
+The owner confirmed all key decisions, KD-1 through KD-16, by 2026-09-11, and approved the spec on 2026-09-13. KD-17 through KD-19 were added later by dated amendments (2026-09-18 and 2026-09-19, §4). Phase 1 (A1, B1, C1) may start.
 
 ## Research Sources
 
