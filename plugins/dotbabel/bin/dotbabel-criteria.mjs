@@ -12,12 +12,12 @@
  * argv change, unknown spec), 64 a usage error.
  */
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 
 import { version } from "../src/index.mjs";
 import { parse, helpText } from "../src/lib/argv.mjs";
 import { ValidationError, formatError, ERROR_CODES } from "../src/lib/errors.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
+import { writeAll } from "../src/lib/write-all.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
 import { createHarnessContext, listSpecDirs } from "../src/spec-harness-lib.mjs";
 import { verifyCriteria } from "../src/criteria/verify.mjs";
@@ -89,11 +89,6 @@ function realGhApiWithInput(argv, payload) {
 
 const deps = { capture: realCapture, ghApiWithInput: realGhApiWithInput, log: (msg) => process.stderr.write(`${msg}\n`) };
 
-function writeAll(text) {
-  const buffer = Buffer.from(text);
-  let offset = 0;
-  while (offset < buffer.length) offset += fs.writeSync(process.stdout.fd, buffer, offset);
-}
 
 function exitWithValidationError(error, verbose) {
   process.stderr.write(`${formatError(error, { verbose })}\n`);
