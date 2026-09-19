@@ -110,5 +110,10 @@ itself.
 ## Found while measuring
 
 `dotbabel quality check --json` **piped** truncates at ~64 KiB (65,727 of 224,778 bytes) and exits
-2; redirected to a file it is complete and exits 0. CI redirects, so it never surfaced. Not fixed
-here.
+2; redirected to a file it is complete and exits 0. CI redirects, so it never surfaced.
+
+Root cause: the bin printed with a synchronous `fs.writeSync` loop on `process.stdout.fd`, which
+Node makes non-blocking for a pipe, so once the 64 KiB pipe buffer filled and the reader lagged the
+write threw `EAGAIN` and the command exited 2. It is fixed separately (`fix(cli): stop truncating
+--json output that a slow pipe reader cannot keep up with`), not in this change: a shared `writeAll`
+that retries on `EAGAIN`.
