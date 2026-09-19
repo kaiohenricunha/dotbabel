@@ -1,0 +1,24 @@
+{
+  "$comment": "The measured OpenCode case (DOC-2, \"`opencode models` Grammar and Stability\"): the command exits 0 and prints nothing. A successful exit code alone does not imply ok (section 5 'Adapter result'). `expectedResult` is the outcome that a runtime adapter's classification MUST produce for the `process` block, which is unknown with diagnostic empty_output. The P-5 contract enforces only that this result is well formed and that an ok result cannot be built without evidence; the classification itself belongs to the P-6 and P-7 adapters, which should run this fixture through their real classifier. Preserving a previously valid cache on a failed refresh is REL-2 and belongs to catalog/.",
+  "process": {
+    "argv": ["opencode", "models"],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "expectedResult": {
+    "status": "unknown",
+    "provenance": {
+      "sourceId": "opencode",
+      "sourceKind": "runtime",
+      "sourceVersion": "2.0.5",
+      "adapterVersion": "1"
+    },
+    "observedAt": "2026-09-18T00:00:00.000Z",
+    "diagnostic": {
+      "code": "empty_output",
+      "message": "`opencode models` exited 0 and produced no output, so the model list cannot be determined",
+      "retryable": true
+    }
+  }
+}
