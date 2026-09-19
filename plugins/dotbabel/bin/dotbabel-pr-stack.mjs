@@ -17,6 +17,7 @@
  *   dotbabel pr-stack gate   --gate local-attest|merge --pr <N>
  *   dotbabel pr-stack gate   --gate skip-ci [--sha <rev>]
  *   dotbabel pr-stack phases
+ *   dotbabel pr-stack entry   [--pr <N>]
  *
  * `next` prints the commands to run; it never executes them. A rebase after a
  * squash-merge needs `--onto`, so the parent's pre-merge head SHA matters —
@@ -40,6 +41,7 @@ import {
   CONDUCTOR_PHASES,
   checkLocalAttestGate,
   checkMergeGate,
+  deriveEntryPhase,
   hasSkipCi,
   summarizeGates,
 } from "../src/pr-gates.mjs";
@@ -51,7 +53,7 @@ const TOOL = "dotbabel-pr-stack";
 
 const PR_FIELDS = "number,headRefName,baseRefName,state,mergeStateStatus,headRefOid";
 
-const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases"]);
+const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry"]);
 
 const FLAGS = {
   trunk: { type: "string", default: "main" },
@@ -75,11 +77,12 @@ Subcommands:
   next               Print the commands to move a child PR after its parent merged
   gate               Evaluate a precondition gate (local-attest | merge | skip-ci)
   phases             Print the canonical pipeline phase order
+  entry              Print the phase the conductor should start at for this branch
 
 Options:
   --trunk <ref>      Trunk branch name (default: main)
   --limit <N>        Max PRs to enumerate (default: 100)
-  --pr <N>           PR number (required by: next, gate)
+  --pr <N>           PR number (required by: next, gate; optional for entry)
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
@@ -402,9 +405,74 @@ async function main() {
     });
   }
 
+  if (sub === "entry") {
+    // Removes the need to remember that `open-pr` self-skips on an existing
+    // pull request. The state is observable, so it is derived rather than
+    // asked for with `--from`.
+    let prNumber = flags.pr === undefined ? null : requireNumber(flags.pr, "--pr");
+    if (prNumber === null) {
+      // State, not just the number: `gh pr view` falls back to the most recent
+      // CLOSED or MERGED pull request for the head ref, and a dead one must
+      // still enter at phase 2 rather than skip it.
+      const r = sh("gh pr view --json number,state");
+      if (r.status === 0) {
+        try {
+          const view = JSON.parse(r.stdout);
+          if (view.state === "OPEN" && Number.isInteger(view.number) && view.number > 0) {
+            prNumber = view.number;
+          }
+        } catch {
+          prNumber = null;
+        }
+      } else if (!/no pull requests? found|no open pull requests?/i.test(r.stderr)) {
+        // A genuine "this branch has no PR" is the NO_PR answer. Anything else
+        // — gh missing, unauthenticated, an API error — is an environment
+        // problem, and laundering it into NO_PR would tell phase 2 to open a
+        // pull request that may already exist.
+        fail(EXIT_CODES.ENV, `could not resolve the pull request for this branch:\n${r.stderr.trim()}`);
+      }
+    }
+    const result = deriveEntryPhase({ prNumber });
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: { ...result, prNumber },
+      problems: [],
+      lines: [
+        `entry: ${result.phase} (${result.reason})`,
+        ...(result.skips.length > 0 ? [`  skips: ${result.skips.join(", ")}`] : []),
+      ],
+      json,
+    });
+  }
+
   const which = flags.gate;
 
   // skip-ci inspects a local commit message, so it needs no PR number.
+  if (sub === "entry") {
+    // The conductor used to enter at phase 1 always, so resuming an open pull
+    // request meant remembering `--from post-pr-review`. The state is
+    // observable, so it is derived rather than asked for.
+    let prNumber = argv.flags.pr === undefined ? null : requireNumber(argv.flags.pr, "--pr");
+    if (prNumber === null) {
+      const r = sh("gh pr view --json number --jq .number");
+      const n = Number(r.stdout.trim());
+      prNumber = r.status === 0 && Number.isInteger(n) && n > 0 ? n : null;
+    }
+    const result = deriveEntryPhase({ prNumber });
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: { ...result, prNumber },
+      problems: [],
+      lines: [
+        `entry: ${result.phase} (${result.reason})`,
+        ...(result.skips.length > 0 ? [`  skips: ${result.skips.join(", ")}`] : []),
+      ],
+      json,
+    });
+  }
+
   if (which === "skip-ci") {
     const rev = typeof flags.sha === "string" && flags.sha !== "" ? assertRev(flags.sha) : "HEAD";
     const msg = sh(`git log -1 --pretty=%B ${rev}`);

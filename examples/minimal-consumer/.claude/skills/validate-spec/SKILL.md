@@ -55,7 +55,14 @@ not auditing.
 
 2. **Locate the spec directory.** Look for `docs/specs/<spec-id>/` starting from cwd, walking up to find the project root (the directory containing `docs/specs/`).
 
-3. **Confirm the multi-file `/spec` layout.** Required files:
+3. **Report whether the spec declares `acceptance_criteria`.** If `spec.json`
+   has no `acceptance_criteria` array, record an **INFO** finding: the field is
+   optional in the schema, so a spec written before it existed is not
+   malformed — but its claims are prose only, and nothing machine-checkable
+   backs them. Say so in the audit rather than letting the absence pass
+   unremarked. Never escalate this to a failure.
+
+4. **Confirm the multi-file `/spec` layout.** Required files:
    - `spec.json`
    - `README.md`
    - `spec/1-problem-motivation.md`
@@ -72,7 +79,7 @@ not auditing.
 
    > This skill validates only the structured `/spec` format (8 sections + spec.json). The directory `<path>` is missing: `<list>`. For ad-hoc or single-file specs, run `/create-audit` with the spec file as input instead.
 
-4. **Read everything into context.** `spec.json`, `README.md`, all 8 section files, `research/sources.md`, and `current-state/analysis.md` if present (brownfield).
+5. **Read everything into context.** `spec.json`, `README.md`, all 8 section files, `research/sources.md`, and `current-state/analysis.md` if present (brownfield).
 
 ---
 
@@ -145,7 +152,48 @@ ground truth. Run them.
    - Capture exit code, last 30 lines of stdout, last 30 lines of stderr.
    - Record duration.
 
-2. **On any failure, prove pre-existing vs. introduced.** This is non-negotiable per the user's CLAUDE.md test discipline — never assert "pre-existing" without proof. The required check:
+2. **Verify the acceptance criteria**, when the spec declares any:
+
+   ```bash
+   dotbabel criteria verify --spec <spec-id> --json
+   ```
+
+   `<spec-id>` is the directory name resolved in Phase 1 — it must match an
+   existing entry under `docs/specs/`. If it does not, stop rather than pass an
+   unverified string to a command line.
+
+   `--json` is not optional here. When every criterion is still `planned` the
+   command short-circuits, prints no per-criterion lines on stdout, and exits
+   0 — which is exactly the shape of a freshly scaffolded spec, so without
+   `--json` there is nothing to record.
+
+   This belongs here, beside the acceptance commands, because both are the
+   spec's executable ground truth. An audit that ran only the commands could
+   report a spec as implemented while the criteria naming its tests fail.
+
+   Record each criterion's verdict in the audit by id. The tool emits one of
+   five, and **`planned` is not among them** — a criterion declared `planned`
+   in `spec.json` is reported as **`pending`**:
+
+   | Verdict       | Meaning                                                   | Audit                                                          |
+   | ------------- | --------------------------------------------------------- | -------------------------------------------------------------- |
+   | `pass`        | ran, and every named test was confirmed                   | OK                                                             |
+   | `pending`     | declared `planned`; its tests have not landed yet         | INFO, not a failure                                            |
+   | `fail`        | ran and a named test failed                               | **CRITICAL** — the spec asserts what its own tests contradict  |
+   | `unconfirmed` | ran, but a declared test name was not found in the report | **CRITICAL** — usually a paraphrased name; the lookup is exact |
+   | `error`       | could not run: spawn failure, timeout, unreadable report  | INFO, blocked — an environment problem, not a spec problem     |
+
+   **Exit 2 is the environment, not the spec.** Criteria plans require trust,
+   and trust is granted per realpath, so a spec audited from a fresh worktree
+   exits 2 with no verdicts at all. Record that as blocked, label no criterion
+   failed, and re-run after trusting the path.
+
+   **Never resolve a failing criterion by editing the criterion.** This skill
+   audits a spec against the code; rewriting the claim to match broken code
+   inverts that, and the audit would then certify exactly the drift it exists
+   to catch.
+
+3. **On any failure, prove pre-existing vs. introduced.** This is non-negotiable per the user's CLAUDE.md test discipline — never assert "pre-existing" without proof. The required check:
 
    ```bash
    git stash --include-untracked
@@ -158,7 +206,7 @@ ground truth. Run them.
    - If `STASHED_EXIT` is zero → label the failure **introduced** (recorded as **CRITICAL** — the spec implementation broke this command).
    - If there is nothing to stash (clean working tree), the failure is in committed code — label **pre-existing**.
 
-3. **Always restore working state.** `git stash pop` after every stash. If `git stash pop` errors (e.g. conflicts), stop the entire skill, surface the situation to the user, and do not write the audit. Losing user work is worse than missing the audit.
+4. **Always restore working state.** `git stash pop` after every stash. If `git stash pop` errors (e.g. conflicts), stop the entire skill, surface the situation to the user, and do not write the audit. Losing user work is worse than missing the audit.
 
 ---
 
