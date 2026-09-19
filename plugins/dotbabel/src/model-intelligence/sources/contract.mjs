@@ -790,6 +790,28 @@ export function maskText(value) {
 }
 
 /**
+ * Mask and bound free text that came from a runtime, so it can be carried in evidence.
+ *
+ * A runtime's own output is the text most likely to echo a credential back, and it can be
+ * arbitrarily long. This is the guard for any such text that is not a diagnostic message:
+ * a diagnostic already passes through it inside `makeAdapterResult`.
+ * @param {unknown} value
+ * @returns {string} Masked, free of control characters, and at most 1,024 characters.
+ */
+export function boundText(value) {
+  return truncate(maskText(value));
+}
+
+/**
+ * Whether `value` has the shape of a version string (the same shape provenance requires).
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isVersionString(value) {
+  return typeof value === "string" && VERSION_RE.test(value);
+}
+
+/**
  * Render a command line and environment as diagnostic text with credentials removed.
  *
  * Each argument is masked as text, and an argument that is itself a secret flag also

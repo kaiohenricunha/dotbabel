@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "claude",
+    "-p",
+    "x",
+    "--model",
+    "sonnet",
+    "--effort",
+    "dotbabel-bogus",
+    "--no-session-persistence"
+  ],
+  "exitCode": 1,
+  "stdout": "Not logged in · Please run /login\n",
+  "stderr": "Warning: Unknown --effort value 'dotbabel-bogus' — ignoring it and using the default effort. Valid values: low, medium, high, xhigh, max.\n"
+}
