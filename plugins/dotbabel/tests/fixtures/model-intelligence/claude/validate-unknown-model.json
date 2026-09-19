@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "claude",
+    "-p",
+    "x",
+    "--model",
+    "dotbabel-nonexistent-model",
+    "--no-session-persistence"
+  ],
+  "exitCode": 1,
+  "stdout": "Not logged in · Please run /login\n",
+  "stderr": "\"dotbabel-nonexistent-model\" isn't described by this version's model catalog; update Claude Code, or map it with behavesAs on a modelPicker row (or modelOverrides, if it is a provider id of a model this version knows). Until then auto-compact keeps this session within 200k tokens (the context window it assumes); if the model accepts more, append [1m] to the model name for 1M, or set CLAUDE_CODE_MAX_CONTEXT_TOKENS to its real window; CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1 restores the previous wait-for-the-API behavior.\n[claude-code:unrecognized_model] {\"model\":\"dotbabel-nonexistent-model\",\"query_source\":\"sdk\"}\n"
+}

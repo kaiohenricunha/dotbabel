@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "codex",
+    "exec",
+    "--skip-git-repo-check",
+    "--strict-config",
+    "-c",
+    "dotbabel_fake_key=1",
+    "x"
+  ],
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "Error loading config.toml: unknown configuration field `dotbabel_fake_key` in -c/--config override\n"
+}
