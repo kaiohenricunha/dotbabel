@@ -129,11 +129,65 @@ ROOT=$(cd "$ROOT" 2>/dev/null && pwd -P) || exit 0
 if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ]; then
   TRUST_FILE="${CHECK_ON_STOP_TRUSTED_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/dotbabel/check-on-stop-trusted}"
   [ -f "$TRUST_FILE" ] || exit 0
+
+  resolve_worktree_main_repo() {
+    local dir="$1"
+    local git_file="$dir/.git"
+    [ -f "$git_file" ] || return 1
+    local gitdir_line gitdir commondir backlink common_dir
+    IFS= read -r gitdir_line < "$git_file" 2>/dev/null || return 1
+    case "$gitdir_line" in
+      gitdir:\ *) gitdir="${gitdir_line#gitdir: }" ;;
+      *) return 1 ;;
+    esac
+    gitdir="${gitdir%$'\r'}"
+    [ -n "$gitdir" ] || return 1
+    if [[ "$gitdir" != /* ]]; then
+      gitdir="$dir/$gitdir"
+    fi
+    gitdir=$(cd "$gitdir" 2>/dev/null && pwd -P) || return 1
+    [ -f "$gitdir/commondir" ] && [ -f "$gitdir/gitdir" ] || return 1
+
+    # Validate bidirectional backlink to prevent spoofing
+    IFS= read -r backlink < "$gitdir/gitdir" 2>/dev/null || return 1
+    backlink="${backlink%$'\r'}"
+    [ -n "$backlink" ] || return 1
+    if [[ "$backlink" != /* ]]; then
+      backlink="$gitdir/$backlink"
+    fi
+    local backlink_real git_file_real
+    git_file_real=$(cd "$(dirname "$git_file")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$git_file")") || return 1
+    if [ -f "$backlink" ]; then
+      backlink_real=$(cd "$(dirname "$backlink")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$backlink")") || return 1
+      [ "$backlink_real" = "$git_file_real" ] || return 1
+    elif [ -d "$backlink" ]; then
+      backlink_real=$(cd "$backlink" 2>/dev/null && pwd -P) || return 1
+      [ "$backlink_real" = "$dir" ] || return 1
+    else
+      return 1
+    fi
+
+    IFS= read -r commondir < "$gitdir/commondir" 2>/dev/null || return 1
+    commondir="${commondir%$'\r'}"
+    [ -n "$commondir" ] || return 1
+    if [[ "$commondir" != /* ]]; then
+      commondir="$gitdir/$commondir"
+    fi
+    common_dir=$(cd "$commondir" 2>/dev/null && pwd -P) || return 1
+    if [ "$(basename "$common_dir")" = ".git" ]; then
+      cd "$common_dir/.." 2>/dev/null && pwd -P
+      return 0
+    fi
+    return 1
+  }
+
+  MAIN_ROOT=$(resolve_worktree_main_repo "$ROOT" 2>/dev/null) || MAIN_ROOT=""
+
   TRUSTED=0
   while IFS= read -r entry; do
     case "$entry" in ''|'#'*) continue ;; esac
     entry_real=$(cd "$entry" 2>/dev/null && pwd -P) || continue
-    if [ "$entry_real" = "$ROOT" ]; then
+    if [ "$entry_real" = "$ROOT" ] || { [ -n "$MAIN_ROOT" ] && [ "$entry_real" = "$MAIN_ROOT" ]; }; then
       TRUSTED=1
       break
     fi
