@@ -120,6 +120,19 @@ const PROVENANCE_KEYS = Object.freeze(["sourceId", "sourceKind", "sourceVersion"
 /** Diagnostic keys, as section 5 declares them. */
 const DIAGNOSTIC_KEYS = Object.freeze(["code", "message", "retryable"]);
 
+/** A source or adapter id: it enters results, logs and cache keys, so it has the shape of an identifier. */
+const IDENTIFIER_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+
+/**
+ * A version string. Deliberately narrower than "any non-empty text": a runtime's
+ * `--version` output can carry more than a version, such as an account, and this is the
+ * only check standing between that text and a persisted provenance record.
+ */
+const VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._+~:-]{0,63}$/;
+
+/** A diagnostic code: machine-readable, so lowercase snake_case, never free text. */
+const CODE_RE = /^[a-z][a-z0-9_]{0,63}$/;
+
 /** An ISO-8601 timestamp with an explicit offset. `Date.parse` then rejects impossible dates. */
 const ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
@@ -222,6 +235,24 @@ function rejectUnknownKeys(block, allowed, path, errors) {
     if (!allowed.includes(key)) {
       errors.push({ path: `${path}.${key}`, message: `unknown key; expected only ${allowed.join(", ")}` });
     }
+  }
+  checkComment(block, path, errors);
+}
+
+/**
+ * Require `$comment`, when present, to be a string.
+ *
+ * It is allowed at every level and is otherwise unchecked, so a function or a deeply
+ * nested object placed there would pass validation and then crash the registry's
+ * snapshot with an opaque error instead of a `DescriptorError`.
+ * @param {object} block
+ * @param {string} path
+ * @param {DescriptorError[]} errors
+ * @returns {void}
+ */
+function checkComment(block, path, errors) {
+  if (Object.hasOwn(block, "$comment") && typeof (/** @type {any} */ (block).$comment) !== "string") {
+    errors.push({ path: path === "" ? "$comment" : `${path}.$comment`, message: "must be a string" });
   }
 }
 
@@ -334,9 +365,12 @@ export function validateDescriptor(descriptor) {
     }
   }
 
+  checkComment(descriptor, "", errors);
   const { id, kind, capabilities } = /** @type {any} */ (descriptor);
   if (typeof id !== "string" || id === "") {
     errors.push({ path: "id", message: "must be a non-empty string" });
+  } else if (!IDENTIFIER_RE.test(id)) {
+    errors.push({ path: "id", message: "must be an identifier: letters, digits, dot, underscore or hyphen, at most 64" });
   }
   if (!DESCRIPTOR_KINDS.includes(kind)) {
     errors.push({ path: "kind", message: `must be one of ${DESCRIPTOR_KINDS.join(", ")}` });
@@ -408,8 +442,15 @@ export function assertDescriptor(descriptor) {
  * Provenance is required for every status, not only for success. A failure a caller
  * cannot attribute to a source is a failure it cannot cache against, retry against,
  * or explain, and `unavailable` is the status most likely to need attribution.
+ *
+ * Every field that can carry text into a log or a PR comment is constrained. The
+ * diagnostic message is masked and bounded. The source id, the two versions and the
+ * diagnostic code must have the shape of an identifier, because a CLI's `--version`
+ * output can carry more than a version, such as an account, and nothing else stops it.
+ * `evidence` is structured data for `catalog/` rather than diagnostic text, so it is
+ * neither masked nor copied.
  * @param {object} input
- * @returns {object} A frozen result.
+ * @returns {object} A result frozen at the top level. Its provenance and diagnostic are frozen too, and `evidence` is passed by reference.
  */
 export function makeAdapterResult(input) {
   if (!isPlainObject(input)) throw new TypeError(`adapter result must be an object, got ${typeOf(input)}`);
@@ -424,20 +465,26 @@ export function makeAdapterResult(input) {
     throw new TypeError(`adapter result: status must be one of ${ADAPTER_RESULT_STATUSES.join(", ")}`);
   }
   if (!isPlainObject(provenance)) throw new TypeError("adapter result: provenance is required for every status, including unavailable");
-  if (typeof provenance.sourceId !== "string" || provenance.sourceId === "") {
-    throw new TypeError("adapter result: provenance.sourceId must be a non-empty string");
-  }
-  if (!DESCRIPTOR_KINDS.includes(provenance.sourceKind)) {
-    throw new TypeError(`adapter result: provenance.sourceKind must be one of ${DESCRIPTOR_KINDS.join(", ")}`);
-  }
   for (const key of ownKeys(provenance)) {
     if (!PROVENANCE_KEYS.includes(key)) {
       throw new TypeError(`adapter result: provenance has unknown key "${key}"; provenance names the source and nothing else (OPS-4)`);
     }
   }
-  for (const key of ["sourceVersion", "adapterVersion"]) {
-    if (provenance[key] !== undefined && !isNonEmptyString(provenance[key])) {
-      throw new TypeError(`adapter result: provenance.${key} must be a non-empty string when present`);
+  // Read by OWN key, so the fields that are checked are exactly the fields that are copied.
+  // A dotted read resolves through the prototype chain and would validate a value the copy
+  // below then drops, leaving a frozen empty provenance.
+  const sourceId = safeOwn(provenance, "sourceId");
+  const sourceKind = safeOwn(provenance, "sourceKind");
+  const sourceVersion = safeOwn(provenance, "sourceVersion");
+  const adapterVersion = safeOwn(provenance, "adapterVersion");
+  if (!isNonEmptyString(sourceId)) throw new TypeError("adapter result: provenance.sourceId must be a non-empty string");
+  if (!IDENTIFIER_RE.test(sourceId)) throw new TypeError("adapter result: provenance.sourceId must be an identifier: letters, digits, dot, underscore or hyphen, at most 64");
+  if (!DESCRIPTOR_KINDS.includes(sourceKind)) {
+    throw new TypeError(`adapter result: provenance.sourceKind must be one of ${DESCRIPTOR_KINDS.join(", ")}`);
+  }
+  for (const [key, value] of [["sourceVersion", sourceVersion], ["adapterVersion", adapterVersion]]) {
+    if (value !== undefined && !(typeof value === "string" && VERSION_RE.test(value))) {
+      throw new TypeError(`adapter result: provenance.${key} must be a version string: letters, digits and . _ + ~ : -, at most 64`);
     }
   }
   // observedAt is the one input catalog/ derives freshness from, so a value it cannot
@@ -452,7 +499,15 @@ export function makeAdapterResult(input) {
   if (status !== "ok" && evidence !== undefined) throw new TypeError(`adapter result: status ${status} must carry no evidence`);
 
   /** @type {Record<string, unknown>} */
-  const result = { status, provenance: Object.freeze({ ...provenance }) };
+  const result = {
+    status,
+    provenance: Object.freeze({
+      sourceId,
+      sourceKind,
+      ...(sourceVersion === undefined ? {} : { sourceVersion }),
+      ...(adapterVersion === undefined ? {} : { adapterVersion }),
+    }),
+  };
   if (evidence !== undefined) result.evidence = evidence;
   if (observedAt !== undefined) result.observedAt = observedAt;
   if (diagnostic !== undefined) {
@@ -460,9 +515,13 @@ export function makeAdapterResult(input) {
     for (const key of ownKeys(diagnostic)) {
       if (!DIAGNOSTIC_KEYS.includes(key)) throw new TypeError(`adapter result: diagnostic has unknown key "${key}"`);
     }
-    if (!isNonEmptyString(diagnostic.code)) throw new TypeError("adapter result: diagnostic.code must be a non-empty string");
-    if (!isNonEmptyString(diagnostic.message)) throw new TypeError("adapter result: diagnostic.message must be a non-empty string; section 5 declares it required");
-    if (diagnostic.retryable !== undefined && typeof diagnostic.retryable !== "boolean") {
+    const code = safeOwn(diagnostic, "code");
+    const message = safeOwn(diagnostic, "message");
+    const retryable = safeOwn(diagnostic, "retryable");
+    if (!isNonEmptyString(code)) throw new TypeError("adapter result: diagnostic.code must be a non-empty string");
+    if (!CODE_RE.test(code)) throw new TypeError("adapter result: diagnostic.code must be lowercase snake_case: a-z, 0-9 and underscore, at most 64");
+    if (!isNonEmptyString(message)) throw new TypeError("adapter result: diagnostic.message must be a non-empty string; section 5 declares it required");
+    if (retryable !== undefined && typeof retryable !== "boolean") {
       throw new TypeError("adapter result: diagnostic.retryable must be a boolean when present");
     }
     // The message is masked and bounded HERE, in the one function every result passes
@@ -470,9 +529,9 @@ export function makeAdapterResult(input) {
     // forget it (OPS-4). Masking only in `unavailable()` left a hand-built diagnostic
     // able to carry a token straight into a log or a PR comment.
     result.diagnostic = Object.freeze({
-      code: diagnostic.code,
-      message: truncate(maskText(diagnostic.message)),
-      ...(diagnostic.retryable === undefined ? {} : { retryable: diagnostic.retryable }),
+      code,
+      message: truncate(maskText(message)),
+      ...(retryable === undefined ? {} : { retryable }),
     });
   }
   return Object.freeze(result);
@@ -530,8 +589,6 @@ const SECRET_WORDS = Object.freeze([
   "SECRET",
   "PASSWORD",
   "PASSWD",
-  "PASS",
-  "PWD",
   "CREDENTIAL",
   "AUTHORIZATION",
   "AUTH",
@@ -541,11 +598,19 @@ const SECRET_WORDS = Object.freeze([
   "ACCOUNT",
   "EMAIL",
   "USERNAME",
-  "PAT",
 ]);
 
-/** One name segment that ends in a secret word. */
-const SECRET_SEGMENT_RE = new RegExp(`(?:${SECRET_WORDS.join("|")})S?$`, "i");
+/**
+ * Short words that mark a secret only as a WHOLE segment.
+ *
+ * `MYSQL_PASS`, `GITHUB_PAT` and `APP_PWD` are real names, but as a suffix these three
+ * words also end `BYPASS`, `COMPASS` and `COMPAT`, so `COMPAT_LEVEL=2` would be redacted
+ * for nothing.
+ */
+const SECRET_WHOLE_WORDS = Object.freeze(["PASS", "PWD", "PAT"]);
+
+/** One name segment that ends in a secret word, or is one of the short whole words. */
+const SECRET_SEGMENT_RE = new RegExp(`(?:${SECRET_WORDS.join("|")})S?$|^(?:${SECRET_WHOLE_WORDS.join("|")})S?$`, "i");
 
 /**
  * Whether a variable, flag or header name marks its value as a credential.
@@ -597,32 +662,90 @@ const SECRET_VALUE_RES = Object.freeze([
   /\b[A-Za-z0-9_-]{40,}\b/g,
 ]);
 
+/*
+ * Every pattern below that scans a run of name characters starts with a lookbehind that
+ * forbids one before the match. Without it the pattern could begin at EVERY position
+ * inside one long token, consume the rest of the token greedily, fail to find its
+ * separator, and backtrack: quadratic, 80,000 characters of `-a` took 5 seconds. With it
+ * a token is scanned from its first character only, so the work is linear (CWE-1333).
+ */
+
 /** Credentials carried in the userinfo part of a URL: `scheme://user:secret@host`. */
-const URL_USERINFO_RE = /\b([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^\s/@]+@/g;
+const URL_USERINFO_RE = /(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^\s/@]+@/g;
 
 /** A header whose whole value is a credential, matched to the end of its line. */
 const SECRET_HEADER_RE = /\b((?:proxy-)?authorization|cookie|set-cookie)(\s*:\s*)[^\r\n]*/gi;
 
-/** A bearer credential appearing outside a header. */
-const BEARER_RE = /\b(Bearer)\s+[A-Za-z0-9._~+/=-]+/gi;
+/**
+ * A bearer credential, or a base64 blob after `Basic`, appearing outside a header.
+ *
+ * `Basic` needs eight base64 characters after it, so ordinary prose such as "Basic
+ * auth" survives. A short blob that slips under the floor is still caught by the
+ * header rule when it travels in a header, which is where it normally does.
+ */
+const BEARER_RE = /\b(Bearer\s+[A-Za-z0-9._~+/=-]+|Basic\s+[A-Za-z0-9+/]{8,}={0,2})/gi;
 
 /** `--flag value` or `--flag=value`, so a labelled flag inside free text is found. */
-const FLAG_VALUE_RE = /(--?[A-Za-z0-9][A-Za-z0-9_-]*)(=|\s+)(?!-)("[^"]*"|'[^']*'|\S+)/g;
-
-/** `name=value` or `name: value`, so a labelled secret inside free text is found. */
-const LABELLED_VALUE_RE = /\b([A-Za-z_][A-Za-z0-9_.-]*)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,;)&]+)/g;
+const FLAG_VALUE_RE = /(?<![A-Za-z0-9_-])(--?[A-Za-z0-9][A-Za-z0-9_-]*)(=|\s+)(?!-)("[^"]*"|'[^']*'|\S+)/g;
 
 /**
- * Remove control and format characters.
+ * The LABEL of `name=value`, `name: value` or a JSON-style `"name": "value"`: a name and
+ * its separator, without the value. The optional quote after the name is what lets a JSON
+ * key, whose closing quote sits between the name and the colon, reach its separator.
+ */
+const LABEL_RE = /(?<![A-Za-z0-9_.-])([A-Za-z_][A-Za-z0-9_.-]*)(["']?\s*[:=]\s*)/g;
+
+/** The value that follows a label. Sticky, so it matches exactly where the label ended. */
+const LABEL_VALUE_RE = /"[^"]*"|'[^']*'|[^\s,;)&]+/y;
+
+/**
+ * Mask the value of every secret-named label in free text.
  *
- * This runs BEFORE any pattern is matched. A zero-width character inside a token would
- * otherwise break the shape rule first and only turn into visible noise afterwards,
- * leaving the token readable.
+ * The label is matched alone and the value is consumed only when the name is a secret.
+ * Matching name and value together would swallow the value of a NON-secret name, so in
+ * `https://host/cb?token=abc` the label `https:` would consume the whole URL and the
+ * `token=` inside it would never be examined. Skipping a value instead leaves the scan
+ * free to resume inside it.
+ * @param {string} text
+ * @returns {string}
+ */
+function maskLabelled(text) {
+  let out = "";
+  let copied = 0;
+  LABEL_RE.lastIndex = 0;
+  for (let label = LABEL_RE.exec(text); label !== null; label = LABEL_RE.exec(text)) {
+    if (!isSecretName(label[1])) continue;
+    const valueStart = label.index + label[0].length;
+    LABEL_VALUE_RE.lastIndex = valueStart;
+    const value = LABEL_VALUE_RE.exec(text);
+    if (value === null) continue;
+    out += `${text.slice(copied, valueStart)}[redacted]`;
+    copied = valueStart + value[0].length;
+    LABEL_RE.lastIndex = copied;
+  }
+  return out + text.slice(copied);
+}
+
+/**
+ * Largest text `maskText` will examine. A diagnostic is cut to a kilobyte, and masking
+ * can shrink text by at most a factor of four (a 40-character token becomes ten), so
+ * 32 KiB of input cannot put more than eight kilobytes of masked text in front of
+ * a cut, and a token this bound splits lands far beyond anything that can reach output.
+ */
+const MASK_INPUT_LIMIT = 32_768;
+
+/**
+ * Remove control and format characters, keeping tab, newline and carriage return.
+ *
+ * This runs BEFORE the header rule and every other pattern. A zero-width character
+ * inside a header NAME or inside a token would otherwise break the match first and only
+ * turn into visible noise afterwards, leaving the value readable. Whitespace controls
+ * stay for now because the header rule matches to the end of a line.
  * @param {string} value
  * @returns {string}
  */
 function stripInvisible(value) {
-  return value.replace(/[\t\n\r]/g, " ").replace(/[\p{Cc}\p{Cf}]/gu, "");
+  return value.replace(/[\p{Cc}\p{Cf}]/gu, (ch) => (/[\t\n\r]/.test(ch) ? ch : ""));
 }
 
 /**
@@ -651,14 +774,17 @@ function truncate(value) {
  * headers first, then a secret flag or a secret NAME, and last the shape of a token.
  * The command and its non-secret words survive, because a diagnostic redacted into
  * uselessness fails its caller as surely as one that leaks (OPS-4).
+ *
+ * The input is bounded to 32 KiB before any pattern runs, so the cost is bounded too.
+ * That is safe here because a diagnostic keeps only its first kilobyte.
  * @param {unknown} value
  * @returns {string}
  */
 export function maskText(value) {
-  let out = String(value).replace(SECRET_HEADER_RE, "$1$2[redacted]");
-  out = stripInvisible(out).replace(URL_USERINFO_RE, "$1[redacted]@").replace(BEARER_RE, "$1 [redacted]");
+  let out = stripInvisible(String(value).slice(0, MASK_INPUT_LIMIT)).replace(SECRET_HEADER_RE, "$1$2[redacted]");
+  out = out.replace(/[\t\n\r]/g, " ").replace(URL_USERINFO_RE, "$1[redacted]@").replace(BEARER_RE, (match) => `${match.split(/\s/)[0]} [redacted]`);
   out = out.replace(FLAG_VALUE_RE, (match, flag, sep) => (isSecretFlag(flag) ? `${flag}${sep}[redacted]` : match));
-  out = out.replace(LABELLED_VALUE_RE, (match, name, sep) => (isSecretName(name) ? `${name}${sep}[redacted]` : match));
+  out = maskLabelled(out);
   for (const re of SECRET_VALUE_RES) out = out.replace(re, "[redacted]");
   return out;
 }
@@ -828,14 +954,24 @@ export function createRegistry(descriptors) {
   /** @type {Map<string, object>} */
   const byId = new Map();
   for (const descriptor of descriptors) {
-    assertDescriptor(descriptor);
-    const id = /** @type {any} */ (descriptor).id;
+    // Snapshot FIRST and validate the snapshot. Validating the caller's object and then
+    // cloning it reads every property twice, and a getter can answer differently the
+    // second time, so the registry would store something that never passed validation
+    // (a time-of-check to time-of-use gap on the ARCH-44 property this registry exists
+    // for). The snapshot is also frozen all the way down: freezing the caller's own
+    // object would be a side effect on state the registry does not own, and a shallow
+    // freeze would let a caller who kept a handle on a nested table change what
+    // `isVerified` reports.
+    let snapshot;
+    try {
+      snapshot = structuredClone(descriptor);
+    } catch {
+      throw new TypeError("createRegistry: a descriptor must be plain data: no functions, symbols or other values that cannot be cloned");
+    }
+    assertDescriptor(snapshot);
+    const id = /** @type {any} */ (snapshot).id;
     if (byId.has(id)) throw new TypeError(`createRegistry: duplicate adapter id "${id}"`);
-    // A validated SNAPSHOT, frozen all the way down. Freezing the caller's own object would
-    // be a side effect on state the registry does not own, and a shallow freeze would let a
-    // caller who kept a handle on a nested table change what `isVerified` reports about a
-    // capability nobody measured, which is the ARCH-44 property this registry exists for.
-    byId.set(id, deepFreeze(structuredClone(descriptor)));
+    byId.set(id, deepFreeze(snapshot));
   }
 
   /**

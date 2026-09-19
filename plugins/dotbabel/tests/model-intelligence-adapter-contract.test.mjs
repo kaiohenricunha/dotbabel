@@ -15,6 +15,7 @@ import {
   resolveTimeoutMs,
   runBounded,
   redactForDiagnostic,
+  maskText,
 } from "../src/model-intelligence/sources/contract.mjs";
 import { SUPPORT_STATES, ADAPTER_RESULT_STATUSES, ARTIFACT_KINDS, SOURCE_KINDS } from "../src/model-intelligence/domain/index.mjs";
 
@@ -696,6 +697,134 @@ describe("review hardening", () => {
     }
     expect(resolveTimeoutMs({ channel: "network", timeoutMs: 2_147_483_647 })).toBe(2_147_483_647);
     expect(resolveTimeoutMs({ channel: "network", timeoutMs: 1 })).toBe(1);
+  });
+
+  it("masks adversarial input in linear time (CWE-1333)", () => {
+    // maskText now sits behind EVERY diagnostic message, including a captured stderr that
+    // an attacker-influenced tool may make arbitrarily long. Each of these shapes made a
+    // first version of a pattern start a match at every position inside one token,
+    // consume the rest of it greedily, and backtrack: 80,000 characters took 5 to 6
+    // seconds and 160,000 took 22. The inputs stay just under the 32 KiB bound on purpose,
+    // so the bound cannot hide a pattern that goes quadratic again; at this size the
+    // broken patterns took 0.2 to 0.75 seconds and the fixed ones take a few milliseconds.
+    const shapes = {
+      "dash runs": ["-a".repeat(15_000), 250],
+      "dotted name": ["a.".repeat(15_000), 250],
+      "hyphen name": ["a-".repeat(15_000), 250],
+      "url schemes": ["a+".repeat(15_000) + "://", 100],
+      "flag pairs": ["--f x ".repeat(5_000), 250],
+      "colon pairs": ["a: ".repeat(10_000), 250],
+      "equals pairs": ["a=b ".repeat(7_500), 250],
+      "unclosed quotes": ['k="'.repeat(10_000), 250],
+      "underscore name": ["A_".repeat(15_000) + "=x", 250],
+    };
+    for (const [label, [input, limitMs]] of Object.entries(shapes)) {
+      const started = performance.now();
+      maskText(input);
+      expect(performance.now() - started, label).toBeLessThan(limitMs);
+    }
+  });
+
+  it("bounds the text it will mask, since a diagnostic is cut far shorter than that anyway", () => {
+    // 32 KiB is at least eight times the 1 KiB a diagnostic keeps, so a token cut by the
+    // input bound lands well beyond anything that can reach the output.
+    const huge = "y ".repeat(40_000);
+    expect(maskText(huge).length).toBeLessThanOrEqual(32_768);
+    expect(maskText(`login sk-ant-api03-AbCdEf0123456789 ${huge}`)).not.toContain("AbCdEf0123456789");
+  });
+
+  it("masks a labelled secret inside JSON-shaped and quoted text", () => {
+    for (const text of ['{"password":"hunter2"}', '{"api_key": "hunter2", "ok": 1}', "password = 'hunter2'", 'token: "hunter2"', "https://example.com/cb?token=hunter2&x=1"]) {
+      expect(maskText(text), text).not.toContain("hunter2");
+    }
+    // Ordinary structured text keeps its non-secret fields.
+    expect(maskText('{"name":"codex","ok":true}')).toBe('{"name":"codex","ok":true}');
+    expect(maskText("https://example.com/cb?page=2&x=1")).toBe("https://example.com/cb?page=2&x=1");
+  });
+
+  it("masks a whole credential header even when an invisible character hides its name", () => {
+    const zeroWidth = String.fromCharCode(0x200b);
+    // The header rule masks to the end of the line, which is why it must see the header
+    // name intact: with the name broken it missed, and the fallback masked only the first
+    // token, leaving the second cookie readable.
+    const hidden = maskText(`Cook${zeroWidth}ie: session=abc; csrf=def`);
+    expect(hidden).not.toContain("abc");
+    expect(hidden).not.toContain("csrf=def");
+    // Newlines still end the header, so text on the next line is not swallowed with it.
+    const twoLines = maskText("Authorization: Bearer hunter2" + String.fromCharCode(10) + "exit status 1");
+    expect(twoLines).not.toContain("hunter2");
+    expect(twoLines).toContain("exit status 1");
+  });
+
+  it("masks a Basic credential outside a header without redacting ordinary prose", () => {
+    expect(maskText("proxy rejected Basic dXNlcjpodW50ZXIy")).not.toContain("dXNlcjpodW50ZXIy");
+    expect(maskText("proxy rejected Bearer hunter2")).not.toContain("hunter2");
+    // Short prose after the word is left alone.
+    expect(maskText("Basic usage: codex models")).toBe("Basic usage: codex models");
+  });
+
+  it("does not redact a name that merely contains a short secret word", () => {
+    // PASS, PWD and PAT count only as a whole segment. As suffixes they would also catch
+    // BYPASS, COMPASS and COMPAT, and COMPAT_LEVEL=2 would be redacted for nothing.
+    for (const name of ["COMPAT_LEVEL", "BYPASS_CACHE", "COMPASS_DIR"]) {
+      expect(redactForDiagnostic({ env: { [name]: "2" } }), name).toBe(`${name}=2`);
+    }
+    for (const name of ["MYSQL_PASS", "GITHUB_PAT", "APP_PWD", "PGPASSWORD"]) {
+      expect(redactForDiagnostic({ env: { [name]: "hunter2" } }), name).toBe(`${name}=[redacted]`);
+    }
+  });
+
+  it("reads provenance and diagnostic fields by own key, so what is checked is what is copied", () => {
+    // A dotted read resolves through the prototype chain. Every check passed, then the
+    // copy dropped both fields and produced a frozen EMPTY provenance, which defeats the
+    // reason provenance is required at all.
+    const inherited = Object.create({ sourceId: "codex", sourceKind: "runtime" });
+    expect(() => makeAdapterResult({ status: "unknown", provenance: inherited, diagnostic: { code: "x", message: "m" } })).toThrow(/sourceId/);
+    const inheritedDiagnostic = Object.create({ code: "x", message: "m" });
+    expect(() => makeAdapterResult({ status: "unknown", provenance: prov, diagnostic: inheritedDiagnostic })).toThrow(/diagnostic\.code/);
+  });
+
+  it("constrains the free-text provenance and diagnostic fields to identifier shapes", () => {
+    const base = { status: "ok", evidence: 1 };
+    // A CLI's --version output can carry more than a version, such as an account.
+    for (const bad of ["opencode 2.0.5 (user@example.com)", "2.0.5 user@example.com", "v 1", "", "x".repeat(65)]) {
+      expect(() => makeAdapterResult({ ...base, provenance: { ...prov, sourceVersion: bad } }), bad.slice(0, 20)).toThrow(/sourceVersion/);
+    }
+    for (const good of ["2.0.5", "1", "1.0.0-beta+build.5", "0.154.0"]) {
+      expect(makeAdapterResult({ ...base, provenance: { ...prov, adapterVersion: good } }).provenance.adapterVersion).toBe(good);
+    }
+    for (const bad of ["user@example.com", "has space", "", "x".repeat(65), "-leading"]) {
+      expect(() => makeAdapterResult({ ...base, provenance: { sourceId: bad, sourceKind: "runtime" } }), bad.slice(0, 20)).toThrow(/sourceId/);
+    }
+    // A diagnostic code is machine-readable, so it is never free text derived from stderr.
+    for (const bad of ["Bad Code", "auth failed: sk-abc", "UPPER", "1leading", "x".repeat(65)]) {
+      expect(() => makeAdapterResult({ status: "unknown", provenance: prov, diagnostic: { code: bad, message: "m" } }), bad.slice(0, 20)).toThrow(/diagnostic\.code/);
+    }
+    expect(() => makeAdapterResult({ status: "unknown", provenance: prov, diagnostic: { code: "nonzero_exit", message: "m" } })).not.toThrow();
+    // The same shape governs a descriptor id, because it is the registry key.
+    expect(paths(descriptor({ id: "user@example.com" }))).toContain("id");
+  });
+
+  it("snapshots a descriptor once, so validation and storage cannot disagree", () => {
+    // A getter answers differently on each read. Validating the caller's object and then
+    // cloning it read `kind` twice: it validated as a runtime and was stored as an
+    // artifact, so the registry held something that never passed validation.
+    let reads = 0;
+    const hostile = descriptor();
+    Object.defineProperty(hostile, "kind", { enumerable: true, get: () => (reads++ === 0 ? "runtime" : "artifact") });
+    const reg = createRegistry([hostile]);
+    expect(reg.get("claude").kind).toBe("runtime");
+    expect(validateDescriptor(reg.get("claude")).errors).toEqual([]);
+  });
+
+  it("reports a non-string $comment as a descriptor error instead of crashing the registry", () => {
+    // $comment is allowed at every level and used to be unchecked, so a function or a
+    // deeply nested object passed validation and then failed opaquely inside the snapshot.
+    expect(paths({ ...descriptor(), $comment: 5 })).toContain("$comment");
+    expect(paths(descriptor({ capabilities: { discovery: op({ $comment: {} }) } }))).toContain("capabilities.discovery.$comment");
+    expect(paths(descriptor({ capabilities: { invocation: { support: "supported", axes: {}, $comment: [] } } }))).toContain("capabilities.invocation.$comment");
+    // A value structuredClone cannot copy fails with a clear message at registration.
+    expect(() => createRegistry([{ ...descriptor(), notes: () => {} }])).toThrow(/plain data/);
   });
 
   it("keeps stale out of the adapter result vocabulary, because freshness is derived by catalog", () => {
