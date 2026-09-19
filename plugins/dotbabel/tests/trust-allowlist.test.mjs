@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -7,6 +8,7 @@ import {
   grantCheckOnStopTrust,
   isRepoTrusted,
   resolveTrustFilePath,
+  resolveWorktreeMainRepo,
 } from "../src/trust-allowlist.mjs";
 import { ERROR_CODES, ValidationError } from "../src/lib/errors.mjs";
 
@@ -287,5 +289,116 @@ describe("isRepoTrusted", () => {
     const res = isRepoTrusted({ repoRoot: "/nonexistent/xyz", env });
     expect(res.trusted).toBe(false);
     expect(res.readError).toBeTruthy();
+  });
+
+  it("trusts a linked worktree when its main repository is in the allowlist", () => {
+    const { repo, env } = fixture();
+    execFileSync("git", ["init", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: repo });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: repo });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "branch-a"], { cwd: repo });
+
+    grantCheckOnStopTrust({ repoRoot: repo, env });
+
+    const res = isRepoTrusted({ repoRoot: wt, env });
+    expect(res.trusted).toBe(true);
+    expect(res.matchedEntry).toBe(fs.realpathSync(repo));
+  });
+
+  it("does not trust a linked worktree when its main repository is untrusted", () => {
+    const { repo, env, trustFile } = fixture();
+    execFileSync("git", ["init", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: repo });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: repo });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "branch-a"], { cwd: repo });
+
+    fs.writeFileSync(trustFile, "/some/other/repo\n", "utf8");
+
+    const res = isRepoTrusted({ repoRoot: wt, env });
+    expect(res.trusted).toBe(false);
+  });
+
+  it("does not trust a spoofed worktree even if pointing to a trusted repository", () => {
+    const { repo, env } = fixture();
+    execFileSync("git", ["init", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: repo });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: repo });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "branch-a"], { cwd: repo });
+
+    grantCheckOnStopTrust({ repoRoot: repo, env });
+
+    const evil = mkTmp("evil-spoof-");
+    const wtGit = fs.readFileSync(path.join(wt, ".git"), "utf8");
+    fs.writeFileSync(path.join(evil, ".git"), wtGit);
+
+    const res = isRepoTrusted({ repoRoot: evil, env });
+    expect(res.trusted).toBe(false);
+  });
+});
+
+describe("resolveWorktreeMainRepo", () => {
+  it("returns null when repo is not a worktree", () => {
+    const dir = mkTmp("not-worktree-");
+    expect(resolveWorktreeMainRepo(dir)).toBeNull();
+    fs.mkdirSync(path.join(dir, ".git"));
+    expect(resolveWorktreeMainRepo(dir)).toBeNull();
+  });
+
+  it("resolves the main repository root for a valid linked worktree", () => {
+    const root = mkTmp("wt-main-");
+    execFileSync("git", ["init", "-b", "main"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: root });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "wt-branch"], { cwd: root });
+
+    const resolved = resolveWorktreeMainRepo(wt);
+    expect(resolved).toBe(fs.realpathSync(root));
+  });
+
+  it("returns null for a spoofed worktree whose backlink does not match", () => {
+    const root = mkTmp("wt-main-");
+    execFileSync("git", ["init", "-b", "main"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: root });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "wt-branch"], { cwd: root });
+
+    const evil = mkTmp("evil-dir-");
+    const wtGit = fs.readFileSync(path.join(wt, ".git"), "utf8");
+    fs.writeFileSync(path.join(evil, ".git"), wtGit);
+
+    expect(resolveWorktreeMainRepo(evil)).toBeNull();
+  });
+});
+
+describe("grantCheckOnStopTrust worktree behavior", () => {
+  it("reports already-present when called on a worktree of an already-trusted repo", () => {
+    const { repo, env } = fixture();
+    execFileSync("git", ["init", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: repo });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: repo });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "branch-a"], { cwd: repo });
+
+    grantCheckOnStopTrust({ repoRoot: repo, env });
+
+    const res = grantCheckOnStopTrust({ repoRoot: wt, env });
+    expect(res.action).toBe("already-present");
   });
 });

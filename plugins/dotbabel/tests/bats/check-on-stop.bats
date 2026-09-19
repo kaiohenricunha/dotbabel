@@ -285,6 +285,57 @@ seed_go() {
   [ -z "$(stub_calls go)" ]
 }
 
+@test "a linked worktree inherits trust when its main repository is in the allowlist" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local wt
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add "$wt" -b wt-branch -q
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  stub_checker go 1 "" "main.go:3: something is wrong"
+  feed_stop_json "$HOOK" false "$wt"
+  [[ "$output" == *'"decision"'* ]]
+  [ -n "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+}
+
+@test "a linked worktree does not run when its main repository is untrusted" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  : > "$TRUST_FILE"
+  local wt
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add "$wt" -b wt-branch -q
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$wt"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+}
+
+@test "a spoofed worktree does not inherit trust from the spoofed repository" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local wt evil
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add "$wt" -b wt-branch -q
+  evil=$(mktemp -d)
+  cat "$wt/.git" > "$evil/.git"
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$evil/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$evil"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+  rm -rf "$evil"
+}
+
 @test "CHECK_ON_STOP_TRUST_ALL=1 overrides the allowlist" {
   seed_go
   : > "$TRUST_FILE"
