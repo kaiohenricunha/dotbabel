@@ -353,6 +353,22 @@ describe("resolveWorktreeMainRepo", () => {
     expect(resolveWorktreeMainRepo(dir)).toBeNull();
   });
 
+  it("returns null when the gitdir pointer is empty", () => {
+    const dir = mkTmp("empty-gitdir-");
+    fs.writeFileSync(path.join(dir, ".git"), "gitdir:\n", "utf8");
+
+    expect(resolveWorktreeMainRepo(dir)).toBeNull();
+  });
+
+  it("returns null when the linked worktree metadata is incomplete", () => {
+    const dir = mkTmp("incomplete-worktree-");
+    const gitDir = path.join(dir, "metadata");
+    fs.mkdirSync(gitDir);
+    fs.writeFileSync(path.join(dir, ".git"), `gitdir: ${gitDir}\n`, "utf8");
+
+    expect(resolveWorktreeMainRepo(dir)).toBeNull();
+  });
+
   it("resolves the main repository root for a valid linked worktree", () => {
     const root = mkTmp("wt-main-");
     execFileSync("git", ["init", "-b", "main"], { cwd: root });
@@ -365,6 +381,22 @@ describe("resolveWorktreeMainRepo", () => {
 
     const resolved = resolveWorktreeMainRepo(wt);
     expect(resolved).toBe(fs.realpathSync(root));
+  });
+
+  it("resolves a valid linked worktree with a relative gitdir pointer", () => {
+    const root = mkTmp("wt-main-");
+    execFileSync("git", ["init", "-b", "main"], { cwd: root });
+    execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: root });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: root });
+    execFileSync("git", ["commit", "--allow-empty", "-m", "init"], { cwd: root });
+
+    const wt = mkTmp("wt-linked-");
+    execFileSync("git", ["worktree", "add", wt, "-b", "wt-branch"], { cwd: root });
+    const gitFile = path.join(wt, ".git");
+    const absoluteGitDir = fs.readFileSync(gitFile, "utf8").trim().slice("gitdir: ".length);
+    fs.writeFileSync(gitFile, `gitdir: ${path.relative(wt, absoluteGitDir)}\n`, "utf8");
+
+    expect(resolveWorktreeMainRepo(wt)).toBe(fs.realpathSync(root));
   });
 
   it("returns null for a spoofed worktree whose backlink does not match", () => {
