@@ -405,18 +405,32 @@ async function main() {
     });
   }
 
-  const which = flags.gate;
-
-  // skip-ci inspects a local commit message, so it needs no PR number.
   if (sub === "entry") {
-    // The conductor used to enter at phase 1 always, so resuming an open pull
-    // request meant remembering `--from post-pr-review`. The state is
-    // observable, so it is derived rather than asked for.
-    let prNumber = argv.flags.pr === undefined ? null : requireNumber(argv.flags.pr, "--pr");
+    // Removes the need to remember that `open-pr` self-skips on an existing
+    // pull request. The state is observable, so it is derived rather than
+    // asked for with `--from`.
+    let prNumber = flags.pr === undefined ? null : requireNumber(flags.pr, "--pr");
     if (prNumber === null) {
-      const r = sh("gh pr view --json number --jq .number");
-      const n = Number(r.stdout.trim());
-      prNumber = r.status === 0 && Number.isInteger(n) && n > 0 ? n : null;
+      // State, not just the number: `gh pr view` falls back to the most recent
+      // CLOSED or MERGED pull request for the head ref, and a dead one must
+      // still enter at phase 2 rather than skip it.
+      const r = sh("gh pr view --json number,state");
+      if (r.status === 0) {
+        try {
+          const view = JSON.parse(r.stdout);
+          if (view.state === "OPEN" && Number.isInteger(view.number) && view.number > 0) {
+            prNumber = view.number;
+          }
+        } catch {
+          prNumber = null;
+        }
+      } else if (!/no pull requests? found|no open pull requests?/i.test(r.stderr)) {
+        // A genuine "this branch has no PR" is the NO_PR answer. Anything else
+        // — gh missing, unauthenticated, an API error — is an environment
+        // problem, and laundering it into NO_PR would tell phase 2 to open a
+        // pull request that may already exist.
+        fail(EXIT_CODES.ENV, `could not resolve the pull request for this branch:\n${r.stderr.trim()}`);
+      }
     }
     const result = deriveEntryPhase({ prNumber });
     return emit({
@@ -432,59 +446,9 @@ async function main() {
     });
   }
 
-  if (which === "skip-ci") {
-    const rev = typeof flags.sha === "string" && flags.sha !== "" ? assertRev(flags.sha) : "HEAD";
-    const msg = sh(`git log -1 --pretty=%B ${rev}`);
-    if (msg.status !== 0) return fail(EXIT_CODES.ENV, `cannot read commit message for ${rev}`);
-    const verdict = hasSkipCi(msg.stdout);
-    const result = {
-      ok: verdict.effective,
-      gate: "skip-ci",
-      reasons: verdict.effective
-        ? []
-        : [
-            {
-              code: verdict.present ? "SKIP_CI_INEFFECTIVE" : "SKIP_CI_ABSENT",
-              message: verdict.present
-                ? `marker ${verdict.marker} sits on the ${verdict.location}; only the first or last line counts`
-                : "commit message carries no [skip ci] marker",
-            },
-          ],
-      warnings: [],
-      hint: verdict.effective ? null : "put [skip ci] on the first or last line of the message",
-      verdict,
-    };
-    return emit({
-      subcommand: sub,
-      ok: result.ok,
-      result,
-      problems: result.reasons,
-      lines: [`gate skip-ci: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
-      json,
-    });
-  }
+  const which = flags.gate;
 
-  const prNumber = requireNumber(flags.pr, "--pr");
-
-  if (which === "local-attest") {
-    const view = ghJson(`gh pr view ${prNumber} --json headRefOid`);
-    const result = checkLocalAttestGate({
-      branch: sh("git rev-parse --abbrev-ref HEAD").stdout.trim(),
-      worktreeStatus: sh("git status --porcelain").stdout,
-      localHead: sh("git rev-parse HEAD").stdout.trim(),
-      prHeadOid: view.headRefOid,
-      prNumber,
-    });
-    return emit({
-      subcommand: sub,
-      ok: result.ok,
-      result,
-      problems: result.reasons,
-      lines: [`gate local-attest: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
-      json,
-    });
-  }
-
+  // skip-ci inspects a local commit message, so it needs no PR number.
   if (which === "merge") {
     const root = repoRoot();
     const view = ghJson(

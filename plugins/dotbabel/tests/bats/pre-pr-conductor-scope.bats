@@ -29,6 +29,27 @@ line_of() {
   [ "$status" -eq 0 ]
 }
 
+@test "pre-pr: the narrowing is conditional on the pr profile being attested later" {
+  # security.high_confidence is a pr-profile rule and a forbidden-exception
+  # floor. Narrowing unconditionally would drop it, and in a consumer repo
+  # (matrix [], required_legs []) it would then run nowhere in the pipeline.
+  run grep -qF 'required_legs' "$PREPR"
+  [ "$status" -eq 0 ]
+  run grep -qF 'QUALITY_ATTESTED' "$PREPR"
+  [ "$status" -eq 0 ]
+  run grep -qF 'security.high_confidence' "$PREPR"
+  [ "$status" -eq 0 ]
+}
+
+@test "pre-pr: the go/no-go summary reports which profile actually ran" {
+  # Step 6 is the persisted record of the run. Reporting "PR profile passed"
+  # after a fast run names a gate that never executed.
+  run grep -qF 'fast profile passed (conductor' "$PREPR"
+  [ "$status" -eq 0 ]
+  run grep -qi 'skipped (conductor' "$PREPR"
+  [ "$status" -eq 0 ]
+}
+
 @test "pre-pr: the two profiles are selected by the mode, not left ambiguous" {
   # A document naming both profiles without branching on CONDUCTOR would leave
   # an agent to guess which one applies.
@@ -47,9 +68,14 @@ line_of() {
 @test "pre-pr: conductor mode still stops on a secrets hit" {
   # The narrowing must not weaken the one thing phase 3 cannot catch: phase 3
   # runs after the push, so a secret has already left the machine by then.
-  run grep -qi 'CRITICAL' "$PREPR"
-  [ "$status" -eq 0 ]
+  #
+  # Anchored to the conductor secrets sentence specifically. A bare CRITICAL
+  # grep is satisfied by the standalone step-3 severity list, which says
+  # nothing about conductor mode — so softening `N > 0` to a warning while
+  # leaving the scrubber call in place would keep that version green.
   run grep -qF 'handoff-scrub.sh' "$PREPR"
+  [ "$status" -eq 0 ]
+  run grep -E 'N > 0.*CRITICAL' "$PREPR"
   [ "$status" -eq 0 ]
 }
 
@@ -69,8 +95,31 @@ line_of() {
 @test "pr-conductor: phase 1 no longer claims to own the test suite" {
   # The claim was false once the authoritative profile moved to local-attest,
   # and a stale claim is how an operator concludes the suite already ran.
-  run grep -n 'test suite' "$CONDUCTOR"
-  [ "$status" -eq 1 ]
+  #
+  # Scoped to phase 1's table row and its section body rather than banning the
+  # phrase document-wide: phase 5 may legitimately say local-attest runs the
+  # full test suite, and a whole-file ban would fail on that sentence under a
+  # test name that claims to be about phase 1.
+  run grep -E '^\| 1 +\| `pre-pr`' "$CONDUCTOR"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"test suite"* ]]
+
+  start=$(grep -n '^### 1\. `pre-pr`' "$CONDUCTOR" | head -1 | cut -d: -f1)
+  end=$(grep -n '^### 2\.' "$CONDUCTOR" | head -1 | cut -d: -f1)
+  [ -n "$start" ]
+  [ -n "$end" ]
+  run sed -n "${start},${end}p" "$CONDUCTOR"
+  [[ "$output" != *"test suite"* ]]
+}
+
+@test "pr-conductor: phase 1 is narrowed in both entry cases" {
+  # The entry table once contrasted "phase 1 in full" against "the narrowed
+  # preflight", but phase 1 invokes /pre-pr --conductor unconditionally. An
+  # agent acting on that contrast would run the pr profile it exists to avoid.
+  run grep -E '^\| `NO_PR`' "$CONDUCTOR"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"narrowed preflight"* ]]
+  [[ "$output" != *"in full"* ]]
 }
 
 @test "pr-conductor: step 0 derives the entry phase" {
@@ -102,9 +151,4 @@ line_of() {
   [ "$entry" -lt "$phase1" ]
 }
 
-@test "pr-conductor: still never merges" {
-  run grep -qF 'gh pr merge' "$CONDUCTOR"
-  [ "$status" -eq 1 ]
-  run grep -qi 'Never merge' "$CONDUCTOR"
-  [ "$status" -eq 0 ]
-}
+# The never-merges contract is pinned by pr-conductor.bats, not duplicated here.

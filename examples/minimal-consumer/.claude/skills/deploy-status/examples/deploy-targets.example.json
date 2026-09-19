@@ -4,11 +4,35 @@
       "kind": "vercel",
       "project": "my-app",
       "projectId": "prj_...",
-      "team": "team_..."
+      "team": "team_...",
+      "smoke": [
+        {
+          "type": "http",
+          "url": "https://my-app.example.com/healthz",
+          "expect_status": 200,
+          "expect_text": "ok"
+        },
+        {
+          "type": "http",
+          "url": "https://my-app.example.com/api/me",
+          "expect_status": 200,
+          "headers": {
+            "Authorization": {
+              "env": "SMOKE_BEARER"
+            }
+          }
+        }
+      ]
     },
     {
       "kind": "fly",
-      "app": "my-api"
+      "app": "my-api",
+      "smoke": [
+        {
+          "type": "command",
+          "argv": ["./scripts/smoke-api.sh", "--prod"]
+        }
+      ]
     },
     {
       "kind": "aws-amplify",

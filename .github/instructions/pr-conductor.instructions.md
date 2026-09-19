@@ -64,10 +64,10 @@ Then derive where to start, rather than asking the operator to remember:
 dotbabel pr-stack entry --pr <N>    # omit --pr to resolve from the current branch
 ```
 
-| Reason    | Entry                                                                 |
-| --------- | --------------------------------------------------------------------- |
-| `NO_PR`   | phase 1 in full, then phase 2 opens the pull request                  |
-| `PR_OPEN` | phase 1 as the narrowed preflight; phase 2 self-skips; then 3 → 4 → 5 |
+| Reason    | Entry                                                                  |
+| --------- | ---------------------------------------------------------------------- |
+| `NO_PR`   | phase 1 as the narrowed preflight, then phase 2 opens the pull request |
+| `PR_OPEN` | phase 1 as the narrowed preflight; phase 2 self-skips; then 3 → 4 → 5  |
 
 `--from <phase>` overrides this and stays the way to resume a known-good run.
 
@@ -77,7 +77,7 @@ If the target PR appears in `pending`, it is blocked by an unmerged parent. Repo
 
 ### 1. `pre-pr`
 
-Run `/pre-pr --conductor` (`commands/pre-pr.md`). This is a **pre-review preflight**, not the authoritative gate: it simplifies, greps for secrets, and runs the cheap `fast` quality profile.
+Run `/pre-pr --conductor` (`commands/pre-pr.md`) — in **both** entry cases; the derived entry changes only whether phase 2 opens the pull request or self-skips. This is a **pre-review preflight**, not the authoritative gate: it simplifies, greps for secrets, and runs the cheap `fast` quality profile.
 
 `--conductor` narrows three steps — the security pass to a secrets-only grep, the quality profile from `pr` to `fast`, and the PR-body checklist away entirely. Each is something the pipeline does properly later: the authoritative security pass runs once in phase 3 via the `security-auditor` agent, the authoritative `pr` quality profile is a leg of the phase 5 matrix pinned to the final head SHA, and phase 2 verifies the body mechanically with the merge gate.
 
@@ -85,7 +85,9 @@ Running the `pr` profile here would grade a tree the review fleet is about to ch
 
 **Do not run `/simplify` or `/code-simplifier` separately** — `commands/pre-pr.md` step 2 already invokes it and commits the result as `style: pre-pr simplification pass`. A second pass produces an empty commit and a confusing diff.
 
-Hard stops from this phase are real stops: a CRITICAL security finding, or a `fast` profile failure proven branch-introduced by the `git stash` check. Do not advance past them.
+Hard stops from this phase are real stops: a CRITICAL security finding, or a `fast` profile failure. Do not advance past them.
+
+No `git stash` proof here. `correctness.tests` is a `pr`-profile rule, so `fast` produces no test failure to attribute, and `--base` already scopes the changed-scope rules to this branch's diff. The stash proof belongs to the `pr` test legs at phase 5 — and this phase runs in the operator's own checkout, where the rule floor forbids `git stash` because the stash stack is shared across worktrees and concurrent sessions.
 
 ### 2. `open-pr`
 

@@ -15,7 +15,7 @@ model: sonnet
 headless_safe: false
 ---
 
-Quality gate to run before `/git pr`. Simplifies changed code, security-reviews the diff, runs the PR quality profile, and surfaces a go/no-go summary. Does not open the PR — that is `/git pr`.
+Quality gate to run before `/git pr`. Simplifies changed code, security-reviews the diff, runs the quality profile, and surfaces a go/no-go summary. Does not open the PR — that is `/git pr`.
 
 Trigger: when the user is done with a feature and is about to open a PR, or says "prepare PR", "pre-PR", or "clean up before PR". Also triggered directly via `/pre-pr [base-branch]`.
 
@@ -154,19 +154,25 @@ Classify findings:
 - **INFO** → record in summary only.
 - No findings → record "security: clean."
 
-### 4. Run the PR quality profile
+### 4. Run the quality profile
 
 Run the resolved repository commands and normalized policy checks through one entry point:
 
 ```bash
-if [ "$CONDUCTOR" = "1" ]; then
+# Narrow to `fast` ONLY when this repository demonstrably runs the `pr`
+# profile later, as a required leg of the attested matrix. Otherwise run `pr`
+# here, because otherwise it runs nowhere.
+QUALITY_ATTESTED=$(jq -r 'try (((.attestation.required_legs // []) | index("quality")) != null) catch false' .dotbabel.json 2>/dev/null || echo false)
+if [ "$CONDUCTOR" = "1" ] && [ "$QUALITY_ATTESTED" = "true" ]; then
   dotbabel quality check --profile fast --base "$BASE"
 else
   dotbabel quality check --profile pr --base "$BASE"
 fi
 ```
 
-**Conductor mode runs `--profile fast`.** It is the documented "while you edit" profile and this repository's default, so it still catches a real problem before the review fleet is dispatched — but the authoritative `pr` profile is a leg of the `local-attest` matrix and grades the final head, so running it here would grade a tree the review is about to change.
+**Conductor mode runs `--profile fast` only when the `pr` profile is attested later.** The condition is not decoration. `security.high_confidence` belongs to the `pr` profile alone (`plugins/dotbabel/src/quality/policy.mjs:35`, where `pr = ["pr", "deep"]`), and it is one of the rules no exception may ever suppress (`policy.mjs:58-61`). Narrowing unconditionally would drop a security floor, not merely some cost.
+
+Where `.dotbabel.json` makes `quality` a required attestation leg, that floor is recovered at `local-attest` against the final head SHA, and running `pr` here would only grade a tree the review fleet is about to change. Without that leg — the **default** for a fresh consumer, since `matrix` starts empty and `required_legs` defaults to `[]` — narrowing would leave `security.high_confidence` running nowhere in the pipeline, with `[skip ci]` suppressing the remote workflow that might have caught it. So there, the full profile runs here.
 
 Do not pass `--allow-project-commands` during a local run. Use the external trust allowlist.
 
@@ -202,9 +208,11 @@ Pre-PR gate: branch → $BRANCH (base: $BASE)
                    |  secrets-grep clean (conductor — full review in phase 3)
                    |  ⚠ skill unavailable — skipped
   Step 4 — Quality:   ✓ PR profile passed
+                   |  ✓ fast profile passed (conductor — pr profile runs in local-attest)
                    |  ✗ checked rule failed (BLOCKED)
                    |  ✗ required evidence unavailable (BLOCKED)
   Step 5 — PR body:   checklist above
+                   |  skipped (conductor — phase 2 verifies the body via the merge gate)
 
 Status: READY — run `/git pr` to open the pull request.
      |  BLOCKED — <reason>. Fix the issue above before opening the PR.
@@ -214,7 +222,7 @@ Status: READY — run `/git pr` to open the pull request.
 
 - **Never open the PR.** That is `/git pr`. This command only gates.
 - **STOP on CRITICAL security findings.** Do not advance to steps 4–6; surface findings immediately.
-- **STOP if the PR quality profile returns exit code 1 or 2.** Surface the normalized results.
+- **STOP if the quality profile returns exit code 1 or 2**, whichever profile the mode selected. Surface the normalized results.
 - **Security-review unavailable is a warning, not a failure.** Warn, skip, continue.
 - **`--conductor` narrows steps 3, 4 and 5.** A secrets hit still stops the run, step 4 still stops on exit 1 or 2, and steps 1, 2 and 6 behave exactly as they do standalone. A direct `/pre-pr` is unchanged and remains a real pre-PR quality gate on the `pr` profile.
 - **Simplify commits are style commits.** Message: `style: pre-pr simplification pass`. Atomic — do not bundle with feature changes.
