@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 
 import { version } from "../src/index.mjs";
 import { parse } from "../src/lib/argv.mjs";
 import { ERROR_CODES, ValidationError, formatError } from "../src/lib/errors.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
+import { writeAll } from "../src/lib/write-all.mjs";
 import { createQualityBaseline, writeQualityBaseline } from "../src/quality/baseline.mjs";
 import { resolveQualityPolicy } from "../src/quality/config.mjs";
 import { detectQualityCapabilities, planQualityCheck } from "../src/quality/discovery.mjs";
@@ -108,11 +108,6 @@ function print(report) {
   writeAll(argv.json ? `${JSON.stringify(report, null, 2)}\n` : renderQualityHuman(report));
 }
 
-function writeAll(text) {
-  const buffer = Buffer.from(text);
-  let offset = 0;
-  while (offset < buffer.length) offset += fs.writeSync(process.stdout.fd, buffer, offset);
-}
 
 try {
   const policy = resolveQualityPolicy({ repoRoot, profile: profileFlag, base: argv.flags.base, head: argv.flags.head, jobs });
