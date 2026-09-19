@@ -22,20 +22,9 @@
  * @typedef {{run: (argv: string[]) => {status: number, stdout: string, stderr: string}}} GateDeps
  */
 
-import { DEFAULT_GOVERNANCE_FILES, hashGovernanceFiles } from "./attestation.mjs";
+import { DEFAULT_GOVERNANCE_FILES, hashGovernanceFiles, isGovernablePath } from "./attestation.mjs";
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
-
-/**
- * A governed path must be a plain relative path inside the repository.
- *
- * The list comes from `.dotbabel.json` at the base ref, which is reviewed
- * content — but it reaches `git show`, and a path that escapes the repository
- * or carries shell metacharacters is a configuration bug worth refusing rather
- * than hashing around. Refusing is also the fail-closed direction: an entry the
- * gate will not read produces a hash that cannot match any producer's.
- */
-const GOVERNED_PATH_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]*$/;
 
 /**
  * True when a commit object is present in this clone.
@@ -116,7 +105,7 @@ export function attestationGateInputs(deps, view, comments) {
     Array.isArray(policy.governance_files) && policy.governance_files.length > 0
       ? policy.governance_files.map(String)
       : [...DEFAULT_GOVERNANCE_FILES];
-  const governed = declared.filter((p) => GOVERNED_PATH_RE.test(p) && !p.includes(".."));
+  const governed = declared.filter(isGovernablePath);
 
   // The merge base, not the base tip. It is the fork point, so it is stable
   // while the trunk advances and only a rebase moves it — and a rebase moves

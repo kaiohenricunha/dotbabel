@@ -7,6 +7,7 @@ import {
   attestationPayloadProblem,
   buildAttestationPayload,
   hashGovernanceFiles,
+  isGovernablePath,
   parseAttestationComment,
   passedLegs,
   renderAttestationHeader,
@@ -459,5 +460,43 @@ describe("evidence-payload codec", () => {
     const line = encodePayloadLine(other, { a: 1 });
     expect(decodePayloadLine(other, body(line)).payload).toEqual({ a: 1 });
     expect(decodePayloadLine(P, body(line)).state).toBe("absent");
+  });
+});
+
+describe("isGovernablePath", () => {
+  it("accepts plain relative repository paths", () => {
+    for (const ok of [
+      ".dotbabel.json",
+      "package.json",
+      "ci/run_tests-2.sh",
+      "a/b/c.mjs",
+      ".github/workflows/test.yml",
+    ]) {
+      expect(isGovernablePath(ok), ok).toBe(true);
+    }
+  });
+
+  it("refuses anything that could escape the repository or reach a shell", () => {
+    const refused = [
+      "",
+      "../outside",
+      "a/../b",
+      "/abs",
+      "-n",
+      "has space.txt",
+      "x;touch pwned",
+      "$(id)",
+      "`id`",
+      "a|b",
+      "a&b",
+      "a\nb",
+      "a'b",
+      'a"b',
+    ];
+    for (const bad of refused) expect(isGovernablePath(bad), JSON.stringify(bad)).toBe(false);
+  });
+
+  it("refuses values that are not strings", () => {
+    for (const bad of [null, undefined, 1, {}, ["a"]]) expect(isGovernablePath(bad)).toBe(false);
   });
 });

@@ -160,6 +160,57 @@ describe("checkPreconditions", () => {
     );
   });
 
+  it("never puts a governance path into a shell command line", () => {
+    // `.dotbabel.json` is read at HEAD, so the governed-file list is authored by
+    // the pull request being attested, and `deps.run` hands its argument to a
+    // shell. An entry such as `x;touch pwned` must not reach that shell; it hashes
+    // as absent, which the gate (which drops it) can never match. That is the
+    // fail-closed outcome this design already documents for a bad entry.
+    const hostile = ["x;touch pwned", "$(id)", "a b", "../escape", "-n"];
+    const { deps, calls } = makeDeps({
+      runReplies: [
+        [
+          /git show .*:\.dotbabel\.json/,
+          {
+            stdout: JSON.stringify({
+              attestation: { governance_files: [".dotbabel.json", ...hostile] },
+            }),
+          },
+        ],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    const pre = checkPreconditions(deps, baseConfig());
+    expect(pre.configHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    const shown = calls.run.filter((c) => /git show/.test(c.cmd)).map((c) => c.cmd);
+    for (const bad of hostile) {
+      expect(
+        shown.some((cmd) => cmd.includes(bad)),
+        `a command line contained ${JSON.stringify(bad)}`,
+      ).toBe(false);
+    }
+  });
+
+  it("still hashes a governed path that is merely unusual but safe", () => {
+    const { deps, calls } = makeDeps({
+      runReplies: [
+        [
+          /git show .*:\.dotbabel\.json/,
+          {
+            stdout: JSON.stringify({
+              attestation: { governance_files: [".dotbabel.json", "ci/run_tests-2.sh"] },
+            }),
+          },
+        ],
+        ...GOV_REPLIES,
+        ...HAPPY_REPLIES,
+      ],
+    });
+    checkPreconditions(deps, baseConfig());
+    expect(calls.run.some((c) => /git show abc1234\w*:ci\/run_tests-2\.sh/.test(c.cmd))).toBe(true);
+  });
+
   it("leaves the merge base null when the base branch is not fetched", () => {
     const { deps } = makeDeps({
       runReplies: [

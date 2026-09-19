@@ -61,7 +61,12 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { dirname } from "node:path";
 
-import { ATTEST_MARKER_PREFIX, DEFAULT_GOVERNANCE_FILES, hashGovernanceFiles } from "./attestation.mjs";
+import {
+  ATTEST_MARKER_PREFIX,
+  DEFAULT_GOVERNANCE_FILES,
+  hashGovernanceFiles,
+  isGovernablePath,
+} from "./attestation.mjs";
 import { createRunManifest, recordLeg, sha256File, writeRunManifest } from "./attest-run.mjs";
 import {
   buildAuditEntry,
@@ -128,6 +133,10 @@ function governanceFileList(deps, rev) {
  * @returns {string|null}
  */
 function showAtRev(deps, rev, path) {
+  // `deps.run` takes a shell string, and the path comes from `.dotbabel.json` at
+  // the revision being attested. An entry the shared predicate refuses is never
+  // handed to a shell; it reads as absent, exactly as the gate treats it.
+  if (!isGovernablePath(path)) return null;
   const r = deps.run(`git show ${rev}:${path}`, { capture: true });
   return r.status === 0 ? r.stdout : null;
 }
