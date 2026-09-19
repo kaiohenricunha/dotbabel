@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-18T14:01:19.750Z",
+  "generatedAt": "2026-09-19T13:03:21.879Z",
   "version": "3.4.0",
   "artifacts": [
     {
@@ -610,14 +610,14 @@
       "type": "command",
       "path": "commands/merge-pr.md",
       "name": "merge-pr",
-      "description": "Merge a pull request only after full local verification and a passing quality gate.\n",
+      "description": "Merge a pull request only after verifying that trusted evidence covers its exact head SHA.\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["github-actions"],
         "task": ["review", "testing"],
         "maturity": "validated"
       },
-      "version": "1.0.0",
+      "version": "2.0.0",
       "owner": "@kaiohenricunha"
     },
     {
@@ -701,7 +701,7 @@
       "type": "command",
       "path": "commands/pre-pr.md",
       "name": "pre-pr",
-      "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the PR quality profile, and surface a go/no-go summary before opening a pull request.\n",
+      "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the quality profile, and surface a go/no-go summary before opening a pull request.\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["none"],
