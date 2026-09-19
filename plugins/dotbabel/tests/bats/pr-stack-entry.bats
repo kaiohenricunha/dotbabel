@@ -120,3 +120,41 @@ stub_gh_state() {
   [[ "$output" == *"(NO_PR)"* ]]
   [[ "$output" != *"skips:"* ]]
 }
+
+# --- subcommand dispatch ----------------------------------------------------
+#
+# Added after adding `entry` silently deleted the `skip-ci` and `local-attest`
+# gate branches: both suites stayed green, because nothing exercised the bin's
+# dispatch at all. `gate --gate skip-ci` then fell through to "--gate must be
+# one of", which is the error for an unknown gate — so the conductor's
+# every-commit skip-ci check would have reported a usage error as a gate
+# failure. Cheap to pin, and it is the same class of gap the review found.
+
+@test "pr-stack: every documented gate still dispatches" {
+  # skip-ci needs no PR and no network, so it is the one gate a test can run
+  # end to end. The others are asserted to reach their own logic rather than
+  # the unknown-gate error.
+  git commit -q --allow-empty -m "chore: nothing [skip ci]"
+  run node "$BIN" gate --gate skip-ci
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"gate skip-ci: PASS"* ]]
+}
+
+@test "pr-stack: skip-ci detects a commit with no marker" {
+  git commit -q --allow-empty -m "chore: nothing"
+  run node "$BIN" gate --gate skip-ci
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"gate skip-ci: FAIL"* ]]
+}
+
+@test "pr-stack: an unknown gate is still a usage error" {
+  run node "$BIN" gate --gate nonsense --pr 1
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"--gate must be one of"* ]]
+}
+
+@test "pr-stack: phases and entry dispatch without touching the gate flag" {
+  run node "$BIN" phases
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pre-pr"* ]]
+}

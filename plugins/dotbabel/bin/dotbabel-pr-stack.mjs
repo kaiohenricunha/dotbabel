@@ -449,6 +449,83 @@ async function main() {
   const which = flags.gate;
 
   // skip-ci inspects a local commit message, so it needs no PR number.
+  if (sub === "entry") {
+    // The conductor used to enter at phase 1 always, so resuming an open pull
+    // request meant remembering `--from post-pr-review`. The state is
+    // observable, so it is derived rather than asked for.
+    let prNumber = argv.flags.pr === undefined ? null : requireNumber(argv.flags.pr, "--pr");
+    if (prNumber === null) {
+      const r = sh("gh pr view --json number --jq .number");
+      const n = Number(r.stdout.trim());
+      prNumber = r.status === 0 && Number.isInteger(n) && n > 0 ? n : null;
+    }
+    const result = deriveEntryPhase({ prNumber });
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: { ...result, prNumber },
+      problems: [],
+      lines: [
+        `entry: ${result.phase} (${result.reason})`,
+        ...(result.skips.length > 0 ? [`  skips: ${result.skips.join(", ")}`] : []),
+      ],
+      json,
+    });
+  }
+
+  if (which === "skip-ci") {
+    const rev = typeof flags.sha === "string" && flags.sha !== "" ? assertRev(flags.sha) : "HEAD";
+    const msg = sh(`git log -1 --pretty=%B ${rev}`);
+    if (msg.status !== 0) return fail(EXIT_CODES.ENV, `cannot read commit message for ${rev}`);
+    const verdict = hasSkipCi(msg.stdout);
+    const result = {
+      ok: verdict.effective,
+      gate: "skip-ci",
+      reasons: verdict.effective
+        ? []
+        : [
+            {
+              code: verdict.present ? "SKIP_CI_INEFFECTIVE" : "SKIP_CI_ABSENT",
+              message: verdict.present
+                ? `marker ${verdict.marker} sits on the ${verdict.location}; only the first or last line counts`
+                : "commit message carries no [skip ci] marker",
+            },
+          ],
+      warnings: [],
+      hint: verdict.effective ? null : "put [skip ci] on the first or last line of the message",
+      verdict,
+    };
+    return emit({
+      subcommand: sub,
+      ok: result.ok,
+      result,
+      problems: result.reasons,
+      lines: [`gate skip-ci: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      json,
+    });
+  }
+
+  const prNumber = requireNumber(flags.pr, "--pr");
+
+  if (which === "local-attest") {
+    const view = ghJson(`gh pr view ${prNumber} --json headRefOid`);
+    const result = checkLocalAttestGate({
+      branch: sh("git rev-parse --abbrev-ref HEAD").stdout.trim(),
+      worktreeStatus: sh("git status --porcelain").stdout,
+      localHead: sh("git rev-parse HEAD").stdout.trim(),
+      prHeadOid: view.headRefOid,
+      prNumber,
+    });
+    return emit({
+      subcommand: sub,
+      ok: result.ok,
+      result,
+      problems: result.reasons,
+      lines: [`gate local-attest: ${result.ok ? "PASS" : "FAIL"}`, ...result.reasons.map((r) => `  ✗ ${r.message}`)],
+      json,
+    });
+  }
+
   if (which === "merge") {
     const root = repoRoot();
     const view = ghJson(
