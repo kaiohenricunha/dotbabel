@@ -1070,28 +1070,85 @@ describe("deriveEntryPhase", () => {
     expect(out.skips).toEqual(["open-pr"]);
   });
 
-  it("never derives a terminal phase from an existing attestation", () => {
-    // The omission is the contract. An attestation proves a SHA passed the
-    // matrix; it says nothing about whether the SHA was reviewed, and review
-    // markers are not SHA-pinned so nothing here can tell. A READY-and-stop
-    // outcome would let `dotbabel local-attest` run directly, then skip the
-    // whole review stage on evidence that never spoke to it.
+  it("never derives a terminal phase from an attestation alone", () => {
+    // An attestation proves a SHA passed the matrix. It says nothing about
+    // whether the SHA was reviewed, so it can never be the reason to skip the
+    // review stage: somebody can run `dotbabel local-attest` directly and then
+    // invoke the conductor.
     for (const state of [
-      { prNumber: 400 },
+      { prNumber: 400, attestedAtHead: true },
+      { prNumber: 400, attestedAtHead: true, reviewedAtHead: false },
       { prNumber: 400, attested: true },
       { prNumber: 400, attestationSha: "a".repeat(40) },
     ]) {
       const out = deriveEntryPhase(state);
-      expect(out.phase).toBe("pre-pr");
-      expect(out.phase).not.toBe("stop");
-      expect(out.skips).not.toContain("post-pr-review");
-      expect(out.skips).not.toContain("review-pr");
+      expect(out).toEqual({ phase: "pre-pr", reason: "PR_OPEN", skips: ["open-pr"] });
+    }
+  });
+
+  it("resumes at local-attest when the review already finished on this head", () => {
+    const out = deriveEntryPhase({ prNumber: 400, reviewedAtHead: true });
+    expect(out).toEqual({
+      phase: "local-attest",
+      reason: "REVIEWED_AT_HEAD",
+      skips: ["pre-pr", "open-pr", "post-pr-review", "review-pr"],
+    });
+    expect(deriveEntryPhase({ prNumber: 400, reviewedAtHead: true, attestedAtHead: false }).phase).toBe(
+      "local-attest",
+    );
+  });
+
+  it("stops only when the review and the attestation both name this head", () => {
+    const out = deriveEntryPhase({ prNumber: 400, reviewedAtHead: true, attestedAtHead: true });
+    expect(out).toEqual({
+      phase: "stop",
+      reason: "REVIEWED_AND_ATTESTED",
+      skips: ["pre-pr", "open-pr", "post-pr-review", "review-pr", "local-attest"],
+    });
+  });
+
+  it("counts only a literal true, so a truthy value cannot skip a stage", () => {
+    for (const truthy of [1, "true", "yes", {}, []]) {
+      expect(deriveEntryPhase({ prNumber: 400, reviewedAtHead: truthy, attestedAtHead: truthy })).toMatchObject({
+        phase: "pre-pr",
+      });
+    }
+  });
+
+  it("ignores review and attestation flags when there is no pull request", () => {
+    expect(deriveEntryPhase({ prNumber: null, reviewedAtHead: true, attestedAtHead: true })).toEqual({
+      phase: "pre-pr",
+      reason: "NO_PR",
+      skips: [],
+    });
+  });
+
+  it("skips exactly the phases that come before the one it enters at", () => {
+    const order = CONDUCTOR_PHASES.map((p) => p.id);
+    for (const state of [
+      { prNumber: null },
+      { prNumber: 1 },
+      { prNumber: 1, attestedAtHead: true },
+      { prNumber: 1, reviewedAtHead: true },
+      { prNumber: 1, reviewedAtHead: true, attestedAtHead: true },
+    ]) {
+      const out = deriveEntryPhase(state);
+      const before = order.slice(0, order.indexOf(out.phase));
+      // `open-pr` is the one deliberate exception: an open pull request skips it
+      // even though the preflight before it still runs.
+      const expected = state.prNumber !== null && out.phase === "pre-pr" ? ["open-pr"] : before;
+      expect(out.skips, JSON.stringify(state)).toEqual(expected);
     }
   });
 
   it("only ever names phases the pipeline actually declares", () => {
     const ids = new Set(CONDUCTOR_PHASES.map((p) => p.id));
-    for (const state of [{ prNumber: null }, { prNumber: 1 }]) {
+    for (const state of [
+      { prNumber: null },
+      { prNumber: 1 },
+      { prNumber: 1, reviewedAtHead: true },
+      { prNumber: 1, reviewedAtHead: true, attestedAtHead: true },
+    ]) {
       const out = deriveEntryPhase(state);
       expect(ids.has(out.phase)).toBe(true);
       for (const s of out.skips) expect(ids.has(s)).toBe(true);

@@ -28,6 +28,7 @@ Argument: `$ARGUMENTS` — PR number (required), plus an optional `--conductor` 
 - **Step 6** — security-review the fix delta, not the whole PR diff.
 - **Step 11** — do not execute test-plan items; the conductor's `local-attest` phase runs them and ticks the boxes. Write a `<!-- test-plan: deferred -->` marker into the PR body so the merge gate blocks until they actually run.
 - **Step 14** — NOT narrowed. Criteria verification runs in conductor mode exactly as it does standalone, because nothing else in the pipeline does it. A failing criterion stops the conductor before `local-attest`.
+- **Step 14b** — NOT narrowed. It records that the review finished on this head, which is what lets a later `/pr-conductor <PR#>` skip the review stage instead of dispatching the fleet again.
 - **Step 15** — a deferred plan yields status `deferred`, not `reviewed`.
 
 ## Workflow
@@ -301,6 +302,8 @@ gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "<thre
 
 Do NOT use `minimizeComment` — that hides comments instead of resolving them. Always use `resolveReviewThread` with a thread ID starting with `PRRT_`.
 
+**A finding thread you answered as a false positive in step 4 counts as addressed: resolve it too.** Step 14b refuses to record the review as finished while any thread that `/post-pr-review` posted is still open, and a thread left open after a reply is the usual reason it cannot.
+
 ### 13. Final branch health gate
 
 Before writing the summary, re-verify:
@@ -339,6 +342,22 @@ Never hand-write the evidence marker. `plugins/dotbabel/hooks/guard-criteria-evi
 
 **A failing criterion is never resolved by editing the criterion.** Fix the code, or stop and report.
 
+### 14b. Record that the review finished
+
+This verifies nothing itself. It records the outcome of the steps above so the next run does not repeat them. Run it only when the row is about to be `reviewed` or, in conductor mode, `deferred` — never for `blocked`, `push-failed`, or `conflicts-unresolved`. Run it from the PR worktree, so the head commit and the commit `/post-pr-review` reviewed are both present locally:
+
+```bash
+cd ".claude/worktrees/pr-$NUMBER" && dotbabel pr-stack review-complete --pr "$NUMBER"
+```
+
+It posts a SHA-pinned comment only when it can check what the comment asserts: a `/post-pr-review` receipt exists for an ancestor of the head, no thread that `/post-pr-review` posted is unresolved, and the criteria half of the merge gate has no blocking reason. Advisory test-quality threads from step 11 stay open on purpose and do not block it. Read the exit code:
+
+- `0` — posted. Record `review-complete: recorded` in the summary.
+- `1` — refused, with a reason code. This is not a `/review-pr` failure and does not change the row status, but it means a later run cannot skip the review stage. `REVIEW_NO_RECEIPT` says `/post-pr-review` never ran on this pull request; `REVIEW_FINDINGS_OPEN` names threads still to resolve. Fix what it names, or record `review-complete: not recorded (<code>)`. Never work around it.
+- `2` — an environment problem. Record `review-complete: unavailable` and say which.
+
+Never hand-write the marker. The guard hook blocks it, and neither the conductor nor a later run can tell a marker the command derived from one an agent typed. The marker names the exact head, so it stops counting the moment anything is pushed.
+
 ### 15. Summary report
 
 Output a table:
@@ -355,5 +374,7 @@ A PR may only be marked `reviewed` if:
 - `mergeable` is `MERGEABLE` and branch is not `BEHIND` (verified in step 13)
 
 Otherwise the row status is `blocked`, `push-failed`, `test-plan-missing`, or `conflicts-unresolved` and the blocker is called out.
+
+Add the step 14b outcome — `review-complete: recorded`, `not recorded (<code>)`, or `unavailable` — beside the status.
 
 End with the commit pushed, the worktree cleanup command, and any remaining action items.

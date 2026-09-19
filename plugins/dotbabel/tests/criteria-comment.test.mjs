@@ -186,6 +186,24 @@ describe("postEvidenceComment", () => {
     expect(postCalls(calls)[0].argv.join(" ")).toMatch(/--method POST repos\/o\/r\/issues\/1\/comments/);
   });
 
+  it("minimizes only the family named by markerPrefix, so one family never hides another", () => {
+    const calls = [];
+    const REVIEW_PREFIX = "<!-- review-complete verified-sha=";
+    const comments = [
+      olderMine,
+      { user: { login: "tester" }, node_id: "REVIEW_OLD", body: `${REVIEW_PREFIX}${"b".repeat(40)} -->\nold` },
+    ];
+    postEvidenceComment(fakeDeps({ me: "tester", comments, calls }), {
+      repo: "o/r",
+      pr: 1,
+      body: "new body",
+      markerPrefix: REVIEW_PREFIX,
+    });
+    const minimized = minimizeCalls(calls);
+    expect(minimized).toHaveLength(1);
+    expect(minimized[0].argv).toContain("id=REVIEW_OLD");
+  });
+
   it("minimizes only its own older evidence comments, never a foreign or unrelated one", () => {
     const calls = [];
     const comments = [

@@ -64,14 +64,16 @@ Then derive where to start, rather than asking the operator to remember:
 dotbabel pr-stack entry --pr <N>    # omit --pr to resolve from the current branch
 ```
 
-| Reason    | Entry                                                                  |
-| --------- | ---------------------------------------------------------------------- |
-| `NO_PR`   | phase 1 as the narrowed preflight, then phase 2 opens the pull request |
-| `PR_OPEN` | phase 1 as the narrowed preflight; phase 2 self-skips; then 3 → 4 → 5  |
+| Reason                  | Entry                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------- |
+| `NO_PR`                 | phase 1 as the narrowed preflight, then phase 2 opens the pull request                   |
+| `PR_OPEN`               | phase 1 as the narrowed preflight; phase 2 self-skips; then 3 → 4 → 5                    |
+| `REVIEWED_AT_HEAD`      | phase 5 (`local-attest`); phases 1 to 4 already finished on this exact head              |
+| `REVIEWED_AND_ATTESTED` | phase 6: print the hand-off and stop; the review and the attestation both name this head |
 
 `--from <phase>` overrides this and stays the way to resume a known-good run.
 
-**There is deliberately no "already attested, so stop" outcome.** An attestation proves a SHA passed the configured matrix; it does not prove the SHA went through `post-pr-review` and `review-pr`. Someone can run `dotbabel local-attest` directly and then invoke this skill, and review markers are not SHA-pinned, so nothing can tell a reviewed head from an unreviewed one. A READY-and-stop rule would skip the entire review stage on evidence that never spoke to it. If you know the conductor already ran, invoke `/merge-pr` directly.
+**Neither fact stands in for the other.** The command reads two SHA-pinned comments for the current head: a review-complete marker and a passing attestation. An attestation alone never skips the review stage: it proves a SHA passed the configured matrix and says nothing about review, and someone can run `dotbabel local-attest` directly and then invoke this skill. Only a review-complete marker can skip phases 1 to 4. `dotbabel pr-stack review-complete` posts it as the last act of `/review-pr`, and only after checking that a `/post-pr-review` receipt exists, that no finding it posted is still open, and that the criteria check has no blocking reason. It names the head, so it stops counting the moment anything is pushed. If either comment cannot be read, the command reports why and the entry falls back to `PR_OPEN`, which is always safe.
 
 If the target PR appears in `pending`, it is blocked by an unmerged parent. Report which PR must land first and stop; do not start the pipeline on a PR that cannot merge.
 
@@ -113,7 +115,7 @@ The fleet sizes itself to the diff profile (`skills/post-pr-review/SKILL.md` ste
 
 ### 4. `review-pr`
 
-Run `/review-pr <N> --conductor` (`skills/review-pr/SKILL.md`) — all 15 steps. It applies fixes in its own worktree, replies, resolves threads, pushes, and verifies the acceptance criteria as its last step.
+Run `/review-pr <N> --conductor` (`skills/review-pr/SKILL.md`) — all 15 steps. It applies fixes in its own worktree, replies, resolves threads, pushes, verifies the acceptance criteria, and finally records that the review finished (its step 14b), which is what step 0 reads on the next run.
 
 **Stop here on a failing criterion.** Step 14 of that skill runs `dotbabel criteria verify --pr <N> --post`. A non-zero exit means the pull request does not satisfy the criteria its linked specs declare, so it reports **BLOCKED** and this pipeline does **not** advance to `local-attest` — spending the matrix on a change the criteria already reject buys nothing. Report which criteria failed and stop. Never resolve a failing criterion by editing the criterion.
 

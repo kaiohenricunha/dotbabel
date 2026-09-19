@@ -606,24 +606,27 @@ npx dotbabel-quality check --json | jq -r '.results[] | select(.verdict=="fail")
 Reason about stacked pull requests — dependency graph, merge order, and the
 exact commands a child needs once its parent has merged.
 
-| Subcommand | Purpose                                                          |
-| ---------- | ---------------------------------------------------------------- |
-| `graph`    | Print the raw dependency graph                                   |
-| `plan`     | What can land now, what is blocked, and any structural problems  |
-| `next`     | The commands to move a child PR after its parent merged          |
-| `gate`     | Evaluate a precondition (`local-attest` \| `merge` \| `skip-ci`) |
-| `phases`   | The canonical pipeline phase order                               |
+| Subcommand        | Purpose                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| `graph`           | Print the raw dependency graph                                   |
+| `plan`            | What can land now, what is blocked, and any structural problems  |
+| `next`            | The commands to move a child PR after its parent merged          |
+| `gate`            | Evaluate a precondition (`local-attest` \| `merge` \| `skip-ci`) |
+| `phases`          | The canonical pipeline phase order                               |
+| `entry`           | The phase the conductor should start at for this branch          |
+| `review-complete` | Post the SHA-pinned marker that the review stage finished        |
 
-| Flag                 | Default  |                                              |
-| -------------------- | -------- | -------------------------------------------- |
-| `--trunk <ref>`      | `main`   | Trunk branch name                            |
-| `--limit <N>`        | 100      | Max PRs to enumerate                         |
-| `--pr <N>`           | —        | Required by `next` and `gate`                |
-| `--parent <N>`       | —        | Required by `next`                           |
-| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging |
-| `--remote <name>`    | `origin` | Git remote                                   |
-| `--gate <name>`      | —        | Gate to evaluate                             |
-| `--sha <rev>`        | `HEAD`   | Commit to inspect for `--gate skip-ci`       |
+| Flag                 | Default  |                                                                     |
+| -------------------- | -------- | ------------------------------------------------------------------- |
+| `--trunk <ref>`      | `main`   | Trunk branch name                                                   |
+| `--limit <N>`        | 100      | Max PRs to enumerate                                                |
+| `--pr <N>`           | —        | Required by `next`, `gate`, `review-complete`; optional for `entry` |
+| `--parent <N>`       | —        | Required by `next`                                                  |
+| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging                        |
+| `--remote <name>`    | `origin` | Git remote                                                          |
+| `--gate <name>`      | —        | Gate to evaluate                                                    |
+| `--sha <rev>`        | `HEAD`   | Commit to inspect for `--gate skip-ci`                              |
+| `--dry-run`          | off      | `review-complete`: check and print, post nothing                    |
 
 Capture `--parent-sha` before the parent merges. The repo squash-merges, so the
 parent's original commits are not ancestors of the squashed commit and
@@ -632,6 +635,20 @@ branch, so the ref can be gone by the time you want it.
 
 **Exits 1** from `plan` on a structural problem (cycle, orphan base, two open
 PRs on one head). Those need a human decision, not a retry.
+
+`entry` derives where `/pr-conductor` should start from two SHA-pinned comments
+on the current head: a review-complete marker and a passing attestation. It
+returns `NO_PR`, `PR_OPEN`, `REVIEWED_AT_HEAD` (resume at `local-attest`), or
+`REVIEWED_AND_ATTESTED` (stop and hand off). An attestation alone never skips the
+review stage. Evidence it cannot read degrades to `PR_OPEN`, never to an error.
+
+`review-complete` is the sanctioned writer of that marker. It posts only after
+checking that a `post-pr-review` receipt exists for an ancestor of the head, that
+no finding `post-pr-review` posted is still unresolved, and that the criteria half
+of the merge gate has no blocking reason, and it re-reads the head immediately
+before posting. Exit `0` posted (or dry run passed), `1` refused with a reason
+code, `2` environment error. See [`docs/attestation.md`](./attestation.md) for the
+sibling attestation evidence.
 
 ---
 

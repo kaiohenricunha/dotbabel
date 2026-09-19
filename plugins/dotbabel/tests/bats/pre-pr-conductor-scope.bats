@@ -125,7 +125,7 @@ line_of() {
 @test "pr-conductor: step 0 derives the entry phase" {
   run grep -qF 'dotbabel pr-stack entry' "$CONDUCTOR"
   [ "$status" -eq 0 ]
-  for reason in NO_PR PR_OPEN; do
+  for reason in NO_PR PR_OPEN REVIEWED_AT_HEAD REVIEWED_AND_ATTESTED; do
     run grep -qF "$reason" "$CONDUCTOR"
     [ "$status" -eq 0 ]
   done
@@ -136,10 +136,10 @@ line_of() {
   [ "$status" -eq 0 ]
 }
 
-@test "pr-conductor: refuses to derive a terminal phase from an attestation" {
-  # The omission is the contract, so it is stated rather than merely absent —
-  # otherwise a later edit "helpfully" adds the shortcut back.
-  run grep -qi 'no "already attested, so stop" outcome' "$CONDUCTOR"
+@test "pr-conductor: refuses to skip the review stage on an attestation alone" {
+  # The rule is the contract, so it is stated rather than merely implemented —
+  # otherwise a later edit "helpfully" lets a bare attestation skip the review.
+  run grep -qi 'An attestation alone never skips the review stage' "$CONDUCTOR"
   [ "$status" -eq 0 ]
 }
 

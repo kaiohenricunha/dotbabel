@@ -5,12 +5,12 @@ _Last updated: v3.4.0_
 dotbabel ships four Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.
 
-| Hook                         | Event         | Fires                 | Purpose                                              |
-| ---------------------------- | ------------- | --------------------- | ---------------------------------------------------- |
-| `guard-destructive-git.sh`   | `PreToolUse`  | before each Bash call | Blocks destructive git commands                      |
-| `guard-criteria-evidence.sh` | `PreToolUse`  | before each Bash call | Blocks a hand-written criteria evidence marker       |
-| `check-on-write.sh`          | `PostToolUse` | after each file edit  | Per-file syntax check of the edited file             |
-| `check-on-stop.sh`           | `Stop`        | once per turn         | Project-wide checks when the build graph is coherent |
+| Hook                         | Event         | Fires                 | Purpose                                                               |
+| ---------------------------- | ------------- | --------------------- | --------------------------------------------------------------------- |
+| `guard-destructive-git.sh`   | `PreToolUse`  | before each Bash call | Blocks destructive git commands                                       |
+| `guard-criteria-evidence.sh` | `PreToolUse`  | before each Bash call | Blocks a hand-written evidence marker (criteria, attestation, review) |
+| `check-on-write.sh`          | `PostToolUse` | after each file edit  | Per-file syntax check of the edited file                              |
+| `check-on-stop.sh`           | `Stop`        | once per turn         | Project-wide checks when the build graph is coherent                  |
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
@@ -42,6 +42,18 @@ them. Treat this as a guardrail against the casual path, not a security
 boundary. The durable fix is for the gate to stop trusting comment text — an
 unforgeable value derived from the run, or a check-run artifact the agent
 cannot author.
+
+It guards three evidence families, each with its own sanctioned writer:
+
+| Family      | Sanctioned writer                            | Read by                                    |
+| ----------- | -------------------------------------------- | ------------------------------------------ |
+| criteria    | `dotbabel criteria verify --pr <N> --post`   | the merge gate                             |
+| attestation | `dotbabel local-attest --pr <N>`             | the merge gate and CI                      |
+| review      | `dotbabel pr-stack review-complete --pr <N>` | `/pr-conductor`, to skip a finished review |
+
+The `post-pr-review` receipt is guarded too, because the review-complete writer
+reads it to believe a review ran. The per-finding idempotency marker on ordinary
+review comments is deliberately not guarded: no skip decision rests on it.
 
 Bypass only after the user confirms, by exporting the variable in the
 environment Claude Code itself was started with:

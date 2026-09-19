@@ -180,14 +180,14 @@
     {
       "name": "post-pr-review",
       "path": ".claude/skills/post-pr-review/SKILL.md",
-      "checksum": "sha256:83a4a25f232675c7f786f036548781e0b6f9b8b6f00114921ab4518e5a2d5f06",
+      "checksum": "sha256:9b091507a23383e21a2be8f62718b1c021e168d7be49940cf477a6eb1f0f7f08",
       "dependencies": [],
       "lastValidated": "2026-09-19"
     },
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:459aca027bb75e0dc186712cf143168bb0073c7f5bb69c9905bf1919018f120c",
+      "checksum": "sha256:7298e328de63bd24432c577810621f1a69d0a2fb6fcca16e825a8561eb1fed4a",
       "dependencies": [],
       "lastValidated": "2026-09-19"
     },
@@ -243,7 +243,7 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:767792b0bbbdf9073d671cd56913afd0029b0c2da583d256112faa7898384b6d",
+      "checksum": "sha256:421e0511a0d8aa6e313b38f6b90c006e1dbd8aaeef40cffae7458d85f4e68fa4",
       "dependencies": [],
       "lastValidated": "2026-09-19"
     },

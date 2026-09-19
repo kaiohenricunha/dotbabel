@@ -254,3 +254,32 @@ export function passedLegs(payload) {
   }
   return out;
 }
+
+/**
+ * True when a trusted, never-edited comment carries a passing attestation for
+ * exactly this head.
+ *
+ * This is the conductor's question ("has the attest phase already happened for
+ * this commit?"), not the merge gate's ("may this merge?"). It ignores
+ * `attestation.enforce`, the governance hash and the required legs on purpose:
+ * those decide whether `/merge-pr` may rely on the attestation, and a
+ * repository that does not enforce still has a finished attest phase.
+ *
+ * @param {{ comments: Array<{body: string, authorAssociation: string, lastEditedAt?: string|null}>|null|undefined,
+ *           headSha: unknown, trustedAssociations?: string[] }} input
+ * @returns {boolean}
+ */
+export function hasCurrentAttestation({ comments, headSha, trustedAssociations }) {
+  if (!Array.isArray(comments) || typeof headSha !== "string" || !/^[0-9a-f]{40}$/i.test(headSha)) return false;
+  const trusted = new Set(trustedAssociations ?? ["OWNER"]);
+  return comments.some((c) => {
+    if (!c || !trusted.has(c.authorAssociation) || (c.lastEditedAt ?? null) !== null) return false;
+    const parsed = parseAttestationComment(c.body);
+    return (
+      parsed.state === "ok" &&
+      String(parsed.sha).toLowerCase() === headSha.toLowerCase() &&
+      attestationPayloadProblem(parsed.payload) === null &&
+      /** @type {any} */ (parsed.payload).verdict === "pass"
+    );
+  });
+}

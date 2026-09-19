@@ -214,3 +214,64 @@ SP=' '
     [ "$status" -eq 2 ]
   done
 }
+
+# --- P-G6: the guard covers the review-complete family and the receipt ------
+#
+# The conductor now skips the review stage on a review-complete comment, and
+# that comment is only honest if the sanctioned command posted it after checking
+# the review really finished. A forged one skips a review nobody did, and a
+# forged post-pr-review receipt is what lets the sanctioned command believe a
+# review ran. As above, the literals are assembled from parts.
+
+@test "guard-criteria-evidence: denies a gh command that writes the review-complete marker" {
+  marker="review-complete${SP}verified-sha="
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- ${marker}abc1234 -->\\\"\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
+@test "guard-criteria-evidence: denies the review-complete payload line" {
+  payload="review-complete-payload${SP}"
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- ${payload}eyJhIjoxfQ -->\\\"\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies the post-pr-review receipt marker" {
+  tail="receipt"
+  run run_hook "\"gh api repos/o/r/pulls/42/reviews -f body=\\\"<!-- post-pr-review:v1:${tail} -->\\\"\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a review-complete marker delivered via --body-file" {
+  marker="review-complete${SP}verified-sha="
+  printf '<!-- %sabc1234 -->\n' "$marker" > "$BATS_TEST_TMPDIR/forged-review.md"
+  run run_hook "\"gh pr comment 42 --body-file $BATS_TEST_TMPDIR/forged-review.md\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"forged-review.md"* ]]
+}
+
+@test "guard-criteria-evidence: allows the sanctioned review-complete writer and the receipt script" {
+  # Neither carries its marker in its own command text, so neither needs an exception.
+  run run_hook '"dotbabel pr-stack review-complete --pr 42"'
+  [ "$status" -eq 0 ]
+  run run_hook '"node plugins/dotbabel/bin/dotbabel-pr-stack.mjs review-complete --pr 42 --dry-run"'
+  [ "$status" -eq 0 ]
+  run run_hook '"bash plugins/dotbabel/scripts/post-pr-review-post-receipt.sh 42 --posted 3"'
+  [ "$status" -eq 0 ]
+}
+
+@test "guard-criteria-evidence: still allows the idempotency marker on an ordinary finding" {
+  # Findings are posted with a per-finding marker. Guarding those would break
+  # post-pr-review itself, and they are not what a skip decision relies on.
+  run run_hook '"gh api repos/o/r/pulls/42/comments -f body=\"fix this <!-- post-pr-review:v1:0123456789abcdef -->\""'
+  [ "$status" -eq 0 ]
+}
+
+@test "guard-criteria-evidence: the block message names every sanctioned writer" {
+  marker="review-complete${SP}verified-sha="
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- ${marker}abc1234 -->\\\"\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"dotbabel criteria verify"* ]]
+  [[ "$output" == *"dotbabel local-attest"* ]]
+  [[ "$output" == *"dotbabel pr-stack review-complete"* ]]
+}

@@ -750,6 +750,124 @@
         "format": "junit-xml",
         "path": ".dotbabel/criteria/AC-24.junit.xml"
       }
+    },
+    {
+      "id": "AC-25",
+      "status": "active",
+      "given": "an open pull request whose current head may have a review-complete comment and a passing attestation",
+      "when": "the conductor derives its entry phase",
+      "then": "an attestation alone never skips the review stage, a review alone resumes at local-attest, both stop, and evidence for another commit or from an untrusted author counts for nothing",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "never derives a terminal phase from an attestation alone"
+        },
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "resumes at local-attest when the review already finished on this head"
+        },
+        {
+          "file": "plugins/dotbabel/tests/pr-gates.test.mjs",
+          "name": "stops only when the review and the attestation both name this head"
+        },
+        {
+          "file": "plugins/dotbabel/tests/review-evidence.test.mjs",
+          "name": "reports REVIEW_STALE, naming both commits, when a trusted comment names another head"
+        },
+        {
+          "file": "plugins/dotbabel/tests/review-evidence.test.mjs",
+          "name": "reports REVIEW_UNTRUSTED for a non-owner and for an edited comment"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/pr-gates.test.mjs",
+        "plugins/dotbabel/tests/review-evidence.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-25.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-25.junit.xml"
+      }
+    },
+    {
+      "id": "AC-26",
+      "status": "active",
+      "given": "a pull request whose review stage may or may not have finished",
+      "when": "dotbabel pr-stack review-complete runs",
+      "then": "it posts only with a trusted receipt, no open finding thread, and no blocking criteria reason, refuses on anything unreadable, and re-reads the head before posting",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/review-complete.test.mjs",
+          "name": "posts nothing without a post-pr-review receipt"
+        },
+        {
+          "file": "plugins/dotbabel/tests/review-complete.test.mjs",
+          "name": "posts nothing while a finding the review posted is still unresolved"
+        },
+        {
+          "file": "plugins/dotbabel/tests/review-complete.test.mjs",
+          "name": "posts nothing while the criteria check has a blocking reason"
+        },
+        {
+          "file": "plugins/dotbabel/tests/review-complete.test.mjs",
+          "name": "fails closed when reviews, threads or ancestry cannot be read"
+        },
+        {
+          "file": "plugins/dotbabel/tests/review-complete.test.mjs",
+          "name": "refuses to post when the head moved while it was gathering"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/review-complete.test.mjs",
+        "plugins/dotbabel/tests/review-evidence.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-26.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-26.junit.xml"
+      }
+    },
+    {
+      "id": "AC-27",
+      "status": "active",
+      "given": "an agent that would write the review-complete marker, its payload line, or the post-pr-review receipt by hand",
+      "when": "the PreToolUse guard sees the command",
+      "then": "it blocks the command and names every sanctioned writer, while the writers and the ordinary finding marker still pass",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats",
+          "name": "guard-criteria-evidence: denies a gh command that writes the review-complete marker"
+        },
+        {
+          "file": "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats",
+          "name": "guard-criteria-evidence: denies the post-pr-review receipt marker"
+        },
+        {
+          "file": "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats",
+          "name": "guard-criteria-evidence: the block message names every sanctioned writer"
+        },
+        {
+          "file": "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats",
+          "name": "guard-criteria-evidence: allows the sanctioned review-complete writer and the receipt script"
+        },
+        {
+          "file": "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats",
+          "name": "guard-criteria-evidence: still allows the idempotency marker on an ordinary finding"
+        }
+      ],
+      "argv": [
+        "bash",
+        "plugins/dotbabel/scripts/run-bats.sh",
+        "plugins/dotbabel/tests/bats/guard-criteria-evidence.bats"
+      ]
     }
   ]
 }
