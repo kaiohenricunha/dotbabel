@@ -1,5 +1,7 @@
 # Attestation: verify once per commit, then reuse
 
+_Last updated: v3.4.0_
+
 `dotbabel local-attest` runs your CI matrix on your machine and posts a comment
 that names the commit it verified. With enforcement on, `/merge-pr` reads that
 comment instead of running the test suite and the quality profile a second time.
