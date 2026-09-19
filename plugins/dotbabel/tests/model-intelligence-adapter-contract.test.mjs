@@ -112,14 +112,21 @@ describe("source adapter contract", () => {
 
   it("contract fixture: exit 0 with empty output is unknown, not ok", () => {
     // The measured OpenCode case (DOC-2, "`opencode models` Grammar and Stability").
-    // A zero exit code alone does not mean success, and an empty catalog must never
-    // replace a previously valid one (ARCH-30).
+    //
+    // What this proves, and what it does not. P-5 defines the contract and owns no
+    // classifier, so it cannot show that an ADAPTER turns this process into `unknown`:
+    // that is the P-6 and P-7 adapters' obligation, and `expectedResult` in the fixture
+    // is the outcome their classification must produce for the `process` block. What the
+    // contract does own is (1) admitting and preserving this result, and (2) refusing
+    // the wrong answer: it will not build an `ok` result that carries no evidence, so an
+    // empty catalog can never be reported as a successful one (ARCH-30). Cache
+    // preservation on a failed refresh is REL-2 and belongs to catalog/, not here.
     const f = fixture("opencode-exit0-empty-output.json");
     expect(f.process.exitCode).toBe(0);
     expect(f.process.stdout).toBe("");
     const r = makeAdapterResult(f.expectedResult);
     expect(r.status).toBe("unknown");
-    expect(r.status).not.toBe("ok");
+    expect(() => makeAdapterResult({ ...f.expectedResult, status: "ok" })).toThrow(/requires evidence/);
     expect(r.evidence).toBeUndefined();
     expect(r.diagnostic.code).toBe("empty_output");
     expect(r.provenance.sourceId).toBe("opencode");
@@ -399,7 +406,7 @@ describe("source adapter contract", () => {
     expect(() => makeAdapterResult(null)).toThrow(/must be an object, got null/);
     // The result and its nested records are frozen, so a consumer cannot edit
     // provenance after the fact and change what a cached fact claims.
-    const r = makeAdapterResult({ status: "ok", evidence: 1, provenance: prov, diagnostic: { code: "c" } });
+    const r = makeAdapterResult({ status: "ok", evidence: 1, provenance: prov, diagnostic: { code: "c", message: "m" } });
     expect(Object.isFrozen(r) && Object.isFrozen(r.provenance) && Object.isFrozen(r.diagnostic)).toBe(true);
   });
 
@@ -449,10 +456,12 @@ describe("source adapter contract", () => {
     expect(t.observedAt).toBe(fixed);
     expect(t.diagnostic.message).toMatch(/exceeded 15 ms on the network channel/);
 
-    // `version` and `$comment` are accepted so a descriptor can be shipped as a
-    // documented file; every other extra key is still an error.
-    expect(validateDescriptor({ ...descriptor(), version: 1, $comment: "notes" }).errors).toEqual([]);
+    // `$comment` is accepted so a descriptor can be shipped as a documented file;
+    // every other extra key is an error, including `version`, which the §5 interface
+    // does not define and which would be ambiguous beside the two provenance versions.
+    expect(validateDescriptor({ ...descriptor(), $comment: "notes" }).errors).toEqual([]);
     expect(validateDescriptor({ ...descriptor(), notes: "x" }).errors.map((e) => e.path)).toContain("notes");
+    expect(validateDescriptor({ ...descriptor(), version: 1 }).errors.map((e) => e.path)).toContain("version");
   });
 
   it("handles a non-string argv element and every inline flag spelling", () => {
@@ -506,5 +515,194 @@ describe("source adapter contract", () => {
     // policy/ applies here (CWE-1321).
     const hostile = JSON.parse(String.raw`{"id":"x","kind":"runtime","capabilities":{"binding":{"__proto__":{"support":"supported","axes":{}}}}}`);
     expect(validateDescriptor(hostile).errors.map((e) => e.path)).toContain("capabilities.binding.__proto__");
+  });
+});
+
+// Findings from the PR 407 review. Each defect below was reproduced against the module
+// before it was fixed, so each of these tests failed first.
+describe("review hardening", () => {
+  const prov = { sourceId: "codex", sourceKind: "runtime" };
+  const paths = (d) => validateDescriptor(d).errors.map((e) => e.path);
+
+  it("masks a secret in a diagnostic message on every path that can carry one", async () => {
+    const secret = "sk-ant-api03-AbCdEf0123456789";
+    expect(unavailable({ provenance: prov, code: "nonzero_exit", message: `login failed: ${secret}` }).diagnostic.message).not.toContain(secret);
+
+    // unavailable() is not the only builder. A hand-built unsupported or unknown result
+    // goes through the same guard, so an adapter cannot forget it (OPS-4).
+    const built = makeAdapterResult({ status: "unsupported", provenance: prov, diagnostic: { code: "auth_required", message: `${secret} ${"x ".repeat(2_000)}` } });
+    expect(built.diagnostic.message).not.toContain(secret);
+    expect(built.diagnostic.message.length).toBeLessThanOrEqual(1_024);
+
+    // A LABELLED secret has no recognisable shape; the label is what identifies it.
+    const labelled = [
+      "Command failed with exit code 1: codex --api-key hunter2 models",
+      "authentication failed (password=hunter2)",
+      "token: hunter2 rejected",
+      "Authorization: Bearer hunter2",
+      "request to https://user:hunter2@example.com/x failed",
+    ];
+    for (const message of labelled) {
+      const thrown = await runBounded(() => { throw new Error(message); }, { channel: "subprocess", provenance: prov });
+      expect(thrown.diagnostic.message, message).not.toContain("hunter2");
+    }
+  });
+
+  it("requires a diagnostic message, as section 5 declares it required", () => {
+    expect(() => makeAdapterResult({ status: "unknown", provenance: prov, diagnostic: { code: "timeout" } })).toThrow(/diagnostic\.message/);
+    expect(() => makeAdapterResult({ status: "unknown", provenance: prov, diagnostic: { code: "timeout", message: "" } })).toThrow(/diagnostic\.message/);
+  });
+
+  it("redacts compound credential flags, header arguments and URL userinfo", () => {
+    const secretArgv = [
+      ["c", "--access-token", "hunter2"],
+      ["c", "--client-secret=hunter2"],
+      ["c", "--refresh-token", "hunter2"],
+      ["c", "--auth-token", "hunter2"],
+      ["c", "--private-key", "hunter2"],
+      ["c", "--authorization", "hunter2"],
+      ["curl", "-H", "Authorization: Bearer hunter2"],
+      ["curl", "-H", "Cookie: sid=hunter2"],
+      ["curl", "--header", "X-Api-Key: hunter2"],
+    ];
+    for (const argv of secretArgv) expect(redactForDiagnostic({ argv }), argv.join(" ")).not.toContain("hunter2");
+
+    // The command and its subcommands survive, so the diagnostic stays readable.
+    expect(redactForDiagnostic({ argv: ["codex", "--access-token", "hunter2", "models"] })).toBe("codex --access-token [redacted] models");
+    expect(redactForDiagnostic({ argv: ["curl", "-H", "Authorization: Bearer hunter2"] })).toBe("curl -H Authorization: [redacted]");
+
+    // Userinfo carries the credential; the host and path do not, and stay.
+    expect(redactForDiagnostic({ argv: ["git", "clone", "https://oauth2:glpat-A1b2C3d4E5f6G7h8I9j0@gitlab.com/x.git"] })).toBe("git clone https://[redacted]@gitlab.com/x.git");
+    expect(redactForDiagnostic({ env: { DATABASE_URL: "postgres://admin:hunter2@db:5432/app" } })).toBe("DATABASE_URL=postgres://[redacted]@db:5432/app");
+    expect(redactForDiagnostic({ argv: ["curl", "https://example.com/a?b=c"] })).toBe("curl https://example.com/a?b=c");
+  });
+
+  it("redacts every conventional secret-bearing variable name, including compound and plural forms", () => {
+    const secretNames = ["PGPASSWORD", "OPENAI_APIKEY", "API_KEYS", "TOKENS", "MYSQL_PASS", "GITHUB_PAT", "NPM_AUTHTOKEN", "APP_PWD", "CLIENT_SECRETS"];
+    for (const name of secretNames) expect(redactForDiagnostic({ env: { [name]: "hunter2" } }), name).toBe(`${name}=[redacted]`);
+    // Over-redaction is the deliberate bias, but ordinary variables must stay readable.
+    for (const name of ["KEYBOARD_LAYOUT", "PATH", "HOME", "EDITOR", "LANG"]) {
+      expect(redactForDiagnostic({ env: { [name]: "plain" } }), name).toBe(`${name}=plain`);
+    }
+  });
+
+  it("normalizes control and format characters before matching, so they cannot split a token", () => {
+    const zeroWidth = String.fromCharCode(0x200b);
+    const bell = String.fromCharCode(7);
+    // The shape rule needs the token contiguous. A zero-width character used to break the
+    // match first and only become visible noise afterwards.
+    expect(redactForDiagnostic({ env: { OPAQUE: `sk-abc${zeroWidth}defghijklmnop` } })).not.toContain("defghijklmnop");
+    expect(redactForDiagnostic({ argv: ["codex", `sk-abc${bell}defghijklmnop`] })).not.toContain("defghijklmnop");
+  });
+
+  it("never splits a surrogate pair when it truncates", () => {
+    const emoji = String.fromCodePoint(0x1f600);
+    // The cut falls between the two halves of the emoji, which used to leave a lone
+    // surrogate that corrupts JSON output and PR comments.
+    const r = unavailable({ provenance: prov, code: "x", message: "a".repeat(1_022) + emoji + "tail" });
+    expect(r.diagnostic.message.length).toBeLessThanOrEqual(1_024);
+    expect(r.diagnostic.message.isWellFormed()).toBe(true);
+  });
+
+  it("accepts only the four provenance fields, typed, and an ISO observedAt", () => {
+    const base = { status: "ok", evidence: 1 };
+    const full = makeAdapterResult({ ...base, provenance: { sourceId: "x", sourceKind: "runtime", sourceVersion: "2.0.5", adapterVersion: "1" }, observedAt: "2026-09-18T00:00:00.000Z" });
+    expect(full.provenance).toEqual({ sourceId: "x", sourceKind: "runtime", sourceVersion: "2.0.5", adapterVersion: "1" });
+
+    // OPS-4 keeps identifiers out of provenance, and the section 5 invariant keeps the
+    // three dimensions apart: neither an account nor a freshness may ride along.
+    for (const extra of [{ accountId: "user@example.com" }, { derivation: "declared" }, { freshness: "stale" }]) {
+      expect(() => makeAdapterResult({ ...base, provenance: { sourceId: "x", sourceKind: "runtime", ...extra } }), Object.keys(extra)[0]).toThrow(/provenance.*unknown key/);
+    }
+    for (const bad of [42, {}, true, ""]) {
+      expect(() => makeAdapterResult({ ...base, provenance: { sourceId: "x", sourceKind: "runtime", sourceVersion: bad } }), String(bad)).toThrow(/sourceVersion/);
+      expect(() => makeAdapterResult({ ...base, provenance: { sourceId: "x", sourceKind: "runtime", adapterVersion: bad } }), String(bad)).toThrow(/adapterVersion/);
+    }
+    // observedAt is the one input catalog/ derives freshness from, so a bad one becomes a
+    // freshness bug in a module that cannot defend itself against it.
+    for (const bad of [12345, new Date(), "yesterday", "2026-13-40T99:00:00Z", ""]) {
+      expect(() => makeAdapterResult({ ...base, provenance: prov, observedAt: bad }), String(bad)).toThrow(/observedAt/);
+    }
+    expect(() => makeAdapterResult({ ...base, provenance: prov, observedAt: "2026-09-18T00:00:00+02:00" })).not.toThrow();
+  });
+
+  it("rejects unknown keys inside capability blocks, and operational keys on an unsupported operation", () => {
+    expect(paths(descriptor({ capabilities: { discovery: op({ availability: "available" }) } }))).toContain("capabilities.discovery.availability");
+    expect(paths(descriptor({ capabilities: { discovery: op({ freshness: "fresh" }) } }))).toContain("capabilities.discovery.freshness");
+    // "May omit" is not "may contradict": an unsupported operation with a network story
+    // is the reader confusion the omission rule exists to prevent.
+    for (const key of ["network", "auth", "cacheable", "execution"]) {
+      const block = { support: "unsupported", [key]: key === "cacheable" ? true : "never" };
+      expect(paths(descriptor({ capabilities: { observation: block } })), key).toContain(`capabilities.observation.${key}`);
+    }
+    // A resurrected boolean the spec deliberately replaced with enums must not survive.
+    expect(paths(descriptor({ capabilities: { binding: { agent: { support: "supported", axes: {}, requiresNetwork: true } } } }))).toContain("capabilities.binding.agent.requiresNetwork");
+    expect(paths(descriptor({ capabilities: { invocation: { support: "supported", axes: {}, extra: 1 } } }))).toContain("capabilities.invocation.extra");
+    // `$comment` is the documented annotation key inside every block.
+    expect(paths(descriptor({ capabilities: { discovery: op({ $comment: "why" }) } }))).toEqual([]);
+  });
+
+  it("answers from a validated snapshot, not from an object the caller can still edit", () => {
+    const d = descriptor();
+    const reg = createRegistry([d]);
+    // The registry does not own the caller's object, so it must not freeze it.
+    expect(Object.isFrozen(d)).toBe(false);
+    // Editing afterwards must not change what the registry reports about an unmeasured
+    // capability (ARCH-44).
+    d.capabilities.binding.agent.support = "unsupported";
+    d.capabilities.binding.skill = { support: "supported", axes: { model: "supported" } };
+    expect(reg.bindingSupport("claude", "agent")).toBe("supported");
+    expect(reg.isVerified("claude", "skill")).toBe(false);
+    // And the snapshot itself is frozen all the way down.
+    expect(Object.isFrozen(reg.get("claude").capabilities.binding.agent.axes)).toBe(true);
+  });
+
+  it("hands the operation an AbortSignal and aborts it only when the timeout wins", async () => {
+    let seen;
+    let aborted = false;
+    const timedOut = await runBounded(
+      ({ signal }) => {
+        seen = signal;
+        signal.addEventListener("abort", () => { aborted = true; });
+        return new Promise(() => {});
+      },
+      { channel: "subprocess", timeoutMs: 20, provenance: prov },
+    );
+    expect(timedOut.diagnostic.code).toBe("timeout");
+    expect(seen).toBeInstanceOf(AbortSignal);
+    // Promise.race abandons the loser but cannot stop it; the signal is what lets a
+    // subprocess adapter kill its child instead of leaving it running.
+    expect(aborted).toBe(true);
+
+    let finished;
+    await runBounded(async ({ signal }) => { finished = signal; return 1; }, { channel: "subprocess", provenance: prov });
+    expect(finished.aborted).toBe(false);
+  });
+
+  it("reports an operation that resolves no evidence as unknown, not as a transient failure", async () => {
+    // A resolved undefined used to make makeAdapterResult throw inside the try block, and
+    // the catch reported that programming error as an unavailable, retryable runtime error.
+    const r = await runBounded(async () => undefined, { channel: "subprocess", provenance: prov });
+    expect(r.status).toBe("unknown");
+    expect(r.diagnostic.code).toBe("insufficient_evidence");
+    expect(r.evidence).toBeUndefined();
+  });
+
+  it("rejects a timeout the timer cannot honour", () => {
+    // Node clamps a delay above 2**31-1 to 1 ms, which turns a generous timeout into an
+    // immediate one, and a fraction is clamped up the same way.
+    for (const bad of [2 ** 31, 2_147_483_648, 0.4, 1.5]) {
+      expect(() => resolveTimeoutMs({ channel: "network", timeoutMs: bad }), String(bad)).toThrow(/timeoutMs/);
+    }
+    expect(resolveTimeoutMs({ channel: "network", timeoutMs: 2_147_483_647 })).toBe(2_147_483_647);
+    expect(resolveTimeoutMs({ channel: "network", timeoutMs: 1 })).toBe(1);
+  });
+
+  it("keeps stale out of the adapter result vocabulary, because freshness is derived by catalog", () => {
+    // ARCH-12 lists `stale` among the states an adapter may report. Section 5 supersedes
+    // it: freshness is derived from observedAt, and a flat `status: stale` is the
+    // ambiguous form the spec names as the thing to avoid.
+    expect(ADAPTER_RESULT_STATUSES).not.toContain("stale");
+    expect(() => makeAdapterResult({ status: "stale", provenance: prov })).toThrow(/status must be one of/);
   });
 });
