@@ -678,6 +678,78 @@
         "format": "junit-xml",
         "path": ".dotbabel/criteria/AC-22.junit.xml"
       }
+    },
+    {
+      "id": "AC-23",
+      "status": "active",
+      "given": "a repository whose .dotbabel.json enforces attestation but whose local-attest configuration cannot work",
+      "when": "dotbabel doctor runs",
+      "then": "it fails and names the consequence for a missing config, an ungoverned config, or an unknown required leg, and it never executes an executable config in a repository that is not trusted",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/check-attestation-adoption.test.mjs",
+          "name": "fails with NO_CONFIG when nothing can produce evidence"
+        },
+        {
+          "file": "plugins/dotbabel/tests/check-attestation-adoption.test.mjs",
+          "name": "fails with CONFIG_UNGOVERNED when the config file is outside governance_files"
+        },
+        {
+          "file": "plugins/dotbabel/tests/check-attestation-adoption.test.mjs",
+          "name": "fails with REQUIRED_LEG_UNKNOWN naming a required leg no matrix entry provides"
+        },
+        {
+          "file": "plugins/dotbabel/tests/check-attestation-adoption.test.mjs",
+          "name": "does not load an executable config when execution is not permitted"
+        },
+        {
+          "file": "plugins/dotbabel/tests/dotbabel-doctor.test.mjs",
+          "name": "does not execute the repository's config when the repository is not trusted"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/check-attestation-adoption.test.mjs",
+        "plugins/dotbabel/tests/dotbabel-doctor.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-23.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-23.junit.xml"
+      }
+    },
+    {
+      "id": "AC-24",
+      "status": "active",
+      "given": "a .dotbabel.json whose governance_files carries an entry with shell metacharacters or a path that escapes the repository",
+      "when": "local-attest computes the configuration hash",
+      "then": "no such entry reaches a shell command line, and it is hashed as absent so it can never match the gate's hash",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/local-attest-runner.test.mjs",
+          "name": "never puts a governance path into a shell command line"
+        },
+        {
+          "file": "plugins/dotbabel/tests/attestation.test.mjs",
+          "name": "refuses anything that could escape the repository or reach a shell"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/local-attest-runner.test.mjs",
+        "plugins/dotbabel/tests/attestation.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-24.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-24.junit.xml"
+      }
     }
   ]
 }

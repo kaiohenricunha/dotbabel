@@ -16,7 +16,9 @@ below behaves exactly as before: `/merge-pr` verifies the branch itself.
 1. **Have a local-attest config.** Run `dotbabel local-attest --init`, then read the
    draft against your workflows (see [the README](../README.md#local-attestation)).
    Add a `quality` leg if you use [`dotbabel quality`](./quality.md), so its verdict
-   is produced at attest time rather than at merge time.
+   is produced at attest time rather than at merge time. Give the `test` leg a
+   `produces` list and pass `--reuse` so the quality leg does not run lint and the
+   suite a second time ([Reusing a local-attest run](./quality.md#reusing-a-local-attest-run)).
 2. **Choose what must be proven.** Name every leg that `/merge-pr` should no longer
    re-run in `required_legs`. Then list every file that decides what those legs do
    in `governance_files` (step 3 explains why).
