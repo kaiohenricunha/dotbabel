@@ -1,7 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
+import { writeAll } from "../src/lib/write-all.mjs";
 
 const MODULE = path.resolve(import.meta.dirname, "../src/lib/write-all.mjs");
 
@@ -106,5 +108,60 @@ describe("writeAll", () => {
     `;
     const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { timeout: 20_000, maxBuffer: 32 * 1024 * 1024 });
     expect(r.stdout.equals(Buffer.from(text))).toBe(true);
+  });
+});
+
+describe("writeAll in process", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const eagain = () => Object.assign(new Error("resource temporarily unavailable"), { code: "EAGAIN" });
+
+  it("keeps writing from where a partial write stopped until every byte is out", () => {
+    const write = vi.spyOn(fs, "writeSync").mockReturnValueOnce(3).mockReturnValueOnce(4).mockReturnValueOnce(3);
+    writeAll("0123456789", 7);
+    expect(write.mock.calls.map(([fd, , offset]) => [fd, offset])).toEqual([
+      [7, 0],
+      [7, 3],
+      [7, 7],
+    ]);
+    expect(Buffer.from(write.mock.calls[0][1]).toString()).toBe("0123456789");
+  });
+
+  it("waits and retries on EAGAIN instead of failing or spinning", () => {
+    const wait = vi.spyOn(Atomics, "wait").mockReturnValue("timed-out");
+    const write = vi.spyOn(fs, "writeSync").mockImplementationOnce(() => { throw eagain(); })
+      .mockImplementationOnce(() => { throw eagain(); })
+      .mockReturnValueOnce(5);
+    writeAll("hello", 7);
+    expect(write).toHaveBeenCalledTimes(3);
+    expect(wait).toHaveBeenCalledTimes(2);
+    expect(wait.mock.calls[0].slice(1)).toEqual([0, 0, 2]);
+  });
+
+  it("rethrows any other error without waiting", () => {
+    const wait = vi.spyOn(Atomics, "wait");
+    vi.spyOn(fs, "writeSync").mockImplementation(() => { throw Object.assign(new Error("bad fd"), { code: "EBADF" }); });
+    expect(() => writeAll("hello", 7)).toThrow(expect.objectContaining({ code: "EBADF" }));
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  it("makes no write call for an empty string", () => {
+    const write = vi.spyOn(fs, "writeSync");
+    writeAll("", 7);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("defaults to standard output", () => {
+    const write = vi.spyOn(fs, "writeSync").mockReturnValue(1);
+    writeAll("x");
+    expect(write.mock.calls[0][0]).toBe(process.stdout.fd);
+  });
+
+  it("counts bytes rather than characters for multi-byte text", () => {
+    const text = "✓é";
+    const write = vi.spyOn(fs, "writeSync").mockReturnValue(Buffer.byteLength(text));
+    writeAll(text, 7);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0][1].length).toBe(5);
   });
 });
