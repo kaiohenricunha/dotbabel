@@ -32,6 +32,7 @@ const TRUST_FILE_NAME = "check-on-stop-trusted";
 const HEADER = [
   "# dotbabel check-on-stop trust allowlist. One absolute path per line.",
   "# Repos listed here may run their own build tooling at turn end.",
+  "# A validated linked worktree inherits trust from its main repository entry.",
   "# Consumer: plugins/dotbabel/hooks/check-on-stop.sh",
   "# Revoke: delete the line.",
   "",
@@ -214,7 +215,7 @@ export function grantCheckOnStopTrust(opts) {
  * unrelated trusted repository.
  *
  * @param {string} repoRoot Physical path to check.
- * @returns {string|null} Resolved physical path of main repository, or null if not a worktree.
+ * @returns {string|null} Resolved trust anchor, or null for invalid or unsupported metadata.
  */
 export function resolveWorktreeMainRepo(repoRoot) {
   try {
@@ -258,7 +259,7 @@ export function resolveWorktreeMainRepo(repoRoot) {
       commonDir = resolve(realGitDir, commonDir);
     }
     const realCommonDir = realpathSync(commonDir);
-    if (basename(realCommonDir) !== ".git") return null;
+    const standardRepo = basename(realCommonDir) === ".git";
 
     // A matching backlink alone is forgeable when both files live in an
     // attacker-controlled directory. Git owns linked-worktree metadata only
@@ -266,7 +267,7 @@ export function resolveWorktreeMainRepo(repoRoot) {
     const realWorktreesDir = realpathSync(join(realCommonDir, "worktrees"));
     if (dirname(realGitDir) !== realWorktreesDir) return null;
 
-    return realpathSync(dirname(realCommonDir));
+    return realpathSync(standardRepo ? dirname(realCommonDir) : realCommonDir);
   } catch {
     return null;
   }

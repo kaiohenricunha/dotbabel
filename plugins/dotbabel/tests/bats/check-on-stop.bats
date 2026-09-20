@@ -360,6 +360,43 @@ seed_go() {
   rm -rf "$evil"
 }
 
+@test "a linked worktree attached to a bare repository inherits trust" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local bare wt
+  bare=$(mktemp -d)
+  git clone --bare -q "$REPO" "$bare/repo.git"
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git --git-dir="$bare/repo.git" worktree add -q "$wt" -b wt-branch
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  printf '%s\n' "$bare/repo.git" > "$TRUST_FILE"
+  stub_checker go 1 "" "main.go:3: something is wrong"
+  feed_stop_json "$HOOK" false "$wt"
+  [[ "$output" == *'"decision"'* ]]
+  [ -n "$(stub_calls go)" ]
+  git --git-dir="$bare/repo.git" worktree remove "$wt" || rm -rf "$wt"
+  rm -rf "$bare"
+}
+
+@test "a symlinked worktree gitfile does not bypass the strict trust check" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local wt
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add -q "$wt" -b wt-branch
+  mv "$wt/.git" "$wt/.git-file"
+  ln -s .git-file "$wt/.git"
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$wt"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+}
+
 @test "CHECK_ON_STOP_TRUST_ALL=1 overrides the allowlist" {
   seed_go
   : > "$TRUST_FILE"

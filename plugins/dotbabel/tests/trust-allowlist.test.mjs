@@ -429,6 +429,27 @@ describe("resolveWorktreeMainRepo", () => {
 
     expect(resolveWorktreeMainRepo(evil)).toBeNull();
   });
+
+  it("resolves a linked worktree attached to a bare repository", () => {
+    const bare = mkTmp("bare-repo.git-");
+    const wt = mkTmp("bare-wt-");
+    const gitDir = path.join(bare, "worktrees", "linked");
+    fs.mkdirSync(gitDir, { recursive: true });
+    fs.writeFileSync(path.join(wt, ".git"), `gitdir: ${gitDir}\n`, "utf8");
+    fs.writeFileSync(path.join(gitDir, "gitdir"), `${path.join(wt, ".git")}\n`, "utf8");
+    fs.writeFileSync(path.join(gitDir, "commondir"), `${bare}\n`, "utf8");
+
+    expect(resolveWorktreeMainRepo(wt)).toBe(fs.realpathSync(bare));
+  });
+
+  it("rejects a symlinked worktree gitfile", () => {
+    const dir = mkTmp("symlinked-gitfile-");
+    const gitFile = path.join(dir, ".git-file");
+    fs.writeFileSync(gitFile, "gitdir: nowhere\n", "utf8");
+    fs.symlinkSync(".git-file", path.join(dir, ".git"));
+
+    expect(resolveWorktreeMainRepo(dir)).toBeNull();
+  });
 });
 
 describe("grantCheckOnStopTrust worktree behavior", () => {
