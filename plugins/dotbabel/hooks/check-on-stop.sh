@@ -134,7 +134,7 @@ if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ]; then
     local dir="$1"
     local git_file="$dir/.git"
     [ -f "$git_file" ] || return 1
-    local gitdir_line gitdir commondir backlink common_dir
+    local gitdir_line gitdir commondir backlink common_dir worktrees_dir
     IFS= read -r gitdir_line < "$git_file" 2>/dev/null || return 1
     case "$gitdir_line" in
       gitdir:\ *) gitdir="${gitdir_line#gitdir: }" ;;
@@ -174,11 +174,14 @@ if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ]; then
       commondir="$gitdir/$commondir"
     fi
     common_dir=$(cd "$commondir" 2>/dev/null && pwd -P) || return 1
-    if [ "$(basename "$common_dir")" = ".git" ]; then
-      cd "$common_dir/.." 2>/dev/null && pwd -P
-      return 0
-    fi
-    return 1
+    [ "$(basename "$common_dir")" = ".git" ] || return 1
+
+    # A self-consistent backlink is still forgeable outside the trusted
+    # repository. Git owns linked-worktree metadata only in this directory.
+    worktrees_dir=$(cd "$common_dir/worktrees" 2>/dev/null && pwd -P) || return 1
+    [ "$(dirname "$gitdir")" = "$worktrees_dir" ] || return 1
+
+    cd "$common_dir/.." 2>/dev/null && pwd -P
   }
 
   MAIN_ROOT=$(resolve_worktree_main_repo "$ROOT" 2>/dev/null) || MAIN_ROOT=""

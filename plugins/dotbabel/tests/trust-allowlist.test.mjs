@@ -415,6 +415,20 @@ describe("resolveWorktreeMainRepo", () => {
 
     expect(resolveWorktreeMainRepo(evil)).toBeNull();
   });
+
+  it("returns null for forged metadata outside the trusted repository admin directory", () => {
+    const root = mkTmp("wt-main-");
+    fs.mkdirSync(path.join(root, ".git", "worktrees"), { recursive: true });
+
+    const evil = mkTmp("evil-dir-");
+    const forgedGitDir = path.join(evil, "admin");
+    fs.mkdirSync(forgedGitDir);
+    fs.writeFileSync(path.join(evil, ".git"), `gitdir: ${forgedGitDir}\n`, "utf8");
+    fs.writeFileSync(path.join(forgedGitDir, "gitdir"), `${path.join(evil, ".git")}\n`, "utf8");
+    fs.writeFileSync(path.join(forgedGitDir, "commondir"), `${path.join(root, ".git")}\n`, "utf8");
+
+    expect(resolveWorktreeMainRepo(evil)).toBeNull();
+  });
 });
 
 describe("grantCheckOnStopTrust worktree behavior", () => {

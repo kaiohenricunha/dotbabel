@@ -209,8 +209,9 @@ export function grantCheckOnStopTrust(opts) {
  * If `repoRoot` is a linked git worktree, resolve the root of its main
  * repository by reading the worktree metadata without executing git commands.
  *
- * Verifies bidirectional backlink: `<worktree>/.git` -> `gitdir` -> `<gitdir>/gitdir` -> `<worktree>/.git`
- * to prevent forged worktrees.
+ * Verifies the bidirectional backlink and requires the administration directory
+ * to be `<common-dir>/worktrees/<id>` so forged metadata cannot claim an
+ * unrelated trusted repository.
  *
  * @param {string} repoRoot Physical path to check.
  * @returns {string|null} Resolved physical path of main repository, or null if not a worktree.
@@ -257,11 +258,15 @@ export function resolveWorktreeMainRepo(repoRoot) {
       commonDir = resolve(realGitDir, commonDir);
     }
     const realCommonDir = realpathSync(commonDir);
-    if (basename(realCommonDir) === ".git") {
-      const candidateMain = dirname(realCommonDir);
-      return realpathSync(candidateMain);
-    }
-    return null;
+    if (basename(realCommonDir) !== ".git") return null;
+
+    // A matching backlink alone is forgeable when both files live in an
+    // attacker-controlled directory. Git owns linked-worktree metadata only
+    // below <common-dir>/worktrees/<id>; bind the backlink to that location.
+    const realWorktreesDir = realpathSync(join(realCommonDir, "worktrees"));
+    if (dirname(realGitDir) !== realWorktreesDir) return null;
+
+    return realpathSync(dirname(realCommonDir));
   } catch {
     return null;
   }

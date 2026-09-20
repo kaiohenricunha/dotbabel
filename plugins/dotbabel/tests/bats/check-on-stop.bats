@@ -336,6 +336,30 @@ seed_go() {
   rm -rf "$evil"
 }
 
+@test "forged worktree metadata outside the trusted git directory does not inherit trust" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local evil forged_gitdir
+  evil=$(mktemp -d)
+  forged_gitdir="$evil/admin"
+  mkdir "$forged_gitdir"
+  printf 'gitdir: %s\n' "$forged_gitdir" > "$evil/.git"
+  printf '%s\n' "$evil/.git" > "$forged_gitdir/gitdir"
+  printf '%s\n' "$REPO/.git" > "$forged_gitdir/commondir"
+  printf 'ref: refs/heads/main\n' > "$forged_gitdir/HEAD"
+  cat "$REPO/.git/index" > "$forged_gitdir/index"
+  cat "$REPO/README.md" > "$evil/README.md"
+  cat "$REPO/go.mod" > "$evil/go.mod"
+  cat "$REPO/main.go" > "$evil/main.go"
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$evil/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$evil"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  rm -rf "$evil"
+}
+
 @test "CHECK_ON_STOP_TRUST_ALL=1 overrides the allowlist" {
   seed_go
   : > "$TRUST_FILE"
