@@ -19,8 +19,8 @@
  * lines and `#` comments ignored; each entry resolved before an exact compare.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { ERROR_CODES, ValidationError } from "./lib/errors.mjs";
 import { configDir } from "./lib/paths.mjs";
@@ -32,6 +32,7 @@ const TRUST_FILE_NAME = "check-on-stop-trusted";
 const HEADER = [
   "# dotbabel check-on-stop trust allowlist. One absolute path per line.",
   "# Repos listed here may run their own build tooling at turn end.",
+  "# A validated linked worktree inherits trust from its main repository entry.",
   "# Consumer: plugins/dotbabel/hooks/check-on-stop.sh",
   "# Revoke: delete the line.",
   "",
@@ -105,7 +106,7 @@ function readEntries(text) {
 }
 
 /**
- * True when `entries` already grants trust to `resolved`.
+ * True when `entries` already grants trust to `resolved` or its `mainRepo`.
  *
  * Matches on raw equality OR on resolved equality, deliberately. Resolve-only
  * would miss an entry whose directory has since been deleted and append a
@@ -114,13 +115,15 @@ function readEntries(text) {
  *
  * @param {string[]} entries
  * @param {string} resolved
+ * @param {string|null} [mainRepo]
  * @returns {boolean}
  */
-function alreadyTrusted(entries, resolved) {
+function alreadyTrusted(entries, resolved, mainRepo = null) {
   for (const entry of entries) {
-    if (entry === resolved) return true;
+    if (entry === resolved || (mainRepo && entry === mainRepo)) return true;
     try {
-      if (realpathSync(entry) === resolved) return true;
+      const real = realpathSync(entry);
+      if (real === resolved || (mainRepo && real === mainRepo)) return true;
     } catch {
       // An entry that no longer resolves cannot match; raw equality above
       // already covered the case where it is textually identical.
@@ -149,6 +152,7 @@ export function grantCheckOnStopTrust(opts) {
   const env = opts.env ?? process.env;
   const trustFile = resolveTrustFilePath(env);
   const entry = resolveEntry(opts.repoRoot, trustFile);
+  const mainRepo = resolveWorktreeMainRepo(entry);
 
   const fileExists = existsSync(trustFile);
   let existingText = "";
@@ -166,7 +170,7 @@ export function grantCheckOnStopTrust(opts) {
     }
   }
 
-  if (alreadyTrusted(readEntries(existingText), entry)) {
+  if (alreadyTrusted(readEntries(existingText), entry, mainRepo)) {
     return { action: "already-present", trustFile, entry, createdFile: false };
   }
 
@@ -200,6 +204,73 @@ export function grantCheckOnStopTrust(opts) {
   }
 
   return { action: "added", trustFile, entry, createdFile: !fileExists };
+}
+
+/**
+ * If `repoRoot` is a linked git worktree, resolve the root of its main
+ * repository by reading the worktree metadata without executing git commands.
+ *
+ * Verifies the bidirectional backlink and requires the administration directory
+ * to be `<common-dir>/worktrees/<id>` so forged metadata cannot claim an
+ * unrelated trusted repository.
+ *
+ * @param {string} repoRoot Physical path to check.
+ * @returns {string|null} Resolved trust anchor, or null for invalid or unsupported metadata.
+ */
+export function resolveWorktreeMainRepo(repoRoot) {
+  try {
+    const gitPath = join(repoRoot, ".git");
+    if (!existsSync(gitPath)) return null;
+    const stat = lstatSync(gitPath);
+    if (!stat.isFile()) return null;
+
+    const content = readFileSync(gitPath, "utf8");
+    const firstLine = content.split("\n")[0].trim();
+    if (!firstLine.startsWith("gitdir:")) return null;
+
+    let gitDir = firstLine.slice(7).trim();
+    if (!gitDir) return null;
+    if (!isAbsolute(gitDir)) {
+      gitDir = resolve(repoRoot, gitDir);
+    }
+    const realGitDir = realpathSync(gitDir);
+
+    const commonDirFile = join(realGitDir, "commondir");
+    const gitDirFile = join(realGitDir, "gitdir");
+    if (!existsSync(commonDirFile) || !existsSync(gitDirFile)) return null;
+
+    // Verify backlink to prevent spoofing
+    const backlinkRaw = readFileSync(gitDirFile, "utf8").split("\n")[0].trim();
+    let backlink = backlinkRaw;
+    if (!backlink) return null;
+    if (!isAbsolute(backlink)) {
+      backlink = resolve(realGitDir, backlink);
+    }
+    const realBacklink = realpathSync(backlink);
+    const realGitPath = realpathSync(gitPath);
+    if (realBacklink !== realGitPath && realBacklink !== repoRoot) {
+      return null;
+    }
+
+    const commonDirRaw = readFileSync(commonDirFile, "utf8").split("\n")[0].trim();
+    let commonDir = commonDirRaw;
+    if (!commonDir) return null;
+    if (!isAbsolute(commonDir)) {
+      commonDir = resolve(realGitDir, commonDir);
+    }
+    const realCommonDir = realpathSync(commonDir);
+    const standardRepo = basename(realCommonDir) === ".git";
+
+    // A matching backlink alone is forgeable when both files live in an
+    // attacker-controlled directory. Git owns linked-worktree metadata only
+    // below <common-dir>/worktrees/<id>; bind the backlink to that location.
+    const realWorktreesDir = realpathSync(join(realCommonDir, "worktrees"));
+    if (dirname(realGitDir) !== realWorktreesDir) return null;
+
+    return realpathSync(standardRepo ? dirname(realCommonDir) : realCommonDir);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -238,6 +309,8 @@ export function isRepoTrusted(opts) {
     };
   }
 
+  const mainRepo = resolveWorktreeMainRepo(resolved);
+
   let text;
   try {
     text = readFileSync(trustFile, "utf8");
@@ -259,7 +332,7 @@ export function isRepoTrusted(opts) {
       // Matches the hook: an entry that cannot be resolved is skipped.
       continue;
     }
-    if (entryResolved === resolved) {
+    if (entryResolved === resolved || (mainRepo && entryResolved === mainRepo)) {
       return {
         trusted: true,
         trustFile,

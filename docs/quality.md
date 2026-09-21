@@ -329,6 +329,8 @@ Use repeated `--pass-env <name>` for required extra variables. Reports must stay
 Local project execution requires the external exact-path trust allowlist used by `check-on-stop`.
 CI can use `--allow-project-commands` for one invocation. This flag never persists.
 Trust is not a sandbox. Repository code can access the user's permitted files and network.
+The allowlist entry for a standard or bare main repository also covers a validated linked
+worktree. Invalid Git worktree metadata never inherits trust.
 
 ## Baselines and legacy repositories
 

@@ -55,13 +55,14 @@
 # does not work and was tried first: a hostile repo simply commits it and
 # arrives pre-trusted on clone (reproduced — a build.rs payload executed).
 # Authorization read out of the artifact being authorized is not
-# authorization. The allowlist is user-scope, one realpath per line:
+# authorization. The allowlist is user-scope, one realpath per line. A
+# validated linked worktree inherits trust from its main repository entry:
 #
 #   Enable:  echo "$(realpath .)" >> ~/.config/dotbabel/check-on-stop-trusted
 #   Or:      CHECK_ON_STOP_TRUST_ALL=1 for blanket behavior
 #
-# Comparison is exact against the resolved path, not a prefix, so a trusted
-# /srv/app does not silently trust /srv/app-untrusted.
+# Comparison is exact against the resolved path or its validated worktree trust
+# anchor, not a prefix, so a trusted /srv/app does not trust /srv/app-untrusted.
 # Bypass:  BYPASS_CHECK_ON_STOP=1
 # Tuning:  CHECK_ON_STOP_TIMEOUT (seconds per check, default 120)
 #          CHECK_ON_STOP_MAX_LINES (default 30)
@@ -123,17 +124,82 @@ fi
 ROOT=$(cd "$ROOT" 2>/dev/null && pwd -P) || exit 0
 
 # Trust gate. See the header: these checkers execute repo-controlled build
-# code, so the user must have allowlisted this repo out-of-tree. Nothing
-# below this point may read anything from $ROOT — note in particular that
-# `git rev-parse`/`git status` would load the repo's own .git/config.
+# code, so the user must have allowlisted this repo out-of-tree. The resolver
+# below may read fixed Git worktree metadata from `$ROOT/.git`; no Git command,
+# repository configuration, or project code runs before this gate. In
+# particular, `git rev-parse` and `git status` would load the repo's config.
 if [ "${CHECK_ON_STOP_TRUST_ALL:-0}" != "1" ]; then
   TRUST_FILE="${CHECK_ON_STOP_TRUSTED_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/dotbabel/check-on-stop-trusted}"
   [ -f "$TRUST_FILE" ] || exit 0
+
+  resolve_worktree_main_repo() {
+    local dir="$1"
+    local git_file="$dir/.git"
+    [ -L "$git_file" ] && return 1
+    [ -f "$git_file" ] || return 1
+    local gitdir_line gitdir commondir backlink common_dir worktrees_dir
+    IFS= read -r gitdir_line < "$git_file" 2>/dev/null || return 1
+    case "$gitdir_line" in
+      gitdir:\ *) gitdir="${gitdir_line#gitdir: }" ;;
+      *) return 1 ;;
+    esac
+    gitdir="${gitdir%$'\r'}"
+    [ -n "$gitdir" ] || return 1
+    if [[ "$gitdir" != /* ]]; then
+      gitdir="$dir/$gitdir"
+    fi
+    gitdir=$(cd "$gitdir" 2>/dev/null && pwd -P) || return 1
+    [ -f "$gitdir/commondir" ] && [ -f "$gitdir/gitdir" ] || return 1
+
+    # Validate bidirectional backlink to prevent spoofing
+    IFS= read -r backlink < "$gitdir/gitdir" 2>/dev/null || return 1
+    backlink="${backlink%$'\r'}"
+    [ -n "$backlink" ] || return 1
+    if [[ "$backlink" != /* ]]; then
+      backlink="$gitdir/$backlink"
+    fi
+    local backlink_real git_file_real
+    git_file_real=$(cd "$(dirname "$git_file")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$git_file")") || return 1
+    if [ -f "$backlink" ]; then
+      backlink_real=$(cd "$(dirname "$backlink")" 2>/dev/null && printf '%s/%s' "$(pwd -P)" "$(basename "$backlink")") || return 1
+      [ "$backlink_real" = "$git_file_real" ] || return 1
+    elif [ -d "$backlink" ]; then
+      backlink_real=$(cd "$backlink" 2>/dev/null && pwd -P) || return 1
+      [ "$backlink_real" = "$dir" ] || return 1
+    else
+      return 1
+    fi
+
+    IFS= read -r commondir < "$gitdir/commondir" 2>/dev/null || return 1
+    commondir="${commondir%$'\r'}"
+    [ -n "$commondir" ] || return 1
+    if [[ "$commondir" != /* ]]; then
+      commondir="$gitdir/$commondir"
+    fi
+    common_dir=$(cd "$commondir" 2>/dev/null && pwd -P) || return 1
+    local standard_repo=0
+    [ "$(basename "$common_dir")" = ".git" ] && standard_repo=1
+
+    # A self-consistent backlink is still forgeable outside the trusted
+    # repository. Git owns linked-worktree metadata only in this directory.
+    worktrees_dir=$(cd "$common_dir/worktrees" 2>/dev/null && pwd -P) || return 1
+    [ "$(dirname "$gitdir")" = "$worktrees_dir" ] || return 1
+
+    if [ "$standard_repo" = "1" ]; then
+      cd "$common_dir/.." 2>/dev/null && pwd -P
+    else
+      printf '%s\n' "$common_dir"
+    fi
+  }
+
+  MAIN_ROOT=$(resolve_worktree_main_repo "$ROOT" 2>/dev/null) || MAIN_ROOT=""
+
   TRUSTED=0
   while IFS= read -r entry; do
     case "$entry" in ''|'#'*) continue ;; esac
     entry_real=$(cd "$entry" 2>/dev/null && pwd -P) || continue
-    if [ "$entry_real" = "$ROOT" ]; then
+    # A main-repository entry also authorizes a validated linked worktree.
+    if [ "$entry_real" = "$ROOT" ] || { [ -n "$MAIN_ROOT" ] && [ "$entry_real" = "$MAIN_ROOT" ]; }; then
       TRUSTED=1
       break
     fi

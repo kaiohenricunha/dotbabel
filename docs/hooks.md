@@ -160,8 +160,10 @@ repointing a symlink cannot move it to another checkout.
 The gate compares against the project root the harness reports, which is not
 always the directory you are sitting in. When a session in
 `.claude/worktrees/<slug>/` reports the **repo root**, one entry for that root
-covers every worktree. When it reports the worktree path instead, that path
-needs its own entry.
+covers every worktree. When it reports the worktree path instead, the hook
+resolves a validated linked worktree to its main repository trust anchor. This
+also supports worktrees attached to a bare repository. Invalid or forged Git
+metadata does not inherit trust.
 
 Rather than guess, run `dotbabel doctor` inside the worktree. It names the exact
 path it checked, so a mismatch is visible in one line.

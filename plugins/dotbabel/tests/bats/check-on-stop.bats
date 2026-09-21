@@ -285,6 +285,118 @@ seed_go() {
   [ -z "$(stub_calls go)" ]
 }
 
+@test "a linked worktree inherits trust when its main repository is in the allowlist" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local wt
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add "$wt" -b wt-branch -q
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  stub_checker go 1 "" "main.go:3: something is wrong"
+  feed_stop_json "$HOOK" false "$wt"
+  [[ "$output" == *'"decision"'* ]]
+  [ -n "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+}
+
+@test "a linked worktree does not run when its main repository is untrusted" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  : > "$TRUST_FILE"
+  local wt
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add "$wt" -b wt-branch -q
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$wt"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+}
+
+@test "a spoofed worktree does not inherit trust from the spoofed repository" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local wt evil
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add "$wt" -b wt-branch -q
+  evil=$(mktemp -d)
+  cat "$wt/.git" > "$evil/.git"
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$evil/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$evil"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+  rm -rf "$evil"
+}
+
+@test "forged worktree metadata outside the trusted git directory does not inherit trust" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local evil forged_gitdir
+  evil=$(mktemp -d)
+  forged_gitdir="$evil/admin"
+  mkdir "$forged_gitdir"
+  printf 'gitdir: %s\n' "$forged_gitdir" > "$evil/.git"
+  printf '%s\n' "$evil/.git" > "$forged_gitdir/gitdir"
+  printf '%s\n' "$REPO/.git" > "$forged_gitdir/commondir"
+  printf 'ref: refs/heads/main\n' > "$forged_gitdir/HEAD"
+  cat "$REPO/.git/index" > "$forged_gitdir/index"
+  cat "$REPO/README.md" > "$evil/README.md"
+  cat "$REPO/go.mod" > "$evil/go.mod"
+  cat "$REPO/main.go" > "$evil/main.go"
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$evil/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$evil"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  rm -rf "$evil"
+}
+
+@test "a linked worktree attached to a bare repository inherits trust" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local bare wt
+  bare=$(mktemp -d)
+  git clone --bare -q "$REPO" "$bare/repo.git"
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git --git-dir="$bare/repo.git" worktree add -q "$wt" -b wt-branch
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  printf '%s\n' "$bare/repo.git" > "$TRUST_FILE"
+  stub_checker go 1 "" "main.go:3: something is wrong"
+  feed_stop_json "$HOOK" false "$wt"
+  [[ "$output" == *'"decision"'* ]]
+  [ -n "$(stub_calls go)" ]
+  git --git-dir="$bare/repo.git" worktree remove "$wt" || rm -rf "$wt"
+  rm -rf "$bare"
+}
+
+@test "a symlinked worktree gitfile does not bypass the strict trust check" {
+  seed_go
+  git -C "$REPO" add -A && git -C "$REPO" commit -q -m "seed go"
+  local wt
+  wt=$(mktemp -d)
+  rm -rf "$wt"
+  git -C "$REPO" worktree add -q "$wt" -b wt-branch
+  mv "$wt/.git" "$wt/.git-file"
+  ln -s .git-file "$wt/.git"
+  printf 'package main\n\nfunc main() { _ = 2 }\n' > "$wt/main.go"
+  stub_checker go 1 "" "should not run"
+  feed_stop_json "$HOOK" false "$wt"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ -z "$(stub_calls go)" ]
+  git -C "$REPO" worktree remove "$wt" || rm -rf "$wt"
+}
+
 @test "CHECK_ON_STOP_TRUST_ALL=1 overrides the allowlist" {
   seed_go
   : > "$TRUST_FILE"
