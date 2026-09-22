@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-09-19T13:03:21.879Z",
+  "generatedAt": "2026-09-22T13:10:34.260Z",
   "version": "3.4.0",
   "artifacts": [
     {
@@ -841,6 +841,21 @@
         "domain": ["infra", "devex"],
         "platform": ["vercel", "flyio", "aws"],
         "task": ["debugging", "incident-response"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "security-audit",
+      "type": "skill",
+      "path": "skills/security-audit/SKILL.md",
+      "name": "security-audit",
+      "description": "Whole-repository security audit with independent verification of every finding, vendored from cloudflare/security-audit-skill. Guidance by default; runs the full six-phase audit (parallel hunters, verifiers that did not hunt, coverage ledger, schema-validated findings.json) only on an explicit audit or pen-test request. Triggers on: \"security audit\", \"audit this codebase\", \"pen test the code\", \"full security review\", \"end-to-end security review\", \"security audit report\".\n",
+      "facets": {
+        "domain": ["devex", "security"],
+        "platform": ["none"],
+        "task": ["review", "diagnostics"],
         "maturity": "draft"
       },
       "version": "1.0.0",

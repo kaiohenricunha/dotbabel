@@ -1,2 +1,7 @@
 CHANGELOG.md
 .claude/skills-manifest.json
+# Verbatim upstream copy of cloudflare/security-audit-skill, pinned and hash-checked
+# by scripts/sync-security-audit.mjs --check. Formatting it would break the pin.
+skills/security-audit/references/upstream/
+plugins/dotbabel/templates/claude/skills/security-audit/references/upstream/
+examples/minimal-consumer/.claude/skills/security-audit/references/upstream/

@@ -68,6 +68,7 @@
     "./templates/claude/skills/review-pr",
     "./templates/claude/skills/review-prs",
     "./templates/claude/skills/rollback-prod",
+    "./templates/claude/skills/security-audit",
     "./templates/claude/skills/security-review",
     "./templates/claude/skills/smoke-test",
     "./templates/claude/skills/spec",

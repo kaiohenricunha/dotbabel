@@ -262,6 +262,13 @@
       "lastValidated": null
     },
     {
+      "name": "security-audit",
+      "path": ".claude/skills/security-audit/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "security-review",
       "path": ".claude/skills/security-review/SKILL.md",
       "checksum": "",

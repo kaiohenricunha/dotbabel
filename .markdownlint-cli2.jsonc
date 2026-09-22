@@ -20,6 +20,10 @@
     "commands/**",
     "skills/**",
     ".claude/commands/**",
-    ".claude/skills/**"
+    ".claude/skills/**",
+    // Verbatim upstream copy of cloudflare/security-audit-skill (hash-pinned by
+    // scripts/sync-security-audit.mjs). Any path: the templates and example copies,
+    // and the .opencode/.cli/.agents fan-out symlinks that lead back to it.
+    "**/security-audit/references/upstream/**"
   ]
 }
