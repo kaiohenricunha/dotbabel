@@ -27,19 +27,27 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { isVersionString, runBounded } from "../contract.mjs";
+import { isSecretName, isVersionString, runBounded } from "../contract.mjs";
 
 /** A closed local port. A connection to it is refused at once and nothing leaves the machine. */
 export const DEAD_PROXY = "http://127.0.0.1:9";
 
-/** OPS-2: no single runtime output may exceed the 8 MiB per-entry limit. */
+/**
+ * A defensive bound on one run's total output, sized to the OPS-2 per-entry limit that P-9 will
+ * enforce on the capability cache. This is not itself OPS-2: OPS-2 bounds a cache entry, not a
+ * subprocess, and belongs to P-9, not this module.
+ */
 export const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 
 /** How long a child gets to exit on SIGTERM before it is killed. */
 const KILL_GRACE_MS = 1_000;
 
-/** Names that mark an extra environment variable as a credential, which the isolated environment refuses. */
-const CREDENTIAL_NAME_RE = /(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)/i;
+/**
+ * The names this function itself pins. A caller's `extra` is spread after them, so an unguarded
+ * collision -- `extra: { NO_PROXY: "..." }` or `extra: { HOME: realHome }` -- would silently win and
+ * unpin the scratch home or the dead-port network isolation, with no error and nothing to catch it.
+ */
+const ISOLATION_PINNED_NAMES = new Set(["PATH", "HOME", "TERM", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy", "NO_PROXY"]);
 
 /**
  * Build the environment a runtime is run with.
@@ -54,7 +62,8 @@ const CREDENTIAL_NAME_RE = /(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH)
  */
 export function buildIsolatedEnv({ source = {}, home, extra = {} }) {
   for (const name of Object.keys(extra)) {
-    if (CREDENTIAL_NAME_RE.test(name)) throw new TypeError(`buildIsolatedEnv: "${name}" looks like a credential and is never passed to a runtime`);
+    if (isSecretName(name)) throw new TypeError(`buildIsolatedEnv: "${name}" looks like a credential and is never passed to a runtime`);
+    if (ISOLATION_PINNED_NAMES.has(name)) throw new TypeError(`buildIsolatedEnv: "${name}" is an isolation pin and cannot be overridden by "extra"`);
   }
   return {
     PATH: source.PATH ?? "",
@@ -118,7 +127,9 @@ export async function withScratchRoot(prefix, fn, { tmpdir: base = tmpdir() } = 
   try {
     return await fn(root);
   } finally {
-    await rm(root, { recursive: true, force: true });
+    // A retry, not just `force`, is defense in depth against a straggler that is still writing:
+    // `force` only swallows `ENOENT`, not `ENOTEMPTY`/`EBUSY` from a concurrent writer.
+    await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 }
 
@@ -170,7 +181,10 @@ export function runProcess(spec, { signal } = {}) {
     }
 
     const out = { stdout: "", stderr: "" };
-    const bytes = { stdout: 0, stderr: 0 };
+    // One shared budget across both streams (OPS-2), not one per stream: a per-stream budget would
+    // let a run retain up to two times `maxOutputBytes` before either stream was individually
+    // flagged, and both `validate` paths concatenate stdout and stderr before parsing them.
+    let bytesUsed = 0;
     const decoders = { stdout: new StringDecoder("utf8"), stderr: new StringDecoder("utf8") };
     let truncated = false;
     let stoppedEarly = false;
@@ -192,7 +206,12 @@ export function runProcess(spec, { signal } = {}) {
     const finish = (settle) => {
       if (settled) return;
       settled = true;
-      if (killTimer !== undefined) clearTimeout(killTimer);
+      // The escalation is cleared only once the child has actually exited: the `close` handler below
+      // sets `exitCode`/`signalCode` before it calls `finish`. A settle reached any other way -- an
+      // `error` event, or a `stopWhen` predicate that throws -- can fire while the child is still
+      // alive, and clearing the timer there would leave a SIGTERM-trapping child unreaped: the
+      // promise would settle, but the process would not.
+      if (killTimer !== undefined && (child.exitCode !== null || child.signalCode !== null)) clearTimeout(killTimer);
       signal?.removeEventListener("abort", onAbort);
       settle();
     };
@@ -200,9 +219,9 @@ export function runProcess(spec, { signal } = {}) {
     /** @param {"stdout" | "stderr"} name */
     const onData = (name) => (/** @type {Buffer} */ chunk) => {
       if (truncated) return;
-      const room = maxOutputBytes - bytes[name];
+      const room = maxOutputBytes - bytesUsed;
       const kept = chunk.length > room ? chunk.subarray(0, Math.max(room, 0)) : chunk;
-      bytes[name] += kept.length;
+      bytesUsed += kept.length;
       out[name] += decoders[name].write(kept);
       if (kept.length < chunk.length) {
         truncated = true;
@@ -343,12 +362,32 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
       assertOutsideRoot(scratch, ctx.realRoot);
       if (prepare !== undefined) await prepare({ scratch, home, work, runtimeRoot });
       const env = buildIsolatedEnv({ source: ctx.env, home, extra: { [rootEnvVar]: runtimeRoot } });
-      return runBounded(({ signal }) => ctx.runCommand({ command, args, cwd: work, env, stopWhen }, { signal }), {
-        channel: "subprocess",
-        timeoutMs: ctx.timeoutMs,
-        provenance,
-        now: ctx.now,
-      });
+      /** @type {Promise<unknown> | undefined} */
+      let operationSettled;
+      const result = await runBounded(
+        ({ signal }) => {
+          operationSettled = ctx.runCommand({ command, args, cwd: work, env, stopWhen }, { signal });
+          return operationSettled;
+        },
+        { channel: "subprocess", timeoutMs: ctx.timeoutMs, provenance, now: ctx.now },
+      );
+      // On a timeout, `runBounded` returns as soon as its race against the timer settles; it does
+      // not await the losing operation. That operation is still running -- and may still be writing
+      // into `scratch` -- until its own signal handling finishes killing it, so cleanup below must
+      // wait for it too, or `rm` would race a live writer. A well-behaved `runCommand` settles within
+      // `KILL_GRACE_MS` of its signal aborting (as `runProcess` does); the extra bound here is a
+      // backstop against one that does not, so a broken caller cannot hang this indefinitely.
+      if (operationSettled !== undefined) {
+        /** @type {NodeJS.Timeout} */
+        let backstop;
+        const timedOut = new Promise((r) => {
+          backstop = setTimeout(r, KILL_GRACE_MS * 3);
+          backstop.unref();
+        });
+        await Promise.race([operationSettled.catch(() => {}), timedOut]);
+        clearTimeout(backstop);
+      }
+      return result;
     },
     { tmpdir: ctx.tmpDir },
   );

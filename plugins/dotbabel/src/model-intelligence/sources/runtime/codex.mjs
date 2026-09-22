@@ -153,6 +153,7 @@ export function parseDebugModels(text) {
  */
 export function parseExecBanner(text) {
   const lines = String(text ?? "").split("\n");
+  // Matches a line such as "OpenAI Codex v0.155.1" to pull the version from.
   const version = parseVersion(lines.find((l) => /^OpenAI Codex v/.test(l)));
   /** @type {Record<string, string>} */
   const fields = {};
@@ -164,6 +165,7 @@ export function parseExecBanner(text) {
       continue;
     }
     if (separators !== 1) continue;
+    // Matches a banner field line such as "model: gpt-6-astra" or "reasoning effort: high".
     const match = /^([A-Za-z][A-Za-z ]*?):\s*(.*)$/.exec(line);
     if (match !== null) fields[match[1]] = match[2].trim();
   }
@@ -171,7 +173,8 @@ export function parseExecBanner(text) {
 }
 
 /**
- * True once the banner is complete: its second separator has arrived on stderr, where Codex prints it.
+ * True once the banner is complete: its second separator (a line of eight dashes, `--------`) has
+ * arrived on stderr, where Codex prints it.
  * @param {{stderr: string}} streams
  * @returns {boolean}
  */
@@ -198,6 +201,7 @@ export function readModelKeys(text) {
   for (const line of text.split("\n")) {
     const trimmed = line.trim();
     if (trimmed.startsWith("[")) break;
+    // Matches a TOML scalar-key line such as `model = "gpt-6-astra"` or `model_reasoning_effort = 'high' # note`.
     const match = /^([a-z_]+)\s*=\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*(?:#.*)?$/.exec(trimmed);
     if (match === null || !MODEL_KEYS.includes(match[1])) continue;
     let value;

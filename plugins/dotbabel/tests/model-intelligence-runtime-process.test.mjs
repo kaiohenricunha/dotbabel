@@ -42,8 +42,22 @@ describe("isolated environment", () => {
   it("adds only the extra variables the caller names, and refuses one that looks like a credential", () => {
     const env = buildIsolatedEnv({ source: { PATH: "/p" }, home: "/tmp/h", extra: { CODEX_HOME: "/tmp/scratch/ch" } });
     expect(env.CODEX_HOME).toBe("/tmp/scratch/ch");
-    for (const name of ["OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GH_TOKEN", "MY_SECRET"]) {
+    // The same considered word list `contract.mjs`'s diagnostic redaction uses (`isSecretName`), so
+    // a name it treats as a credential -- including the whole-word forms PASS/PWD/PAT it added for
+    // secrets a narrower name-only rule would miss -- is refused here too, not just a masked-KEY/TOKEN subset.
+    for (const name of ["OPENAI_API_KEY", "ANTHROPIC_AUTH_TOKEN", "GH_TOKEN", "MY_SECRET", "MYSQL_PASS", "GITHUB_PAT", "APP_PWD", "SESSION_ID", "GH_COOKIE"]) {
       expect(() => buildIsolatedEnv({ source: {}, home: "/tmp/h", extra: { [name]: "x" } }), name).toThrow(/credential/);
+    }
+    // A name that merely ends in a secret-looking suffix is not a false positive.
+    expect(() => buildIsolatedEnv({ source: {}, home: "/tmp/h", extra: { COMPAT_LEVEL: "2" } })).not.toThrow();
+  });
+
+  it("refuses an extra variable that would override an isolation pin, rather than silently letting it win", () => {
+    // `extra` used to spread last, so a caller (a future adapter, not any current call site) naming
+    // one of these could unpin the scratch home or re-open the network with no error and no test
+    // failure -- exactly the collision a name-based credential check cannot catch.
+    for (const name of ["HOME", "PATH", "TERM", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "https_proxy", "http_proxy", "all_proxy", "NO_PROXY"]) {
+      expect(() => buildIsolatedEnv({ source: { PATH: "/p" }, home: "/tmp/h", extra: { [name]: "escaped" } }), name).toThrow(/isolation/);
     }
   });
 
@@ -145,6 +159,20 @@ describe("runProcess", () => {
     expect(out.truncated).toBe(true);
     expect(out.stdout.length).toBeLessThanOrEqual(200_000);
     expect(MAX_OUTPUT_BYTES).toBe(8 * 1024 * 1024);
+  });
+
+  it("shares one output budget across both streams, so a run cannot buffer double the cap", async () => {
+    // Sequenced deliberately: stderr fills to just under the cap first, then (after it has landed)
+    // stdout writes enough to push the COMBINED total over the cap while staying under the cap on
+    // its own. Before this fix, `bytes` was tracked per stream, so neither write alone would trip
+    // truncation and the run would buffer up to two times `maxOutputBytes` before anything noticed.
+    const controller = new AbortController();
+    const guard = setTimeout(() => controller.abort(), 3_000);
+    const body = "process.stderr.write('a'.repeat(60000)); setTimeout(() => { process.stdout.write('b'.repeat(60000)); setInterval(() => {}, 1000); }, 100);";
+    const out = await runProcess(script(body, { maxOutputBytes: 100_000 }), { signal: controller.signal });
+    clearTimeout(guard);
+    expect(out.truncated).toBe(true);
+    expect(out.stdout.length + out.stderr.length).toBeLessThanOrEqual(100_000);
   });
 
   it("rejects with the errno when the binary does not exist", async () => {

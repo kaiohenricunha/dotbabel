@@ -185,7 +185,10 @@ describe("codex source adapter", () => {
     const missing = await codex.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow });
     expect(missing.diagnostic.code).toBe("binary_missing");
 
-    const hung = context(() => new Promise(() => {}));
+    // A real runCommand settles once its signal aborts (that is how the actual child process
+    // eventually exits after SIGTERM/SIGKILL); this fake matches that instead of hanging forever, so
+    // it does not mask `runIsolated` genuinely waiting for the operation to finish.
+    const hung = context((spec, { signal }) => new Promise((resolvePromise) => signal.addEventListener("abort", () => resolvePromise(outcome({ stderr: "" })), { once: true })));
     const timedOut = await codex.observe({ ...hung.ctx, timeoutMs: 25 });
     expect(timedOut.status).toBe("unavailable");
     expect(timedOut.diagnostic).toMatchObject({ code: "timeout", retryable: true });

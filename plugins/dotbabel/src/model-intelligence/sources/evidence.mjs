@@ -20,6 +20,13 @@
  * - **Closed.** An unknown field is an error, so no identifier or credential can ride along by accident
  *   (OPS-4).
  *
+ * OPS-4 masking boundary: only free runtime text -- `ValidationEvidence check.runtimeText` and a
+ * reasoning level's `description` -- passes through `boundText`. A model id, provider, effort and
+ * `ModelFact` field go through `identifier()`, which bounds length and rejects control characters but
+ * does not mask. These are the surfaces `contract.mjs` names as safe to carry unmasked (the runtime
+ * id, its version, the evidence kind, timestamps, and model identifiers); a runtime that puts a
+ * credential-shaped string where an identifier is expected is not caught here.
+ *
  * The module is pure: it validates data it is given and performs no I/O.
  */
 

@@ -22,11 +22,18 @@
  * this adapter never runs a model turn. Complete observation, with `result.modelUsage`, needs one, and
  * the descriptor declares `may-execute-model` for the capability so no caller mistakes it for free
  * discovery: a caller that has a stream from a turn it ran elsewhere passes it as `context.stream`.
+ *
+ * Residual risk: the "no credential" guarantee is file- and env-based (`CLAUDE_CONFIG_DIR`, `HOME`,
+ * `ANTHROPIC_API_KEY` dropped). It does not cover a credential Claude Code reads from outside those
+ * roots -- the macOS Keychain, or a managed-settings file such as
+ * `/Library/Application Support/ClaudeCode/managed-settings.json` or `/etc/claude-code/managed-settings.json`
+ * with an `apiKeyHelper`. Where such a credential is present, the dead-port proxy (`process.mjs`)
+ * remains the only barrier to a probe reaching the network.
  */
 
 import { makeAdapterResult, assertDescriptor, isVersionString } from "../contract.mjs";
 import { deepFreeze, makeInvocation, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { assertOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { MAX_OUTPUT_BYTES, assertOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "claude";
@@ -108,7 +115,7 @@ function parseUsage(modelUsage) {
  * A line that is not JSON, or not an object, is counted and skipped, so one bad line cannot hide the
  * events around it. Only the two events this adapter reads are kept.
  * @param {unknown} text
- * @returns {{init?: {model?: string, version?: string, apiKeySource?: string}, result?: {isError: boolean, usage: object[]}, malformedLines: number, empty: boolean}}
+ * @returns {{init?: {model?: string, version?: string}, result?: {isError: boolean, usage: object[]}, malformedLines: number, empty: boolean}}
  */
 export function parseStreamJson(text) {
   const lines = String(text ?? "").split("\n").map((l) => l.trim()).filter((l) => l !== "");
@@ -127,7 +134,11 @@ export function parseStreamJson(text) {
       continue;
     }
     if (event.type === "system" && event.subtype === "init" && parsed.init === undefined) {
-      parsed.init = { model: optionalIdentifier(event.model), version: optionalIdentifier(event.claude_code_version), apiKeySource: optionalIdentifier(event.apiKeySource) };
+      // `event.apiKeySource` is deliberately not read here: it describes authentication state, and
+      // nothing in this module consumes it, so it is left in the raw event rather than parsed and
+      // then dropped -- an unused field is exactly the kind of value OPS-4 wants to never carry
+      // along unmasked "just in case".
+      parsed.init = { model: optionalIdentifier(event.model), version: optionalIdentifier(event.claude_code_version) };
     } else if (event.type === "result") {
       parsed.result = { isError: event.is_error === true, usage: parseUsage(event.modelUsage) };
     }
@@ -218,7 +229,20 @@ export async function discover(context) {
 export async function observe(context = {}) {
   const ctx = resolveContext(context, ROOT);
   const options = /** @type {any} */ (context);
-  if (typeof options.stream === "string") return classifyStream(parseStreamJson(options.stream), ctx);
+  if (typeof options.stream === "string") {
+    // A probed stream is already bounded by `runProcess`'s own output cap; `context.stream` is
+    // caller-supplied text with no such bound, so it is checked here before `parseStreamJson` runs
+    // `split` and one `JSON.parse` per line over it with no upper limit on either.
+    if (Buffer.byteLength(options.stream, "utf8") > MAX_OUTPUT_BYTES) {
+      return makeAdapterResult({
+        status: "unknown",
+        provenance: baseProvenance(),
+        observedAt: ctx.now(),
+        diagnostic: { code: "malformed_output", message: `the supplied stream exceeded the ${MAX_OUTPUT_BYTES}-byte limit` },
+      });
+    }
+    return classifyStream(parseStreamJson(options.stream), ctx);
+  }
 
   const args = ["-p", PROBE_PROMPT];
   if (options.model !== undefined) args.push("--model", assertOpaqueValue("model", options.model));

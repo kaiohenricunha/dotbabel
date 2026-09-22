@@ -5,14 +5,15 @@
 // limit, and the failure paths. Each test states the behavior it protects.
 
 import { describe, it, expect } from "vitest";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 import { fakeRunner, outcome, enoent, fixedNow } from "./fixtures/model-intelligence/fake-runner.mjs";
 import { optionalIdentifier, optionalCount, makeModelFact, makeDiscoveryEvidence, makeObservedConfiguration, makeInvocation, makeValidationEvidence } from "../src/model-intelligence/sources/evidence.mjs";
 import * as claude from "../src/model-intelligence/sources/runtime/claude.mjs";
 import * as codex from "../src/model-intelligence/sources/runtime/codex.mjs";
-import { assertOutsideRoot, firstLine, probeVersion, resolveContext, runIsolated, runProcess } from "../src/model-intelligence/sources/runtime/process.mjs";
+import { MAX_OUTPUT_BYTES, assertOutsideRoot, firstLine, probeVersion, resolveContext, runIsolated, runProcess } from "../src/model-intelligence/sources/runtime/process.mjs";
 
 const BACKSLASH = String.fromCharCode(92);
 const TAB = String.fromCharCode(9);
@@ -100,6 +101,17 @@ describe("claude stream parsing boundaries", () => {
     expect(bad.status).toBe("ok");
     expect(Object.hasOwn(bad.provenance, "sourceVersion")).toBe(false);
     expect(Object.hasOwn(bad.evidence, "runtimeVersion")).toBe(false);
+  });
+
+  it("rejects a caller-supplied stream larger than the output cap, instead of parsing it unbounded", async () => {
+    // Unlike a probed stream, which `runProcess`'s own cap already bounds, `context.stream` is
+    // caller-supplied text with no upstream bound. This line is syntactically VALID JSON that names a
+    // real model -- so without a size check it parses successfully (slowly) and returns "ok" -- to
+    // prove the rejection comes from the size bound and not merely from a parse failure.
+    const oversized = initLine({ padding: "x".repeat(MAX_OUTPUT_BYTES) });
+    const result = await claude.observe({ stream: oversized, now: fixedNow });
+    expect(result.status).toBe("unknown");
+    expect(result.diagnostic.code).toBe("malformed_output");
   });
 
   it("explains why a stream is unusable, and distinguishes garbage from a stream that simply lacks the event", async () => {
@@ -322,6 +334,32 @@ describe("process helper boundaries", () => {
     expect(seen.spec.stopWhen).toBe(stopWhen);
     expect(seen.spec.args).toEqual(["x"]);
   });
+
+  it("does not remove the scratch root until the operation itself has settled, even after a timeout", async () => {
+    // `runBounded` returns as soon as its race against the timeout settles; it does not await the
+    // losing operation. If `runIsolated` removed the scratch root as soon as `runBounded` returned,
+    // an operation still running past the timeout would be writing into a directory that no longer
+    // exists.
+    let scratchDir;
+    let releaseOperation;
+    const runCommand = (spec) => {
+      scratchDir = dirname(spec.cwd);
+      return new Promise((resolvePromise) => {
+        releaseOperation = () => resolvePromise(outcome({ stdout: "late" }));
+      });
+    };
+    const ctx = resolveContext({ runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 20 }, ROOT);
+    const pending = runIsolated(ctx, { prefix: "mi-race", command: "codex", args: ["x"], ...ROOT, provenance: { sourceId: "codex", sourceKind: "runtime" } });
+
+    await new Promise((r) => setTimeout(r, 100)); // well past the 20ms timeout
+    expect(existsSync(scratchDir)).toBe(true); // the operation has not settled yet, so cleanup must wait
+
+    releaseOperation();
+    const result = await pending;
+    expect(result.status).toBe("unavailable");
+    expect(result.diagnostic.code).toBe("timeout");
+    expect(existsSync(scratchDir)).toBe(false); // cleanup ran once the operation actually finished
+  });
 });
 
 describe("provenance carries the runtime version only when the runtime reported one", () => {
@@ -436,6 +474,28 @@ describe("subprocess runner boundaries", () => {
     const failure = new Error("predicate broke");
     await expect(runProcess(spec("process.stdout.write('x'); setInterval(() => {}, 1000)", { stopWhen: () => { throw failure; } }))).rejects.toBe(failure);
   });
+
+  it("still escalates to SIGKILL when the stop predicate throws and the child ignores SIGTERM", async () => {
+    // A child that traps SIGTERM needs the SIGKILL escalation to actually die. If `finish()` clears
+    // `killTimer` on this path (as it did before this fix), the escalation never fires and the child
+    // is never reaped -- only the promise settles.
+    const failure = new Error("predicate broke");
+    const pidFile = await makeTempDir("mi-pidfile");
+    const pidPath = resolve(pidFile, "pid");
+    const body = `require('fs').writeFileSync(${JSON.stringify(pidPath)}, String(process.pid)); process.on('SIGTERM', () => {}); process.stdout.write('up'); setInterval(() => {}, 1000)`;
+    await expect(runProcess(spec(body, { stopWhen: ({ stdout }) => { if (stdout.includes("up")) throw failure; return false; } }))).rejects.toBe(failure);
+
+    const { readFileSync } = await import("node:fs");
+    const pid = Number(readFileSync(pidPath, "utf8"));
+    await new Promise((r) => setTimeout(r, 1_500)); // past KILL_GRACE_MS
+    let alive = true;
+    try {
+      process.kill(pid, 0);
+    } catch {
+      alive = false;
+    }
+    expect(alive).toBe(false);
+  }, 20_000);
 
   it("does not split a multibyte character across two chunks, and decodes stderr the same way", async () => {
     const out = await runProcess(spec("const b = Buffer.from('a\\u00e9b'); process.stderr.write(b.subarray(0, 2)); setTimeout(() => process.stderr.write(b.subarray(2)), 30)"));

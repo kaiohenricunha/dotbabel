@@ -148,7 +148,10 @@ describe("claude source adapter", () => {
     let seenSignal;
     const { ctx } = context((spec, { signal }) => {
       seenSignal = signal;
-      return new Promise(() => {});
+      // A real runCommand settles once its signal aborts (that is how the actual child process
+      // eventually exits after SIGTERM/SIGKILL); this fake matches that instead of hanging forever,
+      // so it does not mask `runIsolated` genuinely waiting for the operation to finish.
+      return new Promise((resolvePromise) => signal.addEventListener("abort", () => resolvePromise(outcome({ stdout: "" })), { once: true }));
     });
     const result = await claude.observe({ ...ctx, timeoutMs: 25 });
     expect(result.status).toBe("unavailable");
