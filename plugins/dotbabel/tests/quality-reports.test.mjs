@@ -291,16 +291,25 @@ describe("mutation reports", () => {
       ? { file: "src/a.mjs", line: 999999, status: "Killed" }   // miss: full scan
       : { file: "src/a.mjs", line: 5000, status: "Killed" });   // hit at the end: full scan
 
-    const started = Date.now();
-    const score = calculateChangedMutationScore(mutants, changedLines);
-    const elapsed = Date.now() - started;
+    // Best of several runs, not one. Measured on this workload: a per-mutant
+    // `includes` scan costs ~230ms at its fastest and ~600ms under suite load;
+    // the Set costs ~3ms. 100ms sits below the linear floor and leaves the Set
+    // a 30x margin, so the bound separates the two algorithms instead of timing
+    // the machine -- but a single sample also measures whatever else shares the
+    // machine at that instant, and failed at 124-130ms under concurrent `npm
+    // test` + `npm run coverage` on an unmodified checkout (#390). The fastest
+    // of a few catches the algorithm's real cost; a quadratic scan is slow on
+    // every run, not just an unlucky one.
+    let best = Number.POSITIVE_INFINITY;
+    let score;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const started = Date.now();
+      score = calculateChangedMutationScore(mutants, changedLines);
+      best = Math.min(best, Date.now() - started);
+    }
 
     expect(score).toMatchObject({ valid: 10000, detected: 10000, actual: 100 });
-    // Measured on this workload: a per-mutant `includes` scan costs ~230ms at
-    // its fastest and ~600ms under suite load; the Set costs ~3ms. 100ms sits
-    // below the linear floor and leaves the Set a 30x margin, so the bound
-    // separates the two algorithms instead of timing the machine.
-    expect(elapsed).toBeLessThan(100);
+    expect(best).toBeLessThan(100);
   });
 
   it("parses a report with 20000 mutants in under 2 seconds", () => {
