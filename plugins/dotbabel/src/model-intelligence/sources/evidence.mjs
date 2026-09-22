@@ -208,6 +208,13 @@ function flag(name, value) {
 }
 
 /**
+ * Every fact `makeModelFact` has returned. Freezing is not proof of provenance, because anyone can
+ * freeze a forged object, so `makeDiscoveryEvidence` checks membership here instead.
+ * @type {WeakSet<object>}
+ */
+const BUILT_FACTS = new WeakSet();
+
+/**
  * @param {unknown} level
  * @returns {Readonly<{effort: string, description?: string}>}
  */
@@ -257,13 +264,6 @@ export function makeModelFact(input) {
   BUILT_FACTS.add(fact);
   return fact;
 }
-
-/**
- * Every fact `makeModelFact` has returned. Freezing is not proof of provenance, because anyone can
- * freeze a forged object, so `makeDiscoveryEvidence` checks membership here instead.
- * @type {WeakSet<object>}
- */
-const BUILT_FACTS = new WeakSet();
 
 /**
  * Which models accept each effort value that any of them accepts.
