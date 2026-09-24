@@ -97,7 +97,8 @@ The end-to-end flow uses `/flyctl` (see `skills/flyctl/`) as the worked example.
    `schemas/skill.schema.json` (`type: skill`, optional `tools`, `model`,
    `effort`, `inputs`, `outputs`, `prerequisites`). Side-effectful skills MUST
    set `disable-model-invocation: true` (CLAUDE.md §Skills, Commands, and
-   Discovery). New skills typically ship `maturity: draft`; promotion to
+   Discovery). The one exception is `pr-conductor`, which an agent can start
+   behind a `permissions.ask` rule in the shipped settings. New skills typically ship `maturity: draft`; promotion to
    `validated` is a separate bump.
 
 2. **Register the skill in `.claude/skills-manifest.json`.** This is a manual
