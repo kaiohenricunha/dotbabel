@@ -261,6 +261,11 @@ solely for safety.
 "push handoff" should auto-route, while `/handoff` still works as a direct
 invocation.
 
+`pr-conductor` is side-effectful but model-invocable on purpose: an agent can
+start it after it commits a branch. The shipped settings put
+`Skill(pr-conductor)` in `permissions.ask`, so each agent-started run waits for
+the user to approve the Claude Code prompt.
+
 Loading model: skill descriptions are available for discovery, full `SKILL.md`
 content loads only when invoked, and supporting files load only when referenced.
 

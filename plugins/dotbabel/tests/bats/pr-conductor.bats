@@ -36,8 +36,32 @@ BIN="$REPO_ROOT/plugins/dotbabel/bin/dotbabel-pr-stack.mjs"
   [ "$status" -eq 0 ]
 }
 
-@test "pr-conductor: side-effectful skill disables model invocation" {
-  run grep -q '^disable-model-invocation: true$' "$SKILL"
+@test "pr-conductor: agents can invoke the skill, gated by an ask permission" {
+  # An agent may start the pipeline, but only after the user approves the
+  # Claude Code prompt. The skill is model-invocable; the shipped settings
+  # template carries the ask rule that makes the prompt appear.
+  run grep -q '^disable-model-invocation: false$' "$SKILL"
+  [ "$status" -eq 0 ]
+  for settings in \
+    "$REPO_ROOT/plugins/dotbabel/templates/claude/settings.json" \
+    "$REPO_ROOT/examples/minimal-consumer/.claude/settings.json"; do
+    run jq -e '.permissions.ask | index("Skill(pr-conductor)")' "$settings"
+    [ "$status" -eq 0 ] || {
+      echo "missing ask rule for Skill(pr-conductor) in $settings"
+      return 1
+    }
+    run jq -e '(.permissions.allow // []) | index("Skill(pr-conductor)") | not' "$settings"
+    [ "$status" -eq 0 ] || {
+      echo "shipped settings must not pre-allow Skill(pr-conductor): $settings"
+      return 1
+    }
+  done
+}
+
+@test "pr-conductor: SKILL.md documents the invocation consent gate" {
+  run grep -qF 'Skill(pr-conductor)' "$SKILL"
+  [ "$status" -eq 0 ]
+  run grep -qF 'permissions.ask' "$SKILL"
   [ "$status" -eq 0 ]
 }
 

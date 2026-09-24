@@ -2,14 +2,14 @@
 id: pr-conductor
 name: pr-conductor
 type: skill
-version: 1.1.0
+version: 1.2.0
 domain: [devex]
 platform: [github-actions]
 task: [review, testing]
 maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-08-08
-updated: 2026-08-12
+updated: 2026-09-24
 description: >
   Land one pull request end to end: pre-PR quality gate, open the PR, AI review,
   apply review fixes, local CI attestation — then STOP with a go/no-go summary.
@@ -21,7 +21,7 @@ description: >
 argument-hint: "[PR#] [--stack] [--from <phase>] [--dry-run]"
 model: sonnet
 user-invocable: true
-disable-model-invocation: true
+disable-model-invocation: false
 headless_safe: false
 allowed-tools: Read Bash Grep Glob
 ---
@@ -29,6 +29,8 @@ allowed-tools: Read Bash Grep Glob
 Land one pull request end to end. This skill is a conductor: it sequences existing artifacts in a fixed order and owns only what none of them own — stacked-PR ordering and the stop-before-merge gate. It does not reimplement simplification, review, testing, or merging.
 
 Trigger: when the user says "land this PR", "run the PR pipeline", "ship this branch", "what's blocking my PR", or invokes `/pr-conductor`.
+
+**Invocation consent.** An agent can start this skill itself, but only with the user's approval. The shipped `.claude/settings.json` puts `Skill(pr-conductor)` in `permissions.ask`, so Claude Code prompts the user before each agent-started run. Call the skill only when the branch is committed and ready for a pull request. Treat the approved prompt as consent for that one run, not for later runs. Never edit the `ask` rule to skip the prompt. A user who wants no prompt adds `Skill(pr-conductor)` to `permissions.allow` in their own settings.
 
 Arguments: `$ARGUMENTS`
 

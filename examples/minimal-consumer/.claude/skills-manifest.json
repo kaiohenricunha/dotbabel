@@ -187,7 +187,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:7298e328de63bd24432c577810621f1a69d0a2fb6fcca16e825a8561eb1fed4a",
+      "checksum": "sha256:51019fa15460d6c01cf2e6f509e17a723eadac0dafe4fcb8dbdb5429a27255a7",
       "dependencies": [],
       "lastValidated": "2026-09-24"
     },
