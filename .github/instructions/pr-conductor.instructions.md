@@ -16,6 +16,8 @@ Land one pull request end to end. This skill is a conductor: it sequences existi
 
 Trigger: when the user says "land this PR", "run the PR pipeline", "ship this branch", "what's blocking my PR", or invokes `/pr-conductor`.
 
+**Invocation consent.** An agent can start this skill itself, but only with the user's approval. The shipped `.claude/settings.json` puts `Skill(pr-conductor)` in `permissions.ask`, so Claude Code prompts the user before each agent-started run. Call the skill only when the branch is committed and ready for a pull request. Treat the approved prompt as consent for that one run, not for later runs. Never edit the `ask` rule to skip the prompt. A user who wants no prompt adds `Skill(pr-conductor)` to `permissions.allow` in their own settings.
+
 Arguments: `$ARGUMENTS`
 
 - (empty) — run the full pipeline for the current branch, opening a PR if none exists.
