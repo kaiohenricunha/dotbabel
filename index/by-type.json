@@ -57,6 +57,7 @@
     "review-pr",
     "review-prs",
     "rollback-prod",
+    "security-audit",
     "security-review",
     "smoke-test",
     "spec",

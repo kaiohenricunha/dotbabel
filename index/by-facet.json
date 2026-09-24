@@ -38,6 +38,7 @@
       "review-pr",
       "review-prs",
       "rollback-prod",
+      "security-audit",
       "security-review",
       "smoke-test",
       "spec",
@@ -78,6 +79,7 @@
     "security": [
       "compliance-auditor",
       "dependabot-sweep",
+      "security-audit",
       "security-auditor",
       "security-engineer",
       "security-review"
@@ -117,6 +119,7 @@
       "project-sync",
       "quality-review",
       "reproduce-bug",
+      "security-audit",
       "security-auditor",
       "security-review",
       "spec",
@@ -222,6 +225,7 @@
       "release-conductor",
       "review-pr",
       "review-prs",
+      "security-audit",
       "security-auditor",
       "security-engineer",
       "security-review",
@@ -270,6 +274,7 @@
       "deploy-status",
       "flyctl",
       "kubernetes-specialist",
+      "security-audit",
       "security-auditor",
       "smoke-test"
     ],
@@ -363,6 +368,7 @@
       "release-conductor",
       "review-prs",
       "rollback-prod",
+      "security-audit",
       "security-auditor",
       "security-engineer",
       "smoke-test",

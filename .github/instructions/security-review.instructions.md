@@ -12,6 +12,8 @@ Analyze a diff or set of changed files for common security vulnerabilities.
 
 Arguments: `$ARGUMENTS` (optional: a PR number, file path, or `staged` for staged changes. Default: staged changes.)
 
+This is a fast checklist on one diff. For a whole-repository or subsystem audit with independently verified findings, use the `security-audit` skill instead.
+
 ## Stack detection
 
 Detect what's in the repo before applying checks (run once at the start):

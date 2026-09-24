@@ -161,6 +161,7 @@ The end-to-end flow uses `/flyctl` (see `skills/flyctl/`) as the worked example.
    node plugins/dotbabel/bin/dotbabel-doctor.mjs
    node plugins/dotbabel/bin/dotbabel-index.mjs --check
    node scripts/build-plugin.mjs --check
+   node scripts/sync-security-audit.mjs --check
    node scripts/stamp-doc-versions.mjs --check
    npm run lint
    npm test
@@ -185,6 +186,12 @@ Common pitfalls:
   requires them; `build-plugin.mjs` strips them only for the templates copy.
 - **Running `build-plugin.mjs` before `dotbabel-index.mjs`.** The plugin
   build reads the index — a stale index produces a stale manifest.
+- **Hand-editing a vendored upstream copy.** `skills/security-audit/references/upstream/`
+  is a verbatim, hash-pinned copy of `cloudflare/security-audit-skill`, and
+  `sync-security-audit.mjs --check` fails on any edit. Put dotbabel behavior in
+  `skills/security-audit/SKILL.md`. To move the pin, run
+  `node scripts/sync-security-audit.mjs --update --ref <sha>`, then repeat steps
+  3–5. The `sync-security-audit` workflow opens that PR every week when upstream moves.
 
 ## Releasing a new version
 

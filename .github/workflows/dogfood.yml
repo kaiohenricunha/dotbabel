@@ -40,6 +40,8 @@ jobs:
       - run: node plugins/dotbabel/bin/dotbabel-doctor.mjs
       - run: node plugins/dotbabel/bin/dotbabel-index.mjs --check
       - run: node scripts/build-plugin.mjs --check
+      - name: security-audit upstream copy matches its pin
+        run: node scripts/sync-security-audit.mjs --check
       - name: docs version stamps match package.json
         run: node scripts/stamp-doc-versions.mjs --check
 
