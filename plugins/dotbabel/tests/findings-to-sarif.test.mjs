@@ -241,10 +241,13 @@ describe("findingsToSarif", () => {
 describe("SKILL.md quality example", () => {
   it("is a valid .dotbabel.json quality config that runs this converter", () => {
     const skill = readFileSync(join(REPO_ROOT, "skills", "security-audit", "SKILL.md"), "utf8");
-    const block = /```json\n([\s\S]*?)\n```/.exec(skill);
-    expect(block, "SKILL.md must keep its .dotbabel.json example").not.toBeNull();
+    // Pick the block by content, not by position: SKILL.md carries more than
+    // one JSON example (the promoter manifest is another one).
+    const blocks = [...skill.matchAll(/```json\n([\s\S]*?)\n```/g)].map((match) => match[1]);
+    const block = blocks.find((body) => body.includes('"quality"'));
+    expect(block, "SKILL.md must keep its .dotbabel.json example").toBeDefined();
 
-    const { quality } = JSON.parse(block[1]);
+    const { quality } = JSON.parse(block);
     expect(() => validateQualityConfig(quality)).not.toThrow();
     const tool = quality.components[0].tools.security;
     expect(tool.argv[1]).toBe(".claude/skills/security-audit/scripts/findings-to-sarif.mjs");
