@@ -51,8 +51,9 @@ templates/
 
 ## Per-template rationale
 
-- **`claude/hooks/guard-destructive-git.sh`** — PreToolUse hook that blocks
-  destructive git calls. Exit 2 per Claude Code hook protocol. See
+- **`claude/hooks/guard-destructive-git.sh`** — PreToolUse hook that asks the
+  user before a destructive git call runs. It returns `permissionDecision: "ask"`
+  per the Claude Code hook protocol. See
   [ADR-0014](./adr/0014-cli-tick-cross-warn-format.md) for the ✓/✗/⚠ format inheritance.
   This tree is the **repo-scope** surface `dotbabel-init` scaffolds, and it carries
   only the guard hook. The editor and turn-end checkers (`check-on-write.sh`,

@@ -1,6 +1,6 @@
 {
   "permissions": {
-    "ask": ["Skill(pr-conductor)"]
+    "ask": ["Skill(pr-conductor)", "Bash(gh pr merge:*)", "Bash(git push origin --delete:*)"]
   },
   "hooks": {
     "PreToolUse": [

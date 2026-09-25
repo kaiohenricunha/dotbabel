@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# PreToolUse hook: block destructive git operations.
+# PreToolUse hook: ask the user before a destructive git operation runs.
 # Reads JSON from stdin (Claude Code hook protocol).
-# Exit 2 = block the tool call (Claude Code hook protocol — NOT the harness
-# validator exit convention). Exit 0 = allow.
+# On a match it prints a PreToolUse `permissionDecision: "ask"` object on
+# stdout and exits 0, so Claude Code prompts the user and the call runs only
+# on their approval. An agent needs no bypass flag for an approved call.
+# Exit 0 with no output = allow.
 #
-# Bypass, only after the user confirms the destructive call:
+# Skip the prompt, only after the user confirms the destructive call:
 #   - Per call: write BYPASS_DESTRUCTIVE_GIT=1 directly before that git call, as
 #     in `BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers only
-#     that call; another destructive git call in the same command still blocks.
-#     A tool call cannot set this hook's own environment, so the prefix is the
-#     only bypass an agent can act on.
+#     that call; another destructive git call in the same command still asks.
 #   - Session: BYPASS_DESTRUCTIVE_GIT=1 in the hook's own environment (exported
 #     before Claude Code starts) disables the guard for every call.
 # Use sparingly — the block exists because these operations are silently
@@ -100,11 +100,9 @@ PATTERNS=(
 
 for rx in "${PATTERNS[@]}"; do
   if printf '%s' "$SCAN" | grep -qE "$rx"; then
-    {
-      echo "BLOCKED: Destructive git operation detected. Get explicit user confirmation first."
-      echo "         Bypass (only with user confirmation): run that one call as BYPASS_DESTRUCTIVE_GIT=1 git <args>"
-    } >&2
-    exit 2
+    jq -cn --arg reason "Destructive git operation detected. It runs only if the user approves this prompt." \
+      '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $reason}}'
+    exit 0
   fi
 done
 
