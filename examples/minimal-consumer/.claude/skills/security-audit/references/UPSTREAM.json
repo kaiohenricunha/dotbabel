@@ -1,7 +1,7 @@
 {
   "repository": "https://github.com/cloudflare/security-audit-skill",
-  "commit": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
-  "synced_at": "2026-09-22",
+  "commit": "d24bc269171a9171fac58493e0ffba511d571a4a",
+  "synced_at": "2026-09-25",
   "renames": {
     "skills/security-audit/SKILL.md": "UPSTREAM-SKILL.md"
   },
@@ -32,7 +32,7 @@
     },
     "HUNTING.md": {
       "upstream_path": "skills/security-audit/HUNTING.md",
-      "sha256": "71c121decea1322c47c718f6e110f1a892980bb4266bd7ac55ef043a213ade09"
+      "sha256": "cb5b571eab3758e655860e97054ab4d6906e0e8dc2b340287fad7693fa58d489"
     },
     "LICENSE": {
       "upstream_path": "LICENSE",
@@ -60,7 +60,7 @@
     },
     "UPSTREAM-SKILL.md": {
       "upstream_path": "skills/security-audit/SKILL.md",
-      "sha256": "5e3e96a1e438d8f35fef0a1e38f02d4f00e2bdf910401b7dfe00e6779c6dac85"
+      "sha256": "20dcfe14ff1afa9584c0181eb409880a9a7fdc1a3f75abc951b277cd798af056"
     },
     "VALIDATION-AND-REPORTING.md": {
       "upstream_path": "skills/security-audit/VALIDATION-AND-REPORTING.md",
