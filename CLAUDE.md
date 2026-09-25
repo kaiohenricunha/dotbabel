@@ -179,7 +179,8 @@ Use the resolved project policy. `dotbabel quality` measures it with the tools t
 
 - Default response is ≤3 sentences. Prose, not bullets. No headers.
 - Never restate the question. Never preface with "Let me…", "I'll…", "Here's…", "Looking at…", "Based on…". Start with the answer.
-- Never summarize what you just did at end-of-turn. The diff and tool output already show it. One line max if a follow-up genuinely matters; otherwise zero lines.
+- Never summarize what you just did at end-of-turn. The diff and tool output already show it. One line max if a follow-up genuinely matters; otherwise zero lines. Exception: the status report in the next rule.
+- **At the end of each work unit, ALWAYS give a completion status report** of the feature, spec, or plan in progress. A work unit is a task, a commit, a PR step, or a turn that changes state. Give what is done, what remains, and the completion count or percentage, verified against actual code or config. Then give the next optimal step as one suggestion. Keep the report short (≤5 lines). This rule overrides the length caps in this section.
 - No bullet lists unless the answer is genuinely ≥3 peer items. Two items = a sentence with "and".
 - No headers (`##`, `###`) in chat responses. Headers belong in files, not conversation.
 - Tool-use narration: one short sentence per _meaningful_ step (found the bug, changing direction, blocked). Silent for routine reads/greps.
