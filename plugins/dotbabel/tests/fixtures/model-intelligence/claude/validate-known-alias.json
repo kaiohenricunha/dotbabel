@@ -1,0 +1,6 @@
+{
+  "argv": ["claude", "-p", "x", "--model", "opus", "--no-session-persistence"],
+  "exitCode": 1,
+  "stdout": "Not logged in · Please run /login\n",
+  "stderr": ""
+}

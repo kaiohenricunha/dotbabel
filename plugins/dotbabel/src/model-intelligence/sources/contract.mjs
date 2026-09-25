@@ -614,10 +614,14 @@ const SECRET_SEGMENT_RE = new RegExp(`(?:${SECRET_WORDS.join("|")})S?$|^(?:${SEC
 
 /**
  * Whether a variable, flag or header name marks its value as a credential.
+ *
+ * Exported so a module outside this one (`sources/runtime/process.mjs`, which decides what a
+ * caller may add to a runtime's environment) checks against the same considered word list instead
+ * of keeping a second, narrower one that could drift from it.
  * @param {string} name
  * @returns {boolean}
  */
-function isSecretName(name) {
+export function isSecretName(name) {
   return name.split(/[-_]+/).some((segment) => SECRET_SEGMENT_RE.test(segment));
 }
 
@@ -787,6 +791,28 @@ export function maskText(value) {
   out = maskLabelled(out);
   for (const re of SECRET_VALUE_RES) out = out.replace(re, "[redacted]");
   return out;
+}
+
+/**
+ * Mask and bound free text that came from a runtime, so it can be carried in evidence.
+ *
+ * A runtime's own output is the text most likely to echo a credential back, and it can be
+ * arbitrarily long. This is the guard for any such text that is not a diagnostic message:
+ * a diagnostic already passes through it inside `makeAdapterResult`.
+ * @param {unknown} value
+ * @returns {string} Masked, free of control characters, and at most 1,024 characters.
+ */
+export function boundText(value) {
+  return truncate(maskText(value));
+}
+
+/**
+ * Whether `value` has the shape of a version string (the same shape provenance requires).
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+export function isVersionString(value) {
+  return typeof value === "string" && VERSION_RE.test(value);
 }
 
 /**

@@ -1,0 +1,7 @@
+{
+  "argv": ["codex", "exec", "--skip-git-repo-check", "--strict-config", "x"],
+  "exitCode": 2,
+  "stdout": "",
+  "stderr": "error: unexpected argument '--strict-config' found\n\n  tip: to pass '--strict-config' as a value, use '-- --strict-config'\n\nUsage: codex exec [OPTIONS] [PROMPT]\n       codex exec [OPTIONS] <COMMAND> [ARGS]\n\nFor more information, try '--help'.\n",
+  "$comment": "Reconstructed, not captured. The installed Codex (0.155.1) has --strict-config, so a run without it cannot be recorded. This is the real clap error that 0.155.1 printed for an unknown flag (--dotbabel-no-such-flag) with only the flag's name replaced by --strict-config, which is what an older Codex would print. clap's wording does not depend on the flag."
+}

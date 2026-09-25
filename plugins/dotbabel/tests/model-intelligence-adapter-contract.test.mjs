@@ -16,6 +16,8 @@ import {
   runBounded,
   redactForDiagnostic,
   maskText,
+  boundText,
+  isVersionString,
 } from "../src/model-intelligence/sources/contract.mjs";
 import { SUPPORT_STATES, ADAPTER_RESULT_STATUSES, ARTIFACT_KINDS, SOURCE_KINDS } from "../src/model-intelligence/domain/index.mjs";
 
@@ -825,6 +827,16 @@ describe("review hardening", () => {
     expect(paths(descriptor({ capabilities: { invocation: { support: "supported", axes: {}, $comment: [] } } }))).toContain("capabilities.invocation.$comment");
     // A value structuredClone cannot copy fails with a clear message at registration.
     expect(() => createRegistry([{ ...descriptor(), notes: () => {} }])).toThrow(/plain data/);
+  });
+
+  it("masks and bounds runtime text carried outside a diagnostic, and recognises a version string", () => {
+    const secret = "sk-ant-api03-AbCdEf0123456789";
+    const bounded = boundText(`token ${secret} ${"y ".repeat(2_000)}`);
+    expect(bounded).not.toContain(secret);
+    expect(bounded.length).toBeLessThanOrEqual(1_024);
+    expect(boundText("plain text")).toBe("plain text");
+    for (const good of ["2.1.278", "0.155.1", "1.0.0-beta+build.5"]) expect(isVersionString(good), good).toBe(true);
+    for (const bad of ["", "not a version", "2.1.278 user@example.com", 7, null, undefined, "x".repeat(65)]) expect(isVersionString(bad), String(bad)).toBe(false);
   });
 
   it("keeps stale out of the adapter result vocabulary, because freshness is derived by catalog", () => {

@@ -1,0 +1,28 @@
+Reading additional input from stdin...
+OpenAI Codex v0.155.1
+--------
+workdir: /tmp/scratch/work
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 00000000-0000-4000-8000-000000000000
+--------
+user
+x
+2026-09-19T18:42:07.273447Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+2026-09-19T18:42:07.367359Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+2026-09-19T18:42:07.582773Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+ERROR: Reconnecting... 2/5
+2026-09-19T18:42:07.982623Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+ERROR: Reconnecting... 3/5
+2026-09-19T18:42:08.729400Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+ERROR: Reconnecting... 4/5
+2026-09-19T18:42:10.374356Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+ERROR: Reconnecting... 5/5
+2026-09-19T18:42:13.822850Z ERROR codex_api::endpoint::responses_websocket: failed to connect to websocket: IO error: Connection refused (os error 111), url: wss://api.openai.com/v1/responses
+warning: Falling back from WebSockets to HTTPS transport. stream disconnected before completion: Connection refused (os error 111)
+ERROR: Reconnecting... waiting for network
+ERROR: Reconnecting... waiting for network
