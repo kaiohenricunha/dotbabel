@@ -79,6 +79,21 @@ setup() {
   near "$SKILL" "Do not edit files in \`references/upstream/\`" "sync-security-audit.mjs" 120
 }
 
+@test "security-audit: ships the artifact promoter and documents how to run it" {
+  # Without this, a run cannot retain evidence produced by target-controlled
+  # code, and every such lead stays needs_validation with a promotion blocker.
+  [ -f "$SKILL_DIR/scripts/promote-artifact/promote-artifact.go" ]
+  [ -f "$SKILL_DIR/scripts/promote-artifact/promote-artifact_test.go" ]
+  [ -f "$TEMPLATE_DIR/scripts/promote-artifact/promote-artifact.go" ]
+  # A go.mod anywhere in this repo makes `dotbabel quality` discover a Go
+  # component (quality/adapters/go.mjs keys on go.mod), so there must be none.
+  run find "$SKILL_DIR/scripts" "$TEMPLATE_DIR/scripts" -name go.mod
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  near "$SKILL" "promote-artifact.go" "--scratch" 200
+  near "$SKILL" "When it is not" "no parent-side artifact promotion available" 400
+}
+
 @test "security-review: routes whole-repository audits to security-audit" {
   near "$REPO_ROOT/skills/security-review/SKILL.md" "whole-repository" "\`security-audit\` skill" 160
 }
