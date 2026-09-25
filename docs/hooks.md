@@ -7,7 +7,7 @@ symlinks all of them into `~/.claude/hooks/`.
 
 | Hook                         | Event         | Fires                 | Purpose                                                               |
 | ---------------------------- | ------------- | --------------------- | --------------------------------------------------------------------- |
-| `guard-destructive-git.sh`   | `PreToolUse`  | before each Bash call | Blocks destructive git commands                                       |
+| `guard-destructive-git.sh`   | `PreToolUse`  | before each Bash call | Asks the user before a destructive git command runs                   |
 | `guard-criteria-evidence.sh` | `PreToolUse`  | before each Bash call | Blocks a hand-written evidence marker (criteria, attestation, review) |
 | `check-on-write.sh`          | `PostToolUse` | after each file edit  | Per-file syntax check of the edited file                              |
 | `check-on-stop.sh`           | `Stop`        | once per turn         | Project-wide checks when the build graph is coherent                  |
@@ -245,7 +245,7 @@ outside the allowlisted root is refused, never checked.
 | ---------------------------- | -------------- | ------------------------------------------------------------------- |
 | `BYPASS_CHECK_ON_WRITE=1`    | check-on-write | Disables the hook                                                   |
 | `BYPASS_CHECK_ON_STOP=1`     | check-on-stop  | Disables the hook                                                   |
-| `BYPASS_DESTRUCTIVE_GIT=1`   | guard          | Allows the one git call it prefixes                                 |
+| `BYPASS_DESTRUCTIVE_GIT=1`   | guard          | Skips the prompt for the one git call it prefixes                   |
 | `CHECK_ON_WRITE_TIMEOUT`     | check-on-write | Seconds per checker (default 5)                                     |
 | `CHECK_ON_STOP_TIMEOUT`      | check-on-stop  | Seconds per checker (default 120)                                   |
 | `CHECK_ON_STOP_TRUST_ALL`    | check-on-stop  | Bypasses the allowlist                                              |
@@ -254,10 +254,13 @@ outside the allowlisted root is refused, never checked.
 | `BYPASS_PRE_PUSH=1`          | pre-push       | Skips the pre-push quality check                                    |
 | `DOTBABEL_PRE_PUSH_TIMEOUT`  | pre-push       | Seconds for the check (default 120), when `timeout(1)` is installed |
 
-Write the guard bypass directly before the git call that the user confirmed, as in
-`BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers only that call, so
-another destructive git call in the same command is still blocked. Exporting the
-variable into the Claude Code session environment disables the guard for every call.
+The guard does not block. On a match it returns a PreToolUse `permissionDecision: "ask"`,
+so Claude Code shows the user a permission prompt, and the call runs only if the user
+approves it. An agent never needs the bypass for an approved call. A user can skip the
+prompt for one call with `BYPASS_DESTRUCTIVE_GIT=1 git branch -D old-branch`. It covers
+only that call, so another destructive git call in the same command still asks.
+Exporting the variable into the Claude Code session environment disables the guard for
+every call.
 The guard also matches git global options such as `-C <dir>` and `-c <key=value>`,
 and git called by a path such as `/usr/bin/git`.
 
