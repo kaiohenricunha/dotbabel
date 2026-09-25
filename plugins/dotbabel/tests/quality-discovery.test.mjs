@@ -106,12 +106,22 @@ describe("quality discovery", () => {
     expect(filesMatchingQualityPaths(files)).toEqual([]);
   });
 
-  it("matches 10000 changed files against 50 globs in under 500 milliseconds", () => {
+  it("matches 10000 changed files against 50 globs in under 500 milliseconds (PERF-7)", () => {
     const files = Array.from({ length: 10_000 }, (_, index) => `packages/p${index % 100}/src/file-${index}.mjs`);
     const globs = Array.from({ length: 50 }, (_, index) => `packages/p${index}/tests/**`);
-    const started = performance.now();
-    expect(filesMatchingQualityPaths(files, globs)).toEqual([]);
-    expect(performance.now() - started).toBeLessThan(500);
+    // Best of several runs, not one. A single sample also measures whatever else
+    // shares the machine at that instant -- `npm run coverage` running the same
+    // suite concurrently, as the quality harness does, pushed one run to 655ms on
+    // an unmodified checkout (#390). The fastest of a few catches the algorithm's
+    // real cost; a slow ALGORITHM is slow on every run, not just an unlucky one.
+    let best = Number.POSITIVE_INFINITY;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const started = performance.now();
+      const result = filesMatchingQualityPaths(files, globs);
+      best = Math.min(best, performance.now() - started);
+      if (attempt === 0) expect(result).toEqual([]);
+    }
+    expect(best).toBeLessThan(500);
   });
 
   it("finds several languages and nested components", () => {
