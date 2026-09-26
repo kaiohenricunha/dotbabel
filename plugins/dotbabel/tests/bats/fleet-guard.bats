@@ -159,3 +159,36 @@ post_tool() { # <payload> [event]
   post_tool '{"session_id":"sess-a","prompt":"go on"}' prompt
   [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
 }
+
+# ------------------------------------------------ merge token fast path ----
+#
+# pre-bash runs before every Bash call, so the wrapper starts node only for a
+# command that can need the merge token.
+
+bash_payload() { # <command>
+  printf '{"session_id":"sess-a","tool_name":"Bash","tool_input":{"command":"%s"}}' "$1"
+}
+
+@test "pre-bash starts no node for a command that needs no merge token" {
+  stub_node
+  post_tool "$(bash_payload 'ls -la && npm test')" pre-bash
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+  [ ! -e "$WORK/node-calls" ]
+}
+
+@test "pre-bash starts node for a rebase, a local-attest, and a gh pr merge" {
+  stub_node
+  for c in "git rebase origin/main" "dotbabel local-attest --pr 1" "gh pr merge 1 --squash"; do
+    post_tool "$(bash_payload "$c")" pre-bash
+    [ "$status" -eq 0 ]
+  done
+  [ "$(wc -l <"$WORK/node-calls")" -eq 3 ]
+  [ "$(cat "$WORK/node-stdin")" = "$(bash_payload 'gh pr merge 1 --squash')" ]
+}
+
+@test "post-tool starts node after a local-attest, to keep a held merge token fresh" {
+  stub_node
+  post_tool "$(bash_payload 'dotbabel local-attest --pr 1')"
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
+}

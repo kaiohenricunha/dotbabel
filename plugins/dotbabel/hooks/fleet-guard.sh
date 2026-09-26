@@ -3,12 +3,16 @@
 #
 # Register it in ~/.claude/settings.json (see docs/fleet.md):
 #   PreToolUse, matcher "Edit|Write|MultiEdit|NotebookEdit":  fleet-guard.sh pre-edit
+#   PreToolUse, matcher "Bash":                                fleet-guard.sh pre-bash
 #   SessionStart:                                              fleet-guard.sh session-start
 #
 # pre-edit      The first edit to a file in a governed repo claims it for the
 #               session. An edit to a path that another live session claims
 #               gets a PreToolUse "deny" whose reason names the owner to
 #               SendMessage; after the escalation window it becomes an "ask".
+# pre-bash      A rebase onto the base, a local-attest, or a gh pr merge takes
+#               the repo's merge token; while another live session holds it,
+#               the command gets a PreToolUse "deny" that names the holder.
 # session-start Prints the live claims of the session's repo as context.
 # post-tool     PostToolUse on every tool: records a `gh pr merge` the session
 #               ran, then tells the session about merges it has not seen.
@@ -31,12 +35,18 @@
 # or an event newer than this session's seen marker. Otherwise exit at once.
 input=""
 case "${1:-}" in
+  pre-bash)
+    # Runs before every Bash call: start node only for a command that can
+    # need the merge token. The bin reads the command properly.
+    input=$(cat)
+    [[ $input == *rebase* || $input == *local-attest* || $input == *"gh pr merge"* ]] || exit 0
+    ;;
   post-tool | prompt)
     input=$(cat)
     LC_ALL=C # glob order and [[ > ]] must match node's byte order
     state="${DOTBABEL_FLEET_STATE_DIR:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/dotbabel/fleet}"
     work=0
-    if [ "$1" = post-tool ] && [[ $input =~ \"tool_name\"[[:space:]]*:[[:space:]]*\"Bash\" ]] && [[ $input == *"gh pr merge"* ]]; then
+    if [ "$1" = post-tool ] && [[ $input =~ \"tool_name\"[[:space:]]*:[[:space:]]*\"Bash\" ]] && [[ $input == *"gh pr merge"* || $input == *local-attest* ]]; then
       work=1
     elif [[ $input =~ \"session_id\"[[:space:]]*:[[:space:]]*\"([A-Za-z0-9_-]+)\" ]]; then
       sid=${BASH_REMATCH[1]}
