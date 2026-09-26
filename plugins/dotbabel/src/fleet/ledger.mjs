@@ -159,3 +159,21 @@ export function listRepoDirs(root) {
     return [];
   }
 }
+
+/**
+ * One session's claims in every repo, keyed by repo key. `active` is false for
+ * a claim whose worktree no longer exists.
+ *
+ * @param {string} root state root
+ * @param {string} ownerKey
+ * @returns {Record<string, Array<object>>}
+ */
+export function ownClaimsByRepo(root, ownerKey) {
+  const out = {};
+  for (const dir of listRepoDirs(root)) {
+    const mine = readOwnerRecords(dir).find((r) => r.owner.key === ownerKey);
+    if (!mine || mine.claims.length === 0) continue;
+    out[mine.repo] = mine.claims.map((c) => ({ ...c, active: !c.worktree || fs.existsSync(c.worktree) }));
+  }
+  return out;
+}

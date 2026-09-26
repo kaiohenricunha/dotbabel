@@ -216,6 +216,21 @@ function heavyLabel(words) {
 }
 
 /**
+ * The commands a shell command line runs: one word list per simple command,
+ * quotes removed, and leading assignments, keywords, and wrappers such as
+ * `timeout` or `env` stripped. Scanning stops at a heredoc. Null for a
+ * non-string or for text with an unclosed quote.
+ *
+ * @param {string|null|undefined} command
+ * @returns {string[][]|null}
+ */
+export function simpleCommands(command) {
+  if (typeof command !== "string") return null;
+  const segments = splitCommands(command);
+  return segments === null ? null : segments.map(stripPrefixes).filter((words) => words.length > 0);
+}
+
+/**
  * The label of the first heavy command in a shell command line — a test run
  * that uses many CPUs, such as `npm test`, `vitest`, `go test`, or `pytest` —
  * or null. It reads quotes and command separators, so `git commit -m
@@ -226,10 +241,8 @@ function heavyLabel(words) {
  */
 export function findHeavyCommand(command) {
   if (typeof command !== "string" || command.trim() === "") return null;
-  const segments = splitCommands(command);
-  if (segments === null) return null;
-  for (const words of segments) {
-    const label = heavyLabel(stripPrefixes(words));
+  for (const words of simpleCommands(command) ?? []) {
+    const label = heavyLabel(words);
     if (label) return label;
   }
   return null;

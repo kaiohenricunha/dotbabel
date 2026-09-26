@@ -21,7 +21,7 @@ settings validator, and a destructive-git PreToolUse hook.
 | Enabling the editor and turn-end checks      | [hooks.md](./hooks.md) — what each hook does, and the check-on-stop trust model    |
 | Enforcing a language-aware quality floor     | [quality.md](./quality.md) — policies, adapters, baselines, trust, and CI          |
 | Reusing local verification at merge time     | [attestation.md](./attestation.md) — enforcement policy, governance files, doctor  |
-| Running several sessions in one repository   | [fleet.md](./fleet.md) — file claims, CPU lanes, and their limits                  |
+| Running several sessions in one repository   | [fleet.md](./fleet.md) — file claims, CPU lanes, merge events, and their limits    |
 | Upgrading or forking                         | [upgrade-guide.md](./upgrade-guide.md)                                             |
 | Contributing                                 | [../CONTRIBUTING.md](../CONTRIBUTING.md)                                           |
 
