@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * dotbabel-fleet — claims that stop concurrent Claude Code sessions from
- * editing the same files of one repo.
+ * dotbabel-fleet — keep concurrent Claude Code sessions off each other's
+ * files and CPUs.
  *
  * A session's first edit to a file in a governed repo (one with a
  * `.dotbabel.json`) claims that path. The PreToolUse hook then denies another
@@ -11,7 +11,12 @@
  * claim ends when its owner releases it, when the owner's process exits, or
  * when the worktree it was made in is removed.
  *
- * ALL git shell-outs live here. `src/fleet/*` decides, stores, and formats.
+ * CPU lanes: `lane` runs a command through scripts/fleet-lane.sh, which waits
+ * for a free lane of CPUs and pins the command to it, and `lanes` shows who
+ * holds each lane. hooks/fleet-shell-prefix.sh (the CLAUDE_CODE_SHELL_PREFIX
+ * target) sends heavy Bash tool commands to the same script.
+ *
+ * ALL git and bash shell-outs live here. `src/fleet/*` decides, stores, and formats.
  *
  * Usage:
  *   dotbabel fleet board   [--json]
@@ -19,6 +24,8 @@
  *   dotbabel fleet release <pattern>... | --all
  *   dotbabel fleet prune
  *   dotbabel fleet hook    pre-edit | session-start    (hook JSON on stdin)
+ *   dotbabel fleet lane    [--name <label>] -- <command> [args...]
+ *   dotbabel fleet lanes   [--json]
  *
  * Environment:
  *   DOTBABEL_FLEET_MODE=off               turn the hooks off
@@ -29,12 +36,14 @@
  * Exits:
  *   0   ok. `hook` always exits 0: it fails open, so a broken ledger never blocks an edit
  *   1   `claim` refused: a live peer holds an overlapping claim
+ *   N   `lane`: the command's own exit status
  *   2   environment error: not in a git repo, or not inside a Claude Code session
  *   64  bad CLI invocation
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
@@ -46,6 +55,7 @@ import {
   formatDenyReason,
   formatSessionContext,
 } from "../src/fleet/format.mjs";
+import { formatLanes, parseLayout, readLaneState } from "../src/fleet/lanes.mjs";
 import {
   RECORD_SCHEMA,
   listRepoDirs,
@@ -70,7 +80,8 @@ import { findSelf, isOwnerAlive, ownerFromEntry, readRegistry, sessionsDir } fro
 
 const TOOL = "dotbabel-fleet";
 const SELF_PATH = fileURLToPath(import.meta.url);
-const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook"]);
+const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
+const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes"]);
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const DEFAULT_ESCALATE_MINUTES = 15;
 
@@ -80,6 +91,8 @@ const USAGE = `Usage:
   dotbabel fleet release <pattern>... | --all           release this session's claims
   dotbabel fleet prune                                  remove claims of exited sessions
   dotbabel fleet hook    pre-edit | session-start       Claude Code hook entry (JSON on stdin)
+  dotbabel fleet lane    [--name <label>] -- <cmd>...   run a command in a free CPU lane
+  dotbabel fleet lanes   [--json]                       show the CPU lanes and who holds them
 
 Patterns are relative to the repo root. A bare path also covers everything
 below it; ** and * are globs.
@@ -482,7 +495,94 @@ function cmdPrune() {
   return EXIT_CODES.OK;
 }
 
+// --------------------------------------------------------------- lanes ----
+
+/**
+ * `lane [--name <label>] -- <command> [args...]`. Parsed by hand, because the
+ * command's own flags must reach it untouched. Resolves to the command's exit
+ * status. SIGINT is left to the terminal, which sends it to the whole process
+ * group; SIGTERM and SIGHUP are forwarded, since they reach only this process.
+ */
+function cmdLane(argv) {
+  let name = null;
+  let i = 0;
+  while (i < argv.length && argv[i] !== "--") {
+    if (argv[i] !== "--name") break;
+    if (argv[i + 1] === undefined) throw new UsageError("--name needs a value");
+    name = argv[i + 1];
+    i += 2;
+  }
+  if (argv[i] === "--") i += 1;
+  const command = argv.slice(i);
+  if (command.length === 0) throw new UsageError("lane needs a command: dotbabel fleet lane -- <command> [args...]");
+
+  const env = { ...process.env };
+  if (!env.DOTBABEL_LANE_SESSION) {
+    const self = findSelf({ entries: readRegistry(sessionsDir()).entries, startPid: process.ppid });
+    if (self?.name) env.DOTBABEL_LANE_SESSION = self.name;
+  }
+  const args = [LANE_SCRIPT, ...(name ? ["--name", name] : []), "--", ...command];
+  return new Promise((resolve) => {
+    const child = spawn("bash", args, { stdio: "inherit", env });
+    const ignoreInt = () => {};
+    const forward = (sig) => child.kill(sig);
+    process.on("SIGINT", ignoreInt);
+    process.on("SIGTERM", forward);
+    process.on("SIGHUP", forward);
+    child.on("error", (err) => {
+      process.stderr.write(`${TOOL}: cannot run bash: ${err.message}\n`);
+      resolve(EXIT_CODES.ENV);
+    });
+    child.on("exit", (code, signal) => {
+      process.off("SIGINT", ignoreInt);
+      process.off("SIGTERM", forward);
+      process.off("SIGHUP", forward);
+      resolve(code ?? 128 + (os.constants.signals[signal] ?? 0));
+    });
+  });
+}
+
+/** `lanes [--json]`: the layout from fleet-lane.sh, and who holds or waits for each lane. */
+function cmdLanes(args) {
+  const r = spawnSync("bash", [LANE_SCRIPT, "--layout"], { encoding: "utf8" });
+  if (r.status !== 0) throw new EnvError(`cannot read the lane layout: ${(r.stderr || "bash failed").trim()}`);
+  const layout = parseLayout(r.stdout);
+  const killSwitch = path.join(stateRoot(), "lanes.off");
+  const switchedOff = fs.existsSync(killSwitch);
+  const { holders, waiters } = layout.off ? { holders: {}, waiters: [] } : readLaneState(path.join(stateRoot(), "lanes"), layout);
+  if (args.json) {
+    const view = (info) => ({
+      pid: Number(info.pid),
+      label: info.label ?? null,
+      session: info.session || null,
+      cwd: info.cwd ?? null,
+      startedAt: new Date(Number(info.started) * 1000).toISOString(),
+    });
+    const out = {
+      off: layout.off || switchedOff,
+      killSwitch: switchedOff ? killSwitch : null,
+      ncpu: layout.ncpu,
+      lanes: layout.lanes.map((l) => ({ ...l, holder: holders[l.index] ? view(holders[l.index]) : null })),
+      waiters: waiters.map(view),
+    };
+    process.stdout.write(`${JSON.stringify(out, null, 2)}\n`);
+  } else {
+    process.stdout.write(`${formatLanes({ layout, holders, waiters, now: Date.now() })}\n`);
+    if (switchedOff) process.stdout.write(`The kill switch ${killSwitch} is on, so commands run without a lane.\n`);
+  }
+  return EXIT_CODES.OK;
+}
+
 function main(argv) {
+  if (argv[0] === "lane") {
+    try {
+      return cmdLane(argv.slice(1));
+    } catch (err) {
+      if (!(err instanceof UsageError)) throw err;
+      process.stderr.write(`${TOOL}: ${err.message}\n`);
+      return EXIT_CODES.USAGE;
+    }
+  }
   let args;
   try {
     args = parse(argv, { note: { type: "string" }, all: { type: "boolean" } });
@@ -513,6 +613,7 @@ function main(argv) {
     if (sub === "board") return cmdBoard(subArgs);
     if (sub === "claim") return cmdClaim(subArgs);
     if (sub === "release") return cmdRelease(subArgs);
+    if (sub === "lanes") return cmdLanes(subArgs);
     return cmdPrune();
   } catch (err) {
     if (err instanceof UsageError) {
@@ -528,7 +629,9 @@ function main(argv) {
 }
 
 if (invokedDirectly(import.meta.url)) {
-  process.exitCode = main(process.argv.slice(2));
+  Promise.resolve(main(process.argv.slice(2))).then((code) => {
+    process.exitCode = code;
+  });
 } else if (misfiredAs(TOOL)) {
   process.stderr.write(`${TOOL}: entry guard did not match argv[1]=${process.argv[1]}\n`);
   process.exitCode = EXIT_CODES.ENV;
