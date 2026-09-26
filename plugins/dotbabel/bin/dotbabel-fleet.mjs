@@ -561,6 +561,7 @@ function eventHook(input, event) {
   const text = deliverEvents(root, input.session_id, {
     selfKey: self?.key ?? null,
     claimsByRepo: self ? ownClaimsByRepo(root, self.key) : {},
+    startedAt: selfEntry?.startedAt ?? null,
   });
   if (!text) return null;
   const hookEventName = event === "prompt" ? "UserPromptSubmit" : "PostToolUse";

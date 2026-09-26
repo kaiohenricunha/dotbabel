@@ -258,7 +258,7 @@ describe("recordMerge", () => {
 describe("deliverEvents", () => {
   const claimsByRepo = { [REPO]: [{ pattern: "docs/hooks.md", active: true }] };
 
-  it("skips history on first contact, then delivers each new event once", () => {
+  it("without a start time, skips history on first contact, then delivers each new event once", () => {
     const root = makeTempDir("fleet-events-");
     writeEvent(root, merge({ pr: 1 }), { now: T0, pid: 1 });
     expect(deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo })).toBe("");
@@ -267,6 +267,51 @@ describe("deliverEvents", () => {
     expect(text).toContain("#2");
     expect(text).not.toContain("#1 ");
     expect(deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo })).toBe("");
+  });
+
+  it("on first contact, delivers the events recorded after the session started", () => {
+    const root = makeTempDir("fleet-events-");
+    writeEvent(root, merge({ pr: 1 }), { now: T0, pid: 1 });
+    const newest = writeEvent(root, merge({ pr: 2 }), { now: T0 + 10, pid: 1 });
+    const who = { selfKey: "200-2", claimsByRepo, startedAt: T0 + 5 };
+    const text = deliverEvents(root, "sess-a", who);
+    expect(text).toContain("#2");
+    expect(text).not.toContain("#1 ");
+    expect(readSeen(root, "sess-a")).toBe(newest);
+    expect(deliverEvents(root, "sess-a", who)).toBe("");
+  });
+
+  it("on first contact, skips the events recorded before the session started", () => {
+    const root = makeTempDir("fleet-events-");
+    const old = writeEvent(root, merge({ pr: 1 }), { now: T0, pid: 1 });
+    expect(deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo, startedAt: T0 + 1 })).toBe("");
+    expect(readSeen(root, "sess-a")).toBe(old);
+  });
+
+  it("counts an event from the millisecond the session started as news", () => {
+    const root = makeTempDir("fleet-events-");
+    writeEvent(root, merge({ pr: 1 }), { now: T0, pid: 1 });
+    expect(deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo, startedAt: T0 })).toContain("#1 ");
+  });
+
+  it.each([
+    ["a numeric string", String(T0 - 5)],
+    ["NaN", Number.NaN],
+    ["zero", 0],
+    ["negative", -5],
+    ["Infinity", Number.POSITIVE_INFINITY],
+  ])("falls back to skipping history when the start time is %s", (_label, startedAt) => {
+    const root = makeTempDir("fleet-events-");
+    const old = writeEvent(root, merge({ pr: 1 }), { now: T0, pid: 1 });
+    expect(deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo, startedAt })).toBe("");
+    expect(readSeen(root, "sess-a")).toBe(old);
+  });
+
+  it("follows the marker, not the start time, once the session has one", () => {
+    const root = makeTempDir("fleet-events-");
+    deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo });
+    writeEvent(root, merge({ pr: 1 }), { now: T0, pid: 1 });
+    expect(deliverEvents(root, "sess-a", { selfKey: "200-2", claimsByRepo, startedAt: T0 + 100 })).toContain("#1 ");
   });
 
   it("advances the marker past events that do not matter to the session", () => {

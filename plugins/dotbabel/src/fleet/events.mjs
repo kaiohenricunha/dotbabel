@@ -293,26 +293,27 @@ export function recordMerge(root, pr, { by = null, now = Date.now(), pid = proce
 
 /**
  * The context text for the events a session has not seen, and advance its
- * marker. On a session's first call the marker starts at the newest event, so
- * a new session is not told about merges from before it started.
+ * marker. A session without a marker has seen the events recorded before it
+ * started, so a new session is not told about older merges, but a merge that
+ * a running session lived through reaches it on its first call. That call can
+ * come late: fleet-guard.sh starts no node while no event exists. Without a
+ * usable start time, the marker starts at the newest event.
  *
  * @param {string} root
  * @param {string} sessionId
- * @param {{selfKey: string, claimsByRepo: Record<string, Array<object>>}} who
+ * @param {{selfKey: string, claimsByRepo: Record<string, Array<object>>, startedAt?: number|null}} who
+ *   `startedAt` is the session's start in epoch ms, from its registry entry
  * @returns {string} "" when there is nothing to tell
  */
-export function deliverEvents(root, sessionId, { selfKey, claimsByRepo }) {
+export function deliverEvents(root, sessionId, { selfKey, claimsByRepo, startedAt = null }) {
   if (!SESSION_ID.test(String(sessionId))) return "";
   const names = listEventNames(root);
   const newest = names.at(-1) ?? "0";
-  const seen = readSeen(root, sessionId);
-  if (seen === null) {
-    writeSeen(root, sessionId, newest);
-    return "";
-  }
+  const marker = readSeen(root, sessionId);
+  const seen = marker ?? (Number.isFinite(startedAt) && startedAt > 0 ? eventName(startedAt, 0) : newest);
   const fresh = names.filter((n) => n > seen);
+  if (marker === null || fresh.length > 0) writeSeen(root, sessionId, newest);
   if (fresh.length === 0) return "";
-  writeSeen(root, sessionId, newest);
   const items = relevantEvents(readEvents(root, fresh), { selfKey, claimsByRepo });
   return items.length > 0 ? formatEventContext(items) : "";
 }
