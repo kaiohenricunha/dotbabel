@@ -27,7 +27,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { isSecretName, isVersionString, makeAdapterResult, runBounded } from "../contract.mjs";
+import { isSecretName, isVersionString, makeAdapterResult, resolveTimeoutMs, runBounded } from "../contract.mjs";
 
 /** A closed local port. A connection to it is refused at once and nothing leaves the machine. */
 export const DEAD_PROXY = "http://127.0.0.1:9";
@@ -345,7 +345,9 @@ export function firstLine(text) {
  * @property {string} homeDir
  * @property {string} realRoot The runtime's real configuration root, which is read at most and never written.
  * @property {() => string} now
- * @property {number} [timeoutMs]
+ * @property {number} budgetMs The whole operation's time budget (REL-1), shared by every child it starts.
+ * @property {number} startedAt When the operation began, on the `monotonic` clock.
+ * @property {() => number} monotonic A clock in milliseconds that never goes backwards. Injectable for tests.
  * @property {string} [tmpDir]
  * @property {(path: string, encoding: "utf8") => Promise<string>} readFile
  */
@@ -361,13 +363,18 @@ export function resolveContext(context, { rootEnvVar, rootDirName }) {
   const env = ctx.env ?? process.env;
   const homeDir = ctx.homeDir ?? homedir();
   const configured = env[rootEnvVar];
+  // One budget for the whole operation, not one per child: REL-1 bounds an OPERATION, and an
+  // operation such as a multi-axis validate starts several children plus a version probe.
+  const monotonic = ctx.monotonic ?? (() => performance.now());
   return {
+    budgetMs: resolveTimeoutMs({ channel: "subprocess", timeoutMs: ctx.timeoutMs }),
+    startedAt: monotonic(),
+    monotonic,
     runCommand: ctx.runCommand ?? runProcess,
     env,
     homeDir,
     realRoot: configured !== undefined && configured !== "" ? resolve(configured) : join(homeDir, rootDirName),
     now: ctx.now ?? (() => new Date().toISOString()),
-    timeoutMs: ctx.timeoutMs,
     tmpDir: ctx.tmpDir,
     readFile: ctx.readFile ?? readFile,
   };
@@ -393,6 +400,16 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
   // Checked BEFORE anything is created: a scratch directory inside the real root would make the
   // isolation a fiction, and creating it there would already be a write.
   assertOutsideRoot(ctx.tmpDir ?? tmpdir(), ctx.realRoot);
+  // This child gets only what is left of the operation's budget. Once it is spent, nothing starts.
+  const remainingMs = Math.floor(ctx.budgetMs - (ctx.monotonic() - ctx.startedAt));
+  if (remainingMs <= 0) {
+    return makeAdapterResult({
+      status: "unavailable",
+      provenance,
+      observedAt: ctx.now(),
+      diagnostic: { code: "timeout", message: `the operation's ${ctx.budgetMs} ms budget was spent before this step started`, retryable: true },
+    });
+  }
   return withScratchRoot(
     prefix,
     async (scratch) => {
@@ -410,7 +427,7 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
           operationSettled = ctx.runCommand({ command, args, cwd: work, env, stopWhen }, { signal });
           return operationSettled;
         },
-        { channel: "subprocess", timeoutMs: ctx.timeoutMs, provenance, now: ctx.now },
+        { channel: "subprocess", timeoutMs: remainingMs, provenance, now: ctx.now },
       );
       // On a timeout, `runBounded` returns as soon as its race against the timer settles; it does
       // not await the losing operation. That operation is still running -- and may still be writing

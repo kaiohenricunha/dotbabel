@@ -291,8 +291,13 @@ describe("process helper boundaries", () => {
     expect(defaults.env).toBe(process.env);
     expect(defaults.now()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(typeof defaults.readFile).toBe("function");
-    const injected = { runCommand: () => {}, env: { PATH: "p" }, homeDir: "/h", now: () => "t", timeoutMs: 7, tmpDir: "/t", readFile: () => "" };
-    expect(resolveContext(injected, ROOT)).toMatchObject({ homeDir: "/h", timeoutMs: 7, tmpDir: "/t" });
+    // With no timeout given, the operation's budget is the REL-1 subprocess default.
+    expect(defaults.budgetMs).toBe(10_000);
+    const injected = { runCommand: () => {}, env: { PATH: "p" }, homeDir: "/h", now: () => "t", timeoutMs: 7, tmpDir: "/t", readFile: () => "", monotonic: () => 42 };
+    // An injected timeout becomes the whole operation's budget, measured from the injected clock.
+    expect(resolveContext(injected, ROOT)).toMatchObject({ homeDir: "/h", budgetMs: 7, startedAt: 42, tmpDir: "/t" });
+    // An invalid timeout is a caller-contract breach, so it throws before anything runs.
+    expect(() => resolveContext({ ...injected, timeoutMs: -1 }, ROOT)).toThrow(/timeoutMs/);
     expect(resolveContext(injected, ROOT).now()).toBe("t");
   });
 
@@ -352,6 +357,48 @@ describe("process helper boundaries", () => {
     expect(seen.spec.env.HOME).toBe(seen.paths.home);
     expect(seen.spec.stopWhen).toBe(stopWhen);
     expect(seen.spec.args).toEqual(["x"]);
+  });
+
+  it("gives one operation one time budget: a later child gets only what is left, and none once it is spent (REL-1)", async () => {
+    // REL-1 bounds an OPERATION. Before this, each child had its own full timeout, so a multi-axis
+    // validate could take (N+1) times the budget. The clock is injected, so nothing here times the machine.
+    let now = 0;
+    const seen = [];
+    const runner = fakeRunner((spec) => {
+      seen.push(spec.args.join(" "));
+      now += 60;
+      return outcome({ stderr: "OpenAI Codex v0.155.1" });
+    });
+    const ctx = resolveContext({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 100, monotonic: () => now }, ROOT);
+    const provenance = { sourceId: "codex", sourceKind: "runtime" };
+    const first = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["one"], ...ROOT, provenance });
+    expect(first.status).toBe("ok");
+    const second = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["two"], ...ROOT, provenance });
+    expect(second.status).toBe("ok");
+    // 120 ms of the 100 ms budget are spent, so the third child is never started.
+    const third = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["three"], ...ROOT, provenance });
+    expect(third.status).toBe("unavailable");
+    expect(third.diagnostic).toMatchObject({ code: "timeout", retryable: true });
+    expect(seen).toEqual(["one", "two"]);
+  });
+
+  it("codex validate() with two axes settles within one budget when each child is slow, instead of taking twice as long", async () => {
+    // Each child really takes 80 ms and honors its abort signal, as runProcess does. With one budget of
+    // 100 ms, the second child gets only the ~20 ms left and is stopped, so the operation reports its
+    // bound. With a budget per child it would get a fresh 100 ms, finish at 80 ms, and pass at ~160 ms.
+    const runner = fakeRunner((spec, { signal }) => {
+      if (spec.args[0] === "--version") return outcome({ stdout: "codex-cli 0.155.1" });
+      return new Promise((resolvePromise) => {
+        const timer = setTimeout(() => resolvePromise(outcome({ stderr: "OpenAI Codex v0.155.1\n" })), 80);
+        signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolvePromise(outcome({ aborted: true }));
+        }, { once: true });
+      });
+    });
+    const result = await codex.validate({ model: "gpt-5.5", reasoning: "high" }, { runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow, timeoutMs: 100 });
+    expect(result.status).toBe("unavailable");
+    expect(result.diagnostic.code).toBe("timeout");
   });
 
   it("does not remove the scratch root until the operation itself has settled, even after a timeout", async () => {
