@@ -28,7 +28,7 @@ import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { assertDescriptor, makeAdapterResult } from "../contract.mjs";
 import { deepFreeze, makeDiscoveryEvidence, makeInvocation, makeModelFact, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { assertOpaqueValue, firstLine, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { assertOpaqueValue, checkOpaqueValue, firstLine, invalidAxisValue, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "codex";
@@ -364,10 +364,14 @@ function probeAnswered({ stderr }) {
 export async function validate(input, context) {
   const known = isPlainObject(input) ? Object.keys(AXIS_KEYS).filter((axis) => /** @type {any} */ (input)[axis] !== undefined) : [];
   if (known.length === 0) throw new TypeError("codex validate: input must name a model or a reasoning axis");
-  const values = Object.fromEntries(known.map((axis) => [axis, assertOpaqueValue(axis, /** @type {any} */ (input)[axis])]));
-
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
+  // A bad value is data, not a caller breach, so it is a result with provenance (contract.mjs).
+  for (const axis of known) {
+    if (!checkOpaqueValue(axis, /** @type {any} */ (input)[axis])) return invalidAxisValue(ctx, provenance, axis);
+  }
+  const values = Object.fromEntries(known.map((axis) => [axis, /** @type {string} */ (/** @type {any} */ (input)[axis])]));
+
   /** @type {object[]} */
   const checks = [];
   for (const axis of known) {
@@ -408,6 +412,9 @@ export async function validate(input, context) {
  * The model becomes `--model` and the reasoning axis becomes a `-c` override whose value is a TOML
  * string. Any other axis is named in `unsupportedAxes` rather than dropped (ARCH-49). Nothing is
  * executed and no shell string is built.
+ *
+ * Throws on an invalid axis value, unlike the async operations: it is synchronous and returns a plain
+ * Invocation, so a bad value is a caller error to fix before rendering (failure channels, `contract.mjs`).
  * @param {{runtimeId: string, axes: Record<string, unknown>}} resolvedConfig
  * @returns {Readonly<import("../evidence.mjs").Invocation>}
  */

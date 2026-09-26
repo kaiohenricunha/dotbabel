@@ -221,13 +221,26 @@ describe("claude source adapter", () => {
     expect(result.evidence.checks[0].verdict).toBe("unverifiable");
   });
 
-  it("validate() refuses input that could be read as a flag, and empty input", async () => {
+  it("validate() answers a value that could be read as a flag with an invalid_axis_value result, and runs nothing", async () => {
     const { runner, ctx } = context(() => recorded("validate-known-alias.json"));
-    for (const bad of [{ model: "--dangerously-skip-permissions" }, { model: "-x" }, { effort: "--model" }, { model: "" }, { model: 7 }, { model: "line" + String.fromCharCode(10) + "break" }]) {
-      await expect(claude.validate(bad, ctx), JSON.stringify(bad)).rejects.toThrow(/model|effort/);
+    // The value is data that may come from a repository's own frontmatter, so a bad one is a result the
+    // caller can attribute and report, with provenance, rather than an exception (the split-by-source rule).
+    for (const bad of [{ model: "--dangerously-skip-permissions" }, { model: "-x" }, { effort: "--model" }, { model: "" }, { model: "line" + String.fromCharCode(10) + "break" }]) {
+      const result = await claude.validate(bad, ctx);
+      expect(result.status, JSON.stringify(bad)).toBe("unknown");
+      expect(result.diagnostic.code, JSON.stringify(bad)).toBe("invalid_axis_value");
+      expect(result.provenance.sourceId).toBe("claude");
+      // The diagnostic names the axis and never echoes the value (OPS-4).
+      expect(result.diagnostic.message).not.toContain("dangerously");
     }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("validate() throws when the caller breaks the input contract: no axis, a non-object, or a value that is not a string", async () => {
+    const { runner, ctx } = context(() => recorded("validate-known-alias.json"));
     await expect(claude.validate({}, ctx)).rejects.toThrow(/model or an effort/);
     await expect(claude.validate(null, ctx)).rejects.toThrow(/model or an effort/);
+    await expect(claude.validate({ model: 7 }, ctx)).rejects.toThrow(/model must be a string/);
     // Nothing was run for any of them.
     expect(runner.calls).toHaveLength(0);
   });

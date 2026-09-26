@@ -312,13 +312,22 @@ describe("codex source adapter", () => {
     expect(result.evidence.checks[0]).toMatchObject({ axis: "reasoning", verdict: "unverifiable", scope: "key" });
   });
 
-  it("validate() refuses input that could be read as a flag or a TOML injection, and empty input", async () => {
+  it("validate() answers a value that could be read as a flag or a TOML injection with an invalid_axis_value result, and runs nothing", async () => {
     const { runner, ctx } = context(() => outcome({ stderr: banner() }));
-    for (const bad of [{ model: "--config" }, { reasoning: "-c" }, { model: "" }, { model: 3 }, { model: "a" + String.fromCharCode(10) + "b" }]) {
-      await expect(codex.validate(bad, ctx), JSON.stringify(bad)).rejects.toThrow(/model|reasoning/);
+    for (const bad of [{ model: "--config" }, { reasoning: "-c" }, { model: "" }, { model: "a" + String.fromCharCode(10) + "b" }]) {
+      const result = await codex.validate(bad, ctx);
+      expect(result.status, JSON.stringify(bad)).toBe("unknown");
+      expect(result.diagnostic.code, JSON.stringify(bad)).toBe("invalid_axis_value");
+      expect(result.provenance.sourceId).toBe("codex");
     }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("validate() throws when the caller breaks the input contract: no known axis, or a value that is not a string", async () => {
+    const { runner, ctx } = context(() => outcome({ stderr: banner() }));
     await expect(codex.validate({}, ctx)).rejects.toThrow(/model or a reasoning/);
     await expect(codex.validate({ contextTier: "1m" }, ctx)).rejects.toThrow(/model or a reasoning/);
+    await expect(codex.validate({ model: 3 }, ctx)).rejects.toThrow(/model must be a string/);
     expect(runner.calls).toHaveLength(0);
   });
 

@@ -27,7 +27,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { isSecretName, isVersionString, runBounded } from "../contract.mjs";
+import { isSecretName, isVersionString, makeAdapterResult, runBounded } from "../contract.mjs";
 
 /** A closed local port. A connection to it is refused at once and nothing leaves the machine. */
 export const DEAD_PROXY = "http://127.0.0.1:9";
@@ -270,10 +270,51 @@ export function runProcess(spec, { signal } = {}) {
  * @returns {string}
  */
 export function assertOpaqueValue(name, value) {
-  if (typeof value !== "string" || value === "" || value.length > 200 || /[\p{Cc}\p{Cf}]/u.test(value) || value.startsWith("-")) {
+  if (typeof value !== "string" || !isOpaqueString(value)) {
     throw new TypeError(`${name} must be a printable string of at most 200 characters that does not start with a dash`);
   }
   return value;
+}
+
+/**
+ * True when a string is safe to hand to a runtime as one argument (see `assertOpaqueValue`).
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isOpaqueString(value) {
+  return value !== "" && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value) && !value.startsWith("-");
+}
+
+/**
+ * Check a caller-supplied value under the failure-channel rule in `contract.mjs`.
+ *
+ * A value that is not a string breaks the caller's contract and throws. A string that fails the
+ * opaque rules is data, which may come from a repository's own frontmatter, so it returns `false`
+ * for the caller to report as an `invalid_axis_value` result instead of an exception.
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {boolean} True when the value is safe to pass on.
+ */
+export function checkOpaqueValue(name, value) {
+  if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
+  return isOpaqueString(value);
+}
+
+/**
+ * The `unknown` result for a caller-supplied value that failed `checkOpaqueValue`. The message names
+ * the axis and never echoes the value (OPS-4).
+ * @param {RuntimeContext} ctx
+ * @param {object} provenance
+ * @param {string} axis
+ * @returns {object}
+ */
+export function invalidAxisValue(ctx, provenance, axis) {
+  return makeAdapterResult({
+    status: "unknown",
+    provenance,
+    observedAt: ctx.now(),
+    diagnostic: { code: "invalid_axis_value", message: `the ${axis} value is not safe to pass to the runtime: it is empty, longer than 200 characters, holds a control character, or starts with a dash` },
+  });
 }
 
 /**

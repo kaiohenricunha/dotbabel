@@ -449,6 +449,15 @@ export function assertDescriptor(descriptor) {
  * output can carry more than a version, such as an account, and nothing else stops it.
  * `evidence` is structured data for `catalog/` rather than diagnostic text, so it is
  * neither masked nor copied.
+ *
+ * Failure channels: an adapter operation reports a failure through this result, never a
+ * throw, whenever the failure comes from DATA -- the runtime's behavior, or a value the
+ * caller passed on from somewhere it does not control, such as a repository's
+ * frontmatter. A value that fails validation is `unknown` with code `invalid_axis_value`,
+ * with provenance intact. An operation THROWS only for a caller-contract breach (a missing
+ * or wrongly typed input, such as a model that is not a string) and for a safety fault
+ * such as the SEC-1 root check, which must never be absorbed. `renderInvocation` is
+ * synchronous and returns a plain Invocation, so it throws on any invalid value.
  * @param {object} input
  * @returns {object} A result frozen at the top level. Its provenance and diagnostic are frozen too, and `evidence` is passed by reference.
  */

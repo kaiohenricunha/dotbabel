@@ -33,7 +33,7 @@
 
 import { makeAdapterResult, assertDescriptor, isVersionString } from "../contract.mjs";
 import { deepFreeze, makeInvocation, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { MAX_OUTPUT_BYTES, assertOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { MAX_OUTPUT_BYTES, assertOpaqueValue, checkOpaqueValue, firstLine, invalidAxisValue, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "claude";
@@ -43,6 +43,12 @@ export const ADAPTER_VERSION = "1";
 
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CLAUDE_CONFIG_DIR", rootDirName: ".claude" });
+
+/** The caller-supplied values a probe passes on, each as a flag and the name the caller uses. */
+const PROBE_FLAGS = Object.freeze([
+  ["--model", "model"],
+  ["--effort", "effort"],
+]);
 
 /** A prompt is required by `-p`, but nothing is ever sent: there is no credential to send it with. */
 const PROBE_PROMPT = "x";
@@ -250,8 +256,13 @@ export async function observe(context = {}) {
   const args = ["-p", PROBE_PROMPT];
   /** @type {string[]} */
   const carried = [];
-  if (options.model !== undefined) carried.push("--model", assertOpaqueValue("model", options.model));
-  if (options.effort !== undefined) carried.push("--effort", assertOpaqueValue("effort", options.effort));
+  for (const [flag, name] of PROBE_FLAGS) {
+    const value = options[name];
+    if (value === undefined) continue;
+    // A bad value is data, not a caller breach, so it is a result with provenance (contract.mjs).
+    if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, baseProvenance(), name);
+    carried.push(flag, value);
+  }
   args.push(...carried, "--output-format", "stream-json", "--verbose", "--no-session-persistence");
   // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so its answer reflects only
   // the flags carried in plus Claude's defaults. The evidence names those flags (ARCH-28).
@@ -303,13 +314,17 @@ export async function validate(input, context) {
     throw new TypeError("claude validate: input must name a model or an effort");
   }
   const { model, effort } = /** @type {any} */ (input);
-  const args = ["-p", PROBE_PROMPT];
-  if (model !== undefined) args.push("--model", assertOpaqueValue("model", model));
-  if (effort !== undefined) args.push("--effort", assertOpaqueValue("effort", effort));
-  args.push("--no-session-persistence");
-
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
+  const args = ["-p", PROBE_PROMPT];
+  for (const [flag, name] of PROBE_FLAGS) {
+    const value = /** @type {any} */ (input)[name];
+    if (value === undefined) continue;
+    if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, provenance, name);
+    args.push(flag, value);
+  }
+  args.push("--no-session-persistence");
+
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-claude", command: "claude", args, ...ROOT, provenance }));
   if (ran.status !== "ok") return ran;
   const text = `${ran.evidence.stderr}\n${ran.evidence.stdout}`;
@@ -355,6 +370,9 @@ export async function validate(input, context) {
  *
  * The model becomes `--model` and the reasoning axis becomes `--effort`. Any other axis is named in
  * `unsupportedAxes` rather than dropped (ARCH-49). Nothing is executed and no shell string is built.
+ *
+ * Throws on an invalid axis value, unlike the async operations: it is synchronous and returns a plain
+ * Invocation, so a bad value is a caller error to fix before rendering (failure channels, `contract.mjs`).
  * @param {{runtimeId: string, axes: Record<string, unknown>}} resolvedConfig
  * @returns {Readonly<import("../evidence.mjs").Invocation>}
  */

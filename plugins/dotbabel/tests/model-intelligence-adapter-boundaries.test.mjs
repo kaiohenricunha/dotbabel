@@ -106,6 +106,22 @@ describe("claude stream parsing boundaries", () => {
     expect(Object.hasOwn(bad.evidence, "runtimeVersion")).toBe(false);
   });
 
+  it("observe() answers a model or effort that could be read as a flag with an invalid_axis_value result, and runs nothing", async () => {
+    const runner = fakeRunner(() => outcome({ stdout: initLine() }));
+    for (const bad of [{ model: "--dangerously-skip-permissions" }, { effort: "-x" }, { model: "" }]) {
+      const result = await claude.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow, ...bad });
+      expect(result.status, JSON.stringify(bad)).toBe("unknown");
+      expect(result.diagnostic.code).toBe("invalid_axis_value");
+    }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("observe() throws when the caller passes a model that is not a string, which is a contract breach and not data", async () => {
+    const runner = fakeRunner(() => outcome({ stdout: initLine() }));
+    await expect(claude.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow, model: 7 })).rejects.toThrow(/model must be a string/);
+    expect(runner.calls).toHaveLength(0);
+  });
+
   it("rejects a caller-supplied stream larger than the output cap, instead of parsing it unbounded", async () => {
     // Unlike a probed stream, which `runProcess`'s own cap already bounds, `context.stream` is
     // caller-supplied text with no upstream bound. This line is syntactically VALID JSON that names a
