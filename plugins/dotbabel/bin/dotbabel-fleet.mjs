@@ -11,6 +11,10 @@
  * claim ends when its owner releases it, when the owner's process exits, or
  * when the worktree it was made in is removed.
  *
+ * Event feed: after a `gh pr merge`, the post-tool hook records the merge
+ * (confirmed through `gh pr view`), and every other session that claims
+ * files in that repo reads it on its next tool call or prompt.
+ *
  * CPU lanes: `lane` runs a command through scripts/fleet-lane.sh, which waits
  * for a free lane of CPUs and pins the command to it, and `lanes` shows who
  * holds each lane. hooks/fleet-shell-prefix.sh (the CLAUDE_CODE_SHELL_PREFIX
@@ -23,9 +27,11 @@
  *   dotbabel fleet claim   <pattern>... [--note <text>] [--json]
  *   dotbabel fleet release <pattern>... | --all
  *   dotbabel fleet prune
- *   dotbabel fleet hook    pre-edit | session-start    (hook JSON on stdin)
+ *   dotbabel fleet hook    pre-edit | session-start | post-tool | prompt   (hook JSON on stdin)
  *   dotbabel fleet lane    [--name <label>] -- <command> [args...]
  *   dotbabel fleet lanes   [--json]
+ *   dotbabel fleet events  [--all] [--json]
+ *   dotbabel fleet event   --pr <N> [--repo <owner/name>]
  *
  * Environment:
  *   DOTBABEL_FLEET_MODE=off               turn the hooks off
@@ -55,10 +61,12 @@ import {
   formatDenyReason,
   formatSessionContext,
 } from "../src/fleet/format.mjs";
+import { deliverEvents, listEventNames, parseMergeCommand, readEvents, recordMerge } from "../src/fleet/events.mjs";
 import { formatLanes, parseLayout, readLaneState } from "../src/fleet/lanes.mjs";
 import {
   RECORD_SCHEMA,
   listRepoDirs,
+  ownClaimsByRepo,
   readDenials,
   readOwnerRecords,
   removeOwnerRecord,
@@ -81,7 +89,8 @@ import { findSelf, isOwnerAlive, ownerFromEntry, readRegistry, sessionsDir } fro
 const TOOL = "dotbabel-fleet";
 const SELF_PATH = fileURLToPath(import.meta.url);
 const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
-const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes"]);
+const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event"]);
+const PR_FIELDS = "number,title,state,mergeCommit,baseRefName,headRefName,files,url";
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const DEFAULT_ESCALATE_MINUTES = 15;
 
@@ -90,9 +99,12 @@ const USAGE = `Usage:
   dotbabel fleet claim   <pattern>... [--note <text>]   claim paths or globs for this session
   dotbabel fleet release <pattern>... | --all           release this session's claims
   dotbabel fleet prune                                  remove claims of exited sessions
-  dotbabel fleet hook    pre-edit | session-start       Claude Code hook entry (JSON on stdin)
+  dotbabel fleet hook    <event>                        Claude Code hook entry (JSON on stdin):
+                                                        pre-edit, session-start, post-tool, prompt
   dotbabel fleet lane    [--name <label>] -- <cmd>...   run a command in a free CPU lane
   dotbabel fleet lanes   [--json]                       show the CPU lanes and who holds them
+  dotbabel fleet events  [--all] [--json]               show recent merges in this repo (or all repos)
+  dotbabel fleet event   --pr <N> [--repo <owner/name>] record a merge made outside Claude Code
 
 Patterns are relative to the repo root. A bare path also covers everything
 below it; ** and * are globs.
@@ -363,6 +375,9 @@ function runHook(event) {
   } else if (event === "session-start") {
     const text = sessionStart(input);
     if (text) process.stdout.write(`${text}\n`);
+  } else if (event === "post-tool" || event === "prompt") {
+    const out = eventHook(input, event);
+    if (out) process.stdout.write(`${JSON.stringify(out)}\n`);
   }
 }
 
@@ -495,6 +510,107 @@ function cmdPrune() {
   return EXIT_CODES.OK;
 }
 
+// -------------------------------------------------------------- events ----
+
+/** `gh pr view` JSON for a merge target (null: the current branch's PR), or null when gh fails. */
+function ghPrView(target, repo, cwd) {
+  const args = ["pr", "view", ...(target ? [target] : []), "--json", PR_FIELDS, ...(repo ? ["--repo", repo] : [])];
+  const r = spawnSync("gh", args, { cwd, encoding: "utf8", timeout: 15_000 });
+  if (r.status !== 0) return null;
+  try {
+    return JSON.parse(r.stdout);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Record a confirmed merge, then release the merging session's own claims on
+ * the merged branch: that work has landed.
+ */
+function recordMergeBy(pr, self) {
+  const root = stateRoot();
+  const result = recordMerge(root, pr, { by: self });
+  if (self && result.event?.head) {
+    const dir = repoDir(root, result.event.repo);
+    const mine = readOwnerRecords(dir).find((r) => r.owner.key === self.key);
+    const kept = mine ? mine.claims.filter((c) => c.branch !== result.event.head) : [];
+    if (mine && kept.length !== mine.claims.length) {
+      saveRecord(dir, { ...mine, claims: kept, updatedAt: new Date().toISOString() });
+    }
+  }
+  return result;
+}
+
+/**
+ * PostToolUse (`post-tool`) and UserPromptSubmit (`prompt`): record a
+ * `gh pr merge` this session just ran, then tell the session about merges it
+ * has not seen. fleet-guard.sh starts this only when there is something to do.
+ */
+function eventHook(input, event) {
+  const registry = readRegistry(sessionsDir());
+  const selfEntry = findSelf({ entries: registry.entries, sessionId: input.session_id, startPid: process.ppid });
+  const self = selfEntry ? ownerFromEntry(selfEntry) : null;
+  if (event === "post-tool" && input.tool_name === "Bash") {
+    const merge = parseMergeCommand(input.tool_input?.command);
+    const pr = merge ? ghPrView(merge.target, merge.repo, input.cwd || process.cwd()) : null;
+    if (pr) recordMergeBy(pr, self);
+  }
+  const root = stateRoot();
+  // An unidentified session still advances its marker, so the shell fast path stays fast.
+  const text = deliverEvents(root, input.session_id, {
+    selfKey: self?.key ?? null,
+    claimsByRepo: self ? ownClaimsByRepo(root, self.key) : {},
+  });
+  if (!text) return null;
+  const hookEventName = event === "prompt" ? "UserPromptSubmit" : "PostToolUse";
+  return { hookSpecificOutput: { hookEventName, additionalContext: text } };
+}
+
+/** `events [--all] [--json]`: the merges recorded in the last 7 days, newest first. */
+function cmdEvents(args) {
+  const all = Boolean(args.flags.all);
+  const repo = all ? null : requireRepo();
+  const events = readEvents(stateRoot(), listEventNames(stateRoot()))
+    .map((e) => e.event)
+    .filter((e) => all || e.repo === repo.key)
+    .reverse();
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify({ repo: repo?.key ?? null, events }, null, 2)}\n`);
+    return EXIT_CODES.OK;
+  }
+  if (events.length === 0) {
+    process.stdout.write(`No merges recorded${repo ? ` for ${repo.key}` : ""} in the last 7 days.\n`);
+    return EXIT_CODES.OK;
+  }
+  for (const e of events) {
+    const when = String(e.at).slice(0, 16).replace("T", " ");
+    const count = Array.isArray(e.files) ? e.files.length : 0;
+    const cols = [when, `#${e.pr} ${e.title ?? ""}`.trim(), String(e.sha).slice(0, 7), `${count} files`];
+    if (e.by?.name) cols.push(`by ${e.by.name}`);
+    if (all) cols.push(e.repo);
+    process.stdout.write(`${cols.join("  ")}\n`);
+  }
+  return EXIT_CODES.OK;
+}
+
+/** `event --pr <N> [--repo <owner/name>]`: record a merge made outside Claude Code. */
+function cmdEvent(args) {
+  if (typeof args.flags.pr !== "string" || args.flags.pr === "") throw new UsageError("event needs --pr <number>");
+  const repo = typeof args.flags.repo === "string" ? args.flags.repo : null;
+  const pr = ghPrView(args.flags.pr, repo, process.cwd());
+  if (!pr) throw new EnvError("gh pr view failed. Check `gh auth status` and the --pr and --repo values.");
+  const selfEntry = findSelf({ entries: readRegistry(sessionsDir()).entries, startPid: process.ppid });
+  const result = recordMergeBy(pr, selfEntry ? ownerFromEntry(selfEntry) : null);
+  if (result.reason === "not-merged") {
+    process.stderr.write(`${TOOL}: #${pr.number ?? args.flags.pr} is not merged, so there is nothing to record.\n`);
+    return EXIT_CODES.VALIDATION;
+  }
+  const what = `#${result.event.pr} (${String(result.event.sha).slice(0, 7)}) in ${result.event.repo}`;
+  process.stdout.write(result.recorded ? `Recorded the merge of ${what}.\n` : `Already recorded: ${what}.\n`);
+  return EXIT_CODES.OK;
+}
+
 // --------------------------------------------------------------- lanes ----
 
 /**
@@ -585,7 +701,12 @@ function main(argv) {
   }
   let args;
   try {
-    args = parse(argv, { note: { type: "string" }, all: { type: "boolean" } });
+    args = parse(argv, {
+      note: { type: "string" },
+      all: { type: "boolean" },
+      pr: { type: "string" },
+      repo: { type: "string" },
+    });
   } catch (err) {
     process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n${USAGE}\n`);
     return EXIT_CODES.USAGE;
@@ -614,6 +735,8 @@ function main(argv) {
     if (sub === "claim") return cmdClaim(subArgs);
     if (sub === "release") return cmdRelease(subArgs);
     if (sub === "lanes") return cmdLanes(subArgs);
+    if (sub === "events") return cmdEvents(subArgs);
+    if (sub === "event") return cmdEvent(subArgs);
     return cmdPrune();
   } catch (err) {
     if (err instanceof UsageError) {

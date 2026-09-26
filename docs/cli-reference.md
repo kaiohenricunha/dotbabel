@@ -654,28 +654,34 @@ sibling attestation evidence.
 
 ## `dotbabel-fleet`
 
-File claims and CPU lanes for concurrent Claude Code sessions. See
-[fleet.md](./fleet.md) for how claims start and end and how lanes work, and
-[hooks.md](./hooks.md) for the hooks.
+File claims, CPU lanes, and merge events for concurrent Claude Code sessions.
+See [fleet.md](./fleet.md) for how claims start and end, how lanes work, and
+how the event feed reports merges, and [hooks.md](./hooks.md) for the hooks.
 
-| Subcommand             | Purpose                                                  |
-| ---------------------- | -------------------------------------------------------- |
-| `board`                | Show the claims in the current repository                |
-| `claim <pattern>...`   | Claim paths or globs for this session                    |
-| `release <pattern>...` | Release this session's matching claims                   |
-| `release --all`        | Release every claim this session holds in the repository |
-| `prune`                | Remove the claim records of sessions that exited         |
-| `hook pre-edit`        | `PreToolUse` entry: claim, or deny / ask with a reason   |
-| `hook session-start`   | `SessionStart` entry: print the live claims as context   |
-| `lane -- <command>`    | Run a command in a free CPU lane, with its exit status   |
-| `lanes`                | Show each CPU lane, its holder, and the waiting commands |
+| Subcommand             | Purpose                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `board`                | Show the claims in the current repository                        |
+| `claim <pattern>...`   | Claim paths or globs for this session                            |
+| `release <pattern>...` | Release this session's matching claims                           |
+| `release --all`        | Release every claim this session holds in the repository         |
+| `prune`                | Remove the claim records of sessions that exited                 |
+| `hook pre-edit`        | `PreToolUse` entry: claim, or deny / ask with a reason           |
+| `hook session-start`   | `SessionStart` entry: print the live claims as context           |
+| `hook post-tool`       | `PostToolUse` entry: record a `gh pr merge`, report merges       |
+| `hook prompt`          | `UserPromptSubmit` entry: report merges the session has not seen |
+| `lane -- <command>`    | Run a command in a free CPU lane, with its exit status           |
+| `lanes`                | Show each CPU lane, its holder, and the waiting commands         |
+| `events`               | Show the merges of the last 7 days in this repository            |
+| `event --pr <N>`       | Record a merge made outside Claude Code                          |
 
-| Flag             | Default     |                                                    |
-| ---------------- | ----------- | -------------------------------------------------- |
-| `--note <text>`  | —           | `claim`: the intent other sessions see             |
-| `--name <label>` | the command | `lane`: the label that `lanes` shows               |
-| `--all`          | off         | `release`: release every claim                     |
-| `--json`         | off         | `board`, `claim`, `lanes`: machine-readable output |
+| Flag             | Default        |                                                              |
+| ---------------- | -------------- | ------------------------------------------------------------ |
+| `--note <text>`  | —              | `claim`: the intent other sessions see                       |
+| `--name <label>` | the command    | `lane`: the label that `lanes` shows                         |
+| `--pr <N>`       | —              | `event`: the merged pull request                             |
+| `--repo <o/r>`   | the cwd's repo | `event`: the repository of the pull request                  |
+| `--all`          | off            | `release`: release every claim; `events`: every repository   |
+| `--json`         | off            | `board`, `claim`, `lanes`, `events`: machine-readable output |
 
 `claim`, `release`, and `board` find their own session by walking up the
 process tree to a process in `~/.claude/sessions/`, so run them from a Claude
@@ -685,7 +691,8 @@ Code session.
 refusal lists each owner. **Exits 2** outside a git repository, and from
 `claim` and `release` outside a Claude Code session. `hook` always exits 0: it
 fails open. `lane` exits with the command's own status, and 64 without a
-command.
+command. `event` exits 1 when the pull request is not merged, and 2 when
+`gh pr view` fails.
 
 ---
 

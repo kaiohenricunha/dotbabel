@@ -1,9 +1,9 @@
-# Fleet: file claims and CPU lanes across Claude Code sessions
+# Fleet: file claims, CPU lanes, and merge events across Claude Code sessions
 
 _Last updated: v3.4.0_
 
 When several Claude Code sessions work on one machine, they get in each
-other's way in two places:
+other's way in three places:
 
 - **Files.** Two sessions change the same file on two branches, and each
   finds out only at merge time. `dotbabel fleet` gives each session a claim on
@@ -14,6 +14,10 @@ other's way in two places:
   the same time overload the machine and tests time out. [CPU lanes](#cpu-lanes)
   give each heavy test run a fixed set of CPUs, and the other runs wait for a
   free lane.
+- **Merges.** One session merges a pull request, and the others keep working
+  on a base that moved. The [event feed](#event-feed) records each merge and
+  tells every session that claims files in that repository, with the files it
+  must rebase over.
 
 ## How it works
 
@@ -264,3 +268,87 @@ carry secrets.
   next to Claude Code's own login shell. A command that names a test tool and
   a test verb also starts Node for the check, about the time of a bare
   `node -e ''`.
+
+## Event feed
+
+When a session runs `gh pr merge`, the `post-tool` hook asks `gh pr view`
+whether the pull request merged. If it did, the hook records one event: the
+repository, the pull request, the merge commit, the base branch, and the
+changed files. The merging session also releases its own claims on the merged
+branch, because that work has landed.
+
+Every other session reads the events it has not seen on its next tool call
+(`post-tool`) or its next prompt (`prompt`, for a session that waits for you).
+A session gets a message only for a repository where it holds claims:
+
+- If the merge changed files that the session claims, the message names them
+  and tells the session to rebase onto the new base before it pushes or
+  merges.
+- Otherwise, one line says that the base moved and that none of the changed
+  files are claimed there.
+
+A session does not get merges from before its first hook call. Events are kept
+for 7 days.
+
+### Set up the event feed
+
+Add these blocks to `~/.claude/settings.json`, next to the claim hooks, then
+restart each Claude Code session:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/fleet-guard.sh post-tool",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/fleet-guard.sh prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook runs after every tool call, so `fleet-guard.sh` decides in bash
+whether there is work. It starts Node only for a Bash call that runs
+`gh pr merge`, or when an event is newer than the session's seen marker. Each
+other call costs about 3 ms.
+
+### Event commands
+
+| Command                                        | Purpose                                                     |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| `dotbabel fleet events [--all] [--json]`       | Show the merges of the last 7 days, newest first            |
+| `dotbabel fleet event --pr <N> [--repo <o/r>]` | Record a merge made outside Claude Code, such as on the web |
+
+A merge is recorded once per repository, pull request, and merge commit, so
+running `event` after the hook recorded the same merge does nothing.
+
+### Limits of the event feed
+
+- **Only a merge that a session runs is seen.** A merge in the GitHub web
+  interface or by another tool is not recorded until someone runs
+  `dotbabel fleet event --pr <N>`.
+- **The overlap comes from claims.** A file that a session changed without a
+  claim (with Bash, or before the claims existed) does not count, and neither
+  do the shared files (lockfiles, `CHANGELOG.md`) that are never claimed.
+- **Delivery waits for activity.** An idle session learns about a merge when
+  you send it the next prompt.
+- **`gh` must be signed in** in the merging session, because the event comes
+  from `gh pr view`.

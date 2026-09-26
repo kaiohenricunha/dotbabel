@@ -105,3 +105,57 @@ edit() {
   [ -z "$output" ]
   [ ! -d "$WORK/state" ]
 }
+
+# ------------------------------------------------ event feed fast path ----
+#
+# post-tool runs after every tool call and prompt runs on every prompt, so
+# the wrapper decides in bash whether node has work. A stub node records
+# each start and the stdin it got.
+
+stub_node() {
+  printf '#!/bin/sh\necho started >>"%s/node-calls"\ncat >"%s/node-stdin"\n' "$WORK" "$WORK" >"$WORK/stub/node"
+  chmod +x "$WORK/stub/node"
+}
+
+post_tool() { # <payload> [event]
+  run bash -c 'printf "%s" "$1" | PATH="$2:$PATH" "$3" "$4"' _ "$1" "$WORK/stub" "$WORK/hooks/fleet-guard.sh" "${2:-post-tool}"
+}
+
+@test "post-tool starts no node when there is no event and no merge" {
+  stub_node
+  post_tool '{"session_id":"sess-a","tool_name":"Read","tool_input":{}}'
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/node-calls" ]
+  mkdir -p "$WORK/state/events" "$WORK/state/seen"
+  echo '{}' >"$WORK/state/events/000000000000001-1.json"
+  echo "000000000000001-1.json" >"$WORK/state/seen/sess-a"
+  post_tool '{"session_id":"sess-a","tool_name":"Read","tool_input":{}}'
+  [ ! -e "$WORK/node-calls" ]
+}
+
+@test "post-tool starts node when an event is newer than the session's marker" {
+  stub_node
+  mkdir -p "$WORK/state/events" "$WORK/state/seen"
+  echo "000000000000001-1.json" >"$WORK/state/seen/sess-a"
+  echo '{}' >"$WORK/state/events/000000000000002-7.json"
+  post_tool '{"session_id":"sess-a","tool_name":"Read","tool_input":{}}'
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
+}
+
+@test "post-tool starts node for a gh pr merge command, with the payload on stdin" {
+  stub_node
+  payload='{"session_id":"sess-a","tool_name":"Bash","tool_input":{"command":"gh pr merge 5 --squash"}}'
+  post_tool "$payload"
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
+  [ "$(cat "$WORK/node-stdin")" = "$payload" ]
+}
+
+@test "prompt ignores a gh pr merge in the prompt text but delivers new events" {
+  stub_node
+  post_tool '{"session_id":"sess-a","prompt":"please gh pr merge 5"}' prompt
+  [ ! -e "$WORK/node-calls" ]
+  mkdir -p "$WORK/state/events"
+  echo '{}' >"$WORK/state/events/000000000000002-7.json"
+  post_tool '{"session_id":"sess-a","prompt":"go on"}' prompt
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
+}
