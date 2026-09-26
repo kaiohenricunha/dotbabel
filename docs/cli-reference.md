@@ -654,8 +654,9 @@ sibling attestation evidence.
 
 ## `dotbabel-fleet`
 
-File claims across concurrent Claude Code sessions. See [fleet.md](./fleet.md)
-for how claims start and end, and [hooks.md](./hooks.md) for the hook.
+File claims and CPU lanes for concurrent Claude Code sessions. See
+[fleet.md](./fleet.md) for how claims start and end and how lanes work, and
+[hooks.md](./hooks.md) for the hooks.
 
 | Subcommand             | Purpose                                                  |
 | ---------------------- | -------------------------------------------------------- |
@@ -666,12 +667,15 @@ for how claims start and end, and [hooks.md](./hooks.md) for the hook.
 | `prune`                | Remove the claim records of sessions that exited         |
 | `hook pre-edit`        | `PreToolUse` entry: claim, or deny / ask with a reason   |
 | `hook session-start`   | `SessionStart` entry: print the live claims as context   |
+| `lane -- <command>`    | Run a command in a free CPU lane, with its exit status   |
+| `lanes`                | Show each CPU lane, its holder, and the waiting commands |
 
-| Flag            | Default |                                           |
-| --------------- | ------- | ----------------------------------------- |
-| `--note <text>` | —       | `claim`: the intent other sessions see    |
-| `--all`         | off     | `release`: release every claim            |
-| `--json`        | off     | `board`, `claim`: machine-readable output |
+| Flag             | Default     |                                                    |
+| ---------------- | ----------- | -------------------------------------------------- |
+| `--note <text>`  | —           | `claim`: the intent other sessions see             |
+| `--name <label>` | the command | `lane`: the label that `lanes` shows               |
+| `--all`          | off         | `release`: release every claim                     |
+| `--json`         | off         | `board`, `claim`, `lanes`: machine-readable output |
 
 `claim`, `release`, and `board` find their own session by walking up the
 process tree to a process in `~/.claude/sessions/`, so run them from a Claude
@@ -680,7 +684,8 @@ Code session.
 **Exits 1** from `claim` when a live session holds an overlapping claim; the
 refusal lists each owner. **Exits 2** outside a git repository, and from
 `claim` and `release` outside a Claude Code session. `hook` always exits 0: it
-fails open.
+fails open. `lane` exits with the command's own status, and 64 without a
+command.
 
 ---
 

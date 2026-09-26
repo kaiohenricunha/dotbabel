@@ -1,13 +1,19 @@
-# Fleet: file claims across Claude Code sessions
+# Fleet: file claims and CPU lanes across Claude Code sessions
 
 _Last updated: v3.4.0_
 
-When several Claude Code sessions work in one repository, two of them can
-change the same file on two branches. Each finds out only at merge time.
-`dotbabel fleet` gives each session a claim on the files it edits, and it
-blocks an edit by another session to a claimed file. The blocked session gets
-the name of the owner, so it can use `SendMessage` to agree on who changes the
-file.
+When several Claude Code sessions work on one machine, they get in each
+other's way in two places:
+
+- **Files.** Two sessions change the same file on two branches, and each
+  finds out only at merge time. `dotbabel fleet` gives each session a claim on
+  the files it edits, and it blocks an edit by another session to a claimed
+  file. The blocked session gets the name of the owner, so it can use
+  `SendMessage` to agree on who changes the file.
+- **CPUs.** Each full test suite starts one worker per CPU, so a few suites at
+  the same time overload the machine and tests time out. [CPU lanes](#cpu-lanes)
+  give each heavy test run a fixed set of CPUs, and the other runs wait for a
+  free lane.
 
 ## How it works
 
@@ -143,7 +149,7 @@ Environment variables take precedence:
 | `DOTBABEL_FLEET_STATE_DIR`        | Ledger root (default `$XDG_STATE_HOME/dotbabel/fleet`)    |
 | `CLAUDE_CONFIG_DIR`               | Where Claude Code keeps `sessions/` (default `~/.claude`) |
 
-## Limits
+## Limits of the claims
 
 - **Only the edit tools are guarded.** `Edit`, `Write`, `MultiEdit`, and
   `NotebookEdit` claim and can be denied. A Bash command that writes a file
@@ -161,3 +167,100 @@ Environment variables take precedence:
 - **Each guarded edit starts Node.** At a load average of 42 on 16 CPUs, one
   hook call took 0.6 to 0.8 seconds, most of it Node startup.
 - **Git 2.31 or later** is necessary (`rev-parse --path-format`).
+
+## CPU lanes
+
+A lane is a fixed set of CPUs. The online CPUs are split into lanes of about
+5, and the last CPU stays free for shells, editors, and the sessions
+themselves. A machine with 16 CPUs gets 3 lanes: CPUs 0-4, 5-9, and 10-14. A
+machine with fewer than 6 CPUs keeps no CPU free.
+
+A heavy test command waits in a queue until a lane is free, then runs pinned
+to that lane with `taskset`. The first command to wait is the first to get a
+lane. Tools that count the CPUs they may use then start one worker per lane
+CPU: Node's `os.availableParallelism()` (vitest, jest), Go's `GOMAXPROCS`, and
+`nproc`. pytest-xdist counts CPUs with psutil, which ignores the pinning, so
+the lane also sets `PYTEST_XDIST_AUTO_NUM_WORKERS`. The lane is free the
+moment the command exits. If the lane process dies, the kernel releases its
+lock.
+
+### Set up the lanes
+
+`bootstrap.sh` links `fleet-shell-prefix.sh` into `~/.claude/hooks/`. Add this
+block to `~/.claude/settings.json` with the absolute path of your home, then
+restart each Claude Code session:
+
+```json
+{
+  "env": {
+    "CLAUDE_CODE_SHELL_PREFIX": "/home/you/.claude/hooks/fleet-shell-prefix.sh"
+  }
+}
+```
+
+Claude Code then runs every shell command it starts through the wrapper:
+Bash tool calls, hook commands, the status line, and MCP server startup. The
+wrapper sends a Bash tool call to a lane only when it runs a heavy test
+command:
+
+- `npm`, `pnpm`, `yarn`, or `bun` with `test`, or a script whose name starts
+  with `test`, `coverage`, `attest`, `mutation`, or `e2e`
+- `vitest`, `jest`, `bats`, `playwright test`, `stryker run`, and `node --test`
+- `go test`, `cargo test`, `make test` or `make check`, `mvn test` or
+  `mvn verify`, and `gradle test` or `gradle check`
+- `pytest` (also through `python -m`, `uv run`, and `poetry run`), `tox`, and
+  `nox`
+- `dotbabel local-attest` and `dotbabel quality check`
+
+Watch modes (`vitest --watch`, `npm run test:watch`) never go to a lane,
+because they never end. Every other command, and every hook and MCP server,
+runs at once with the same shell and flags that Claude Code uses. The
+command text does not change, so your permission rules match as before.
+
+### Turn the lanes off
+
+- **At once, for every session:** `touch ~/.local/state/dotbabel/fleet/lanes.off`.
+  Remove the file to turn the lanes on again. No restart is necessary.
+- **For the sessions you start next:** set `DOTBABEL_FLEET_LANES=off` in their
+  environment, or remove the `CLAUDE_CODE_SHELL_PREFIX` entry and restart.
+
+### Lane commands
+
+| Command                                       | Purpose                                                |
+| --------------------------------------------- | ------------------------------------------------------ |
+| `dotbabel fleet lanes [--json]`               | Show each lane, its holder, and the commands that wait |
+| `dotbabel fleet lane [--name <label>] -- cmd` | Run any command in a lane, also from your own terminal |
+
+A holder shows a short label (such as `npm test`), the session name, and the
+directory. The lane files never hold the command line, because commands can
+carry secrets.
+
+### Lane settings
+
+| Variable                    | Effect                                                            |
+| --------------------------- | ----------------------------------------------------------------- |
+| `DOTBABEL_FLEET_LANES`      | `off`, or explicit lanes as CPU lists joined by `;`: `0-4;5-9`    |
+| `DOTBABEL_FLEET_LANE_COUNT` | The number of lanes in the automatic layout                       |
+| `DOTBABEL_FLEET_NCPU`       | The CPU count for the automatic layout (default: the online CPUs) |
+
+### Limits of the lanes
+
+- **Linux only.** A lane needs `flock` and `taskset` (util-linux). Without
+  them, or with bash older than 4, the command runs at once, with no lane.
+- **Only the command text is read.** A script that starts a test runner, such
+  as `./run-tests.sh`, is not seen. Run it with `dotbabel fleet lane --`. A
+  heredoc stops the reading, so a test command after a heredoc in the same
+  Bash call runs with no lane.
+- **The wrapper reads Claude Code's internal form of a Bash call**
+  (`eval '<command>' && pwd -P >| <file>`). If a new Claude Code version
+  changes that form, heavy commands run with no lane. No command breaks.
+- **Containers are outside the lane.** testcontainers and `docker run` start
+  processes under the Docker daemon. Give them `--cpuset-cpus` yourself.
+- **A hung test holds its lane** until it exits. `dotbabel fleet lanes` shows
+  which session holds it.
+- **`CLAUDE_CODE_SHELL_PREFIX` has one slot.** To use another wrapper as well,
+  make one wrapper call the other.
+- **Cost.** Every command pays for one bash start, which is not measurable
+  next to Claude Code's own login shell. A command that names a test tool and
+  a test verb also starts Node for the check, about the time of a bare
+  `node -e ''`.
