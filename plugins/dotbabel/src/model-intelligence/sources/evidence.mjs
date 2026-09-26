@@ -197,10 +197,10 @@ export function makeObservedConfiguration(input) {
   const fields = knownFields("ObservedEffectiveConfiguration", input, OBSERVED_FIELDS);
   if (!isRuntimeId(fields.runtimeId)) throw new TypeError(`ObservedEffectiveConfiguration.runtimeId must be one of ${RUNTIME_IDS.join(", ")}`);
   if (typeof fields.turnExecuted !== "boolean") throw new TypeError("ObservedEffectiveConfiguration.turnExecuted must be a boolean");
-  /** @type {Record<string, unknown>} */
   if (!CONFIGURATION_BASES.includes(/** @type {any} */ (fields.configurationBasis))) {
     throw new TypeError(`ObservedEffectiveConfiguration.configurationBasis must be one of ${CONFIGURATION_BASES.join(", ")}`);
   }
+  /** @type {Record<string, unknown>} */
   const out = { runtimeId: fields.runtimeId, turnExecuted: fields.turnExecuted, configurationBasis: fields.configurationBasis, axes: observedAxes(fields.axes) };
   if (fields.configurationBasis === "reconstructed") {
     // A reconstruction must say what it carried in, or a default would read as the user's own setting.
