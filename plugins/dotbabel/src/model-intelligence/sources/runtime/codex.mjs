@@ -223,18 +223,19 @@ export function readModelKeys(text) {
  * Write a scratch config holding only the user's model keys. With none, no file is written.
  * @param {import("./process.mjs").RuntimeContext} ctx
  * @param {{runtimeRoot: string}} paths
- * @returns {Promise<void>}
+ * @returns {Promise<string[]>} The keys carried into the scratch config, in write order. Empty when none were.
  */
 async function seedScratchConfig(ctx, { runtimeRoot }) {
   let text;
   try {
     text = await ctx.readFile(join(ctx.realRoot, "config.toml"), "utf8");
   } catch {
-    return;
+    return [];
   }
   const keys = readModelKeys(text);
-  const body = MODEL_KEYS.filter((k) => keys[k] !== undefined).map((k) => `${k} = ${JSON.stringify(keys[k])}\n`).join("");
-  if (body !== "") await writeFile(join(runtimeRoot, "config.toml"), body);
+  const carried = MODEL_KEYS.filter((k) => keys[k] !== undefined);
+  if (carried.length > 0) await writeFile(join(runtimeRoot, "config.toml"), carried.map((k) => `${k} = ${JSON.stringify(keys[k])}\n`).join(""));
+  return carried;
 }
 
 /**
@@ -278,6 +279,8 @@ export async function discover(context) {
 export async function observe(context) {
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
+  /** @type {string[]} */
+  let carried = [];
   const ran = /** @type {any} */ (
     await runIsolated(ctx, {
       prefix: "mi-codex",
@@ -285,7 +288,9 @@ export async function observe(context) {
       args: ["exec", "--skip-git-repo-check", PROBE_PROMPT],
       ...ROOT,
       stopWhen: bannerComplete,
-      prepare: (paths) => seedScratchConfig(ctx, paths),
+      prepare: async (paths) => {
+        carried = await seedScratchConfig(ctx, paths);
+      },
       provenance,
     })
   );
@@ -303,6 +308,10 @@ export async function observe(context) {
   const observed = makeObservedConfiguration({
     runtimeId: RUNTIME_ID,
     turnExecuted: false,
+    // The banner reflects a scratch config seeded with only the carried keys, never the user's full
+    // configuration (profiles, providers, CODEX_* variables), so this is a reconstruction (ARCH-28).
+    configurationBasis: "reconstructed",
+    reconstructedFrom: carried,
     // `reasoning` is the axis name this adapter's invocation contract already uses (AXIS_KEYS,
     // renderInvocation), so an observed effort and a resolved one compare under the same name.
     axes: { model, ...(effort === undefined ? {} : { reasoning: effort }) },

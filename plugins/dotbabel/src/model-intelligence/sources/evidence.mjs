@@ -157,7 +157,14 @@ function usageEntry(entry) {
   return Object.freeze(out);
 }
 
-const OBSERVED_FIELDS = Object.freeze(["runtimeId", "turnExecuted", "axes", "provider", "usage", "fieldSources", "runtimeVersion"]);
+const OBSERVED_FIELDS = Object.freeze(["runtimeId", "turnExecuted", "configurationBasis", "reconstructedFrom", "axes", "provider", "usage", "fieldSources", "runtimeVersion"]);
+
+/**
+ * Where an observed configuration came from. `as-run` is evidence from a run the caller made.
+ * `reconstructed` is a probe in a scratch home: it sees only what was carried into it, plus the
+ * runtime's own defaults, and never the user's full configuration (SEC-1 keeps it out).
+ */
+export const CONFIGURATION_BASES = Object.freeze(["as-run", "reconstructed"]);
 
 /**
  * An axis name: a plain identifier. The set of names is open (§5 `Configuration axes`), but each
@@ -169,6 +176,8 @@ const AXIS_NAME_RE = /^[a-z][A-Za-z0-9]{0,63}$/;
  * @typedef {object} ObservedEffectiveConfiguration
  * @property {string} runtimeId A `RUNTIMES` id.
  * @property {boolean} turnExecuted Whether a model turn ran to produce this. Absence of usage means no turn, not zero usage.
+ * @property {"as-run"|"reconstructed"} configurationBasis Whether this is the configuration a real run used, or a probe's reconstruction of it.
+ * @property {ReadonlyArray<string>} [reconstructedFrom] Present only when reconstructed: the inputs carried into the probe, such as config keys or flags. Empty means every value is the runtime's default.
  * @property {Readonly<Record<string, string>>} axes Each configuration value the runtime reported, under the runtime-owned axis name the adapter uses (`model`, `reasoning`, a fused `selector`, ...). Opaque, and present only when reported; the map itself is always present.
  * @property {string} [provider] Opaque, and only when the runtime reported one. Never derived from the model.
  * @property {ReadonlyArray<{model: string, canonicalModel?: string, provider?: string, contextWindow?: number, maxOutputTokens?: number, thinkingTokens?: number}>} usage Per-model usage, empty when no turn ran.
@@ -207,7 +216,17 @@ export function makeObservedConfiguration(input) {
   if (!isRuntimeId(fields.runtimeId)) throw new TypeError(`ObservedEffectiveConfiguration.runtimeId must be one of ${RUNTIME_IDS.join(", ")}`);
   if (typeof fields.turnExecuted !== "boolean") throw new TypeError("ObservedEffectiveConfiguration.turnExecuted must be a boolean");
   /** @type {Record<string, unknown>} */
-  const out = { runtimeId: fields.runtimeId, turnExecuted: fields.turnExecuted, axes: observedAxes(fields.axes) };
+  if (!CONFIGURATION_BASES.includes(/** @type {any} */ (fields.configurationBasis))) {
+    throw new TypeError(`ObservedEffectiveConfiguration.configurationBasis must be one of ${CONFIGURATION_BASES.join(", ")}`);
+  }
+  const out = { runtimeId: fields.runtimeId, turnExecuted: fields.turnExecuted, configurationBasis: fields.configurationBasis, axes: observedAxes(fields.axes) };
+  if (fields.configurationBasis === "reconstructed") {
+    // A reconstruction must say what it carried in, or a default would read as the user's own setting.
+    if (!Array.isArray(fields.reconstructedFrom)) throw new TypeError("ObservedEffectiveConfiguration.reconstructedFrom must list the inputs a reconstructed configuration carried in");
+    out.reconstructedFrom = Object.freeze(fields.reconstructedFrom.map((v) => identifier("ObservedEffectiveConfiguration.reconstructedFrom entry", v)));
+  } else if (fields.reconstructedFrom !== undefined) {
+    throw new TypeError("ObservedEffectiveConfiguration.reconstructedFrom is only meaningful for a reconstructed configuration");
+  }
   copyOptional(out, fields, "ObservedEffectiveConfiguration", { provider: identifier });
   if (fields.usage !== undefined && !Array.isArray(fields.usage)) throw new TypeError("ObservedEffectiveConfiguration.usage must be an array");
   out.usage = Object.freeze((/** @type {unknown[]} */ (fields.usage) ?? []).map(usageEntry));

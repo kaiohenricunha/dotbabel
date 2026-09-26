@@ -141,6 +141,9 @@ describe("codex source adapter", () => {
     expect(observed).toMatchObject({ runtimeId: "codex", turnExecuted: false, axes: { model: "gpt-6-astra", reasoning: "xhigh" }, provider: "openai" });
     expect(observed.axes.model).not.toBe(observed.provider);
     expect(observed.fieldSources).toEqual({ "axes.model": "exec-banner:model", "axes.reasoning": "exec-banner:reasoning effort", provider: "exec-banner:provider" });
+    // No user config was carried in, so every value is the runtime's own default, and that is stated.
+    expect(observed.configurationBasis).toBe("reconstructed");
+    expect(observed.reconstructedFrom).toEqual([]);
     // Nothing that identifies the scratch run leaks into the evidence.
     expect(JSON.stringify(observed)).not.toMatch(/scratch|session|workdir|00000000/);
     expect(result.provenance.sourceVersion).toBe("0.155.1");
@@ -227,7 +230,11 @@ describe("codex source adapter", () => {
         return outcome({ stderr: banner(), stoppedEarly: true });
       }),
     );
-    await codex.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin", CODEX_HOME: realRoot, OPENAI_API_KEY: "sk-proj-abcdefghijklmnop" }, homeDir: home, now: fixedNow });
+    const result = await codex.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin", CODEX_HOME: realRoot, OPENAI_API_KEY: "sk-proj-abcdefghijklmnop" }, homeDir: home, now: fixedNow });
+    // The banner reflects a scratch config that carries exactly these keys, and the evidence says so,
+    // so a caller never reads a reconstruction as the user's full configuration (ARCH-28).
+    expect(result.evidence.configurationBasis).toBe("reconstructed");
+    expect(result.evidence.reconstructedFrom).toEqual(["model", "model_provider", "model_reasoning_effort"]);
 
     // Only the four model keys, read from the top of the file. The plugin and project sections, and
     // a `model` key inside a table, are private and irrelevant, and are not carried.

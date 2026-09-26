@@ -36,7 +36,7 @@ describe("shared evidence helpers", () => {
   });
 
   it("requires a recorded source for the provider and every axis, and keys each source by the field it describes", () => {
-    const base = { runtimeId: "codex", turnExecuted: false, axes: { model: "m" }, fieldSources: { "axes.model": "a" } };
+    const base = { runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes: { model: "m" }, fieldSources: { "axes.model": "a" } };
     expect(() => makeObservedConfiguration({ ...base, provider: "openai" })).toThrow(/fieldSources\["provider"\]/);
     expect(() => makeObservedConfiguration({ ...base, axes: { model: "m", reasoning: "high" } })).toThrow(/fieldSources\["axes.reasoning"\]/);
     const full = makeObservedConfiguration({ ...base, axes: { model: "m", reasoning: "high" }, provider: "openai", fieldSources: { "axes.model": "a", "axes.reasoning": "c", provider: "b" } });

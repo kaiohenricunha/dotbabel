@@ -14,7 +14,7 @@ describe("observed effective configuration", () => {
   it("keeps each configuration axis under its runtime-owned name, and the provider as a separate, individually sourced field", () => {
     const observed = makeObservedConfiguration({
       runtimeId: "codex",
-      turnExecuted: false,
+      turnExecuted: false, configurationBasis: "as-run",
       axes: { model: "gpt-6-astra", reasoning: "xhigh" },
       provider: "openai",
       fieldSources: { "axes.model": "exec-banner:model", "axes.reasoning": "exec-banner:reasoning effort", provider: "exec-banner:provider" },
@@ -32,7 +32,7 @@ describe("observed effective configuration", () => {
     // selector stays one opaque axis instead of being forced into model and reasoning (ARCH-1, ARCH-17).
     const observed = makeObservedConfiguration({
       runtimeId: "antigravity",
-      turnExecuted: false,
+      turnExecuted: false, configurationBasis: "as-run",
       axes: { selector: "gemini-3.8-flash-high" },
       fieldSources: { "axes.selector": "settings:selector" },
     });
@@ -41,18 +41,18 @@ describe("observed effective configuration", () => {
   });
 
   it("does not invent a field the runtime did not report", () => {
-    const observed = makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, axes: { model: "claude-opus-5" }, fieldSources: { "axes.model": "system/init.model" } });
+    const observed = makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, configurationBasis: "as-run", axes: { model: "claude-opus-5" }, fieldSources: { "axes.model": "system/init.model" } });
     // Effort is absent because Claude reports none (DOC-2, constraint 19), and absence stays
     // distinguishable from an observed value.
     expect(Object.hasOwn(observed.axes, "reasoning")).toBe(false);
     expect(Object.hasOwn(observed, "provider")).toBe(false);
     expect(observed.usage).toEqual([]);
     // With nothing reported, the axis map is present and empty rather than absent.
-    expect(makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, fieldSources: {} }).axes).toEqual({});
+    expect(makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, configurationBasis: "as-run", fieldSources: {} }).axes).toEqual({});
   });
 
   it("rejects an unknown runtime, a missing turn flag, an unknown field and a reported value with no source", () => {
-    const ok = { runtimeId: "claude", turnExecuted: false, axes: { model: "m" }, fieldSources: { "axes.model": "s" } };
+    const ok = { runtimeId: "claude", turnExecuted: false, configurationBasis: "as-run", axes: { model: "m" }, fieldSources: { "axes.model": "s" } };
     expect(() => makeObservedConfiguration({ ...ok, runtimeId: "clade" })).toThrow(/runtimeId/);
     expect(() => makeObservedConfiguration({ ...ok, turnExecuted: "no" })).toThrow(/turnExecuted/);
     expect(() => makeObservedConfiguration({ ...ok, accountId: "user@example.com" })).toThrow(/unknown field.*accountId/);
@@ -66,25 +66,51 @@ describe("observed effective configuration", () => {
   });
 
   it("rejects an axis name that is not a plain identifier and an axis value that is not a short printable string", () => {
-    const sourced = (axes) => ({ runtimeId: "codex", turnExecuted: false, axes, fieldSources: Object.fromEntries(Object.keys(axes).map((k) => [`axes.${k}`, "s"])) });
+    const sourced = (axes) => ({ runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes, fieldSources: Object.fromEntries(Object.keys(axes).map((k) => [`axes.${k}`, "s"])) });
     for (const name of ["__proto__", "Model Name", "", "1model", "a.b", "x".repeat(65)]) {
       expect(() => makeObservedConfiguration(sourced({ [name]: "v" })), JSON.stringify(name)).toThrow(/axis name/);
     }
     for (const value of ["", "x".repeat(201), `tab${String.fromCharCode(9)}bed`, 7, null]) {
       expect(() => makeObservedConfiguration(sourced({ model: value })), String(value).slice(0, 10)).toThrow(/axes.model/);
     }
-    expect(() => makeObservedConfiguration({ runtimeId: "codex", turnExecuted: false, axes: ["model"], fieldSources: {} })).toThrow(/axes must be an object/);
+    expect(() => makeObservedConfiguration({ runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes: ["model"], fieldSources: {} })).toThrow(/axes must be an object/);
+  });
+
+  it("says whether a configuration came from a real run or was reconstructed in a probe, and what the probe carried in", () => {
+    const base = { runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes: { model: "m" }, fieldSources: { "axes.model": "exec-banner:model" } };
+    // A probe runs in a scratch home, so its answer reflects only what was carried into it plus the
+    // runtime's defaults. Recording that makes a reconstructed default distinguishable from the user's
+    // real configuration, which catalog/ must know before it ranks the evidence (ARCH-28).
+    const seeded = makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: ["model", "model_reasoning_effort"] });
+    expect(seeded.configurationBasis).toBe("reconstructed");
+    expect(seeded.reconstructedFrom).toEqual(["model", "model_reasoning_effort"]);
+    expect(Object.isFrozen(seeded.reconstructedFrom)).toBe(true);
+    // Nothing carried in means the values are the runtime's own defaults, and that is stated, not implied.
+    expect(makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: [] }).reconstructedFrom).toEqual([]);
+    const asRun = makeObservedConfiguration({ ...base, configurationBasis: "as-run" });
+    expect(asRun.configurationBasis).toBe("as-run");
+    expect(Object.hasOwn(asRun, "reconstructedFrom")).toBe(false);
+  });
+
+  it("rejects a missing or unknown basis, and a carried-input list that contradicts the basis", () => {
+    const base = { runtimeId: "codex", turnExecuted: false, fieldSources: {} };
+    expect(() => makeObservedConfiguration(base)).toThrow(/configurationBasis/);
+    expect(() => makeObservedConfiguration({ ...base, configurationBasis: "guessed" })).toThrow(/configurationBasis/);
+    expect(() => makeObservedConfiguration({ ...base, configurationBasis: "reconstructed" })).toThrow(/reconstructedFrom/);
+    expect(() => makeObservedConfiguration({ ...base, configurationBasis: "as-run", reconstructedFrom: [] })).toThrow(/reconstructedFrom/);
+    expect(() => makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: "model" })).toThrow(/reconstructedFrom/);
+    expect(() => makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: [""] })).toThrow(/reconstructedFrom/);
   });
 
   it("rejects a source for a field that was not reported, so provenance cannot describe nothing", () => {
-    expect(() => makeObservedConfiguration({ runtimeId: "codex", turnExecuted: false, axes: {}, fieldSources: { "axes.model": "s" } })).toThrow(/fieldSources\["axes.model"\].*not reported/);
-    expect(() => makeObservedConfiguration({ runtimeId: "codex", turnExecuted: false, axes: {}, fieldSources: { effort: "s" } })).toThrow(/fieldSources\["effort"\]/);
+    expect(() => makeObservedConfiguration({ runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes: {}, fieldSources: { "axes.model": "s" } })).toThrow(/fieldSources\["axes.model"\].*not reported/);
+    expect(() => makeObservedConfiguration({ runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes: {}, fieldSources: { effort: "s" } })).toThrow(/fieldSources\["effort"\]/);
   });
 
   it("validates each usage entry and keeps optional numbers optional", () => {
     const observed = makeObservedConfiguration({
       runtimeId: "claude",
-      turnExecuted: true,
+      turnExecuted: true, configurationBasis: "as-run",
       axes: { model: "claude-opus-5[1m]" },
       fieldSources: { "axes.model": "system/init.model" },
       usage: [{ model: "claude-opus-5[1m]", thinkingTokens: 130 }, { model: "claude-haiku-4-5-20251001", canonicalModel: "claude-haiku-4-5-20251001", provider: "anthropic", contextWindow: 200000, maxOutputTokens: 64000, thinkingTokens: 0 }],
@@ -93,13 +119,13 @@ describe("observed effective configuration", () => {
     expect(Object.hasOwn(observed.usage[0], "contextWindow")).toBe(false);
     expect(observed.usage[1].provider).toBe("anthropic");
     for (const bad of [{ model: "" }, { model: "m", contextWindow: -1 }, { model: "m", thinkingTokens: Number.NaN }, { model: "m", contextWindow: "big" }, { model: "m", extra: 1 }, null]) {
-      expect(() => makeObservedConfiguration({ runtimeId: "claude", turnExecuted: true, fieldSources: {}, usage: [bad] }), JSON.stringify(bad)).toThrow();
+      expect(() => makeObservedConfiguration({ runtimeId: "claude", turnExecuted: true, configurationBasis: "as-run", fieldSources: {}, usage: [bad] }), JSON.stringify(bad)).toThrow();
     }
   });
 
   it("carries the runtime version when given and rejects text that is not a version", () => {
-    expect(makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, runtimeVersion: "2.1.278", fieldSources: {} }).runtimeVersion).toBe("2.1.278");
-    expect(() => makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, runtimeVersion: "2.1.278 user@example.com", fieldSources: {} })).toThrow(/runtimeVersion/);
+    expect(makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, configurationBasis: "as-run", runtimeVersion: "2.1.278", fieldSources: {} }).runtimeVersion).toBe("2.1.278");
+    expect(() => makeObservedConfiguration({ runtimeId: "claude", turnExecuted: false, configurationBasis: "as-run", runtimeVersion: "2.1.278 user@example.com", fieldSources: {} })).toThrow(/runtimeVersion/);
   });
 });
 

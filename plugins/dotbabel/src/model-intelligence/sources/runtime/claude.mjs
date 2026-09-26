@@ -168,10 +168,12 @@ function initComplete({ stdout }) {
  * Turn a parsed stream into a result, classifying what cannot be used as `unknown`.
  * @param {ReturnType<typeof parseStreamJson>} parsed
  * @param {import("./process.mjs").RuntimeContext} ctx
- * @param {string} [detail] Runtime text to include in a diagnostic, already a single line.
+ * @param {object} how
+ * @param {{configurationBasis: "as-run"} | {configurationBasis: "reconstructed", reconstructedFrom: string[]}} how.basis Whether the stream is from a real run or from this adapter's probe.
+ * @param {string} [how.detail] Runtime text to include in a diagnostic, already a single line.
  * @returns {object}
  */
-function classifyStream(parsed, ctx, detail) {
+function classifyStream(parsed, ctx, { basis, detail }) {
   const provenance = baseProvenance();
   const unknown = (code, message) => makeAdapterResult({ status: "unknown", provenance, observedAt: ctx.now(), diagnostic: { code, message } });
   if (parsed.empty) return unknown("empty_output", "the runtime produced no output, so the resolved model cannot be determined");
@@ -183,6 +185,7 @@ function classifyStream(parsed, ctx, detail) {
   const observed = makeObservedConfiguration({
     runtimeId: RUNTIME_ID,
     turnExecuted,
+    ...basis,
     axes: { model: parsed.init.model },
     fieldSources: { "axes.model": "system/init.model" },
     usage: parsed.result?.usage ?? [],
@@ -241,13 +244,18 @@ export async function observe(context = {}) {
         diagnostic: { code: "malformed_output", message: `the supplied stream exceeded the ${MAX_OUTPUT_BYTES}-byte limit` },
       });
     }
-    return classifyStream(parseStreamJson(options.stream), ctx);
+    return classifyStream(parseStreamJson(options.stream), ctx, { basis: { configurationBasis: "as-run" } });
   }
 
   const args = ["-p", PROBE_PROMPT];
-  if (options.model !== undefined) args.push("--model", assertOpaqueValue("model", options.model));
-  if (options.effort !== undefined) args.push("--effort", assertOpaqueValue("effort", options.effort));
-  args.push("--output-format", "stream-json", "--verbose", "--no-session-persistence");
+  /** @type {string[]} */
+  const carried = [];
+  if (options.model !== undefined) carried.push("--model", assertOpaqueValue("model", options.model));
+  if (options.effort !== undefined) carried.push("--effort", assertOpaqueValue("effort", options.effort));
+  args.push(...carried, "--output-format", "stream-json", "--verbose", "--no-session-persistence");
+  // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so its answer reflects only
+  // the flags carried in plus Claude's defaults. The evidence names those flags (ARCH-28).
+  const basis = { configurationBasis: /** @type {const} */ ("reconstructed"), reconstructedFrom: carried.filter((arg) => arg.startsWith("--")) };
 
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-claude", command: "claude", args, ...ROOT, stopWhen: initComplete, provenance: baseProvenance() }));
   if (ran.status !== "ok") return ran;
@@ -255,7 +263,7 @@ export async function observe(context = {}) {
   if (outcome.truncated) {
     return makeAdapterResult({ status: "unknown", provenance: baseProvenance(), observedAt: ctx.now(), diagnostic: { code: "malformed_output", message: "the output exceeded the size limit before system/init arrived" } });
   }
-  return classifyStream(parseStreamJson(outcome.stdout), ctx, firstLine(outcome.stderr || outcome.stdout));
+  return classifyStream(parseStreamJson(outcome.stdout), ctx, { basis, detail: firstLine(outcome.stderr || outcome.stdout) });
 }
 
 /** Text Claude prints when its own catalog does not describe a model. */

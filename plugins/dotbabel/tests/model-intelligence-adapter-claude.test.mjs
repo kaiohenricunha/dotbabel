@@ -68,6 +68,9 @@ describe("claude source adapter", () => {
     // The model is opaque, including the context variant in brackets (ARCH-17).
     expect(observed).toMatchObject({ runtimeId: "claude", turnExecuted: true, axes: { model: "claude-opus-5[1m]" } });
     expect(observed.fieldSources["axes.model"]).toBe("system/init.model");
+    // A stream from a run the caller made is the configuration as it ran, not a reconstruction.
+    expect(observed.configurationBasis).toBe("as-run");
+    expect(Object.hasOwn(observed, "reconstructedFrom")).toBe(false);
     expect(observed.usage).toHaveLength(2);
     const [haiku, opus] = observed.usage;
     expect(haiku).toMatchObject({ model: "claude-haiku-4-5-20251001", canonicalModel: "claude-haiku-4-5-20251001", provider: "anthropic", contextWindow: 200000, maxOutputTokens: 64000, thinkingTokens: 0 });
@@ -126,6 +129,10 @@ describe("claude source adapter", () => {
     const result = await claude.observe({ ...ctx, model: "opus", effort: "high" });
     expect(result.status).toBe("ok");
     expect(result.evidence.axes.model).toBe("claude-opus-5");
+    // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so the answer reflects only
+    // the flags carried in plus Claude's defaults, and the evidence names those flags.
+    expect(result.evidence.configurationBasis).toBe("reconstructed");
+    expect(result.evidence.reconstructedFrom).toEqual(["--model", "--effort"]);
     // Provenance carries the version the runtime itself reported.
     expect(result.provenance.sourceVersion).toBe("2.1.278");
 
