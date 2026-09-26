@@ -1,6 +1,6 @@
 # Fleet: file claims, CPU lanes, and merge events across Claude Code sessions
 
-_Last updated: v3.4.0_
+_Last updated: v4.0.0_
 
 When several Claude Code sessions work on one machine, they get in each
 other's way in three places:
