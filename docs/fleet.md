@@ -1,4 +1,4 @@
-# Fleet: file claims, CPU lanes, and merge events across Claude Code sessions
+# Fleet: file claims, CPU lanes, merge events, and the merge token across Claude Code sessions
 
 _Last updated: v3.4.0_
 
@@ -17,7 +17,8 @@ other's way in three places:
 - **Merges.** One session merges a pull request, and the others keep working
   on a base that moved. The [event feed](#event-feed) records each merge and
   tells every session that claims files in that repository, with the files it
-  must rebase over.
+  must rebase over. The [merge token](#merge-token) lets only one session at a
+  time rebase, attest, and merge in a repository.
 
 ## How it works
 
@@ -140,18 +141,20 @@ In `.dotbabel.json`:
 
 | Key                      | Default | Effect                                              |
 | ------------------------ | ------- | --------------------------------------------------- |
-| `mode`                   | on      | `"off"` turns both hooks off for the repository     |
-| `shared`                 | `[]`    | Extra globs that are never claimed or denied        |
+| `mode`                   | on      | `"off"` turns the hooks off for the repository      |
+| `shared`                 | `[]`    | Extra globs that are never claimed                  |
 | `escalate_after_minutes` | `15`    | Minutes of blocks before `ask`; `0` means never ask |
+| `token_idle_minutes`     | `60`    | Minutes before an unused merge token is free        |
 
 Environment variables take precedence:
 
-| Variable                          | Effect                                                    |
-| --------------------------------- | --------------------------------------------------------- |
-| `DOTBABEL_FLEET_MODE=off`         | Turns the hooks off for every repository                  |
-| `DOTBABEL_FLEET_ESCALATE_MINUTES` | Overrides `escalate_after_minutes`                        |
-| `DOTBABEL_FLEET_STATE_DIR`        | Ledger root (default `$XDG_STATE_HOME/dotbabel/fleet`)    |
-| `CLAUDE_CONFIG_DIR`               | Where Claude Code keeps `sessions/` (default `~/.claude`) |
+| Variable                            | Effect                                                    |
+| ----------------------------------- | --------------------------------------------------------- |
+| `DOTBABEL_FLEET_MODE=off`           | Turns the hooks off for every repository                  |
+| `DOTBABEL_FLEET_ESCALATE_MINUTES`   | Overrides `escalate_after_minutes`                        |
+| `DOTBABEL_FLEET_TOKEN_IDLE_MINUTES` | Overrides `token_idle_minutes`                            |
+| `DOTBABEL_FLEET_STATE_DIR`          | Ledger root (default `$XDG_STATE_HOME/dotbabel/fleet`)    |
+| `CLAUDE_CONFIG_DIR`                 | Where Claude Code keeps `sessions/` (default `~/.claude`) |
 
 ## Limits of the claims
 
@@ -356,3 +359,78 @@ running `event` after the hook recorded the same merge does nothing.
   you send it the next prompt.
 - **`gh` must be signed in** in the merging session, because the event comes
   from `gh pr view`.
+
+## Merge token
+
+Two pull requests can each pass their checks against the same old base, and
+then conflict or break the base once both merge. The merge token prevents
+this: in each repository, only one session at a time rebases onto the base,
+attests, and merges.
+
+A session takes the token of a governed repository when it runs one of these
+commands in a Bash call:
+
+- a rebase onto a base branch: `git rebase origin/main`, `git rebase --onto
+origin/main ...`, or `git pull --rebase origin main`. The base branches are
+  `main`, `master`, and the branch that `origin/HEAD` names.
+- `dotbabel local-attest`, also through `npx` or `node .../dotbabel.mjs`
+- `gh pr merge`. With `--repo`, the token of that repository counts, also
+  from a directory outside its checkout.
+
+While another live session holds the token, such a command gets a
+`PreToolUse` `deny`. The reason names the holder to `SendMessage`, and says
+when the token frees itself. A shared file (a lockfile, `CHANGELOG.md`, or a
+`shared` glob) is never claimed, and an edit of one is denied while another
+session holds the token.
+
+The token is free again when:
+
+- the holder's `gh pr merge` is recorded (see the [event feed](#event-feed)),
+- the holder's process exits,
+- the holder runs no token command for 60 minutes (`token_idle_minutes`); the
+  end of a holder's `local-attest` counts as use, or
+- the holder runs `dotbabel fleet token release`.
+
+### Set up the merge token
+
+Add this block to the `PreToolUse` list in `~/.claude/settings.json`, then
+restart each Claude Code session:
+
+```json
+{
+  "matcher": "Bash",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "$HOME/.claude/hooks/fleet-guard.sh pre-bash",
+      "timeout": 10
+    }
+  ]
+}
+```
+
+`fleet-guard.sh` starts Node only for a command that contains `rebase`,
+`local-attest`, or `gh pr merge`. The event feed hooks must also be set up,
+so that a recorded merge frees the token.
+
+### Token commands
+
+| Command                         | Purpose                                                  |
+| ------------------------------- | -------------------------------------------------------- |
+| `dotbabel fleet token [--json]` | Show who holds the token of this repository              |
+| `dotbabel fleet token take`     | Take the token before a manual rebase, attest, and merge |
+| `dotbabel fleet token release`  | Give the token back                                      |
+
+`take` exits 1 and names the holder when a live peer holds the token.
+`release` exits 1 when this session holds no token. `board` also shows the
+holder.
+
+### Limits of the merge token
+
+- **Only the command text is read.** A script that rebases or merges, a merge
+  in the GitHub web interface, and a rebase that names no base branch take no
+  token.
+- **The token does not wait.** A blocked session tries again later; nothing
+  queues it.
+- **An idle hour frees the token** even when its holder still means to merge.
+  The next token command takes it again if it is free.

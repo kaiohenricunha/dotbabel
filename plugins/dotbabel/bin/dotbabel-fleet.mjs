@@ -15,6 +15,11 @@
  * (confirmed through `gh pr view`), and every other session that claims
  * files in that repo reads it on its next tool call or prompt.
  *
+ * Merge token: one session at a time per repo rebases onto the base, attests,
+ * and merges. The pre-bash hook takes the repo's token for such a command and
+ * denies it while another live session holds the token; a recorded merge, the
+ * holder's exit, or an idle hour frees it.
+ *
  * CPU lanes: `lane` runs a command through scripts/fleet-lane.sh, which waits
  * for a free lane of CPUs and pins the command to it, and `lanes` shows who
  * holds each lane. hooks/fleet-shell-prefix.sh (the CLAUDE_CODE_SHELL_PREFIX
@@ -27,21 +32,24 @@
  *   dotbabel fleet claim   <pattern>... [--note <text>] [--json]
  *   dotbabel fleet release <pattern>... | --all
  *   dotbabel fleet prune
- *   dotbabel fleet hook    pre-edit | session-start | post-tool | prompt   (hook JSON on stdin)
+ *   dotbabel fleet hook    pre-edit | pre-bash | session-start | post-tool | prompt   (hook JSON on stdin)
  *   dotbabel fleet lane    [--name <label>] -- <command> [args...]
  *   dotbabel fleet lanes   [--json]
  *   dotbabel fleet events  [--all] [--json]
  *   dotbabel fleet event   --pr <N> [--repo <owner/name>]
+ *   dotbabel fleet token   [status | take | release] [--json]
  *
  * Environment:
  *   DOTBABEL_FLEET_MODE=off               turn the hooks off
  *   DOTBABEL_FLEET_ESCALATE_MINUTES=<n>   ask the user after n minutes of blocks (default 15, 0 = never)
+ *   DOTBABEL_FLEET_TOKEN_IDLE_MINUTES=<n> free an unused merge token after n minutes (default 60)
  *   DOTBABEL_FLEET_STATE_DIR=<dir>        ledger root (default $XDG_STATE_HOME/dotbabel/fleet)
  *   CLAUDE_CONFIG_DIR                     where Claude Code keeps sessions/ (default ~/.claude)
  *
  * Exits:
  *   0   ok. `hook` always exits 0: it fails open, so a broken ledger never blocks an edit
- *   1   `claim` refused: a live peer holds an overlapping claim
+ *   1   `claim` refused: a live peer holds an overlapping claim; `token take` refused:
+ *       a live peer holds the token; `token release`: this session holds no token
  *   N   `lane`: the command's own exit status
  *   2   environment error: not in a git repo, or not inside a Claude Code session
  *   64  bad CLI invocation
@@ -85,11 +93,24 @@ import {
   releaseClaims,
 } from "../src/fleet/policy.mjs";
 import { findSelf, isOwnerAlive, ownerFromEntry, readRegistry, sessionsDir } from "../src/fleet/registry.mjs";
+import {
+  DEFAULT_TOKEN_IDLE_MS,
+  findTokenCommand,
+  formatTokenDeny,
+  formatTokenStatus,
+  readToken,
+  releaseToken,
+  takeToken,
+  tokenHolder,
+  touchToken,
+} from "../src/fleet/token.mjs";
 
 const TOOL = "dotbabel-fleet";
 const SELF_PATH = fileURLToPath(import.meta.url);
 const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
-const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event"]);
+const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token"]);
+const TOKEN_ACTIONS = new Set(["status", "take", "release"]);
+const TOKEN_ACTION_TEXT = { rebase: "rebase onto the base", attest: "local-attest", merge: "gh pr merge" };
 const PR_FIELDS = "number,title,state,mergeCommit,baseRefName,headRefName,files,url";
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
 const DEFAULT_ESCALATE_MINUTES = 15;
@@ -100,16 +121,17 @@ const USAGE = `Usage:
   dotbabel fleet release <pattern>... | --all           release this session's claims
   dotbabel fleet prune                                  remove claims of exited sessions
   dotbabel fleet hook    <event>                        Claude Code hook entry (JSON on stdin):
-                                                        pre-edit, session-start, post-tool, prompt
+                                                        pre-edit, pre-bash, session-start, post-tool, prompt
   dotbabel fleet lane    [--name <label>] -- <cmd>...   run a command in a free CPU lane
   dotbabel fleet lanes   [--json]                       show the CPU lanes and who holds them
   dotbabel fleet events  [--all] [--json]               show recent merges in this repo (or all repos)
   dotbabel fleet event   --pr <N> [--repo <owner/name>] record a merge made outside Claude Code
+  dotbabel fleet token   [status | take | release]      show, take, or give back this repo's merge token
 
 Patterns are relative to the repo root. A bare path also covers everything
 below it; ** and * are globs.
 
-Exit codes: 0 ok, 1 claim refused, 2 env error, 64 usage error.`;
+Exit codes: 0 ok, 1 claim or token refused, 2 env error, 64 usage error.`;
 
 class UsageError extends Error {}
 class EnvError extends Error {}
@@ -207,6 +229,20 @@ function escalateAfterMs(repo) {
   return (Number.isFinite(minutes) && minutes >= 0 ? minutes : DEFAULT_ESCALATE_MINUTES) * 60_000;
 }
 
+function tokenIdleMs(repo) {
+  const raw = process.env.DOTBABEL_FLEET_TOKEN_IDLE_MINUTES ?? repo?.config?.token_idle_minutes;
+  const minutes = raw === undefined || raw === "" ? NaN : Number(raw);
+  return Number.isFinite(minutes) && minutes >= 0 ? minutes * 60_000 : DEFAULT_TOKEN_IDLE_MS;
+}
+
+/** The base branch names a rebase must name to need the merge token. */
+function baseBranches(repo) {
+  const head = repo ? (git(repo.toplevel, ["symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD"]) ?? "").trim() : "";
+  const bases = new Set(["main", "master"]);
+  if (head.includes("/")) bases.add(head.slice(head.indexOf("/") + 1));
+  return [...bases];
+}
+
 /** How a session should run this CLI: the `dotbabel` on PATH, or this file. */
 function cliCommand() {
   const onPath = (process.env.PATH ?? "")
@@ -283,13 +319,16 @@ function preEdit(input, now) {
 
   const repo = resolveRepo(abs);
   if (!repo?.governed || fleetOff(repo) || !repo.rel) return null;
-  if (isSharedPath(repo.rel, sharedGlobs(repo)) || isIgnored(repo.toplevel, repo.rel)) return null;
+  if (isIgnored(repo.toplevel, repo.rel)) return null;
+  const shared = isSharedPath(repo.rel, sharedGlobs(repo));
 
   const registry = readRegistry(sessionsDir());
   const selfEntry = findSelf({ entries: registry.entries, sessionId: input.session_id, startPid: process.ppid });
   if (!selfEntry) return null;
   const self = ownerFromEntry(selfEntry);
   const dir = repoDir(stateRoot(), repo.key);
+  // A shared file is never claimed; it changes only outside a peer's merge token.
+  if (shared) return tokenDeny(dir, repo, self, `edit of ${repo.rel}`, now);
   const window = escalateAfterMs(repo);
   const denials = readDenials(dir, self.key);
   const judge = (owners) =>
@@ -347,6 +386,54 @@ function preEdit(input, now) {
   };
 }
 
+/** The deny output when a live peer holds the repo's token, or null. */
+function tokenDeny(dir, repo, self, action, now) {
+  const idleMs = tokenIdleMs(repo);
+  const holder = tokenHolder(readToken(dir), { now, idleMs });
+  if (!holder || holder.owner.key === self.key) return null;
+  return denyOutput(formatTokenDeny({ repoKey: repo.key, holder, action, cli: cliCommand(), now, idleMs }));
+}
+
+function denyOutput(reason) {
+  return { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason } };
+}
+
+/**
+ * The repo a token command acts on: `gh pr merge --repo` names it, `git -C`
+ * moves to it, and otherwise it is the session's directory. A --repo outside
+ * any checkout of it counts as governed once the fleet keeps a ledger for it.
+ */
+function tokenRepo(found, cwd) {
+  const here = resolveRepo(found.cwd ? path.resolve(cwd, found.cwd) : cwd);
+  if (!found.repo) return here;
+  const key = normalizeRemote(`https://${found.repo.split("/").length > 2 ? "" : "github.com/"}${found.repo}`);
+  if (!key) return null;
+  if (here?.key === key) return here;
+  const known = fs.existsSync(repoDir(stateRoot(), key));
+  return { key, branch: null, governed: known, config: {} };
+}
+
+/**
+ * PreToolUse on Bash: a rebase onto the base, a local-attest, or a gh pr merge
+ * takes the repo's merge token, and is denied while a live peer holds it.
+ */
+function preBash(input, now) {
+  if (input.tool_name !== "Bash") return null;
+  const cwd = input.cwd || process.cwd();
+  const found = findTokenCommand(input.tool_input?.command, { bases: baseBranches(resolveRepo(cwd)) });
+  if (!found) return null;
+  const repo = tokenRepo(found, cwd);
+  if (!repo?.governed || fleetOff(repo)) return null;
+  const selfEntry = findSelf({ entries: readRegistry(sessionsDir()).entries, sessionId: input.session_id, startPid: process.ppid });
+  if (!selfEntry) return null;
+  const self = ownerFromEntry(selfEntry);
+  const idleMs = tokenIdleMs(repo);
+  const result = takeToken(repoDir(stateRoot(), repo.key), { repoKey: repo.key, owner: self, branch: repo.branch, kind: found.kind, now, idleMs });
+  if (result.taken) return null;
+  const action = TOKEN_ACTION_TEXT[found.kind];
+  return denyOutput(formatTokenDeny({ repoKey: repo.key, holder: result.holder, action, cli: cliCommand(), now, idleMs }));
+}
+
 /** SessionStart: the claims in the session's repo, as plain context text. */
 function sessionStart(input) {
   const repo = resolveRepo(input.cwd || process.cwd());
@@ -369,8 +456,8 @@ function runHook(event) {
     return;
   }
   if (!input || typeof input !== "object" || Array.isArray(input)) return;
-  if (event === "pre-edit") {
-    const out = preEdit(input, Date.now());
+  if (event === "pre-edit" || event === "pre-bash") {
+    const out = (event === "pre-edit" ? preEdit : preBash)(input, Date.now());
     if (out) process.stdout.write(`${JSON.stringify(out)}\n`);
   } else if (event === "session-start") {
     const text = sessionStart(input);
@@ -408,11 +495,14 @@ function cmdBoard(args) {
     prune: registryHealthy(registry),
     selfKey,
   });
+  const now = Date.now();
+  const holder = tokenHolder(readToken(repoDir(stateRoot(), repo.key)), { now, idleMs: tokenIdleMs(repo) });
   if (args.json) {
     const view = owners.map(({ record, ...o }) => ({ ...o, pid: record.owner.pid }));
-    process.stdout.write(`${JSON.stringify({ repo: repo.key, self: selfKey, owners: view, removed }, null, 2)}\n`);
+    process.stdout.write(`${JSON.stringify({ repo: repo.key, self: selfKey, owners: view, removed, token: holder }, null, 2)}\n`);
   } else {
-    process.stdout.write(`${formatBoard({ repoKey: repo.key, owners, removed, now: Date.now() })}\n`);
+    const token = formatTokenStatus({ repoKey: repo.key, holder, now, idleMs: tokenIdleMs(repo) });
+    process.stdout.write(`${formatBoard({ repoKey: repo.key, owners, removed, now })}\n${token}\n`);
   }
   return EXIT_CODES.OK;
 }
@@ -531,6 +621,7 @@ function ghPrView(target, repo, cwd) {
 function recordMergeBy(pr, self) {
   const root = stateRoot();
   const result = recordMerge(root, pr, { by: self });
+  if (self && result.event) releaseToken(repoDir(root, result.event.repo), self.key);
   if (self && result.event?.head) {
     const dir = repoDir(root, result.event.repo);
     const mine = readOwnerRecords(dir).find((r) => r.owner.key === self.key);
@@ -555,6 +646,10 @@ function eventHook(input, event) {
     const merge = parseMergeCommand(input.tool_input?.command);
     const pr = merge ? ghPrView(merge.target, merge.repo, input.cwd || process.cwd()) : null;
     if (pr) recordMergeBy(pr, self);
+    // A holder's rebase or local-attest that just ended used the token.
+    const found = self && !merge ? findTokenCommand(input.tool_input?.command) : null;
+    const repo = found ? tokenRepo(found, input.cwd || process.cwd()) : null;
+    if (repo?.key) touchToken(repoDir(stateRoot(), repo.key), self.key);
   }
   const root = stateRoot();
   // An unidentified session still advances its marker, so the shell fast path stays fast.
@@ -609,6 +704,39 @@ function cmdEvent(args) {
   }
   const what = `#${result.event.pr} (${String(result.event.sha).slice(0, 7)}) in ${result.event.repo}`;
   process.stdout.write(result.recorded ? `Recorded the merge of ${what}.\n` : `Already recorded: ${what}.\n`);
+  return EXIT_CODES.OK;
+}
+
+// --------------------------------------------------------------- token ----
+
+/** `token [status | take | release] [--json]`: this repo's merge token. */
+function cmdToken(args) {
+  const action = args.positional[0] ?? "status";
+  if (!TOKEN_ACTIONS.has(action)) throw new UsageError(`token takes status, take, or release, not "${action}"`);
+  const repo = requireRepo();
+  const dir = repoDir(stateRoot(), repo.key);
+  const now = Date.now();
+  const idleMs = tokenIdleMs(repo);
+  if (action === "status") {
+    const holder = tokenHolder(readToken(dir), { now, idleMs });
+    const out = args.json
+      ? JSON.stringify({ repo: repo.key, holder }, null, 2)
+      : formatTokenStatus({ repoKey: repo.key, holder, now, idleMs });
+    process.stdout.write(`${out}\n`);
+    return EXIT_CODES.OK;
+  }
+  const self = requireSelf(readRegistry(sessionsDir()));
+  if (action === "release") {
+    const released = releaseToken(dir, self.key);
+    process.stdout.write(released ? `Released the merge token for ${repo.key}.\n` : `This session holds no merge token for ${repo.key}.\n`);
+    return released ? EXIT_CODES.OK : EXIT_CODES.VALIDATION;
+  }
+  const result = takeToken(dir, { repoKey: repo.key, owner: self, branch: repo.branch, kind: "manual", now, idleMs });
+  if (!result.taken) {
+    process.stderr.write(`${formatTokenDeny({ repoKey: repo.key, holder: result.holder, action: "token take", cli: cliCommand(), now, idleMs })}\n`);
+    return EXIT_CODES.VALIDATION;
+  }
+  process.stdout.write(`This session holds the merge token for ${repo.key}.\n`);
   return EXIT_CODES.OK;
 }
 
@@ -738,6 +866,7 @@ function main(argv) {
     if (sub === "lanes") return cmdLanes(subArgs);
     if (sub === "events") return cmdEvents(subArgs);
     if (sub === "event") return cmdEvent(subArgs);
+    if (sub === "token") return cmdToken(subArgs);
     return cmdPrune();
   } catch (err) {
     if (err instanceof UsageError) {
