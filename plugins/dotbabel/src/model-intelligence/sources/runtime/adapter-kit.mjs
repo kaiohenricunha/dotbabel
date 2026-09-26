@@ -58,6 +58,18 @@ export function unknownResult(ctx, provenance, code, message) {
 }
 
 /**
+ * The `unknown` result for a caller-supplied value that failed `checkOpaqueValue`. The message names
+ * the axis and never echoes the value (OPS-4).
+ * @param {{now: () => string}} ctx
+ * @param {object} provenance
+ * @param {string} axis
+ * @returns {object}
+ */
+export function invalidAxisValue(ctx, provenance, axis) {
+  return unknownResult(ctx, provenance, "invalid_axis_value", `the ${axis} value is not safe to pass to the runtime: it is empty, longer than 200 characters, holds a control character, or starts with a dash`);
+}
+
+/**
  * Render a resolved configuration as structured arguments for one runtime (ARCH-47).
  *
  * `axisArgs` maps each axis the runtime can express to the arguments that express it. Every other axis

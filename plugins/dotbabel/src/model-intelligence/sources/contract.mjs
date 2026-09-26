@@ -458,8 +458,13 @@ export function assertDescriptor(descriptor) {
  * frontmatter. A value that fails validation is `unknown` with code `invalid_axis_value`,
  * with provenance intact. An operation THROWS only for a caller-contract breach (a missing
  * or wrongly typed input, such as a model that is not a string) and for a safety fault
- * such as the SEC-1 root check, which must never be absorbed. `renderInvocation` is
- * synchronous and returns a plain Invocation, so it throws on any invalid value.
+ * such as the SEC-1 root check, which must never be absorbed.
+ *
+ * One exception, split by operation rather than by source: `renderInvocation` is
+ * synchronous and returns a plain Invocation, so it throws on any invalid value, even one
+ * that came from frontmatter. Its caller is the resolver, which must have validated each
+ * value first, so a bad value there is a caller breach. Spec §5 declares
+ * `renderInvocation(...): InvocationResult`; this divergence is open until §5 is amended.
  * @param {object} input
  * @returns {object} A result frozen at the top level. Its provenance and diagnostic are frozen too, and `evidence` is passed by reference.
  */

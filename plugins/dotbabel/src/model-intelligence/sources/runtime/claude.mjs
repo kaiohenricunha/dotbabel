@@ -33,8 +33,8 @@
 
 import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
 import { makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
-import { MAX_OUTPUT_BYTES, checkOpaqueValue, firstLine, invalidAxisValue, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { invalidAxisValue, renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
+import { MAX_OUTPUT_BYTES, checkOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "claude";
@@ -248,18 +248,19 @@ export async function observe(context = {}) {
 
   const args = ["-p", PROBE_PROMPT];
   /** @type {string[]} */
-  const carried = [];
+  const carriedFlags = [];
   for (const [flag, name] of PROBE_FLAGS) {
     const value = options[name];
     if (value === undefined) continue;
     // A bad value is data, not a caller breach, so it is a result with provenance (contract.mjs).
     if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, baseProvenance(), name);
-    carried.push(flag, value);
+    args.push(flag, value);
+    carriedFlags.push(flag);
   }
-  args.push(...carried, "--output-format", "stream-json", "--verbose", "--no-session-persistence");
+  args.push("--output-format", "stream-json", "--verbose", "--no-session-persistence");
   // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so its answer reflects only
   // the flags carried in plus Claude's defaults. The evidence names those flags (ARCH-28).
-  const basis = { configurationBasis: /** @type {const} */ ("reconstructed"), reconstructedFrom: carried.filter((arg) => arg.startsWith("--")) };
+  const basis = { configurationBasis: /** @type {const} */ ("reconstructed"), reconstructedFrom: carriedFlags };
 
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-claude", command: "claude", args, ...ROOT, stopWhen: initComplete, provenance: baseProvenance() }));
   if (ran.status !== "ok") return ran;

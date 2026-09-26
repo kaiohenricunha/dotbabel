@@ -382,6 +382,39 @@ describe("process helper boundaries", () => {
     expect(seen).toEqual(["one", "two"]);
   });
 
+  it("reports a budget spent exactly, or down to a fraction of a millisecond, as a timeout result rather than a throw", async () => {
+    // A remainder of 0, or 0.5 floored to 0, must stop before runBounded, whose timeout must be a positive integer.
+    let now = 0;
+    const runner = fakeRunner(() => outcome({ stderr: "OpenAI Codex v0.155.1" }));
+    const provenance = { sourceId: "codex", sourceKind: "runtime" };
+    for (const spent of [100, 99.5]) {
+      now = 0;
+      const ctx = resolveContext({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 100, monotonic: () => now }, ROOT);
+      now = spent;
+      const result = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["z"], ...ROOT, provenance });
+      expect(result, String(spent)).toMatchObject({ status: "unavailable", diagnostic: { code: "timeout" } });
+    }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("charges the time prepare takes to the budget, and starts no child when prepare spends the rest", async () => {
+    let now = 0;
+    const runner = fakeRunner(() => outcome({ stderr: "OpenAI Codex v0.155.1" }));
+    const ctx = resolveContext({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 100, monotonic: () => now }, ROOT);
+    const result = await runIsolated(ctx, {
+      prefix: "mi-budget",
+      command: "codex",
+      args: ["late"],
+      ...ROOT,
+      prepare: async () => {
+        now += 100;
+      },
+      provenance: { sourceId: "codex", sourceKind: "runtime" },
+    });
+    expect(result).toMatchObject({ status: "unavailable", diagnostic: { code: "timeout", retryable: true } });
+    expect(runner.calls).toHaveLength(0);
+  });
+
   it("codex validate() with two axes settles within one budget when each child is slow, instead of taking twice as long", async () => {
     // Each child really takes 80 ms and honors its abort signal, as runProcess does. With one budget of
     // 100 ms, the second child gets only the ~20 ms left and is stopped, so the operation reports its

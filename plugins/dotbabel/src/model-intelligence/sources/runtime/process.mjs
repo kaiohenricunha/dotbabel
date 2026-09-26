@@ -301,23 +301,6 @@ export function checkOpaqueValue(name, value) {
 }
 
 /**
- * The `unknown` result for a caller-supplied value that failed `checkOpaqueValue`. The message names
- * the axis and never echoes the value (OPS-4).
- * @param {RuntimeContext} ctx
- * @param {object} provenance
- * @param {string} axis
- * @returns {object}
- */
-export function invalidAxisValue(ctx, provenance, axis) {
-  return makeAdapterResult({
-    status: "unknown",
-    provenance,
-    observedAt: ctx.now(),
-    diagnostic: { code: "invalid_axis_value", message: `the ${axis} value is not safe to pass to the runtime: it is empty, longer than 200 characters, holds a control character, or starts with a dash` },
-  });
-}
-
-/**
  * Extract a version from the text a runtime prints for `--version`. Never echoes the text.
  * @param {unknown} text
  * @returns {string | undefined}
@@ -348,7 +331,7 @@ export function firstLine(text) {
  * @property {number} budgetMs The whole operation's time budget (REL-1), shared by every child it starts.
  * @property {number} startedAt When the operation began, on the `monotonic` clock.
  * @property {() => number} monotonic A clock in milliseconds that never goes backwards. Injectable for tests.
- * @property {string} [tmpDir]
+ * @property {string | undefined} tmpDir Where scratch roots are made. Always present; `undefined` means the OS temp directory.
  * @property {(path: string, encoding: "utf8") => Promise<string>} readFile
  */
 
@@ -381,6 +364,31 @@ export function resolveContext(context, { rootEnvVar, rootDirName }) {
 }
 
 /**
+ * Whole milliseconds left of the operation's budget. Floored, because a child's timeout must be a
+ * positive integer, so a fraction of a millisecond counts as spent.
+ * @param {RuntimeContext} ctx
+ * @returns {number}
+ */
+function remainingMs(ctx) {
+  return Math.floor(ctx.budgetMs - (ctx.monotonic() - ctx.startedAt));
+}
+
+/**
+ * The `unavailable` result for a step that the operation's spent budget stops before it starts.
+ * @param {RuntimeContext} ctx
+ * @param {object} provenance
+ * @returns {object}
+ */
+function budgetSpent(ctx, provenance) {
+  return makeAdapterResult({
+    status: "unavailable",
+    provenance,
+    observedAt: ctx.now(),
+    diagnostic: { code: "timeout", message: `the operation's ${ctx.budgetMs} ms budget was spent before this step started`, retryable: true },
+  });
+}
+
+/**
  * Run one runtime command in a fresh scratch home, under a finite timeout, and return the bounded result.
  *
  * On success the result's evidence is the raw `ProcessOutcome`, for the adapter to classify. On a
@@ -400,16 +408,9 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
   // Checked BEFORE anything is created: a scratch directory inside the real root would make the
   // isolation a fiction, and creating it there would already be a write.
   assertOutsideRoot(ctx.tmpDir ?? tmpdir(), ctx.realRoot);
-  // This child gets only what is left of the operation's budget. Once it is spent, nothing starts.
-  const remainingMs = Math.floor(ctx.budgetMs - (ctx.monotonic() - ctx.startedAt));
-  if (remainingMs <= 0) {
-    return makeAdapterResult({
-      status: "unavailable",
-      provenance,
-      observedAt: ctx.now(),
-      diagnostic: { code: "timeout", message: `the operation's ${ctx.budgetMs} ms budget was spent before this step started`, retryable: true },
-    });
-  }
+  // This child gets only what is left of the operation's budget. Once it is spent, nothing starts:
+  // checked here so a spent budget creates no scratch root, and again after `prepare` below.
+  if (remainingMs(ctx) <= 0) return budgetSpent(ctx, provenance);
   return withScratchRoot(
     prefix,
     async (scratch) => {
@@ -419,6 +420,10 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
       await Promise.all([home, work, runtimeRoot].map((dir) => mkdir(dir, { recursive: true })));
       assertOutsideRoot(scratch, ctx.realRoot);
       if (prepare !== undefined) await prepare({ scratch, home, work, runtimeRoot });
+      // Scratch setup and `prepare` (Codex reads the user's config.toml there) are part of the
+      // operation too, so the child is bounded by what is left after them, not before.
+      const childMs = remainingMs(ctx);
+      if (childMs <= 0) return budgetSpent(ctx, provenance);
       const env = buildIsolatedEnv({ source: ctx.env, home, extra: { [rootEnvVar]: runtimeRoot } });
       /** @type {Promise<unknown> | undefined} */
       let operationSettled;
@@ -427,7 +432,7 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
           operationSettled = ctx.runCommand({ command, args, cwd: work, env, stopWhen }, { signal });
           return operationSettled;
         },
-        { channel: "subprocess", timeoutMs: remainingMs, provenance, now: ctx.now },
+        { channel: "subprocess", timeoutMs: childMs, provenance, now: ctx.now },
       );
       // On a timeout, `runBounded` returns as soon as its race against the timer settles; it does
       // not await the losing operation. That operation is still running -- and may still be writing

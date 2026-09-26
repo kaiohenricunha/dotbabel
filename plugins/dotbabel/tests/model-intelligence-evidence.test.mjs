@@ -70,6 +70,10 @@ describe("observed effective configuration", () => {
     for (const name of ["__proto__", "Model Name", "", "1model", "a.b", "x".repeat(65)]) {
       expect(() => makeObservedConfiguration(sourced({ [name]: "v" })), JSON.stringify(name)).toThrow(/axis name/);
     }
+    // The accepted range is 1 to 64 characters, so both ends are pinned beside the 65-character rejection.
+    for (const name of ["x", "x".repeat(64), "contextTier"]) {
+      expect(makeObservedConfiguration(sourced({ [name]: "v" })).axes[name], name).toBe("v");
+    }
     for (const value of ["", "x".repeat(201), `tab${String.fromCharCode(9)}bed`, 7, null]) {
       expect(() => makeObservedConfiguration(sourced({ model: value })), String(value).slice(0, 10)).toThrow(/axes.model/);
     }

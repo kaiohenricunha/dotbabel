@@ -28,8 +28,8 @@ import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
 import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
 import { makeDiscoveryEvidence, makeModelFact, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
-import { assertOpaqueValue, checkOpaqueValue, firstLine, invalidAxisValue, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { invalidAxisValue, renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
+import { assertOpaqueValue, checkOpaqueValue, firstLine, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "codex";
@@ -360,10 +360,14 @@ export async function validate(input, context) {
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
   // A bad value is data, not a caller breach, so it is a result with provenance (contract.mjs).
+  // Each value is read once, so the value that passed the check is the value that is used.
+  /** @type {Record<string, string>} */
+  const values = {};
   for (const axis of known) {
-    if (!checkOpaqueValue(axis, /** @type {any} */ (input)[axis])) return invalidAxisValue(ctx, provenance, axis);
+    const value = /** @type {any} */ (input)[axis];
+    if (!checkOpaqueValue(axis, value)) return invalidAxisValue(ctx, provenance, axis);
+    values[axis] = value;
   }
-  const values = Object.fromEntries(known.map((axis) => [axis, /** @type {string} */ (/** @type {any} */ (input)[axis])]));
 
   /** @type {object[]} */
   const checks = [];
