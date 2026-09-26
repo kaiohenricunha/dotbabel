@@ -10,11 +10,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
-import { listEventNames, readEvents } from "../src/fleet/events.mjs";
+import { listEventNames, readEvents, readSeen } from "../src/fleet/events.mjs";
 import { readOwnerRecords, repoDir } from "../src/fleet/ledger.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.resolve(__dirname, "../bin/dotbabel-fleet.mjs");
+const GUARD = path.resolve(__dirname, "../hooks/fleet-guard.sh");
 const NODE = process.execPath;
 const REPO_KEY = "github.com/acme/widget";
 const HAS_PROC = fs.existsSync("/proc/self/stat");
@@ -80,7 +81,9 @@ afterAll(() => {
   for (const s of sleepers) s.child.kill("SIGKILL");
 });
 
-function world() {
+// `viaGuard` runs every hook through hooks/fleet-guard.sh, as Claude Code
+// does, so the shell fast path is part of the test.
+function world({ viaGuard = false } = {}) {
   const root = makeTempDir("fleet-events-cli-");
   const repo = path.join(root, "widget");
   const home = path.join(root, "home");
@@ -95,13 +98,16 @@ function world() {
   git(["init", "-q", "-b", "main"]);
   git(["remote", "add", "origin", "git@github.com:acme/widget.git"]);
   fs.writeFileSync(path.join(repo, ".dotbabel.json"), "{}");
-  for (const s of [
-    { pid: process.pid, sessionId: "sess-self", procStart: procStart(process.pid), name: "self-pane" },
-    { pid: peer.pid, sessionId: "sess-peer", procStart: peer.procStart, name: "peer-pane" },
-    { pid: other.pid, sessionId: "sess-other", procStart: other.procStart, name: "other-pane" },
-  ]) {
+  // Every session started a minute ago, so the merges of a test come after it.
+  const startedAt = Date.now() - 60_000;
+  const sessions = [
+    { pid: process.pid, sessionId: "sess-self", procStart: procStart(process.pid), name: "self-pane", startedAt },
+    { pid: peer.pid, sessionId: "sess-peer", procStart: peer.procStart, name: "peer-pane", startedAt },
+    { pid: other.pid, sessionId: "sess-other", procStart: other.procStart, name: "other-pane", startedAt },
+  ];
+  const register = (s) =>
     fs.writeFileSync(path.join(config, "sessions", `${s.pid}.json`), JSON.stringify({ status: "busy", ...s }));
-  }
+  sessions.forEach(register);
   const log = path.join(root, "gh.log");
   const env = cleanEnv({
     HOME: home,
@@ -113,7 +119,8 @@ function world() {
   });
   const w = { root, repo, state, env, log, git };
   w.hook = (event, payload, extraEnv = {}) => {
-    const r = spawnSync(NODE, [BIN, "hook", event], {
+    const [cmd, ...args] = viaGuard ? ["bash", GUARD, event] : [NODE, BIN, "hook", event];
+    const r = spawnSync(cmd, args, {
       input: JSON.stringify({ cwd: repo, ...payload }),
       env: { ...env, ...extraEnv },
       encoding: "utf8",
@@ -129,6 +136,8 @@ function world() {
     w.hook("post-tool", { session_id: sessionId, tool_name: "Read", tool_input: { file_path: path.join(repo, "x") } });
   w.prompt = (sessionId) => w.hook("prompt", { session_id: sessionId, prompt: "go on" });
   w.events = () => readEvents(state, listEventNames(state)).map((e) => e.event);
+  w.seen = (sessionId) => readSeen(state, sessionId);
+  w.startAt = (sessionId, ms) => register(Object.assign(sessions.find((s) => s.sessionId === sessionId), { startedAt: ms }));
   w.claimsOf = (name) =>
     readOwnerRecords(repoDir(state, REPO_KEY))
       .filter((r) => r.owner.name === name)
@@ -141,7 +150,7 @@ describe.skipIf(!HAS_PROC)("event feed: producer and consumers", () => {
   it("records a merge and tells a peer whose claims it touched, once", () => {
     const w = world();
     w.edit("sess-peer", "docs/a.md");
-    expect(w.read("sess-peer")).toBeNull(); // first contact: history is skipped
+    expect(w.read("sess-peer")).toBeNull(); // nothing merged yet
 
     expect(w.bash("sess-self", "gh pr merge 426 --squash --delete-branch")).toBeNull();
     const [event] = w.events();
@@ -187,10 +196,31 @@ describe.skipIf(!HAS_PROC)("event feed: producer and consumers", () => {
     expect(w.read("sess-other")).toBeNull();
   });
 
-  it("skips merges from before a session's first hook call", () => {
+  it("tells a session about a merge made after it started, on its first hook call", () => {
     const w = world();
     w.edit("sess-peer", "docs/a.md");
     w.bash("sess-self", "gh pr merge 426");
+    expect(w.read("sess-peer").additionalContext).toContain("#426");
+    expect(w.read("sess-peer")).toBeNull();
+  });
+
+  it("tells a peer about the first merge ever recorded when the hooks run through fleet-guard.sh", () => {
+    const w = world({ viaGuard: true });
+    w.edit("sess-peer", "docs/a.md");
+    expect(w.read("sess-peer")).toBeNull(); // no event yet, so the shell exits before node
+    expect(w.seen("sess-peer")).toBeNull();
+    w.bash("sess-self", "gh pr merge 426 --squash");
+    const told = w.read("sess-peer");
+    expect(told.additionalContext).toContain("#426");
+    expect(told.additionalContext).toContain("docs/a.md");
+    expect(w.read("sess-peer")).toBeNull();
+  });
+
+  it("skips merges from before a session started", () => {
+    const w = world();
+    w.bash("sess-self", "gh pr merge 426");
+    w.startAt("sess-peer", Number(listEventNames(w.state)[0].slice(0, 15)) + 1);
+    w.edit("sess-peer", "docs/a.md");
     expect(w.read("sess-peer")).toBeNull();
     w.bash("sess-self", "gh pr merge 427", { FAKE_GH_PR_JSON: prJson({ number: 427, mergeCommit: { oid: "a".repeat(40) } }) });
     expect(w.read("sess-peer").additionalContext).toContain("#427");

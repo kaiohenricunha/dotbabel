@@ -287,8 +287,12 @@ A session gets a message only for a repository where it holds claims:
 - Otherwise, one line says that the base moved and that none of the changed
   files are claimed there.
 
-A session does not get merges from before its first hook call. Events are kept
-for 7 days.
+A session does not get merges from before it started. On its first hook call,
+the events recorded before its start time (`startedAt` in its Claude Code
+session registry entry) count as seen, and the later ones are delivered. So a
+merge that a running session lives through reaches it, also when that merge is
+the first event ever recorded. Without a start time, the first hook call counts
+every earlier event as seen. Events are kept for 7 days.
 
 ### Set up the event feed
 
