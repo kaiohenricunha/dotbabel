@@ -303,13 +303,14 @@ export async function observe(context) {
   const observed = makeObservedConfiguration({
     runtimeId: RUNTIME_ID,
     turnExecuted: false,
-    model,
+    // `reasoning` is the axis name this adapter's invocation contract already uses (AXIS_KEYS,
+    // renderInvocation), so an observed effort and a resolved one compare under the same name.
+    axes: { model, ...(effort === undefined ? {} : { reasoning: effort }) },
     ...(provider === undefined ? {} : { provider }),
-    ...(effort === undefined ? {} : { effort }),
     fieldSources: {
-      model: "exec-banner:model",
+      "axes.model": "exec-banner:model",
+      ...(effort === undefined ? {} : { "axes.reasoning": "exec-banner:reasoning effort" }),
       ...(provider === undefined ? {} : { provider: "exec-banner:provider" }),
-      ...(effort === undefined ? {} : { effort: "exec-banner:reasoning effort" }),
     },
     ...(banner.version === undefined ? {} : { runtimeVersion: banner.version }),
   });

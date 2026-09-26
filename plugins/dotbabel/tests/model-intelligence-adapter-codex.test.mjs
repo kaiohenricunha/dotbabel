@@ -138,9 +138,9 @@ describe("codex source adapter", () => {
     const observed = result.evidence;
     // The defect in handoff-extract.sh:276 stored the provider in the model field. Here they are
     // separate fields with separate sources (ARCH-2, ARCH-28).
-    expect(observed).toMatchObject({ runtimeId: "codex", turnExecuted: false, model: "gpt-6-astra", provider: "openai", effort: "xhigh" });
-    expect(observed.model).not.toBe(observed.provider);
-    expect(observed.fieldSources).toEqual({ model: "exec-banner:model", provider: "exec-banner:provider", effort: "exec-banner:reasoning effort" });
+    expect(observed).toMatchObject({ runtimeId: "codex", turnExecuted: false, axes: { model: "gpt-6-astra", reasoning: "xhigh" }, provider: "openai" });
+    expect(observed.axes.model).not.toBe(observed.provider);
+    expect(observed.fieldSources).toEqual({ "axes.model": "exec-banner:model", "axes.reasoning": "exec-banner:reasoning effort", provider: "exec-banner:provider" });
     // Nothing that identifies the scratch run leaks into the evidence.
     expect(JSON.stringify(observed)).not.toMatch(/scratch|session|workdir|00000000/);
     expect(result.provenance.sourceVersion).toBe("0.155.1");

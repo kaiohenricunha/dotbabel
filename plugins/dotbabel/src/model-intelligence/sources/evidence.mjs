@@ -9,10 +9,10 @@
  *
  * Four rules run through every constructor:
  *
- * - **Opaque and separate.** A model id, a provider and an effort are three fields, each an opaque
- *   string taken from a named surface of the runtime. None is parsed for meaning and none is derived
- *   from another (ARCH-2, ARCH-17). Handoff's extractor once stored the provider in the model field;
- *   nothing here can.
+ * - **Opaque and separate.** Each configuration value sits under its own runtime-owned axis name, and
+ *   the provider is a separate field. Every value is an opaque string taken from a named surface of the
+ *   runtime. None is parsed for meaning and none is derived from another (ARCH-1, ARCH-2, ARCH-17).
+ *   Handoff's extractor once stored the provider in the model field; nothing here can.
  * - **Absent is not empty.** An optional field exists only when the runtime reported it, so a caller
  *   can tell "not reported" from "reported as nothing".
  * - **Recognised is not available.** Validation says what a runtime recognises, never what an
@@ -157,22 +157,48 @@ function usageEntry(entry) {
   return Object.freeze(out);
 }
 
-const OBSERVED_FIELDS = Object.freeze(["runtimeId", "turnExecuted", "model", "provider", "effort", "usage", "fieldSources", "runtimeVersion"]);
+const OBSERVED_FIELDS = Object.freeze(["runtimeId", "turnExecuted", "axes", "provider", "usage", "fieldSources", "runtimeVersion"]);
+
+/**
+ * An axis name: a plain identifier. The set of names is open (§5 `Configuration axes`), but each
+ * name is a short word, so it can never be `__proto__`, a path, or free text.
+ */
+const AXIS_NAME_RE = /^[a-z][A-Za-z0-9]{0,63}$/;
 
 /**
  * @typedef {object} ObservedEffectiveConfiguration
  * @property {string} runtimeId A `RUNTIMES` id.
  * @property {boolean} turnExecuted Whether a model turn ran to produce this. Absence of usage means no turn, not zero usage.
- * @property {string} [model] Opaque, exactly as the runtime reported it.
+ * @property {Readonly<Record<string, string>>} axes Each configuration value the runtime reported, under the runtime-owned axis name the adapter uses (`model`, `reasoning`, a fused `selector`, ...). Opaque, and present only when reported; the map itself is always present.
  * @property {string} [provider] Opaque, and only when the runtime reported one. Never derived from the model.
- * @property {string} [effort] Opaque, and only when the runtime reported one. Claude reports none.
  * @property {ReadonlyArray<{model: string, canonicalModel?: string, provider?: string, contextWindow?: number, maxOutputTokens?: number, thinkingTokens?: number}>} usage Per-model usage, empty when no turn ran.
- * @property {Readonly<Record<string, string>>} fieldSources For each reported field, the surface of the runtime that supplied it (ARCH-28).
+ * @property {Readonly<Record<string, string>>} fieldSources For each reported value, keyed `axes.<name>` or `provider`, the surface of the runtime that supplied it (ARCH-28).
  * @property {string} [runtimeVersion]
  */
 
 /**
+ * @param {unknown} axes
+ * @returns {Readonly<Record<string, string>>}
+ */
+function observedAxes(axes) {
+  if (axes === undefined) return Object.freeze({});
+  if (!isPlainObject(axes)) throw new TypeError("ObservedEffectiveConfiguration.axes must be an object");
+  return Object.freeze(
+    Object.fromEntries(
+      Object.entries(/** @type {object} */ (axes)).map(([name, value]) => {
+        if (!AXIS_NAME_RE.test(name)) throw new TypeError(`ObservedEffectiveConfiguration: axis name ${JSON.stringify(name.slice(0, 70))} must be a plain identifier`);
+        return [name, identifier(`ObservedEffectiveConfiguration.axes.${name}`, value)];
+      }),
+    ),
+  );
+}
+
+/**
  * Build the configuration a runtime reports as currently in effect.
+ *
+ * Only the provider is a named field. Every configurable value sits in `axes` under the name the
+ * runtime adapter contract gives it, because §5 makes axis names runtime-owned: a runtime whose
+ * selector fuses model and effort reports one `selector` axis, not a synthetic `model` plus `reasoning`.
  * @param {object} input
  * @returns {Readonly<ObservedEffectiveConfiguration>}
  */
@@ -181,19 +207,24 @@ export function makeObservedConfiguration(input) {
   if (!isRuntimeId(fields.runtimeId)) throw new TypeError(`ObservedEffectiveConfiguration.runtimeId must be one of ${RUNTIME_IDS.join(", ")}`);
   if (typeof fields.turnExecuted !== "boolean") throw new TypeError("ObservedEffectiveConfiguration.turnExecuted must be a boolean");
   /** @type {Record<string, unknown>} */
-  const out = { runtimeId: fields.runtimeId, turnExecuted: fields.turnExecuted };
-  copyOptional(out, fields, "ObservedEffectiveConfiguration", { model: identifier, provider: identifier, effort: identifier });
+  const out = { runtimeId: fields.runtimeId, turnExecuted: fields.turnExecuted, axes: observedAxes(fields.axes) };
+  copyOptional(out, fields, "ObservedEffectiveConfiguration", { provider: identifier });
   if (fields.usage !== undefined && !Array.isArray(fields.usage)) throw new TypeError("ObservedEffectiveConfiguration.usage must be an array");
   out.usage = Object.freeze((/** @type {unknown[]} */ (fields.usage) ?? []).map(usageEntry));
 
-  const sources = knownFields("ObservedEffectiveConfiguration.fieldSources", fields.fieldSources ?? {}, ["model", "provider", "effort"]);
-  for (const field of ["model", "provider", "effort"]) {
-    if (out[field] !== undefined && sources[field] === undefined) {
-      // A value with no recorded source has no provenance, which ARCH-28 requires for every field.
-      throw new TypeError(`ObservedEffectiveConfiguration.fieldSources.${field} is required when ${field} is reported`);
+  // Every reported value needs a source (ARCH-28), and every source must describe a reported value.
+  const reported = [...Object.keys(/** @type {object} */ (out.axes)).map((name) => `axes.${name}`), ...(out.provider === undefined ? [] : ["provider"])];
+  const given = fields.fieldSources ?? {};
+  if (!isPlainObject(given)) throw new TypeError("ObservedEffectiveConfiguration.fieldSources must be an object");
+  for (const key of reported) {
+    if (/** @type {any} */ (given)[key] === undefined) {
+      throw new TypeError(`ObservedEffectiveConfiguration.fieldSources[${JSON.stringify(key)}] is required when ${key} is reported`);
     }
   }
-  out.fieldSources = Object.freeze(Object.fromEntries(Object.entries(sources).map(([k, v]) => [k, identifier(`ObservedEffectiveConfiguration.fieldSources.${k}`, v)])));
+  for (const key of Object.keys(/** @type {object} */ (given))) {
+    if (!reported.includes(key)) throw new TypeError(`ObservedEffectiveConfiguration.fieldSources[${JSON.stringify(key)}] names a field that was not reported`);
+  }
+  out.fieldSources = Object.freeze(Object.fromEntries(reported.map((k) => [k, identifier(`ObservedEffectiveConfiguration.fieldSources[${JSON.stringify(k)}]`, /** @type {any} */ (given)[k])])));
   if (fields.runtimeVersion !== undefined) {
     if (!isVersionString(fields.runtimeVersion)) throw new TypeError("ObservedEffectiveConfiguration.runtimeVersion must be a version string");
     out.runtimeVersion = fields.runtimeVersion;

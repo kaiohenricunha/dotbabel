@@ -57,11 +57,11 @@ runnable(`claude adapter against the installed CLI ${version ?? "(not installed)
   it("reads the resolved model from system/init with no credential and no turn", async () => {
     const result = await claude.observe({ model: "opus" });
     expect(result.status).toBe("ok");
-    expect(result.evidence.model).toEqual(expect.any(String));
+    expect(result.evidence.axes.model).toEqual(expect.any(String));
     expect(result.evidence.turnExecuted).toBe(false);
     expect(result.evidence.usage).toEqual([]);
     // Effort is not observable on Claude Code (DOC-2, constraint 19).
-    expect(Object.hasOwn(result.evidence, "effort")).toBe(false);
+    expect(Object.hasOwn(result.evidence.axes, "reasoning")).toBe(false);
   });
 
   it("classifies discovery as unsupported, because there is no enumeration command", async () => {

@@ -183,8 +183,8 @@ function classifyStream(parsed, ctx, detail) {
   const observed = makeObservedConfiguration({
     runtimeId: RUNTIME_ID,
     turnExecuted,
-    model: parsed.init.model,
-    fieldSources: { model: "system/init.model" },
+    axes: { model: parsed.init.model },
+    fieldSources: { "axes.model": "system/init.model" },
     usage: parsed.result?.usage ?? [],
     ...(isVersionString(parsed.init.version) ? { runtimeVersion: parsed.init.version } : {}),
   });

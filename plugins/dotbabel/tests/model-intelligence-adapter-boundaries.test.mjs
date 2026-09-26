@@ -35,14 +35,17 @@ describe("shared evidence helpers", () => {
     for (const bad of [-1, -0.1, Number.NaN, Number.POSITIVE_INFINITY, "5", null, undefined]) expect(optionalCount(bad)).toBeUndefined();
   });
 
-  it("requires a recorded source for provider and effort as it does for model", () => {
-    const base = { runtimeId: "codex", turnExecuted: false, model: "m", fieldSources: { model: "a" } };
-    expect(() => makeObservedConfiguration({ ...base, provider: "openai" })).toThrow(/fieldSources.provider/);
-    expect(() => makeObservedConfiguration({ ...base, effort: "high" })).toThrow(/fieldSources.effort/);
-    const full = makeObservedConfiguration({ ...base, provider: "openai", effort: "high", fieldSources: { model: "a", provider: "b", effort: "c" } });
-    expect(full.fieldSources).toEqual({ model: "a", provider: "b", effort: "c" });
-    // A source for a field that was not reported is not an error, and nothing is invented for it.
-    expect(makeObservedConfiguration({ ...base, fieldSources: { model: "a", provider: "b" } }).fieldSources.provider).toBe("b");
+  it("requires a recorded source for the provider and every axis, and keys each source by the field it describes", () => {
+    const base = { runtimeId: "codex", turnExecuted: false, axes: { model: "m" }, fieldSources: { "axes.model": "a" } };
+    expect(() => makeObservedConfiguration({ ...base, provider: "openai" })).toThrow(/fieldSources\["provider"\]/);
+    expect(() => makeObservedConfiguration({ ...base, axes: { model: "m", reasoning: "high" } })).toThrow(/fieldSources\["axes.reasoning"\]/);
+    const full = makeObservedConfiguration({ ...base, axes: { model: "m", reasoning: "high" }, provider: "openai", fieldSources: { "axes.model": "a", "axes.reasoning": "c", provider: "b" } });
+    expect(full.fieldSources).toEqual({ "axes.model": "a", "axes.reasoning": "c", provider: "b" });
+    // A source for a field that was not reported would be provenance for nothing, so it is refused.
+    expect(() => makeObservedConfiguration({ ...base, fieldSources: { "axes.model": "a", provider: "b" } })).toThrow(/not reported/);
+    // A source that is not a short printable label is refused like any other identifier.
+    expect(() => makeObservedConfiguration({ ...base, fieldSources: { "axes.model": "" } })).toThrow(/fieldSources\["axes.model"\]/);
+    expect(() => makeObservedConfiguration({ ...base, fieldSources: "exec-banner" })).toThrow(/fieldSources must be an object/);
   });
 
   it("accepts only facts that makeModelFact built, so freezing a forged object does not pass", () => {

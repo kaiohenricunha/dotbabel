@@ -66,8 +66,8 @@ describe("claude source adapter", () => {
     expect(result.status).toBe("ok");
     const observed = result.evidence;
     // The model is opaque, including the context variant in brackets (ARCH-17).
-    expect(observed).toMatchObject({ runtimeId: "claude", turnExecuted: true, model: "claude-opus-5[1m]" });
-    expect(observed.fieldSources.model).toBe("system/init.model");
+    expect(observed).toMatchObject({ runtimeId: "claude", turnExecuted: true, axes: { model: "claude-opus-5[1m]" } });
+    expect(observed.fieldSources["axes.model"]).toBe("system/init.model");
     expect(observed.usage).toHaveLength(2);
     const [haiku, opus] = observed.usage;
     expect(haiku).toMatchObject({ model: "claude-haiku-4-5-20251001", canonicalModel: "claude-haiku-4-5-20251001", provider: "anthropic", contextWindow: 200000, maxOutputTokens: 64000, thinkingTokens: 0 });
@@ -86,8 +86,8 @@ describe("claude source adapter", () => {
     // This is the free half of observation, found while writing the adapter: `system/init` is
     // emitted before authentication and already names the resolved model, so the model needs no
     // billable turn. Only usage does, and there was none.
-    expect(result.evidence).toMatchObject({ model: "claude-opus-5", turnExecuted: false, usage: [] });
-    expect(result.evidence.fieldSources).toEqual({ model: "system/init.model" });
+    expect(result.evidence).toMatchObject({ axes: { model: "claude-opus-5" }, turnExecuted: false, usage: [] });
+    expect(result.evidence.fieldSources).toEqual({ "axes.model": "system/init.model" });
   });
 
   it("classifies text that is not a usable stream as unknown, never as an empty success", async () => {
@@ -125,7 +125,7 @@ describe("claude source adapter", () => {
     const { runner, ctx } = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), exitCode: 1, stoppedEarly: true }));
     const result = await claude.observe({ ...ctx, model: "opus", effort: "high" });
     expect(result.status).toBe("ok");
-    expect(result.evidence.model).toBe("claude-opus-5");
+    expect(result.evidence.axes.model).toBe("claude-opus-5");
     // Provenance carries the version the runtime itself reported.
     expect(result.provenance.sourceVersion).toBe("2.1.278");
 
