@@ -147,7 +147,7 @@ const DIAGNOSTIC_MAX_LENGTH = 1_024;
  * @param {unknown} value
  * @returns {boolean}
  */
-function isPlainObject(value) {
+export function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -161,11 +161,13 @@ function isNonEmptyString(value) {
 }
 
 /**
- * Freeze an object and everything reachable from it.
- * @param {any} value
- * @returns {any}
+ * Freeze an object and everything reachable from it. The one definition in `sources/`; `evidence.mjs`
+ * re-exports it, and the runtime adapters import it.
+ * @template T
+ * @param {T} value
+ * @returns {T}
  */
-function deepFreeze(value) {
+export function deepFreeze(value) {
   if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
   Object.freeze(value);
   for (const key of Object.keys(value)) deepFreeze(value[key]);
@@ -449,6 +451,20 @@ export function assertDescriptor(descriptor) {
  * output can carry more than a version, such as an account, and nothing else stops it.
  * `evidence` is structured data for `catalog/` rather than diagnostic text, so it is
  * neither masked nor copied.
+ *
+ * Failure channels: an adapter operation reports a failure through this result, never a
+ * throw, whenever the failure comes from DATA -- the runtime's behavior, or a value the
+ * caller passed on from somewhere it does not control, such as a repository's
+ * frontmatter. A value that fails validation is `unknown` with code `invalid_axis_value`,
+ * with provenance intact. An operation THROWS only for a caller-contract breach (a missing
+ * or wrongly typed input, such as a model that is not a string) and for a safety fault
+ * such as the SEC-1 root check, which must never be absorbed.
+ *
+ * One exception, split by operation rather than by source: `renderInvocation` is
+ * synchronous and returns a plain Invocation, so it throws on any invalid value, even one
+ * that came from frontmatter. Its caller is the resolver, which must have validated each
+ * value first, so a bad value there is a caller breach. Spec §5 declares
+ * `renderInvocation(...): InvocationResult`; this divergence is open until §5 is amended.
  * @param {object} input
  * @returns {object} A result frozen at the top level. Its provenance and diagnostic are frozen too, and `evidence` is passed by reference.
  */

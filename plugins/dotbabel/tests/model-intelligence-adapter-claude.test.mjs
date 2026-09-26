@@ -66,8 +66,11 @@ describe("claude source adapter", () => {
     expect(result.status).toBe("ok");
     const observed = result.evidence;
     // The model is opaque, including the context variant in brackets (ARCH-17).
-    expect(observed).toMatchObject({ runtimeId: "claude", turnExecuted: true, model: "claude-opus-5[1m]" });
-    expect(observed.fieldSources.model).toBe("system/init.model");
+    expect(observed).toMatchObject({ runtimeId: "claude", turnExecuted: true, axes: { model: "claude-opus-5[1m]" } });
+    expect(observed.fieldSources["axes.model"]).toBe("system/init.model");
+    // A stream from a run the caller made is the configuration as it ran, not a reconstruction.
+    expect(observed.configurationBasis).toBe("as-run");
+    expect(Object.hasOwn(observed, "reconstructedFrom")).toBe(false);
     expect(observed.usage).toHaveLength(2);
     const [haiku, opus] = observed.usage;
     expect(haiku).toMatchObject({ model: "claude-haiku-4-5-20251001", canonicalModel: "claude-haiku-4-5-20251001", provider: "anthropic", contextWindow: 200000, maxOutputTokens: 64000, thinkingTokens: 0 });
@@ -86,8 +89,8 @@ describe("claude source adapter", () => {
     // This is the free half of observation, found while writing the adapter: `system/init` is
     // emitted before authentication and already names the resolved model, so the model needs no
     // billable turn. Only usage does, and there was none.
-    expect(result.evidence).toMatchObject({ model: "claude-opus-5", turnExecuted: false, usage: [] });
-    expect(result.evidence.fieldSources).toEqual({ model: "system/init.model" });
+    expect(result.evidence).toMatchObject({ axes: { model: "claude-opus-5" }, turnExecuted: false, usage: [] });
+    expect(result.evidence.fieldSources).toEqual({ "axes.model": "system/init.model" });
   });
 
   it("classifies text that is not a usable stream as unknown, never as an empty success", async () => {
@@ -125,7 +128,11 @@ describe("claude source adapter", () => {
     const { runner, ctx } = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), exitCode: 1, stoppedEarly: true }));
     const result = await claude.observe({ ...ctx, model: "opus", effort: "high" });
     expect(result.status).toBe("ok");
-    expect(result.evidence.model).toBe("claude-opus-5");
+    expect(result.evidence.axes.model).toBe("claude-opus-5");
+    // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so the answer reflects only
+    // the flags carried in plus Claude's defaults, and the evidence names those flags.
+    expect(result.evidence.configurationBasis).toBe("reconstructed");
+    expect(result.evidence.reconstructedFrom).toEqual(["--model", "--effort"]);
     // Provenance carries the version the runtime itself reported.
     expect(result.provenance.sourceVersion).toBe("2.1.278");
 
@@ -214,13 +221,26 @@ describe("claude source adapter", () => {
     expect(result.evidence.checks[0].verdict).toBe("unverifiable");
   });
 
-  it("validate() refuses input that could be read as a flag, and empty input", async () => {
+  it("validate() answers a value that could be read as a flag with an invalid_axis_value result, and runs nothing", async () => {
     const { runner, ctx } = context(() => recorded("validate-known-alias.json"));
-    for (const bad of [{ model: "--dangerously-skip-permissions" }, { model: "-x" }, { effort: "--model" }, { model: "" }, { model: 7 }, { model: "line" + String.fromCharCode(10) + "break" }]) {
-      await expect(claude.validate(bad, ctx), JSON.stringify(bad)).rejects.toThrow(/model|effort/);
+    // The value is data that may come from a repository's own frontmatter, so a bad one is a result the
+    // caller can attribute and report, with provenance, rather than an exception (the split-by-source rule).
+    for (const bad of [{ model: "--dangerously-skip-permissions" }, { model: "-x" }, { effort: "--model" }, { model: "" }, { model: "line" + String.fromCharCode(10) + "break" }]) {
+      const result = await claude.validate(bad, ctx);
+      expect(result.status, JSON.stringify(bad)).toBe("unknown");
+      expect(result.diagnostic.code, JSON.stringify(bad)).toBe("invalid_axis_value");
+      expect(result.provenance.sourceId).toBe("claude");
+      // The diagnostic names the axis and never echoes the value (OPS-4).
+      expect(result.diagnostic.message).not.toContain("dangerously");
     }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("validate() throws when the caller breaks the input contract: no axis, a non-object, or a value that is not a string", async () => {
+    const { runner, ctx } = context(() => recorded("validate-known-alias.json"));
     await expect(claude.validate({}, ctx)).rejects.toThrow(/model or an effort/);
     await expect(claude.validate(null, ctx)).rejects.toThrow(/model or an effort/);
+    await expect(claude.validate({ model: 7 }, ctx)).rejects.toThrow(/model must be a string/);
     // Nothing was run for any of them.
     expect(runner.calls).toHaveLength(0);
   });
