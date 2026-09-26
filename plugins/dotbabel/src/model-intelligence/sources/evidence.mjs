@@ -31,7 +31,10 @@
  */
 
 import { RUNTIME_IDS, isRuntimeId } from "../domain/index.mjs";
-import { boundText, isVersionString } from "./contract.mjs";
+import { boundText, deepFreeze, isPlainObject, isVersionString } from "./contract.mjs";
+
+/** Freeze a value and everything reachable from it; defined once, in `contract.mjs`. */
+export { deepFreeze };
 
 /** What a runtime can say about one value. Never `available`: see the module header. */
 export const VERDICTS = Object.freeze(["recognized", "unrecognized", "unverifiable"]);
@@ -41,27 +44,6 @@ export const VERDICT_SCOPES = Object.freeze(["key", "value"]);
 
 /** Longest identifier, provider or label accepted. Runtime identifiers are short; a long one is noise or an attack. */
 const MAX_IDENTIFIER = 200;
-
-/**
- * Freeze a value and everything reachable from it.
- * @template T
- * @param {T} value
- * @returns {T}
- */
-export function deepFreeze(value) {
-  if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
-  Object.freeze(value);
-  for (const key of Object.keys(value)) deepFreeze(/** @type {any} */ (value)[key]);
-  return value;
-}
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /**
  * Require an object and reject every key that is not listed.

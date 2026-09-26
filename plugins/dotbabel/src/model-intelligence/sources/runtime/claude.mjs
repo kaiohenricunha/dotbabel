@@ -31,9 +31,10 @@
  * remains the only barrier to a probe reaching the network.
  */
 
-import { makeAdapterResult, assertDescriptor, isVersionString } from "../contract.mjs";
-import { deepFreeze, makeInvocation, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { MAX_OUTPUT_BYTES, assertOpaqueValue, checkOpaqueValue, firstLine, invalidAxisValue, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
+import { makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
+import { MAX_OUTPUT_BYTES, checkOpaqueValue, firstLine, invalidAxisValue, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "claude";
@@ -80,15 +81,7 @@ export const descriptor = deepFreeze(
 );
 
 /** The provenance every result from this adapter starts from. */
-const baseProvenance = () => ({ sourceId: RUNTIME_ID, sourceKind: "runtime", adapterVersion: ADAPTER_VERSION });
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const baseProvenance = () => runtimeProvenance(RUNTIME_ID, ADAPTER_VERSION);
 
 /**
  * Read `result.modelUsage`. Its entries are keyed by model id and carry a set of fields that differs
@@ -181,7 +174,7 @@ function initComplete({ stdout }) {
  */
 function classifyStream(parsed, ctx, { basis, detail }) {
   const provenance = baseProvenance();
-  const unknown = (code, message) => makeAdapterResult({ status: "unknown", provenance, observedAt: ctx.now(), diagnostic: { code, message } });
+  const unknown = (code, message) => unknownResult(ctx, provenance, code, message);
   if (parsed.empty) return unknown("empty_output", "the runtime produced no output, so the resolved model cannot be determined");
   if (parsed.init === undefined || parsed.init.model === undefined) {
     if (parsed.malformedLines > 0 && parsed.result === undefined) return unknown("malformed_output", "the output contained no readable stream-json event");
@@ -195,12 +188,12 @@ function classifyStream(parsed, ctx, { basis, detail }) {
     axes: { model: parsed.init.model },
     fieldSources: { "axes.model": "system/init.model" },
     usage: parsed.result?.usage ?? [],
-    ...(isVersionString(parsed.init.version) ? { runtimeVersion: parsed.init.version } : {}),
+    ...runtimeVersionField(parsed.init.version),
   });
   return makeAdapterResult({
     status: "ok",
     evidence: observed,
-    provenance: { ...provenance, ...(isVersionString(parsed.init.version) ? { sourceVersion: parsed.init.version } : {}) },
+    provenance: withSourceVersion(provenance, parsed.init.version),
     observedAt: ctx.now(),
   });
 }
@@ -359,8 +352,8 @@ export async function validate(input, context) {
   const version = await probeVersion(ctx, { prefix: "mi-claude", command: "claude", ...ROOT, provenance });
   return makeAdapterResult({
     status: "ok",
-    evidence: makeValidationEvidence({ checks, ...(version === undefined ? {} : { runtimeVersion: version }) }),
-    provenance: { ...provenance, ...(version === undefined ? {} : { sourceVersion: version }) },
+    evidence: makeValidationEvidence({ checks, ...runtimeVersionField(version) }),
+    provenance: withSourceVersion(provenance, version),
     observedAt: ctx.now(),
   });
 }
@@ -377,13 +370,11 @@ export async function validate(input, context) {
  * @returns {Readonly<import("../evidence.mjs").Invocation>}
  */
 export function renderInvocation(resolvedConfig) {
-  if (!isPlainObject(resolvedConfig) || /** @type {any} */ (resolvedConfig).runtimeId !== RUNTIME_ID || !isPlainObject(/** @type {any} */ (resolvedConfig).axes)) {
-    throw new TypeError("claude renderInvocation: the configuration is not a resolved claude configuration");
-  }
-  const axes = /** @type {Record<string, unknown>} */ (/** @type {any} */ (resolvedConfig).axes);
-  const args = [];
-  if (axes.model !== undefined) args.push("--model", assertOpaqueValue("model", axes.model));
-  if (axes.reasoning !== undefined) args.push("--effort", assertOpaqueValue("reasoning", axes.reasoning));
-  const unsupportedAxes = Object.keys(axes).filter((name) => name !== "model" && name !== "reasoning").sort();
-  return makeInvocation({ runtimeId: RUNTIME_ID, command: "claude", args, unsupportedAxes });
+  return renderInvocationFor({ runtimeId: RUNTIME_ID, command: "claude", resolvedConfig, axisArgs: INVOCATION_AXIS_ARGS });
 }
+
+/** The axes Claude Code can express on its command line, and the flag for each, in emit order. */
+const INVOCATION_AXIS_ARGS = Object.freeze({
+  model: (value) => ["--model", value],
+  reasoning: (value) => ["--effort", value],
+});

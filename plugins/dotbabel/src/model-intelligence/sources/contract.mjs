@@ -147,7 +147,7 @@ const DIAGNOSTIC_MAX_LENGTH = 1_024;
  * @param {unknown} value
  * @returns {boolean}
  */
-function isPlainObject(value) {
+export function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -161,11 +161,13 @@ function isNonEmptyString(value) {
 }
 
 /**
- * Freeze an object and everything reachable from it.
- * @param {any} value
- * @returns {any}
+ * Freeze an object and everything reachable from it. The one definition in `sources/`; `evidence.mjs`
+ * re-exports it, and the runtime adapters import it.
+ * @template T
+ * @param {T} value
+ * @returns {T}
  */
-function deepFreeze(value) {
+export function deepFreeze(value) {
   if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
   Object.freeze(value);
   for (const key of Object.keys(value)) deepFreeze(value[key]);

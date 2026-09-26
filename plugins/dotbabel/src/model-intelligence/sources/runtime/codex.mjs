@@ -26,8 +26,9 @@
 
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
-import { assertDescriptor, makeAdapterResult } from "../contract.mjs";
-import { deepFreeze, makeDiscoveryEvidence, makeInvocation, makeModelFact, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
+import { makeDiscoveryEvidence, makeModelFact, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
 import { assertOpaqueValue, checkOpaqueValue, firstLine, invalidAxisValue, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
@@ -68,15 +69,7 @@ export const descriptor = deepFreeze(
 );
 
 /** The provenance every result from this adapter starts from. */
-const baseProvenance = () => ({ sourceId: RUNTIME_ID, sourceKind: "runtime", adapterVersion: ADAPTER_VERSION });
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const baseProvenance = () => runtimeProvenance(RUNTIME_ID, ADAPTER_VERSION);
 
 /**
  * Build a model fact from one catalog entry, or `undefined` when the entry cannot be used.
@@ -249,7 +242,7 @@ export async function discover(context) {
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-codex", command: "codex", args: ["debug", "models"], ...ROOT, provenance }));
   if (ran.status !== "ok") return ran;
   const outcome = ran.evidence;
-  const unknown = (code, message) => makeAdapterResult({ status: "unknown", provenance, observedAt: ctx.now(), diagnostic: { code, message } });
+  const unknown = (code, message) => unknownResult(ctx, provenance, code, message);
 
   if (outcome.exitCode !== 0 && !outcome.stoppedEarly) {
     return makeAdapterResult({ status: "unavailable", provenance, observedAt: ctx.now(), diagnostic: { code: "nonzero_exit", message: firstLine(outcome.stderr) || `codex debug models exited ${outcome.exitCode}`, retryable: true } });
@@ -263,7 +256,7 @@ export async function discover(context) {
   return makeAdapterResult({
     status: "ok",
     evidence: makeDiscoveryEvidence({ models: parsed.models, skipped: parsed.skipped }),
-    provenance: { ...provenance, ...(version === undefined ? {} : { sourceVersion: version }) },
+    provenance: withSourceVersion(provenance, version),
     observedAt: ctx.now(),
   });
 }
@@ -297,7 +290,7 @@ export async function observe(context) {
   if (ran.status !== "ok") return ran;
   const outcome = ran.evidence;
   const text = outcome.stderr.trim() !== "" ? outcome.stderr : outcome.stdout;
-  const unknown = (code, message) => makeAdapterResult({ status: "unknown", provenance, observedAt: ctx.now(), diagnostic: { code, message } });
+  const unknown = (code, message) => unknownResult(ctx, provenance, code, message);
   if (text.trim() === "") return unknown("empty_output", "the runtime printed no banner, so the resolved model cannot be determined");
 
   const banner = parseExecBanner(text);
@@ -321,12 +314,12 @@ export async function observe(context) {
       ...(effort === undefined ? {} : { "axes.reasoning": "exec-banner:reasoning effort" }),
       ...(provider === undefined ? {} : { provider: "exec-banner:provider" }),
     },
-    ...(banner.version === undefined ? {} : { runtimeVersion: banner.version }),
+    ...runtimeVersionField(banner.version),
   });
   return makeAdapterResult({
     status: "ok",
     evidence: observed,
-    provenance: { ...provenance, ...(banner.version === undefined ? {} : { sourceVersion: banner.version }) },
+    provenance: withSourceVersion(provenance, banner.version),
     observedAt: ctx.now(),
   });
 }
@@ -400,8 +393,8 @@ export async function validate(input, context) {
   const version = await probeVersion(ctx, { prefix: "mi-codex", command: "codex", ...ROOT, provenance });
   return makeAdapterResult({
     status: "ok",
-    evidence: makeValidationEvidence({ checks, ...(version === undefined ? {} : { runtimeVersion: version }) }),
-    provenance: { ...provenance, ...(version === undefined ? {} : { sourceVersion: version }) },
+    evidence: makeValidationEvidence({ checks, ...runtimeVersionField(version) }),
+    provenance: withSourceVersion(provenance, version),
     observedAt: ctx.now(),
   });
 }
@@ -419,13 +412,11 @@ export async function validate(input, context) {
  * @returns {Readonly<import("../evidence.mjs").Invocation>}
  */
 export function renderInvocation(resolvedConfig) {
-  if (!isPlainObject(resolvedConfig) || /** @type {any} */ (resolvedConfig).runtimeId !== RUNTIME_ID || !isPlainObject(/** @type {any} */ (resolvedConfig).axes)) {
-    throw new TypeError("codex renderInvocation: the configuration is not a resolved codex configuration");
-  }
-  const axes = /** @type {Record<string, unknown>} */ (/** @type {any} */ (resolvedConfig).axes);
-  const args = [];
-  if (axes.model !== undefined) args.push("--model", assertOpaqueValue("model", axes.model));
-  if (axes.reasoning !== undefined) args.push("-c", `model_reasoning_effort=${tomlString(assertOpaqueValue("reasoning", axes.reasoning))}`);
-  const unsupportedAxes = Object.keys(axes).filter((name) => name !== "model" && name !== "reasoning").sort();
-  return makeInvocation({ runtimeId: RUNTIME_ID, command: "codex", args, unsupportedAxes });
+  return renderInvocationFor({ runtimeId: RUNTIME_ID, command: "codex", resolvedConfig, axisArgs: INVOCATION_AXIS_ARGS });
 }
+
+/** The axes Codex can express on its command line, and the arguments for each, in emit order. */
+const INVOCATION_AXIS_ARGS = Object.freeze({
+  model: (value) => ["--model", value],
+  reasoning: (value) => ["-c", `model_reasoning_effort=${tomlString(value)}`],
+});
