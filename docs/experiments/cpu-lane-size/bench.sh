@@ -29,6 +29,7 @@
 #   BENCH_GATE_PCT / BENCH_TRIP_PCT  foreign CPU, % of all CPUs (default 6 / 12)
 #   BENCH_TRIP_SAMPLES  seconds above the trip level that spoil a run (default 60)
 #   BENCH_LAYOUTS_C / BENCH_MIX_C   phase C layouts and job mix (smoke tests)
+#   BENCH_START_BY / BENCH_CUTOFF   launch-c: latest start, and no new run after (default 02:00 / 04:00)
 
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -56,6 +57,8 @@ MAX_REPS_C="${BENCH_MAX_REPS_C:-$((REPS_C + 2))}"
 CLK_TCK=$(getconf CLK_TCK)
 NCPU=$(getconf _NPROCESSORS_ONLN)
 CGROUP_DIR=""
+START_BY_EPOCH="${BENCH_START_BY_EPOCH:-0}"
+CUTOFF_EPOCH="${BENCH_CUTOFF_EPOCH:-0}"
 SELF="$HERE/bench.sh"
 LANES_DIR="${DOTBABEL_FLEET_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/dotbabel/fleet}/lanes"
 FLEET_LANE="$PROJECTS/dotbabel/plugins/dotbabel/scripts/fleet-lane.sh"
@@ -242,9 +245,14 @@ report_foreign() {
 
 # Start only on a quiet host: foreign CPU at or below GATE_PCT for a whole
 # window. There is no "start anyway": after max_wait the run stops without data.
-gate_quiet() { # <max wait s> <label>
-  local max=$1 label=$2 start=$SECONDS a b f st last_report=-300
+gate_quiet() { # <max wait s> <label> [<deadline epoch s>]
+  local max=$1 label=$2 deadline=${3:-0} start=$SECONDS a b f st last_report=-300
   while :; do
+    if [ "$deadline" -gt 0 ] && [ "$(date +%s)" -ge "$deadline" ]; then
+      log "deadline $(date -d "@$deadline" +%H:%M) reached before $label; stopping without data"
+      jq -cn --arg label "$label" --argjson t "$(now_ms)" '{phase:"C-abort",label:$label,reason:"deadline",t:$t}' >>"$TRIALS"
+      return 1
+    fi
     a=$(cpu_snap)
     sleep "$GATE_WINDOW_S"
     b=$(cpu_snap)
@@ -479,9 +487,15 @@ lane_job() { # <suite> <id>
   local suite=$1 id=$2 n dir rc
   local locks="$LOGS/slot-locks"
   mkdir -p "$locks"
+  local waited=0
   while :; do
     for ((n = 1; n <= SLOTS; n++)); do mkdir "$locks/$suite-$n" 2>/dev/null && break 2; done
     sleep 0.2
+    waited=$((waited + 1))
+    if [ "$waited" -ge 3000 ]; then # 10 minutes: every slot is stuck, so the job fails instead of holding a lane
+      log "$id: no free $suite slot after 600s"
+      return 70
+    fi
   done
   printf '%s %s %s %s\n' "$(now_ms)" "${DOTBABEL_LANE:-}" "${DOTBABEL_LANE_CPUS:-}" "$n" >"$LOGS/$id.start"
   dir=$(slot_dir "$suite" "$n")
@@ -558,7 +572,6 @@ run_layout_c() { # <layout> <rep> <attempt>
 # every layout, so that the layouts stay paired, and a new repetition starts.
 phase_c() {
   local rep=0 clean=0 layout attempt ok
-  gate_quiet "$GATE_WAIT_START_S" "phase C" || return 3
   if ! meter_selfcheck; then
     log "the foreign-load meter failed its check; stopping without data"
     return 4
@@ -568,7 +581,13 @@ phase_c() {
     ok=1
     while read -r layout; do
       for attempt in 1 2; do
-        gate_quiet "$GATE_WAIT_S" "C-$layout-r$rep-a$attempt" || return 3
+        if [ "$CUTOFF_EPOCH" -gt 0 ] && [ "$(date +%s)" -ge "$CUTOFF_EPOCH" ]; then
+          log "cutoff $(date -d "@$CUTOFF_EPOCH" +%H:%M) reached: no new runs"
+          jq -cn --argjson t "$(now_ms)" '{phase:"C-abort",label:"cutoff",reason:"cutoff",t:$t}' >>"$TRIALS"
+          log "phase C: $clean clean repetitions of $rep (stopped at the cutoff)"
+          return 5
+        fi
+        gate_quiet "$GATE_WAIT_S" "C-$layout-r$rep-a$attempt" "$CUTOFF_EPOCH" || return 3
         DRIFT=$(drift_ms)
         run_layout_c "$layout" "$rep" "$attempt"
         [ "$LAST_CONTAMINATED" = false ] && break
@@ -613,16 +632,27 @@ main() {
     teardown) teardown_slots ;;
     _lane-job) lane_job "$2" "$3" ;;
     launch-c)
-      local at="${2:-now}" wait_s=0
-      if [ "$at" != now ]; then
-        wait_s=$(($(date -d "$at" +%s) - $(date +%s)))
-        if [ "$wait_s" -lt 0 ]; then
-          log "start time $at is in the past"
-          exit 64
-        fi
+      local at="${2:-now}" target start_by cutoff day
+      target=$(date +%s)
+      [ "$at" = now ] || target=$(date -d "$at" +%s) || exit 64
+      if [ "$target" -lt $(($(date +%s) - 60)) ]; then
+        log "start time $at is in the past"
+        exit 64
       fi
-      log "phase C starts at $(date -d "@$(($(date +%s) + wait_s))" +%H:%M) (in ${wait_s}s)"
-      sleep "$wait_s"
+      # The latest start and the cutoff are the next such times after the target.
+      day=$(date -d "@$target" +%F)
+      start_by=$(date -d "$day ${BENCH_START_BY:-02:00}" +%s)
+      [ "$start_by" -gt "$target" ] || start_by=$((start_by + 86400))
+      cutoff=$(date -d "$day ${BENCH_CUTOFF:-04:00}" +%s)
+      [ "$cutoff" -gt "$target" ] || cutoff=$((cutoff + 86400))
+      log "phase C starts at $(date -d "@$target" '+%F %H:%M'); latest start $(date -d "@$start_by" +%H:%M); no new run after $(date -d "@$cutoff" +%H:%M)"
+      # Wall clock, not sleep: the monotonic clock stops while the laptop sleeps.
+      while [ "$(date +%s)" -lt "$target" ]; do sleep 30; done
+      if [ "$(date +%s)" -ge "$start_by" ]; then
+        log "missed the start window (now $(date +%H:%M)); not starting"
+        exit 6
+      fi
+      export BENCH_START_BY_EPOCH=$start_by BENCH_CUTOFF_EPOCH=$cutoff
       exec systemd-run --user --scope --quiet --unit="lane-bench-c-$(date +%s)" -- bash "$SELF" phase-c
       ;;
     stop)
@@ -649,6 +679,12 @@ main() {
       trap 'release_lanes' EXIT
       trap 'exit 130' INT TERM HUP
       setup_slots || exit 2
+      # Phase C waits for a quiet host BEFORE it takes the lanes, so a long
+      # wait does not block the other sessions' test runs.
+      if [ "$cmd" = phase-c ] && ! gate_quiet "$GATE_WAIT_START_S" "phase C" "$START_BY_EPOCH"; then
+        log "phase-c stopped (exit 3)"
+        exit 3
+      fi
       RESERVED=true
       if [ "${BENCH_NO_RESERVE:-}" = 1 ]; then
         RESERVED=false
@@ -656,6 +692,8 @@ main() {
       else
         reserve_lanes
       fi
+      # Slot locks of a run that was stopped mid-job would make jobs idle in a lane.
+      rm -rf "$LOGS/slot-locks"
       start_probe
       # A quiet minute first: the responsiveness baseline for the decision rule.
       echo IDLE >"$CURRENT"
