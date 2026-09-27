@@ -6,6 +6,7 @@ import {
   makeObservedConfiguration,
   makeModelFact,
   makeDiscoveryEvidence,
+  makeProviderCatalogEvidence,
   makeValidationEvidence,
   makeInvocation,
 } from "../src/model-intelligence/sources/evidence.mjs";
@@ -244,5 +245,49 @@ describe("deepFreeze", () => {
     expect(Object.isFrozen(value.a.b[1])).toBe(true);
     expect(deepFreeze(5)).toBe(5);
     expect(deepFreeze(null)).toBeNull();
+  });
+});
+
+describe("provider catalog evidence (a knowledge source)", () => {
+  const discovery = (...ids) => makeDiscoveryEvidence({ models: ids.map((id) => makeModelFact({ id, supportedReasoningLevels: [{ effort: "high" }] })) });
+
+  it("keeps one discovery per provider, so the same model id under two providers stays two facts (ARCH-3)", () => {
+    const evidence = makeProviderCatalogEvidence({
+      providers: [
+        { id: "anthropic", displayName: "Anthropic", discovery: discovery("claude-opus-5") },
+        { id: "github-copilot", discovery: discovery("claude-opus-5", "gpt-5.4") },
+      ],
+      missingProviders: ["nope"],
+      skipped: 1,
+    });
+    expect(evidence.providers.map((p) => [p.id, p.discovery.models.map((m) => m.id)])).toEqual([
+      ["anthropic", ["claude-opus-5"]],
+      ["github-copilot", ["claude-opus-5", "gpt-5.4"]],
+    ]);
+    expect(evidence.providers[0].displayName).toBe("Anthropic");
+    expect("displayName" in evidence.providers[1]).toBe(false);
+    expect(evidence.missingProviders).toEqual(["nope"]);
+    expect(evidence.skipped).toBe(1);
+    expect(Object.isFrozen(evidence)).toBe(true);
+    expect(Object.isFrozen(evidence.providers)).toBe(true);
+    expect(Object.isFrozen(evidence.providers[0])).toBe(true);
+    expect(Object.isFrozen(evidence.missingProviders)).toBe(true);
+    expect(makeProviderCatalogEvidence({ providers: [], missingProviders: [] }).skipped).toBe(0);
+  });
+
+  it("accepts only discovery evidence that makeDiscoveryEvidence built, and rejects a duplicate or unsafe provider id", () => {
+    const forged = { models: [], effortSupport: {}, skipped: 0 };
+    expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: forged }], missingProviders: [] })).toThrow(/built discovery evidence/);
+    expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: Object.freeze(forged) }], missingProviders: [] })).toThrow(/built discovery evidence/);
+    const d = discovery("m");
+    expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: d }, { id: "a", discovery: d }], missingProviders: [] })).toThrow(/duplicate provider "a"/);
+    expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: d }], missingProviders: ["a"] })).toThrow(/both present and missing/);
+    for (const id of ["__proto__", "Bad Id", "", "a/b", 7]) {
+      expect(() => makeProviderCatalogEvidence({ providers: [{ id, discovery: d }], missingProviders: [] }), String(id)).toThrow(/provider id/);
+      expect(() => makeProviderCatalogEvidence({ providers: [], missingProviders: [id] }), String(id)).toThrow(/provider id/);
+    }
+    expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: d, availability: "available" }], missingProviders: [] })).toThrow(/unknown field "availability"/);
+    expect(() => makeProviderCatalogEvidence({ providers: {}, missingProviders: [] })).toThrow(/providers must be an array/);
+    expect(() => makeProviderCatalogEvidence({ providers: [], missingProviders: "x" })).toThrow(/missingProviders must be an array/);
   });
 });
