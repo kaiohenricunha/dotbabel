@@ -17,7 +17,7 @@
 | 7   | Non-Functional Requirements | [x] done |
 | 8   | Risks and Alternatives      | [x] done |
 
-The owner approved the spec on 2026-09-13; the metadata status in `spec.json` is `approved`. This is a brownfield spec. [current-state/analysis.md](current-state/analysis.md) holds the grounded audit of the QA surface that dotbabel ships today.
+The owner approved the spec on 2026-09-13. All 7 delivery phases (§6.1) landed, the mutation-score floor (TEST-1) closed on 2026-09-27 (#423 for 11 modules, #432 for the last 2), and the spec's own §6.5 step 9 (audited in `docs/audits/spec-qa-verification-harness-validation-2026-09-26.md`) moved the metadata status in `spec.json` to `done` on 2026-09-27. This is a brownfield spec. [current-state/analysis.md](current-state/analysis.md) holds the grounded audit of the QA surface that dotbabel ships today.
 
 ## Quick Start
 
