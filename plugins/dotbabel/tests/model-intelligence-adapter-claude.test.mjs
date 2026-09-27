@@ -160,7 +160,10 @@ describe("claude source adapter", () => {
       // so it does not mask `runIsolated` genuinely waiting for the operation to finish.
       return new Promise((resolvePromise) => signal.addEventListener("abort", () => resolvePromise(outcome({ stdout: "" })), { once: true }));
     });
-    const result = await claude.observe({ ...ctx, timeoutMs: 25 });
+    // A frozen monotonic clock keeps scratch setup from spending the budget, which on a loaded machine
+    // can take longer than the budget itself and stop the child before it starts; the real timer still
+    // fires at timeoutMs, which is what this test is about.
+    const result = await claude.observe({ ...ctx, timeoutMs: 25, monotonic: () => 0 });
     expect(result.status).toBe("unavailable");
     expect(result.diagnostic).toMatchObject({ code: "timeout", retryable: true });
     // The runner is told to stop, so a hung CLI does not keep running after the caller has its answer.

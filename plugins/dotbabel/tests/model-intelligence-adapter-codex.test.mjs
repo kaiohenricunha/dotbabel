@@ -192,9 +192,16 @@ describe("codex source adapter", () => {
     // eventually exits after SIGTERM/SIGKILL); this fake matches that instead of hanging forever, so
     // it does not mask `runIsolated` genuinely waiting for the operation to finish.
     const hung = context((spec, { signal }) => new Promise((resolvePromise) => signal.addEventListener("abort", () => resolvePromise(outcome({ stderr: "" })), { once: true })));
-    const timedOut = await codex.observe({ ...hung.ctx, timeoutMs: 25 });
+    // A frozen monotonic clock keeps scratch setup from spending the budget, which on a loaded machine
+    // can take longer than the budget itself and stop the child before it starts; the real timer still
+    // fires at timeoutMs, which is what this test is about.
+    const timedOut = await codex.observe({ ...hung.ctx, timeoutMs: 25, monotonic: () => 0 });
     expect(timedOut.status).toBe("unavailable");
     expect(timedOut.diagnostic).toMatchObject({ code: "timeout", retryable: true });
+    // The child started and the real timer stopped it. A budget spent before the start would leave no
+    // call, and would return the same result, so this is what shows the frozen clock still matters.
+    expect(hung.runner.calls).toHaveLength(1);
+    expect(hung.runner.calls[0].signal.aborted).toBe(true);
   });
 
   it("carries only the model keys of the user's config into the scratch config, and never the credential file", async () => {
