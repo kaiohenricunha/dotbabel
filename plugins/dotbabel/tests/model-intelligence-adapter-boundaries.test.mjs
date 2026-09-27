@@ -35,14 +35,17 @@ describe("shared evidence helpers", () => {
     for (const bad of [-1, -0.1, Number.NaN, Number.POSITIVE_INFINITY, "5", null, undefined]) expect(optionalCount(bad)).toBeUndefined();
   });
 
-  it("requires a recorded source for provider and effort as it does for model", () => {
-    const base = { runtimeId: "codex", turnExecuted: false, model: "m", fieldSources: { model: "a" } };
-    expect(() => makeObservedConfiguration({ ...base, provider: "openai" })).toThrow(/fieldSources.provider/);
-    expect(() => makeObservedConfiguration({ ...base, effort: "high" })).toThrow(/fieldSources.effort/);
-    const full = makeObservedConfiguration({ ...base, provider: "openai", effort: "high", fieldSources: { model: "a", provider: "b", effort: "c" } });
-    expect(full.fieldSources).toEqual({ model: "a", provider: "b", effort: "c" });
-    // A source for a field that was not reported is not an error, and nothing is invented for it.
-    expect(makeObservedConfiguration({ ...base, fieldSources: { model: "a", provider: "b" } }).fieldSources.provider).toBe("b");
+  it("requires a recorded source for the provider and every axis, and keys each source by the field it describes", () => {
+    const base = { runtimeId: "codex", turnExecuted: false, configurationBasis: "as-run", axes: { model: "m" }, fieldSources: { "axes.model": "a" } };
+    expect(() => makeObservedConfiguration({ ...base, provider: "openai" })).toThrow(/fieldSources\["provider"\]/);
+    expect(() => makeObservedConfiguration({ ...base, axes: { model: "m", reasoning: "high" } })).toThrow(/fieldSources\["axes.reasoning"\]/);
+    const full = makeObservedConfiguration({ ...base, axes: { model: "m", reasoning: "high" }, provider: "openai", fieldSources: { "axes.model": "a", "axes.reasoning": "c", provider: "b" } });
+    expect(full.fieldSources).toEqual({ "axes.model": "a", "axes.reasoning": "c", provider: "b" });
+    // A source for a field that was not reported would be provenance for nothing, so it is refused.
+    expect(() => makeObservedConfiguration({ ...base, fieldSources: { "axes.model": "a", provider: "b" } })).toThrow(/not reported/);
+    // A source that is not a short printable label is refused like any other identifier.
+    expect(() => makeObservedConfiguration({ ...base, fieldSources: { "axes.model": "" } })).toThrow(/fieldSources\["axes.model"\]/);
+    expect(() => makeObservedConfiguration({ ...base, fieldSources: "exec-banner" })).toThrow(/fieldSources must be an object/);
   });
 
   it("accepts only facts that makeModelFact built, so freezing a forged object does not pass", () => {
@@ -101,6 +104,22 @@ describe("claude stream parsing boundaries", () => {
     expect(bad.status).toBe("ok");
     expect(Object.hasOwn(bad.provenance, "sourceVersion")).toBe(false);
     expect(Object.hasOwn(bad.evidence, "runtimeVersion")).toBe(false);
+  });
+
+  it("observe() answers a model or effort that could be read as a flag with an invalid_axis_value result, and runs nothing", async () => {
+    const runner = fakeRunner(() => outcome({ stdout: initLine() }));
+    for (const bad of [{ model: "--dangerously-skip-permissions" }, { effort: "-x" }, { model: "" }]) {
+      const result = await claude.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow, ...bad });
+      expect(result.status, JSON.stringify(bad)).toBe("unknown");
+      expect(result.diagnostic.code).toBe("invalid_axis_value");
+    }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("observe() throws when the caller passes a model that is not a string, which is a contract breach and not data", async () => {
+    const runner = fakeRunner(() => outcome({ stdout: initLine() }));
+    await expect(claude.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow, model: 7 })).rejects.toThrow(/model must be a string/);
+    expect(runner.calls).toHaveLength(0);
   });
 
   it("rejects a caller-supplied stream larger than the output cap, instead of parsing it unbounded", async () => {
@@ -272,8 +291,13 @@ describe("process helper boundaries", () => {
     expect(defaults.env).toBe(process.env);
     expect(defaults.now()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     expect(typeof defaults.readFile).toBe("function");
-    const injected = { runCommand: () => {}, env: { PATH: "p" }, homeDir: "/h", now: () => "t", timeoutMs: 7, tmpDir: "/t", readFile: () => "" };
-    expect(resolveContext(injected, ROOT)).toMatchObject({ homeDir: "/h", timeoutMs: 7, tmpDir: "/t" });
+    // With no timeout given, the operation's budget is the REL-1 subprocess default.
+    expect(defaults.budgetMs).toBe(10_000);
+    const injected = { runCommand: () => {}, env: { PATH: "p" }, homeDir: "/h", now: () => "t", timeoutMs: 7, tmpDir: "/t", readFile: () => "", monotonic: () => 42 };
+    // An injected timeout becomes the whole operation's budget, measured from the injected clock.
+    expect(resolveContext(injected, ROOT)).toMatchObject({ homeDir: "/h", budgetMs: 7, startedAt: 42, tmpDir: "/t" });
+    // An invalid timeout is a caller-contract breach, so it throws before anything runs.
+    expect(() => resolveContext({ ...injected, timeoutMs: -1 }, ROOT)).toThrow(/timeoutMs/);
     expect(resolveContext(injected, ROOT).now()).toBe("t");
   });
 
@@ -333,6 +357,81 @@ describe("process helper boundaries", () => {
     expect(seen.spec.env.HOME).toBe(seen.paths.home);
     expect(seen.spec.stopWhen).toBe(stopWhen);
     expect(seen.spec.args).toEqual(["x"]);
+  });
+
+  it("gives one operation one time budget: a later child gets only what is left, and none once it is spent (REL-1)", async () => {
+    // REL-1 bounds an OPERATION. Before this, each child had its own full timeout, so a multi-axis
+    // validate could take (N+1) times the budget. The clock is injected, so nothing here times the machine.
+    let now = 0;
+    const seen = [];
+    const runner = fakeRunner((spec) => {
+      seen.push(spec.args.join(" "));
+      now += 60;
+      return outcome({ stderr: "OpenAI Codex v0.155.1" });
+    });
+    const ctx = resolveContext({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 100, monotonic: () => now }, ROOT);
+    const provenance = { sourceId: "codex", sourceKind: "runtime" };
+    const first = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["one"], ...ROOT, provenance });
+    expect(first.status).toBe("ok");
+    const second = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["two"], ...ROOT, provenance });
+    expect(second.status).toBe("ok");
+    // 120 ms of the 100 ms budget are spent, so the third child is never started.
+    const third = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["three"], ...ROOT, provenance });
+    expect(third.status).toBe("unavailable");
+    expect(third.diagnostic).toMatchObject({ code: "timeout", retryable: true });
+    expect(seen).toEqual(["one", "two"]);
+  });
+
+  it("reports a budget spent exactly, or down to a fraction of a millisecond, as a timeout result rather than a throw", async () => {
+    // A remainder of 0, or 0.5 floored to 0, must stop before runBounded, whose timeout must be a positive integer.
+    let now = 0;
+    const runner = fakeRunner(() => outcome({ stderr: "OpenAI Codex v0.155.1" }));
+    const provenance = { sourceId: "codex", sourceKind: "runtime" };
+    for (const spent of [100, 99.5]) {
+      now = 0;
+      const ctx = resolveContext({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 100, monotonic: () => now }, ROOT);
+      now = spent;
+      const result = await runIsolated(ctx, { prefix: "mi-budget", command: "codex", args: ["z"], ...ROOT, provenance });
+      expect(result, String(spent)).toMatchObject({ status: "unavailable", diagnostic: { code: "timeout" } });
+    }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("charges the time prepare takes to the budget, and starts no child when prepare spends the rest", async () => {
+    let now = 0;
+    const runner = fakeRunner(() => outcome({ stderr: "OpenAI Codex v0.155.1" }));
+    const ctx = resolveContext({ runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 100, monotonic: () => now }, ROOT);
+    const result = await runIsolated(ctx, {
+      prefix: "mi-budget",
+      command: "codex",
+      args: ["late"],
+      ...ROOT,
+      prepare: async () => {
+        now += 100;
+      },
+      provenance: { sourceId: "codex", sourceKind: "runtime" },
+    });
+    expect(result).toMatchObject({ status: "unavailable", diagnostic: { code: "timeout", retryable: true } });
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("codex validate() with two axes settles within one budget when each child is slow, instead of taking twice as long", async () => {
+    // Each child really takes 80 ms and honors its abort signal, as runProcess does. With one budget of
+    // 100 ms, the second child gets only the ~20 ms left and is stopped, so the operation reports its
+    // bound. With a budget per child it would get a fresh 100 ms, finish at 80 ms, and pass at ~160 ms.
+    const runner = fakeRunner((spec, { signal }) => {
+      if (spec.args[0] === "--version") return outcome({ stdout: "codex-cli 0.155.1" });
+      return new Promise((resolvePromise) => {
+        const timer = setTimeout(() => resolvePromise(outcome({ stderr: "OpenAI Codex v0.155.1\n" })), 80);
+        signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          resolvePromise(outcome({ aborted: true }));
+        }, { once: true });
+      });
+    });
+    const result = await codex.validate({ model: "gpt-5.5", reasoning: "high" }, { runCommand: runner.runCommand, env: { PATH: "/usr/bin" }, homeDir: "/home/nobody", now: fixedNow, timeoutMs: 100 });
+    expect(result.status).toBe("unavailable");
+    expect(result.diagnostic.code).toBe("timeout");
   });
 
   it("does not remove the scratch root until the operation itself has settled, even after a timeout", async () => {

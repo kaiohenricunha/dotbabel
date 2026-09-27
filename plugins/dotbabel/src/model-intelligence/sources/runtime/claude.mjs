@@ -31,9 +31,10 @@
  * remains the only barrier to a probe reaching the network.
  */
 
-import { makeAdapterResult, assertDescriptor, isVersionString } from "../contract.mjs";
-import { deepFreeze, makeInvocation, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
-import { MAX_OUTPUT_BYTES, assertOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
+import { makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { invalidAxisValue, renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
+import { MAX_OUTPUT_BYTES, checkOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "claude";
@@ -43,6 +44,12 @@ export const ADAPTER_VERSION = "1";
 
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CLAUDE_CONFIG_DIR", rootDirName: ".claude" });
+
+/** The caller-supplied values a probe passes on, each as a flag and the name the caller uses. */
+const PROBE_FLAGS = Object.freeze([
+  ["--model", "model"],
+  ["--effort", "effort"],
+]);
 
 /** A prompt is required by `-p`, but nothing is ever sent: there is no credential to send it with. */
 const PROBE_PROMPT = "x";
@@ -74,15 +81,7 @@ export const descriptor = deepFreeze(
 );
 
 /** The provenance every result from this adapter starts from. */
-const baseProvenance = () => ({ sourceId: RUNTIME_ID, sourceKind: "runtime", adapterVersion: ADAPTER_VERSION });
-
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function isPlainObject(value) {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const baseProvenance = () => runtimeProvenance(RUNTIME_ID, ADAPTER_VERSION);
 
 /**
  * Read `result.modelUsage`. Its entries are keyed by model id and carry a set of fields that differs
@@ -168,12 +167,14 @@ function initComplete({ stdout }) {
  * Turn a parsed stream into a result, classifying what cannot be used as `unknown`.
  * @param {ReturnType<typeof parseStreamJson>} parsed
  * @param {import("./process.mjs").RuntimeContext} ctx
- * @param {string} [detail] Runtime text to include in a diagnostic, already a single line.
+ * @param {object} how
+ * @param {{configurationBasis: "as-run"} | {configurationBasis: "reconstructed", reconstructedFrom: string[]}} how.basis Whether the stream is from a real run or from this adapter's probe.
+ * @param {string} [how.detail] Runtime text to include in a diagnostic, already a single line.
  * @returns {object}
  */
-function classifyStream(parsed, ctx, detail) {
+function classifyStream(parsed, ctx, { basis, detail }) {
   const provenance = baseProvenance();
-  const unknown = (code, message) => makeAdapterResult({ status: "unknown", provenance, observedAt: ctx.now(), diagnostic: { code, message } });
+  const unknown = (code, message) => unknownResult(ctx, provenance, code, message);
   if (parsed.empty) return unknown("empty_output", "the runtime produced no output, so the resolved model cannot be determined");
   if (parsed.init === undefined || parsed.init.model === undefined) {
     if (parsed.malformedLines > 0 && parsed.result === undefined) return unknown("malformed_output", "the output contained no readable stream-json event");
@@ -183,15 +184,16 @@ function classifyStream(parsed, ctx, detail) {
   const observed = makeObservedConfiguration({
     runtimeId: RUNTIME_ID,
     turnExecuted,
-    model: parsed.init.model,
-    fieldSources: { model: "system/init.model" },
+    ...basis,
+    axes: { model: parsed.init.model },
+    fieldSources: { "axes.model": "system/init.model" },
     usage: parsed.result?.usage ?? [],
-    ...(isVersionString(parsed.init.version) ? { runtimeVersion: parsed.init.version } : {}),
+    ...runtimeVersionField(parsed.init.version),
   });
   return makeAdapterResult({
     status: "ok",
     evidence: observed,
-    provenance: { ...provenance, ...(isVersionString(parsed.init.version) ? { sourceVersion: parsed.init.version } : {}) },
+    provenance: withSourceVersion(provenance, parsed.init.version),
     observedAt: ctx.now(),
   });
 }
@@ -241,13 +243,24 @@ export async function observe(context = {}) {
         diagnostic: { code: "malformed_output", message: `the supplied stream exceeded the ${MAX_OUTPUT_BYTES}-byte limit` },
       });
     }
-    return classifyStream(parseStreamJson(options.stream), ctx);
+    return classifyStream(parseStreamJson(options.stream), ctx, { basis: { configurationBasis: "as-run" } });
   }
 
   const args = ["-p", PROBE_PROMPT];
-  if (options.model !== undefined) args.push("--model", assertOpaqueValue("model", options.model));
-  if (options.effort !== undefined) args.push("--effort", assertOpaqueValue("effort", options.effort));
+  /** @type {string[]} */
+  const carriedFlags = [];
+  for (const [flag, name] of PROBE_FLAGS) {
+    const value = options[name];
+    if (value === undefined) continue;
+    // A bad value is data, not a caller breach, so it is a result with provenance (contract.mjs).
+    if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, baseProvenance(), name);
+    args.push(flag, value);
+    carriedFlags.push(flag);
+  }
   args.push("--output-format", "stream-json", "--verbose", "--no-session-persistence");
+  // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so its answer reflects only
+  // the flags carried in plus Claude's defaults. The evidence names those flags (ARCH-28).
+  const basis = { configurationBasis: /** @type {const} */ ("reconstructed"), reconstructedFrom: carriedFlags };
 
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-claude", command: "claude", args, ...ROOT, stopWhen: initComplete, provenance: baseProvenance() }));
   if (ran.status !== "ok") return ran;
@@ -255,7 +268,7 @@ export async function observe(context = {}) {
   if (outcome.truncated) {
     return makeAdapterResult({ status: "unknown", provenance: baseProvenance(), observedAt: ctx.now(), diagnostic: { code: "malformed_output", message: "the output exceeded the size limit before system/init arrived" } });
   }
-  return classifyStream(parseStreamJson(outcome.stdout), ctx, firstLine(outcome.stderr || outcome.stdout));
+  return classifyStream(parseStreamJson(outcome.stdout), ctx, { basis, detail: firstLine(outcome.stderr || outcome.stdout) });
 }
 
 /** Text Claude prints when its own catalog does not describe a model. */
@@ -295,13 +308,17 @@ export async function validate(input, context) {
     throw new TypeError("claude validate: input must name a model or an effort");
   }
   const { model, effort } = /** @type {any} */ (input);
-  const args = ["-p", PROBE_PROMPT];
-  if (model !== undefined) args.push("--model", assertOpaqueValue("model", model));
-  if (effort !== undefined) args.push("--effort", assertOpaqueValue("effort", effort));
-  args.push("--no-session-persistence");
-
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
+  const args = ["-p", PROBE_PROMPT];
+  for (const [flag, name] of PROBE_FLAGS) {
+    const value = /** @type {any} */ (input)[name];
+    if (value === undefined) continue;
+    if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, provenance, name);
+    args.push(flag, value);
+  }
+  args.push("--no-session-persistence");
+
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-claude", command: "claude", args, ...ROOT, provenance }));
   if (ran.status !== "ok") return ran;
   const text = `${ran.evidence.stderr}\n${ran.evidence.stdout}`;
@@ -336,8 +353,8 @@ export async function validate(input, context) {
   const version = await probeVersion(ctx, { prefix: "mi-claude", command: "claude", ...ROOT, provenance });
   return makeAdapterResult({
     status: "ok",
-    evidence: makeValidationEvidence({ checks, ...(version === undefined ? {} : { runtimeVersion: version }) }),
-    provenance: { ...provenance, ...(version === undefined ? {} : { sourceVersion: version }) },
+    evidence: makeValidationEvidence({ checks, ...runtimeVersionField(version) }),
+    provenance: withSourceVersion(provenance, version),
     observedAt: ctx.now(),
   });
 }
@@ -347,17 +364,18 @@ export async function validate(input, context) {
  *
  * The model becomes `--model` and the reasoning axis becomes `--effort`. Any other axis is named in
  * `unsupportedAxes` rather than dropped (ARCH-49). Nothing is executed and no shell string is built.
+ *
+ * Throws on an invalid axis value, unlike the async operations: it is synchronous and returns a plain
+ * Invocation, so a bad value is a caller error to fix before rendering (failure channels, `contract.mjs`).
  * @param {{runtimeId: string, axes: Record<string, unknown>}} resolvedConfig
  * @returns {Readonly<import("../evidence.mjs").Invocation>}
  */
 export function renderInvocation(resolvedConfig) {
-  if (!isPlainObject(resolvedConfig) || /** @type {any} */ (resolvedConfig).runtimeId !== RUNTIME_ID || !isPlainObject(/** @type {any} */ (resolvedConfig).axes)) {
-    throw new TypeError("claude renderInvocation: the configuration is not a resolved claude configuration");
-  }
-  const axes = /** @type {Record<string, unknown>} */ (/** @type {any} */ (resolvedConfig).axes);
-  const args = [];
-  if (axes.model !== undefined) args.push("--model", assertOpaqueValue("model", axes.model));
-  if (axes.reasoning !== undefined) args.push("--effort", assertOpaqueValue("reasoning", axes.reasoning));
-  const unsupportedAxes = Object.keys(axes).filter((name) => name !== "model" && name !== "reasoning").sort();
-  return makeInvocation({ runtimeId: RUNTIME_ID, command: "claude", args, unsupportedAxes });
+  return renderInvocationFor({ runtimeId: RUNTIME_ID, command: "claude", resolvedConfig, axisArgs: INVOCATION_AXIS_ARGS });
 }
+
+/** The axes Claude Code can express on its command line, and the flag for each, in emit order. */
+const INVOCATION_AXIS_ARGS = Object.freeze({
+  model: (value) => ["--model", value],
+  reasoning: (value) => ["--effort", value],
+});

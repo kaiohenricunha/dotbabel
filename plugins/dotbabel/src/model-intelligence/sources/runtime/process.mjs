@@ -27,7 +27,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { StringDecoder } from "node:string_decoder";
-import { isSecretName, isVersionString, runBounded } from "../contract.mjs";
+import { isSecretName, isVersionString, makeAdapterResult, resolveTimeoutMs, runBounded } from "../contract.mjs";
 
 /** A closed local port. A connection to it is refused at once and nothing leaves the machine. */
 export const DEAD_PROXY = "http://127.0.0.1:9";
@@ -270,10 +270,34 @@ export function runProcess(spec, { signal } = {}) {
  * @returns {string}
  */
 export function assertOpaqueValue(name, value) {
-  if (typeof value !== "string" || value === "" || value.length > 200 || /[\p{Cc}\p{Cf}]/u.test(value) || value.startsWith("-")) {
+  if (typeof value !== "string" || !isOpaqueString(value)) {
     throw new TypeError(`${name} must be a printable string of at most 200 characters that does not start with a dash`);
   }
   return value;
+}
+
+/**
+ * True when a string is safe to hand to a runtime as one argument (see `assertOpaqueValue`).
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isOpaqueString(value) {
+  return value !== "" && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value) && !value.startsWith("-");
+}
+
+/**
+ * Check a caller-supplied value under the failure-channel rule in `contract.mjs`.
+ *
+ * A value that is not a string breaks the caller's contract and throws. A string that fails the
+ * opaque rules is data, which may come from a repository's own frontmatter, so it returns `false`
+ * for the caller to report as an `invalid_axis_value` result instead of an exception.
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {boolean} True when the value is safe to pass on.
+ */
+export function checkOpaqueValue(name, value) {
+  if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
+  return isOpaqueString(value);
 }
 
 /**
@@ -304,8 +328,10 @@ export function firstLine(text) {
  * @property {string} homeDir
  * @property {string} realRoot The runtime's real configuration root, which is read at most and never written.
  * @property {() => string} now
- * @property {number} [timeoutMs]
- * @property {string} [tmpDir]
+ * @property {number} budgetMs The whole operation's time budget (REL-1), shared by every child it starts.
+ * @property {number} startedAt When the operation began, on the `monotonic` clock.
+ * @property {() => number} monotonic A clock in milliseconds that never goes backwards. Injectable for tests.
+ * @property {string | undefined} tmpDir Where scratch roots are made. Always present; `undefined` means the OS temp directory.
  * @property {(path: string, encoding: "utf8") => Promise<string>} readFile
  */
 
@@ -320,16 +346,46 @@ export function resolveContext(context, { rootEnvVar, rootDirName }) {
   const env = ctx.env ?? process.env;
   const homeDir = ctx.homeDir ?? homedir();
   const configured = env[rootEnvVar];
+  // One budget for the whole operation, not one per child: REL-1 bounds an OPERATION, and an
+  // operation such as a multi-axis validate starts several children plus a version probe.
+  const monotonic = ctx.monotonic ?? (() => performance.now());
   return {
+    budgetMs: resolveTimeoutMs({ channel: "subprocess", timeoutMs: ctx.timeoutMs }),
+    startedAt: monotonic(),
+    monotonic,
     runCommand: ctx.runCommand ?? runProcess,
     env,
     homeDir,
     realRoot: configured !== undefined && configured !== "" ? resolve(configured) : join(homeDir, rootDirName),
     now: ctx.now ?? (() => new Date().toISOString()),
-    timeoutMs: ctx.timeoutMs,
     tmpDir: ctx.tmpDir,
     readFile: ctx.readFile ?? readFile,
   };
+}
+
+/**
+ * Whole milliseconds left of the operation's budget. Floored, because a child's timeout must be a
+ * positive integer, so a fraction of a millisecond counts as spent.
+ * @param {RuntimeContext} ctx
+ * @returns {number}
+ */
+function remainingMs(ctx) {
+  return Math.floor(ctx.budgetMs - (ctx.monotonic() - ctx.startedAt));
+}
+
+/**
+ * The `unavailable` result for a step that the operation's spent budget stops before it starts.
+ * @param {RuntimeContext} ctx
+ * @param {object} provenance
+ * @returns {object}
+ */
+function budgetSpent(ctx, provenance) {
+  return makeAdapterResult({
+    status: "unavailable",
+    provenance,
+    observedAt: ctx.now(),
+    diagnostic: { code: "timeout", message: `the operation's ${ctx.budgetMs} ms budget was spent before this step started`, retryable: true },
+  });
 }
 
 /**
@@ -352,6 +408,9 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
   // Checked BEFORE anything is created: a scratch directory inside the real root would make the
   // isolation a fiction, and creating it there would already be a write.
   assertOutsideRoot(ctx.tmpDir ?? tmpdir(), ctx.realRoot);
+  // This child gets only what is left of the operation's budget. Once it is spent, nothing starts:
+  // checked here so a spent budget creates no scratch root, and again after `prepare` below.
+  if (remainingMs(ctx) <= 0) return budgetSpent(ctx, provenance);
   return withScratchRoot(
     prefix,
     async (scratch) => {
@@ -361,6 +420,10 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
       await Promise.all([home, work, runtimeRoot].map((dir) => mkdir(dir, { recursive: true })));
       assertOutsideRoot(scratch, ctx.realRoot);
       if (prepare !== undefined) await prepare({ scratch, home, work, runtimeRoot });
+      // Scratch setup and `prepare` (Codex reads the user's config.toml there) are part of the
+      // operation too, so the child is bounded by what is left after them, not before.
+      const childMs = remainingMs(ctx);
+      if (childMs <= 0) return budgetSpent(ctx, provenance);
       const env = buildIsolatedEnv({ source: ctx.env, home, extra: { [rootEnvVar]: runtimeRoot } });
       /** @type {Promise<unknown> | undefined} */
       let operationSettled;
@@ -369,7 +432,7 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
           operationSettled = ctx.runCommand({ command, args, cwd: work, env, stopWhen }, { signal });
           return operationSettled;
         },
-        { channel: "subprocess", timeoutMs: ctx.timeoutMs, provenance, now: ctx.now },
+        { channel: "subprocess", timeoutMs: childMs, provenance, now: ctx.now },
       );
       // On a timeout, `runBounded` returns as soon as its race against the timer settles; it does
       // not await the losing operation. That operation is still running -- and may still be writing

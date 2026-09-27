@@ -55,10 +55,10 @@ runnable(`codex adapter against the installed CLI ${version ?? "(not installed)"
     const result = await codex.observe();
     expect(result.status).toBe("ok");
     const observed = result.evidence;
-    expect(observed.model).toEqual(expect.any(String));
+    expect(observed.axes.model).toEqual(expect.any(String));
     expect(observed.turnExecuted).toBe(false);
     // The provider comes from its own banner line and is never the model.
-    if (observed.provider !== undefined) expect(observed.provider).not.toBe(observed.model);
+    if (observed.provider !== undefined) expect(observed.provider).not.toBe(observed.axes.model);
     expect(result.provenance.sourceVersion).toBe(version);
   });
 

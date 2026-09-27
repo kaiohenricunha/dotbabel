@@ -138,9 +138,12 @@ describe("codex source adapter", () => {
     const observed = result.evidence;
     // The defect in handoff-extract.sh:276 stored the provider in the model field. Here they are
     // separate fields with separate sources (ARCH-2, ARCH-28).
-    expect(observed).toMatchObject({ runtimeId: "codex", turnExecuted: false, model: "gpt-6-astra", provider: "openai", effort: "xhigh" });
-    expect(observed.model).not.toBe(observed.provider);
-    expect(observed.fieldSources).toEqual({ model: "exec-banner:model", provider: "exec-banner:provider", effort: "exec-banner:reasoning effort" });
+    expect(observed).toMatchObject({ runtimeId: "codex", turnExecuted: false, axes: { model: "gpt-6-astra", reasoning: "xhigh" }, provider: "openai" });
+    expect(observed.axes.model).not.toBe(observed.provider);
+    expect(observed.fieldSources).toEqual({ "axes.model": "exec-banner:model", "axes.reasoning": "exec-banner:reasoning effort", provider: "exec-banner:provider" });
+    // No user config was carried in, so every value is the runtime's own default, and that is stated.
+    expect(observed.configurationBasis).toBe("reconstructed");
+    expect(observed.reconstructedFrom).toEqual([]);
     // Nothing that identifies the scratch run leaks into the evidence.
     expect(JSON.stringify(observed)).not.toMatch(/scratch|session|workdir|00000000/);
     expect(result.provenance.sourceVersion).toBe("0.155.1");
@@ -227,7 +230,11 @@ describe("codex source adapter", () => {
         return outcome({ stderr: banner(), stoppedEarly: true });
       }),
     );
-    await codex.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin", CODEX_HOME: realRoot, OPENAI_API_KEY: "sk-proj-abcdefghijklmnop" }, homeDir: home, now: fixedNow });
+    const result = await codex.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin", CODEX_HOME: realRoot, OPENAI_API_KEY: "sk-proj-abcdefghijklmnop" }, homeDir: home, now: fixedNow });
+    // The banner reflects a scratch config that carries exactly these keys, and the evidence says so,
+    // so a caller never reads a reconstruction as the user's full configuration (ARCH-28).
+    expect(result.evidence.configurationBasis).toBe("reconstructed");
+    expect(result.evidence.reconstructedFrom).toEqual(["model", "model_provider", "model_reasoning_effort"]);
 
     // Only the four model keys, read from the top of the file. The plugin and project sections, and
     // a `model` key inside a table, are private and irrelevant, and are not carried.
@@ -305,13 +312,22 @@ describe("codex source adapter", () => {
     expect(result.evidence.checks[0]).toMatchObject({ axis: "reasoning", verdict: "unverifiable", scope: "key" });
   });
 
-  it("validate() refuses input that could be read as a flag or a TOML injection, and empty input", async () => {
+  it("validate() answers a value that could be read as a flag or a TOML injection with an invalid_axis_value result, and runs nothing", async () => {
     const { runner, ctx } = context(() => outcome({ stderr: banner() }));
-    for (const bad of [{ model: "--config" }, { reasoning: "-c" }, { model: "" }, { model: 3 }, { model: "a" + String.fromCharCode(10) + "b" }]) {
-      await expect(codex.validate(bad, ctx), JSON.stringify(bad)).rejects.toThrow(/model|reasoning/);
+    for (const bad of [{ model: "--config" }, { reasoning: "-c" }, { model: "" }, { model: "a" + String.fromCharCode(10) + "b" }]) {
+      const result = await codex.validate(bad, ctx);
+      expect(result.status, JSON.stringify(bad)).toBe("unknown");
+      expect(result.diagnostic.code, JSON.stringify(bad)).toBe("invalid_axis_value");
+      expect(result.provenance.sourceId).toBe("codex");
     }
+    expect(runner.calls).toHaveLength(0);
+  });
+
+  it("validate() throws when the caller breaks the input contract: no known axis, or a value that is not a string", async () => {
+    const { runner, ctx } = context(() => outcome({ stderr: banner() }));
     await expect(codex.validate({}, ctx)).rejects.toThrow(/model or a reasoning/);
     await expect(codex.validate({ contextTier: "1m" }, ctx)).rejects.toThrow(/model or a reasoning/);
+    await expect(codex.validate({ model: 3 }, ctx)).rejects.toThrow(/model must be a string/);
     expect(runner.calls).toHaveLength(0);
   });
 
