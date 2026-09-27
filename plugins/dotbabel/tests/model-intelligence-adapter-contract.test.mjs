@@ -300,6 +300,10 @@ describe("source adapter contract", () => {
       expect((await run(code)).diagnostic.code, code).toBe("network_unavailable");
     }
     expect((await run("ETIMEDOUT")).diagnostic.code).toBe("timeout");
+    // Node's fetch keeps the errno on `cause`; the error's own code, when present, still wins.
+    const viaCause = (code, own) => runBounded(() => { throw Object.assign(new TypeError("fetch failed"), { cause: Object.assign(new Error(code), { code }), ...(own ? { code: own } : {}) }); }, { channel: "network", provenance: prov });
+    expect((await viaCause("ECONNREFUSED")).diagnostic.code).toBe("network_unavailable");
+    expect((await viaCause("ECONNREFUSED", "ENOENT")).diagnostic.code).toBe("binary_missing");
     // An unrecognised errno is named as such instead of being forced into one of the
     // above: guessing a failure mode is how a diagnostic misleads.
     expect((await run("EIO")).diagnostic.code).toBe("runtime_error");

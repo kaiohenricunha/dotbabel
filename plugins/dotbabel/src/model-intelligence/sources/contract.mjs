@@ -458,7 +458,8 @@ export function assertDescriptor(descriptor) {
  * frontmatter. A value that fails validation is `unknown` with code `invalid_axis_value`,
  * with provenance intact. An operation THROWS only for a caller-contract breach (a missing
  * or wrongly typed input, such as a model that is not a string) and for a safety fault
- * such as the SEC-1 root check, which must never be absorbed.
+ * such as the SEC-1 root check or a knowledge-source URL that is not HTTPS (SEC-3), which
+ * must never be absorbed.
  *
  * One exception, split by operation rather than by source: `renderInvocation` is
  * synchronous and returns a plain Invocation, so it throws on any invalid value, even one
@@ -893,7 +894,11 @@ export function resolveTimeoutMs({ channel, timeoutMs }) {
  * @returns {string}
  */
 function codeForError(err) {
-  const code = isPlainObject(err) ? /** @type {any} */ (err).code : undefined;
+  // Node's fetch rejects with `TypeError: fetch failed` and keeps the errno on `cause`, so
+  // reading only the error's own code would report a refused connection as `runtime_error`.
+  const own = isPlainObject(err) ? /** @type {any} */ (err).code : undefined;
+  const cause = isPlainObject(err) && isPlainObject(/** @type {any} */ (err).cause) ? /** @type {any} */ (err).cause.code : undefined;
+  const code = own ?? cause;
   if (code === "ENOENT" || code === "EACCES" || code === "EPERM") return "binary_missing";
   if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ENETUNREACH" || code === "EAI_AGAIN") return "network_unavailable";
   if (code === "ETIMEDOUT") return "timeout";
