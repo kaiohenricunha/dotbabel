@@ -380,6 +380,14 @@ Fail the job on exit `1` **and** exit `2`. Exit `2` means a tool, report, base, 
 
 `--allow-project-commands` authorizes project-owned commands for that one run and never persists. Local runs use the exact-path trust allowlist instead.
 
+This repository does not schedule its own `deep` job. A whole-repository deep run takes about 1.5 hours on a hosted runner, so `.github/workflows/quality.yml` runs it only on `workflow_dispatch`. Run the routine deep audit locally:
+
+```bash
+dotbabel quality check --profile deep --all
+```
+
+The job uses `--all`, not `--base origin/main`. A dispatched run checks out the default branch, so a base of `origin/main` gives an empty diff, and every changed-scope rule reports `not_applicable`. `plugins/dotbabel/tests/dogfood-quality-workflow.test.mjs` pins both choices. The consumer template in `plugins/dotbabel/templates/workflows/quality.yml` keeps its weekly schedule.
+
 ### Mutation testing
 
 `mutation.changed_score` counts only the mutants that **start on a line the

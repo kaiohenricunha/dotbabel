@@ -447,7 +447,10 @@ describe("process helper boundaries", () => {
         releaseOperation = () => resolvePromise(outcome({ stdout: "late" }));
       });
     };
-    const ctx = resolveContext({ runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 20 }, ROOT);
+    // A frozen monotonic clock keeps scratch setup from spending the budget, which on a loaded machine
+    // can take longer than the budget itself and stop the child before it starts. The real timer still
+    // fires at timeoutMs, which is the precondition for the cleanup ordering this test checks.
+    const ctx = resolveContext({ runCommand, env: { PATH: "/usr/bin" }, homeDir: "/nowhere", now: fixedNow, timeoutMs: 20, monotonic: () => 0 }, ROOT);
     const pending = runIsolated(ctx, { prefix: "mi-race", command: "codex", args: ["x"], ...ROOT, provenance: { sourceId: "codex", sourceKind: "runtime" } });
 
     await new Promise((r) => setTimeout(r, 100)); // well past the 20ms timeout
