@@ -7,6 +7,7 @@
 #   bench.sh pilot      each suite at 5 and 15 CPUs, and 2 concurrent DV runs
 #   bench.sh full       phase A (scaling) and phase B (fleet throughput)
 #   bench.sh phase-a | phase-b
+#   bench.sh phase-c    jobs arrive over time and queue for lanes (test 1)
 #   bench.sh teardown   remove the bench slots
 #   bench.sh stop       end a detached run and every test it started
 #
@@ -21,6 +22,8 @@
 #   BENCH_REPS_A    phase A repetitions      (default 3)
 #   BENCH_REPS_B    phase B repetitions      (default 2)
 #   BENCH_SEED      shuffle seed             (default 20260927)
+#   BENCH_REPS_C    phase C repetitions      (default 3)
+#   BENCH_ARRIVAL_WINDOW_S / BENCH_ARRIVAL_MEAN_S  phase C arrivals (default 360 / 36)
 
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,6 +34,11 @@ NS="${BENCH_NS:-2 3 4 5 6 8 10 15}"
 REPS_A="${BENCH_REPS_A:-3}"
 REPS_B="${BENCH_REPS_B:-2}"
 SEED="${BENCH_SEED:-20260927}"
+REPS_C="${BENCH_REPS_C:-3}"
+ARRIVAL_WINDOW_S="${BENCH_ARRIVAL_WINDOW_S:-360}"
+ARRIVAL_MEAN_S="${BENCH_ARRIVAL_MEAN_S:-36}"
+SLOTS="${BENCH_SLOTS:-2}"
+SELF="$HERE/bench.sh"
 LANES_DIR="${DOTBABEL_FLEET_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/dotbabel/fleet}/lanes"
 FLEET_LANE="$PROJECTS/dotbabel/plugins/dotbabel/scripts/fleet-lane.sh"
 DRIFT_CPU=15
@@ -49,6 +57,9 @@ declare -A LAYOUT=(
   [1x15]="0-14"
   [unlaned]="-;-;-;-;-"
 )
+# Phase C: the layouts to compare, and the job mix (a pick is uniform over this list).
+LAYOUTS_C=(3x5 2x7 4x4)
+MIX_C="DV DV DV SV SV SG SG DB MP"
 
 mkdir -p "$OUT" "$LOGS"
 TRIALS="$OUT/trials.jsonl"
@@ -72,7 +83,7 @@ setup_slots() {
   for suite in "${SUITES[@]}"; do
     repo=${REPO[$suite]}
     main="$PROJECTS/$repo"
-    for n in 1 2; do
+    for ((n = 1; n <= SLOTS; n++)); do
       dir=$(slot_dir "$suite" "$n")
       if [ ! -d "$dir" ]; then
         git -C "$main" worktree add -q --detach "$dir" "$(sha_of "$repo")" || return 1
@@ -90,7 +101,7 @@ setup_slots() {
 teardown_slots() {
   local suite n dir
   for suite in "${SUITES[@]}"; do
-    for n in 1 2; do
+    for n in 1 2 3 4 5 6; do
       dir=$(slot_dir "$suite" "$n")
       [ -d "$dir" ] || continue
       # Bench slots are disposable: only test output and hardlinked deps live there.
@@ -314,6 +325,97 @@ phase_b() {
   done
 }
 
+# ------------------------------------------------------------ phase C ----
+#
+# Jobs arrive as a seeded Poisson stream and go through the real
+# fleet-lane.sh (its FIFO queue, taskset, and env), with a private state
+# directory and the layout under test. The arrival schedule of a repetition
+# is the same for every layout.
+
+schedule_c() { # <seed> → "<ms offset> <suite>" lines
+  awk -v seed="$1" -v mean="$ARRIVAL_MEAN_S" -v win="$ARRIVAL_WINDOW_S" -v mix="$MIX_C" 'BEGIN {
+    srand(seed); n = split(mix, m, " "); t = 0
+    while (t <= win) {
+      printf "%d %s\n", t * 1000, m[int(rand() * n) + 1]
+      t += -mean * log(1 - rand())
+    }
+  }'
+}
+
+# Inside the lane: take a free slot of the suite, run it, give the slot back.
+lane_job() { # <suite> <id>
+  local suite=$1 id=$2 n dir rc
+  local locks="$LOGS/slot-locks"
+  mkdir -p "$locks"
+  while :; do
+    for ((n = 1; n <= SLOTS; n++)); do mkdir "$locks/$suite-$n" 2>/dev/null && break 2; done
+    sleep 0.2
+  done
+  printf '%s %s %s %s\n' "$(now_ms)" "${DOTBABEL_LANE:-}" "${DOTBABEL_LANE_CPUS:-}" "$n" >"$LOGS/$id.start"
+  dir=$(slot_dir "$suite" "$n")
+  (cd "$dir" && /usr/bin/time -o "$LOGS/$id.time" -f '%e %U %S %M' bash -c "$(suite_cmd "$suite")") >"$LOGS/$id.log" 2>&1
+  rc=$?
+  rmdir "$locks/$suite-$n"
+  return "$rc"
+}
+
+arrival_job() { # <layout> <rep> <pos> <suite> <private state dir>
+  local layout=$1 rep=$2 pos=$3 suite=$4 priv=$5 id arrive rc end
+  id="C-$layout-r$rep-q$pos-$suite"
+  arrive=$(now_ms)
+  for fd in "${LOCK_FDS[@]}"; do eval "exec $fd>&-"; done
+  env -u DOTBABEL_LANE -u DOTBABEL_LANE_CPUS DOTBABEL_FLEET_STATE_DIR="$priv" \
+    DOTBABEL_FLEET_LANES="${LAYOUT[$layout]}" DOTBABEL_LANE_SESSION=bench \
+    bash "$FLEET_LANE" --name "$suite" -- bash "$SELF" _lane-job "$suite" "$id" 2>>"$LOGS/$id.queue"
+  rc=$?
+  end=$(now_ms)
+  local start lane cpus slot wall user sys rss
+  read -r start lane cpus slot <"$LOGS/$id.start" 2>/dev/null || true
+  read -r wall user sys rss < <(tail -1 "$LOGS/$id.time" 2>/dev/null) || true
+  jq -cn --arg layout "$layout" --argjson rep "$rep" --argjson pos "$pos" --arg suite "$suite" \
+    --argjson arrive "$arrive" --argjson start "${start:-null}" --argjson end "$end" \
+    --argjson lane "${lane:-null}" --arg cpus "${cpus:-}" --argjson slot "${slot:-null}" --argjson rc "$rc" \
+    --argjson wall "${wall:-null}" --argjson user "${user:-null}" --argjson sys "${sys:-null}" \
+    --argjson rss "${rss:-null}" --argjson failures "$(failures_of "$suite" "$LOGS/$id.log")" \
+    --argjson timeouts "$(timeouts_of "$LOGS/$id.log")" --argjson drift "${DRIFT:-null}" \
+    '{phase:"C",layout:$layout,rep:$rep,pos:$pos,suite:$suite,arrive:$arrive,start:$start,end:$end,
+      lane:$lane,cpus:$cpus,slot:$slot,exit:$rc,wall:$wall,user:$user,sys:$sys,maxrss_kb:$rss,
+      failures:$failures,timeouts:$timeouts,drift_ms:$drift}' >>"$TRIALS"
+  log "$id wait=$(( (${start:-$end} - arrive) / 1000 ))s exit=$rc wall=${wall:-?}s"
+}
+
+run_layout_c() { # <layout> <rep>
+  local layout=$1 rep=$2 priv t0 ms suite pos=0
+  priv="$LOGS/state-C-$layout-r$rep"
+  rm -rf "$priv"
+  mkdir -p "$priv"
+  local -a jobs_c=()
+  echo "C-$layout-r$rep" >"$CURRENT"
+  t0=$(now_ms)
+  while read -r ms suite; do
+    local wait_ms=$((t0 + ms - $(now_ms)))
+    [ "$wait_ms" -gt 0 ] && sleep "$((wait_ms / 1000)).$(printf '%03d' $((wait_ms % 1000)))"
+    arrival_job "$layout" "$rep" "$pos" "$suite" "$priv" &
+    jobs_c+=("$!")
+    pos=$((pos + 1))
+  done < <(schedule_c "$((SEED + 200 + rep))")
+  wait "${jobs_c[@]}"
+  jq -cn --arg layout "$layout" --argjson rep "$rep" --argjson t0 "$t0" --argjson t1 "$(now_ms)" --argjson n "$pos" \
+    '{phase:"C-layout",layout:$layout,rep:$rep,start:$t0,end:$t1,jobs:$n}' >>"$TRIALS"
+  : >"$CURRENT"
+  log "phase C $layout r$rep: $pos jobs in $((($(now_ms) - t0) / 1000))s"
+}
+
+phase_c() {
+  local rep layout
+  for ((rep = 1; rep <= REPS_C; rep++)); do
+    while read -r layout; do
+      prepare
+      run_layout_c "$layout" "$rep"
+    done < <(printf '%s\n' "${LAYOUTS_C[@]}" | shuffle "$((SEED + 300 + rep))")
+  done
+}
+
 pilot() {
   local suite
   for suite in "${SUITES[@]}"; do
@@ -340,12 +442,14 @@ main() {
   case "$cmd" in
     setup) setup_slots ;;
     teardown) teardown_slots ;;
+    _lane-job) lane_job "$2" "$3" ;;
     stop)
       # The run is a process-group leader (setsid): end it and every test it started.
       local pid
       pid=$(cat "$OUT/bench.pid" 2>/dev/null) && kill -TERM -- "-$(ps -o pgid= -p "$pid" | tr -d ' ')"
       ;;
-    pilot | full | phase-a | phase-b)
+    pilot | full | phase-a | phase-b | phase-c)
+      [ "$cmd" = phase-c ] && SLOTS=4
       echo "$$" >"$OUT/bench.pid"
       trap 'release_lanes' EXIT
       trap 'exit 130' INT TERM HUP
@@ -365,6 +469,7 @@ main() {
         full) phase_a && phase_b ;;
         phase-a) phase_a ;;
         phase-b) phase_b ;;
+        phase-c) phase_c ;;
       esac
       log "$cmd done"
       ;;

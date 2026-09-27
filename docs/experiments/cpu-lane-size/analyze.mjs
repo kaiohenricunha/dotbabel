@@ -202,4 +202,58 @@ if (runs.length) {
   out.push("");
 }
 
+// Phase C: jobs arrive over time and queue for lanes.
+const arrivals = trials.filter((t) => t.phase === "C");
+if (arrivals.length) {
+  const SHORT = new Set(["DV", "SG"]);
+  const cRuns = trials.filter((t) => t.phase === "C-layout");
+  const stats = {};
+  for (const layout of [...new Set(arrivals.map((t) => t.layout))]) {
+    const rows = arrivals.filter((t) => t.layout === layout);
+    const wait = rows.map((t) => ((t.start ?? t.end) - t.arrive) / 1000);
+    const turn = rows.map((t) => (t.end - t.arrive) / 1000);
+    const shortTurn = rows.filter((t) => SHORT.has(t.suite)).map((t) => (t.end - t.arrive) / 1000);
+    const samples = cRuns.filter((r) => r.layout === layout).flatMap((r) => window(`C-${layout}-r${r.rep}`));
+    stats[layout] = {
+      jobs: rows.length,
+      meanTurn: turn.reduce((s, x) => s + x, 0) / turn.length,
+      p95Turn: quantile(turn, 0.95),
+      p50Wait: quantile(wait, 0.5),
+      p95Wait: quantile(wait, 0.95),
+      shortP95: quantile(shortTurn, 0.95),
+      failures: rows.reduce((n, t) => n + (t.failures || 0) + (t.exit !== 0 && !t.failures ? 1 : 0), 0),
+      nodeP95: quantile(samples.map((p) => p.node_ms), 0.95),
+      span: median(cRuns.filter((r) => r.layout === layout).map((r) => (r.end - r.start) / 1000)),
+    };
+  }
+  out.push(
+    "## Phase C: jobs arrive over time",
+    "",
+    table(
+      ["layout", "jobs", "mean turnaround s", "p95 turnaround s", "p50 wait s", "p95 wait s", "short p95 s", "failures", "node p95 ms", "median run s"],
+      Object.entries(stats).map(([k, s]) => [k, s.jobs, fmt(s.meanTurn), fmt(s.p95Turn), fmt(s.p50Wait), fmt(s.p95Wait), fmt(s.shortP95), s.failures, fmt(s.nodeP95, 0), fmt(s.span, 0)]),
+    ),
+    "",
+  );
+  // Locked rule: a layout replaces 3x5 only when it wins clearly and costs nothing else.
+  const base = stats["3x5"];
+  if (base) {
+    const winners = Object.entries(stats)
+      .filter(([k]) => k !== "3x5")
+      .filter(([, s]) => s.meanTurn <= base.meanTurn * 0.95)
+      .filter(([, s]) => s.shortP95 <= base.shortP95 * 1.2)
+      .filter(([, s]) => s.failures <= base.failures)
+      .filter(([, s]) => !(s.nodeP95 > base.nodeP95 * 1.5))
+      .sort((x, y) => x[1].meanTurn - y[1].meanTurn);
+    out.push(
+      "## Phase C decision",
+      "",
+      winners.length
+        ? `**${winners[0][0]}** replaces 3x5: mean turnaround ${fmt(winners[0][1].meanTurn)} s against ${fmt(base.meanTurn)} s (${fmt((1 - winners[0][1].meanTurn / base.meanTurn) * 100)}% lower).`
+        : `No layout beats 3x5 by the locked rule, so 3x5 stays (mean turnaround ${fmt(base.meanTurn)} s).`,
+      "",
+    );
+  }
+}
+
 process.stdout.write(`${out.join("\n")}\n`);
