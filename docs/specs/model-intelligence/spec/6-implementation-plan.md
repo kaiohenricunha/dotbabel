@@ -812,27 +812,27 @@ Decided by the owner on 2026-09-18, after P-1 and P-2 landed. §6.3 defines the 
 
 An implementation unit is not mechanically one pull request. The planning target is ~25 PRs rather than the 32 that one-PR-per-sub-prompt would imply. Ship the §6.3 units in this order:
 
-| PR    | Units             | PR    | Units         |
-| ----- | ----------------- | ----- | ------------- |
-| PR-01 | P-1 + P-2         | PR-14 | P-17          |
-| PR-02 | P-3               | PR-15 | P-18          |
-| PR-03 | P-4               | PR-16 | P-19a + P-19b |
-| PR-04 | P-5               | PR-17 | P-19c         |
-| PR-05 | P-6 + P-7         | PR-18 | P-19d         |
-| PR-06 | P-8a (P-8b later) | PR-19 | P-19e         |
-| PR-07 | P-9               | PR-20 | P-19f         |
-| PR-08 | P-10 + P-11       | PR-21 | P-20          |
-| PR-09 | P-12              | PR-22 | P-21          |
-| PR-10 | P-13              | PR-23 | P-22a + P-22b |
-| PR-11 | P-14              | PR-24 | P-22c + P-22d |
-| PR-12 | P-15              | PR-25 | P-23          |
-| PR-13 | P-16              |       |               |
+| PR    | Units       | PR    | Units         |
+| ----- | ----------- | ----- | ------------- |
+| PR-01 | P-1 + P-2   | PR-14 | P-17          |
+| PR-02 | P-3         | PR-15 | P-18          |
+| PR-03 | P-4         | PR-16 | P-19a + P-19b |
+| PR-04 | P-5         | PR-17 | P-19c         |
+| PR-05 | P-6 + P-7   | PR-18 | P-19d         |
+| PR-06 | P-8a        | PR-19 | P-19e         |
+| PR-07 | P-9         | PR-20 | P-19f         |
+| PR-08 | P-10 + P-11 | PR-21 | P-20          |
+| PR-09 | P-12        | PR-22 | P-21          |
+| PR-10 | P-13        | PR-23 | P-22a + P-22b |
+| PR-11 | P-14        | PR-24 | P-22c + P-22d |
+| PR-12 | P-15        | PR-25 | P-23          |
+| PR-13 | P-16        | PR-26 | P-8b          |
 
 Why each group exists:
 
 - **P-1 + P-2** — the domain vocabulary and the canonical requirement/schema are one foundation. Landed as PR #387 and PR #389; the split was incidental, not a precedent.
 - **P-6 + P-7** — the Claude and Codex adapters implement the same stabilised adapter contract and keep separate tests.
-- **P-8a + P-8b** — the knowledge-source implementations share one boundary. Split this PR if the official-provider adapter proves materially larger than expected. Split on 2026-09-27: RQ-1 closed for Models.dev only, so P-8a lands alone and P-8b follows in its own PR once the OpenAI response shape is known. The plan becomes 26 PRs.
+- **P-8a + P-8b** — the knowledge-source implementations share one boundary. Split this PR if the official-provider adapter proves materially larger than expected. Split on 2026-09-27: RQ-1 closed for Models.dev only, so P-8a lands alone as PR-06, and P-8b follows as PR-26 once the OpenAI response shape is known. The plan becomes 26 PRs.
 - **P-10 + P-11** — P-10 deliberately leaves enforcement and explanation stubbed, and P-11 completes the resolver. Grouping avoids merging that artificial intermediate state.
 - **P-19a + P-19b** — both are low-risk, unambiguous migration batches.
 - **P-22a + P-22b** and **P-22c + P-22d** — adapter-only runtime coverage under the current scope. These PRs do not introduce cross-runtime agent fan-out, which §2 puts out of scope.
