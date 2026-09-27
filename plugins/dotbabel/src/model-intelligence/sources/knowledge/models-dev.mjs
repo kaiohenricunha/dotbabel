@@ -234,7 +234,7 @@ function reduceDocument(doc, requested) {
       continue;
     }
     const provider = doc[id];
-    if (!isPlainObject(provider) || !isPlainObject(/** @type {any} */ (provider).models) || Array.isArray(/** @type {any} */ (provider).models)) {
+    if (!isPlainObject(provider) || !isPlainObject(/** @type {any} */ (provider).models)) {
       skipped += 1;
       continue;
     }
@@ -298,7 +298,7 @@ export async function discover(context) {
   } catch {
     return result("unknown", "malformed_output", "the response was not JSON");
   }
-  if (!isPlainObject(doc) || Array.isArray(doc)) return result("unknown", "malformed_output", "the response was not the JSON object keyed by provider that was expected");
+  if (!isPlainObject(doc)) return result("unknown", "malformed_output", "the response was not the JSON object keyed by provider that was expected");
 
   const evidence = reduceDocument(doc, requested);
   if (evidence.providers.length === 0) {
