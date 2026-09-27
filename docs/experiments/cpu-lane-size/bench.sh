@@ -8,6 +8,8 @@
 #   bench.sh full       phase A (scaling) and phase B (fleet throughput)
 #   bench.sh phase-a | phase-b
 #   bench.sh phase-c    jobs arrive over time and queue for lanes (test 1)
+#   bench.sh launch-c [HH:MM]  wait until HH:MM, then run phase-c in its own
+#                       systemd user scope (phase C refuses to run outside one)
 #   bench.sh teardown   remove the bench slots
 #   bench.sh stop       end a detached run and every test it started
 #
@@ -24,6 +26,9 @@
 #   BENCH_SEED      shuffle seed             (default 20260927)
 #   BENCH_REPS_C    phase C repetitions      (default 3)
 #   BENCH_ARRIVAL_WINDOW_S / BENCH_ARRIVAL_MEAN_S  phase C arrivals (default 360 / 36)
+#   BENCH_GATE_PCT / BENCH_TRIP_PCT  foreign CPU, % of all CPUs (default 6 / 12)
+#   BENCH_TRIP_SAMPLES  seconds above the trip level that spoil a run (default 60)
+#   BENCH_LAYOUTS_C / BENCH_MIX_C   phase C layouts and job mix (smoke tests)
 
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,6 +43,19 @@ REPS_C="${BENCH_REPS_C:-3}"
 ARRIVAL_WINDOW_S="${BENCH_ARRIVAL_WINDOW_S:-360}"
 ARRIVAL_MEAN_S="${BENCH_ARRIVAL_MEAN_S:-36}"
 SLOTS="${BENCH_SLOTS:-2}"
+# Foreign load: CPU used outside the benchmark's own cgroup. The layouts use
+# CPUs 0-14 and keep CPU 15 free, so about 1 CPU of foreign load (6% of 16)
+# fits on the free CPU; about 2 CPUs (12%) take time from the lanes.
+GATE_PCT="${BENCH_GATE_PCT:-6}"
+TRIP_PCT="${BENCH_TRIP_PCT:-12}"
+TRIP_SAMPLES="${BENCH_TRIP_SAMPLES:-60}"
+GATE_WINDOW_S="${BENCH_GATE_WINDOW_S:-30}"
+GATE_WAIT_START_S="${BENCH_GATE_WAIT_START_S:-10800}"
+GATE_WAIT_S="${BENCH_GATE_WAIT_S:-1800}"
+MAX_REPS_C="${BENCH_MAX_REPS_C:-$((REPS_C + 2))}"
+CLK_TCK=$(getconf CLK_TCK)
+NCPU=$(getconf _NPROCESSORS_ONLN)
+CGROUP_DIR=""
 SELF="$HERE/bench.sh"
 LANES_DIR="${DOTBABEL_FLEET_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/dotbabel/fleet}/lanes"
 FLEET_LANE="$PROJECTS/dotbabel/plugins/dotbabel/scripts/fleet-lane.sh"
@@ -58,8 +76,8 @@ declare -A LAYOUT=(
   [unlaned]="-;-;-;-;-"
 )
 # Phase C: the layouts to compare, and the job mix (a pick is uniform over this list).
-LAYOUTS_C=(3x5 2x7 4x4)
-MIX_C="DV DV DV SV SV SG SG DB MP"
+read -r -a LAYOUTS_C <<<"${BENCH_LAYOUTS_C:-3x5 2x7 4x4}"
+MIX_C="${BENCH_MIX_C:-DV DV DV SV SV SG SG DB MP}"
 
 mkdir -p "$OUT" "$LOGS"
 TRIALS="$OUT/trials.jsonl"
@@ -174,9 +192,120 @@ drift_ms() {
   taskset -c "$DRIFT_CPU" node -e 'const t=process.hrtime.bigint();let x=0;for(let i=0;i<2.3e8;i++)x+=i;if(x<0)console.log(x);console.log(Number((process.hrtime.bigint()-t)/1000000n))'
 }
 
+# The benchmark's own cgroup: a systemd user scope named lane-bench*.scope.
+# Its cpu.stat counts every process of the run, also the ones that exited.
+find_cgroup() {
+  local cg
+  cg=$(sed -n 's/^0:://p' /proc/self/cgroup)
+  [[ ${cg##*/} == lane-bench*.scope ]] || return 1
+  CGROUP_DIR="/sys/fs/cgroup$cg"
+  [ -r "$CGROUP_DIR/cpu.stat" ]
+}
+
+# "<busy jiffies> <steal jiffies> <benchmark usage usec> <now usec>"
+cpu_snap() {
+  local _cpu user nice system _idle _iowait irq softirq steal _rest usage=0
+  read -r _cpu user nice system _idle _iowait irq softirq steal _rest </proc/stat
+  [ -n "$CGROUP_DIR" ] && usage=$(awk '/^usage_usec/{print $2}' "$CGROUP_DIR/cpu.stat" 2>/dev/null)
+  echo "$((user + nice + system + irq + softirq)) $steal ${usage:-0} $(date +%s%6N)"
+}
+
+# CPU used outside the benchmark between two snapshots, and steal, in tenths
+# of a percent of all CPUs: "<foreign> <steal>".
+foreign_between() {
+  local -a a b
+  read -r -a a <<<"$1"
+  read -r -a b <<<"$2"
+  local cap=$((NCPU * (b[3] - a[3])))
+  if [ "$cap" -le 0 ]; then
+    echo "0 0"
+    return
+  fi
+  local busy=$(((b[0] - a[0]) * 1000000 / CLK_TCK)) own=$((b[2] - a[2]))
+  local foreign=$((busy - own))
+  [ "$foreign" -gt 0 ] || foreign=0
+  echo "$((foreign * 1000 / cap)) $(((b[1] - a[1]) * 1000000 / CLK_TCK * 1000 / cap))"
+}
+
+pct() { printf '%d.%d' "$(($1 / 10))" "$(($1 % 10))"; }
+
+# Log what uses the CPU outside the benchmark, for the morning log.
+report_foreign() {
+  local own=" "
+  [ -n "$CGROUP_DIR" ] && own=" $(tr '\n' ' ' <"$CGROUP_DIR/cgroup.procs") "
+  top -b -n 2 -d 2 -o %CPU -w 200 |
+    awk -v own="$own" '/^top -/{f++} f==2 && $1 ~ /^[0-9]+$/ && $9+0 >= 5 && index(own, " " $1 " ") == 0 {printf "  %s%% %s (pid %s)\n", $9, $12, $1}' |
+    head -8 >&2
+  timeout 20 docker stats --no-stream --format '  docker {{.Name}} {{.CPUPerc}}' 2>/dev/null | grep -v ' 0.00%' >&2
+  return 0
+}
+
+# Start only on a quiet host: foreign CPU at or below GATE_PCT for a whole
+# window. There is no "start anyway": after max_wait the run stops without data.
+gate_quiet() { # <max wait s> <label>
+  local max=$1 label=$2 start=$SECONDS a b f st last_report=-300
+  while :; do
+    a=$(cpu_snap)
+    sleep "$GATE_WINDOW_S"
+    b=$(cpu_snap)
+    read -r f st <<<"$(foreign_between "$a" "$b")"
+    if [ "$f" -le $((GATE_PCT * 10)) ]; then
+      log "quiet before $label: foreign $(pct "$f")%, steal $(pct "$st")%"
+      return 0
+    fi
+    if ((SECONDS - last_report >= 300)); then
+      log "waiting before $label: foreign $(pct "$f")% > ${GATE_PCT}%"
+      report_foreign
+      last_report=$SECONDS
+    fi
+    if ((SECONDS - start >= max)); then
+      log "host not quiet before $label after ${max}s; stopping without data"
+      report_foreign
+      jq -cn --arg label "$label" --argjson foreign "$f" --argjson t "$(now_ms)" \
+        '{phase:"C-abort",label:$label,foreign_permille:$foreign,t:$t}' >>"$TRIALS"
+      return 1
+    fi
+  done
+}
+
+# Check the meter on the quiet host before any data: 3 busy processes in
+# another scope must read as foreign (3 of the CPUs), and the same load in this
+# scope must not. The permille thresholds allow for noise.
+meter_selfcheck() {
+  local a b base ext own st pid expected
+  local -a busy=()
+  a=$(cpu_snap)
+  sleep 5
+  b=$(cpu_snap)
+  read -r base st <<<"$(foreign_between "$a" "$b")"
+  systemd-run --user --scope --quiet --unit="lane-foreign-check-$$" -- \
+    bash -c 'for j in 1 2 3; do timeout 5 yes >/dev/null & done; wait' &
+  pid=$!
+  a=$(cpu_snap)
+  sleep 5
+  b=$(cpu_snap)
+  wait "$pid"
+  read -r ext st <<<"$(foreign_between "$a" "$b")"
+  for _ in 1 2 3; do
+    timeout 5 yes >/dev/null &
+    busy+=("$!")
+  done
+  a=$(cpu_snap)
+  sleep 5
+  b=$(cpu_snap)
+  wait "${busy[@]}"
+  read -r own st <<<"$(foreign_between "$a" "$b")"
+  expected=$((3 * 1000 / NCPU))
+  jq -cn --argjson base "$base" --argjson ext "$ext" --argjson own "$own" --argjson expected "$expected" \
+    '{phase:"C-meter",base_permille:$base,outside_permille:$ext,inside_permille:$own,expected_step:$expected}' >>"$TRIALS"
+  log "meter check: base $(pct "$base")%, 3 CPUs outside $(pct "$ext")%, 3 CPUs inside $(pct "$own")% (step should be $(pct "$expected")%)"
+  ((ext - base >= expected * 2 / 3 && own - base <= expected / 3))
+}
+
 start_probe() {
   (
-    local t0 t1 t2 load psi
+    local t0 t1 t2 load psi prev cur f st
+    prev=$(cpu_snap)
     while :; do
       t0=$(date +%s%N)
       node -e 0
@@ -185,9 +314,12 @@ start_probe() {
       t2=$(date +%s%N)
       read -r load _ </proc/loadavg
       psi=$(awk '/^some/{split($2,a,"=");split($5,b,"=");print a[2]" "b[2]}' /proc/pressure/cpu)
-      printf '{"t":%s,"trial":"%s","load1":%s,"psi_avg10":%s,"psi_total":%s,"node_ms":%s,"bash_ms":%s}\n' \
+      cur=$(cpu_snap)
+      read -r f st <<<"$(foreign_between "$prev" "$cur")"
+      prev=$cur
+      printf '{"t":%s,"trial":"%s","load1":%s,"psi_avg10":%s,"psi_total":%s,"node_ms":%s,"bash_ms":%s,"foreign_pct":%s,"steal_pct":%s}\n' \
         "$((t0 / 1000000))" "$(cat "$CURRENT" 2>/dev/null)" "$load" "${psi% *}" "${psi#* }" \
-        "$(((t1 - t0) / 1000000))" "$(((t2 - t1) / 1000000))" >>"$PROBE"
+        "$(((t1 - t0) / 1000000))" "$(((t2 - t1) / 1000000))" "$(pct "$f")" "$(pct "$st")" >>"$PROBE"
       sleep 1
     done
   ) &
@@ -359,9 +491,9 @@ lane_job() { # <suite> <id>
   return "$rc"
 }
 
-arrival_job() { # <layout> <rep> <pos> <suite> <private state dir>
-  local layout=$1 rep=$2 pos=$3 suite=$4 priv=$5 id arrive rc end
-  id="C-$layout-r$rep-q$pos-$suite"
+arrival_job() { # <layout> <rep> <attempt> <pos> <suite> <private state dir>
+  local layout=$1 rep=$2 attempt=$3 pos=$4 suite=$5 priv=$6 id arrive rc end
+  id="C-$layout-r$rep-a$attempt-q$pos-$suite"
   arrive=$(now_ms)
   for fd in "${LOCK_FDS[@]}"; do eval "exec $fd>&-"; done
   env -u DOTBABEL_LANE -u DOTBABEL_LANE_CPUS DOTBABEL_FLEET_STATE_DIR="$priv" \
@@ -372,48 +504,85 @@ arrival_job() { # <layout> <rep> <pos> <suite> <private state dir>
   local start lane cpus slot wall user sys rss
   read -r start lane cpus slot <"$LOGS/$id.start" 2>/dev/null || true
   read -r wall user sys rss < <(tail -1 "$LOGS/$id.time" 2>/dev/null) || true
-  jq -cn --arg layout "$layout" --argjson rep "$rep" --argjson pos "$pos" --arg suite "$suite" \
+  jq -cn --arg layout "$layout" --argjson rep "$rep" --argjson attempt "$attempt" --argjson pos "$pos" --arg suite "$suite" \
     --argjson arrive "$arrive" --argjson start "${start:-null}" --argjson end "$end" \
     --argjson lane "${lane:-null}" --arg cpus "${cpus:-}" --argjson slot "${slot:-null}" --argjson rc "$rc" \
     --argjson wall "${wall:-null}" --argjson user "${user:-null}" --argjson sys "${sys:-null}" \
     --argjson rss "${rss:-null}" --argjson failures "$(failures_of "$suite" "$LOGS/$id.log")" \
     --argjson timeouts "$(timeouts_of "$LOGS/$id.log")" --argjson drift "${DRIFT:-null}" \
-    '{phase:"C",layout:$layout,rep:$rep,pos:$pos,suite:$suite,arrive:$arrive,start:$start,end:$end,
+    '{phase:"C",layout:$layout,rep:$rep,attempt:$attempt,pos:$pos,suite:$suite,arrive:$arrive,start:$start,end:$end,
       lane:$lane,cpus:$cpus,slot:$slot,exit:$rc,wall:$wall,user:$user,sys:$sys,maxrss_kb:$rss,
       failures:$failures,timeouts:$timeouts,drift_ms:$drift}' >>"$TRIALS"
   log "$id wait=$(( (${start:-$end} - arrive) / 1000 ))s exit=$rc wall=${wall:-?}s"
 }
 
-run_layout_c() { # <layout> <rep>
-  local layout=$1 rep=$2 priv t0 ms suite pos=0
-  priv="$LOGS/state-C-$layout-r$rep"
+run_layout_c() { # <layout> <rep> <attempt>
+  local layout=$1 rep=$2 attempt=$3 priv t0 ms suite pos=0 tag
+  tag="C-$layout-r$rep-a$attempt"
+  priv="$LOGS/state-$tag"
   rm -rf "$priv"
   mkdir -p "$priv"
   local -a jobs_c=()
-  echo "C-$layout-r$rep" >"$CURRENT"
+  echo "$tag" >"$CURRENT"
   t0=$(now_ms)
   while read -r ms suite; do
     local wait_ms=$((t0 + ms - $(now_ms)))
     [ "$wait_ms" -gt 0 ] && sleep "$((wait_ms / 1000)).$(printf '%03d' $((wait_ms % 1000)))"
-    arrival_job "$layout" "$rep" "$pos" "$suite" "$priv" &
+    arrival_job "$layout" "$rep" "$attempt" "$pos" "$suite" "$priv" &
     jobs_c+=("$!")
     pos=$((pos + 1))
   done < <(schedule_c "$((SEED + 200 + rep))")
   wait "${jobs_c[@]}"
-  jq -cn --arg layout "$layout" --argjson rep "$rep" --argjson t0 "$t0" --argjson t1 "$(now_ms)" --argjson n "$pos" \
-    '{phase:"C-layout",layout:$layout,rep:$rep,start:$t0,end:$t1,jobs:$n}' >>"$TRIALS"
+  local t1
+  t1=$(now_ms)
   : >"$CURRENT"
-  log "phase C $layout r$rep: $pos jobs in $((($(now_ms) - t0) / 1000))s"
+  sleep 2 # let the probe write its last sample of this run
+  # Foreign load during the run, from the probe's once-per-second samples.
+  local foreign
+  foreign=$(jq -sc --arg tag "$tag" --argjson trip "$TRIP_PCT" \
+    '[.[] | select(.trial == $tag) | .foreign_pct // empty] |
+     {samples: length, over_trip_s: (map(select(. > $trip)) | length),
+      mean: (if length > 0 then add / length else 0 end), max: (max // 0)}' "$PROBE")
+  LAST_CONTAMINATED=false
+  [ "$(jq -r .over_trip_s <<<"$foreign")" -ge "$TRIP_SAMPLES" ] && LAST_CONTAMINATED=true
+  jq -cn --arg layout "$layout" --argjson rep "$rep" --argjson attempt "$attempt" --argjson t0 "$t0" \
+    --argjson t1 "$t1" --argjson n "$pos" --argjson foreign "$foreign" --argjson contaminated "$LAST_CONTAMINATED" \
+    --argjson reserved "$RESERVED" \
+    '{phase:"C-layout",layout:$layout,rep:$rep,attempt:$attempt,start:$t0,end:$t1,jobs:$n,
+      foreign:$foreign,contaminated:$contaminated,lanes_reserved:$reserved}' >>"$TRIALS"
+  log "phase C $tag: $pos jobs in $(((t1 - t0) / 1000))s; foreign $foreign; contaminated=$LAST_CONTAMINATED"
 }
 
+# A contaminated run is repeated once on a quiet host with the same
+# schedule. If it is contaminated again, the whole repetition is dropped for
+# every layout, so that the layouts stay paired, and a new repetition starts.
 phase_c() {
-  local rep layout
-  for ((rep = 1; rep <= REPS_C; rep++)); do
+  local rep=0 clean=0 layout attempt ok
+  gate_quiet "$GATE_WAIT_START_S" "phase C" || return 3
+  if ! meter_selfcheck; then
+    log "the foreign-load meter failed its check; stopping without data"
+    return 4
+  fi
+  while ((clean < REPS_C && rep < MAX_REPS_C)); do
+    rep=$((rep + 1))
+    ok=1
     while read -r layout; do
-      prepare
-      run_layout_c "$layout" "$rep"
+      for attempt in 1 2; do
+        gate_quiet "$GATE_WAIT_S" "C-$layout-r$rep-a$attempt" || return 3
+        DRIFT=$(drift_ms)
+        run_layout_c "$layout" "$rep" "$attempt"
+        [ "$LAST_CONTAMINATED" = false ] && break
+      done
+      if [ "$LAST_CONTAMINATED" = true ]; then
+        ok=0
+        jq -cn --argjson rep "$rep" --arg layout "$layout" '{phase:"C-rep-dropped",rep:$rep,layout:$layout}' >>"$TRIALS"
+        log "repetition $rep dropped: $layout was contaminated twice"
+        break
+      fi
     done < <(printf '%s\n' "${LAYOUTS_C[@]}" | shuffle "$((SEED + 300 + rep))")
+    ((ok)) && clean=$((clean + 1))
   done
+  log "phase C: $clean clean repetitions of $rep"
 }
 
 pilot() {
@@ -443,22 +612,54 @@ main() {
     setup) setup_slots ;;
     teardown) teardown_slots ;;
     _lane-job) lane_job "$2" "$3" ;;
+    launch-c)
+      local at="${2:-now}" wait_s=0
+      if [ "$at" != now ]; then
+        wait_s=$(($(date -d "$at" +%s) - $(date +%s)))
+        if [ "$wait_s" -lt 0 ]; then
+          log "start time $at is in the past"
+          exit 64
+        fi
+      fi
+      log "phase C starts at $(date -d "@$(($(date +%s) + wait_s))" +%H:%M) (in ${wait_s}s)"
+      sleep "$wait_s"
+      exec systemd-run --user --scope --quiet --unit="lane-bench-c-$(date +%s)" -- bash "$SELF" phase-c
+      ;;
     stop)
-      # The run is a process-group leader (setsid): end it and every test it started.
-      local pid
-      pid=$(cat "$OUT/bench.pid" 2>/dev/null) && kill -TERM -- "-$(ps -o pgid= -p "$pid" | tr -d ' ')"
+      # A phase C run owns a scope: stopping it ends every process of the run.
+      if systemctl --user list-units --plain --no-legend 'lane-bench-c-*.scope' | grep -q .; then
+        systemctl --user stop 'lane-bench-c-*.scope'
+      else
+        # Other runs are process-group leaders (setsid): end each and every test it started.
+        local pid
+        pid=$(cat "$OUT/bench.pid" 2>/dev/null) && kill -TERM -- "-$(ps -o pgid= -p "$pid" | tr -d ' ')"
+      fi
+      pkill -f 'bench.sh launch-c' 2>/dev/null
+      return 0
       ;;
     pilot | full | phase-a | phase-b | phase-c)
-      [ "$cmd" = phase-c ] && SLOTS=4
+      if [ "$cmd" = phase-c ]; then
+        SLOTS=4
+        if ! find_cgroup; then
+          log "phase C must run in its own lane-bench*.scope, so foreign load can be measured: use bench.sh launch-c"
+          exit 2
+        fi
+      fi
       echo "$$" >"$OUT/bench.pid"
       trap 'release_lanes' EXIT
       trap 'exit 130' INT TERM HUP
       setup_slots || exit 2
-      reserve_lanes
+      RESERVED=true
+      if [ "${BENCH_NO_RESERVE:-}" = 1 ]; then
+        RESERVED=false
+        log "NOT holding the fleet lanes (BENCH_NO_RESERVE=1, smoke tests only)"
+      else
+        reserve_lanes
+      fi
       start_probe
       # A quiet minute first: the responsiveness baseline for the decision rule.
       echo IDLE >"$CURRENT"
-      sleep 60
+      sleep "${BENCH_IDLE_S:-60}"
       : >"$CURRENT"
       jq -cn --arg cmd "$cmd" --argjson t "$(now_ms)" --arg host "$(uname -r)" \
         --arg cpu "$(lscpu | sed -n 's/^Model name: *//p')" --arg ns "$NS" \
@@ -469,7 +670,13 @@ main() {
         full) phase_a && phase_b ;;
         phase-a) phase_a ;;
         phase-b) phase_b ;;
-        phase-c) phase_c ;;
+        phase-c)
+          phase_c || {
+            rc=$?
+            log "phase-c stopped (exit $rc)"
+            exit "$rc"
+          }
+          ;;
       esac
       log "$cmd done"
       ;;

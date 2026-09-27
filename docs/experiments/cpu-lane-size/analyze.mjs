@@ -202,18 +202,56 @@ if (runs.length) {
   out.push("");
 }
 
-// Phase C: jobs arrive over time and queue for lanes.
-const arrivals = trials.filter((t) => t.phase === "C");
+// Phase C: jobs arrive over time and queue for lanes. Only clean runs count,
+// and only repetitions in which every layout has a clean run, so the layouts
+// stay paired on the same arrival schedules.
+const cLayoutRuns = trials.filter((t) => t.phase === "C-layout");
+const cleanRun = new Map();
+for (const r of cLayoutRuns) if (r.contaminated === false) cleanRun.set(`${r.layout}|${r.rep}`, r);
+const cLayouts = [...new Set(cLayoutRuns.map((r) => r.layout))];
+const dropped = new Set(trials.filter((t) => t.phase === "C-rep-dropped").map((t) => t.rep));
+const cleanReps = [...new Set(cLayoutRuns.map((r) => r.rep))].filter(
+  (rep) => !dropped.has(rep) && cLayouts.every((l) => cleanRun.has(`${l}|${rep}`)),
+);
+if (cLayoutRuns.length) {
+  out.push(
+    "## Phase C runs",
+    "",
+    table(
+      ["run", "jobs", "foreign mean %", "foreign max %", "s over trip", "contaminated", "used"],
+      cLayoutRuns.map((r) => [
+        `${r.layout} r${r.rep} a${r.attempt ?? 1}`,
+        r.jobs,
+        fmt(r.foreign?.mean),
+        fmt(r.foreign?.max),
+        r.foreign?.over_trip_s ?? "–",
+        r.contaminated ?? "–",
+        cleanReps.includes(r.rep) && cleanRun.get(`${r.layout}|${r.rep}`) === r ? "yes" : "no",
+      ]),
+    ),
+    "",
+    `Clean paired repetitions: ${cleanReps.length} (${cleanReps.join(", ") || "none"}).`,
+    "",
+  );
+}
+for (const a of trials.filter((t) => t.phase === "C-abort")) {
+  out.push(`Stopped without data before ${a.label}: foreign load ${fmt(a.foreign_permille / 10)}% did not go down.`, "");
+}
+const arrivals = trials.filter((t) => {
+  if (t.phase !== "C") return false;
+  const run = cleanRun.get(`${t.layout}|${t.rep}`);
+  return run && cleanReps.includes(t.rep) && (t.attempt ?? 1) === (run.attempt ?? 1);
+});
 if (arrivals.length) {
   const SHORT = new Set(["DV", "SG"]);
-  const cRuns = trials.filter((t) => t.phase === "C-layout");
+  const cRuns = cLayoutRuns.filter((r) => cleanReps.includes(r.rep) && cleanRun.get(`${r.layout}|${r.rep}`) === r);
   const stats = {};
   for (const layout of [...new Set(arrivals.map((t) => t.layout))]) {
     const rows = arrivals.filter((t) => t.layout === layout);
     const wait = rows.map((t) => ((t.start ?? t.end) - t.arrive) / 1000);
     const turn = rows.map((t) => (t.end - t.arrive) / 1000);
     const shortTurn = rows.filter((t) => SHORT.has(t.suite)).map((t) => (t.end - t.arrive) / 1000);
-    const samples = cRuns.filter((r) => r.layout === layout).flatMap((r) => window(`C-${layout}-r${r.rep}`));
+    const samples = cleanReps.flatMap((rep) => window(`C-${layout}-r${rep}-a${cleanRun.get(`${layout}|${rep}`).attempt ?? 1}`));
     stats[layout] = {
       jobs: rows.length,
       meanTurn: turn.reduce((s, x) => s + x, 0) / turn.length,
@@ -237,7 +275,9 @@ if (arrivals.length) {
   );
   // Locked rule: a layout replaces 3x5 only when it wins clearly and costs nothing else.
   const base = stats["3x5"];
-  if (base) {
+  if (cleanReps.length < 2) {
+    out.push("## Phase C decision", "", `No decision: ${cleanReps.length} clean paired repetitions, and the rule needs at least 2.`, "");
+  } else if (base) {
     const winners = Object.entries(stats)
       .filter(([k]) => k !== "3x5")
       .filter(([, s]) => s.meanTurn <= base.meanTurn * 0.95)
