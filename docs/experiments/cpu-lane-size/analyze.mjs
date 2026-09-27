@@ -6,14 +6,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 const dir = process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "results");
 const readJsonl = (name) => {
   const file = path.join(dir, name);
-  if (!fs.existsSync(file)) return [];
-  return fs
-    .readFileSync(file, "utf8")
+  let text = "";
+  if (fs.existsSync(file)) text = fs.readFileSync(file, "utf8");
+  else if (fs.existsSync(`${file}.gz`)) text = zlib.gunzipSync(fs.readFileSync(`${file}.gz`)).toString("utf8");
+  return text
     .split("\n")
     .filter(Boolean)
     .map((line) => {
@@ -133,7 +135,11 @@ if (runs.length) {
     const reps = runs.filter((r) => r.layout === layout);
     const makespans = reps.map((r) => (r.end - r.start) / 1000);
     const jobsIn = trials.filter((t) => t.phase === "B" && t.layout === layout);
-    const loadFailures = jobsIn.filter((t) => (t.failures > 0 || t.exit !== 0) && !soloFailures[t.suite]).length;
+    // A layout with one lane runs one job at a time: its failures cannot come from load.
+    const concurrent = layout === "unlaned" || (LAYOUT_WIDTH[layout] ?? 0) < 15;
+    const loadFailures = concurrent
+      ? jobsIn.filter((t) => (t.failures > 0 || t.exit !== 0) && !soloFailures[t.suite]).length
+      : 0;
     const samples = reps.flatMap((r) => window(`B-${layout}-r${r.rep}`));
     layoutRows.push({
       layout,
