@@ -47,6 +47,7 @@ const SUBCOMMANDS = [
   "quality",
   "criteria",
   "models",
+  "fleet",
 ];
 
 function printUsage() {

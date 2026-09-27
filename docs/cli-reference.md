@@ -652,6 +652,55 @@ sibling attestation evidence.
 
 ---
 
+## `dotbabel-fleet`
+
+File claims, CPU lanes, merge events, and the merge token for concurrent Claude Code sessions.
+See [fleet.md](./fleet.md) for how claims start and end, how lanes work, and
+how the event feed reports merges, and [hooks.md](./hooks.md) for the hooks.
+
+| Subcommand             | Purpose                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `board`                | Show the claims in the current repository                        |
+| `claim <pattern>...`   | Claim paths or globs for this session                            |
+| `release <pattern>...` | Release this session's matching claims                           |
+| `release --all`        | Release every claim this session holds in the repository         |
+| `prune`                | Remove the claim records of sessions that exited                 |
+| `hook pre-edit`        | `PreToolUse` entry: claim, or deny / ask with a reason           |
+| `hook pre-bash`        | `PreToolUse` entry on `Bash`: take the merge token, or deny      |
+| `hook session-start`   | `SessionStart` entry: print the live claims as context           |
+| `hook post-tool`       | `PostToolUse` entry: record a `gh pr merge`, report merges       |
+| `hook prompt`          | `UserPromptSubmit` entry: report merges the session has not seen |
+| `lane -- <command>`    | Run a command in a free CPU lane, with its exit status           |
+| `lanes`                | Show each CPU lane, its holder, and the waiting commands         |
+| `events`               | Show the merges of the last 7 days in this repository            |
+| `event --pr <N>`       | Record a merge made outside Claude Code                          |
+| `token [status]`       | Show who holds this repository's merge token                     |
+| `token take`           | Take the merge token for this session                            |
+| `token release`        | Give this session's merge token back                             |
+
+| Flag             | Default        |                                                            |
+| ---------------- | -------------- | ---------------------------------------------------------- |
+| `--note <text>`  | —              | `claim`: the intent other sessions see                     |
+| `--name <label>` | the command    | `lane`: the label that `lanes` shows                       |
+| `--pr <N>`       | —              | `event`: the merged pull request                           |
+| `--repo <o/r>`   | the cwd's repo | `event`: the repository of the pull request                |
+| `--all`          | off            | `release`: release every claim; `events`: every repository |
+| `--json`         | off            | `board`, `claim`, `lanes`, `events`, `token`: JSON output  |
+
+`claim`, `release`, and `board` find their own session by walking up the
+process tree to a process in `~/.claude/sessions/`, so run them from a Claude
+Code session.
+
+**Exits 1** from `claim` when a live session holds an overlapping claim; the
+refusal lists each owner. **Exits 2** outside a git repository, and from
+`claim` and `release` outside a Claude Code session. `hook` always exits 0: it
+fails open. `lane` exits with the command's own status, and 64 without a
+command. `event` exits 1 when the pull request is not merged, and 2 when
+`gh pr view` fails. `token take` exits 1 when a live session holds the token,
+and `token release` exits 1 when this session holds none.
+
+---
+
 ## `dotbabel-handoff`
 
 Cross-agent and cross-machine session handoff. See

@@ -2,15 +2,17 @@
 
 _Last updated: v3.4.0_
 
-dotbabel ships four Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
+dotbabel ships six Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.
 
-| Hook                         | Event         | Fires                 | Purpose                                                               |
-| ---------------------------- | ------------- | --------------------- | --------------------------------------------------------------------- |
-| `guard-destructive-git.sh`   | `PreToolUse`  | before each Bash call | Asks the user before a destructive git command runs                   |
-| `guard-criteria-evidence.sh` | `PreToolUse`  | before each Bash call | Blocks a hand-written evidence marker (criteria, attestation, review) |
-| `check-on-write.sh`          | `PostToolUse` | after each file edit  | Per-file syntax check of the edited file                              |
-| `check-on-stop.sh`           | `Stop`        | once per turn         | Project-wide checks when the build graph is coherent                  |
+| Hook                         | Event                                                           | Fires                                                                                       | Purpose                                                                                              |
+| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `guard-destructive-git.sh`   | `PreToolUse`                                                    | before each Bash call                                                                       | Asks the user before a destructive git command runs                                                  |
+| `guard-criteria-evidence.sh` | `PreToolUse`                                                    | before each Bash call                                                                       | Blocks a hand-written evidence marker (criteria, attestation, review)                                |
+| `check-on-write.sh`          | `PostToolUse`                                                   | after each file edit                                                                        | Per-file syntax check of the edited file                                                             |
+| `check-on-stop.sh`           | `Stop`                                                          | once per turn                                                                               | Project-wide checks when the build graph is coherent                                                 |
+| `fleet-guard.sh`             | `PreToolUse`, `SessionStart`, `PostToolUse`, `UserPromptSubmit` | before each file edit and Bash call, at session start, after each tool call, at each prompt | Blocks an edit to a file that another live session claims, holds the merge token, and reports merges |
+| `fleet-shell-prefix.sh`      | `CLAUDE_CODE_SHELL_PREFIX`                                      | around every shell command                                                                  | Sends heavy test commands to a free CPU lane                                                         |
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
@@ -104,6 +106,42 @@ The hooks are low-cost feedback, not the full quality policy.
 Run `dotbabel quality check --profile fast` for an explicit changed-code check.
 Run the `pr` or `deep` profile for tests, coverage, and configured analyzers.
 Unlike fail-open hooks, the quality command reports unavailable tools and uses documented exit codes.
+
+---
+
+## `fleet-guard.sh`
+
+Stops two concurrent Claude Code sessions from changing the same file of one
+repository. A session's first edit to a file in a governed repository claims
+it. An edit by another live session to a claimed path gets a `PreToolUse`
+`deny` whose reason names the owner to `SendMessage`. After 15 minutes of
+blocks by the same owner, the next attempt is an `ask`, so the user decides.
+At `SessionStart`, the hook prints the live claims of the session's
+repository. After a `gh pr merge`, the `PostToolUse` entry records the merge,
+and the `PostToolUse` and `UserPromptSubmit` entries tell every other session
+that claims files in that repository. Before a Bash call that rebases onto
+the base, runs `dotbabel local-attest`, or runs `gh pr merge`, the `pre-bash`
+entry takes the repository's merge token, and denies the call while another
+live session holds it.
+
+The script only locates and runs `bin/dotbabel-fleet.mjs`, and it fails open:
+without Node, or on any error, the edit goes ahead. Register it with five
+entries: `pre-edit` on the edit tools, `pre-bash` on `Bash`, `session-start`,
+`post-tool` on every tool, and `prompt`. See
+[fleet.md](./fleet.md) for the settings block, the claim rules, and the
+limits.
+
+---
+
+## `fleet-shell-prefix.sh`
+
+Not an event hook: it is the `CLAUDE_CODE_SHELL_PREFIX` target, so Claude
+Code runs every shell command it starts through it. It sends a Bash tool call
+that runs a heavy test command (`npm test`, `vitest`, `go test`, `pytest`, and
+the like) to `scripts/fleet-lane.sh`, which waits for a free CPU lane and
+pins the command to it. Every other command runs at once, unchanged. It never
+stores the command it receives, and `touch ~/.local/state/dotbabel/fleet/lanes.off`
+turns it off in every session at once. See [fleet.md](./fleet.md#cpu-lanes).
 
 ---
 
