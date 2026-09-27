@@ -16,18 +16,18 @@ Confidence labels: `CONFIRMED` (measured or read from the source at the installe
 
 ### Models.dev
 
-| Property                     | Measured value                                                                                                                                                                                                        | Confidence |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| Endpoint                     | One document, `https://models.dev/api.json`. A `?provider=` query returns the same full document, and the per-provider paths that were tried redirect (302).                                                          | CONFIRMED  |
-| Authentication               | None.                                                                                                                                                                                                                 | CONFIRMED  |
-| Size                         | 4,693,478 bytes (4.48 MiB), which is 56% of the OPS-2 per-entry limit of 8 MiB. The seven providers relevant to Dotbabel total 294,506 bytes.                                                                         | CONFIRMED  |
-| Caching                      | `etag` is present, a conditional GET with `If-None-Match` returns `304`, and `cache-control` is `public, max-age=0, must-revalidate`. Two fetches three seconds apart had the same sha256.                            | CONFIRMED  |
-| Shape                        | An object keyed by provider id: 222 providers and 7,847 model records. Provider keys: `id`, `env`, `npm`, `name`, `doc`, `models`, and `api` on 196 of 222.                                                           | CONFIRMED  |
-| Model fields on every record | `id`, `name`, `description`, `attachment`, `reasoning`, `tool_call`, `release_date`, `last_updated`, `modalities`, `open_weights`, `limit` (`context`, `output`).                                                     | CONFIRMED  |
-| Optional model fields        | `cost` (7,430), `temperature` (7,351), `family` (7,178), `reasoning_options` (5,664), `structured_output` (5,427), `knowledge` (4,111), `interleaved` (1,089), `provider` (312), `status` (283), `experimental` (58). | CONFIRMED  |
-| Lifecycle                    | `status` is `deprecated` on 210 records and `beta` on 73.                                                                                                                                                             | CONFIRMED  |
-| Versioning                   | The document has no schema or version marker at the top level.                                                                                                                                                        | CONFIRMED  |
-| License and ownership        | Not retrieved: the repository lookup returned no data.                                                                                                                                                                | UNVERIFIED |
+| Property                     | Measured value                                                                                                                                                                                                                                                                                                | Confidence |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Endpoint                     | One document, `https://models.dev/api.json`. A `?provider=` query returns the same full document, and the per-provider paths that were tried redirect (302).                                                                                                                                                  | CONFIRMED  |
+| Authentication               | None.                                                                                                                                                                                                                                                                                                         | CONFIRMED  |
+| Size                         | 4,693,478 bytes (4.48 MiB), which is 56% of the OPS-2 per-entry limit of 8 MiB. The seven providers relevant to Dotbabel total 294,506 bytes.                                                                                                                                                                 | CONFIRMED  |
+| Caching                      | `etag` is present, a conditional GET with `If-None-Match` returns `304`, and `cache-control` is `public, max-age=0, must-revalidate`. Two fetches three seconds apart had the same sha256.                                                                                                                    | CONFIRMED  |
+| Shape                        | An object keyed by provider id: 222 providers and 7,847 model records. Provider keys: `id`, `env`, `npm`, `name`, `doc`, `models`, and `api` on 196 of 222.                                                                                                                                                   | CONFIRMED  |
+| Model fields on every record | `id`, `name`, `description`, `attachment`, `reasoning`, `tool_call`, `release_date`, `last_updated`, `modalities`, `open_weights`, `limit` (`context`, `output`).                                                                                                                                             | CONFIRMED  |
+| Optional model fields        | `cost` (7,430), `temperature` (7,351), `family` (7,178), `reasoning_options` (5,664), `structured_output` (5,427), `knowledge` (4,111), `interleaved` (1,089), `provider` (312), `status` (283), `experimental` (58).                                                                                         | CONFIRMED  |
+| Lifecycle                    | `status` is `deprecated` on 210 records and `beta` on 73.                                                                                                                                                                                                                                                     | CONFIRMED  |
+| Versioning                   | The document has no schema or version marker at the top level.                                                                                                                                                                                                                                                | CONFIRMED  |
+| License and ownership        | Re-measured on 2026-09-27. The repository `anomalyco/models.dev` (moved from `sst/models.dev`, which redirects to it) carries an MIT `LICENSE`, "Copyright (c) 2025 models.dev". The data is TOML files under `providers/` in the same repository, so the license covers it. The website has no terms of use. | CONFIRMED  |
 
 Three facts bear on the design:
 
@@ -52,7 +52,20 @@ All three official APIs require a credential for a model list. The Anthropic API
 - The absence of a version marker in Models.dev means that the adapter validates the shape of each record and returns `unknown` with `malformed_output` on a mismatch. It cannot detect a schema change from a header.
 - R-4 stays Medium: Models.dev is stable and structured today, and the official APIs are credential-gated.
 
-**RQ-1 status: closed for Models.dev; closed for the availability and documented shape of the Anthropic and Gemini APIs; the OpenAI response shape and the Models.dev license stay open.**
+### Models.dev license, measured on 2026-09-27
+
+| Fact                                     | Evidence                                                                                                                                                             | Confidence |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| Repository and owner                     | `sst/models.dev` redirects to `anomalyco/models.dev`, owned by the organization "Anomaly". The last push was on 2026-09-27.                                          | CONFIRMED  |
+| License                                  | The repository `LICENSE` is MIT, "Copyright (c) 2025 models.dev". Its one condition: the copyright and permission notice stays with any copy or substantial portion. | CONFIRMED  |
+| The license covers the data              | The data is TOML files under `providers/` in the licensed repository. The README says these files "power the API".                                                   | CONFIRMED  |
+| The license covers the `api.json` output | The README line above is the only link between the files and the endpoint. No separate statement covers the served document.                                         | LIKELY     |
+| Separate terms of use                    | The `https://models.dev` page holds no terms, privacy, or license text. It links only to the repository.                                                             | CONFIRMED  |
+| Growth                                   | `api.json` was 4,921,185 bytes (4.69 MiB) with 223 providers, against 4.48 MiB and 222 providers on 2026-09-18. The `etag` is a quoted 32-digit hex value.           | CONFIRMED  |
+
+Consequence: the adapter may fetch, reduce, and cache the data. Every stored or committed copy keeps the MIT notice: the capability cache (P-9) stores it next to the entry, and the recorded test fixture ships a `NOTICE` file.
+
+**RQ-1 status, 2026-09-27: closed for Models.dev, including the license, and for the availability and documented shape of the Anthropic and Gemini APIs. The OpenAI response shape stays open. P-8a (Models.dev) therefore proceeds, and P-8b (official provider APIs) stays blocked on the OpenAI shape (IMPL-1).**
 
 ## RQ-3 — Copilot Custom Agents and `.prompt.md`
 
