@@ -338,7 +338,11 @@ start_probe() {
 
 suite_cmd() { # <suite>
   case "$1" in
-    DV | SV) echo "npx vitest run" ;;
+    # One DV test is flaky under CPU load on main (a 20-25 ms budget runs out
+    # before its child starts; fix pending on feat/model-intelligence-p08a-models-dev).
+    # A random failure would count against one layout, so phase C leaves it out.
+    DV) echo "npx vitest run --exclude '**/model-intelligence-adapter-claude.test.mjs'" ;;
+    SV) echo "npx vitest run" ;;
     DB | DBJ) echo "bash plugins/dotbabel/scripts/run-bats.sh" ;;
     SG) echo "cd api && go test ./... -race -count=1" ;;
     MP) echo "$PROJECTS/moneyballer/.venv/bin/pytest elt/tests/ -q -m 'not real_api' --timeout=120 -n auto -p no:cacheprovider" ;;
