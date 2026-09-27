@@ -10,8 +10,14 @@
 // while the job exits 0. That failure is invisible at runtime, so it is pinned
 // here.
 //
-// Only `jobs.deep` is checked. The `pr` job diffs against the pull request base
-// on purpose.
+// A whole-repository deep run takes about 1.5 hours on a hosted runner, and
+// this repository's CI minutes are limited. So the job runs only on
+// workflow_dispatch, never on a schedule, and the routine deep audit runs
+// locally (docs/quality.md, "Continuous integration"). The consumer template
+// keeps its weekly schedule.
+//
+// Only `jobs.deep` is checked for flags. The `pr` job diffs against the pull
+// request base on purpose.
 
 import { describe, it, expect } from "vitest";
 import path from "path";
@@ -25,9 +31,10 @@ const WORKFLOW = path.join(REPO_ROOT, ".github", "workflows", "quality.yml");
 
 const QUALITY_CHECK = /dotbabel-quality\.mjs\s+check\b|dotbabel\s+quality\s+check\b/;
 
+const loadWorkflow = () => yaml.load(fs.readFileSync(WORKFLOW, "utf8"));
+
 function deepQualityScripts() {
-  const doc = yaml.load(fs.readFileSync(WORKFLOW, "utf8"));
-  return (doc.jobs?.deep?.steps ?? [])
+  return (loadWorkflow().jobs?.deep?.steps ?? [])
     .map((step) => step.run)
     .filter((script) => typeof script === "string" && QUALITY_CHECK.test(script));
 }
@@ -42,7 +49,16 @@ describe("dogfood .github/workflows/quality.yml deep job", () => {
   it("audits the whole repository, not an empty diff", () => {
     for (const script of deepQualityScripts()) {
       expect(script).toMatch(/--all\b/);
-      expect(script, "a scheduled whole-repo audit must not scope itself to a diff").not.toMatch(/--(base|head)\b/);
+      expect(script, "a whole-repo audit must not scope itself to a diff").not.toMatch(/--(base|head)\b/);
     }
+  });
+
+  it("runs only on demand, never on a schedule", () => {
+    const doc = loadWorkflow();
+    // js-yaml reads the bare `on:` key as the boolean true.
+    const on = doc.on ?? doc[true] ?? {};
+    expect(Object.keys(on)).toContain("workflow_dispatch");
+    expect(Object.keys(on), "a scheduled deep run spends CI minutes every week").not.toContain("schedule");
+    expect(doc.jobs.deep.if).toBe("github.event_name == 'workflow_dispatch'");
   });
 });

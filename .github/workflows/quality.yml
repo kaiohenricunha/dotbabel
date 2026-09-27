@@ -2,8 +2,8 @@ name: Language-aware quality
 
 on:
   pull_request:
-  schedule:
-    - cron: "17 4 * * 1"
+  # No schedule: a whole-repository deep run costs about 1.5 CI hours, so it
+  # runs only on demand. The routine deep audit runs locally (docs/quality.md).
   workflow_dispatch:
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
           path: quality-report.json
 
   deep:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
