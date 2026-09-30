@@ -191,6 +191,14 @@ the lane also sets `PYTEST_XDIST_AUTO_NUM_WORKERS`. The lane is free the
 moment the command exits. If the lane process dies, the kernel releases its
 lock.
 
+**Lending (off by default).** With `DOTBABEL_FLEET_LEND=2`, a command that
+finds free lanes may take 2 of them and run on all their CPUs, so a lone test
+run is not limited to one lane. Lending never takes the last free lane, so the
+next command still starts at once, and it takes only one lane while another
+command waits. On 4 lanes, 3 commands in a row get 2, 1, and 1 lanes. The
+[lane size benchmark](./experiments/2026-09-27-cpu-lane-size.md) measures
+whether lending pays off on a machine.
+
 ### Set up the lanes
 
 `bootstrap.sh` links `fleet-shell-prefix.sh` into `~/.claude/hooks/`. Add this
@@ -248,10 +256,20 @@ carry secrets.
 | --------------------------- | ----------------------------------------------------------------- |
 | `DOTBABEL_FLEET_LANES`      | `off`, or explicit lanes as CPU lists joined by `;`: `0-4;5-9`    |
 | `DOTBABEL_FLEET_LANE_COUNT` | The number of lanes in the automatic layout                       |
+| `DOTBABEL_FLEET_LANE_WIDTH` | CPUs per lane in the automatic layout (see below)                 |
+| `DOTBABEL_FLEET_LEND`       | The most lanes one command may take while others are free (`1`)   |
 | `DOTBABEL_FLEET_NCPU`       | The CPU count for the automatic layout (default: the online CPUs) |
+
+Without `DOTBABEL_FLEET_LANE_WIDTH`, the automatic layout makes lanes of about
+5 CPUs, and the last lane takes the CPUs left over. With it, the layout makes
+`round(usable CPUs / width)` lanes, at least 2 from 8 usable CPUs, and gives
+the CPUs left over one each to the first lanes. On 16 CPUs, width 4 gives
+`0-3;4-7;8-11;12-14`, and width 7 gives `0-7;8-14`.
 
 ### Limits of the lanes
 
+- **A lent lane is not taken back.** A command that took 2 lanes keeps both
+  until it ends, even when other commands start to wait.
 - **Linux only.** A lane needs `flock` and `taskset` (util-linux). Without
   them, or with bash older than 4, the command runs at once, with no lane.
 - **Only the command text is read.** A script that starts a test runner, such
