@@ -94,3 +94,54 @@ bash bench.sh teardown
 ```
 
 `results/trials.jsonl` has one row per trial, and `results/probe.jsonl.gz` has the host probe. The pilot data is in `results/pilot/`.
+
+## Test 1: jobs that arrive over time (2026-09-28)
+
+Phases A and B give all jobs at once. Sessions do not work that way: they start test runs at random times, so a short run can wait behind a long one. Test 1 measures that wait.
+
+**Method.**
+
+- Each repetition sends a seeded Poisson stream of jobs, for 6 minutes with a mean gap of 36 s, through the real `fleet-lane.sh`, with its FIFO queue, `taskset`, and environment. The jobs use a private state directory, and the benchmark holds the real lanes.
+- Every layout gets the same schedule in a repetition. The 3 repetitions had 14, 7, and 12 jobs, with the mix DV×3, SV×2, SG×2, DB×1, and MP×1.
+- The layouts are 3×5 (today), 2×7, and 4×4, in interleaved order.
+- The DV suite leaves out `model-intelligence-adapter-claude.test.mjs`. That test fails about half the time under load (fixed later on main in #435), and a random failure would count against one layout.
+
+**Load control (added after an invalid first attempt).** The first attempt, on 2026-09-27 05:49, was stopped after 2 of 9 runs. Other sessions ran Docker, compiles, and eslint outside the lanes, the load reached 45, and the same jobs ran 4–5 times slower in one layout. Its data is in `results/arrivals-invalid/`, and nothing here uses it. The second attempt adds these controls:
+
+- The run is a systemd user scope, and foreign CPU is the busy time in `/proc/stat` minus the scope's `cpu.stat` usage.
+- A run starts only when foreign CPU stays at or below 6% (about the 1 free CPU) for 30 s. There is no "start anyway".
+- A self-check runs before any data. 3 busy CPUs in another scope must read as foreign, and inside the benchmark's own scope they must not.
+- A run with 60 s above 12% foreign load (about 2 CPUs) is repeated once. A second failure drops the repetition for all layouts.
+
+**Run.** It ran on 2026-09-28 from 21:53 to 00:13. The gate waited 11 minutes, until 2 busy squadranks sessions went quiet.
+
+- The meter check passed: a base of 2.9%, +20.1% for 3 CPUs outside (18.7% expected), and +5.3% for 3 CPUs inside (limit 6.2%).
+- All 9 runs were clean on the first attempt. Foreign load averaged 2.5–4.2%, and the most time any run spent above the trip level was 22 s.
+
+| Layout      | Jobs | Mean turnaround s | p95 turnaround s | p50 wait s | p95 wait s | Short-job (DV, SG) p95 s | Failures | `node -e 0` p95 ms |
+| ----------- | ---- | ----------------- | ---------------- | ---------- | ---------- | ------------------------ | -------- | ------------------ |
+| 2×7         | 33   | 374.3             | 634.9            | 206.2      | 546.9      | 614.5                    | 1        | 140                |
+| 3×5 (today) | 33   | 399.8             | 717.6            | 88.8       | 530.9      | 629.7                    | 1        | 137                |
+| 4×4         | 33   | 410.4             | 726.8            | 4.8        | 457.6      | 582.9                    | 0        | 127                |
+
+2×7 has the lowest mean turnaround in every repetition: 484, 140, and 382 s, against 511, 158, and 410 s for 3×5. With 2 lanes, jobs wait longer for a lane (p50 206 s against 89 s), but each job finishes sooner, so the total time is lower.
+
+The failures:
+
+- **2×7:** SV `e2e-seed-residue.test.mjs (live)`, a live check against the repository. It also failed with no other job running in phase B.
+- **3×5:** DB `forwards TERM to the command and exits with its status`, a timing-sensitive signal test.
+
+### Test 1 decision (rule locked before the run)
+
+A layout replaces 3×5 only if all of these are true:
+
+- its mean turnaround is at least 5% lower
+- its short-job p95 is no more than 20% worse
+- it has no more failures
+- its `node -e 0` p95 is no more than 1.5×
+
+**2×7 passes all four:** 6.4% lower mean turnaround, a better short-job p95, 1 failure against 1, and 140 ms against 137 ms. 4×4 does not pass. On this machine, the data supports 7 CPUs per lane: `k = (usable + 3) / 7`, which gives lanes 0-6 and 7-14.
+
+The margin (6.4%) is just above the 5% limit, and only a 16-CPU machine was measured. With `W = 7`, a 10-CPU machine would get 1 lane of 9, and that is not measured. So a formula change needs its own decision, and it may need a floor of 2 lanes.
+
+Reproduce: `BENCH_OUT=$PWD/results/arrivals BENCH_REPS_C=3 systemd-run --user --scope --unit=lane-bench-launch-$(date +%s) -- setsid nohup bash bench.sh launch-c 23:00 &`, then `node analyze.mjs results/arrivals`.
