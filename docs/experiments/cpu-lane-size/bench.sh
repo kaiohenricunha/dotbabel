@@ -71,6 +71,7 @@ declare -A REPO=([DV]=dotbabel [DB]=dotbabel [DBJ]=dotbabel [SV]=squadranks [SG]
 # Phase B layouts: name → CPU lists joined by ";" ("unlaned": no pinning, 5 at once).
 LAYOUT_NAMES=(5x3 4x4 3x5 2x7 1x15 unlaned)
 declare -A LAYOUT=(
+  [4x4-lend]="0-3;4-7;8-11;12-14"
   [5x3]="0-2;3-5;6-8;9-11;12-14"
   [4x4]="0-3;4-7;8-11;12-14"
   [3x5]="0-4;5-9;10-14"
@@ -79,7 +80,8 @@ declare -A LAYOUT=(
   [unlaned]="-;-;-;-;-"
 )
 # Phase C: the layouts to compare, and the job mix (a pick is uniform over this list).
-read -r -a LAYOUTS_C <<<"${BENCH_LAYOUTS_C:-3x5 2x7 4x4}"
+# A layout name that ends in -lend runs with DOTBABEL_FLEET_LEND=2 (lane lending).
+read -r -a LAYOUTS_C <<<"${BENCH_LAYOUTS_C:-3x5 2x7 4x4 4x4-lend}"
 MIX_C="${BENCH_MIX_C:-DV DV DV SV SV SG SG DB MP}"
 
 mkdir -p "$OUT" "$LOGS"
@@ -514,8 +516,10 @@ arrival_job() { # <layout> <rep> <attempt> <pos> <suite> <private state dir>
   id="C-$layout-r$rep-a$attempt-q$pos-$suite"
   arrive=$(now_ms)
   for fd in "${LOCK_FDS[@]}"; do eval "exec $fd>&-"; done
+  local lend=1
+  [[ $layout == *-lend ]] && lend=2
   env -u DOTBABEL_LANE -u DOTBABEL_LANE_CPUS DOTBABEL_FLEET_STATE_DIR="$priv" \
-    DOTBABEL_FLEET_LANES="${LAYOUT[$layout]}" DOTBABEL_LANE_SESSION=bench \
+    DOTBABEL_FLEET_LANES="${LAYOUT[$layout]}" DOTBABEL_FLEET_LEND="$lend" DOTBABEL_LANE_SESSION=bench \
     bash "$FLEET_LANE" --name "$suite" -- bash "$SELF" _lane-job "$suite" "$id" 2>>"$LOGS/$id.queue"
   rc=$?
   end=$(now_ms)

@@ -21,6 +21,11 @@
 # when this script dies, so a crash never loses a lane. Waiters queue on
 # <state>/lanes/queue.lock, so the first to wait is the first to get a lane.
 #
+# Lending (DOTBABEL_FLEET_LEND=<n>, off by default): the command at the head of
+# the queue may take up to n free lanes and run on all their CPUs. It never
+# takes the last free lane, and it takes only one lane while another live
+# command waits. A lent lane frees when the command ends.
+#
 # While the command runs, lane-<n>.holder records the --name label (such as
 # "npm test"), the Claude Code session name, and the working directory. It
 # never records the command line, because commands can carry secrets.
@@ -33,6 +38,10 @@
 # Settings:
 #   DOTBABEL_FLEET_LANES       "off", or explicit lanes as CPU lists joined by ";" ("0-4;5-9")
 #   DOTBABEL_FLEET_LANE_COUNT  the number of lanes in the automatic layout
+#   DOTBABEL_FLEET_LANE_WIDTH  CPUs per lane in the automatic layout: round(usable / width)
+#                              lanes, at least 2 from 8 usable CPUs, extra CPUs on the first
+#                              lanes (unset: lanes of about 5, the leftover on the last lane)
+#   DOTBABEL_FLEET_LEND        the most lanes one command may take while others are free (default 1)
 #   DOTBABEL_FLEET_NCPU        the CPU count for the automatic layout (default: online CPUs)
 #   DOTBABEL_FLEET_STATE_DIR   the state root (default $XDG_STATE_HOME/dotbabel/fleet)
 #
@@ -100,6 +109,27 @@ print_layout() {
   local reserve=0 usable k w s e
   [ "$n" -ge 6 ] && reserve=1
   usable=$((n - reserve))
+  local width="${DOTBABEL_FLEET_LANE_WIDTH:-}"
+  if [[ $width =~ ^[1-9][0-9]*$ ]]; then
+    k="${DOTBABEL_FLEET_LANE_COUNT:-}"
+    if ! [[ $k =~ ^[1-9][0-9]*$ ]]; then
+      k=$(((usable + width / 2) / width))
+      [ "$usable" -ge 8 ] && [ "$k" -lt 2 ] && k=2
+    fi
+    [ "$k" -ge 1 ] || k=1
+    [ "$k" -le "$usable" ] || k=$usable
+    # The CPUs left over go one each to the first lanes.
+    local extra=$((usable % k))
+    w=$((usable / k))
+    s=0
+    for ((i = 0; i < k; i++)); do
+      e=$((s + w - 1))
+      [ "$i" -lt "$extra" ] && e=$((e + 1))
+      if [ "$s" -eq "$e" ]; then echo "lane $((i + 1)) $s"; else echo "lane $((i + 1)) $s-$e"; fi
+      s=$((e + 1))
+    done
+    return
+  fi
   k="${DOTBABEL_FLEET_LANE_COUNT:-}"
   [[ $k =~ ^[1-9][0-9]*$ ]] || k=$(((usable + 2) / 5))
   [ "$k" -ge 1 ] || k=1
@@ -170,9 +200,9 @@ write_info() {
 }
 
 waiter="$dir/wait-$$.info"
-holder=""
+holders=()
 waiting=0
-cleanup() { rm -f "$waiter" ${holder:+"$holder"}; }
+cleanup() { rm -f "$waiter" "${holders[@]}"; }
 trap 'cleanup; exit 130' INT
 trap 'cleanup; exit 143' TERM
 trap 'cleanup; exit 129' HUP
@@ -202,29 +232,92 @@ if ! flock -n "$queue"; then
   }
 fi
 
-got=""
-while [ -z "$got" ]; do
-  for ((i = 0; i < ${#lanes[@]}; i++)); do
-    exec {lane}>>"$dir/lane-$((i + 1)).lock" || continue
-    if flock -n "$lane"; then
-      got=$i
-      break
-    fi
-    exec {lane}>&-
+held=()     # the lane numbers (0-based) this script holds
+held_fds=() # their lock descriptors
+
+# take_lane <i>: lock lane i if it is free.
+take_lane() {
+  local fd
+  exec {fd}>>"$dir/lane-$(($1 + 1)).lock" || return 1
+  if flock -n "$fd"; then
+    held+=("$1")
+    held_fds+=("$fd")
+    return 0
+  fi
+  exec {fd}>&-
+  return 1
+}
+
+# True when another live command waits: its waiter file names a process
+# that still runs with the same start time.
+others_wait() {
+  local f pid start now
+  for f in "$dir"/wait-*.info; do
+    [ -e "$f" ] && [ "$f" != "$waiter" ] || continue
+    pid=$(sed -n 's/^pid=//p' "$f")
+    start=$(sed -n 's/^procstart=//p' "$f")
+    [[ $pid =~ ^[0-9]+$ ]] || continue
+    now=$(awk '{ sub(/.*\) /, ""); print $20 }' "/proc/$pid/stat" 2>/dev/null) || continue
+    [ -n "$now" ] && [ "$now" = "$start" ] && return 0
   done
-  if [ -z "$got" ]; then
+  return 1
+}
+
+while [ "${#held[@]}" -eq 0 ]; do
+  for ((i = 0; i < ${#lanes[@]}; i++)); do
+    take_lane "$i" && break
+  done
+  if [ "${#held[@]}" -eq 0 ]; then
     [ "$waiting" = 1 ] || announce
     sleep 0.5
   fi
 done
+
+# Lending. This script still holds the queue lock, so no other command can
+# take a lane while it counts the free ones.
+lend="${DOTBABEL_FLEET_LEND:-1}"
+[[ $lend =~ ^[1-9][0-9]*$ ]] || lend=1
+if [ "$lend" -gt 1 ] && ! others_wait; then
+  spare=()
+  spare_fds=()
+  for ((i = 0; i < ${#lanes[@]}; i++)); do
+    [ "$i" -eq "${held[0]}" ] && continue
+    exec {fd}>>"$dir/lane-$((i + 1)).lock" || continue
+    if flock -n "$fd"; then
+      spare+=("$i")
+      spare_fds+=("$fd")
+    else
+      exec {fd}>&-
+    fi
+  done
+  # Keep at least one free lane for the next command.
+  take=$((lend - 1))
+  [ "$take" -le $((${#spare[@]} - 1)) ] || take=$((${#spare[@]} - 1))
+  for ((j = 0; j < ${#spare[@]}; j++)); do
+    fd=${spare_fds[j]}
+    if [ "$j" -lt "$take" ]; then
+      held+=("${spare[j]}")
+      held_fds+=("$fd")
+    else
+      exec {fd}>&-
+    fi
+  done
+fi
 flock -u "$queue"
 exec {queue}>&-
 rm -f "$waiter"
 
-cpus=${lanes[$got]}
-index=$((got + 1))
-holder="$dir/lane-$index.holder"
-write_info "$holder" "$index" "$cpus"
+parts=()
+for i in "${held[@]}"; do parts+=("${lanes[$i]}"); done
+cpus=$(
+  IFS=,
+  echo "${parts[*]}"
+)
+index=$((held[0] + 1))
+for i in "${held[@]}"; do
+  holders+=("$dir/lane-$((i + 1)).holder")
+  write_info "$dir/lane-$((i + 1)).holder" "$((i + 1))" "$cpus"
+done
 
 width=0
 for part in ${cpus//,/ }; do
@@ -236,8 +329,11 @@ if ! [[ $user_workers =~ ^[1-9][0-9]*$ ]] || [ "$user_workers" -gt "$width" ]; t
   export PYTEST_XDIST_AUTO_NUM_WORKERS="$width"
 fi
 
-# The command must not inherit the lock: the lane belongs to this script.
-taskset -c "$cpus" "$@" {lane}>&- <&0 &
+# The command must not inherit the locks: the lanes belong to this script.
+(
+  for fd in "${held_fds[@]}"; do exec {fd}>&-; done
+  exec taskset -c "$cpus" "$@"
+) <&0 &
 child=$!
 trap 'kill -INT "$child" 2>/dev/null' INT
 trap 'kill -TERM "$child" 2>/dev/null' TERM
@@ -248,5 +344,5 @@ while :; do
   rc=$?
   kill -0 "$child" 2>/dev/null || break
 done
-rm -f "$holder"
+rm -f "${holders[@]}"
 exit "$rc"
