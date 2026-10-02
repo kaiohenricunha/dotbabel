@@ -34,6 +34,8 @@ setup() {
   echo '{}' >"$REPO/.dotbabel.json"
   export HOME="$WORK/home" CLAUDE_CONFIG_DIR="$WORK/home/.claude" DOTBABEL_FLEET_STATE_DIR="$WORK/state"
   unset DOTBABEL_FLEET_MODE DOTBABEL_FLEET_ESCALATE_MINUTES XDG_STATE_HOME
+  # The session-start hook would give the real session scope a CPU weight.
+  export DOTBABEL_FLEET_CPU_WEIGHT=off
   sleep 600 &
   PEER_PID=$!
   register "$$" sess-self self-pane
