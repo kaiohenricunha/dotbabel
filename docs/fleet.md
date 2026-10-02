@@ -145,6 +145,7 @@ In `.dotbabel.json`:
 | `shared`                 | `[]`    | Extra globs that are never claimed                  |
 | `escalate_after_minutes` | `15`    | Minutes of blocks before `ask`; `0` means never ask |
 | `token_idle_minutes`     | `60`    | Minutes before an unused merge token is free        |
+| `heavy`                  | `[]`    | More commands that run in a CPU lane (see below)    |
 
 Environment variables take precedence:
 
@@ -236,6 +237,22 @@ command:
 - `pytest` (also through `python -m`, `uv run`, and `poetry run`), `tox`, and
   `nox`
 - `dotbabel local-attest` and `dotbabel quality check`
+- the commands that the repository lists in `fleet.heavy`
+
+A repository names its own heavy commands in its `.dotbabel.json`:
+
+```json
+{ "fleet": { "heavy": ["./scripts/run-tests.sh", "npm run ci"] } }
+```
+
+An entry matches a command whose first words are the entry's words. An entry
+whose first word has no `/` matches that word in any directory, so
+`run-tests.sh` matches `./run-tests.sh` and `scripts/run-tests.sh`. The lane
+holder shows the entry as its label. The wrapper reads the nearest
+`.dotbabel.json` from the command's directory up to the git top level, without
+starting a process. This adds about 0.4 ms to each Bash call in a directory
+with a `.dotbabel.json`. It starts Node only when the command contains the
+first word of an entry.
 
 Watch modes (`vitest --watch`, `npm run test:watch`) never go to a lane,
 because they never end. Every other command, and every hook and MCP server,
@@ -282,9 +299,10 @@ and width 4 gives `0-3;4-7;8-11;12-14`.
 - **Linux only.** A lane needs `flock` and `taskset` (util-linux). Without
   them, or with bash older than 4, the command runs at once, with no lane.
 - **Only the command text is read.** A script that starts a test runner, such
-  as `./run-tests.sh`, is not seen. Run it with `dotbabel fleet lane --`. A
-  heredoc stops the reading, so a test command after a heredoc in the same
-  Bash call runs with no lane.
+  as `./run-tests.sh`, is not seen unless the repository lists it in
+  `fleet.heavy`. Otherwise run it with `dotbabel fleet lane --`. A heredoc
+  stops the reading, so a test command after a heredoc in the same Bash call
+  runs with no lane.
 - **The wrapper reads Claude Code's internal form of a Bash call**
   (`eval '<command>' && pwd -P >| <file>`). If a new Claude Code version
   changes that form, heavy commands run with no lane. No command breaks.
