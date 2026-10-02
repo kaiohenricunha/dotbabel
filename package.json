@@ -77,7 +77,7 @@
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@vitest/coverage-v8": "^5.0.0",
     "bats": "^1.11.1",
-    "markdownlint-cli2": "^0.23.2",
+    "markdownlint-cli2": "^0.23.3",
     "vitest": "^5.0.0"
   },
   "repository": {
