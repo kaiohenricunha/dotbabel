@@ -270,6 +270,17 @@ describe("jest", () => {
     expect(repo.skipReason()).toMatch(/no test/);
   });
 
+  it("counts only listed test paths, not a package manager's banner lines on stdout", () => {
+    const repo = fakeRepo({
+      files: { ...files, "package.json": JSON.stringify({ scripts: { test: "jest --ci" } }) },
+      changed: ["src/a.ts"],
+      on: { "yarn jest": { status: 0, stdout: "yarn run v1.22.22\n$ /repo/node_modules/.bin/jest --listTests\nDone in 0.41s.\n" } },
+    });
+    expect(run(repo, ["--runner", "jest", "--", "yarn", "test"])).toBe(0);
+    expect(repo.runs).toEqual([]);
+    expect(repo.skipReason()).toMatch(/no test/);
+  });
+
   it("runs in full when the listing probe fails", () => {
     const repo = fakeRepo({ files, changed: ["src/a.ts"], on: { "npx --no-install jest": { status: 1, stdout: "" } } });
     run(repo, jestCmd);
@@ -375,6 +386,14 @@ describe("vitest", () => {
     const [argv] = repo.runs;
     expect(argv.slice(0, 4)).toEqual(["npx", "vitest", "related", "--silent"]);
     expect(argv).not.toContain("--coverage");
+  });
+
+  it("keeps coverage reporter settings, so a reused lcov report is still written", () => {
+    const repo = fakeRepo({ files: { ...files, "package.json": "{}" }, changed: ["src/a.ts"], on: { "npx vitest": reportWith(1) } });
+    run(repo, ["--runner", "vitest", "--", "npx", "vitest", "run", "--coverage", "--coverage.reporter=lcov"]);
+    const [argv] = repo.runs;
+    expect(argv).toContain("--coverage.reporter=lcov");
+    expect(argv.filter((a) => a === "--coverage")).toHaveLength(1);
   });
 
   it("skips without running when no changed file is in the leg", () => {

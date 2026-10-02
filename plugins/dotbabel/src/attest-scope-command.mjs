@@ -295,7 +295,9 @@ function jestLeg(ctx, { exec, args }) {
   const probe = jestScopedArgv({ exec, options: parsed.options, files, list: true });
   const listed = ctx.io.capture(probe[0], probe.slice(1));
   if (listed.status !== 0) return ctx.full("jest could not list the related tests");
-  const count = listed.stdout.split("\n").filter((l) => l.trim() !== "").length;
+  // `--listTests` prints absolute paths. Count only those: yarn classic also
+  // writes its banner (`yarn run v1…`, `$ jest …`, `Done in …`) to stdout.
+  const count = listed.stdout.split("\n").filter((l) => path.isAbsolute(l.trim())).length;
   if (count === 0) return ctx.skip("the changed files reach no test");
   const argv = jestScopedArgv({ exec, options: parsed.options, files });
   ctx.io.log(`attest-scope: ${count} related test file(s): ${argv.join(" ")}`);
@@ -316,7 +318,9 @@ function vitestLeg(ctx, { exec, args }) {
     return ctx.full("the vitest arguments have a shape the scoper does not narrow");
   }
   const coverage = rest.some((a) => a === "--coverage" || a === "--coverage.enabled" || a === "--coverage.enabled=true");
-  const extra = rest.filter((a) => !a.startsWith("--coverage"));
+  // vitestScopedArgs adds `--coverage` itself; reporter and directory settings
+  // stay, so a report another leg reuses is still written where it expects.
+  const extra = rest.filter((a) => a !== "--coverage" && !a.startsWith("--coverage.enabled"));
   const selection = jsSelection(ctx);
   if (selection.mode !== "scoped") return selection.mode === "full" ? ctx.full(selection.reason) : ctx.skip(selection.reason);
   const dir = ctx.io.tempDir();

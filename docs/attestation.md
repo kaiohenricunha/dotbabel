@@ -102,7 +102,9 @@ must have passed.
 Known limits: pytest selection uses file names, so a changed module with no test
 named after it runs the full suite. A JS change outside the directory of a
 sub-directory leg runs that leg in full, because a workspace link can reach it
-and no import graph shows that.
+and no import graph shows that. The pytest coverage floor goes off only when the
+command line has `--cov`. A floor set in `addopts` stays on, so put `--cov` on the
+command line or expect a scoped run to fail on the floor.
 
 ## What the merge gate checks
 
