@@ -127,7 +127,8 @@ live session holds it.
 The script only locates and runs `bin/dotbabel-fleet.mjs`, and it fails open:
 without Node, or on any error, the edit goes ahead. Register it with five
 entries: `pre-edit` on the edit tools, `pre-bash` on `Bash`, `session-start`,
-`post-tool` on every tool, and `prompt`. See
+`post-tool` on every tool, and `prompt`. At `session-start` it also gives the
+session's systemd scope an equal CPU weight (the fair CPU share). See
 [fleet.md](./fleet.md) for the settings block, the claim rules, and the
 limits.
 

@@ -405,6 +405,40 @@ running `event` after the hook recorded the same merge does nothing.
 - **`gh` must be signed in** in the merging session, because the event comes
   from `gh pr view`.
 
+## Fair CPU share
+
+Lanes cover test runs. Builds, scripts, and servers run outside the lanes, and
+without CPU weights the kernel shares the CPUs thread by thread. A session with
+48 busy threads then gets 12 times the CPU of a session with 4. The fair CPU
+share gives each Claude Code session's systemd scope the same `CPUWeight`, so
+the scopes share the CPUs as groups. A session that works alone still uses all
+CPUs; a light session keeps its CPUs next to a heavy one. On a 16-CPU machine,
+4 busy threads next to 48 got 1.05 CPUs without the weights and 3.37 with
+them.
+
+The `session-start` hook gives its own session scope `CPUWeight=100` with
+`systemctl --user set-property --runtime`, in every repository. It acts only on
+a `*.scope` in the user manager's `app.slice` (tmux, for example, makes one per
+pane), and it does nothing when systemd is missing, as on macOS. For sessions
+that started before the hook, run once:
+
+```bash
+dotbabel fleet cpu-share            # set the weight on every live session's scope
+dotbabel fleet cpu-share --status   # only show each session and its scope
+```
+
+| Variable                    | Effect                                                     |
+| --------------------------- | ---------------------------------------------------------- |
+| `DOTBABEL_FLEET_CPU_WEIGHT` | The weight of each session scope (default `100`), or `off` |
+
+The weights last until the scope ends or the next boot. To undo them sooner,
+run `systemctl --user set-property --runtime <scope> CPUWeight=` for each
+scope, or set `DOTBABEL_FLEET_CPU_WEIGHT=off` and start new sessions. systemd
+turns the `cpu` controller of `app.slice` off by itself when no scope with a
+weight is left. Docker containers run in `system.slice`, outside the sessions;
+at the top level, `system.slice` and `user.slice` already share the CPUs 50/50
+under load. The lane size benchmarks ran without the fair share.
+
 ## Merge token
 
 Two pull requests can each pass their checks against the same old base, and

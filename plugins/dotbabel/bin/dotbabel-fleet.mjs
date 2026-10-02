@@ -38,11 +38,13 @@
  *   dotbabel fleet events  [--all] [--json]
  *   dotbabel fleet event   --pr <N> [--repo <owner/name>]
  *   dotbabel fleet token   [status | take | release] [--json]
+ *   dotbabel fleet cpu-share [--status] [--json]
  *
  * Environment:
  *   DOTBABEL_FLEET_MODE=off               turn the hooks off
  *   DOTBABEL_FLEET_ESCALATE_MINUTES=<n>   ask the user after n minutes of blocks (default 15, 0 = never)
  *   DOTBABEL_FLEET_TOKEN_IDLE_MINUTES=<n> free an unused merge token after n minutes (default 60)
+ *   DOTBABEL_FLEET_CPU_WEIGHT=<n|off>     CPU weight of each session scope (default 100)
  *   DOTBABEL_FLEET_STATE_DIR=<dir>        ledger root (default $XDG_STATE_HOME/dotbabel/fleet)
  *   CLAUDE_CONFIG_DIR                     where Claude Code keeps sessions/ (default ~/.claude)
  *
@@ -92,6 +94,7 @@ import {
   patternsOverlap,
   releaseClaims,
 } from "../src/fleet/policy.mjs";
+import { cpuWeightSetting, sessionScope, setPropertyArgs } from "../src/fleet/cpushare.mjs";
 import { findSelf, isOwnerAlive, ownerFromEntry, readRegistry, sessionsDir } from "../src/fleet/registry.mjs";
 import {
   DEFAULT_TOKEN_IDLE_MS,
@@ -108,7 +111,7 @@ import {
 const TOOL = "dotbabel-fleet";
 const SELF_PATH = fileURLToPath(import.meta.url);
 const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
-const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token"]);
+const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token", "cpu-share"]);
 const TOKEN_ACTIONS = new Set(["status", "take", "release"]);
 const TOKEN_ACTION_TEXT = { rebase: "rebase onto the base", attest: "local-attest", merge: "gh pr merge" };
 const PR_FIELDS = "number,title,state,mergeCommit,baseRefName,headRefName,files,url";
@@ -127,6 +130,7 @@ const USAGE = `Usage:
   dotbabel fleet events  [--all] [--json]               show recent merges in this repo (or all repos)
   dotbabel fleet event   --pr <N> [--repo <owner/name>] record a merge made outside Claude Code
   dotbabel fleet token   [status | take | release]      show, take, or give back this repo's merge token
+  dotbabel fleet cpu-share [--status]                    give every live session's scope an equal CPU weight
 
 Patterns are relative to the repo root. A bare path also covers everything
 below it; ** and * are globs.
@@ -460,6 +464,8 @@ function runHook(event) {
     const out = (event === "pre-edit" ? preEdit : preBash)(input, Date.now());
     if (out) process.stdout.write(`${JSON.stringify(out)}\n`);
   } else if (event === "session-start") {
+    // The fair CPU share is per machine, so it applies in every repo.
+    ensureCpuShare();
     const text = sessionStart(input);
     if (text) process.stdout.write(`${text}\n`);
   } else if (event === "post-tool" || event === "prompt") {
@@ -740,6 +746,68 @@ function cmdToken(args) {
   return EXIT_CODES.OK;
 }
 
+// ----------------------------------------------------------- cpu share ----
+
+/** Where /proc is; tests point it at a fake tree. */
+function procRoot() {
+  return process.env.DOTBABEL_FLEET_PROC_ROOT || "/proc";
+}
+
+function scopeOf(pid) {
+  try {
+    return sessionScope(fs.readFileSync(path.join(procRoot(), String(pid), "cgroup"), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** Give a scope its CPU weight until the next boot. Fails quietly. */
+function applyCpuShare(unit, weight) {
+  const r = spawnSync("systemctl", setPropertyArgs(unit, weight), { timeout: 3000, stdio: "ignore" });
+  return r.status === 0;
+}
+
+/** SessionStart: the hook's own session scope gets the weight. */
+function ensureCpuShare() {
+  const weight = cpuWeightSetting(process.env);
+  const scope = weight === null ? null : scopeOf("self");
+  if (scope) applyCpuShare(scope.unit, weight);
+}
+
+/** `cpu-share [--status] [--json]`: the weight for every live session's scope. */
+function cmdCpuShare(args) {
+  const weight = cpuWeightSetting(process.env);
+  if (weight === null) {
+    process.stdout.write("The fair CPU share is off (DOTBABEL_FLEET_CPU_WEIGHT).\n");
+    return EXIT_CODES.OK;
+  }
+  const seen = new Set();
+  const done = new Set();
+  const sessions = [];
+  for (const entry of readRegistry(sessionsDir()).entries) {
+    if (seen.has(entry.pid) || !isOwnerAlive(entry, { procRoot: procRoot() })) continue;
+    seen.add(entry.pid);
+    const scope = scopeOf(entry.pid);
+    let applied = false;
+    if (scope && !args.flags.status) {
+      applied = done.has(scope.unit) || applyCpuShare(scope.unit, weight);
+      if (applied) done.add(scope.unit);
+    }
+    sessions.push({ name: entry.name ?? `pid ${entry.pid}`, pid: entry.pid, unit: scope?.unit ?? null, applied });
+  }
+  sessions.sort((a, b) => a.name.localeCompare(b.name));
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify({ weight, status: Boolean(args.flags.status), sessions }, null, 2)}\n`);
+    return EXIT_CODES.OK;
+  }
+  for (const s of sessions) {
+    const state = !s.unit ? "not in a user app scope" : args.flags.status ? "found" : s.applied ? `CPUWeight=${weight}` : "systemctl failed";
+    process.stdout.write(`  ${s.name}  ${s.unit ?? "-"}  ${state}\n`);
+  }
+  process.stdout.write(`${sessions.length} live session${sessions.length === 1 ? "" : "s"}.\n`);
+  return EXIT_CODES.OK;
+}
+
 // --------------------------------------------------------------- lanes ----
 
 /**
@@ -835,6 +903,7 @@ function main(argv) {
       all: { type: "boolean" },
       pr: { type: "string" },
       repo: { type: "string" },
+      status: { type: "boolean" },
     });
   } catch (err) {
     process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n${USAGE}\n`);
@@ -867,6 +936,7 @@ function main(argv) {
     if (sub === "events") return cmdEvents(subArgs);
     if (sub === "event") return cmdEvent(subArgs);
     if (sub === "token") return cmdToken(subArgs);
+    if (sub === "cpu-share") return cmdCpuShare(subArgs);
     return cmdPrune();
   } catch (err) {
     if (err instanceof UsageError) {
