@@ -252,7 +252,9 @@ holder shows the entry as its label. The wrapper reads the nearest
 `.dotbabel.json` from the command's directory up to the git top level, without
 starting a process. This adds about 0.4 ms to each Bash call in a directory
 with a `.dotbabel.json`. It starts Node only when the command contains the
-first word of an entry.
+first word of an entry. Give each entry a distinctive first word: an entry
+that starts with `make` or `go` starts Node for almost every command, and each
+start costs about 18 ms.
 
 Watch modes (`vitest --watch`, `npm run test:watch`) never go to a lane,
 because they never end. Every other command, and every hook and MCP server,
