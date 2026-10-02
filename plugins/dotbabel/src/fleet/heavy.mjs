@@ -247,3 +247,53 @@ export function findHeavyCommand(command) {
   }
   return null;
 }
+
+const MAX_HEAVY_ENTRIES = 50;
+const MAX_LABEL = 60;
+
+/**
+ * The `fleet.heavy` entries of a `.dotbabel.json`: the commands a repository
+ * names as heavy test runs, beyond the built-in ones. Bad JSON, a missing
+ * list, and entries that are not non-empty strings give no entries.
+ *
+ * @param {string} text the file's contents
+ * @returns {string[]} at most 50 trimmed entries
+ */
+export function parseHeavyConfig(text) {
+  let heavy;
+  try {
+    heavy = JSON.parse(text)?.fleet?.heavy;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(heavy)) return [];
+  return heavy
+    .filter((e) => typeof e === "string" && e.trim() !== "")
+    .map((e) => e.trim())
+    .slice(0, MAX_HEAVY_ENTRIES);
+}
+
+/**
+ * The first `fleet.heavy` entry that a shell command line runs, as a label.
+ * An entry matches a simple command whose first words equal the entry's
+ * words. An entry whose first word has no "/" also matches that word in any
+ * directory, so "run-suite.sh" matches "./run-suite.sh". The label comes from
+ * the entry, never from the command, so it holds no command-line secrets.
+ *
+ * @param {string|null|undefined} command
+ * @param {string[]} entries from parseHeavyConfig
+ * @returns {string|null} a single-line label of at most 60 characters, or null
+ */
+export function findCustomHeavy(command, entries) {
+  if (typeof command !== "string" || command.trim() === "" || !Array.isArray(entries)) return null;
+  const wanted = entries.map((e) => String(e).split(/\s+/).filter(Boolean)).filter((w) => w.length > 0);
+  for (const words of simpleCommands(command) ?? []) {
+    for (const entry of wanted) {
+      if (words.length < entry.length) continue;
+      const first = entry[0].includes("/") ? words[0] : words[0].slice(words[0].lastIndexOf("/") + 1);
+      if (first !== entry[0]) continue;
+      if (entry.slice(1).every((w, i) => words[i + 1] === w)) return entry.join(" ").slice(0, MAX_LABEL);
+    }
+  }
+  return null;
+}

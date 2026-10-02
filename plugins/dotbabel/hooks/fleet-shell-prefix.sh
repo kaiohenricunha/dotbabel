@@ -60,12 +60,44 @@ esac
 q="'"
 cmd=${cmd//"$q\"$q\"$q"/$q}
 
-# Start node only for a command that names a test tool AND a test verb, so
-# `npm install` or `node -e` never pays for the check. Every command the
-# detector (src/fleet/heavy.mjs) calls heavy must match both; a test pins that.
+# A repo can name its own heavy commands: "fleet": {"heavy": [...]} in its
+# .dotbabel.json. Find the nearest one, up to the git top level, with no fork:
+# this runs before every Bash tool command.
+heavy_config=""
+heavy_words=() # the first word of each entry, without its directory
+find_heavy_config() {
+  local d=$PWD text="" list entry
+  while :; do
+    if [ -f "$d/.dotbabel.json" ]; then
+      read -r -d '' text <"$d/.dotbabel.json"
+      [[ $text =~ \"heavy\"[[:space:]]*:[[:space:]]*\[([^]]*)\] ]] || return 0
+      heavy_config="$d/.dotbabel.json"
+      list=${BASH_REMATCH[1]}
+      while [[ $list =~ \"([^\"]+)\" ]]; do
+        entry=${BASH_REMATCH[1]}
+        entry=${entry#"${entry%%[![:space:]]*}"}
+        entry=${entry%%[[:space:]]*}
+        [ -n "$entry" ] && heavy_words+=("${entry##*/}")
+        list=${list#*\"${BASH_REMATCH[1]}\"}
+      done
+      return 0
+    fi
+    if [ -e "$d/.git" ] || [ -z "$d" ] || [ "$d" = / ]; then return 0; fi
+    d=${d%/*}
+  done
+}
+find_heavy_config
+
+# Without such a list, start node only for a command that names a test tool
+# AND a test verb, so `npm install` or `node -e` never pays for the check.
+# Every built-in heavy command of the detector (src/fleet/heavy.mjs) must
+# match both; a test pins that.
 tools='(^|[^[:alnum:]_.-])(npm|pnpm|pnpx|yarn|bun|bunx|npx|vitest|jest|bats|playwright|stryker|go|pytest|py\.test|python[0-9.]*|uv|poetry|pipenv|hatch|tox|nox|make|gmake|cargo|mvn|mvnw|gradle|gradlew|node|dotbabel|dotbabel-local-attest|dotbabel-quality)([^[:alnum:]_-]|$)'
 verbs='(^|[^[:alnum:]_-])(test|t|tst|coverage|attest|mutation|e2e|vitest|jest|bats|pytest|py\.test|tox|nox|nextest|verify|check|integration-test|stryker|local-attest|dotbabel-local-attest|--test|(test|check|coverage|e2e)[-_:.][[:alnum:]_:.-]*|[[:alnum:]]*Test)([^[:alnum:]_-]|$)'
-[[ $cmd =~ $tools ]] && [[ $cmd =~ $verbs ]] || run
+# A listed command needs node only when the command names an entry's first word.
+named=0
+for w in "${heavy_words[@]}"; do [[ $cmd == *"$w"* ]] && named=1; done
+[ "$named" = 1 ] || { [[ $cmd =~ $tools ]] && [[ $cmd =~ $verbs ]]; } || run
 command -v node >/dev/null 2>&1 || run
 
 # ~/.claude/hooks/<this> is a symlink into the dotbabel checkout.
@@ -83,6 +115,6 @@ check="$here/../scripts/fleet-lane-check.mjs"
 lane="$here/../scripts/fleet-lane.sh"
 [ -f "$check" ] && [ -f "$lane" ] || run
 
-label=$(printf '%s' "$cmd" | node "$check" 2>/dev/null) || run
+label=$(printf '%s' "$cmd" | DOTBABEL_FLEET_HEAVY_CONFIG="$heavy_config" node "$check" 2>/dev/null) || run
 [ -n "$label" ] || run
 exec bash "$lane" --name "$label" -- "$shell" -c -l "$script"

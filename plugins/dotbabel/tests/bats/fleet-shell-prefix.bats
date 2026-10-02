@@ -88,11 +88,78 @@ bash_tool_script() {
 
 # ------------------------------------------------------------------ lanes ----
 
+# repo_with <config JSON or ""> — a git repo with a script that reports its lane.
+repo_with() {
+  REPO="$WORK/outer/repo"
+  mkdir -p "$REPO/.git" "$REPO/sub"
+  [ -n "$1" ] && printf '%s\n' "$1" >"$REPO/.dotbabel.json"
+  printf '#!/bin/sh\necho "lane=${DOTBABEL_LANE:-none} label=$(sed -n "s/^label=//p" "$DOTBABEL_FLEET_STATE_DIR/lanes/lane-1.holder" 2>/dev/null)"\n' >"$REPO/run-suite.sh"
+  chmod +x "$REPO/run-suite.sh"
+}
+
 @test "runs a heavy Bash tool command in a CPU lane" {
   needs_tools
   DOTBABEL_FLEET_LANES=0 run "$PREFIX" "$(bash_tool_script 'npm test')"
   [ "$status" -eq 0 ]
   [ "$output" = "1" ]
+}
+
+@test "runs a command that the repo names in fleet.heavy in a CPU lane, from any subdirectory" {
+  needs_tools
+  repo_with '{"fleet":{"heavy":["run-suite.sh"]}}'
+  cd "$REPO"
+  DOTBABEL_FLEET_LANES=0 run "$PREFIX" "$(bash_tool_script './run-suite.sh')"
+  [ "$status" -eq 0 ]
+  [ "$output" = "lane=1 label=run-suite.sh" ]
+  cd "$REPO/sub"
+  DOTBABEL_FLEET_LANES=0 run "$PREFIX" "$(bash_tool_script '../run-suite.sh')"
+  [ "$output" = "lane=1 label=run-suite.sh" ]
+}
+
+@test "runs it at once with no fleet.heavy list, with bad JSON, or with no .dotbabel.json" {
+  needs_tools
+  for config in '{"fleet":{"mode":"on"}}' '{"fleet": {"heavy": [ broken' ""; do
+    rm -rf "$WORK/outer"
+    repo_with "$config"
+    cd "$REPO"
+    DOTBABEL_FLEET_LANES=0 run "$PREFIX" "$(bash_tool_script './run-suite.sh')"
+    [ "$status" -eq 0 ]
+    [ "$output" = "lane=none label=" ]
+  done
+}
+
+@test "never reads a .dotbabel.json above the git top level" {
+  needs_tools
+  repo_with ""
+  printf '%s\n' '{"fleet":{"heavy":["run-suite.sh"]}}' >"$WORK/outer/.dotbabel.json"
+  cd "$REPO"
+  DOTBABEL_FLEET_LANES=0 run "$PREFIX" "$(bash_tool_script './run-suite.sh')"
+  [ "$output" = "lane=none label=" ]
+}
+
+@test "starts no node for a command that is not heavy when the repo lists no heavy commands" {
+  repo_with '{"fleet":{"mode":"on"}}'
+  mkdir -p "$WORK/stub"
+  printf '#!/bin/sh\necho started >>"%s/node-calls"\nexit 1\n' "$WORK" >"$WORK/stub/node"
+  chmod +x "$WORK/stub/node"
+  cd "$REPO"
+  PATH="$WORK/stub:$PATH" run "$PREFIX" "$(bash_tool_script 'ls run-suite.sh')"
+  [ "$status" -eq 0 ]
+  [ "$output" = "run-suite.sh" ]
+  [ ! -e "$WORK/node-calls" ]
+}
+
+@test "starts no node in a repo with a heavy list for a command that names none of its entries" {
+  repo_with '{"fleet":{"heavy":["run-suite.sh", "./scripts/e2e.sh --all"]}}'
+  mkdir -p "$WORK/stub"
+  printf '#!/bin/sh\necho started >>"%s/node-calls"\nexit 1\n' "$WORK" >"$WORK/stub/node"
+  chmod +x "$WORK/stub/node"
+  cd "$REPO"
+  PATH="$WORK/stub:$PATH" run "$PREFIX" "$(bash_tool_script 'ls .git')"
+  [ "$status" -eq 0 ]
+  [ ! -e "$WORK/node-calls" ]
+  PATH="$WORK/stub:$PATH" run "$PREFIX" "$(bash_tool_script 'echo e2e.sh')"
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
 }
 
 @test "leaves a command that only mentions a test tool alone" {
