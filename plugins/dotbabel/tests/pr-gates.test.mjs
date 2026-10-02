@@ -809,17 +809,46 @@ describe("checkMergeGate — attestation evidence", () => {
     expect(result.reasons[0].detail).toBe("quality");
   });
 
-  it("counts a diff-skipped required leg as incomplete, never as a pass", () => {
-    // A skipped leg is sound for CI parity, where the same job skips
-    // remotely. It proves nothing ran, and a required leg is required
-    // precisely because the merge gate has stopped checking it itself.
+  it("accepts a scope-skipped required leg beside a required leg that passed", () => {
+    // local-attest runs only the pull request's scope. A required leg with
+    // nothing of this diff in scope records "skipped", and that is as trusted
+    // as a pass: the same trusted, unedited comment carries it, and the config
+    // hash pins the scoping rules to the base branch's.
     const legs = [
       { name: "test", mode: "hard", status: "pass" },
       { name: "quality", mode: "hard", status: "skipped" },
     ];
     const body = attestBody(HEAD, attestPayload({ legs }));
     const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("reports ATTESTATION_INCOMPLETE when every required leg was skipped", () => {
+    // Skips are acceptable only beside evidence: at least one required leg
+    // must have actually run and passed, or the attestation verified nothing.
+    const legs = [
+      { name: "test", mode: "hard", status: "skipped" },
+      { name: "quality", mode: "hard", status: "skipped" },
+      { name: "bats", mode: "hard", status: "pass" },
+    ];
+    const body = attestBody(HEAD, attestPayload({ legs }));
+    const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
     expect(codes(result)).toEqual(["ATTESTATION_INCOMPLETE"]);
+    expect(result.reasons[0].message).toMatch(/no required check ran/);
+    expect(result.reasons[0].detail).toBe("test, quality");
+  });
+
+  it("does not accept a failed, not-run or advisory-failed required leg as satisfied", () => {
+    for (const status of ["fail", "not-run", "advisory-fail", "SKIPPED"]) {
+      const legs = [
+        { name: "test", mode: "hard", status: "pass" },
+        { name: "quality", mode: "hard", status },
+      ];
+      const body = attestBody(HEAD, attestPayload({ legs }));
+      const result = checkMergeGate(attestInput({ attestationComments: [comment(body)] }));
+      expect(codes(result)[0]).toBe("ATTESTATION_INCOMPLETE");
+      expect(result.reasons[0].detail).toBe("quality");
+    }
   });
 
   it("reports ATTESTATION_FAILED when the payload verdict is not a pass", () => {

@@ -226,16 +226,20 @@ async function inspectLegs({ repoRoot, source, governance, required, loadConfigF
     );
   }
 
+  // A skipped required leg satisfies the gate only beside one that passed, so
+  // the risk is a policy in which EVERY required leg can skip: a pull request
+  // that skips them all is blocked.
   const skippable = required.filter((name) => {
     const leg = byName.get(name);
-    return leg && (leg.when || leg.skipWhenDiffOnly);
+    return leg && (leg.when || leg.skipWhenDiffOnly || leg.scope === true);
   });
-  if (skippable.length > 0) {
+  const known = required.filter((name) => byName.has(name));
+  if (skippable.length > 0 && skippable.length === known.length) {
     add(
       "warn",
       "REQUIRED_LEG_SKIPPABLE",
-      `required leg ${skippable.map((n) => JSON.stringify(n)).join(", ")} can be skipped by a path filter, ` +
-        "and a skipped leg is not a pass, so a pull request that skips it is blocked with ATTESTATION_INCOMPLETE",
+      `required leg ${skippable.map((n) => JSON.stringify(n)).join(", ")} can be skipped by a path filter or its scope, ` +
+        "and no required leg always runs, so a pull request that skips every one of them is blocked with ATTESTATION_INCOMPLETE",
     );
   }
 

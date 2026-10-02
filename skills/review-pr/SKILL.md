@@ -131,7 +131,7 @@ BASELINE=$(git -C ".claude/worktrees/pr-$NUMBER" rev-parse HEAD)
   - `pyproject.toml` → `pytest` (or `uv run pytest`)
 - Commit with a clear message referencing the review (e.g., `fix: address PR review — <summary>`).
 
-**Conductor mode:** once the fixes exist, narrow that test run to the files they touched, using the runner's own scoping (`npx vitest related <files>`, `go test` on the touched packages, `pytest` on the matching test files). A runner with no scoping mechanism — a bare `make test` target — falls back to the full suite. The full suite runs regardless in the conductor's `local-attest` phase, so a second full run here buys nothing.
+**Conductor mode:** once the fixes exist, narrow that test run to the files they touched, using the runner's own scoping (`npx vitest related <files>`, `go test` on the touched packages, `pytest` on the matching test files). A runner with no scoping mechanism — a bare `make test` target — falls back to the full suite. The conductor's `local-attest` phase then verifies the scope of the whole pull request's changes, so a full run here buys nothing; the full suite runs only on demand (`dotbabel local-attest --full`) or on a schedule.
 
 Leave the worktree in place when done. Print the cleanup command:
 
@@ -227,7 +227,7 @@ The judgment is **advisory and opens threads for a human**. It never writes a cr
 
 **If the PR body has no `## Test plan` section:** leave a comment asking the author to add one, record `test-plan: missing` in the final summary, and skip steps 12 and 13. Still run step 14 — criteria are independent of the test plan, and a missing plan is no reason to leave the criteria unverified — then go to the summary with status `test-plan-missing`.
 
-**Conductor mode:** still check that the `## Test plan` section exists (a missing one is handled exactly as above) and still classify each item as runnable or manual for the summary. Do not execute any item here, and do not tick any checkbox. The conductor's `local-attest` phase runs the full CI matrix immediately after this skill returns, and ticks each covered box against the attested SHA using the `printf` and PATCH shape below.
+**Conductor mode:** still check that the `## Test plan` section exists (a missing one is handled exactly as above) and still classify each item as runnable or manual for the summary. Do not execute any item here, and do not tick any checkbox. The conductor's `local-attest` phase runs the CI matrix on the scope of the pull request's changes immediately after this skill returns, and ticks each covered box against the attested SHA using the `printf` and PATCH shape below.
 
 **Record the deferral in the PR body** before moving on, so it is a fact a gate can read rather than a promise:
 

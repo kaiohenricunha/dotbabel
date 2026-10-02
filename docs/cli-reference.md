@@ -522,12 +522,18 @@ protect CI minutes.
 | `--no-push`       | false                  | Do not `git push` after attesting                                                |
 | `--dry-run`       | false                  | Print the comment; post nothing                                                  |
 | `--fail-fast`     | false                  | Stop launching legs after the first hard failure; a stopped run cannot attest    |
+| `--full`          | false                  | On-demand full run: ignore every leg's `when` and `scope`; run every leg in full |
 | `--only <leg>`    | —                      | Diagnostic mode: run only the named leg(s); relaxed preconditions; never attests |
 | `--from <leg>`    | —                      | Diagnostic mode: run the matrix from the named leg to the end                    |
 | `--config <path>` | discovered             | Override the config file location                                                |
 
 Config discovery, in order: `.local-attest.config.mjs`,
 `.local-attest.config.json`, then `package.json#local-attest`.
+
+An attest run is PR-scoped: a leg with `scope: true` receives the pull
+request's changed files and runs only what they reach, and a leg with
+`when.changedPaths` runs only when a changed file matches. The full suite runs
+only on demand (`--full`) or on a schedule.
 
 The attestation is SHA-pinned, so a push after attesting invalidates it. Commit
 first, attest second.

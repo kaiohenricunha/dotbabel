@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { parseAttestationComment } from "../src/attestation.mjs";
 import { validateConfig } from "../src/local-attest-config.mjs";
 import { shouldAttest } from "../src/local-attest-lib.mjs";
 import {
@@ -1654,6 +1655,162 @@ describe("execute run manifest (evidence reuse between legs)", () => {
     const cfg = validateConfig({ matrix: [{ name: "a", mode: "hard", command: "echo a" }, { name: "b", mode: "hard", command: "echo b" }] });
     await execute(deps, cfg, { prOverride: null, push: false, dryRun: false, only: ["a"] });
     expect(writes).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR-scoped legs (scope: true) and --full
+// ---------------------------------------------------------------------------
+
+describe("execute scope legs", () => {
+  const SHA = "abc1234abc1234abc1234abc1234abc1234abc12";
+  const happy = [
+    [/git rev-parse --abbrev-ref HEAD/, { stdout: "feature\n" }],
+    [/git status --porcelain/, { stdout: "" }],
+    [/gh auth status/, { status: 0 }],
+    [/gh repo view --json nameWithOwner/, { stdout: "k/r\n" }],
+    [/gh pr view --json number/, { stdout: "42\n" }],
+    [/git rev-parse HEAD/, { stdout: `${SHA}\n` }],
+    [/gh pr view 42 --json headRefOid/, { stdout: `${SHA}\n` }],
+    [/gh api repos.*\/comments --paginate/, { stdout: "[]" }],
+  ];
+  // One renamed file: the Files API reports its old path as previous_filename.
+  const files = [
+    [/pulls\/42\/files/, { stdout: '[["docs/a.md",null],["src/new.mjs","src/old.mjs"]]\n' }],
+    [/--json changedFiles/, { stdout: "2\n" }],
+  ];
+  const matrix = () =>
+    validateConfig({
+      matrix: [
+        { name: "plain", mode: "hard", command: "echo plain" },
+        { name: "lint", mode: "hard", command: "echo lint", scope: true },
+        { name: "test", mode: "hard", command: "echo test", scope: true },
+      ],
+    });
+  /** Deps with a temp dir; `skips` maps a skip-file path to what the leg wrote. */
+  const scopedDeps = (replies, skips = {}) => {
+    const made = makeDeps({ runReplies: replies, readFileReplies: skips });
+    made.calls.removed = [];
+    made.deps.makeTempDir = () => "/tmp/scope-x";
+    made.deps.removeTempDir = (dir) => made.calls.removed.push(dir);
+    return made;
+  };
+  const legEnv = (calls, name) => calls.run.find((c) => c.cmd === `echo ${name}`)?.opts.env ?? {};
+
+  it("passes the changed-file list and a per-leg skip file to scope legs only", async () => {
+    const { deps, calls } = scopedDeps([...happy, ...files]);
+    const r = await execute(deps, matrix(), { prOverride: null, push: false, dryRun: true });
+    expect(r.exitCode).toBe(0);
+    expect(calls.writeFile).toEqual([
+      { path: "/tmp/scope-x/changed-files.json", content: JSON.stringify(["docs/a.md", "src/new.mjs", "src/old.mjs"]) },
+    ]);
+    expect(legEnv(calls, "lint")).toMatchObject({
+      DOTBABEL_ATTEST_CHANGED_FILES: "/tmp/scope-x/changed-files.json",
+      DOTBABEL_ATTEST_SKIP_FILE: "/tmp/scope-x/skip-1",
+    });
+    expect(legEnv(calls, "test").DOTBABEL_ATTEST_SKIP_FILE).toBe("/tmp/scope-x/skip-2");
+    expect(legEnv(calls, "plain").DOTBABEL_ATTEST_CHANGED_FILES).toBeUndefined();
+    expect(legEnv(calls, "plain").DOTBABEL_ATTEST_SKIP_FILE).toBeUndefined();
+    expect(calls.removed).toEqual(["/tmp/scope-x"]);
+  });
+
+  it("records a leg that exits 0 after writing a skip reason as skipped, with the reason in the log", async () => {
+    const { deps, calls } = scopedDeps([...happy, ...files], { "/tmp/scope-x/skip-1": Buffer.from("no changed file is linted\n") });
+    const r = await execute(deps, matrix(), { prOverride: null, push: false, dryRun: true });
+    expect(r.exitCode).toBe(0);
+    expect(r.results.map((x) => [x.name, x.skipped === true, x.passed])).toEqual([
+      ["plain", false, true],
+      ["lint", true, true],
+      ["test", false, true],
+    ]);
+    expect(calls.log.some((l) => /lint: SKIPPED \(out of scope: no changed file is linted\)/.test(l))).toBe(true);
+    const parsed = parseAttestationComment(r.body);
+    expect(parsed.payload.legs.map((l) => l.status)).toEqual(["pass", "skipped", "pass"]);
+    expect(parsed.payload.full).toBeUndefined();
+  });
+
+  it("treats an empty skip file as a normal pass", async () => {
+    const { deps } = scopedDeps([...happy, ...files], { "/tmp/scope-x/skip-1": "  \n" });
+    const r = await execute(deps, matrix(), { prOverride: null, push: false, dryRun: true });
+    expect(r.results[1]).toMatchObject({ passed: true });
+    expect(r.results[1].skipped).toBeUndefined();
+  });
+
+  it("keeps a non-zero exit a failure even when the leg also wrote a skip reason", async () => {
+    const replies = [[/^echo lint$/, { status: 1 }], ...happy, ...files];
+    const { deps, calls } = scopedDeps(replies, { "/tmp/scope-x/skip-1": "nothing\n" });
+    const r = await execute(deps, matrix(), { prOverride: null, push: false, dryRun: false });
+    expect(r.exitCode).toBe(1);
+    expect(r.results[1]).toMatchObject({ passed: false });
+    expect(r.results[1].skipped).toBeUndefined();
+    expect(JSON.parse(calls.appendLog[0].line).result).toBe("hard-fail");
+  });
+
+  it("never attests when every leg was scope-skipped — an empty run is not a pass", async () => {
+    const cfg = validateConfig({
+      matrix: [
+        { name: "lint", mode: "hard", command: "echo lint", scope: true },
+        { name: "test", mode: "hard", command: "echo test", scope: true },
+      ],
+    });
+    const { deps, calls } = scopedDeps([...happy, ...files], {
+      "/tmp/scope-x/skip-0": "nothing\n",
+      "/tmp/scope-x/skip-1": "nothing\n",
+    });
+    const r = await execute(deps, cfg, { prOverride: null, push: false, dryRun: false });
+    expect(r.exitCode).toBe(1);
+    expect(calls.gh).toHaveLength(0);
+    expect(JSON.parse(calls.appendLog[0].line).result).toBe("hard-fail");
+  });
+
+  it("fetches the file list for scope legs even without any diff rule, and fails open when it is unreadable", async () => {
+    const replies = [...happy, [/pulls\/42\/files/, { status: 1, stderr: "api down" }]];
+    const { deps, calls } = scopedDeps(replies);
+    const r = await execute(deps, matrix(), { prOverride: null, push: false, dryRun: true });
+    expect(r.exitCode).toBe(0);
+    expect(calls.run.some((c) => /pulls\/42\/files/.test(c.cmd))).toBe(true);
+    expect(legEnv(calls, "lint").DOTBABEL_ATTEST_CHANGED_FILES).toBeUndefined();
+    expect(legEnv(calls, "lint").DOTBABEL_ATTEST_SKIP_FILE).toBeUndefined();
+    expect(calls.writeFile).toEqual([]);
+  });
+
+  it("fails open when the list cannot be written or the deps have no temp dir", async () => {
+    const unwritable = scopedDeps([...happy, ...files]);
+    unwritable.deps.writeFile = () => {
+      throw new Error("ENOSPC");
+    };
+    await execute(unwritable.deps, matrix(), { prOverride: null, push: false, dryRun: true });
+    expect(legEnv(unwritable.calls, "lint").DOTBABEL_ATTEST_CHANGED_FILES).toBeUndefined();
+    expect(unwritable.calls.warn.some((w) => /run in full/.test(w))).toBe(true);
+
+    const noTemp = makeDeps({ runReplies: [...happy, ...files] });
+    await execute(noTemp.deps, matrix(), { prOverride: null, push: false, dryRun: true });
+    expect(legEnv(noTemp.calls, "lint").DOTBABEL_ATTEST_CHANGED_FILES).toBeUndefined();
+  });
+
+  it("does not fetch the file list when no leg is scoped and no leg has a diff rule", async () => {
+    const cfg = validateConfig({ matrix: [{ name: "plain", mode: "hard", command: "echo plain" }] });
+    const { deps, calls } = scopedDeps([...happy, ...files]);
+    await execute(deps, cfg, { prOverride: null, push: false, dryRun: true });
+    expect(calls.run.some((c) => /pulls\/42\/files/.test(c.cmd))).toBe(false);
+  });
+
+  it("--full ignores when and scope, passes no list, and records full in the payload", async () => {
+    const cfg = validateConfig({
+      matrix: [
+        { name: "lint", mode: "hard", command: "echo lint", scope: true },
+        { name: "gated", mode: "hard", command: "echo gated", when: { changedPaths: ["api/**"] } },
+      ],
+    });
+    const { deps, calls } = scopedDeps([...happy, ...files]);
+    const r = await execute(deps, cfg, { prOverride: null, push: false, dryRun: true, full: true });
+    expect(r.exitCode).toBe(0);
+    expect(calls.run.some((c) => /pulls\/42\/files/.test(c.cmd))).toBe(false);
+    expect(calls.run.some((c) => c.cmd === "echo gated")).toBe(true);
+    expect(legEnv(calls, "lint").DOTBABEL_ATTEST_CHANGED_FILES).toBeUndefined();
+    expect(r.results.every((x) => !x.skipped)).toBe(true);
+    expect(parseAttestationComment(r.body).payload.full).toBe(true);
+    expect(JSON.parse(calls.appendLog[0].line).flags.full).toBe(true);
   });
 });
 

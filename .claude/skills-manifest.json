@@ -152,7 +152,7 @@
     {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
-      "checksum": "sha256:21ec80869ec8637675dc762acb38ff314cba1ef5b661275124d554db78500a17",
+      "checksum": "sha256:9296c936c3f39e38d61bbe5311fc9e7682b8b84867c45ec2264731a7a86deed3",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },
@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:52a05b9a790e2fb8565181f5dcf646dfd709fa81a626b20c54f67cdadfffa7e8",
+      "checksum": "sha256:e61b1537b1367f56b8510b2c2f0450f3c2eedd9693474d364a1da9d68ad6c03b",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },
@@ -189,7 +189,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:6d1318c7e97066bf359b53c0a7c4812ec69ea6527cfc1f6154b948e77f13b257",
+      "checksum": "sha256:ccefd9f7fb741aecbab79dbce76c5915ed1085c6c9de2622b48b83cb32bad07a",
       "dependencies": [
         "pre-pr",
         "git",
@@ -254,7 +254,7 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:85bc7703aefc536760db18d3104b5662eea852f650e7c84d994099b71b135b5a",
+      "checksum": "sha256:797744586193d7da3dc4ab23f1cade13bac0a942fc8395b2f99bd1ec91ed4264",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },

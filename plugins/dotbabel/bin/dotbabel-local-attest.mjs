@@ -9,7 +9,7 @@
  * GitHub-hosted runners after a maintainer has already verified locally.
  *
  * Usage:
- *   dotbabel local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast]
+ *   dotbabel local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--full]
  *                         [--only <leg>] [--from <leg>] [--config <path>]
  *
  *   --pr <N>           Target PR number. Defaults to the open PR for the current branch.
@@ -18,6 +18,8 @@
  *                      nothing, push nothing. Use this to verify a new project's config.
  *   --fail-fast        Stop launching legs after the first hard failure; unstarted legs
  *                      are recorded not-run and the run can no longer attest.
+ *   --full             On-demand full run: ignore every leg's diff rules (`when`,
+ *                      `skipWhenDiffOnly`) and `scope`, and run every leg in full.
  *   --only <leg>       Diagnostic mode: run only the named leg(s), with relaxed
  *                      preconditions (dirty tree fine, no PR needed). Never attests.
  *   --from <leg>       Diagnostic mode: run the matrix suffix starting at the named leg.
@@ -51,7 +53,7 @@ import { parseArgs } from "../src/local-attest-lib.mjs";
 import { ConfigError, loadConfig } from "../src/local-attest-config.mjs";
 import { PreconditionError, execute, realDeps } from "../src/local-attest-runner.mjs";
 
-const HELP = `dotbabel-local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast]
+const HELP = `dotbabel-local-attest [--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--full]
                       [--only <leg>] [--from <leg>] [--config <path>]
                       [--init [--force]]
 
@@ -69,6 +71,10 @@ Options:
   --fail-fast        Stop launching legs after the first hard failure. A
                      fail-fast run that stopped early can never attest; one
                      where nothing failed completed the full matrix and can.
+  --full             On-demand full run. By default a leg with \`scope: true\`
+                     runs only the PR's changes and \`when\` legs skip when no
+                     changed file matches; --full ignores both and runs every
+                     leg in full. The attestation records "full": true.
   --only <leg>       Diagnostic mode: run only the named leg(s). Repeatable,
                      or comma-separated. Relaxed preconditions (dirty tree
                      fine, no PR needed); never posts, labels, or pushes.
@@ -201,6 +207,7 @@ async function main() {
       only: argv.only,
       from: argv.from,
       failFast: argv.failFast,
+      full: argv.full,
     });
     process.exit(result.exitCode);
   } catch (err) {

@@ -152,7 +152,7 @@
     {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
-      "checksum": "sha256:9bfe569868b941ca8fb3eb9d0241c2e8992583d7f2a6c76983f37f445053818c",
+      "checksum": "sha256:f8285ffada80003ce380c1b98886ced49f6382cb6a28cb0db39182a3f61eea20",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },
@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:19f0de1151e7a591f7071de41c44bc20392e8a4284f973527a69c74f0d28b08c",
+      "checksum": "sha256:2c37e62507a1259e483102a3b8c2ea1fe4a51c4eb496c9403cd87051566e3589",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },
@@ -187,7 +187,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:51019fa15460d6c01cf2e6f509e17a723eadac0dafe4fcb8dbdb5429a27255a7",
+      "checksum": "sha256:b6b13210d3195dbcbe33d9676136603109d591cc79e9b53254c317b611e3c8ba",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },
@@ -243,7 +243,7 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:421e0511a0d8aa6e313b38f6b90c006e1dbd8aaeef40cffae7458d85f4e68fa4",
+      "checksum": "sha256:3137d010bdaa87faa8e2b6f60b93550202ffd632d4277274ef3f179fcf7f3487",
       "dependencies": [],
       "lastValidated": "2026-09-25"
     },

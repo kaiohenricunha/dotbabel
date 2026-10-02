@@ -137,10 +137,12 @@ describe("parseArgs", () => {
       failFast: false,
       init: false,
       force: false,
+      full: false,
     });
   });
 
   it("parses --init and --force; both default off so a bare run never scaffolds", () => {
+    expect(parseArgs(["--full"]).full).toBe(true);
     expect(parseArgs(["--init"]).init).toBe(true);
     expect(parseArgs(["--init", "--force"]).force).toBe(true);
     expect(parseArgs(["--dry-run"]).init).toBe(false);
@@ -328,7 +330,20 @@ describe("buildAuditEntry", () => {
       failFast: false,
       push: false,
       dryRun: false,
+      full: false,
     });
+  });
+
+  it("records a --full run in the audit flags", () => {
+    const e = buildAuditEntry({
+      result: "attested",
+      pr: 1,
+      sha: "abc1234",
+      hostname: "h",
+      advisoryFails: [],
+      flags: { full: true },
+    });
+    expect(e.flags.full).toBe(true);
   });
 
   it("copies the advisoryFails array (no shared reference)", () => {

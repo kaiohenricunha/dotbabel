@@ -1,9 +1,24 @@
+// Each `when.changedPaths` list below is the leg's real inputs, read from the
+// scripts it runs. Glob dialect: **, *, ? only.
+const PACKAGE = ["package.json", "package-lock.json"];
+
 export default {
   // The `test` workflow (.github/workflows/test.yml) is gated off a local
-  // attestation, so these legs must reproduce its `test` job exactly:
-  // vitest+coverage, the validate-settings suite, and bats. lint/dogfood/
-  // build-plugin are run too for full local pre-push confidence (their
-  // workflows are not gated).
+  // attestation, so these legs cover its `test` job: vitest+coverage, the
+  // validate-settings suite, and bats. lint/dogfood/build-plugin run too.
+  //
+  // Every run is PR-SCOPED (owner decision): it verifies the scope of the pull
+  // request's changes and nothing more. The full suite runs only on demand
+  // (`local-attest --full`, or the deep quality job) or on a schedule.
+  // - lint, test and bats have `scope: true` and run through the governed
+  //   plugins/dotbabel/scripts/attest-scope.mjs, which selects the changed
+  //   files' lint targets, related and path-matched tests, and bats suites,
+  //   and reports a skip when nothing is in scope. Without the PR's file list
+  //   it runs the leg in full, exactly as before.
+  // - dogfood, build-plugin --check and validate-settings check whole-repo
+  //   invariants, so each runs only when a changed file is one of its inputs.
+  // - quality always runs: it is already diff-scoped (`--base`), and it is the
+  //   required leg that always executes.
   //
   // This file is a GOVERNANCE FILE (.dotbabel.json -> attestation). Its bytes
   // are hashed into every attestation, and the merge gate recomputes that hash
@@ -13,7 +28,7 @@ export default {
   // through explicit verification instead. That is deliberate — without it,
   // rewriting a leg to `true` would produce a truthful "test: pass".
   matrix: [
-    { name: "lint", mode: "hard", command: "npm run lint" },
+    { name: "lint", mode: "hard", command: "node plugins/dotbabel/scripts/attest-scope.mjs lint", scope: true },
     // `produces` is what lets the `quality` leg below reuse this run instead of
     // repeating it. `npm test -- --coverage` is the suite AND the coverage run
     // (`npm run coverage` is `vitest run --coverage`, the same command), so its
@@ -23,20 +38,30 @@ export default {
     {
       name: "test",
       mode: "hard",
-      command: "npm test -- --coverage",
+      command: "node plugins/dotbabel/scripts/attest-scope.mjs test",
+      scope: true,
       produces: ["coverage/lcov.info"],
     },
     {
       name: "validate-settings",
       mode: "hard",
       command: "bash plugins/dotbabel/tests/test_validate_settings.sh",
+      // The suite, the validator it runs, and the library the validator sources.
+      when: {
+        changedPaths: [
+          "plugins/dotbabel/tests/test_validate_settings.sh",
+          "plugins/dotbabel/scripts/validate-settings.sh",
+          "plugins/dotbabel/scripts/lib/**",
+          ...PACKAGE,
+        ],
+      },
     },
-    // Byte-identical to the workflow's bats step (.github/workflows/test.yml),
-    // so the attested command and the CI command cannot drift apart. The
-    // wrapper parallelises when GNU parallel or rush is installed and runs
-    // serially otherwise. bats is by far the longest leg: ~125s serial,
+    // Scoped: the wrapper runs the suites that name a changed file (or a bin
+    // that reaches one) through the same plugins/dotbabel/scripts/run-bats.sh
+    // the workflow's bats step uses, and every suite when run-bats.sh or a
+    // bats helper changed. bats is the longest leg in full: ~125s serial,
     // ~56s at -j 8.
-    { name: "bats", mode: "hard", command: "bash plugins/dotbabel/scripts/run-bats.sh" },
+    { name: "bats", mode: "hard", command: "node plugins/dotbabel/scripts/attest-scope.mjs bats", scope: true },
     // The PR quality profile moved here from `/merge-pr` step 7. It belongs
     // in the attested matrix for two reasons: merge-pr ran it inside a
     // throwaway worktree that project-command trust can never match (so it
@@ -66,8 +91,61 @@ export default {
       command:
         "node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile pr --base \"origin/${DOTBABEL_PR_BASE_REF:-main}\" --reuse lint=lint --reuse test=test --reuse coverage=test",
     },
-    { name: "dogfood", mode: "hard", command: "npm run dogfood" },
-    { name: "build-plugin --check", mode: "hard", command: "npm run build-plugin -- --check" },
+    {
+      name: "dogfood",
+      mode: "hard",
+      command: "npm run dogfood",
+      // The seven validators in package.json's `dogfood` script: the bins and
+      // their src closure, the skills inventory, specs, the rule floor and its
+      // fan-out, repo facts, the compute schema and its generator, and the
+      // protected paths check-spec-coverage classifies a diff by.
+      when: {
+        changedPaths: [
+          ...PACKAGE,
+          "plugins/dotbabel/bin/**",
+          "plugins/dotbabel/src/**",
+          "plugins/dotbabel/templates/**",
+          "scripts/build-compute-schema.mjs",
+          "schemas/dotbabel.compute.schema.json",
+          ".prettierrc*",
+          ".editorconfig",
+          ".claude/**",
+          ".github/workflows/**",
+          ".github/copilot-instructions.md",
+          "commands/*.md",
+          "skills/*/SKILL.md",
+          "docs/specs/**",
+          "docs/repo-facts.json",
+          "CLAUDE.md",
+          "README.md",
+          "AGENTS.md",
+          "GEMINI.md",
+        ],
+      },
+    },
+    {
+      name: "build-plugin --check",
+      mode: "hard",
+      command: "npm run build-plugin -- --check",
+      // scripts/build-plugin.mjs: the artifact index, the skills, commands and
+      // agents it copies (skill support dirs included), the templates it
+      // compares against, plugin.json, and package.json's version.
+      when: {
+        changedPaths: [
+          ...PACKAGE,
+          "scripts/build-plugin.mjs",
+          "plugins/dotbabel/src/lib/argv.mjs",
+          "plugins/dotbabel/src/lib/exit-codes.mjs",
+          "plugins/dotbabel/src/lib/output.mjs",
+          "index/**",
+          "skills/**",
+          "commands/**",
+          "agents/**",
+          "plugins/dotbabel/templates/claude/**",
+          "plugins/dotbabel/.claude-plugin/**",
+        ],
+      },
+    },
   ],
   pushAfterAttest: true,
   // CI's test job runs node 20 and 22 (.github/workflows/test.yml); a local

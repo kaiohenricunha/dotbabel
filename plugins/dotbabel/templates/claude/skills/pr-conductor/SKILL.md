@@ -47,14 +47,14 @@ Arguments: `$ARGUMENTS`
 
 The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotbabel/src/pr-gates.mjs`. `dotbabel pr-stack phases` prints it, and a bats contract test fails if this document and that array ever disagree.
 
-| #   | Phase            | Delegates to                     | Owns                                                              |
-| --- | ---------------- | -------------------------------- | ----------------------------------------------------------------- |
-| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate, cheap `fast` quality profile              |
-| 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                      |
-| 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                                   |
-| 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads, verifies criteria |
-| 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation      |
-| 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                       |
+| #   | Phase            | Delegates to                     | Owns                                                                |
+| --- | ---------------- | -------------------------------- | ------------------------------------------------------------------- |
+| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate, cheap `fast` quality profile                |
+| 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                        |
+| 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                                     |
+| 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads, verifies criteria   |
+| 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally on the PR's scope, posts the attestation |
+| 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                         |
 
 > **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
@@ -154,9 +154,11 @@ A `WORKTREE_DIRTY` or `HEAD_MISMATCH` failure means `local-attest` would abort a
 dotbabel local-attest --pr <N>
 ```
 
+The run is PR-scoped: each leg verifies only the scope of this pull request's changes, and a leg with nothing in scope is recorded `skipped`. Do not pass `--full` here; the full suite runs only on demand or on a schedule.
+
 Phase 4 deferred the test plan to this phase and left a `<!-- test-plan: deferred -->` marker in the PR body to record it, so **every** exit here owes the plan a disposition. There are four:
 
-- **Attest passes** — tick each `## Test plan` checkbox the matrix covered, using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
+- **Attest passes** — tick each `## Test plan` checkbox the matrix covered (a leg recorded `skipped` covered nothing), using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
 - **Attest fails** — record the failure and mark the PR blocked. **Do not push "fix CI" commits in a loop.** The test plan is now unowned: say so explicitly and list every unticked item, so a BLOCKED summary states what still needs verification.
 - **No `.local-attest` config** — skip the attestation and say so plainly; CI will run remotely as normal. **Run the test-plan items now**, per `skills/review-pr/SKILL.md` step 11, before the summary — otherwise the deferral means nothing ever runs them.
 - **Entered here via `--from local-attest`** — no phase 4 ran in this session, so nothing deferred anything. Run the test-plan items as above before the summary rather than assuming a previous session ticked them.
