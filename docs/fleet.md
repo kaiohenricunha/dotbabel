@@ -178,9 +178,12 @@ Environment variables take precedence:
 ## CPU lanes
 
 A lane is a fixed set of CPUs. The online CPUs are split into lanes of about
-5, and the last CPU stays free for shells, editors, and the sessions
-themselves. A machine with 16 CPUs gets 3 lanes: CPUs 0-4, 5-9, and 10-14. A
-machine with fewer than 6 CPUs keeps no CPU free.
+7, and the last CPU stays free for shells, editors, and the sessions
+themselves. A machine with 16 CPUs gets 2 lanes: CPUs 0-7 and 8-14. A machine
+with 8 or more usable CPUs always gets at least 2 lanes, and a machine with
+fewer than 6 CPUs keeps no CPU free. The
+[lane size benchmark](./experiments/2026-09-27-cpu-lane-size.md) measured 2
+lanes of 7-8 against 3 lanes of 5 on a 16-CPU machine.
 
 A heavy test command waits in a queue until a lane is free, then runs pinned
 to that lane with `taskset`. The first command to wait is the first to get a
@@ -191,13 +194,20 @@ the lane also sets `PYTEST_XDIST_AUTO_NUM_WORKERS`. The lane is free the
 moment the command exits. If the lane process dies, the kernel releases its
 lock.
 
-**Lending (off by default).** With `DOTBABEL_FLEET_LEND=2`, a command that
-finds free lanes may take 2 of them and run on all their CPUs, so a lone test
-run is not limited to one lane. Lending never takes the last free lane, so the
-next command still starts at once, and it takes only one lane while another
-command waits. On 4 lanes, 3 commands in a row get 2, 1, and 1 lanes. The
-[lane size benchmark](./experiments/2026-09-27-cpu-lane-size.md) measures
-whether lending pays off on a machine.
+**Lending.** A test run of a session that works alone is not limited to one
+lane. With `DOTBABEL_FLEET_LEND=auto`, the default, a command takes every free
+lane, so all CPUs but the free one, when no other Claude Code session is busy
+and no command waits. Otherwise it takes one lane. Only sessions with the
+status `busy` count; `idle`, `waiting`, and `shell` sessions do not. A command
+whose own session is not in `~/.claude/sessions/` counts every busy session,
+so it does not lend. The cost: a session that becomes busy during a lent run
+waits until that run ends.
+
+With a number, `DOTBABEL_FLEET_LEND=2` for example, a command takes up to that
+many free lanes. It never takes the last free lane, so the next command still
+starts at once, and it takes only one lane while another command waits. On 4
+lanes, 3 commands in a row get 2, 1, and 1 lanes. `DOTBABEL_FLEET_LEND=1` turns
+lending off.
 
 ### Set up the lanes
 
@@ -256,15 +266,14 @@ carry secrets.
 | --------------------------- | ----------------------------------------------------------------- |
 | `DOTBABEL_FLEET_LANES`      | `off`, or explicit lanes as CPU lists joined by `;`: `0-4;5-9`    |
 | `DOTBABEL_FLEET_LANE_COUNT` | The number of lanes in the automatic layout                       |
-| `DOTBABEL_FLEET_LANE_WIDTH` | CPUs per lane in the automatic layout (see below)                 |
-| `DOTBABEL_FLEET_LEND`       | The most lanes one command may take while others are free (`1`)   |
+| `DOTBABEL_FLEET_LANE_WIDTH` | CPUs per lane in the automatic layout (default `7`, see below)    |
+| `DOTBABEL_FLEET_LEND`       | `auto` (default), a lane count, or `1` to turn lending off        |
 | `DOTBABEL_FLEET_NCPU`       | The CPU count for the automatic layout (default: the online CPUs) |
 
-Without `DOTBABEL_FLEET_LANE_WIDTH`, the automatic layout makes lanes of about
-5 CPUs, and the last lane takes the CPUs left over. With it, the layout makes
-`round(usable CPUs / width)` lanes, at least 2 from 8 usable CPUs, and gives
-the CPUs left over one each to the first lanes. On 16 CPUs, width 4 gives
-`0-3;4-7;8-11;12-14`, and width 7 gives `0-7;8-14`.
+The automatic layout makes `round(usable CPUs / width)` lanes, at least 2 from
+8 usable CPUs, and gives the CPUs left over one each to the first lanes. On 16
+CPUs, width 7 (the default) gives `0-7;8-14`, width 5 gives `0-4;5-9;10-14`,
+and width 4 gives `0-3;4-7;8-11;12-14`.
 
 ### Limits of the lanes
 

@@ -21,7 +21,7 @@ setup() {
   export HOME="$WORK/home"
   export DOTBABEL_FLEET_STATE_DIR="$WORK/state"
   export SHELL=/bin/bash
-  unset DOTBABEL_FLEET_LANES DOTBABEL_FLEET_LANE_COUNT DOTBABEL_FLEET_NCPU DOTBABEL_LANE
+  unset DOTBABEL_FLEET_LANES DOTBABEL_FLEET_LANE_COUNT DOTBABEL_FLEET_LANE_WIDTH DOTBABEL_FLEET_LEND DOTBABEL_FLEET_NCPU DOTBABEL_LANE CLAUDE_CONFIG_DIR
   # A fake npm that reports how many CPUs it may use.
   printf '#!/bin/sh\nnproc\n' >"$WORK/bin/npm"
   chmod +x "$WORK/bin/npm"
