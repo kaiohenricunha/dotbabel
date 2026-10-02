@@ -52,7 +52,7 @@ so a pull request cannot relax its own enforcement.
 | Key                    | Default                                          | Meaning                                                                                           |
 | ---------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | `enforce`              | `false`                                          | Require trusted, current attestation evidence before a pull request may merge.                    |
-| `required_legs`        | `[]`                                             | Legs that must be present and passing in the evidence.                                            |
+| `required_legs`        | `[]`                                             | Legs that must be present and pass or be skipped in the evidence, with at least one that passed.  |
 | `governance_files`     | `[".local-attest.config.mjs", ".dotbabel.json"]` | Files whose committed bytes are hashed into every attestation.                                    |
 | `trusted_associations` | `["OWNER"]`                                      | GitHub author associations whose attestation is believed. `OWNER`, `MEMBER`, `COLLABORATOR` only. |
 
@@ -75,9 +75,20 @@ so a pull request cannot relax its own enforcement.
 | `ATTESTATION_INVALID`         | The payload is absent, unreadable, or disagrees with the marker. Attest again with a current dotbabel. |
 | `ATTESTATION_CONFIG_CHANGED`  | Produced under a different configuration than the base branch. See below.                              |
 | `ATTESTATION_BASE_MOVED`      | The diff it graded is not the diff being merged. Rebase, then attest again.                            |
-| `ATTESTATION_INCOMPLETE`      | A required leg is missing or did not pass. See `detail` for which.                                     |
+| `ATTESTATION_INCOMPLETE`      | A required leg is missing or neither passed nor was skipped, or every required leg was skipped.        |
 | `ATTESTATION_FAILED`          | The attestation verdict is not `pass`.                                                                 |
 | `ATTESTATION_BASE_UNREADABLE` | The base commit is not in this clone. Fetch it and re-run.                                             |
+
+### Skipped required legs
+
+`local-attest` runs only the scope of a pull request's changes. A required leg
+with nothing of the diff in its scope is recorded `skipped`, and the gate counts
+it as satisfied: the same trusted, unedited comment carries the status, and the
+config hash pins the scoping rules to the base branch's, so a skip is as
+trustworthy as a pass. At least one required leg must have passed — evidence in
+which every required leg was skipped verified nothing and is
+`ATTESTATION_INCOMPLETE`. The payload's `full: true` field marks an on-demand
+`local-attest --full` run; no gate reads it.
 
 ## Why governance files exist
 
@@ -111,19 +122,19 @@ repository is on the [trust allowlist](./hooks.md); otherwise it says the legs w
 not inspected. A `.local-attest.config.json` or `package.json#local-attest` config is
 data and is always read.
 
-| Level | Code                      | What is wrong, and the fix                                                                                         |
-| ----- | ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| fail  | `NO_CONFIG`               | Enforcement is on and nothing can produce evidence, so every merge is blocked. Add a config.                       |
-| fail  | `CONFIG_UNGOVERNED`       | The file that defines the matrix is not in `governance_files`, so a pull request can rewrite its own legs. Add it. |
-| fail  | `REQUIRED_LEG_UNKNOWN`    | `required_legs` names a leg the matrix lacks, so every merge is blocked. Fix the name or add the leg.              |
-| fail  | `GOVERNANCE_PATH_INVALID` | An entry in `governance_files` is not a plain relative path. Fix it on the base branch.                            |
-| fail  | `CONFIG_INVALID`          | The config does not load or validate. The message says why.                                                        |
-| warn  | `NO_REQUIRED_LEGS`        | `required_legs` is empty, so any attestation is accepted whatever it contained.                                    |
-| warn  | `REQUIRED_LEG_SKIPPABLE`  | A required leg has a path filter. A pull request that skips it is blocked. Remove the filter or the requirement.   |
-| warn  | `LEG_COMMAND_UNGOVERNED`  | A leg runs a package script and `package.json` is not governed.                                                    |
-| warn  | `GOVERNED_FILE_MISSING`   | A `governance_files` entry does not exist. It is probably misspelled and governs nothing.                          |
-| warn  | `LEGS_UNINSPECTED`        | The config is executable and the repository is not trusted. Run `dotbabel project-init --trust`.                   |
-| warn  | `POLICY_UNREADABLE`       | `.dotbabel.json` does not parse. The gate reads that as no policy.                                                 |
-| info  | `ATTESTATION_OFF`         | Enforcement is off. Nothing is wrong.                                                                              |
+| Level | Code                      | What is wrong, and the fix                                                                                          |
+| ----- | ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| fail  | `NO_CONFIG`               | Enforcement is on and nothing can produce evidence, so every merge is blocked. Add a config.                        |
+| fail  | `CONFIG_UNGOVERNED`       | The file that defines the matrix is not in `governance_files`, so a pull request can rewrite its own legs. Add it.  |
+| fail  | `REQUIRED_LEG_UNKNOWN`    | `required_legs` names a leg the matrix lacks, so every merge is blocked. Fix the name or add the leg.               |
+| fail  | `GOVERNANCE_PATH_INVALID` | An entry in `governance_files` is not a plain relative path. Fix it on the base branch.                             |
+| fail  | `CONFIG_INVALID`          | The config does not load or validate. The message says why.                                                         |
+| warn  | `NO_REQUIRED_LEGS`        | `required_legs` is empty, so any attestation is accepted whatever it contained.                                     |
+| warn  | `REQUIRED_LEG_SKIPPABLE`  | Every required leg can skip (path filter or `scope`). A PR that skips them all is blocked. Require a leg that runs. |
+| warn  | `LEG_COMMAND_UNGOVERNED`  | A leg runs a package script and `package.json` is not governed.                                                     |
+| warn  | `GOVERNED_FILE_MISSING`   | A `governance_files` entry does not exist. It is probably misspelled and governs nothing.                           |
+| warn  | `LEGS_UNINSPECTED`        | The config is executable and the repository is not trusted. Run `dotbabel project-init --trust`.                    |
+| warn  | `POLICY_UNREADABLE`       | `.dotbabel.json` does not parse. The gate reads that as no policy.                                                  |
+| info  | `ATTESTATION_OFF`         | Enforcement is off. Nothing is wrong.                                                                               |
 
 Doctor exits `1` when any finding is `fail`. Warnings never change the exit code.

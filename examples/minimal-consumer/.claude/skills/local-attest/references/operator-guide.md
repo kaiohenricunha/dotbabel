@@ -81,8 +81,11 @@ included. `restoreFiles` snapshots and restores in diagnostic runs too.
 
 Config-side execution controls (see [config.md](config.md)): `lane` groups
 legs into concurrent lanes; `when.changedPaths` and `skipWhenDiffOnly` mark
-legs skipped against the PR's changed files (skipped legs still appear in
-every table with status `skipped`, and an all-skipped run refuses to attest);
+legs skipped against the PR's changed files, and a `scope: true` leg receives
+the changed files (`DOTBABEL_ATTEST_CHANGED_FILES`) and reports a skip through
+`DOTBABEL_ATTEST_SKIP_FILE` when nothing is in its scope (skipped legs still
+appear in every table with status `skipped`, and an all-skipped run refuses to
+attest); `--full` ignores all of these and runs every leg in full;
 `passPrBody` injects the PR body as `env.PR_BODY`; `restoreFiles` snapshots
 tracked files a leg overwrites and restores them before the head recheck.
 
@@ -165,8 +168,9 @@ Attestation runs legs serially within a lane and lanes concurrently (a
 config without `lane` fields is fully sequential), and costs whatever the
 configured legs cost — minutes for a lint-and-unit matrix, tens of minutes with heavy
 e2e and multiple language runtimes. That's the deliberate price of skipping
-the remote run; use `--only`/`--from`/`--fail-fast` for iteration and save
-full runs for attestation.
+the remote run; use `--only`/`--from`/`--fail-fast` for iteration. Scoped legs
+(`scope: true`, `when.changedPaths`) keep an attest run to the pull request's
+changes; keep `--full` for an on-demand full run.
 
 ### Audit
 

@@ -303,6 +303,13 @@ cache. A result is reused only when all of these hold, and each is checked:
   to the digest the leg recorded — a file at the right path that is not the file the leg wrote is
   refused.
 
+A PR-scoped leg (`scope: true` in the local-attest config) that finds nothing in scope is
+recorded `skipped`, and a skipped leg never stands in. Give each reused quality tool a `paths`
+filter that matches what the scoped leg must run for, and make the leg run whenever a changed file
+matches it: the tool is then `not_triggered` exactly when the leg skipped, and quality never falls
+back to a full run of a tool the scope left out. This repository reads those `paths` (and
+`critical_paths`) from `.dotbabel.json` in its scope wrapper, so the two sides share one source.
+
 If any check fails the tool simply runs, so a refusal costs time and never correctness. The
 decision is made per capability: a tampered coverage report costs `coverage` its reuse but not
 `lint`. The result records every decision under `reuse`, with a `reason` for each refusal
