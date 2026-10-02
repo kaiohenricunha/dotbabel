@@ -681,6 +681,7 @@ how the event feed reports merges, and [hooks.md](./hooks.md) for the hooks.
 | `events`               | Show the merges of the last 7 days in this repository            |
 | `event --pr <N>`       | Record a merge made outside Claude Code                          |
 | `token [status]`       | Show who holds this repository's merge token                     |
+| `cpu-share [--status]` | Give every live session's scope an equal CPU weight              |
 | `token take`           | Take the merge token for this session                            |
 | `token release`        | Give this session's merge token back                             |
 
