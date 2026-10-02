@@ -336,6 +336,12 @@ describe("pytestScopedArgv", () => {
     ).toEqual(["python", "-m", "pytest", "-q", "tests/unit/test_a.py"]);
   });
 
+  it("returns null when every selected test is outside the paths CI runs, so nothing empty is run", () => {
+    expect(
+      pytestScopedArgv({ exec: ["pytest"], options: [], paths: ["tests/unit"], tests: ["tests/e2e/test_x.py"] }),
+    ).toBeNull();
+  });
+
   it("turns off the coverage floor when the command measures coverage, because a subset cannot meet a global floor", () => {
     expect(pytestScopedArgv({ exec: ["pytest"], options: ["--cov=app"], paths: [], tests: ["tests/test_a.py"] })).toEqual([
       "pytest",

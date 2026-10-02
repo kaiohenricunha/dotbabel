@@ -483,12 +483,14 @@ export function selectPytestTests({ changedFiles, prefix, testFiles, exists }) {
  * the suite cannot meet a floor set for the whole suite.
  *
  * @param {{ exec: string[], options: string[], paths: string[], tests: string[] }} input
- * @returns {string[]}
+ * @returns {string[]|null}  null when no selected test is inside the original paths
  */
 export function pytestScopedArgv({ exec, options, paths, tests }) {
   const within = (t) => paths.length === 0 || paths.some((p) => p === "." || isUnder(t, p.replace(/\/$/, "")));
+  const kept = tests.filter(within);
+  if (kept.length === 0) return null;
   const coverage = options.some((o) => o === "--cov" || o.startsWith("--cov="));
-  return [...exec, ...options, ...(coverage ? ["--cov-fail-under=0"] : []), ...tests.filter(within)];
+  return [...exec, ...options, ...(coverage ? ["--cov-fail-under=0"] : []), ...kept];
 }
 
 /** jest options that already choose tests by their own rule. */

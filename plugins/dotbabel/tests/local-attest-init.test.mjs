@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   matrixFromWorkflows,
   renderConfig,
+  scopeLegs,
   toolchainFromWorkflows,
 } from "../src/local-attest-init.mjs";
 
@@ -163,6 +164,111 @@ jobs:
 `;
     const r = matrixFromWorkflows(files([".github/workflows/t.yml", multi]));
     expect(r.legs[0].command).toBe("npm ci\nnpm test");
+  });
+});
+
+describe("scopeLegs — scoped attestation is the default for drafted test legs", () => {
+  const drafted = () => matrixFromWorkflows(files([".github/workflows/test.yml", TEST_YML])).legs;
+  const scripts = { "": { "test:coverage": "jest --coverage", lint: "eslint ." } };
+  const scoped = (scriptsByDir = scripts) => scopeLegs(drafted(), { scriptsFor: (dir) => scriptsByDir[dir] ?? null });
+  const byName = (legs) => Object.fromEntries(legs.map((l) => [l.name, l]));
+
+  it("wraps a go test step in the scoper and marks the leg scope: true", () => {
+    const leg = byName(scoped())["backend: Go tests"];
+    expect(leg.scope).toBe(true);
+    expect(leg.command).toBe("dotbabel attest-scope --runner go -- go test -race -count=1 ./...");
+    expect(leg.cwd).toBe("api");
+  });
+
+  it("keeps the CI command byte for byte after the separator, so a full run is exactly CI", () => {
+    for (const leg of scoped().filter((l) => l.scope)) {
+      const original = drafted().find((d) => d.name === leg.name);
+      expect(leg.command.endsWith(` -- ${original.command}`)).toBe(true);
+    }
+  });
+
+  it("follows a package script to the runner it calls", () => {
+    const leg = byName(scoped())["frontend: Unit tests"];
+    expect(leg.scope).toBe(true);
+    expect(leg.command).toBe("dotbabel attest-scope --runner jest -- npm run test:coverage");
+  });
+
+  it("leaves a package script unscoped when its runner is unknown", () => {
+    const leg = byName(scoped({}))["frontend: Unit tests"];
+    expect(leg.scope).toBeUndefined();
+    expect(leg.command).toBe("npm run test:coverage");
+  });
+
+  it("leaves steps that are not a test runner untouched", () => {
+    const legs = byName(scoped());
+    for (const name of ["frontend: npm ci", "frontend: Lint"]) {
+      expect(legs[name].scope).toBeUndefined();
+      expect(legs[name].command).toBe(drafted().find((d) => d.name === name).command);
+    }
+  });
+
+  it("leaves a multi-line or chained step untouched, since it cannot be rewritten faithfully", () => {
+    const legs = scopeLegs(
+      [
+        { name: "a", mode: "hard", command: "npm ci\nnpm test", lane: "j", source: "x" },
+        { name: "b", mode: "hard", command: "go vet ./... && go test ./...", lane: "j", source: "x" },
+      ],
+      { scriptsFor: () => ({ test: "jest" }) },
+    );
+    expect(legs.every((l) => l.scope === undefined)).toBe(true);
+  });
+
+  it("keeps a workflow path filter on a scoped leg", () => {
+    const legs = scopeLegs(
+      [{ name: "t", mode: "hard", command: "pytest -q", lane: "j", source: "x", when: { changedPaths: ["api/**"] } }],
+      { scriptsFor: () => null },
+    );
+    expect(legs[0]).toMatchObject({ scope: true, when: { changedPaths: ["api/**"] } });
+  });
+
+  it("reads scripts from the leg's own directory", () => {
+    const seen = [];
+    scopeLegs(drafted(), { scriptsFor: (dir) => (seen.push(dir), null) });
+    expect(seen).toContain("api");
+    expect(seen).toContain("");
+  });
+
+  it("does not mutate the drafted legs", () => {
+    const legs = drafted();
+    scopeLegs(legs, { scriptsFor: () => scripts[""] });
+    expect(legs.every((l) => l.scope === undefined)).toBe(true);
+  });
+});
+
+describe("renderConfig with scoped legs", () => {
+  const rendered = () => {
+    const r = matrixFromWorkflows(files([".github/workflows/test.yml", TEST_YML]));
+    const legs = scopeLegs(r.legs, { scriptsFor: () => ({ "test:coverage": "jest --coverage" }) });
+    return renderConfig({ ...r, legs, toolchain: null });
+  };
+
+  it("writes scope: true and the wrapped command, and the validator accepts it", async () => {
+    const { validateConfig } = await import("../src/local-attest-config.mjs");
+    const out = rendered();
+    expect(out).toContain("scope: true,");
+    const mod = await import(`data:text/javascript,${encodeURIComponent(out)}`);
+    const cfg = validateConfig(mod.default);
+    expect(cfg.matrix.filter((l) => l.scope).map((l) => l.name)).toEqual(["frontend: Unit tests", "backend: Go tests"]);
+  });
+
+  it("explains the scoped default and how to run everything on demand", () => {
+    const out = rendered();
+    expect(out).toMatch(/scope: true/);
+    expect(out).toMatch(/local-attest --full/);
+  });
+
+  it("says nothing about scoping when no leg is scoped", () => {
+    const out = renderConfig({
+      legs: [{ name: "a", mode: "hard", command: "make test", lane: "j", source: "x" }],
+      warnings: [],
+      toolchain: null,
+    });
+    expect(out).not.toMatch(/local-attest --full/);
   });
 });
 

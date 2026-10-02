@@ -524,6 +524,7 @@ protect CI minutes.
 | `--fail-fast`     | false                  | Stop launching legs after the first hard failure; a stopped run cannot attest    |
 | `--only <leg>`    | —                      | Diagnostic mode: run only the named leg(s); relaxed preconditions; never attests |
 | `--from <leg>`    | —                      | Diagnostic mode: run the matrix from the named leg to the end                    |
+| `--full`          | false                  | Run every leg in full: ignore `when` path rules and `scope: true` for this run   |
 | `--config <path>` | discovered             | Override the config file location                                                |
 
 Config discovery, in order: `.local-attest.config.mjs`,
@@ -534,6 +535,26 @@ first, attest second.
 
 To let `/merge-pr` reuse an attestation instead of re-running the suite, see
 [attestation.md](./attestation.md).
+
+---
+
+## `dotbabel-attest-scope`
+
+Run one local-attest test leg on the scope of a pull request.
+`dotbabel local-attest --init` writes this wrapper around each test step it
+recognises and marks the leg `scope: true`.
+
+```bash
+dotbabel attest-scope --runner <vitest|jest|go|pytest> -- <CI command...>
+```
+
+The command reads the changed files from `DOTBABEL_ATTEST_CHANGED_FILES` and runs
+only the tests they reach. When they reach no test, it writes a reason to
+`DOTBABEL_ATTEST_SKIP_FILE` and exits 0, and `local-attest` records the leg as
+`skipped`. Without a changed-file list, or when it is unsure, it runs the CI command
+unchanged. See [Scoped attestation is the default](./attestation.md#scoped-attestation-is-the-default).
+
+Exit codes: the exit code of the test command, 0 for a recorded skip, 64 usage error.
 
 ---
 

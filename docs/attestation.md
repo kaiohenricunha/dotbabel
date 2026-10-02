@@ -44,6 +44,66 @@ The pull request that adds this policy cannot use it: enforcement is read from t
 **base** branch, and the base has no policy yet. That pull request lands through
 the explicit verification path once. Every pull request after it uses the evidence.
 
+## Scoped attestation is the default
+
+A change to two or three files in one package does not need the whole test suite.
+`dotbabel local-attest --init` drafts each test step it recognises as a **scoped
+leg**:
+
+```js
+{
+  name: "api: Go tests",
+  mode: "hard",
+  cwd: "api",
+  command: "dotbabel attest-scope --runner go -- go test -race ./...",
+  scope: true,
+},
+```
+
+For a `scope: true` leg, `local-attest` gives the leg the pull request's changed
+files. `dotbabel attest-scope` then runs only the tests that those files can reach:
+
+| Runner   | How it selects the tests                                                                                                   |
+| -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `go`     | Reads the package graph from `go list`. Tests each changed package that has test files, and each package that imports one. |
+| `jest`   | Runs `--findRelatedTests` on the changed files, after `--listTests` shows that at least one test is related.               |
+| `vitest` | Runs `vitest related` on the changed files, and counts the tests in a JSON report.                                         |
+| `pytest` | Runs the test files named after each changed module: `views.py` selects `test_views.py` and `views_test.py`.               |
+
+`--init` recognises `go test`, `pytest` (also `python -m pytest`, `uv run pytest`
+and `poetry run pytest`), `jest`, `vitest`, and a package script (`npm test`,
+`npm run <script>`, `yarn <script>`, `pnpm <script>`) that runs one of them. It does
+not scope a chained or multi-line step, and it never changes a leg that is not a
+test runner.
+
+The wrapper gives one of three results:
+
+- **Scoped run.** The narrowed command runs, and its exit code is the result of the
+  leg.
+- **Skip.** No test is in scope, and the leg is recorded as `skipped`. A run that
+  tests nothing is also a skip and never a pass, so each runner counts its tests.
+- **Full run.** The CI command after `--` runs unchanged. This occurs when there
+  is no changed-file list, when a shared input changed (a runner config, a
+  manifest, a lockfile, `conftest.py`, `go.mod`), when no rule relates a changed
+  file to a test, or when the wrapper cannot parse the command.
+
+A scoped run turns off the coverage floor (`--coverageThreshold={}`,
+`--cov-fail-under=0`, `--coverage.thresholds.*=0`), because a part of the suite
+cannot meet a floor set for the whole suite. Changed-line coverage stays with the
+`quality` leg.
+
+**The full suite runs only on demand.** `dotbabel local-attest --full` runs every
+leg in full. No rule or gate requires a full run.
+
+The merge gate accepts a scoped attestation. A required leg counts when it passed
+or when it was skipped because nothing was in its scope. At least one required leg
+must have passed.
+
+Known limits: pytest selection uses file names, so a changed module with no test
+named after it runs the full suite. A JS change outside the directory of a
+sub-directory leg runs that leg in full, because a workspace link can reach it
+and no import graph shows that.
+
 ## What the merge gate checks
 
 The policy is read from the base ref with `git show`, never from the pull request,
@@ -75,7 +135,7 @@ so a pull request cannot relax its own enforcement.
 | `ATTESTATION_INVALID`         | The payload is absent, unreadable, or disagrees with the marker. Attest again with a current dotbabel. |
 | `ATTESTATION_CONFIG_CHANGED`  | Produced under a different configuration than the base branch. See below.                              |
 | `ATTESTATION_BASE_MOVED`      | The diff it graded is not the diff being merged. Rebase, then attest again.                            |
-| `ATTESTATION_INCOMPLETE`      | A required leg is missing or did not pass. See `detail` for which.                                     |
+| `ATTESTATION_INCOMPLETE`      | A required leg is missing or failed, or every required leg was skipped. See `detail` for which.        |
 | `ATTESTATION_FAILED`          | The attestation verdict is not `pass`.                                                                 |
 | `ATTESTATION_BASE_UNREADABLE` | The base commit is not in this clone. Fetch it and re-run.                                             |
 

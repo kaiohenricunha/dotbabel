@@ -28,11 +28,13 @@
  * @property {string} [cwd]
  * @property {string} lane
  * @property {{ changedPaths: string[] }} [when]
+ * @property {boolean} [scope]  the leg runs through `dotbabel attest-scope`
  * @property {string} source  provenance, rendered as a comment
  */
 
 import yaml from "js-yaml";
 
+import { detectRunner, simpleArgv, wrapCommand } from "./attest-scope-runners.mjs";
 import { usesPackageRunner } from "./check-attestation-adoption.mjs";
 
 /** Steps whose `uses:` is pure CI plumbing with no local equivalent. */
@@ -266,6 +268,31 @@ export function matrixFromWorkflows(fileList) {
 }
 
 /**
+ * Make each recognised test step a scoped leg: it runs through
+ * `dotbabel attest-scope`, which runs only the tests the pull request's
+ * changed files reach. This is the default because a change to a few files in
+ * one package should not run the whole suite; `dotbabel local-attest --full`
+ * runs every leg in full on demand.
+ *
+ * Only a plain single command whose runner is known (go test, pytest, jest,
+ * vitest, directly or through one package script) is scoped. Every other leg
+ * keeps its command untouched, and the CI command always follows the
+ * wrapper's `--` byte for byte, so a full run is exactly what CI runs.
+ *
+ * @param {DraftLeg[]} legs
+ * @param {{ scriptsFor: (dir: string) => Record<string, string>|null }} input
+ *   `package.json#scripts` of a leg's directory ("" for the repository root)
+ * @returns {DraftLeg[]}  new leg objects; the input is not changed
+ */
+export function scopeLegs(legs, { scriptsFor }) {
+  return legs.map((leg) => {
+    const argv = simpleArgv(leg.command);
+    const runner = argv ? detectRunner(argv, scriptsFor(leg.cwd ?? ""))?.runner : undefined;
+    return runner ? { ...leg, command: wrapCommand(runner, leg.command), scope: true } : { ...leg };
+  });
+}
+
+/**
  * Comment block that says how to turn this matrix into merge-authorizing
  * evidence. Without it a repository can run `--init`, attest for months, and
  * never learn that `/merge-pr` could reuse those attestations.
@@ -326,6 +353,16 @@ export function renderConfig({ legs, warnings, toolchain }) {
   out.push("// side once, fix every TODO below, then delete this banner.");
   out.push("");
 
+  if (legs.some((l) => l.scope)) {
+    out.push("// Legs marked `scope: true` run on the pull request's scope: the");
+    out.push("// `dotbabel attest-scope` wrapper runs only the tests the changed files");
+    out.push("// reach, records the leg as skipped when they reach none, and runs the CI");
+    out.push("// command after `--` unchanged whenever it is unsure. Run");
+    out.push("// `dotbabel local-attest --full` to run every leg in full on demand. To");
+    out.push("// always run one leg in full, delete its `scope: true` and the wrapper.");
+    out.push("");
+  }
+
   if (warnings.length > 0) {
     out.push(`// ${warnings.length} thing(s) the generator could not translate:`);
     for (const w of warnings) out.push(`// TODO: ${w}`);
@@ -345,6 +382,7 @@ export function renderConfig({ legs, warnings, toolchain }) {
     if (leg.env) out.push(`      env: ${JSON.stringify(leg.env)},`);
     if (leg.when)
       out.push(`      when: { changedPaths: ${JSON.stringify(leg.when.changedPaths)} },`);
+    if (leg.scope) out.push("      scope: true,");
     out.push("    },");
   }
   out.push("  ],");

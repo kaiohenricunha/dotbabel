@@ -43,6 +43,7 @@ import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 import {
   matrixFromWorkflows,
   renderConfig,
+  scopeLegs,
   toolchainFromWorkflows,
 } from "../src/local-attest-init.mjs";
 
@@ -138,11 +139,25 @@ async function runInit(argv) {
     );
   }
 
-  writeFileSync(target, renderConfig({ ...draft, toolchain }), "utf8");
+  // Scoped attestation is the default: recognised test steps run only the
+  // tests a pull request's changes reach. `npm test` resolves through the
+  // scripts of the leg's own directory.
+  const scriptsFor = (legDir) => {
+    try {
+      return JSON.parse(readFileSync(resolve(process.cwd(), legDir, "package.json"), "utf8")).scripts ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const legs = scopeLegs(draft.legs, { scriptsFor });
+  const scoped = legs.filter((l) => l.scope).length;
+
+  writeFileSync(target, renderConfig({ ...draft, legs, toolchain }), "utf8");
 
   process.stdout.write(
     `Drafted ${target}\n` +
       `  ${draft.legs.length} leg(s) from ${files.length} workflow file(s)\n` +
+      `  ${scoped} test leg(s) scoped to each pull request's changes (--full runs them all)\n` +
       `  ${draft.warnings.length} TODO(s) written into the file\n\n` +
       "This is a DRAFT, not a gate. Attesting switches remote CI off, so a leg\n" +
       "missing here is enforced nowhere. Review it against your workflows, then:\n" +

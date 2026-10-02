@@ -43,6 +43,7 @@ const SUBCOMMANDS = [
   "show",
   "handoff",
   "local-attest",
+  "attest-scope",
   "pr-stack",
   "quality",
   "criteria",
