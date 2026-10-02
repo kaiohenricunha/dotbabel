@@ -239,10 +239,9 @@ export function attestationPayloadProblem(payload) {
 /**
  * The leg names a payload reports as actually having passed.
  *
- * Only `pass` counts. `skipped` is deliberately excluded: a diff-scoped skip
- * is sound for CI parity, where the same job skips remotely, but it proves
- * nothing ran — and a required leg is required precisely because the merge
- * gate is about to stop checking it itself.
+ * Only `pass` counts. `skipped` is deliberately excluded: a skip is sound —
+ * see {@link satisfiedLegs} — but it proves nothing ran, so the merge gate
+ * uses this set to require that at least one required leg actually passed.
  *
  * @param {object} payload
  * @returns {Set<string>}
@@ -251,6 +250,28 @@ export function passedLegs(payload) {
   const out = new Set();
   for (const leg of payload?.legs ?? []) {
     if (leg && leg.status === "pass" && typeof leg.name === "string") out.add(leg.name);
+  }
+  return out;
+}
+
+/**
+ * The leg names a payload reports as satisfied: passed, or skipped because
+ * nothing of the pull request's diff was in the leg's scope.
+ *
+ * `local-attest` runs only the pull request's scope, so a required leg with
+ * nothing in scope records `skipped`. That status is as trustworthy as `pass`:
+ * the same trusted, never-edited comment carries it, and the config hash pins
+ * the scoping rules to the base branch's. This is a separate set on purpose —
+ * {@link passedLegs} keeps meaning "legs that actually passed", which the
+ * merge gate uses to require that at least one required leg really ran.
+ *
+ * @param {object} payload
+ * @returns {Set<string>}
+ */
+export function satisfiedLegs(payload) {
+  const out = new Set();
+  for (const leg of payload?.legs ?? []) {
+    if (leg && (leg.status === "pass" || leg.status === "skipped") && typeof leg.name === "string") out.add(leg.name);
   }
   return out;
 }

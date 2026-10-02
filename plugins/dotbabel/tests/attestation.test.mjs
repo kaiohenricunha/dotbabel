@@ -11,6 +11,7 @@ import {
   isGovernablePath,
   parseAttestationComment,
   passedLegs,
+  satisfiedLegs,
   renderAttestationHeader,
 } from "../src/attestation.mjs";
 import { decodePayloadLine, encodePayloadLine } from "../src/lib/evidence-payload.mjs";
@@ -369,6 +370,33 @@ describe("passedLegs", () => {
 
   it("ignores a leg entry that is not an object or has no name", () => {
     expect(passedLegs({ legs: [null, { status: "pass" }, { name: 7, status: "pass" }] }).size).toBe(0);
+  });
+});
+
+describe("satisfiedLegs", () => {
+  it("counts pass and skipped, and nothing else", () => {
+    const p = payload({
+      legs: [
+        { name: "test", mode: "hard", status: "pass" },
+        { name: "bats", mode: "hard", status: "skipped" },
+        { name: "knip", mode: "advisory", status: "advisory-fail" },
+        { name: "lint", mode: "hard", status: "fail" },
+        { name: "dogfood", mode: "hard", status: "not-run" },
+      ],
+    });
+    expect([...satisfiedLegs(p)].sort()).toEqual(["bats", "test"]);
+  });
+
+  it("leaves passedLegs meaning only the legs that passed", () => {
+    const p = payload({ legs: [{ name: "bats", mode: "hard", status: "skipped" }] });
+    expect(passedLegs(p).size).toBe(0);
+    expect([...satisfiedLegs(p)]).toEqual(["bats"]);
+  });
+
+  it("returns an empty set for a payload with no usable legs", () => {
+    expect(satisfiedLegs(null).size).toBe(0);
+    expect(satisfiedLegs({ legs: null }).size).toBe(0);
+    expect(satisfiedLegs({ legs: [null, { status: "skipped" }, { name: 7, status: "pass" }] }).size).toBe(0);
   });
 });
 

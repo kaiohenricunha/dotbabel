@@ -43,6 +43,7 @@ import {
   attestationPayloadProblem,
   parseAttestationComment,
   passedLegs,
+  satisfiedLegs,
 } from "./attestation.mjs";
 import { CRITERIA_MARKER_PREFIX } from "./criteria/comment.mjs";
 import { parseEvidenceComment, evidencePayloadProblem, payloadCoverage } from "./criteria/evidence.mjs";
@@ -632,14 +633,28 @@ function evaluateAttestation(input) {
 
   const required = Array.isArray(input.requiredLegs) ? input.requiredLegs.filter(Boolean) : [];
   if (required.length > 0) {
-    const passed = passedLegs(parsed.payload);
-    const missing = required.filter((name) => !passed.has(name));
+    // A required leg is satisfied when it passed or when nothing of this
+    // diff was in its scope (`skipped`) — local-attest runs only the pull
+    // request's scope. Skips count only beside evidence: at least one
+    // required leg must have actually run and passed.
+    const satisfied = satisfiedLegs(parsed.payload);
+    const missing = required.filter((name) => !satisfied.has(name));
     if (missing.length > 0) {
       return [
         {
           code: "ATTESTATION_INCOMPLETE",
           message: "the attestation does not show every required check passing",
           detail: missing.join(", "),
+        },
+      ];
+    }
+    const passed = passedLegs(parsed.payload);
+    if (!required.some((name) => passed.has(name))) {
+      return [
+        {
+          code: "ATTESTATION_INCOMPLETE",
+          message: "every required check was skipped, so no required check ran",
+          detail: required.join(", "),
         },
       ];
     }
