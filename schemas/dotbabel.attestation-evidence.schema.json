@@ -52,6 +52,10 @@
       "type": "object",
       "description": "The versions this run certified. An attestation can switch off a multi-version CI matrix, so the record names the one version it covered.",
       "additionalProperties": { "type": "string" }
+    },
+    "full": {
+      "const": true,
+      "description": "Present only on an on-demand `local-attest --full` run, which ignored every leg's diff rules and scoping. Informational; no gate reads it."
     }
   }
 }

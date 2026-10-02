@@ -38,6 +38,8 @@
  *                                                    that exits 0 after writing a reason there is
  *                                                    recorded as skipped. Without the list it gets
  *                                                    neither and must run in full
+ * @property {string} [scopeSkipFile]                runner-internal, never read from a config:
+ *                                                    the skip file handed to this scope leg
  * @property {string[]} [produces]                    repository-relative report files this leg
  *                                                    writes. Once the leg PASSES they are hashed
  *                                                    into the run manifest so a later leg can

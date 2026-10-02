@@ -192,6 +192,12 @@ describe("buildAttestationPayload", () => {
     expect(p).not.toHaveProperty("merge_base");
     expect(p).not.toHaveProperty("config_hash");
     expect(p).not.toHaveProperty("toolchain");
+    expect(p).not.toHaveProperty("full");
+  });
+
+  it("records an on-demand full run as full: true, and nothing for a scoped run", () => {
+    expect(payload({ full: true }).full).toBe(true);
+    expect(payload({ full: false })).not.toHaveProperty("full");
   });
 
   it("records the merge base, config hash and toolchain when given", () => {

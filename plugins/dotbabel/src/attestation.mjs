@@ -134,10 +134,12 @@ export function hashGovernanceFiles(entries) {
  *
  * @param {{ headSha: string, mergeBase?: string|null, configHash?: string|null,
  *           legs: Array<{name: string, mode: string, status: string}>,
- *           toolchain?: object|null, toolVersion?: string, now?: Date }} input
+ *           toolchain?: object|null, toolVersion?: string, full?: boolean, now?: Date }} input
+ *   `full`: the run was an on-demand `--full` run that ignored every leg's
+ *   scoping. Recorded for the audit trail only; no gate reads it.
  * @returns {object}
  */
-export function buildAttestationPayload({ headSha, mergeBase, configHash, legs, toolchain, toolVersion, now }) {
+export function buildAttestationPayload({ headSha, mergeBase, configHash, legs, toolchain, toolVersion, full, now }) {
   const list = Array.isArray(legs) ? legs : [];
   /** @type {any} */
   const payload = {
@@ -153,6 +155,7 @@ export function buildAttestationPayload({ headSha, mergeBase, configHash, legs, 
   if (mergeBase) payload.merge_base = mergeBase;
   if (configHash) payload.config_hash = configHash;
   if (toolchain && Object.keys(toolchain).length > 0) payload.toolchain = toolchain;
+  if (full === true) payload.full = true;
   return payload;
 }
 
