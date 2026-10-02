@@ -294,7 +294,8 @@ This is different from artifact binding. A runtime can support selecting a model
 Supported adapters expose operations conceptually equivalent to:
 
 ```ts
-discover(context): Promise<AdapterResult<DiscoveryEvidence>>
+discover(context): Promise<AdapterResult<DiscoveryEvidence>> // kind: runtime
+discover(context): Promise<AdapterResult<ProviderCatalogEvidence>> // kind: knowledge-source; context.providers is required
 
 observe(context): Promise<AdapterResult<ObservationEvidence>>
 
@@ -418,6 +419,26 @@ capabilities:
   validation:
     support: unsupported
 ```
+
+**Discovery evidence of a knowledge source.** Decided by the owner on 2026-09-27. A knowledge source such as Models.dev describes many providers, and one model id occurs under more than one of them (1,094 ids in DOC-3). Catalog identity is the pair of provider and model id (ARCH-3). So the evidence groups the models by provider and holds one runtime-style `DiscoveryEvidence` per provider. A `ModelFact` still carries no provider field, and `effortSupport` stays unambiguous inside each provider.
+
+```ts
+interface ProviderCatalogEvidence {
+  providers: Array<{
+    id: string; // the provider id, as the source keys it (source-scoped; see below)
+    displayName?: string;
+    discovery: DiscoveryEvidence; // models, effortSupport, skipped
+  }>;
+  missingProviders: string[]; // requested providers the source does not describe
+  skipped: number; // requested providers present in the source but unusable
+}
+```
+
+The caller names the providers to keep. The adapter reduces the document to them before any persistence, because the full Models.dev document already uses more than half of the OPS-2 per-entry limit. A requested provider that is absent is listed, not dropped without a word. No field of this evidence states availability: presence in a knowledge source is never proof that a model can be invoked (ARCH-14).
+
+`provenance.sourceKind` tells `catalog/` which of the two evidence shapes a `discover` result holds. Every knowledge adapter module also exports `notice`, the text that must be stored with each copy of its data (`null` when the source needs none), so `catalog/` can honor a license without naming the adapter.
+
+**Open decision before P-9 joins sources.** A provider id is source-scoped: it is the key the source itself uses. Catalog identity is the pair of provider and model id (ARCH-3), so a fact from Models.dev and a fact from an official API (P-8b) join only when both name the provider the same way. Before P-9 merges two knowledge sources, the owner decides one of two rules: every knowledge adapter emits a Dotbabel provider namespace, or `catalog/` owns an explicit alias table.
 
 This keeps one adapter contract without pretending that runtime and catalog sources expose the same operations.
 
@@ -948,7 +969,23 @@ Release projection manifests record `snapshotId` as one of their deterministic i
 
 ## External APIs
 
-The third-party APIs that the knowledge-source adapters consume are the official model/catalog APIs and Models.dev, as accepted in §3 `External APIs / Dependencies`. Their concrete request and response shapes are open under RQ-1 in [research/sources.md](../research/sources.md); this section receives them when that research lands. The runtime CLI surfaces that the runtime adapters call are recorded in DOC-2, "Runtime Capability Matrix".
+The third-party APIs that the knowledge-source adapters consume are the official model/catalog APIs and Models.dev, as accepted in §3 `External APIs / Dependencies`. RQ-1 in [research/sources.md](../research/sources.md) holds the research. The shapes land here as each part of it closes.
+
+### Models.dev
+
+Measured in DOC-3 on 2026-09-18 and again on 2026-09-27.
+
+| Property     | Contract                                                                                                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request      | `GET https://models.dev/api.json`. No authentication, and Dotbabel sends no credential and no cookie (SEC-3). A redirect is refused.                                                                                                                                                                |
+| Response     | One JSON object keyed by provider id. Each provider has `id`, `name`, and `models`, an object keyed by model id. No top-level schema or version marker exists.                                                                                                                                      |
+| Model record | `id`, `name`, `limit.context`, and `reasoning_options` feed a `ModelFact`. Only `reasoning_options` entries of type `effort` give effort values (ARCH-1).                                                                                                                                           |
+| Version      | The document states none. `sourceVersion` is Dotbabel-derived: `sha256:` and the first 32 hex digits of the SHA-256 of the received bytes.                                                                                                                                                          |
+| Caching      | `etag` and `cache-control: public, max-age=0, must-revalidate`. A conditional GET returns `304`. It needs the stored `etag`, so it lands with the cache in P-9, which amends this contract: an `etag` input to `discover`, the received `etag` in the result, and a `304` reported as not modified. |
+| Size         | 4.69 MiB on 2026-09-27 and growing. The adapter caps the raw read at 32 MiB, and the reduced evidence must stay within the OPS-2 per-entry limit of 8 MiB.                                                                                                                                          |
+| License      | MIT, "Copyright (c) 2025 models.dev", confirmed for the served `api.json` (DOC-3). Every stored or committed copy keeps the adapter's `notice`.                                                                                                                                                     |
+
+The official provider APIs stay open under RQ-1: the OpenAI response shape is unknown, so P-8b waits. The runtime CLI surfaces that the runtime adapters call are recorded in DOC-2, "Runtime Capability Matrix".
 
 ## Internal APIs
 
