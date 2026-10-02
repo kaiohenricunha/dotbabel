@@ -11,7 +11,11 @@ LANE="$REPO_ROOT/plugins/dotbabel/scripts/fleet-lane.sh"
 setup() {
   WORK="$(mktemp -d)"
   export DOTBABEL_FLEET_STATE_DIR="$WORK/state"
-  unset DOTBABEL_FLEET_LANES DOTBABEL_FLEET_LANE_COUNT DOTBABEL_FLEET_LANE_WIDTH DOTBABEL_FLEET_LEND DOTBABEL_FLEET_NCPU DOTBABEL_LANE DOTBABEL_LANE_CPUS PYTEST_XDIST_AUTO_NUM_WORKERS
+  unset DOTBABEL_FLEET_LANES DOTBABEL_FLEET_LANE_COUNT DOTBABEL_FLEET_LANE_WIDTH DOTBABEL_FLEET_LEND DOTBABEL_FLEET_NCPU DOTBABEL_LANE DOTBABEL_LANE_CPUS DOTBABEL_LANE_SESSION PYTEST_XDIST_AUTO_NUM_WORKERS
+  # A private session registry: the live Claude Code sessions of this machine
+  # must not change what lending does in a test.
+  export CLAUDE_CONFIG_DIR="$WORK/cfg"
+  mkdir -p "$CLAUDE_CONFIG_DIR/sessions"
 }
 
 teardown() {
@@ -35,6 +39,12 @@ waiter_file() { # <pid> <procstart>
   printf 'pid=%s\nprocstart=%s\nlabel=npm test\nsession=peer\n' "$1" "$2" >"$WORK/state/lanes/wait-$1.info"
 }
 
+# A Claude Code session registry entry: register <pid> <status> [<procstart>].
+register() {
+  printf '{"pid":%d,"sessionId":"s-%s","procStart":"%s","name":"pane-%s","status":"%s"}\n' \
+    "$1" "$1" "${3:-$(start_time "$1")}" "$1" "$2" >"$CLAUDE_CONFIG_DIR/sessions/$1.json"
+}
+
 # Wait up to ~5 s for a file to exist.
 await_file() {
   for _ in $(seq 1 50); do [ -e "$1" ] && return 0; sleep 0.1; done
@@ -43,10 +53,10 @@ await_file() {
 
 # ---------------------------------------------------------------- layout ----
 
-@test "layout: 16 CPUs make 3 lanes of 5 and keep the last CPU free" {
+@test "layout: 16 CPUs make 2 lanes of 8 and 7 and keep the last CPU free" {
   DOTBABEL_FLEET_NCPU=16 run bash "$LANE" --layout
   [ "$status" -eq 0 ]
-  [ "$output" = "$(printf 'ncpu 16\nlane 1 0-4\nlane 2 5-9\nlane 3 10-14')" ]
+  [ "$output" = "$(printf 'ncpu 16\nlane 1 0-7\nlane 2 8-14')" ]
 }
 
 @test "layout: small machines get one lane, and no CPU is kept free below 6" {
@@ -56,23 +66,21 @@ await_file() {
   [ "$output" = "$(printf 'ncpu 4\nlane 1 0-3')" ]
 }
 
-@test "layout: the last lane takes the CPUs left over" {
+@test "layout: the CPUs left over go one each to the first lanes" {
   DOTBABEL_FLEET_NCPU=32 run bash "$LANE" --layout
-  [ "${lines[0]}" = "ncpu 32" ]
-  [ "${#lines[@]}" -eq 7 ]
-  [ "${lines[6]}" = "lane 6 25-30" ]
+  [ "$output" = "$(printf 'ncpu 32\nlane 1 0-7\nlane 2 8-15\nlane 3 16-23\nlane 4 24-30')" ]
 }
 
 @test "layout: DOTBABEL_FLEET_LANE_COUNT sets the count, DOTBABEL_FLEET_LANES sets explicit CPU lists" {
-  DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANE_COUNT=2 run bash "$LANE" --layout
-  [ "$output" = "$(printf 'ncpu 16\nlane 1 0-6\nlane 2 7-14')" ]
+  DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANE_COUNT=3 run bash "$LANE" --layout
+  [ "$output" = "$(printf 'ncpu 16\nlane 1 0-4\nlane 2 5-9\nlane 3 10-14')" ]
   DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANES='0-1;2,3' run bash "$LANE" --layout
   [ "$output" = "$(printf 'ncpu 16\nlane 1 0-1\nlane 2 2,3')" ]
 }
 
 @test "layout: an invalid DOTBABEL_FLEET_LANES falls back to the automatic layout" {
   DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANES='0-1;abc' run bash "$LANE" --layout
-  [ "${lines[1]}" = "lane 1 0-4" ]
+  [ "${lines[1]}" = "lane 1 0-7" ]
 }
 
 @test "layout: off prints off" {
@@ -85,14 +93,16 @@ await_file() {
   [ "$output" = "$(printf 'ncpu 16\nlane 1 0-3\nlane 2 4-7\nlane 3 8-11\nlane 4 12-14')" ]
   DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANE_WIDTH=7 run bash "$LANE" --layout
   [ "$output" = "$(printf 'ncpu 16\nlane 1 0-7\nlane 2 8-14')" ]
-  DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANE_WIDTH=x run bash "$LANE" --layout
+  DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANE_WIDTH=5 run bash "$LANE" --layout
   [ "$output" = "$(printf 'ncpu 16\nlane 1 0-4\nlane 2 5-9\nlane 3 10-14')" ]
+  DOTBABEL_FLEET_NCPU=16 DOTBABEL_FLEET_LANE_WIDTH=x run bash "$LANE" --layout
+  [ "$output" = "$(printf 'ncpu 16\nlane 1 0-7\nlane 2 8-14')" ]
 }
 
-@test "layout: with DOTBABEL_FLEET_LANE_WIDTH, 8 or more usable CPUs always get at least 2 lanes" {
-  DOTBABEL_FLEET_NCPU=10 DOTBABEL_FLEET_LANE_WIDTH=7 run bash "$LANE" --layout
+@test "layout: 8 or more usable CPUs always get at least 2 lanes" {
+  DOTBABEL_FLEET_NCPU=10 run bash "$LANE" --layout
   [ "$output" = "$(printf 'ncpu 10\nlane 1 0-4\nlane 2 5-8')" ]
-  DOTBABEL_FLEET_NCPU=8 DOTBABEL_FLEET_LANE_WIDTH=7 run bash "$LANE" --layout
+  DOTBABEL_FLEET_NCPU=8 run bash "$LANE" --layout
   [ "$output" = "$(printf 'ncpu 8\nlane 1 0-6')" ]
 }
 
@@ -261,12 +271,91 @@ await_file() {
   [ "$status" -ne 0 ]
 }
 
-@test "lending: an unset or invalid DOTBABEL_FLEET_LEND lends nothing" {
+@test "lending: an invalid DOTBABEL_FLEET_LEND, or 1, lends nothing" {
   needs_tools
-  for v in "" x 0 -1 1; do
+  for v in x 0 -1 1 "2x"; do
     DOTBABEL_FLEET_LANES='0;1;2' DOTBABEL_FLEET_LEND="$v" run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
     [ "$output" = "0" ]
   done
+}
+
+# ---------------------------------------------------------- auto lending ----
+#
+# DOTBABEL_FLEET_LEND=auto, the default: when no other live Claude Code session
+# is busy and no command waits, a command takes every free lane, the last one
+# too. Otherwise it takes one lane. Only "busy" sessions count; "idle",
+# "waiting", and "shell" do not. A command whose own session is not in the
+# registry counts every busy session as another one, so it does not lend.
+
+@test "auto: with no other busy session, a command takes every free lane" {
+  needs_tools
+  register "$$" busy # the command's own session (an ancestor of the lane script)
+  DOTBABEL_FLEET_LANES='0;1;2' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS $PYTEST_XDIST_AUTO_NUM_WORKERS"'
+  [ "$status" -eq 0 ]
+  [ "$output" = "0,1,2 3" ]
+}
+
+@test "auto: another live busy session stops lending" {
+  needs_tools
+  register "$$" busy
+  sleep 30 &
+  BG_PID=$!
+  register "$BG_PID" busy
+  DOTBABEL_FLEET_LANES='0;1;2' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+  [ "$output" = "0" ]
+}
+
+@test "auto: idle, waiting, and shell sessions do not stop lending" {
+  needs_tools
+  register "$$" busy
+  sleep 30 &
+  BG_PID=$!
+  for st in idle waiting shell; do
+    register "$BG_PID" "$st"
+    DOTBABEL_FLEET_LANES='0;1' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+    [ "$output" = "0,1" ]
+  done
+}
+
+@test "auto: a busy entry of a process that is gone, or of a reused pid, does not stop lending" {
+  needs_tools
+  register "$$" busy
+  gone=$(bash -c 'echo $$')
+  register "$gone" busy 12345
+  sleep 30 &
+  BG_PID=$!
+  register "$BG_PID" busy 1 # a live pid with another start time
+  DOTBABEL_FLEET_LANES='0;1' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+  [ "$output" = "0,1" ]
+}
+
+@test "auto: a live waiting command stops lending" {
+  needs_tools
+  register "$$" busy
+  sleep 30 &
+  BG_PID=$!
+  waiter_file "$BG_PID" "$(start_time "$BG_PID")"
+  DOTBABEL_FLEET_LANES='0;1;2' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+  [ "$output" = "0" ]
+}
+
+@test "auto: a command that cannot find its own session counts every busy session" {
+  needs_tools
+  sleep 30 &
+  BG_PID=$!
+  register "$BG_PID" busy
+  DOTBABEL_FLEET_LANES='0;1' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+  [ "$output" = "0" ]
+  rm "$CLAUDE_CONFIG_DIR/sessions/$BG_PID.json"
+  DOTBABEL_FLEET_LANES='0;1' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+  [ "$output" = "0,1" ]
+}
+
+@test "auto: DOTBABEL_LANE_SESSION names the session but does not hide it from the busy check" {
+  needs_tools
+  register "$$" busy
+  DOTBABEL_LANE_SESSION=named DOTBABEL_FLEET_LANES='0;1' run bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"'
+  [ "$output" = "0,1" ]
 }
 
 # ------------------------------------------------------------- fallbacks ----
