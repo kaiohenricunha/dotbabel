@@ -145,3 +145,41 @@ A layout replaces 3×5 only if all of these are true:
 The margin (6.4%) is just above the 5% limit, and only a 16-CPU machine was measured. With `W = 7`, a 10-CPU machine would get 1 lane of 9, and that is not measured. So a formula change needs its own decision, and it may need a floor of 2 lanes.
 
 Reproduce: `BENCH_OUT=$PWD/results/arrivals BENCH_REPS_C=3 systemd-run --user --scope --unit=lane-bench-launch-$(date +%s) -- setsid nohup bash bench.sh launch-c 23:00 &`, then `node analyze.mjs results/arrivals`.
+
+## Night test 2: lending, and 4 layouts (2026-09-30)
+
+**Question.** Does lane lending pay off, and does 2×7 still win when 4×4 is compared too? This test ran before scoped attests existed, so it uses the same full-suite job mix and the same arrival schedules as test 1.
+
+**Method.** The method is the same as test 1, with four layouts: 3×5, 2×7, 4×4, and 4×4 with `DOTBABEL_FLEET_LEND=2` (#441). Lending never takes the last free lane, and it never lends while another command waits. Each layout had 3 repetitions. The locked rule was the same as test 1, and the PR (#441) and the schedule message stated it before the run.
+
+**Run.** It ran on 2026-09-30 from 23:01 to 04:18. The meter check passed: a base of 1.7%, +19.4% for 3 CPUs outside (18.7% expected), and +0.9% inside.
+
+- Foreign load was higher than in test 1: 5.0–5.8% on average, against 2.5–4.2%. Every run took about 60% longer than in test 1.
+- Two runs were contaminated (4×4 and 4×4-lend in repetition 1). Both were clean when repeated.
+- The 04:00 cutoff stopped the test before 4×4 ran in repetition 3. So the paired analysis uses repetitions 1 and 2 only. The partial repetition 3 is shown below, but it is not part of the decision.
+
+| Layout       | Jobs | Mean turnaround s | p95 turnaround s | p50 wait s | Short-job p95 s | Failures | `node -e 0` p95 ms |
+| ------------ | ---- | ----------------- | ---------------- | ---------- | --------------- | -------- | ------------------ |
+| 2×7          | 21   | 497.0             | 835.9            | 268.2      | 807.1           | 1        | 178                |
+| 3×5 (today)  | 21   | 648.8             | 1155.6           | 103.0      | 1024.1          | 0        | 183                |
+| 4×4          | 21   | 686.6             | 1090.2           | 31.0       | 1033.6          | 1        | 153                |
+| 4×4 + lend 2 | 21   | 692.6             | 1183.3           | 146.4      | 1010.5          | 0        | 160                |
+
+Mean turnaround for each repetition, in seconds:
+
+| Layout       | Repetition 1 | Repetition 2 | Repetition 3 (partial, not used) |
+| ------------ | ------------ | ------------ | -------------------------------- |
+| 2×7          | 600          | 290          | 677                              |
+| 3×5          | 812          | 321          | 771                              |
+| 4×4          | 849          | 359          | not run                          |
+| 4×4 + lend 2 | 869          | 337          | 720                              |
+
+The failures were all timing-sensitive tests:
+
+- **2×7:** moneyballer `test_circuit_breaker.py:114`.
+- **4×4:** squadranks vitest `check-betting-vocabulary.test.mjs` timed out at 15 s.
+- **4×4, contaminated attempt (not used):** squadranks Go `TestStripOperators_LongInputIsLinear`.
+
+**Result under the locked rule: 3×5 stays.** 2×7 had 23% lower mean turnaround and a better short-job p95, but it had 1 failure against 0 for 3×5. The rule allows no more failures. Lending gave no gain under this load: 693 s with lending against 687 s for plain 4×4.
+
+**The user's decision (2026-10-02).** The user chose 2×7 as the new default on the evidence of both nights. 2×7 had the lowest mean turnaround in all 5 complete paired repetitions: 6.4% lower in test 1 and 23% lower here. The benchmark rule did not select 2×7 in this test; the change is the user's decision. The user also asked for session-aware lending, so that a session that runs alone can use more than one lane.
