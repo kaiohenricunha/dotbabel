@@ -358,8 +358,11 @@ export function makeDiscoveryEvidence(input) {
  */
 const BUILT_DISCOVERIES = new WeakSet();
 
-/** A provider id as a knowledge source keys it: lower case, and never a prototype key such as `__proto__`. */
+/** A provider id as a knowledge source keys it: lower case. `__proto__` fails the pattern, and `isProviderId` refuses the other prototype names. */
 const PROVIDER_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+/** Names that pass the pattern but are `Object.prototype` members, so they are never a provider id. */
+const PROTOTYPE_NAMES = Object.freeze(["constructor", "prototype"]);
 
 /**
  * Whether `value` has the shape of a provider id.
@@ -367,7 +370,7 @@ const PROVIDER_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
  * @returns {value is string}
  */
 export function isProviderId(value) {
-  return typeof value === "string" && PROVIDER_ID_RE.test(value);
+  return typeof value === "string" && PROVIDER_ID_RE.test(value) && !PROTOTYPE_NAMES.includes(value);
 }
 
 /**
@@ -417,9 +420,12 @@ export function makeProviderCatalogEvidence(input) {
     out.discovery = provider.discovery;
     return Object.freeze(out);
   });
+  const missing = new Set();
   const missingProviders = fields.missingProviders.map((id) => {
     const checked = providerId("ProviderCatalogEvidence missing provider id", id);
     if (seen.has(checked)) throw new TypeError(`ProviderCatalogEvidence: provider "${checked}" is both present and missing`);
+    if (missing.has(checked)) throw new TypeError(`ProviderCatalogEvidence: duplicate missing provider "${checked}"`);
+    missing.add(checked);
     return checked;
   });
   const skipped = fields.skipped === undefined ? 0 : count("ProviderCatalogEvidence.skipped", fields.skipped);

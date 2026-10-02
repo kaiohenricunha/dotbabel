@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:net";
+import { createServer as createHttpServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import * as modelsDev from "../src/model-intelligence/sources/knowledge/models-dev.mjs";
-import { validateDescriptor } from "../src/model-intelligence/sources/contract.mjs";
+import { MAX_CACHE_ENTRY_BYTES, validateDescriptor } from "../src/model-intelligence/sources/contract.mjs";
 import { makeModelFact } from "../src/model-intelligence/sources/evidence.mjs";
 
 const FIXTURE_DIR = fileURLToPath(new URL("./fixtures/model-intelligence/", import.meta.url));
@@ -125,6 +126,51 @@ describe("models-dev knowledge-source adapter", () => {
     expect(result.evidence.skipped).toBe(1);
   });
 
+  it("treats a provider whose records are all unusable as unusable, never as an empty success (ARCH-30)", async () => {
+    // A schema change upstream, such as a renamed id, must not read as a provider with no models.
+    const doc = recorded();
+    for (const record of Object.values(doc.anthropic.models)) delete record.id;
+    doc.openai.models = {};
+    const partial = await discoverWith(() => reply(JSON.stringify(doc))).run;
+    expect(partial.status).toBe("ok");
+    expect(partial.evidence.providers.map((p) => p.id)).toEqual(["github-copilot"]);
+    expect(partial.evidence.skipped).toBe(2);
+    for (const record of Object.values(doc["github-copilot"].models)) delete record.id;
+    const none = await discoverWith(() => reply(JSON.stringify(doc))).run;
+    expect(none.status).toBe("unknown");
+    expect(none.diagnostic.code).toBe("insufficient_evidence");
+  });
+
+  it("keeps only lower-case effort tokens, so a network value never becomes a prototype key", async () => {
+    const doc = recorded();
+    doc.anthropic.models["claude-opus-4-5"].reasoning_options = [{ type: "effort", values: ["__proto__", "constructor", "prototype", "High", "x y", "high", "low"] }];
+    const result = await discoverWith(() => reply(JSON.stringify(doc))).run;
+    const discovery = result.evidence.providers[0].discovery;
+    expect(discovery.models.find((m) => m.id === "claude-opus-4-5").supportedReasoningLevels).toEqual([{ effort: "high" }, { effort: "low" }]);
+    expect(Object.keys(discovery.effortSupport)).not.toContain("constructor");
+  });
+
+  it("reports a refused redirect from a real fetch as unavailable and not retryable, and never follows it (SEC-3)", async () => {
+    let followed = false;
+    const target = createHttpServer((_req, res) => {
+      followed = true;
+      res.end("{}");
+    });
+    const redirecting = createHttpServer((_req, res) => {
+      res.writeHead(302, { location: `http://127.0.0.1:${target.address().port}/api.json` });
+      res.end();
+    });
+    await Promise.all([target, redirecting].map((s) => new Promise((r) => s.listen(0, "127.0.0.1", r))));
+    try {
+      const result = await modelsDev.discover({ providers: ["anthropic"], url: `http://127.0.0.1:${redirecting.address().port}/api.json`, now: fixedNow });
+      expect(result.status).toBe("unavailable");
+      expect(result.diagnostic).toMatchObject({ code: "redirect_refused", retryable: false });
+      expect(followed).toBe(false);
+    } finally {
+      await Promise.all([target, redirecting].map((s) => new Promise((r) => s.close(r))));
+    }
+  });
+
   it("returns unknown with malformed_output for a body that is not the expected JSON object", async () => {
     for (const body of ["<html>not json</html>", "[]", "null", '"text"']) {
       const { run } = discoverWith(() => reply(body));
@@ -135,7 +181,8 @@ describe("models-dev knowledge-source adapter", () => {
   });
 
   it("discover() returns unavailable with network_unavailable when the fetch is refused, and never throws", async () => {
-    for (const code of ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH"]) {
+    // EACCES and EPERM here are a firewall or sandbox refusing the connection: there is no binary.
+    for (const code of ["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ENETUNREACH", "EACCES", "EPERM"]) {
       const { run } = discoverWith(() => Promise.reject(nodeFetchFailure(code)));
       const result = await run;
       expect(result.status, code).toBe("unavailable");
@@ -181,7 +228,7 @@ describe("models-dev knowledge-source adapter", () => {
     const { double, run } = discoverWith(() => reply(RECORDED));
     await run;
     const [{ init }] = double.calls;
-    expect(init.redirect).toBe("error");
+    expect(init.redirect).toBe("manual");
     expect(init.credentials).toBe("omit");
     const headers = new Headers(init.headers);
     for (const name of ["authorization", "cookie", "x-api-key", "proxy-authorization", "api-key"]) {
@@ -254,6 +301,11 @@ describe("models-dev knowledge-source adapter", () => {
 
   it("exports the MIT notice that every stored copy must keep", () => {
     expect(modelsDev.MODELS_DEV_NOTICE).toContain("MIT");
+    // `notice` is the export every knowledge adapter carries, so catalog/ finds it without naming this adapter.
+    expect(modelsDev.notice).toBe(modelsDev.MODELS_DEV_NOTICE);
+    // OPS-2 has one source: the adapter checks the limit catalog/ enforces, not a private copy.
+    expect(modelsDev.MAX_ENTRY_BYTES).toBe(MAX_CACHE_ENTRY_BYTES);
+    expect(MAX_CACHE_ENTRY_BYTES).toBe(8 * 1024 * 1024);
     expect(modelsDev.MODELS_DEV_NOTICE).toContain("Copyright (c) 2025 models.dev");
     expect(readFileSync(`${FIXTURE_DIR}models-dev/NOTICE`, "utf8")).toContain("Copyright (c) 2025 models.dev");
   });

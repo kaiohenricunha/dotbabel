@@ -282,7 +282,8 @@ describe("provider catalog evidence (a knowledge source)", () => {
     const d = discovery("m");
     expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: d }, { id: "a", discovery: d }], missingProviders: [] })).toThrow(/duplicate provider "a"/);
     expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: d }], missingProviders: ["a"] })).toThrow(/both present and missing/);
-    for (const id of ["__proto__", "Bad Id", "", "a/b", 7]) {
+    expect(() => makeProviderCatalogEvidence({ providers: [], missingProviders: ["a", "a"] })).toThrow(/duplicate missing provider "a"/);
+    for (const id of ["__proto__", "constructor", "prototype", "Bad Id", "", "a/b", 7]) {
       expect(() => makeProviderCatalogEvidence({ providers: [{ id, discovery: d }], missingProviders: [] }), String(id)).toThrow(/provider id/);
       expect(() => makeProviderCatalogEvidence({ providers: [], missingProviders: [id] }), String(id)).toThrow(/provider id/);
     }

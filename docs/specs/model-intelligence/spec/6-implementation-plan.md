@@ -340,7 +340,7 @@ Blocked until RQ-1 closes (IMPL-1). Split into `P-8a` Models.dev and `P-8b` offi
 2. **Read first** — `SPEC/spec/3-high-level-architecture.md` (`External APIs / Dependencies`, ARCH-21, ARCH-24); `SPEC/research/sources.md` (RQ-1 result); `plugins/dotbabel/src/model-intelligence/sources/contract.mjs`; the recorded response fixture; `plugins/dotbabel/src/lib/handoff-remote.mjs` (existing network helper conventions).
 3. **Implement** — create `plugins/dotbabel/src/model-intelligence/sources/knowledge/<source>.mjs`. Constraints: ARCH-14, ARCH-21, ARCH-24, no credential handling (§2). Out of scope: cache persistence, authority ranking.
 4. **Commands** — narrow test; `npm run lint`; `npm test`.
-5. **Acceptance evidence** — the four named tests pass on recorded fixtures (TEST-1); Bats not required.
+5. **Acceptance evidence** — the six named tests pass on recorded fixtures (TEST-1); Bats not required.
 
 ### P-9 — Catalog normalization, cache, and refresh locking (`catalog/`, `refresh`, `status`) — `/think`
 
@@ -358,9 +358,13 @@ Blocked until RQ-1 closes (IMPL-1). Split into `P-8a` Models.dev and `P-8b` offi
    - `keeps the cache tree at or under 64 MiB after maintenance without evicting the last valid evidence, and refuses an entry above 8 MiB` (OPS-2)
    - torture (TEST-8): `many simultaneous refreshes of one key run exactly one discovery`
    - `with the network down and no cache, a Dotbabel command outside Model Intelligence behaves as before` (REL-5)
+   - `a knowledge-source cache entry is stored with its adapter's notice export` (DOC-3, the Models.dev MIT license)
+   - `refuses a serialized cache entry above MAX_CACHE_ENTRY_BYTES, envelope and notice included` (OPS-2; the adapter checks only its evidence)
+   - `rebuilds cached knowledge-source evidence from JSON through the evidence builders, so the cache read path runs the same validation`
+   - `a conditional GET sends the stored etag, and a 304 keeps the previous entry fresh without replacing it` (amends the §5 adapter result and `sources/knowledge/models-dev.mjs`)
    - Expected before implementation: module missing; the two verbs do not exist.
 2. **Read first** — `SPEC/spec/4-data-flow-components.md` (`Shared State`, ARCH-59 to ARCH-65); `SPEC/spec/5-interfaces-apis.md` (`Catalog evidence envelope`, `Freshness is separate`, `Refresh state is separate`); `plugins/dotbabel/src/lib/handoff-preflight.mjs:93-110` (`writeCacheAtomic`); `plugins/dotbabel/src/lib/paths.mjs:45-55`; `plugins/dotbabel/src/model-intelligence/sources/contract.mjs`.
-3. **Implement** — create `plugins/dotbabel/src/model-intelligence/catalog/index.mjs`, `catalog/cache.mjs`, `catalog/lock.mjs`; add the `refresh` and `status` verbs to `plugins/dotbabel/bin/dotbabel-models.mjs`. Constraints: ARCH-28, ARCH-30, ARCH-59, ARCH-60, ARCH-61, ARCH-65. P-9 consumes adapter output through fixtures and does not wait for P-8 (IMPL-3, IMPL-5). Out of scope: resolution, snapshot, drift of generated files.
+3. **Implement** — create `plugins/dotbabel/src/model-intelligence/catalog/index.mjs`, `catalog/cache.mjs`, `catalog/lock.mjs`; add the `refresh` and `status` verbs to `plugins/dotbabel/bin/dotbabel-models.mjs`. Constraints: ARCH-28, ARCH-30, ARCH-59, ARCH-60, ARCH-61, ARCH-65. P-9 consumes adapter output through fixtures and does not wait for P-8 (IMPL-3, IMPL-5). P-9 also changes `sources/knowledge/models-dev.mjs` for the conditional GET, and it does not key the cache by `sourceVersion` alone, because that hashes the full Models.dev document, not the reduced evidence. Out of scope: resolution, snapshot, drift of generated files.
 4. **Commands** — narrow test; bats file; `npm run lint`; `npm test`.
 5. **Acceptance evidence** — the six vitest names and the two bats tests pass; Bats required.
 

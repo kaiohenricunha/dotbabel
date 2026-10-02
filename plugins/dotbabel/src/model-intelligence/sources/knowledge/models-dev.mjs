@@ -15,7 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult, runBounded } from "../contract.mjs";
+import { MAX_CACHE_ENTRY_BYTES, assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult, runBounded } from "../contract.mjs";
 import { isProviderId, makeDiscoveryEvidence, makeModelFact, makeProviderCatalogEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
 
 /** The source's id, as the descriptor and every provenance name it. */
@@ -33,8 +33,8 @@ export const SOURCE_URL = "https://models.dev/api.json";
  */
 export const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 
-/** The OPS-2 per-entry limit. Evidence above it is rejected before anything could persist it. */
-export const MAX_ENTRY_BYTES = 8 * 1024 * 1024;
+/** The OPS-2 per-entry limit, shared with `catalog/`. Evidence above it is rejected before anything could persist it. */
+export const MAX_ENTRY_BYTES = MAX_CACHE_ENTRY_BYTES;
 
 /** The notice the MIT license requires on every stored or committed copy of the data. */
 export const MODELS_DEV_NOTICE = `Model metadata from Models.dev (https://models.dev, https://github.com/anomalyco/models.dev).
@@ -61,6 +61,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 `;
+
+/**
+ * The notice to store with every copy of this source's data. Every knowledge adapter exports `notice`
+ * (a string, or `null` when its source needs none), so `catalog/` finds it through the same module
+ * handle it calls `discover` on, without naming this adapter.
+ */
+export const notice = MODELS_DEV_NOTICE;
 
 /** The adapter's declared capabilities: discovery only, over the network, with no credential. */
 export const descriptor = deepFreeze(
@@ -160,16 +167,22 @@ async function readBounded(response, signal) {
   return { tooLarge: false, bytes: Buffer.concat(chunks) };
 }
 
+/** An effort value as Models.dev spells one: a short lower-case token such as `low` or `xhigh`. */
+const EFFORT_TOKEN_RE = /^[a-z][a-z0-9_-]{0,31}$/;
+
 /**
  * The effort values one record accepts. Only an `effort` option is an effort vocabulary: `toggle` and
  * `budget_tokens` are other mechanisms, and treating them as levels would invent values (ARCH-1).
+ *
+ * An effort value is the one string from the network that becomes an object KEY (`effortSupport`), so
+ * only a lower-case token is kept, never a prototype name such as `constructor`.
  * @param {unknown} options
  * @returns {string[]}
  */
 function effortValues(options) {
   if (!Array.isArray(options)) return [];
   const values = options.flatMap((option) => (isPlainObject(option) && /** @type {any} */ (option).type === "effort" && Array.isArray(/** @type {any} */ (option).values) ? /** @type {any} */ (option).values : []));
-  return [...new Set(values.map(optionalIdentifier).filter((v) => v !== undefined))];
+  return [...new Set(values.filter((v) => typeof v === "string" && EFFORT_TOKEN_RE.test(v) && v !== "constructor" && v !== "prototype"))];
 }
 
 /**
@@ -238,8 +251,15 @@ function reduceDocument(doc, requested) {
       skipped += 1;
       continue;
     }
+    const discovery = providerDiscovery(/** @type {any} */ (provider).models);
+    // A provider with no usable record is unusable, not a provider with no models: a schema change
+    // upstream, such as a renamed id, must never read as an empty success (ARCH-30).
+    if (discovery.models.length === 0) {
+      skipped += 1;
+      continue;
+    }
     const displayName = optionalIdentifier(/** @type {any} */ (provider).name);
-    providers.push({ id, ...(displayName === undefined ? {} : { displayName }), discovery: providerDiscovery(/** @type {any} */ (provider).models) });
+    providers.push({ id, ...(displayName === undefined ? {} : { displayName }), discovery });
   }
   return makeProviderCatalogEvidence({ providers, missingProviders, skipped });
 }
@@ -272,9 +292,10 @@ export async function discover(context) {
   const ran = /** @type {any} */ (
     await runBounded(
       async ({ signal }) => {
-        // No header, cookie or URL credential is ever sent, and a redirect is refused, so the request
-        // cannot be steered to a clear-text host after the checks above (SEC-3).
-        const response = await fetchImpl(url.href, { method: "GET", headers: { accept: "application/json" }, redirect: "error", credentials: "omit", signal });
+        // No header, cookie or URL credential is ever sent, and a redirect is never followed, so the
+        // request cannot be steered to a clear-text host after the checks above (SEC-3). `manual` hands
+        // back the 3xx itself, which is refused below by status, not by an error message's wording.
+        const response = await fetchImpl(url.href, { method: "GET", headers: { accept: "application/json" }, redirect: "manual", credentials: "omit", signal });
         if (!response.ok) {
           await response.body?.cancel().catch(() => {});
           return { httpStatus: response.status };
@@ -287,6 +308,9 @@ export async function discover(context) {
   if (ran.status !== "ok") return ran;
   const { httpStatus, read } = ran.evidence;
 
+  if (read === undefined && httpStatus >= 300 && httpStatus < 400) {
+    return result("unavailable", "redirect_refused", `the source answered HTTP ${httpStatus}, a redirect, which is never followed (SEC-3)`, false);
+  }
   if (read === undefined) {
     return result("unavailable", "http_error", `the source answered HTTP ${httpStatus}`, httpStatus >= 500 || httpStatus === 429);
   }
