@@ -19,6 +19,9 @@
  *   dotbabel pr-stack phases
  *   dotbabel pr-stack entry   [--pr <N>]
  *   dotbabel pr-stack review-complete --pr <N> [--dry-run]
+ *   dotbabel pr-stack record  --pr <N> --phase <id> --outcome <o> [--reason <CODE>]
+ *                             [--evidence <url>]... [--sha <full sha>]
+ *   dotbabel pr-stack receipt --pr <N>
  *
  * `next` prints the commands to run; it never executes them. A rebase after a
  * squash-merge needs `--onto`, so the parent's pre-merge head SHA matters —
@@ -32,7 +35,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 
 import { parse } from "../src/lib/argv.mjs";
@@ -51,12 +56,23 @@ import { criteriaGateInputs, prComments } from "../src/criteria/gate-inputs.mjs"
 import { attestationGateInputs } from "../src/attestation-gate-inputs.mjs";
 import { reviewEntryFacts } from "../src/review-gate-inputs.mjs";
 import { postReviewComplete } from "../src/review-complete.mjs";
+import {
+  RECEIPT_OUTCOMES,
+  appendAttempt,
+  createReceipt,
+  frontmatterModel,
+  receiptPath,
+  receiptProblem,
+  receiptVerdict,
+  rollbackPoint,
+  summarizePhases,
+} from "../src/run-receipt.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
 const PR_FIELDS = "number,headRefName,baseRefName,state,mergeStateStatus,headRefOid";
 
-const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry", "review-complete"]);
+const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry", "review-complete", "record", "receipt"]);
 
 const FLAGS = {
   trunk: { type: "string", default: "main" },
@@ -68,6 +84,10 @@ const FLAGS = {
   gate: { type: "string" },
   sha: { type: "string" },
   "dry-run": { type: "boolean" },
+  phase: { type: "string" },
+  outcome: { type: "string" },
+  reason: { type: "string" },
+  evidence: { type: "string", multiple: true },
 };
 
 const HELP = `${TOOL} <subcommand> [options]
@@ -83,17 +103,25 @@ Subcommands:
   phases             Print the canonical pipeline phase order
   entry              Print the phase the conductor should start at for this branch
   review-complete    Post the SHA-pinned marker that the review stage finished on the head
+  record             Append one phase attempt to the pull request's run receipt
+  receipt            Print the run receipt: verdict, per-phase attempts, rollback point
 
 Options:
   --trunk <ref>      Trunk branch name (default: main)
   --limit <N>        Max PRs to enumerate (default: 100)
-  --pr <N>           PR number (required by: next, gate, review-complete; optional for entry)
+  --pr <N>           PR number (required by: next, gate, review-complete, record, receipt;
+                     optional for entry)
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
   --gate <name>      Gate to evaluate: local-attest | merge | skip-ci
-  --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD)
+  --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD);
+                     record: the head SHA, when gh cannot be asked
   --dry-run          review-complete: check and print the comment, post nothing
+  --phase <id>       record: the conductor phase (see \`phases\`)
+  --outcome <o>      record: ${RECEIPT_OUTCOMES.join(" | ")}
+  --reason <CODE>    record: the blocking reason code, UPPER_SNAKE
+  --evidence <url>   record: a link to evidence the phase produced (repeatable)
   --json             Emit a single JSON object on stdout
   --help, -h         Show this help
   --version, -V      Show version
@@ -392,6 +420,97 @@ function renderPlan(plan) {
 }
 
 /**
+ * Absolute git common directory: one per repository, shared by every
+ * worktree, so all of a pull request's phases extend one receipt.
+ *
+ * @returns {string}
+ */
+function gitCommonDir() {
+  const r = run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  if (r.status !== 0 || r.stdout.trim() === "") return fail(EXIT_CODES.ENV, "not inside a git repository");
+  return r.stdout.trim();
+}
+
+/**
+ * Read and check the receipt at `file`, or null when none exists yet. A file
+ * that is unreadable or fails `receiptProblem` is an environment error: it is
+ * history, and silently starting over would erase it.
+ *
+ * @param {string} file
+ * @returns {import("../src/run-receipt.mjs").RunReceipt|null}
+ */
+function readReceipt(file) {
+  if (!existsSync(file)) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (err) {
+    return fail(EXIT_CODES.ENV, `${file} is not readable JSON: ${err.message}`);
+  }
+  const problem = receiptProblem(parsed);
+  if (problem) return fail(EXIT_CODES.ENV, `${file} is not a run receipt (${problem}); left unchanged`);
+  return parsed;
+}
+
+/**
+ * Replace the receipt atomically, so a crash mid-write leaves the previous
+ * history rather than half a file.
+ *
+ * @param {string} file
+ * @param {import("../src/run-receipt.mjs").RunReceipt} receipt
+ * @returns {void}
+ */
+function writeReceipt(file, receipt) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`);
+  renameSync(tmp, file);
+}
+
+/**
+ * The `model` a phase artifact's frontmatter requests: the repository's copy
+ * first, then the one `bootstrap` links into `~/.claude/`. Null when neither
+ * exists or names one — that is what the receipt records, not a guess.
+ *
+ * @param {string} root
+ * @param {string} artifact
+ * @returns {string|null}
+ */
+function requestedModel(root, artifact) {
+  for (const file of [join(root, artifact), join(homedir(), ".claude", artifact)]) {
+    if (!existsSync(file)) continue;
+    try {
+      return frontmatterModel(readFileSync(file, "utf8"));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Render a receipt as human-readable lines.
+ *
+ * @param {import("../src/run-receipt.mjs").RunReceipt} receipt
+ * @returns {string[]}
+ */
+function renderReceipt(receipt) {
+  const rollback = rollbackPoint(receipt);
+  const lines = [`receipt #${receipt.pr}: ${receiptVerdict(receipt)}`];
+  for (const [phase, s] of Object.entries(summarizePhases(receipt))) {
+    const last = receipt.attempts.filter((a) => a.phase === phase).at(-1);
+    const reason = last?.reason_code ? ` (${last.reason_code})` : "";
+    lines.push(`  ${phase}: ${s.attempts} attempt(s), last ${s.last_outcome}${reason}`);
+  }
+  lines.push(
+    rollback
+      ? `  rollback point: ${rollback.base_ref ?? "(base unknown)"} @ ${rollback.merge_base.slice(0, 12)}`
+      : "  rollback point: unknown",
+  );
+  return lines;
+}
+
+/**
  * Entry point.
  *
  * @returns {Promise<void>}
@@ -602,6 +721,100 @@ async function main() {
           : []),
         ...(flags["dry-run"] === true && outcome.body ? ["", outcome.body] : []),
       ],
+      json,
+    });
+  }
+
+  if (sub === "record") {
+    const prNumber = requireNumber(flags.pr, "--pr");
+    const phase = CONDUCTOR_PHASES.find((p) => p.id === flags.phase);
+    if (!phase) return fail(EXIT_CODES.USAGE, `--phase must be one of: ${CONDUCTOR_PHASES.map((p) => p.id).join(", ")}`);
+    if (!RECEIPT_OUTCOMES.includes(/** @type {any} */ (flags.outcome))) {
+      return fail(EXIT_CODES.USAGE, `--outcome must be one of: ${RECEIPT_OUTCOMES.join(", ")}`);
+    }
+    if (flags.reason !== undefined && !/^[A-Z][A-Z0-9_]*$/.test(String(flags.reason))) {
+      return fail(EXIT_CODES.USAGE, "--reason must be an UPPER_SNAKE reason code");
+    }
+    const explicitSha = typeof flags.sha === "string" && flags.sha !== "" ? flags.sha : null;
+    if (explicitSha !== null && !/^[0-9a-f]{40}$/i.test(explicitSha)) {
+      return fail(EXIT_CODES.USAGE, "--sha must be a full 40-character SHA for record");
+    }
+    // The head comes from the pull request, not the local checkout: `/review-pr`
+    // pushes from its own worktree, so this checkout can lag behind the head
+    // the phase actually ran on. --sha is the way to record when gh cannot answer.
+    const view = run(["gh", "pr", "view", String(prNumber), "--json", "headRefOid,baseRefName"]);
+    let headSha = explicitSha;
+    let baseRef = null;
+    if (view.status === 0) {
+      try {
+        const parsed = JSON.parse(view.stdout);
+        headSha ??= parsed.headRefOid;
+        baseRef = typeof parsed.baseRefName === "string" && parsed.baseRefName !== "" ? parsed.baseRefName : null;
+      } catch {
+        // Fall through: an unparseable answer is no answer.
+      }
+    }
+    if (typeof headSha !== "string" || !/^[0-9a-f]{40}$/i.test(headSha)) {
+      return fail(EXIT_CODES.ENV, `could not read the head of #${prNumber}; pass --sha to record anyway\n${view.stderr.trim()}`);
+    }
+    let mergeBase = null;
+    if (baseRef !== null) {
+      const mb = run(["git", "merge-base", `${flags.remote}/${baseRef}`, headSha]);
+      if (mb.status === 0 && /^[0-9a-f]{40}$/i.test(mb.stdout.trim())) mergeBase = mb.stdout.trim();
+    }
+    const file = receiptPath(gitCommonDir(), prNumber);
+    const { version } = await import("../src/index.mjs");
+    const receipt = appendAttempt(readReceipt(file) ?? createReceipt({ pr: prNumber }), {
+      phase: phase.id,
+      outcome: String(flags.outcome),
+      headSha,
+      baseRef,
+      mergeBase,
+      reasonCode: flags.reason === undefined ? null : String(flags.reason),
+      evidence: Array.isArray(flags.evidence) ? flags.evidence.map(String) : [],
+      requestedModel: requestedModel(repoRoot(), phase.artifact),
+      toolVersion: version,
+    });
+    writeReceipt(file, receipt);
+    const attempt = receipt.attempts.at(-1);
+    const summary = summarizePhases(receipt)[phase.id];
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: { path: file, attempt, phase: summary, verdict: receiptVerdict(receipt) },
+      lines: [
+        `record: ${attempt.phase} attempt ${attempt.n} ${attempt.outcome} on ${attempt.head_sha.slice(0, 8)}`,
+        `  consecutive failures: ${summary.consecutive_failures}`,
+        `  receipt: ${file}`,
+      ],
+      json,
+    });
+  }
+
+  if (sub === "receipt") {
+    const prNumber = requireNumber(flags.pr, "--pr");
+    const file = receiptPath(gitCommonDir(), prNumber);
+    const receipt = readReceipt(file);
+    if (receipt === null) {
+      return emit({
+        subcommand: sub,
+        ok: true,
+        result: { path: file, receipt: null },
+        lines: [`no receipt for #${prNumber} (${file})`],
+        json,
+      });
+    }
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: {
+        path: file,
+        verdict: receiptVerdict(receipt),
+        phases: summarizePhases(receipt),
+        rollback: rollbackPoint(receipt),
+        receipt,
+      },
+      lines: renderReceipt(receipt),
       json,
     });
   }
