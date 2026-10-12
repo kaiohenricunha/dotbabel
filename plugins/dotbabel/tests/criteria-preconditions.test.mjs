@@ -121,6 +121,34 @@ describe("checkPrPreconditions", () => {
     expect(checkPrPreconditions(untouched, args(dir)).specIds).toEqual(["example"]);
   });
 
+  it("keeps the body's specs when the base spec listing cannot be read", () => {
+    const { dir, head } = cleanRepo();
+    const inner = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: head, isCrossRepository: false, body: BODY } });
+    const deps = {
+      capture(argv) {
+        if (argv[0] === "git" && argv[1] === "ls-tree" && argv.includes("docs/specs/")) throw new Error("unreadable");
+        return inner.capture(argv);
+      },
+    };
+    expect(checkPrPreconditions(deps, args(dir)).specIds).toEqual(["example"]);
+  });
+
+  it("leaves out an implicated spec that the head deletes", () => {
+    const dir = initRepo();
+    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    const goneDir = path.join(dir, "docs", "specs", "gone");
+    fs.mkdirSync(goneDir, { recursive: true });
+    fs.writeFileSync(path.join(goneDir, "spec.json"), JSON.stringify({ id: "gone", linked_paths: ["src/**"], acceptance_criteria: [] }));
+    fs.mkdirSync(path.join(dir, "src"));
+    fs.writeFileSync(path.join(dir, "src", "a.js"), "1\n");
+    const base = commit(dir, "base");
+    fs.rmSync(goneDir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "src", "a.js"), "2\n");
+    const head = commit(dir, "delete the spec, change src");
+    const deps = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: base, isCrossRepository: false, body: BODY } });
+    expect(checkPrPreconditions(deps, args(dir)).specIds).toEqual(["example"]);
+  });
+
   it("throws CRITERIA_TRUST_REQUIRED when the repository is untrusted and allowProjectCommands is false", () => {
     const { dir, head } = cleanRepo();
     const deps = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: head, isCrossRepository: false, body: BODY } });
