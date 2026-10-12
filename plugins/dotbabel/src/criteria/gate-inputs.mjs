@@ -264,7 +264,7 @@ function hasCriteriaChangeRationale(body) {
  * @param {string[]} changedPaths
  * @returns {string[]|null} null when the base tree could not be read.
  */
-function implicatedSpecIds(deps, baseSha, changedPaths) {
+export function implicatedSpecIds(deps, baseSha, changedPaths) {
   if (changedPaths.length === 0) return [];
 
   // `--full-tree`: without it `git ls-tree` resolves the pathspec relative to
