@@ -970,7 +970,7 @@ async function main() {
       // then raise or remove the limit without anyone noticing.
       return fail(EXIT_CODES.ENV, err.message);
     }
-    const receipt = readReceipt(receiptPath(gitCommonDir(), prNumber));
+    const receipt = readReceipt(receiptPath(gitCommonDir(), prNumber), prNumber);
     const consecutiveFailures = receipt ? (summarizePhases(receipt)[phase.id]?.consecutive_failures ?? 0) : 0;
     const result = checkAttemptBudget({ phase: phase.id, consecutiveFailures, maxAttempts });
     return emit({

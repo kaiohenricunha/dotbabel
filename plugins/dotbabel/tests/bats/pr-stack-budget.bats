@@ -85,3 +85,12 @@ fail_review() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"consecutive failures: 1 of 3"* ]]
 }
+
+@test "pr-stack gate budget: a receipt for another pull request is an env error" {
+  fail_review
+  RECEIPT="$REPO/.git/dotbabel/receipts/pr-42.json"
+  jq '.pr = 7' "$RECEIPT" > "$RECEIPT.x" && mv "$RECEIPT.x" "$RECEIPT"
+  run node "$BIN" gate --gate budget --pr 42 --phase review-pr
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"#42"* ]]
+}
