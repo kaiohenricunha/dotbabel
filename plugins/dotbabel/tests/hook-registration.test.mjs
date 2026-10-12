@@ -45,6 +45,22 @@ describe("SHIPPED_HOOK_EVENTS", () => {
   });
 });
 
+describe("docs/hooks.md table", () => {
+  it("lists exactly the shipped hooks with the events SHIPPED_HOOK_EVENTS expects", () => {
+    const md = fs.readFileSync(path.resolve(import.meta.dirname, "..", "..", "..", "docs", "hooks.md"), "utf8");
+    const rows = {};
+    for (const line of md.split("\n")) {
+      const m = /^\| `([a-z-]+\.sh)`\s*\|([^|]*)\|/.exec(line);
+      if (m) rows[m[1]] = [...m[2].matchAll(/`([A-Za-z_]+)`/g)].map((x) => x[1]);
+    }
+    expect(Object.keys(rows).sort()).toEqual(listShippedHooks(HOOKS_DIR));
+    for (const [hook, entries] of Object.entries(SHIPPED_HOOK_EVENTS)) {
+      const events = [...new Set(entries.map((e) => e.split(":")[0]))];
+      expect(events, hook).toEqual(rows[hook]);
+    }
+  });
+});
+
 describe("listShippedHooks", () => {
   it("lists only .sh files, sorted", () => {
     const dir = makeTmpDir();
@@ -97,7 +113,7 @@ describe("hookRegistrationReport", () => {
       env: {},
     });
     expect(report.registered).toEqual([
-      { hook: "guard-destructive-git.sh", events: ["PreToolUse"], missing: [] },
+      { hook: "guard-destructive-git.sh", events: ["PreToolUse"], missing: [], scopes: [] },
     ]);
     expect(report.unregistered.map((u) => u.hook)).toEqual([
       "check-on-write.sh",
@@ -116,6 +132,7 @@ describe("hookRegistrationReport", () => {
           path: "/r/.claude/settings.json",
           settings: {
             hooks: {
+              PreToolUse: [commandHook("x/fleet-guard.sh pre-bash")],
               SessionStart: [commandHook("x/fleet-guard.sh session-start")],
               PostToolUse: [commandHook("x/fleet-guard.sh post-tool")],
               UserPromptSubmit: [commandHook("x/fleet-guard.sh prompt")],
@@ -130,6 +147,7 @@ describe("hookRegistrationReport", () => {
         hook: "fleet-guard.sh",
         events: ["PostToolUse", "PreToolUse", "SessionStart", "UserPromptSubmit"],
         missing: [],
+        scopes: [],
       },
     ]);
   });
@@ -146,9 +164,77 @@ describe("hookRegistrationReport", () => {
       {
         hook: "fleet-guard.sh",
         events: ["PreToolUse"],
-        missing: ["SessionStart", "PostToolUse", "UserPromptSubmit"],
+        missing: ["PreToolUse:pre-bash", "SessionStart:session-start", "PostToolUse:post-tool", "UserPromptSubmit:prompt"],
+        scopes: [],
       },
     ]);
+  });
+
+  it("tells fleet-guard's two PreToolUse entries apart, so a missing merge-token entry shows", () => {
+    const report = hookRegistrationReport({
+      shippedHooks: ["fleet-guard.sh"],
+      sources: [
+        {
+          path: "/u/settings.json",
+          settings: {
+            hooks: {
+              PreToolUse: [commandHook("x/fleet-guard.sh pre-edit")],
+              SessionStart: [commandHook("x/fleet-guard.sh session-start")],
+              PostToolUse: [commandHook("x/fleet-guard.sh post-tool")],
+              UserPromptSubmit: [commandHook("x/fleet-guard.sh prompt")],
+            },
+          },
+        },
+      ],
+      env: {},
+    });
+    expect(report.registered[0].missing).toEqual(["PreToolUse:pre-bash"]);
+  });
+
+  it("finds a shipped hook behind a wrapper command, a guard, or an interpreter flag", () => {
+    const report = hookRegistrationReport({
+      shippedHooks: ["check-on-write.sh", "check-on-stop.sh", "guard-destructive-git.sh"],
+      sources: [
+        {
+          path: "/u/settings.json",
+          settings: {
+            hooks: {
+              PostToolUse: [commandHook("timeout 10 $HOME/.claude/hooks/check-on-write.sh")],
+              Stop: [commandHook("test -x ~/.claude/hooks/check-on-stop.sh && ~/.claude/hooks/check-on-stop.sh")],
+              PreToolUse: [commandHook("bash -o pipefail ~/.claude/hooks/guard-destructive-git.sh")],
+            },
+          },
+        },
+      ],
+      env: {},
+    });
+    expect(report.unregistered).toEqual([]);
+  });
+
+  it("ignores a hooks key that is not an event name and reports it escaped", () => {
+    const report = hookRegistrationReport({
+      shippedHooks: ["guard-destructive-git.sh"],
+      sources: [
+        {
+          path: "/r/.claude/settings.json",
+          settings: { hooks: { "PreToolUse\u001b[3A\n  ✓ fake": [commandHook("x/guard-destructive-git.sh")] } },
+        },
+      ],
+      env: {},
+    });
+    expect(report.registered).toEqual([]);
+    expect(report.badKeys).toEqual([{ path: "/r/.claude/settings.json", key: JSON.stringify("PreToolUse\u001b[3A\n  ✓ fake") }]);
+  });
+
+  it("names the scope of each registration", () => {
+    const report = hookRegistrationReport({
+      shippedHooks: ["guard-destructive-git.sh"],
+      sources: [
+        { path: "/r/.claude/settings.json", scope: "project", settings: { hooks: { PreToolUse: [commandHook("x/guard-destructive-git.sh")] } } },
+      ],
+      env: {},
+    });
+    expect(report.registered[0].scopes).toEqual(["project"]);
   });
 
   it("counts the shell prefix from a settings env block", () => {
@@ -158,7 +244,7 @@ describe("hookRegistrationReport", () => {
       env: {},
     });
     expect(report.registered).toEqual([
-      { hook: "fleet-shell-prefix.sh", events: ["CLAUDE_CODE_SHELL_PREFIX"], missing: [] },
+      { hook: "fleet-shell-prefix.sh", events: ["CLAUDE_CODE_SHELL_PREFIX"], missing: [], scopes: [] },
     ]);
   });
 
@@ -169,6 +255,31 @@ describe("hookRegistrationReport", () => {
       env: { CLAUDE_CODE_SHELL_PREFIX: "/h/fleet-shell-prefix.sh" },
     });
     expect(report.registered.map((r) => r.hook)).toEqual(["fleet-shell-prefix.sh"]);
+  });
+
+  it("reads the shell prefix as one slot: the highest-precedence file wins", () => {
+    const report = hookRegistrationReport({
+      shippedHooks: ["fleet-shell-prefix.sh"],
+      sources: [
+        { path: "/u/settings.json", scope: "user", settings: { env: { CLAUDE_CODE_SHELL_PREFIX: "/h/fleet-shell-prefix.sh" } } },
+        { path: "/r/.claude/settings.local.json", scope: "local", settings: { env: { CLAUDE_CODE_SHELL_PREFIX: "/other/wrap.sh" } } },
+      ],
+      env: { CLAUDE_CODE_SHELL_PREFIX: "/h/fleet-shell-prefix.sh" },
+    });
+    expect(report.registered).toEqual([]);
+    expect(report.shellPrefix).toEqual({ scope: "local", path: "/r/.claude/settings.local.json" });
+  });
+
+  it("reports which scope sets the shell prefix, so a repository's choice is visible", () => {
+    const report = hookRegistrationReport({
+      shippedHooks: ["fleet-shell-prefix.sh"],
+      sources: [
+        { path: "/r/.claude/settings.json", scope: "project", settings: { env: { CLAUDE_CODE_SHELL_PREFIX: ".claude/hooks/fleet-shell-prefix.sh" } } },
+      ],
+      env: {},
+    });
+    expect(report.registered[0].scopes).toEqual(["project"]);
+    expect(report.shellPrefix).toEqual({ scope: "project", path: "/r/.claude/settings.json" });
   });
 
   it("does not count a shell prefix that points at another script", () => {
@@ -237,6 +348,18 @@ describe("readSettingsSources", () => {
     });
 
     expect(sources.map((s) => s.path)).toEqual([path.join(configDir, "settings.json")]);
+  });
+
+  it("tags each source with its scope and strips control characters from a parse error", () => {
+    const home = makeTmpDir("home-");
+    const repo = makeTmpDir("repo-");
+    writeJson(path.join(home, ".claude", "settings.json"), {});
+    writeJson(path.join(repo, ".claude", "settings.json"), {});
+    writeJson(path.join(repo, ".claude", "settings.local.json"), "{\u001b[2J broken");
+    const { sources, errors } = readSettingsSources({ home, repoRoot: repo, env: {} });
+    expect(sources.map((s) => s.scope)).toEqual(["user", "project"]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).not.toMatch(/[\u0000-\u001f\u007f]/);
   });
 
   it("reports an unparseable or non-object file by name and keeps the others", () => {

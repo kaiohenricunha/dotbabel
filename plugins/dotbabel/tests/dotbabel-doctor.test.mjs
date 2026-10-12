@@ -44,6 +44,7 @@ function runDoctor({
   trustedFile,
   repoRoot,
   shellPrefix,
+  json = false,
 }) {
   // Build a hermetic PATH that does NOT inherit the user's PATH (which on a
   // dev machine likely contains a real codex/gemini install in nvm's bin dir).
@@ -73,11 +74,19 @@ function runDoctor({
   if (shellPrefix) env.CLAUDE_CODE_SHELL_PREFIX = shellPrefix;
   else delete env.CLAUDE_CODE_SHELL_PREFIX;
 
-  const result = spawnSync(process.execPath, [DOCTOR, "--repo-root", repoRoot ?? REPO_ROOT], {
+  const args = [DOCTOR, "--repo-root", repoRoot ?? REPO_ROOT, ...(json ? ["--json"] : [])];
+  const result = spawnSync(process.execPath, args, {
     env,
     encoding: "utf8",
   });
   return { stdout: result.stdout, stderr: result.stderr, status: result.status };
+}
+
+// Doctor with --json. Its envelope is the last JSON document on stdout: an
+// earlier check can print one of its own.
+function runDoctorJson(opts) {
+  const res = runDoctor({ ...opts, json: true });
+  return JSON.parse(res.stdout.slice(res.stdout.lastIndexOf('{\n  "events"')));
 }
 
 // A throwaway repo root carrying only docs/repo-facts.json with the given
@@ -211,7 +220,7 @@ describe("dotbabel-doctor hook registration check", () => {
     const res = runDoctor({ home, repoRoot });
 
     expect(res.stdout).toMatch(
-      /hooks registered: guard-criteria-evidence\.sh \(PreToolUse\), guard-destructive-git\.sh \(PreToolUse\)/,
+      /hooks registered: guard-criteria-evidence\.sh \(PreToolUse; project\), guard-destructive-git\.sh \(PreToolUse; user\)/,
     );
     expect(res.stdout).toMatch(/check-on-write\.sh is shipped but not registered — expects PostToolUse/);
     expect(res.stdout).toMatch(/check-on-stop\.sh is shipped but not registered — expects Stop/);
@@ -220,6 +229,28 @@ describe("dotbabel-doctor hook registration check", () => {
     );
     expect(res.stdout).toMatch(/task-context\.sh is shipped but not registered — expects SessionStart/);
     expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(5);
+  });
+
+  it("never fails the run for an unregistered or partly registered hook", () => {
+    const home = makeTmpDir("home-");
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    writeSettings(home, "settings.json", {
+      hooks: { PreToolUse: [command("$HOME/.claude/hooks/fleet-guard.sh pre-edit")] },
+    });
+    const res = runDoctorJson({ home, repoRoot });
+    const hookEvents = res.events.filter((e) => e.message.startsWith("hooks"));
+    expect(hookEvents.length).toBeGreaterThan(3);
+    expect(hookEvents.some((e) => e.kind === "warn")).toBe(true);
+    expect(hookEvents.filter((e) => e.kind === "fail")).toEqual([]);
+  });
+
+  it("prints no control character from a hostile settings key", () => {
+    const home = makeTmpDir("home-");
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    writeSettings(repoRoot, "settings.json", '{"hooks":{"PreToolUse\\u001b[3A\\n  ok":[{"hooks":[{"type":"command","command":"x/guard-destructive-git.sh"}]}]}}');
+    const res = runDoctor({ home, repoRoot });
+    expect(res.stdout).not.toMatch(/\u001b\[3A/);
+    expect(res.stdout).toMatch(/hooks key that is not an event name/);
   });
 
   it("names the events a partly registered hook still lacks", () => {
@@ -231,9 +262,9 @@ describe("dotbabel-doctor hook registration check", () => {
 
     const res = runDoctor({ home, repoRoot });
 
-    expect(res.stdout).toMatch(/fleet-guard\.sh \(PreToolUse\)/);
+    expect(res.stdout).toMatch(/fleet-guard\.sh \(PreToolUse; user\)/);
     expect(res.stdout).toMatch(
-      /fleet-guard\.sh is registered for PreToolUse but not for SessionStart, PostToolUse, UserPromptSubmit/,
+      /fleet-guard\.sh is registered for PreToolUse but not for PreToolUse \(pre-bash\), SessionStart \(session-start\), PostToolUse \(post-tool\), UserPromptSubmit \(prompt\)/,
     );
   });
 

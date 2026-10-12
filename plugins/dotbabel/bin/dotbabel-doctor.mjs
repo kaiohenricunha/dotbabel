@@ -51,7 +51,14 @@ import {
 } from "../src/index.mjs";
 import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
 import { isRepoTrusted } from "../src/trust-allowlist.mjs";
-import { hookRegistrationReport, listShippedHooks, readSettingsSources } from "../src/hook-registration.mjs";
+import {
+  SHELL_PREFIX_EVENT,
+  describeEntry,
+  hookRegistrationReport,
+  listShippedHooks,
+  printable,
+  readSettingsSources,
+} from "../src/hook-registration.mjs";
 import {
   RUNTIMES,
   anyRuntimePresent,
@@ -196,6 +203,8 @@ if (existsSync(hookPath)) {
   out.warn("guard-destructive-git.sh missing — destructive git commands are unguarded");
 }
 
+let stopHookRegistered = false;
+
 // hook registration. Installed is not enabled: bootstrap links the hooks but
 // never edits settings.json. Never out.fail, for the reason the trust check
 // below gives: an unregistered hook is a valid choice, not a broken install.
@@ -208,20 +217,33 @@ if (existsSync(hookPath)) {
   });
   for (const e of errors) out.warn(`hooks: ${e.path} ${e.message} — its hook registrations were not read`);
   const report = hookRegistrationReport({ shippedHooks, sources, env: process.env });
+  for (const b of report.badKeys) {
+    out.warn(`hooks: ${b.path} has a hooks key that is not an event name, ignored: ${printable(b.key)}`);
+  }
   if (report.registered.length > 0) {
-    const listed = report.registered.map((r) => `${r.hook} (${r.events.join(", ")})`).join(", ");
+    const listed = report.registered
+      .map((r) => `${r.hook} (${[r.events.join(", "), ...(r.scopes.length > 0 ? [r.scopes.join(", ")] : [])].join("; ")})`)
+      .join(", ");
     out.pass(`hooks registered: ${listed}`);
   }
   for (const r of report.registered) {
     if (r.missing.length === 0) continue;
     out.warn(
-      `hooks: ${r.hook} is registered for ${r.events.join(", ")} but not for ${r.missing.join(", ")} — see docs/hooks.md`,
+      `hooks: ${r.hook} is registered for ${r.events.join(", ")} but not for ${r.missing.map(describeEntry).join(", ")} — see docs/hooks.md`,
     );
   }
   for (const u of report.unregistered) {
-    const expects = u.expected.length > 0 ? ` — expects ${u.expected.join(", ")}` : "";
+    const expects = u.expected.length > 0 ? ` — expects ${u.expected.map(describeEntry).join(", ")}` : "";
     out.warn(`hooks: ${u.hook} is shipped but not registered${expects} — see docs/hooks.md#registering-a-hook`);
   }
+  // A shell prefix wraps every shell command Claude Code runs. When the
+  // repository's own settings choose it, say so: that is not a user's choice.
+  if (report.shellPrefix && report.shellPrefix.scope !== "user") {
+    out.warn(
+      `hooks: ${SHELL_PREFIX_EVENT} is set by the ${report.shellPrefix.scope} settings (${report.shellPrefix.path}); it wraps every shell command — check that you trust it`,
+    );
+  }
+  stopHookRegistered = report.registered.some((r) => r.hook === "check-on-stop.sh");
 }
 
 // check-on-stop trust. Never out.fail: the exit code is derived from the fail
@@ -237,8 +259,8 @@ if (existsSync(hookPath)) {
     out.warn(`check-on-stop: trust allowlist unreadable (${trust.readError})`);
   } else if (trust.trusted) {
     out.pass(
-      `check-on-stop: this repo is on the trust allowlist (${trust.trustFile}) — ` +
-        "note dotbabel does not register the Stop hook; add it to your settings.json hooks.Stop",
+      `check-on-stop: this repo is on the trust allowlist (${trust.trustFile})` +
+        (stopHookRegistered ? "" : " — the Stop hook is not registered, so nothing runs it yet; add it to hooks.Stop"),
     );
   } else if (trust.fileExists) {
     out.warn(

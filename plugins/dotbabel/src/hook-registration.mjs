@@ -5,12 +5,18 @@
  * `settings.json`, so an installed hook does nothing until someone registers
  * it. `dotbabel doctor` uses this module to make that gap visible.
  *
- * A registration is matched by the basename of the command's script, so
- * `$HOME/.claude/hooks/fleet-guard.sh pre-edit` and a repository's own
- * `.claude/hooks/fleet-guard.sh` both count as `fleet-guard.sh`.
+ * A registration is matched by the basename of a shipped script anywhere in
+ * the command, so `$HOME/.claude/hooks/fleet-guard.sh pre-edit`, a
+ * repository's own `.claude/hooks/fleet-guard.sh`, and
+ * `timeout 10 ~/.claude/hooks/check-on-write.sh` all count. The check reads
+ * three settings files only; it does not read managed settings, plugin hooks,
+ * or `--settings`, and it does not check matchers.
+ *
+ * @typedef {"user"|"project"|"local"} SettingsScope
  *
  * @typedef {object} SettingsSource
  * @property {string} path
+ * @property {SettingsScope} [scope]
  * @property {Record<string, unknown>} settings
  *
  * @typedef {object} SettingsReadError
@@ -20,7 +26,8 @@
  * @typedef {object} RegisteredHook
  * @property {string} hook
  * @property {string[]} events   Events it is registered for, sorted.
- * @property {string[]} missing  Expected events it is not registered for, in table order.
+ * @property {string[]} missing  Expected entries it is not registered for, in table order.
+ * @property {SettingsScope[]} scopes  The scopes that register it, sorted.
  *
  * @typedef {object} UnregisteredHook
  * @property {string} hook
@@ -34,13 +41,23 @@ import { basename, join } from "node:path";
 export const SHELL_PREFIX_EVENT = "CLAUDE_CODE_SHELL_PREFIX";
 
 /**
- * The events each shipped hook expects, as the table in `docs/hooks.md` lists
- * them. A test fails when this and `plugins/dotbabel/hooks/*.sh` disagree.
+ * The entries each shipped hook expects. An entry is an event, or
+ * `Event:argument` when one script takes several entries that differ by the
+ * argument after it: `fleet-guard.sh` needs two `PreToolUse` entries, and a
+ * missing `pre-bash` must not hide behind a present `pre-edit`. Tests hold the
+ * keys equal to `plugins/dotbabel/hooks/*.sh` and the events equal to the
+ * table in `docs/hooks.md`.
  */
 export const SHIPPED_HOOK_EVENTS = Object.freeze({
   "check-on-stop.sh": Object.freeze(["Stop"]),
   "check-on-write.sh": Object.freeze(["PostToolUse"]),
-  "fleet-guard.sh": Object.freeze(["PreToolUse", "SessionStart", "PostToolUse", "UserPromptSubmit"]),
+  "fleet-guard.sh": Object.freeze([
+    "PreToolUse:pre-edit",
+    "PreToolUse:pre-bash",
+    "SessionStart:session-start",
+    "PostToolUse:post-tool",
+    "UserPromptSubmit:prompt",
+  ]),
   "fleet-shell-prefix.sh": Object.freeze([SHELL_PREFIX_EVENT]),
   "guard-criteria-evidence.sh": Object.freeze(["PreToolUse"]),
   "guard-destructive-git.sh": Object.freeze(["PreToolUse"]),
@@ -49,6 +66,33 @@ export const SHIPPED_HOOK_EVENTS = Object.freeze({
 
 const INTERPRETERS = new Set(["bash", "sh", "zsh", "env"]);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+// Claude Code event names are letters only. Any other key in `hooks` came from
+// a file someone else may control, and is reported escaped, never printed raw.
+const EVENT_NAME = /^[A-Za-z]+$/;
+// Control and format characters, which can rewrite a terminal.
+const CONTROL = /[\p{Cc}\p{Cf}]/gu;
+
+/**
+ * `text` with control and format characters replaced, safe to print.
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+export function printable(text) {
+  return String(text).replace(CONTROL, "?");
+}
+
+/**
+ * A human form of an expected entry: `PreToolUse:pre-bash` is
+ * `PreToolUse (pre-bash)`.
+ *
+ * @param {string} entry
+ * @returns {string}
+ */
+export function describeEntry(entry) {
+  const [event, arg] = entry.split(":");
+  return arg ? `${event} (${arg})` : event;
+}
 
 /**
  * The `.sh` files in a hooks directory, sorted. A missing directory is empty.
@@ -89,6 +133,31 @@ export function commandHookName(command) {
 }
 
 /**
+ * The first shipped hook a command runs, with the argument after it. Looking
+ * for a known name, rather than taking the first word, finds the hook behind
+ * `timeout 10 …`, `test -x … && …`, `cd … && …`, or an interpreter flag that
+ * takes a value.
+ *
+ * @param {unknown} command
+ * @param {Set<string>} known Shipped hook basenames.
+ * @returns {{ name: string, arg: string|null }|null}
+ */
+function findHookCall(command, known) {
+  if (typeof command !== "string") return null;
+  const tokens = command
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.replace(/["']/g, ""));
+  for (let i = 0; i < tokens.length; i += 1) {
+    const name = basename(tokens[i]);
+    if (!known.has(name)) continue;
+    const next = tokens[i + 1];
+    return { name, arg: next && /^[a-z][a-z-]*$/.test(next) ? next : null };
+  }
+  return null;
+}
+
+/**
  * @param {unknown} value
  * @returns {value is Record<string, unknown>}
  */
@@ -97,67 +166,85 @@ function isObject(value) {
 }
 
 /**
- * Map each hook basename to the set of events it is registered for.
+ * Each shipped hook's registered entries (`Event` and `Event:argument`) and
+ * scopes, the keys that are not event names, and the effective shell prefix.
  *
- * @param {SettingsSource[]} sources
+ * @param {SettingsSource[]} sources In precedence order: user, project, local.
  * @param {Record<string, string|undefined>} env
- * @returns {Map<string, Set<string>>}
+ * @param {Set<string>} known
  */
-function collectRegistrations(sources, env) {
-  /** @type {Map<string, Set<string>>} */
+function collectRegistrations(sources, env, known) {
+  /** @type {Map<string, {entries: Set<string>, scopes: Set<string>}>} */
   const found = new Map();
-  const add = (name, event) => {
-    if (!name) return;
-    if (!found.has(name)) found.set(name, new Set());
-    found.get(name).add(event);
+  const add = (call, event, scope) => {
+    if (!call) return;
+    if (!found.has(call.name)) found.set(call.name, { entries: new Set(), scopes: new Set() });
+    const hit = found.get(call.name);
+    hit.entries.add(event);
+    if (call.arg) hit.entries.add(`${event}:${call.arg}`);
+    if (scope) hit.scopes.add(scope);
   };
-
-  const prefixes = [env[SHELL_PREFIX_EVENT]];
-  for (const { settings } of sources) {
-    if (isObject(settings.env)) prefixes.push(/** @type {any} */ (settings.env)[SHELL_PREFIX_EVENT]);
+  /** @type {{path: string, key: string}[]} */
+  const badKeys = [];
+  // The shell prefix is one slot: the highest-precedence file that sets it
+  // wins over the others and over the process environment.
+  let prefix = { value: env[SHELL_PREFIX_EVENT], scope: undefined, path: undefined };
+  for (const { path, scope, settings } of sources) {
+    if (isObject(settings.env) && /** @type {any} */ (settings.env)[SHELL_PREFIX_EVENT] !== undefined) {
+      prefix = { value: /** @type {any} */ (settings.env)[SHELL_PREFIX_EVENT], scope, path };
+    }
     if (!isObject(settings.hooks)) continue;
     for (const [event, blocks] of Object.entries(settings.hooks)) {
+      if (!EVENT_NAME.test(event)) {
+        badKeys.push({ path, key: JSON.stringify(event) });
+        continue;
+      }
       if (!Array.isArray(blocks)) continue;
       for (const block of blocks) {
         if (!isObject(block) || !Array.isArray(block.hooks)) continue;
         for (const hook of block.hooks) {
-          if (isObject(hook) && hook.type === "command") add(commandHookName(hook.command), event);
+          if (isObject(hook) && hook.type === "command") add(findHookCall(hook.command, known), event, scope);
         }
       }
     }
   }
-  for (const prefix of prefixes) add(commandHookName(prefix), SHELL_PREFIX_EVENT);
-  return found;
+  add(findHookCall(prefix.value, known), SHELL_PREFIX_EVENT, prefix.scope);
+  const shellPrefix = prefix.path === undefined ? null : { scope: prefix.scope, path: prefix.path };
+  return { found, badKeys, shellPrefix };
 }
 
 /**
  * Sort the shipped hooks into registered and unregistered. A hook registered
- * for some but not all of its expected events is registered, and `missing`
- * names the rest.
+ * for some but not all of its expected entries is registered, and `missing`
+ * names the rest. `badKeys` lists `hooks` keys that are not event names,
+ * JSON-escaped; `shellPrefix` names the file that sets the shell prefix, or
+ * null when only the process environment does.
  *
  * @param {{shippedHooks: string[], sources: SettingsSource[], env: Record<string, string|undefined>}} input
- * @returns {{registered: RegisteredHook[], unregistered: UnregisteredHook[]}}
+ * @returns {{registered: RegisteredHook[], unregistered: UnregisteredHook[],
+ *   badKeys: {path: string, key: string}[], shellPrefix: {scope: SettingsScope|undefined, path: string}|null}}
  */
 export function hookRegistrationReport({ shippedHooks, sources, env }) {
-  const found = collectRegistrations(sources, env);
+  const { found, badKeys, shellPrefix } = collectRegistrations(sources, env, new Set(shippedHooks));
   /** @type {RegisteredHook[]} */
   const registered = [];
   /** @type {UnregisteredHook[]} */
   const unregistered = [];
   for (const hook of shippedHooks) {
     const expected = [...(SHIPPED_HOOK_EVENTS[hook] ?? [])];
-    const events = found.get(hook);
-    if (!events) {
+    const hit = found.get(hook);
+    if (!hit) {
       unregistered.push({ hook, expected });
       continue;
     }
     registered.push({
       hook,
-      events: [...events].sort(),
-      missing: expected.filter((event) => !events.has(event)),
+      events: [...hit.entries].filter((e) => !e.includes(":")).sort(),
+      missing: expected.filter((entry) => !hit.entries.has(entry)),
+      scopes: /** @type {SettingsScope[]} */ ([...hit.scopes].sort()),
     });
   }
-  return { registered, unregistered };
+  return { registered, unregistered, badKeys, shellPrefix };
 }
 
 /**
@@ -171,29 +258,32 @@ export function hookRegistrationReport({ shippedHooks, sources, env }) {
  */
 export function readSettingsSources({ home, repoRoot, env }) {
   const userDir = env.CLAUDE_CONFIG_DIR || join(home, ".claude");
+  /** @type {[SettingsScope, string][]} */
   const paths = [
-    join(userDir, "settings.json"),
-    join(repoRoot, ".claude", "settings.json"),
-    join(repoRoot, ".claude", "settings.local.json"),
+    ["user", join(userDir, "settings.json")],
+    ["project", join(repoRoot, ".claude", "settings.json")],
+    ["local", join(repoRoot, ".claude", "settings.local.json")],
   ];
   /** @type {SettingsSource[]} */
   const sources = [];
   /** @type {SettingsReadError[]} */
   const errors = [];
-  for (const path of paths) {
+  for (const [scope, path] of paths) {
     if (!existsSync(path)) continue;
     let settings;
     try {
       settings = JSON.parse(readFileSync(path, "utf8"));
     } catch (err) {
-      errors.push({ path, message: `does not parse: ${err instanceof Error ? err.message : String(err)}` });
+      // V8 quotes source bytes in a parse error, and this file may come from a
+      // cloned repository: strip anything that could rewrite the terminal.
+      errors.push({ path, message: `does not parse: ${printable(err instanceof Error ? err.message : String(err))}` });
       continue;
     }
     if (!isObject(settings)) {
       errors.push({ path, message: "is not a JSON object" });
       continue;
     }
-    sources.push({ path, settings });
+    sources.push({ path, scope, settings });
   }
   return { sources, errors };
 }
