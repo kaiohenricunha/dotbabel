@@ -122,8 +122,8 @@ describe("checkPrPreconditions", () => {
   });
 
   it("keeps the body's specs when the base spec listing cannot be read", () => {
-    const { dir, head } = cleanRepo();
-    const inner = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: head, isCrossRepository: false, body: BODY } });
+    const { dir, base, head } = argvChangeRepo();
+    const inner = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: base, isCrossRepository: false, body: BODY } });
     const deps = {
       capture(argv) {
         if (argv[0] === "git" && argv[1] === "ls-tree" && argv.includes("docs/specs/")) throw new Error("unreadable");
