@@ -618,21 +618,21 @@ exact commands a child needs once its parent has merged.
 | `record`          | Append one phase attempt to the pull request's run receipt       |
 | `receipt`         | Print the run receipt: verdict, attempts, rollback point         |
 
-| Flag                 | Default  |                                                                     |
-| -------------------- | -------- | ------------------------------------------------------------------- |
-| `--trunk <ref>`      | `main`   | Trunk branch name                                                   |
-| `--limit <N>`        | 100      | Max PRs to enumerate                                                |
-| `--pr <N>`           | —        | Required by all but `graph`, `plan`, `phases`; optional for `entry` |
-| `--parent <N>`       | —        | Required by `next`                                                  |
-| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging                        |
-| `--remote <name>`    | `origin` | Git remote                                                          |
-| `--gate <name>`      | —        | Gate to evaluate                                                    |
-| `--sha <rev>`        | `HEAD`   | Commit for `--gate skip-ci`; for `record`, the head when gh fails   |
-| `--dry-run`          | off      | `review-complete`: check and print, post nothing                    |
-| `--phase <id>`       | —        | `record`: the conductor phase                                       |
-| `--outcome <o>`      | —        | `record`: `pass` \| `fail` \| `blocked` \| `skipped`                |
-| `--reason <CODE>`    | —        | `record`: the blocking reason code                                  |
-| `--evidence <url>`   | —        | `record`: a link to evidence the phase produced; repeatable         |
+| Flag                 | Default  |                                                                                               |
+| -------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| `--trunk <ref>`      | `main`   | Trunk branch name                                                                             |
+| `--limit <N>`        | 100      | Max PRs to enumerate                                                                          |
+| `--pr <N>`           | —        | Required except by `graph`, `plan`, `phases`, `--gate skip-ci`; optional for `entry`          |
+| `--parent <N>`       | —        | Required by `next`                                                                            |
+| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging                                                  |
+| `--remote <name>`    | `origin` | Git remote                                                                                    |
+| `--gate <name>`      | —        | Gate to evaluate                                                                              |
+| `--sha <rev>`        | `HEAD`   | `--gate skip-ci`: commit to inspect. `record`: full head SHA, used only when gh cannot answer |
+| `--dry-run`          | off      | `review-complete`: check and print, post nothing                                              |
+| `--phase <id>`       | —        | `record`: the conductor phase                                                                 |
+| `--outcome <o>`      | —        | `record`: `pass` \| `fail` \| `blocked` \| `skipped`                                          |
+| `--reason <CODE>`    | —        | `record`: the blocking reason code                                                            |
+| `--evidence <url>`   | —        | `record`: a link to evidence the phase produced; repeatable                                   |
 
 Capture `--parent-sha` before the parent merges. The repo squash-merges, so the
 parent's original commits are not ancestors of the squashed commit and
@@ -660,17 +660,33 @@ sibling attestation evidence.
 `<git-common-dir>/dotbabel/receipts/pr-<N>.json`
 ([schema](../schemas/dotbabel.run-receipt.schema.json)). The git common
 directory is shared by every worktree, so a phase that runs in another worktree
-extends the same history, and the file can never dirty a working tree. Each
-attempt keeps the head it ran on (from `gh pr view`, or `--sha`), the outcome and
-reason code, the evidence links, the merge base as the rollback point, the
-`model` the phase artifact's frontmatter requests, and the dotbabel version. A
-value it cannot observe stays `null`: the receipt records no cost or model route.
-The log is append-only. A damaged receipt is an environment error (exit `2`) and
-is left unchanged rather than started over.
+extends the same history, and the file can never dirty a working tree. A lock
+file (`pr-<N>.json.lock`) stops two concurrent calls from losing an attempt; a
+lock held longer than 2 seconds is an environment error (exit `2`), and one
+older than 30 seconds is cleared as stale.
 
-`receipt` prints the verdict (`in-progress`, `blocked`, or `ready` once the
-`stop` hand-off is the latest pass), each phase's attempt count and consecutive
-failures, and the rollback point. No receipt yet exits `0`.
+Each attempt keeps the head it ran on, the outcome and reason code, the evidence
+links, the merge base as the rollback point, the `model` the phase artifact's
+frontmatter requests, and the dotbabel version. The head comes from
+`gh pr view`. `--sha` is a fallback for when gh cannot answer: it must be a full
+SHA of a local commit, and it is refused (exit `64`) when it differs from the
+head gh reports. The model is read in the order Claude Code loads the artifact:
+`~/.claude/<artifact>`, then the project's `.claude/<artifact>`; a copy that
+names no model falls through to the next. A value it cannot observe stays
+`null`: the receipt records no cost or model route. The log is append-only. A
+damaged receipt, or one whose `pr` is not the file's, is an environment error
+(exit `2`) and is left unchanged rather than started over.
+
+Warning: the receipt is self-reported. It records what the conductor says each
+phase did, and nothing checks that against the evidence comments. It is a log,
+not evidence, and the merge gate never reads it.
+
+`receipt` prints the verdict, each phase's attempt count, last outcome, and
+consecutive failures, and the rollback point. The verdict is `ready` only when
+the `stop` hand-off is the latest attempt and passed, no other phase's latest
+non-skipped attempt failed, and a passing `local-attest` names the same head as
+`stop`. It is `blocked` while the latest attempt, or a phase that `stop`
+contradicts, failed; otherwise it is `in-progress`. No receipt yet exits `0`.
 
 ---
 

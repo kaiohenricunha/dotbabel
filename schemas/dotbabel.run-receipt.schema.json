@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://dotbabel.dev/schemas/dotbabel.run-receipt.schema.json",
   "title": "dotbabel conductor run receipt",
-  "description": "The append-only history of one pull request's conductor runs, written by `dotbabel pr-stack record` to <git-common-dir>/dotbabel/receipts/pr-<N>.json (never the working tree). Every phase attempt is kept, with the head it ran on, its outcome, its evidence links, the rollback point, and the model its artifact requested. A field nobody observed is null; the receipt never records a cost or a model route it did not see.",
+  "description": "The append-only, SELF-REPORTED history of one pull request's conductor runs (a log, never evidence: the merge gate does not read it), written by `dotbabel pr-stack record` to <git-common-dir>/dotbabel/receipts/pr-<N>.json (never the working tree). Every phase attempt is kept, with the head it ran on, its outcome, its evidence links, the rollback point, and the model its artifact requested. A field nobody observed is null; the receipt never records a cost or a model route it did not see.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "tool", "pr", "created_at", "updated_at", "attempts"],
@@ -60,7 +60,7 @@
             "pattern": "^[0-9a-f]{40}$"
           },
           "base_ref": {
-            "type": ["string", "null"]
+            "oneOf": [{ "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" }, { "type": "null" }]
           },
           "merge_base": {
             "oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{40}$" }, { "type": "null" }]
@@ -75,14 +75,14 @@
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1
+              "pattern": "^\\S+$"
             }
           },
           "requested_model": {
-            "type": ["string", "null"]
+            "oneOf": [{ "type": "string", "pattern": "^[A-Za-z0-9._:/-]+$" }, { "type": "null" }]
           },
           "tool_version": {
-            "type": ["string", "null"]
+            "oneOf": [{ "type": "string", "pattern": "^[0-9A-Za-z.+-]+$" }, { "type": "null" }]
           }
         }
       }

@@ -35,7 +35,7 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
@@ -109,14 +109,15 @@ Subcommands:
 Options:
   --trunk <ref>      Trunk branch name (default: main)
   --limit <N>        Max PRs to enumerate (default: 100)
-  --pr <N>           PR number (required by: next, gate, review-complete, record, receipt;
-                     optional for entry)
+  --pr <N>           PR number (required by: next, gate except --gate skip-ci,
+                     review-complete, record, receipt; optional for entry)
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
   --gate <name>      Gate to evaluate: local-attest | merge | skip-ci
   --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD);
-                     record: the head SHA, when gh cannot be asked
+                     record: the full head SHA to use when gh cannot answer
+                     (refused when it differs from the head gh reports)
   --dry-run          review-complete: check and print the comment, post nothing
   --phase <id>       record: the conductor phase (see \`phases\`)
   --outcome <o>      record: ${RECEIPT_OUTCOMES.join(" | ")}
@@ -437,9 +438,10 @@ function gitCommonDir() {
  * history, and silently starting over would erase it.
  *
  * @param {string} file
+ * @param {number} prNumber The pull request the file is named for.
  * @returns {import("../src/run-receipt.mjs").RunReceipt|null}
  */
-function readReceipt(file) {
+function readReceipt(file, prNumber) {
   if (!existsSync(file)) return null;
   let parsed;
   try {
@@ -447,9 +449,55 @@ function readReceipt(file) {
   } catch (err) {
     return fail(EXIT_CODES.ENV, `${file} is not readable JSON: ${err.message}`);
   }
-  const problem = receiptProblem(parsed);
+  const problem = receiptProblem(parsed, prNumber);
   if (problem) return fail(EXIT_CODES.ENV, `${file} is not a run receipt (${problem}); left unchanged`);
   return parsed;
+}
+
+const RECEIPT_LOCK_WAIT_MS = 2_000;
+const RECEIPT_LOCK_STALE_MS = 30_000;
+
+/**
+ * Run `fn` while holding `<file>.lock`. Every worktree of a repository
+ * extends one receipt, so two `record` calls must not both read N attempts
+ * and each write N+1. A lock older than RECEIPT_LOCK_STALE_MS belongs to a
+ * process that died holding it and is cleared. A live one that does not free
+ * up within RECEIPT_LOCK_WAIT_MS is an environment error.
+ *
+ * @template T
+ * @param {string} file
+ * @param {() => T} fn
+ * @returns {T}
+ */
+function withReceiptLock(file, fn) {
+  const lock = `${file}.lock`;
+  mkdirSync(dirname(file), { recursive: true });
+  const deadline = Date.now() + RECEIPT_LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      break;
+    } catch (err) {
+      if (err.code !== "EEXIST") throw err;
+      let age = 0;
+      try {
+        age = Date.now() - statSync(lock).mtimeMs;
+      } catch {
+        continue; // released between mkdir and stat
+      }
+      if (age > RECEIPT_LOCK_STALE_MS) {
+        rmSync(lock, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() >= deadline) return fail(EXIT_CODES.ENV, `receipt lock is busy: ${lock}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    rmSync(lock, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -468,21 +516,24 @@ function writeReceipt(file, receipt) {
 }
 
 /**
- * The `model` a phase artifact's frontmatter requests: the repository's copy
- * first, then the one `bootstrap` links into `~/.claude/`. Null when neither
- * exists or names one — that is what the receipt records, not a guess.
+ * The `model` a phase artifact's frontmatter requests, read in the order
+ * Claude Code loads a skill or command: the personal copy in `~/.claude/`
+ * (where `bootstrap` links it) wins over the project's `.claude/` copy. A
+ * copy that is unreadable or names no model falls through to the next. Null
+ * when none names one — that is what the receipt records, not a guess.
  *
  * @param {string} root
  * @param {string} artifact
  * @returns {string|null}
  */
 function requestedModel(root, artifact) {
-  for (const file of [join(root, artifact), join(homedir(), ".claude", artifact)]) {
+  for (const file of [join(homedir(), ".claude", artifact), join(root, ".claude", artifact)]) {
     if (!existsSync(file)) continue;
     try {
-      return frontmatterModel(readFileSync(file, "utf8"));
+      const model = frontmatterModel(readFileSync(file, "utf8"));
+      if (model !== null) return model;
     } catch {
-      return null;
+      // Unreadable: try the next copy.
     }
   }
   return null;
@@ -500,7 +551,7 @@ function renderReceipt(receipt) {
   for (const [phase, s] of Object.entries(summarizePhases(receipt))) {
     const last = receipt.attempts.filter((a) => a.phase === phase).at(-1);
     const reason = last?.reason_code ? ` (${last.reason_code})` : "";
-    lines.push(`  ${phase}: ${s.attempts} attempt(s), last ${s.last_outcome}${reason}`);
+    lines.push(`  ${phase}: ${s.attempts} attempt(s), last ${s.last_outcome}${reason}, ${s.consecutive_failures} failed in a row`);
   }
   lines.push(
     rollback
@@ -741,20 +792,32 @@ async function main() {
     }
     // The head comes from the pull request, not the local checkout: `/review-pr`
     // pushes from its own worktree, so this checkout can lag behind the head
-    // the phase actually ran on. --sha is the way to record when gh cannot answer.
+    // the phase actually ran on. --sha is a FALLBACK for when gh cannot answer:
+    // it never overrides the head gh reports, so it cannot attach an outcome to
+    // a commit the pull request is not at.
     const view = run(["gh", "pr", "view", String(prNumber), "--json", "headRefOid,baseRefName"]);
-    let headSha = explicitSha;
+    let ghHead = null;
     let baseRef = null;
     if (view.status === 0) {
       try {
         const parsed = JSON.parse(view.stdout);
-        headSha ??= parsed.headRefOid;
+        if (typeof parsed.headRefOid === "string" && /^[0-9a-f]{40}$/i.test(parsed.headRefOid)) ghHead = parsed.headRefOid;
         baseRef = typeof parsed.baseRefName === "string" && parsed.baseRefName !== "" ? parsed.baseRefName : null;
       } catch {
         // Fall through: an unparseable answer is no answer.
       }
     }
-    if (typeof headSha !== "string" || !/^[0-9a-f]{40}$/i.test(headSha)) {
+    let headSha = ghHead;
+    if (explicitSha !== null && ghHead !== null && explicitSha.toLowerCase() !== ghHead.toLowerCase()) {
+      return fail(EXIT_CODES.USAGE, `--sha ${explicitSha} is not the head of #${prNumber} (${ghHead}); omit --sha`);
+    }
+    if (headSha === null && explicitSha !== null) {
+      if (run(["git", "cat-file", "-e", `${explicitSha}^{commit}`]).status !== 0) {
+        return fail(EXIT_CODES.USAGE, `--sha ${explicitSha} is not a commit in this repository`);
+      }
+      headSha = explicitSha;
+    }
+    if (headSha === null) {
       return fail(EXIT_CODES.ENV, `could not read the head of #${prNumber}; pass --sha to record anyway\n${view.stderr.trim()}`);
     }
     let mergeBase = null;
@@ -764,7 +827,7 @@ async function main() {
     }
     const file = receiptPath(gitCommonDir(), prNumber);
     const { version } = await import("../src/index.mjs");
-    const receipt = appendAttempt(readReceipt(file) ?? createReceipt({ pr: prNumber }), {
+    const attemptInput = {
       phase: phase.id,
       outcome: String(flags.outcome),
       headSha,
@@ -774,8 +837,18 @@ async function main() {
       evidence: Array.isArray(flags.evidence) ? flags.evidence.map(String) : [],
       requestedModel: requestedModel(repoRoot(), phase.artifact),
       toolVersion: version,
+    };
+    // Validate before taking the lock, so a usage error never waits on it.
+    try {
+      appendAttempt(createReceipt({ pr: prNumber }), attemptInput);
+    } catch (err) {
+      return fail(EXIT_CODES.USAGE, err.message);
+    }
+    const receipt = withReceiptLock(file, () => {
+      const next = appendAttempt(readReceipt(file, prNumber) ?? createReceipt({ pr: prNumber }), attemptInput);
+      writeReceipt(file, next);
+      return next;
     });
-    writeReceipt(file, receipt);
     const attempt = receipt.attempts.at(-1);
     const summary = summarizePhases(receipt)[phase.id];
     return emit({
@@ -794,7 +867,7 @@ async function main() {
   if (sub === "receipt") {
     const prNumber = requireNumber(flags.pr, "--pr");
     const file = receiptPath(gitCommonDir(), prNumber);
-    const receipt = readReceipt(file);
+    const receipt = readReceipt(file, prNumber);
     if (receipt === null) {
       return emit({
         subcommand: sub,

@@ -103,13 +103,31 @@ stub_gh_view() {
   [ "$(cat "$RECEIPT")" = '{"schema_version": 9}' ]
 }
 
-@test "pr-stack record: requested_model comes from the phase artifact's frontmatter" {
-  mkdir -p skills/post-pr-review
-  printf -- '---\nid: post-pr-review\nmodel: opus\n---\nbody\n' > skills/post-pr-review/SKILL.md
+@test "pr-stack record: requested_model comes from the project skill's frontmatter" {
+  mkdir -p .claude/skills/post-pr-review
+  printf -- '---\nid: post-pr-review\nmodel: opus\n---\nbody\n' > .claude/skills/post-pr-review/SKILL.md
   run node "$BIN" record --pr 42 --phase post-pr-review --outcome pass --sha "$HEAD_SHA"
   [ "$status" -eq 0 ]
   run jq -r '.attempts[0].requested_model' "$RECEIPT"
   [ "$output" = "opus" ]
+}
+
+@test "pr-stack record: a personal skill wins over the project copy, as Claude Code loads them" {
+  mkdir -p "$HOME/.claude/skills/review-pr" .claude/skills/review-pr
+  printf -- '---\nmodel: haiku\n---\n' > "$HOME/.claude/skills/review-pr/SKILL.md"
+  printf -- '---\nmodel: opus\n---\n' > .claude/skills/review-pr/SKILL.md
+  run node "$BIN" record --pr 42 --phase review-pr --outcome pass --sha "$HEAD_SHA"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.attempts[0].requested_model' "$RECEIPT")" = "haiku" ]
+}
+
+@test "pr-stack record: a copy that names no model falls through to the next one" {
+  mkdir -p "$HOME/.claude/skills/review-pr" .claude/skills/review-pr
+  printf -- '---\nid: review-pr\n---\n' > "$HOME/.claude/skills/review-pr/SKILL.md"
+  printf -- '---\nmodel: opus\n---\n' > .claude/skills/review-pr/SKILL.md
+  run node "$BIN" record --pr 42 --phase review-pr --outcome pass --sha "$HEAD_SHA"
+  [ "$status" -eq 0 ]
+  [ "$(jq -r '.attempts[0].requested_model' "$RECEIPT")" = "opus" ]
 }
 
 @test "pr-stack record: requested_model falls back to the bootstrapped ~/.claude copy" {
@@ -127,6 +145,65 @@ stub_gh_view() {
   [[ "$output" == *"no receipt"* ]]
 }
 
+@test "pr-stack record: a --sha that disagrees with the pull request head is refused" {
+  OTHER="$(git commit -q --allow-empty -m other && git rev-parse HEAD)"
+  run node "$BIN" record --pr 42 --phase local-attest --outcome pass --sha "$OTHER"
+  [ "$status" -eq 64 ]
+  [[ "$output" == *"not the head of #42"* ]]
+  [ ! -f "$RECEIPT" ]
+}
+
+@test "pr-stack record: a --sha that is not a commit here is refused when gh cannot answer" {
+  with_fake_tool_bin gh 'exit 1' >/dev/null
+  run node "$BIN" record --pr 42 --phase pre-pr --outcome pass --sha "$(printf 'd%.0s' {1..40})"
+  [ "$status" -eq 64 ]
+  [ ! -f "$RECEIPT" ]
+}
+
+@test "pr-stack record: an empty --evidence link is a usage error and writes nothing" {
+  run node "$BIN" record --pr 42 --phase pre-pr --outcome pass --evidence ""
+  [ "$status" -eq 64 ]
+  [ ! -f "$RECEIPT" ]
+}
+
+@test "pr-stack record and receipt: a non-JSON receipt is an env error and is left as it was" {
+  mkdir -p "$(dirname "$RECEIPT")"
+  printf 'not json' > "$RECEIPT"
+  run node "$BIN" record --pr 42 --phase pre-pr --outcome pass
+  [ "$status" -eq 2 ]
+  run node "$BIN" receipt --pr 42
+  [ "$status" -eq 2 ]
+  [ "$(cat "$RECEIPT")" = "not json" ]
+}
+
+@test "pr-stack receipt: a receipt for another pull request is an env error" {
+  node "$BIN" record --pr 42 --phase pre-pr --outcome pass >/dev/null
+  jq '.pr = 7' "$RECEIPT" > "$RECEIPT.x" && mv "$RECEIPT.x" "$RECEIPT"
+  run node "$BIN" receipt --pr 42
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"#42"* ]]
+}
+
+@test "pr-stack record: a held lock is an env error; a stale one is cleared" {
+  mkdir -p "$RECEIPT.lock"
+  run node "$BIN" record --pr 42 --phase pre-pr --outcome pass
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"lock"* ]]
+  touch -d '10 minutes ago' "$RECEIPT.lock"
+  run node "$BIN" record --pr 42 --phase pre-pr --outcome pass
+  [ "$status" -eq 0 ]
+  [ ! -d "$RECEIPT.lock" ]
+}
+
+@test "pr-stack receipt: a stop pass after every phase passed on the head reads ready" {
+  for phase in pre-pr post-pr-review review-pr local-attest stop; do
+    node "$BIN" record --pr 42 --phase "$phase" --outcome pass >/dev/null
+  done
+  run node "$BIN" receipt --pr 42 --json
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r '.result.verdict')" = "ready" ]
+}
+
 @test "pr-stack receipt: reports the verdict, per-phase counts, and the rollback point" {
   node "$BIN" record --pr 42 --phase pre-pr --outcome pass >/dev/null
   node "$BIN" record --pr 42 --phase review-pr --outcome fail --reason CRITERIA_FAILED >/dev/null
@@ -137,5 +214,5 @@ stub_gh_view() {
   [ "$(printf '%s' "$output" | jq -r '.result.rollback.merge_base')" = "$HEAD_SHA" ]
   run node "$BIN" receipt --pr 42
   [[ "$output" == *"receipt #42: blocked"* ]]
-  [[ "$output" == *"review-pr: 1 attempt(s), last fail (CRITERIA_FAILED)"* ]]
+  [[ "$output" == *"review-pr: 1 attempt(s), last fail (CRITERIA_FAILED), 1 failed in a row"* ]]
 }

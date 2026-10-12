@@ -69,7 +69,7 @@ Record every phase attempt, so the history of this pull request lives outside th
 dotbabel pr-stack record --pr <N> --phase <id> --outcome pass|fail|blocked|skipped [--reason <CODE>] [--evidence <url>]
 ```
 
-Pass `--reason` with the blocking code a phase stopped on, and `--evidence` with the link to each evidence comment it posted. Under `NO_PR`, phase 1 has no number yet: record it right after phase 2 opens the pull request. Exit `2` means the receipt is unavailable (no `gh`, a damaged file): say so in the summary and continue. A receipt never blocks a phase.
+Pass `--reason` with the blocking code a phase stopped on, and `--evidence` with the link to each evidence comment it posted. Record the outcome you observed, never the one you hope for: the receipt is self-reported, nothing checks it against the evidence comments, and it is never evidence itself — the merge gate does not read it. Under `NO_PR`, phase 1 has no number yet: record it right after phase 2 opens the pull request. Exit `2` means the receipt is unavailable (no `gh`, a damaged file): say so in the summary and continue. A receipt never blocks a phase.
 
 ## Steps
 
@@ -204,9 +204,10 @@ Stack: <this PR is standalone | #<N> lands first, then #<M> needs a rebase>
 Status: READY  |  BLOCKED — <reason>
 ```
 
-Under the summary, print the receipt, which shows each phase's attempts and the rollback point:
+Record this phase, then print the receipt under the summary. It shows each phase's attempts and the rollback point. Record `stop` as `pass` for `Status: READY`, or as `blocked` with the reason code for `Status: BLOCKED`. The receipt reads `ready` only when the `stop` hand-off is its latest pass and no earlier phase contradicts it:
 
 ```bash
+dotbabel pr-stack record --pr <N> --phase stop --outcome pass   # or: --outcome blocked --reason <CODE>
 dotbabel pr-stack receipt --pr <N>
 ```
 

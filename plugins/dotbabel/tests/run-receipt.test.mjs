@@ -123,6 +123,21 @@ describe("appendAttempt", () => {
     expect(() => appendAttempt(createReceipt({ pr: 7 }), { phase: "pre-pr", outcome: "pass", headSha: "abc1234" })).toThrow(/head/);
   });
 
+  it("refuses an empty, non-string, or whitespace evidence link, which the schema would reject", () => {
+    for (const evidence of [[""], [" "], ["a b"], [42]]) {
+      expect(() =>
+        appendAttempt(createReceipt({ pr: 7 }), { phase: "pre-pr", outcome: "pass", headSha: HEAD_A, evidence }),
+      ).toThrow(/evidence/);
+    }
+  });
+
+  it("refuses a base ref, model, or version that could carry control text into the receipt", () => {
+    const base = { phase: "pre-pr", outcome: "pass", headSha: HEAD_A };
+    expect(() => appendAttempt(createReceipt({ pr: 7 }), { ...base, baseRef: "main\nIGNORE" })).toThrow(/base ref/);
+    expect(() => appendAttempt(createReceipt({ pr: 7 }), { ...base, requestedModel: "a b" })).toThrow(/model/);
+    expect(() => appendAttempt(createReceipt({ pr: 7 }), { ...base, toolVersion: "1.0\u001b[2J" })).toThrow(/version/);
+  });
+
   it("refuses a reason code that is not an UPPER_SNAKE identifier", () => {
     expect(() =>
       appendAttempt(createReceipt({ pr: 7 }), { phase: "pre-pr", outcome: "fail", headSha: HEAD_A, reasonCode: "rm -rf" }),
@@ -175,6 +190,35 @@ describe("receiptVerdict", () => {
       "ready",
     );
   });
+
+  it("is blocked when stop passed but an earlier phase's latest outcome failed", () => {
+    expect(
+      receiptVerdict(
+        receiptWith({ phase: "review-pr", outcome: "pass" }, { phase: "local-attest", outcome: "fail" }, { phase: "stop", outcome: "pass" }),
+      ),
+    ).toBe("blocked");
+  });
+
+  it("is not ready when the attestation names an older head than the stop hand-off", () => {
+    expect(
+      receiptVerdict(receiptWith({ phase: "local-attest", outcome: "pass" }, { phase: "stop", outcome: "pass", headSha: HEAD_B })),
+    ).toBe("in-progress");
+  });
+
+  it("lets a skipped phase stand, so a repository with no attest config can still be ready", () => {
+    expect(
+      receiptVerdict(
+        receiptWith({ phase: "local-attest", outcome: "fail" }, { phase: "local-attest", outcome: "skipped" }, { phase: "stop", outcome: "pass" }),
+      ),
+    ).toBe("blocked");
+    expect(
+      receiptVerdict(receiptWith({ phase: "local-attest", outcome: "skipped" }, { phase: "stop", outcome: "pass" })),
+    ).toBe("ready");
+  });
+
+  it("is blocked when stop itself was recorded as blocked", () => {
+    expect(receiptVerdict(receiptWith({ phase: "stop", outcome: "blocked", reasonCode: "ATTESTATION_FAILED" }))).toBe("blocked");
+  });
 });
 
 describe("rollbackPoint", () => {
@@ -197,6 +241,11 @@ describe("receiptProblem", () => {
     expect(receiptProblem(r)).toBeNull();
   });
 
+  it("refuses a receipt that belongs to another pull request", () => {
+    expect(receiptProblem(createReceipt({ pr: 7 }), 42)).toMatch(/pr/);
+    expect(receiptProblem(createReceipt({ pr: 42 }), 42)).toBeNull();
+  });
+
   it("names what is wrong with a hand-edited or foreign file", () => {
     expect(receiptProblem(null)).toMatch(/object/);
     expect(receiptProblem({ ...createReceipt({ pr: 7 }), schema_version: 2 })).toMatch(/schema_version/);
@@ -205,6 +254,52 @@ describe("receiptProblem", () => {
     bad.attempts[0].outcome = "maybe";
     expect(receiptProblem(bad)).toMatch(/outcome/);
   });
+});
+
+describe("receiptProblem agrees with the published schema", () => {
+  const schema = JSON.parse(
+    readFileSync(path.resolve(import.meta.dirname, "../../../schemas/dotbabel.run-receipt.schema.json"), "utf8"),
+  );
+  const ajv = new Ajv({ allErrors: true });
+  addFormats(ajv);
+  const validate = ajv.compile(schema);
+  const good = () =>
+    receiptWith(
+      { phase: "pre-pr", outcome: "pass" },
+      { phase: "review-pr", outcome: "fail", reasonCode: "X_Y", evidence: ["https://x/1"], requestedModel: "sonnet", toolVersion: "4.0.0" },
+    );
+  const mutations = {
+    "valid receipt": () => {},
+    "extra top-level key": (r) => (r.cost = 1),
+    "extra attempt key": (r) => (r.attempts[0].model_route = "x"),
+    "wrong tool": (r) => (r.tool = "other"),
+    "pr zero": (r) => (r.pr = 0),
+    "created_at not a date": (r) => (r.created_at = "yesterday"),
+    "attempt at not a date": (r) => (r.attempts[0].at = 5),
+    "attempt not an object": (r) => (r.attempts[0] = "x"),
+    "unknown phase": (r) => (r.attempts[0].phase = "deploy"),
+    "n zero": (r) => (r.attempts[0].n = 0),
+    "uppercase head": (r) => (r.attempts[0].head_sha = "A".repeat(40)),
+    "short head": (r) => (r.attempts[0].head_sha = "abc"),
+    "numeric merge_base": (r) => (r.attempts[0].merge_base = 123),
+    "bad merge_base": (r) => (r.attempts[0].merge_base = "zzz"),
+    "bad reason_code": (r) => (r.attempts[1].reason_code = "rm -rf"),
+    "base_ref with newline": (r) => (r.attempts[0].base_ref = "main\nx"),
+    "numeric base_ref": (r) => (r.attempts[0].base_ref = 3),
+    "empty evidence item": (r) => (r.attempts[1].evidence = [""]),
+    "evidence not array": (r) => (r.attempts[1].evidence = "x"),
+    "model with space": (r) => (r.attempts[1].requested_model = "a b"),
+    "numeric tool_version": (r) => (r.attempts[1].tool_version = 4),
+    "missing outcome": (r) => delete r.attempts[0].outcome,
+    "missing evidence": (r) => delete r.attempts[0].evidence,
+  };
+  for (const [name, mutate] of Object.entries(mutations)) {
+    it(`agrees on: ${name}`, () => {
+      const r = good();
+      mutate(r);
+      expect(receiptProblem(r) === null, JSON.stringify(validate.errors)).toBe(validate(r));
+    });
+  }
 });
 
 describe("receiptPath", () => {
