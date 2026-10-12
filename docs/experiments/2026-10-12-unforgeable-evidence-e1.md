@@ -89,6 +89,24 @@ The phone (hybrid) tunnels. In each one, Windows reads one message from the phon
 - **Tiers left on this host, all untested:** a USB FIDO2 key through `ssh-keygen.exe` (spec A-5, with the user-presence flag), the Bitwarden desktop SSH agent (spec A-6, with no user-presence flag), and the separate-user signer (spec A-4, weak while interop is on).
 - **Owner decision, 2026-10-12:** the Bitwarden desktop SSH agent. The spec records it as KD-13 and §8 A-6, with its measured facts pending.
 
+## Attended A-6 run: Bitwarden SSH agent (2026-10-12)
+
+Setup: Bitwarden desktop 2026.9.1 (per-user install), SSH agent on, authorization "Always", Windows `ssh-agent` service disabled, a dedicated Bitwarden-generated Ed25519 key `dotbabel-evidence`. All requests ran from WSL through `ssh-keygen.exe -Y sign -n dotbabel-evidence@v1 -f <public key file>`.
+
+| Request            | Owner action                | Result                                   |
+| ------------------ | --------------------------- | ---------------------------------------- |
+| `ssh-add.exe -L`   | none                        | listed the public key at once, no dialog |
+| sign 1 (22:58:05Z) | approved                    | signature in 2 s                         |
+| sign 2 (5 s later) | dialog shown, not answered  | refused after 61 s                       |
+| sign 3             | dialog not answered         | refused after 61 s                       |
+| sign 4 (23:05:34Z) | dialog not answered in time | refused after 61 s                       |
+| sign 5             | dialog not answered in time | refused after 62 s                       |
+
+- The dialog text: "Confirm SSH key usage: `ssh-keygen.exe` is requesting access to `dotbabel-evidence` in order to sign a message" (Authorize, Deny). It is a modal inside the Bitwarden window.
+- Signature 1 verified on Linux (OpenSSH 9.6p1) against `namespaces="dotbabel-evidence@v1"`, and failed under the namespace `git`.
+- Writable from WSL: `%APPDATA%\Bitwarden\data.json`, `%LOCALAPPDATA%\Programs\Bitwarden\Bitwarden.exe`, `resources\app.asar`. The SSH-agent settings were not found in plain text.
+- Not measured: an explicit Deny click.
+
 ## Reproduce
 
 ```bash
