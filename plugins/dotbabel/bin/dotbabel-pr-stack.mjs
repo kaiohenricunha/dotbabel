@@ -543,20 +543,30 @@ function requestedModel(root, artifact) {
 }
 
 /**
- * The parsed \`.dotbabel.json\` of the working tree, or undefined when there is
- * none. The attempt cap bounds a local loop, so the working tree is the right
- * source; the merge gate reads its own policy from the base ref.
+ * The parsed `.dotbabel.json` at `<remote>/<baseRef>`, or undefined when the
+ * base has none. The cap is read from the BASE, never the working tree or the
+ * branch: the conductor edits and commits in that tree, so a cap it can read
+ * there is a cap it can raise. The merge gate reads its policy the same way.
  *
- * @param {string} root
+ * Throws when the base ref is not in this clone: an unfetched ref must not
+ * read as "no config", which would silently apply the default.
+ *
+ * @param {string} remote
+ * @param {string} baseRef
  * @returns {unknown}
  */
-function workingTreeConfig(root) {
-  const file = join(root, ".dotbabel.json");
-  if (!existsSync(file)) return undefined;
+function baseRefConfig(remote, baseRef) {
+  const ref = `${remote}/${baseRef}`;
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(ref)) throw new Error(`base ref ${JSON.stringify(ref)} is not a plain ref name`);
+  if (run(["git", "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]).status !== 0) {
+    throw new Error(`base ref ${ref} is not in this clone; run \`git fetch ${remote} ${baseRef}\` and retry`);
+  }
+  if (run(["git", "cat-file", "-e", `${ref}:.dotbabel.json`]).status !== 0) return undefined;
+  const shown = run(["git", "show", `${ref}:.dotbabel.json`]);
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
+    return JSON.parse(shown.stdout);
   } catch (err) {
-    throw new Error(`${file} is not readable JSON: ${err.message}`);
+    throw new Error(`${ref}:.dotbabel.json is not readable JSON: ${err.message}`);
   }
 }
 
@@ -877,7 +887,7 @@ async function main() {
     let maxAttempts = null;
     let capProblem = null;
     try {
-      maxAttempts = resolveMaxAttempts(workingTreeConfig(repoRoot()), phase.id);
+      maxAttempts = resolveMaxAttempts(baseRefConfig(flags.remote, baseRef ?? flags.trunk), phase.id);
     } catch (err) {
       capProblem = err.message;
     }
@@ -962,9 +972,20 @@ async function main() {
   if (which === "budget") {
     const phase = CONDUCTOR_PHASES.find((p) => p.id === flags.phase);
     if (!phase) return fail(EXIT_CODES.USAGE, `--phase must be one of: ${CONDUCTOR_PHASES.map((p) => p.id).join(", ")}`);
+    // The base the pull request merges into; the trunk when gh cannot say.
+    let baseRef = flags.trunk;
+    const view = run(["gh", "pr", "view", String(prNumber), "--json", "baseRefName"]);
+    if (view.status === 0) {
+      try {
+        const name = JSON.parse(view.stdout).baseRefName;
+        if (typeof name === "string" && name !== "") baseRef = name;
+      } catch {
+        // Fall back to the trunk: an unparseable answer is no answer.
+      }
+    }
     let maxAttempts;
     try {
-      maxAttempts = resolveMaxAttempts(workingTreeConfig(repoRoot()), phase.id);
+      maxAttempts = resolveMaxAttempts(baseRefConfig(flags.remote, baseRef), phase.id);
     } catch (err) {
       // A cap that cannot be read must not become the default: a typo would
       // then raise or remove the limit without anyone noticing.

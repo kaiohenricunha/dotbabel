@@ -157,12 +157,19 @@ export function deriveEntryPhase(state = {}) {
 }
 
 /**
- * Consecutive failed attempts a phase may make before the conductor must stop
- * and hand the decision to the user. Three mirrors `check-on-stop`, which
- * gives up after the same failure blocks twice: enough to fix a slip, too few
- * to loop.
+ * Consecutive failed or blocked attempts a phase may make, whatever the reason
+ * code and head, before the conductor must stop and hand the decision to the
+ * user. Three is enough to fix a slip and too few to loop.
  */
 export const DEFAULT_MAX_ATTEMPTS = 3;
+
+/**
+ * The highest cap a repository may set. Without a ceiling, one edit to the
+ * config makes the budget unlimited, and the gate would still print PASS.
+ */
+export const MAX_ATTEMPTS_CEILING = 10;
+
+const CONDUCTOR_KEYS = new Set(["max_attempts", "phase_max_attempts"]);
 
 /**
  * @param {unknown} value
@@ -170,6 +177,26 @@ export const DEFAULT_MAX_ATTEMPTS = 3;
  */
 function isCount(value) {
   return Number.isInteger(value) && /** @type {number} */ (value) >= 1;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * @param {unknown} value
+ * @param {string} where
+ * @returns {number}
+ */
+function assertCap(value, where) {
+  if (!isCount(value) || /** @type {number} */ (value) > MAX_ATTEMPTS_CEILING) {
+    throw new Error(`${where} must be an integer from 1 to ${MAX_ATTEMPTS_CEILING}`);
+  }
+  return /** @type {number} */ (value);
 }
 
 /**
@@ -186,8 +213,10 @@ function assertPhase(phase) {
  * The attempt cap for one phase, from `.dotbabel.json`'s `conductor` block:
  * `phase_max_attempts[phase]`, else `max_attempts`, else the default.
  *
- * A value the schema rejects throws. Falling back to the default would let a
- * typo raise or remove the cap without anyone noticing.
+ * Everything the schema rejects throws: a value outside 1 to
+ * MAX_ATTEMPTS_CEILING, a misspelled key, an unknown phase key, or a block of
+ * the wrong shape. Falling back to the default would let a typo raise or
+ * remove the cap without anyone noticing.
  *
  * @param {unknown} config The parsed `.dotbabel.json`, or undefined.
  * @param {string} phase
@@ -195,16 +224,23 @@ function assertPhase(phase) {
  */
 export function resolveMaxAttempts(config, phase) {
   assertPhase(phase);
-  const conductor = /** @type {any} */ (config)?.conductor ?? {};
-  const perPhase = conductor.phase_max_attempts?.[phase];
-  if (perPhase !== undefined) {
-    if (!isCount(perPhase)) throw new Error(`conductor.phase_max_attempts.${phase} must be an integer >= 1`);
-    return perPhase;
+  if (!isPlainObject(config) || !("conductor" in config)) return DEFAULT_MAX_ATTEMPTS;
+  const conductor = /** @type {Record<string, unknown>} */ (config).conductor;
+  if (!isPlainObject(conductor)) throw new Error("conductor must be an object");
+  const block = /** @type {Record<string, unknown>} */ (conductor);
+  const unknownKey = Object.keys(block).find((k) => !CONDUCTOR_KEYS.has(k));
+  if (unknownKey !== undefined) throw new Error(`conductor has unknown key ${JSON.stringify(unknownKey)}`);
+  if (block.phase_max_attempts !== undefined) {
+    if (!isPlainObject(block.phase_max_attempts)) throw new Error("conductor.phase_max_attempts must be an object");
+    const perPhase = /** @type {Record<string, unknown>} */ (block.phase_max_attempts);
+    const unknownPhase = Object.keys(perPhase).find((k) => !CONDUCTOR_PHASES.some((p) => p.id === k));
+    if (unknownPhase !== undefined) {
+      throw new Error(`conductor.phase_max_attempts has unknown phase ${JSON.stringify(unknownPhase)}`);
+    }
+    for (const [id, value] of Object.entries(perPhase)) assertCap(value, `conductor.phase_max_attempts.${id}`);
+    if (perPhase[phase] !== undefined) return /** @type {number} */ (perPhase[phase]);
   }
-  if (conductor.max_attempts !== undefined) {
-    if (!isCount(conductor.max_attempts)) throw new Error("conductor.max_attempts must be an integer >= 1");
-    return conductor.max_attempts;
-  }
+  if (block.max_attempts !== undefined) return assertCap(block.max_attempts, "conductor.max_attempts");
   return DEFAULT_MAX_ATTEMPTS;
 }
 

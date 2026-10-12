@@ -43,7 +43,8 @@
  * @property {number} attempts
  * @property {ReceiptOutcome} last_outcome
  * @property {number} consecutive_failures Failed or blocked attempts since the
- *   phase last passed. A skipped attempt neither counts nor resets the run.
+ *   phase last passed. A skipped attempt neither counts nor resets the run,
+ *   except one with reason USER_ALLOWED_RETRY, which resets it.
  */
 
 import path from "node:path";
@@ -52,6 +53,14 @@ import { CONDUCTOR_PHASES } from "./pr-gates.mjs";
 
 /** The outcomes an attempt may record. */
 export const RECEIPT_OUTCOMES = Object.freeze(["pass", "fail", "blocked", "skipped"]);
+
+/**
+ * The reason code of a `skipped` attempt that records the user's explicit
+ * permission to try a phase again. It is the one sanctioned way to lift the
+ * attempt cap: it resets the phase's consecutive-failure count, and it never
+ * reads as a pass.
+ */
+export const USER_ALLOWED_RETRY = "USER_ALLOWED_RETRY";
 
 /** Where receipts live, relative to the git common directory. */
 export const RECEIPT_DIR = path.join("dotbabel", "receipts");
@@ -212,6 +221,7 @@ export function summarizePhases(receipt) {
     for (const a of attempts) {
       if (a.outcome === "pass") consecutive = 0;
       else if (FAILED.has(a.outcome)) consecutive += 1;
+      else if (a.reason_code === USER_ALLOWED_RETRY) consecutive = 0;
     }
     out[id] = { attempts: attempts.length, last_outcome: attempts[attempts.length - 1].outcome, consecutive_failures: consecutive };
   }

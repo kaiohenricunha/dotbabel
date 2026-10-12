@@ -122,12 +122,13 @@
     },
     "conductor": {
       "type": "object",
-      "description": "Attempt caps for /pr-conductor. A phase that fails or is blocked this many times in a row stops the conductor, and the user decides whether another attempt is allowed. Counted from the run receipt (`dotbabel pr-stack receipt`) and checked with `dotbabel pr-stack gate --gate budget`. Read from the working tree: it bounds a local loop, it is not a merge gate.",
+      "description": "Attempt caps for /pr-conductor. A phase that fails or is blocked this many times in a row stops the conductor, and only the user can allow another attempt (a `skipped` attempt with reason USER_ALLOWED_RETRY). Counted from the run receipt and checked with `dotbabel pr-stack gate --gate budget`. Read from the pull request's BASE ref, never the working tree, so a commit in the pull request cannot raise its own cap. At most 10.",
       "additionalProperties": false,
       "properties": {
         "max_attempts": {
           "type": "integer",
           "minimum": 1,
+          "maximum": 10,
           "default": 3,
           "description": "Consecutive failed attempts allowed for every phase."
         },
@@ -139,7 +140,8 @@
           },
           "additionalProperties": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 10
           }
         }
       }

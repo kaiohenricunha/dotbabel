@@ -690,16 +690,25 @@ contradicts, failed; otherwise it is `in-progress`. No receipt yet exits `0`.
 
 `gate --gate budget --pr <N> --phase <id>` is the conductor's attempt cap. It
 counts the phase's consecutive `fail` and `blocked` attempts in the receipt since
-the phase last passed (a `skipped` attempt neither counts nor resets), and fails
-with `CONDUCTOR_BUDGET_EXHAUSTED` when the count reaches the cap. The cap comes
-from the working tree's `.dotbabel.json`:
+the phase last passed, and fails with `CONDUCTOR_BUDGET_EXHAUSTED` when the count
+reaches the cap. A `skipped` attempt neither counts nor resets, except one with
+reason `USER_ALLOWED_RETRY`: that records the user's explicit permission to try
+again, and it resets the count without reading as a pass.
+
+The cap comes from `.dotbabel.json` on the pull request's base ref
+(`<remote>/<baseRefName>` from `gh pr view`, or `<remote>/<trunk>` when gh cannot
+answer), never from the working tree or the branch. The conductor edits and
+commits in that tree, so a cap it could read there is a cap it could raise:
 
 ```json
 { "conductor": { "max_attempts": 3, "phase_max_attempts": { "local-attest": 1 } } }
 ```
 
-`max_attempts` defaults to 3. An invalid value is an environment error (exit
-`2`), never a silent default, because a typo must not raise or remove the cap.
+`max_attempts` defaults to 3, and every value must be from 1 to 10. A value out of
+range, a misspelled key, an unknown phase key, or a `conductor` block of the wrong
+shape is an environment error (exit `2`), never a silent default, because a typo
+must not raise or remove the cap. A base ref that is not in this clone is exit
+`2` as well: fetch it and retry. A damaged receipt is exit `2`, as for `receipt`.
 
 ---
 

@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 
-import { CONDUCTOR_PHASES, DEFAULT_MAX_ATTEMPTS, checkAttemptBudget, resolveMaxAttempts } from "../src/pr-gates.mjs";
+import {
+  CONDUCTOR_PHASES,
+  DEFAULT_MAX_ATTEMPTS,
+  MAX_ATTEMPTS_CEILING,
+  checkAttemptBudget,
+  resolveMaxAttempts,
+} from "../src/pr-gates.mjs";
 
 describe("resolveMaxAttempts", () => {
   it("defaults to 3 when the repository sets nothing", () => {
@@ -20,6 +26,27 @@ describe("resolveMaxAttempts", () => {
     expect(() => resolveMaxAttempts({ conductor: { max_attempts: 0 } }, "pre-pr")).toThrow(/max_attempts/);
     expect(() => resolveMaxAttempts({ conductor: { max_attempts: "3" } }, "pre-pr")).toThrow(/max_attempts/);
     expect(() => resolveMaxAttempts({ conductor: { phase_max_attempts: { "pre-pr": -1 } } }, "pre-pr")).toThrow(/pre-pr/);
+  });
+
+  it("throws on a misspelled key or a block of the wrong shape, rather than using the default", () => {
+    for (const config of [
+      { conductor: { max_attempt: 1 } },
+      { conductor: { phase_max_attempts: { localattest: 1 } } },
+      { conductor: 3 },
+      { conductor: null },
+      { conductor: [] },
+      { conductor: { phase_max_attempts: 5 } },
+      { conductor: { phase_max_attempts: [] } },
+    ]) {
+      expect(() => resolveMaxAttempts(config, "local-attest"), JSON.stringify(config)).toThrow(/conductor/);
+    }
+  });
+
+  it("caps the cap, so one edit cannot make the budget unlimited", () => {
+    expect(MAX_ATTEMPTS_CEILING).toBe(10);
+    expect(resolveMaxAttempts({ conductor: { max_attempts: 10 } }, "pre-pr")).toBe(10);
+    expect(() => resolveMaxAttempts({ conductor: { max_attempts: 11 } }, "pre-pr")).toThrow(/10/);
+    expect(() => resolveMaxAttempts({ conductor: { phase_max_attempts: { "pre-pr": 9007199254740991 } } }, "pre-pr")).toThrow(/10/);
   });
 
   it("throws on an unknown phase", () => {
@@ -76,5 +103,7 @@ describe("dotbabel.config.schema.json conductor block", () => {
       CONDUCTOR_PHASES.map((p) => p.id),
     );
     expect(schema.properties.conductor.properties.max_attempts.default).toBe(DEFAULT_MAX_ATTEMPTS);
+    expect(schema.properties.conductor.properties.max_attempts.maximum).toBe(MAX_ATTEMPTS_CEILING);
+    expect(schema.properties.conductor.properties.phase_max_attempts.additionalProperties.maximum).toBe(MAX_ATTEMPTS_CEILING);
   });
 });
