@@ -47,6 +47,16 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 
 > **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
+## Run receipt
+
+Record every phase attempt, so the history of this pull request lives outside the conversation. When a phase ends — pass, fail, a hard stop, or a self-skip — run:
+
+```bash
+dotbabel pr-stack record --pr <N> --phase <id> --outcome pass|fail|blocked|skipped [--reason <CODE>] [--evidence <url>]
+```
+
+Pass `--reason` with the blocking code a phase stopped on, and `--evidence` with the link to each evidence comment it posted. Record the outcome you observed, never the one you hope for: the receipt is self-reported, nothing checks it against the evidence comments, and it is never evidence itself — the merge gate does not read it. Under `NO_PR`, phase 1 has no number yet: record it right after phase 2 opens the pull request. Exit `2` means the receipt is unavailable (no `gh`, a damaged file): say so in the summary and continue. A receipt never blocks a phase.
+
 ## Steps
 
 ### 0. Stack check (always run first)
@@ -180,6 +190,13 @@ Stack: <this PR is standalone | #<N> lands first, then #<M> needs a rebase>
 Status: READY  |  BLOCKED — <reason>
 ```
 
+Record this phase, then print the receipt under the summary. It shows each phase's attempts and the rollback point. Record `stop` as `pass` for `Status: READY`, or as `blocked` with the reason code for `Status: BLOCKED`. The receipt reads `ready` only when the `stop` hand-off is its latest pass and no earlier phase contradicts it:
+
+```bash
+dotbabel pr-stack record --pr <N> --phase stop --outcome pass   # or: --outcome blocked --reason <CODE>
+dotbabel pr-stack receipt --pr <N>
+```
+
 **This is the end of the skill.** Merging is a separate, explicit instruction from the user. Do not call `/merge-pr` yourself, and do not run the merge command directly.
 
 ## Stacked PRs
@@ -217,4 +234,5 @@ It prints the retarget, fetch, checkout, rebase, and push steps in order. **The 
 - **Do not review the same code twice.** Phase 3 owns the security pass and the comment validation; phases 1 and 4 run in `--conductor` mode so they narrow to a secrets grep and a fix delta.
 - **Stop at hard stops.** A CRITICAL security finding or a branch-introduced test failure ends the run.
 - **Never claim a test failure is pre-existing** without the `git stash` proof that `commands/pre-pr.md` requires.
+- **Record every phase attempt** in the run receipt (see Run receipt above). Never edit the receipt file by hand.
 - **One PR at a time.** For a batch, the caller loops; this skill stays single-PR.
