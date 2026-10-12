@@ -76,19 +76,21 @@ const EXIT_BY_CODE = {
 
 class UsageError extends Error {}
 
-/** The worktree root of `cwd`, or `cwd` itself when git cannot say (the store then reports TASK_NO_REPO). */
-function worktreeRoot(cwd) {
+/** Run git with the caller's GIT_* variables removed, so `-C` decides the repo; trimmed stdout, or null. */
+function git(args) {
   const env = { ...process.env };
   for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
-  const r = spawnSync("git", ["-C", cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", env });
-  return r.status === 0 && r.stdout.trim() !== "" ? r.stdout.trim() : cwd;
+  const r = spawnSync("git", args, { encoding: "utf8", env });
+  return r.status === 0 && r.stdout.trim() !== "" ? r.stdout.trim() : null;
+}
+
+/** The worktree root of `cwd`, or `cwd` itself when git cannot say (the store then reports TASK_NO_REPO). */
+function worktreeRoot(cwd) {
+  return git(["-C", cwd, "rev-parse", "--show-toplevel"]) ?? cwd;
 }
 
 function currentBranch(root) {
-  const env = { ...process.env };
-  for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
-  const r = spawnSync("git", ["-C", root, "symbolic-ref", "--short", "-q", "HEAD"], { encoding: "utf8", env });
-  return r.status === 0 && r.stdout.trim() !== "" ? r.stdout.trim() : null;
+  return git(["-C", root, "symbolic-ref", "--short", "-q", "HEAD"]);
 }
 
 function list(value) {
