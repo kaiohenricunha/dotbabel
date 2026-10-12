@@ -156,6 +156,97 @@ export function deriveEntryPhase(state = {}) {
   };
 }
 
+/**
+ * Consecutive failed attempts a phase may make before the conductor must stop
+ * and hand the decision to the user. Three mirrors `check-on-stop`, which
+ * gives up after the same failure blocks twice: enough to fix a slip, too few
+ * to loop.
+ */
+export const DEFAULT_MAX_ATTEMPTS = 3;
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isCount(value) {
+  return Number.isInteger(value) && /** @type {number} */ (value) >= 1;
+}
+
+/**
+ * @param {string} phase
+ * @returns {void}
+ */
+function assertPhase(phase) {
+  if (!CONDUCTOR_PHASES.some((p) => p.id === phase)) {
+    throw new Error(`phase must be one of ${CONDUCTOR_PHASES.map((p) => p.id).join(", ")}, got ${JSON.stringify(phase)}`);
+  }
+}
+
+/**
+ * The attempt cap for one phase, from `.dotbabel.json`'s `conductor` block:
+ * `phase_max_attempts[phase]`, else `max_attempts`, else the default.
+ *
+ * A value the schema rejects throws. Falling back to the default would let a
+ * typo raise or remove the cap without anyone noticing.
+ *
+ * @param {unknown} config The parsed `.dotbabel.json`, or undefined.
+ * @param {string} phase
+ * @returns {number}
+ */
+export function resolveMaxAttempts(config, phase) {
+  assertPhase(phase);
+  const conductor = /** @type {any} */ (config)?.conductor ?? {};
+  const perPhase = conductor.phase_max_attempts?.[phase];
+  if (perPhase !== undefined) {
+    if (!isCount(perPhase)) throw new Error(`conductor.phase_max_attempts.${phase} must be an integer >= 1`);
+    return perPhase;
+  }
+  if (conductor.max_attempts !== undefined) {
+    if (!isCount(conductor.max_attempts)) throw new Error("conductor.max_attempts must be an integer >= 1");
+    return conductor.max_attempts;
+  }
+  return DEFAULT_MAX_ATTEMPTS;
+}
+
+/**
+ * May the conductor try `phase` again? The model decides how to repair a
+ * failure; this decides whether another attempt is allowed.
+ *
+ * The count is consecutive failed or blocked attempts since the phase last
+ * passed, as the run receipt records them (`summarizePhases`). At the cap the
+ * gate fails: the conductor stops and reports, and the user decides.
+ *
+ * @param {{ phase: string, consecutiveFailures: number, maxAttempts: number }} input
+ * @returns {GateResult & { remaining: number, maxAttempts: number }}
+ */
+export function checkAttemptBudget({ phase, consecutiveFailures, maxAttempts }) {
+  assertPhase(phase);
+  if (!Number.isInteger(consecutiveFailures) || consecutiveFailures < 0) {
+    throw new Error("consecutiveFailures must be a non-negative integer");
+  }
+  if (!isCount(maxAttempts)) throw new Error("maxAttempts must be an integer >= 1");
+  const remaining = Math.max(0, maxAttempts - consecutiveFailures);
+  /** @type {GateReason[]} */
+  const reasons =
+    remaining > 0
+      ? []
+      : [
+          {
+            code: "CONDUCTOR_BUDGET_EXHAUSTED",
+            message: `${phase} failed ${consecutiveFailures} time(s) in a row; the cap is ${maxAttempts}`,
+          },
+        ];
+  return {
+    ok: reasons.length === 0,
+    gate: "budget",
+    reasons,
+    warnings: [],
+    hint: reasons.length === 0 ? null : "stop and report the failures to the user; only the user can allow another attempt",
+    remaining,
+    maxAttempts,
+  };
+}
+
 const MIN_SHA_PREFIX = 7;
 
 const SKIP_CI_RE = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/i;

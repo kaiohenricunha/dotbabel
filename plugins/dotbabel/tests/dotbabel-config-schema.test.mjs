@@ -90,6 +90,20 @@ describe("dotbabel.config.schema.json", () => {
     expect(validate({ quality: { rules: { "unknown.rule": {} } } })).toBe(false);
   });
 
+  it("accepts a conductor attempt cap, with per-phase overrides", () => {
+    const validate = compile();
+    expect(validate({ conductor: { max_attempts: 2 } })).toBe(true);
+    expect(validate({ conductor: { max_attempts: 3, phase_max_attempts: { "review-pr": 1, "local-attest": 2 } } })).toBe(true);
+  });
+
+  it("rejects a conductor cap below 1, an unknown phase, or an unknown key", () => {
+    const validate = compile();
+    expect(validate({ conductor: { max_attempts: 0 } })).toBe(false);
+    expect(validate({ conductor: { max_attempts: 1.5 } })).toBe(false);
+    expect(validate({ conductor: { phase_max_attempts: { deploy: 2 } } })).toBe(false);
+    expect(validate({ conductor: { budget_usd: 5 } })).toBe(false);
+  });
+
   it("is referenced by both the scaffolded default and this repo's config", () => {
     expect(DEFAULT_DOTBABEL_JSON.$schema).toBe(SCHEMA_ID);
     expect(readJson(path.join(REPO_ROOT, ".dotbabel.json")).$schema).toBe(SCHEMA_ID);

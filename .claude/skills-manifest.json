@@ -1,6 +1,10 @@
 {
   "version": 1,
+<<<<<<< HEAD
   "generatedAt": "2026-10-12T13:19:03.496Z",
+=======
+  "generatedAt": "2026-10-12T12:48:34.091Z",
+>>>>>>> cf62285 (feat(pr-stack): attempt cap, the conductor stops after N failed attempts of one phase [skip ci])
   "skills": [
     {
       "name": "agents-search",
@@ -189,7 +193,11 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
+<<<<<<< HEAD
       "checksum": "sha256:db2e278e5569394376daa6f6d85063ada16e0ffd2c465e23c57e2ac49690d9ab",
+=======
+      "checksum": "sha256:971d9b6385a9467061d5f970e83290a2193ccb8473efa596140f74b8db94c6d8",
+>>>>>>> cf62285 (feat(pr-stack): attempt cap, the conductor stops after N failed attempts of one phase [skip ci])
       "dependencies": [
         "pre-pr",
         "git",
