@@ -782,7 +782,7 @@ session start, so a new or resumed session reads that state.
 | `close <slug>`       | Mark a task closed. The record stays and `show` still prints it               |
 | `hook session-start` | `SessionStart` entry: print the open tasks as context                         |
 
-| Flag                 | Used by         |                                                                       |
+| Flag                 | Used by         | Meaning                                                               |
 | -------------------- | --------------- | --------------------------------------------------------------------- |
 | `--goal <text>`      | `new`           | What the work must achieve                                            |
 | `--done-when <text>` | `new`           | A check that decides the work is done. Repeatable                     |
@@ -801,12 +801,22 @@ live in `<git-dir>/dotbabel/tasks/<slug>.json`
 crash, and a new session in that worktree. They do not travel to another
 machine; that is what [`/handoff`](./handoff-guide.md) is for.
 
+A task file's slug must be its file name; a copied or renamed file is reported
+as invalid rather than written to another task. `update` and `close` hold a
+per-task lock (`<slug>.json.lock`), so two writers cannot lose each other's
+decisions; a lock older than 30 seconds is cleared as stale. The record is
+self-reported and advisory: put deferred work in an issue, because the task
+goes away with the worktree.
+
 **Exits 1** when the task already exists (`new`), does not exist, is closed
 (`update`, `close`), or when `--done` names an item that is not pending.
-**Exits 2** outside a git repository, for a symbolic link on the task path,
-and for a task file that does not parse. **Exits 64** for a bad slug, a
-missing `--goal` or `--done-when`, or an `update` with nothing to change.
-`hook` always exits 0: it fails open.
+**Exits 2** outside a git repository, for a symbolic link on the task path, for
+a task file that does not parse or whose slug is not its file name, while
+another writer holds the task's lock, and for any filesystem error. `list`
+reports an unreadable file as a warning and still exits 0. **Exits 64** for a
+bad slug, a missing or blank `--goal` or `--done-when`, any other blank text
+value, or an `update` with nothing to change. `hook` always exits 0: it fails
+open.
 
 ---
 

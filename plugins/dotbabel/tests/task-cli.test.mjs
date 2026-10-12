@@ -83,6 +83,17 @@ describe("dotbabel task new / show", () => {
     expect(task(root, ["new", "--goal", "g", "--done-when", "d"]).code).toBe(64);
   });
 
+  it("refuses blank text values as usage errors (exit 64), not environment errors", () => {
+    const root = repo();
+    expect(task(root, ["new", "a", "--goal", " ", "--done-when", "d"]).code).toBe(64);
+    expect(task(root, ["new", "b", "--goal", "g", "--done-when", ""]).code).toBe(64);
+    expect(task(root, ["new", "c", "--goal", "g", "--done-when", "d", "--constraint", " "]).code).toBe(64);
+    expect(task(root, NEW).code).toBe(0);
+    expect(task(root, ["update", "fix-login", "--phase", " "]).code).toBe(64);
+    expect(task(root, ["update", "fix-login", "--decision", ""]).code).toBe(64);
+    expect(task(root, ["update", "fix-login", "--pending", " "]).code).toBe(64);
+  });
+
   it("refuses a slug that could escape the tasks directory (exit 64)", () => {
     const root = repo();
     const r = task(root, ["new", "../x", "--goal", "g", "--done-when", "d"]);
@@ -154,6 +165,24 @@ describe("dotbabel task update / close / list", () => {
     expect(again.code).toBe(1);
     expect(again.stderr).toContain("TASK_CLOSED");
     expect(task(root, ["update", "fix-login", "--phase", "x"]).code).toBe(1);
+  });
+
+  it("exits 2 with one line, not a stack, for a filesystem error", () => {
+    const root = repo();
+    fs.mkdirSync(path.join(root, ".git", "dotbabel"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".git", "dotbabel", "tasks"), "not a directory");
+    const r = task(root, ["list"]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).not.toMatch(/\n\s+at /);
+  });
+
+  it("exits 2 while another writer holds the task's lock", () => {
+    const root = repo();
+    expect(task(root, NEW).code).toBe(0);
+    fs.mkdirSync(path.join(root, ".git", "dotbabel", "tasks", "fix-login.json.lock"));
+    const r = task(root, ["update", "fix-login", "--phase", "verify"]);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toMatch(/TASK_LOCKED/);
   });
 
   it("lists nothing, with exit 0, in a repository without tasks", () => {

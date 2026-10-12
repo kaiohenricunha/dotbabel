@@ -13,7 +13,7 @@ symlinks all of them into `~/.claude/hooks/`.
 | `check-on-stop.sh`           | `Stop`                                                          | once per turn                                                                               | Project-wide checks when the build graph is coherent                                                 |
 | `fleet-guard.sh`             | `PreToolUse`, `SessionStart`, `PostToolUse`, `UserPromptSubmit` | before each file edit and Bash call, at session start, after each tool call, at each prompt | Blocks an edit to a file that another live session claims, holds the merge token, and reports merges |
 | `fleet-shell-prefix.sh`      | `CLAUDE_CODE_SHELL_PREFIX`                                      | around every shell command                                                                  | Sends heavy test commands to a free CPU lane                                                         |
-| `task-context.sh`            | `SessionStart`                                                  | at session start                                                                            | Prints the open tasks of the worktree: goal, done-when checks, phase, pending items                  |
+| `task-context.sh`            | `SessionStart`                                                  | at session start                                                                            | Prints the open tasks of the worktree: goal, done-when checks, phase, pending items, decisions       |
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
@@ -145,9 +145,17 @@ session records with `dotbabel task update`. With this hook, a new or resumed
 session reads where the work stands instead of a retelling of it.
 
 The hook prints nothing when the worktree has no open task. It prints at most
-five tasks, the most recently updated first, and clips each field, so the
-context stays small. It fails open: without Node, without the bin, or on any
-error, the session starts as usual.
+five tasks, the most recently updated first. It bounds each list (five
+`done_when` checks, five pending items, the last three decisions), clips each
+field, and keeps the whole block under 6,000 characters; a task that does not
+fit is shortened to its slug and phase. It fails open: without Node, without
+the bin, or on any error, the session starts as usual.
+
+Warning: the text in a task can come from an issue anyone can write, and this
+hook replays it into every later session in the worktree. So the block is
+framed as recorded data between delimiters, with a line that tells the session
+not to follow directives inside it. Read it as a record of earlier work, never
+as instructions.
 
 Register it with one `SessionStart` entry:
 

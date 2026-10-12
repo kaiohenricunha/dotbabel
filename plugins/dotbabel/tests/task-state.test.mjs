@@ -21,7 +21,9 @@ import {
   formatSessionContext,
   isValidSlug,
   listTasks,
+  mutateTask,
   readTask,
+  resolveWorktree,
   tasksDir,
   updateTask,
   validateTask,
@@ -248,6 +250,33 @@ describe("formatSessionContext", () => {
     expect(text).toContain("2 more open task(s)");
   });
 
+  it("frames the block as recorded data, never as instructions", () => {
+    const text = formatSessionContext([sample()]);
+    expect(text).toMatch(/data, not instructions/);
+    expect(text).not.toMatch(/continue its work/);
+    expect(text.trimEnd().endsWith("<<< end of recorded task state")).toBe(true);
+  });
+
+  it("bounds the done_when list like pending and decisions", () => {
+    const many = Array.from({ length: 12 }, (_, i) => `check ${i + 1}`);
+    const text = formatSessionContext([sample({ doneWhen: many })]);
+    expect(text).toContain("(5) check 5");
+    expect(text).not.toContain("check 6");
+    expect(text).toContain("and 7 more");
+  });
+
+  it("keeps the whole block under a fixed budget, whatever the tasks hold", () => {
+    const long = "x".repeat(400);
+    const tasks = Array.from({ length: 5 }, (_, i) => {
+      let t = sample({ slug: `big-${i}`, goal: long, doneWhen: Array(5).fill(long) });
+      t = updateTask(t, { pending: Array(10).fill(long), decisions: Array(3).fill(long), now: T1 });
+      return t;
+    });
+    const text = formatSessionContext(tasks);
+    expect(text.length).toBeLessThanOrEqual(6000);
+    expect(text).toContain("dotbabel task list");
+  });
+
   it("truncates a very long field so the context stays small", () => {
     const text = formatSessionContext([sample({ goal: "g".repeat(5000) })]);
     expect(text.length).toBeLessThan(1500);
@@ -287,6 +316,38 @@ describe("storage under the worktree's git directory", () => {
     const root = repo();
     writeTask(root, sample(), { create: true });
     expectCode(() => writeTask(root, sample(), { create: true }), TASK_ERROR_CODES.TASK_EXISTS);
+  });
+
+  it("refuses a task file whose slug is not its file name, so update cannot overwrite another task", () => {
+    const root = repo();
+    writeTask(root, sample(), { create: true });
+    fs.copyFileSync(path.join(tasksDir(root), "fix-login.json"), path.join(tasksDir(root), "other.json"));
+    expectCode(() => readTask(root, "other"), TASK_ERROR_CODES.TASK_INVALID);
+    const { tasks, problems } = listTasks(root);
+    expect(tasks.map((t) => t.slug)).toEqual(["fix-login"]);
+    expect(problems.join(" ")).toMatch(/other\.json.*fix-login/);
+  });
+
+  it("mutates a task under a lock and refuses while another writer holds it", () => {
+    const root = repo();
+    writeTask(root, sample({ worktree: root }), { create: true });
+    const next = mutateTask(root, "fix-login", (t) => updateTask(t, { phase: "verify", now: T1 }));
+    expect(next.phase).toBe("verify");
+    expect(readTask(root, "fix-login").phase).toBe("verify");
+    const lock = path.join(tasksDir(root), "fix-login.json.lock");
+    fs.mkdirSync(lock);
+    expectCode(() => mutateTask(root, "fix-login", (t) => updateTask(t, { phase: "pr", now: T1 })), TASK_ERROR_CODES.TASK_LOCKED);
+    const old = new Date(Date.now() - 10 * 60_000);
+    fs.utimesSync(lock, old, old);
+    expect(mutateTask(root, "fix-login", (t) => updateTask(t, { phase: "pr", now: T1 })).phase).toBe("pr");
+    expect(fs.existsSync(lock)).toBe(false);
+  });
+
+  it("resolves the worktree root and branch with one store helper", () => {
+    const root = repo();
+    expect(resolveWorktree(root)).toEqual({ root, branch: "main" });
+    const outside = fs.realpathSync(makeTempDir("task-state-none-"));
+    expect(resolveWorktree(outside)).toEqual({ root: outside, branch: null });
   });
 
   it("reports a missing task as not found", () => {

@@ -8,25 +8,19 @@
  * new or resumed session reads the state of the work instead of a retelling.
  * Storage and its limits are documented in src/task-state.mjs.
  *
- * ALL git shell-outs and file I/O go through src/task-state.mjs.
- *
- * Usage:
- *   dotbabel task new    <slug> --goal <text> --done-when <text>... [--constraint <text>]... [--phase <p>]
- *   dotbabel task update <slug> [--phase <p>] [--decision <text>]... [--pending <text>]... [--done <text>]...
- *   dotbabel task show   <slug>
- *   dotbabel task list   [--all]
- *   dotbabel task close  <slug>
- *   dotbabel task hook   session-start   (hook JSON on stdin)
+ * Every git shell-out and all task storage go through src/task-state.mjs. The
+ * bin itself reads only the hook payload on stdin. Usage: see USAGE below, or
+ * `dotbabel task --help`.
  *
  * Exits:
  *   0   ok. `hook` always exits 0: it fails open, so a broken task file never blocks a session
  *   1   refused: the task exists, is not found, is closed, or names an item that is not pending
- *   2   environment error: not in a git repository, an unsafe path, or a corrupt task file
- *   64  bad CLI invocation
+ *   2   environment error: not in a git repository, an unsafe path, a corrupt task file, a task
+ *       another writer holds, or any filesystem error
+ *   64  bad CLI invocation, including a blank text value
  */
 
 import fs from "node:fs";
-import { spawnSync } from "node:child_process";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 import { parse } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
@@ -38,7 +32,9 @@ import {
   createTask,
   formatSessionContext,
   listTasks,
+  mutateTask,
   readTask,
+  resolveWorktree,
   updateTask,
   writeTask,
 } from "../src/task-state.mjs";
@@ -67,35 +63,31 @@ const EXIT_BY_CODE = {
   [TASK_ERROR_CODES.TASK_NOT_FOUND]: EXIT_CODES.VALIDATION,
   [TASK_ERROR_CODES.TASK_CLOSED]: EXIT_CODES.VALIDATION,
   [TASK_ERROR_CODES.TASK_PENDING_UNKNOWN]: EXIT_CODES.VALIDATION,
-  // A task built from valid flags cannot fail validation, so TASK_INVALID here
-  // means a corrupt file on disk: an environment problem, like an unsafe path.
+  // The bin refuses blank text values as usage errors before it builds a task,
+  // so TASK_INVALID here means a corrupt file on disk: an environment problem.
   [TASK_ERROR_CODES.TASK_INVALID]: EXIT_CODES.ENV,
+  [TASK_ERROR_CODES.TASK_LOCKED]: EXIT_CODES.ENV,
   [TASK_ERROR_CODES.TASK_PATH_UNSAFE]: EXIT_CODES.ENV,
   [TASK_ERROR_CODES.TASK_NO_REPO]: EXIT_CODES.ENV,
 };
 
 class UsageError extends Error {}
 
-/** Run git with the caller's GIT_* variables removed, so `-C` decides the repo; trimmed stdout, or null. */
-function git(args) {
-  const env = { ...process.env };
-  for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
-  const r = spawnSync("git", args, { encoding: "utf8", env });
-  return r.status === 0 && r.stdout.trim() !== "" ? r.stdout.trim() : null;
+/**
+ * The values of a repeatable text flag. A blank value is a usage error: it
+ * would otherwise reach validation and be reported as a corrupt task (exit 2).
+ */
+function list(value, flag) {
+  const values = value === undefined ? [] : Array.isArray(value) ? value : [value];
+  for (const v of values) if (String(v).trim() === "") throw new UsageError(`--${flag} must not be blank`);
+  return values;
 }
 
-/** The worktree root of `cwd`, or `cwd` itself when git cannot say (the store then reports TASK_NO_REPO). */
-function worktreeRoot(cwd) {
-  return git(["-C", cwd, "rev-parse", "--show-toplevel"]) ?? cwd;
-}
-
-function currentBranch(root) {
-  return git(["-C", root, "symbolic-ref", "--short", "-q", "HEAD"]);
-}
-
-function list(value) {
-  if (value === undefined) return [];
-  return Array.isArray(value) ? value : [value];
+/** One optional text flag, refused when blank. */
+function text(value, flag) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" || value.trim() === "") throw new UsageError(`--${flag} must not be blank`);
+  return value;
 }
 
 function slugArg(args, sub) {
@@ -127,18 +119,19 @@ function emitTask(task, args, verb) {
 
 function cmdNew(args) {
   const slug = slugArg(args, "new");
-  const goal = args.flags.goal;
-  const doneWhen = list(args.flags["done-when"]);
-  if (typeof goal !== "string") throw new UsageError("new needs --goal <text>");
+  const goal = text(args.flags.goal, "goal");
+  const doneWhen = list(args.flags["done-when"], "done-when");
+  if (goal === undefined) throw new UsageError("new needs --goal <text>");
   if (doneWhen.length === 0) throw new UsageError("new needs at least one --done-when <text>: define success before you start");
-  const root = worktreeRoot(process.cwd());
+  const phase = text(args.flags.phase, "phase");
+  const { root, branch } = resolveWorktree(process.cwd());
   const task = createTask({
     slug,
     goal,
     doneWhen,
-    constraints: list(args.flags.constraint),
-    ...(typeof args.flags.phase === "string" ? { phase: args.flags.phase } : {}),
-    branch: currentBranch(root),
+    constraints: list(args.flags.constraint, "constraint"),
+    ...(phase === undefined ? {} : { phase }),
+    branch,
     worktree: root,
   });
   writeTask(root, task, { create: true });
@@ -147,32 +140,30 @@ function cmdNew(args) {
 
 function cmdUpdate(args) {
   const slug = slugArg(args, "update");
-  const root = worktreeRoot(process.cwd());
-  const task = updateTask(readTask(root, slug), {
-    ...(typeof args.flags.phase === "string" ? { phase: args.flags.phase } : {}),
-    decisions: list(args.flags.decision),
-    pending: list(args.flags.pending),
-    done: list(args.flags.done),
-  });
-  writeTask(root, task);
+  const phase = text(args.flags.phase, "phase");
+  const change = {
+    ...(phase === undefined ? {} : { phase }),
+    decisions: list(args.flags.decision, "decision"),
+    pending: list(args.flags.pending, "pending"),
+    done: list(args.flags.done, "done"),
+  };
+  const task = mutateTask(resolveWorktree(process.cwd()).root, slug, (t) => updateTask(t, change));
   return emitTask(task, args, "updated");
 }
 
 function cmdShow(args) {
-  return emitTask(readTask(worktreeRoot(process.cwd()), slugArg(args, "show")), args, "");
+  return emitTask(readTask(resolveWorktree(process.cwd()).root, slugArg(args, "show")), args, "");
 }
 
 function cmdClose(args) {
   const slug = slugArg(args, "close");
-  const root = worktreeRoot(process.cwd());
-  const task = closeTask(readTask(root, slug));
-  writeTask(root, task);
+  const task = mutateTask(resolveWorktree(process.cwd()).root, slug, (t) => closeTask(t));
   return emitTask(task, args, "closed");
 }
 
 function cmdList(args) {
   if (args.positional.length > 0) throw new UsageError("list takes no positional argument");
-  const { tasks, problems } = listTasks(worktreeRoot(process.cwd()));
+  const { tasks, problems } = listTasks(resolveWorktree(process.cwd()).root);
   const shown = tasks
     .filter((t) => args.flags.all === true || t.status === "open")
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
@@ -200,10 +191,10 @@ function runHook(event) {
   }
   if (!input || typeof input !== "object" || Array.isArray(input)) return;
   const cwd = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : process.cwd();
-  const text = formatSessionContext(listTasks(worktreeRoot(cwd)).tasks);
-  if (text === "") return;
+  const context = formatSessionContext(listTasks(resolveWorktree(cwd).root).tasks);
+  if (context === "") return;
   process.stdout.write(
-    `${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } })}\n`,
+    `${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context } })}\n`,
   );
 }
 
@@ -266,7 +257,11 @@ function main(argv) {
       process.stderr.write(`${TOOL}: ${err.message}\n`);
       return EXIT_BY_CODE[err.code] ?? EXIT_CODES.ENV;
     }
-    throw err;
+    // Anything else is a filesystem or runtime failure: an environment error,
+    // never exit 1, which means "refused".
+    process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n`);
+    if (process.env.DOTBABEL_DEBUG) process.stderr.write(`${/** @type {Error} */ (err).stack}\n`);
+    return EXIT_CODES.ENV;
   }
 }
 
