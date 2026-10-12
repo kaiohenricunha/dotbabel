@@ -87,7 +87,7 @@ jobs:
           BATS_JOBS=4 bash plugins/dotbabel/scripts/run-bats.sh
       - name: Upload coverage
         if: matrix.node == '22'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
           path: coverage/
@@ -152,7 +152,7 @@ jobs:
           node plugins/dotbabel/bin/dotbabel-criteria.mjs verify \
             --pr "$PR_NUMBER" \
             --json > .dotbabel/criteria-report.json
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: criteria-report
