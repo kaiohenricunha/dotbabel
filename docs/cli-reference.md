@@ -173,11 +173,39 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook → check-on-stop trust → attestation policy. Prints `✓/✗/⚠` per check.
+hook → hook registration → check-on-stop trust → attestation policy. Prints
+`✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
 | `--repo-root <path>` | resolved via git | Override |
+
+The hook registration rows compare the hooks the package ships with the hooks
+that three settings files register: `$CLAUDE_CONFIG_DIR/settings.json` (default
+`~/.claude/settings.json`), `.claude/settings.json`, and
+`.claude/settings.local.json`. Doctor does not read managed settings, plugin
+hooks, or `--settings`, and it does not check matchers, so a hook registered
+only there shows as unregistered, and a hook under the wrong matcher still
+shows as registered.
+
+A registration counts when a shipped script's basename appears anywhere in the
+command, so a repository's own `.claude/hooks/` copy and a wrapped command such
+as `timeout 10 …/check-on-write.sh` both count. `fleet-guard.sh` needs five
+entries, told apart by the argument after the script: `PreToolUse` with
+`pre-edit` and with `pre-bash`, `SessionStart`, `PostToolUse`, and
+`UserPromptSubmit`. `fleet-shell-prefix.sh` counts when `CLAUDE_CODE_SHELL_PREFIX`
+names it. That variable is one slot: the highest-precedence settings file that
+sets it wins (local, then project, then user), else the environment.
+
+One `✓` row lists the registered hooks with their events and the scopes that
+register them. There is one `⚠` row for each unregistered hook, with the entries
+it expects, and one for each partly registered hook, with the entries it lacks.
+A settings file that does not parse or is not a JSON object is a `⚠` row, and so
+is a `hooks` key that is not an event name; doctor prints that key escaped,
+because a cloned repository controls the project files. A
+`CLAUDE_CODE_SHELL_PREFIX` set by the project or local settings is a `⚠` row as
+well, because it wraps every shell command. These rows never fail the run. See
+[hooks.md](./hooks.md#registering-a-hook).
 
 The trust row reports whether this repo may run turn-end project checks. It
 never fails the run — a repo deliberately left off the allowlist is a valid

@@ -17,7 +17,10 @@ symlinks all of them into `~/.claude/hooks/`.
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
-> See [Registering a hook](#registering-a-hook).
+> See [Registering a hook](#registering-a-hook). `dotbabel doctor` lists the
+> registered hooks with their events, and warns for each shipped hook that no
+> settings file registers. It reads the user, project, and local settings files.
+> It never fails the run, because an unregistered hook is a valid choice.
 
 ---
 
