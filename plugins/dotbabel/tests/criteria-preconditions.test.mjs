@@ -96,6 +96,31 @@ function args(dir, overrides = {}) {
 }
 
 describe("checkPrPreconditions", () => {
+  // The merge gate scopes criteria by the body's spec ids AND the specs whose
+  // linked_paths (read at the base) match the diff (REL-19). verify read only
+  // the body, so a pull request whose body named another spec could never
+  // produce the evidence the gate asked for (squadranks #1668, 2026-10-11).
+  it("adds the specs the diff implicates through their base linked_paths", () => {
+    const dir = initRepo();
+    writeSpec(dir, [{ id: "AC-1", status: "active", argv: ["a"] }]);
+    const otherDir = path.join(dir, "docs", "specs", "other");
+    fs.mkdirSync(otherDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(otherDir, "spec.json"),
+      JSON.stringify({ id: "other", linked_paths: ["src/**"], acceptance_criteria: [{ id: "AC-1", status: "active", argv: ["b"] }] }),
+    );
+    fs.mkdirSync(path.join(dir, "src"));
+    fs.writeFileSync(path.join(dir, "src", "a.js"), "1\n");
+    const base = commit(dir, "base");
+    fs.writeFileSync(path.join(dir, "src", "a.js"), "2\n");
+    const head = commit(dir, "change src");
+    const deps = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: base, isCrossRepository: false, body: BODY } });
+    expect(checkPrPreconditions(deps, args(dir)).specIds).toEqual(["example", "other"]);
+    // A diff outside every linked path implicates nothing.
+    const untouched = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: head, isCrossRepository: false, body: BODY } });
+    expect(checkPrPreconditions(untouched, args(dir)).specIds).toEqual(["example"]);
+  });
+
   it("throws CRITERIA_TRUST_REQUIRED when the repository is untrusted and allowProjectCommands is false", () => {
     const { dir, head } = cleanRepo();
     const deps = fakeDeps(dir, { prView: { headRefOid: head, baseRefOid: head, isCrossRepository: false, body: BODY } });
