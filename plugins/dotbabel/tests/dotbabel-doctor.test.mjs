@@ -218,7 +218,8 @@ describe("dotbabel-doctor hook registration check", () => {
     expect(res.stdout).toMatch(
       /fleet-shell-prefix\.sh is shipped but not registered — expects CLAUDE_CODE_SHELL_PREFIX/,
     );
-    expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(4);
+    expect(res.stdout).toMatch(/task-context\.sh is shipped but not registered — expects SessionStart/);
+    expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(5);
   });
 
   it("names the events a partly registered hook still lacks", () => {

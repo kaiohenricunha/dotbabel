@@ -44,6 +44,7 @@ export const SHIPPED_HOOK_EVENTS = Object.freeze({
   "fleet-shell-prefix.sh": Object.freeze([SHELL_PREFIX_EVENT]),
   "guard-criteria-evidence.sh": Object.freeze(["PreToolUse"]),
   "guard-destructive-git.sh": Object.freeze(["PreToolUse"]),
+  "task-context.sh": Object.freeze(["SessionStart"]),
 });
 
 const INTERPRETERS = new Set(["bash", "sh", "zsh", "env"]);
