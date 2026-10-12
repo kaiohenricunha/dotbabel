@@ -606,17 +606,17 @@ npx dotbabel-quality check --json | jq -r '.results[] | select(.verdict=="fail")
 Reason about stacked pull requests — dependency graph, merge order, and the
 exact commands a child needs once its parent has merged.
 
-| Subcommand        | Purpose                                                          |
-| ----------------- | ---------------------------------------------------------------- |
-| `graph`           | Print the raw dependency graph                                   |
-| `plan`            | What can land now, what is blocked, and any structural problems  |
-| `next`            | The commands to move a child PR after its parent merged          |
-| `gate`            | Evaluate a precondition (`local-attest` \| `merge` \| `skip-ci`) |
-| `phases`          | The canonical pipeline phase order                               |
-| `entry`           | The phase the conductor should start at for this branch          |
-| `review-complete` | Post the SHA-pinned marker that the review stage finished        |
-| `record`          | Append one phase attempt to the pull request's run receipt       |
-| `receipt`         | Print the run receipt: verdict, attempts, rollback point         |
+| Subcommand        | Purpose                                                              |
+| ----------------- | -------------------------------------------------------------------- |
+| `graph`           | Print the raw dependency graph                                       |
+| `plan`            | What can land now, what is blocked, and any structural problems      |
+| `next`            | The commands to move a child PR after its parent merged              |
+| `gate`            | Evaluate a gate (`local-attest` \| `merge` \| `skip-ci` \| `budget`) |
+| `phases`          | The canonical pipeline phase order                                   |
+| `entry`           | The phase the conductor should start at for this branch              |
+| `review-complete` | Post the SHA-pinned marker that the review stage finished            |
+| `record`          | Append one phase attempt to the pull request's run receipt           |
+| `receipt`         | Print the run receipt: verdict, attempts, rollback point             |
 
 | Flag                 | Default  |                                                                                               |
 | -------------------- | -------- | --------------------------------------------------------------------------------------------- |
@@ -629,7 +629,7 @@ exact commands a child needs once its parent has merged.
 | `--gate <name>`      | —        | Gate to evaluate                                                                              |
 | `--sha <rev>`        | `HEAD`   | `--gate skip-ci`: commit to inspect. `record`: full head SHA, used only when gh cannot answer |
 | `--dry-run`          | off      | `review-complete`: check and print, post nothing                                              |
-| `--phase <id>`       | —        | `record`: the conductor phase                                                                 |
+| `--phase <id>`       | —        | `record`, `--gate budget`: the conductor phase                                                |
 | `--outcome <o>`      | —        | `record`: `pass` \| `fail` \| `blocked` \| `skipped`                                          |
 | `--reason <CODE>`    | —        | `record`: the blocking reason code                                                            |
 | `--evidence <url>`   | —        | `record`: a link to evidence the phase produced; repeatable                                   |
@@ -687,6 +687,28 @@ the `stop` hand-off is the latest attempt and passed, no other phase's latest
 non-skipped attempt failed, and a passing `local-attest` names the same head as
 `stop`. It is `blocked` while the latest attempt, or a phase that `stop`
 contradicts, failed; otherwise it is `in-progress`. No receipt yet exits `0`.
+
+`gate --gate budget --pr <N> --phase <id>` is the conductor's attempt cap. It
+counts the phase's consecutive `fail` and `blocked` attempts in the receipt since
+the phase last passed, and fails with `CONDUCTOR_BUDGET_EXHAUSTED` when the count
+reaches the cap. A `skipped` attempt neither counts nor resets, except one with
+reason `USER_ALLOWED_RETRY`: that records the user's explicit permission to try
+again, and it resets the count without reading as a pass.
+
+The cap comes from `.dotbabel.json` on the pull request's base ref
+(`<remote>/<baseRefName>` from `gh pr view`, or `<remote>/<trunk>` when gh cannot
+answer), never from the working tree or the branch. The conductor edits and
+commits in that tree, so a cap it could read there is a cap it could raise:
+
+```json
+{ "conductor": { "max_attempts": 3, "phase_max_attempts": { "local-attest": 1 } } }
+```
+
+`max_attempts` defaults to 3, and every value must be from 1 to 10. A value out of
+range, a misspelled key, an unknown phase key, or a `conductor` block of the wrong
+shape is an environment error (exit `2`), never a silent default, because a typo
+must not raise or remove the cap. A base ref that is not in this clone is exit
+`2` as well: fetch it and retry. A damaged receipt is exit `2`, as for `receipt`.
 
 ---
 

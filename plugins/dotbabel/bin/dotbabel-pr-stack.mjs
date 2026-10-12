@@ -16,6 +16,7 @@
  *   dotbabel pr-stack next   --pr <N> --parent <N> [--parent-sha <sha>] [--remote <name>]
  *   dotbabel pr-stack gate   --gate local-attest|merge --pr <N>
  *   dotbabel pr-stack gate   --gate skip-ci [--sha <rev>]
+ *   dotbabel pr-stack gate   --gate budget --pr <N> --phase <id>
  *   dotbabel pr-stack phases
  *   dotbabel pr-stack entry   [--pr <N>]
  *   dotbabel pr-stack review-complete --pr <N> [--dry-run]
@@ -45,10 +46,12 @@ import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { buildStackGraph, planStack, planChildTransition } from "../src/pr-stack.mjs";
 import {
   CONDUCTOR_PHASES,
+  checkAttemptBudget,
   checkLocalAttestGate,
   checkMergeGate,
   deriveEntryPhase,
   hasSkipCi,
+  resolveMaxAttempts,
   summarizeGates,
 } from "../src/pr-gates.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
@@ -99,7 +102,7 @@ Subcommands:
   graph              Print the raw dependency graph
   plan               Print what can land now, what is blocked, and any problems
   next               Print the commands to move a child PR after its parent merged
-  gate               Evaluate a precondition gate (local-attest | merge | skip-ci)
+  gate               Evaluate a precondition gate (local-attest | merge | skip-ci | budget)
   phases             Print the canonical pipeline phase order
   entry              Print the phase the conductor should start at for this branch
   review-complete    Post the SHA-pinned marker that the review stage finished on the head
@@ -114,12 +117,12 @@ Options:
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
-  --gate <name>      Gate to evaluate: local-attest | merge | skip-ci
+  --gate <name>      Gate to evaluate: local-attest | merge | skip-ci | budget
   --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD);
                      record: the full head SHA to use when gh cannot answer
                      (refused when it differs from the head gh reports)
   --dry-run          review-complete: check and print the comment, post nothing
-  --phase <id>       record: the conductor phase (see \`phases\`)
+  --phase <id>       record, --gate budget: the conductor phase (see \`phases\`)
   --outcome <o>      record: ${RECEIPT_OUTCOMES.join(" | ")}
   --reason <CODE>    record: the blocking reason code, UPPER_SNAKE
   --evidence <url>   record: a link to evidence the phase produced (repeatable)
@@ -540,6 +543,34 @@ function requestedModel(root, artifact) {
 }
 
 /**
+ * The parsed `.dotbabel.json` at `<remote>/<baseRef>`, or undefined when the
+ * base has none. The cap is read from the BASE, never the working tree or the
+ * branch: the conductor edits and commits in that tree, so a cap it can read
+ * there is a cap it can raise. The merge gate reads its policy the same way.
+ *
+ * Throws when the base ref is not in this clone: an unfetched ref must not
+ * read as "no config", which would silently apply the default.
+ *
+ * @param {string} remote
+ * @param {string} baseRef
+ * @returns {unknown}
+ */
+function baseRefConfig(remote, baseRef) {
+  const ref = `${remote}/${baseRef}`;
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(ref)) throw new Error(`base ref ${JSON.stringify(ref)} is not a plain ref name`);
+  if (run(["git", "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]).status !== 0) {
+    throw new Error(`base ref ${ref} is not in this clone; run \`git fetch ${remote} ${baseRef}\` and retry`);
+  }
+  if (run(["git", "cat-file", "-e", `${ref}:.dotbabel.json`]).status !== 0) return undefined;
+  const shown = run(["git", "show", `${ref}:.dotbabel.json`]);
+  try {
+    return JSON.parse(shown.stdout);
+  } catch (err) {
+    throw new Error(`${ref}:.dotbabel.json is not readable JSON: ${err.message}`);
+  }
+}
+
+/**
  * Render a receipt as human-readable lines.
  *
  * @param {import("../src/run-receipt.mjs").RunReceipt} receipt
@@ -851,13 +882,22 @@ async function main() {
     });
     const attempt = receipt.attempts.at(-1);
     const summary = summarizePhases(receipt)[phase.id];
+    // Recording never fails on the cap: an unreadable cap is reported here and
+    // made an error by `gate --gate budget`, which is where the decision is.
+    let maxAttempts = null;
+    let capProblem = null;
+    try {
+      maxAttempts = resolveMaxAttempts(baseRefConfig(flags.remote, baseRef ?? flags.trunk), phase.id);
+    } catch (err) {
+      capProblem = err.message;
+    }
     return emit({
       subcommand: sub,
       ok: true,
-      result: { path: file, attempt, phase: summary, verdict: receiptVerdict(receipt) },
+      result: { path: file, attempt, phase: summary, verdict: receiptVerdict(receipt), maxAttempts },
       lines: [
         `record: ${attempt.phase} attempt ${attempt.n} ${attempt.outcome} on ${attempt.head_sha.slice(0, 8)}`,
-        `  consecutive failures: ${summary.consecutive_failures}`,
+        `  consecutive failures: ${summary.consecutive_failures} of ${maxAttempts ?? `? (${capProblem})`}`,
         `  receipt: ${file}`,
       ],
       json,
@@ -929,6 +969,45 @@ async function main() {
 
   const prNumber = requireNumber(flags.pr, "--pr");
 
+  if (which === "budget") {
+    const phase = CONDUCTOR_PHASES.find((p) => p.id === flags.phase);
+    if (!phase) return fail(EXIT_CODES.USAGE, `--phase must be one of: ${CONDUCTOR_PHASES.map((p) => p.id).join(", ")}`);
+    // The base the pull request merges into; the trunk when gh cannot say.
+    let baseRef = flags.trunk;
+    const view = run(["gh", "pr", "view", String(prNumber), "--json", "baseRefName"]);
+    if (view.status === 0) {
+      try {
+        const name = JSON.parse(view.stdout).baseRefName;
+        if (typeof name === "string" && name !== "") baseRef = name;
+      } catch {
+        // Fall back to the trunk: an unparseable answer is no answer.
+      }
+    }
+    let maxAttempts;
+    try {
+      maxAttempts = resolveMaxAttempts(baseRefConfig(flags.remote, baseRef), phase.id);
+    } catch (err) {
+      // A cap that cannot be read must not become the default: a typo would
+      // then raise or remove the limit without anyone noticing.
+      return fail(EXIT_CODES.ENV, err.message);
+    }
+    const receipt = readReceipt(receiptPath(gitCommonDir(), prNumber), prNumber);
+    const consecutiveFailures = receipt ? (summarizePhases(receipt)[phase.id]?.consecutive_failures ?? 0) : 0;
+    const result = checkAttemptBudget({ phase: phase.id, consecutiveFailures, maxAttempts });
+    return emit({
+      subcommand: sub,
+      ok: result.ok,
+      result,
+      problems: result.reasons,
+      lines: [
+        `gate budget: ${result.ok ? "PASS" : "FAIL"} (${phase.id}: ${consecutiveFailures} of ${maxAttempts} failed in a row)`,
+        ...result.reasons.map((r) => `  ✗ ${r.message}`),
+        ...(result.hint ? [`  → ${result.hint}`] : []),
+      ],
+      json,
+    });
+  }
+
   if (which === "local-attest") {
     const view = ghJson(`gh pr view ${prNumber} --json headRefOid`);
     const result = checkLocalAttestGate({
@@ -968,7 +1047,7 @@ async function main() {
     });
   }
 
-  return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge, skip-ci`);
+  return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge, skip-ci, budget`);
 }
 
 // Run only when invoked as a CLI, not when imported by tests. When argv[1]

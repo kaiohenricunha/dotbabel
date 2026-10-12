@@ -14,6 +14,7 @@ import {
   receiptVerdict,
   rollbackPoint,
   summarizePhases,
+  USER_ALLOWED_RETRY,
 } from "../src/run-receipt.mjs";
 import { CONDUCTOR_PHASES } from "../src/pr-gates.mjs";
 
@@ -166,6 +167,26 @@ describe("summarizePhases", () => {
       { phase: "local-attest", outcome: "fail" },
     );
     expect(summarizePhases(r)["local-attest"].consecutive_failures).toBe(2);
+  });
+
+  it("resets the count on a skipped attempt the user allowed, and only on that one", () => {
+    const r = receiptWith(
+      { phase: "review-pr", outcome: "fail" },
+      { phase: "review-pr", outcome: "fail" },
+      { phase: "review-pr", outcome: "skipped", reasonCode: USER_ALLOWED_RETRY },
+      { phase: "review-pr", outcome: "fail" },
+    );
+    expect(USER_ALLOWED_RETRY).toBe("USER_ALLOWED_RETRY");
+    expect(summarizePhases(r)["review-pr"].consecutive_failures).toBe(1);
+  });
+
+  it("does not let an allowed retry read as a pass", () => {
+    const r = receiptWith(
+      { phase: "local-attest", outcome: "fail" },
+      { phase: "local-attest", outcome: "skipped", reasonCode: USER_ALLOWED_RETRY },
+      { phase: "stop", outcome: "pass" },
+    );
+    expect(receiptVerdict(r)).toBe("blocked");
   });
 
   it("lists phases in conductor order and omits phases never attempted", () => {
