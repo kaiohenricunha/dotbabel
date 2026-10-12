@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-12T15:51:09.787Z",
+  "generatedAt": "2026-10-12T17:04:43.597Z",
   "skills": [
     {
       "name": "agents-search",
@@ -103,7 +103,7 @@
     {
       "name": "fix-with-evidence",
       "path": ".claude/skills/fix-with-evidence/SKILL.md",
-      "checksum": "sha256:c75cd2f1f6268140dda2da98b634940bebac03a0c01781e17628f8cf502e3c49",
+      "checksum": "sha256:c6edef43aa6f5c69f9718134636575c9b7390d619140963b4068b13451cb097d",
       "dependencies": [],
       "lastValidated": "2026-10-12"
     },

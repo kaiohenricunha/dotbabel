@@ -103,7 +103,7 @@
     {
       "name": "fix-with-evidence",
       "path": ".claude/skills/fix-with-evidence/SKILL.md",
-      "checksum": "sha256:bb9dd65690a364ea9e510dda964dd20b0d11919b6573184d98c1e4b74b68e31c",
+      "checksum": "sha256:ca7a993504ea3da2406b016de4ab1616144e0acf5314410941fa3cf74f443b91",
       "dependencies": [],
       "lastValidated": "2026-10-12"
     },

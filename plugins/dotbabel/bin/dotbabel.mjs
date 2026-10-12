@@ -48,6 +48,7 @@ const SUBCOMMANDS = [
   "criteria",
   "models",
   "fleet",
+  "task",
 ];
 
 function printUsage() {

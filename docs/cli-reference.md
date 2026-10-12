@@ -53,6 +53,9 @@ dotbabel show <id> [OPTIONS]
 
 # Language-aware quality (added v3.2.0)
 dotbabel quality [check|detect|explain|baseline] [OPTIONS]
+
+# Task contract and state for work without a spec
+dotbabel task <new|update|show|list|close|hook> [OPTIONS]
 ```
 
 Each subcommand also exists standalone — `npx dotbabel-doctor` and
@@ -759,6 +762,51 @@ fails open. `lane` exits with the command's own status, and 64 without a
 command. `event` exits 1 when the pull request is not merged, and 2 when
 `gh pr view` fails. `token take` exits 1 when a live session holds the token,
 and `token release` exits 1 when this session holds none.
+
+---
+
+## `dotbabel-task`
+
+The contract and the durable state of work that has no spec. `new` fixes the
+goal and the `done_when` checks before execution starts, so success is defined
+first. `update` records where the work stands. The
+[`task-context.sh`](./hooks.md#task-contextsh) hook prints the open tasks at
+session start, so a new or resumed session reads that state.
+
+| Subcommand           | Purpose                                                                       |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `new <slug>`         | Create an open task. Needs `--goal` and at least one `--done-when`            |
+| `update <slug>`      | Set the phase, append decisions and pending items, finish pending items       |
+| `show <slug>`        | Print one task                                                                |
+| `list [--all]`       | Print the open tasks, or every task with `--all`, most recently updated first |
+| `close <slug>`       | Mark a task closed. The record stays and `show` still prints it               |
+| `hook session-start` | `SessionStart` entry: print the open tasks as context                         |
+
+| Flag                 | Used by         |                                                                       |
+| -------------------- | --------------- | --------------------------------------------------------------------- |
+| `--goal <text>`      | `new`           | What the work must achieve                                            |
+| `--done-when <text>` | `new`           | A check that decides the work is done. Repeatable                     |
+| `--constraint <t>`   | `new`           | A limit on how the work is done. Repeatable                           |
+| `--phase <p>`        | `new`, `update` | The phase, in the vocabulary of the driving skill (default `started`) |
+| `--decision <text>`  | `update`        | Append a decision with its time. Repeatable                           |
+| `--pending <text>`   | `update`        | Append a pending item. Repeatable                                     |
+| `--done <text>`      | `update`        | Remove a pending item, matched exactly. Repeatable                    |
+| `--all`              | `list`          | Include closed tasks                                                  |
+| `--json`             | all             | Print `{ok, task}` or `{ok, tasks, problems}`                         |
+
+A slug is lowercase letters, digits, and dashes, up to 64 characters. Tasks
+live in `<git-dir>/dotbabel/tasks/<slug>.json`
+([schema](../schemas/dotbabel.task-state.schema.json)), so they never appear in
+`git status`, and each worktree has its own. They survive a context reset, a
+crash, and a new session in that worktree. They do not travel to another
+machine; that is what [`/handoff`](./handoff-guide.md) is for.
+
+**Exits 1** when the task already exists (`new`), does not exist, is closed
+(`update`, `close`), or when `--done` names an item that is not pending.
+**Exits 2** outside a git repository, for a symbolic link on the task path,
+and for a task file that does not parse. **Exits 64** for a bad slug, a
+missing `--goal` or `--done-when`, or an `update` with nothing to change.
+`hook` always exits 0: it fails open.
 
 ---
 
