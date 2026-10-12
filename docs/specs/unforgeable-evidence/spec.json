@@ -1,0 +1,157 @@
+{
+  "id": "unforgeable-evidence",
+  "title": "Unforgeable evidence — gate on signed evidence an agent cannot produce without the human",
+  "status": "draft",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "plugins/dotbabel/src/lib/attest-marker.mjs",
+    "plugins/dotbabel/src/lib/evidence-payload.mjs",
+    "plugins/dotbabel/src/lib/evidence-signature.mjs",
+    "plugins/dotbabel/src/attestation.mjs",
+    "plugins/dotbabel/src/attestation-gate-inputs.mjs",
+    "plugins/dotbabel/src/local-attest-runner.mjs",
+    "plugins/dotbabel/src/criteria/comment.mjs",
+    "plugins/dotbabel/src/criteria/evidence.mjs",
+    "plugins/dotbabel/src/criteria/gate-inputs.mjs",
+    "plugins/dotbabel/src/review-complete.mjs",
+    "plugins/dotbabel/src/review-evidence.mjs",
+    "plugins/dotbabel/src/review-gate-inputs.mjs",
+    "plugins/dotbabel/src/pr-gates.mjs",
+    "plugins/dotbabel/bin/dotbabel-doctor.mjs",
+    "plugins/dotbabel/hooks/guard-criteria-evidence.sh",
+    "plugins/dotbabel/templates/workflows/test.yml",
+    ".github/workflows/test.yml",
+    "schemas/dotbabel.config.schema.json",
+    "schemas/dotbabel.attestation-evidence.schema.json",
+    "schemas/dotbabel.criteria-evidence.schema.json",
+    "schemas/dotbabel.review-evidence.schema.json",
+    "plugins/dotbabel/tests/evidence-signature*.test.mjs",
+    "docs/attestation.md",
+    "docs/hooks.md"
+  ],
+  "acceptance_commands": ["npx vitest run plugins/dotbabel/tests/evidence-signature.test.mjs"],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "planned",
+      "given": "a base ref with attestation.require_signature true and a signer in its allowed_signers file",
+      "when": "the merge gate reads an attestation whose payload carries a valid signature by that signer for this repo, pull request and head",
+      "then": "the attestation state is verified",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "verifies an attestation signed by a base-ref allowed signer"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature.test.mjs"]
+    },
+    {
+      "id": "AC-2",
+      "status": "planned",
+      "given": "a base ref with attestation.require_signature true",
+      "when": "the only attestation comment from a trusted author carries no signature, or a signature that does not verify",
+      "then": "the gate blocks with EVIDENCE_UNSIGNED or EVIDENCE_SIGNATURE_INVALID",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "blocks an unsigned attestation when signatures are required"
+        },
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "blocks an attestation whose signature does not verify"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature.test.mjs"]
+    },
+    {
+      "id": "AC-3",
+      "status": "planned",
+      "given": "a pull request that adds a new key to the allowed_signers file at its head only",
+      "when": "the merge gate verifies evidence signed by that new key",
+      "then": "the gate blocks with EVIDENCE_SIGNER_UNKNOWN, because signers are read from the base ref",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "reads allowed signers from the base ref, never the head"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature.test.mjs"]
+    },
+    {
+      "id": "AC-4",
+      "status": "planned",
+      "given": "a validly signed payload for another repository, pull request, or head SHA",
+      "when": "it is posted on this pull request",
+      "then": "the gate blocks with EVIDENCE_SIGNATURE_SCOPE, so a signature cannot be replayed",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "refuses a signature replayed from another repository, pull request, or head"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature.test.mjs"]
+    },
+    {
+      "id": "AC-5",
+      "status": "planned",
+      "given": "a base ref without require_signature, or with it false",
+      "when": "the gate reads an unsigned marker comment from a trusted author",
+      "then": "the gate behaves exactly as before this spec, and a signed comment is accepted too",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "accepts unsigned and signed evidence while signatures are not required"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature.test.mjs"]
+    },
+    {
+      "id": "AC-6",
+      "status": "planned",
+      "given": "require_signature true for criteria evidence and for review-complete evidence",
+      "when": "the merge gate and pr-stack entry read an unsigned comment of either family",
+      "then": "criteria evidence blocks with EVIDENCE_UNSIGNED and pr-stack entry does not skip the review stage",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "requires a signature on criteria evidence"
+        },
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature.test.mjs",
+          "name": "does not skip the review stage on unsigned review-complete evidence"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature.test.mjs"]
+    },
+    {
+      "id": "AC-7",
+      "status": "planned",
+      "given": "a configured signing key that is a plain file readable by the current user and is not a security-key (sk) key",
+      "when": "dotbabel doctor runs",
+      "then": "doctor warns EVIDENCE_KEY_AGENT_READABLE, because a signature from that key proves nothing about who signed",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/evidence-signature-doctor.test.mjs",
+          "name": "warns when the signing key is readable by the agent's user"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/evidence-signature-doctor.test.mjs"]
+    },
+    {
+      "id": "AC-8",
+      "status": "planned",
+      "given": "the CI test workflow with require_signature true on the base ref",
+      "when": "a trusted comment carries the attestation marker for the head without a valid signature",
+      "then": "the remote test job runs instead of skipping",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/workflow-templates.test.mjs",
+          "name": "test workflow skips only on a signature-verified attestation"
+        }
+      ],
+      "argv": ["npx", "vitest", "run", "plugins/dotbabel/tests/workflow-templates.test.mjs"]
+    }
+  ],
+  "depends_on_specs": ["dotbabel-core", "qa-verification-harness"],
+  "active_prs": []
+}
