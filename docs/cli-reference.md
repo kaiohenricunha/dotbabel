@@ -173,11 +173,24 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook → check-on-stop trust → attestation policy. Prints `✓/✗/⚠` per check.
+hook → hook registration → check-on-stop trust → attestation policy. Prints
+`✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
 | `--repo-root <path>` | resolved via git | Override |
+
+The hook registration rows compare the hooks the package ships with the hooks
+that Claude Code runs. Doctor reads `$CLAUDE_CONFIG_DIR/settings.json` (default
+`~/.claude/settings.json`), `.claude/settings.json`, and
+`.claude/settings.local.json`. It matches a registration by the basename of the
+command's script, so a repository's own `.claude/hooks/` copy counts.
+`fleet-shell-prefix.sh` counts when `CLAUDE_CODE_SHELL_PREFIX` names it in a
+settings `env` block or in the environment. One `✓` row lists the registered
+hooks with their events. One `⚠` row names each unregistered hook and the
+events it expects, and another names the events a partly registered hook
+lacks. A settings file that does not parse is a `⚠` row. These rows never fail
+the run. See [hooks.md](./hooks.md#registering-a-hook).
 
 The trust row reports whether this repo may run turn-end project checks. It
 never fails the run — a repo deliberately left off the allowlist is a valid

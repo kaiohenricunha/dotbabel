@@ -12,6 +12,8 @@
  *   specs        docs/specs/ scanned; validateSpecs clean
  *   drift        checkInstructionDrift + checkInstructionsFresh clean
  *   hook         plugins/dotbabel/hooks/guard-destructive-git.sh present + exec bit
+ *   hooks        each shipped hook registered in a Claude Code settings file
+ *                (user, project, local) or the shell prefix (warn only)
  *   attestation  .dotbabel.json attestation policy coherent with the local-attest config
  *   bootstrap    ~/.claude/CLAUDE.md and supported CLI symlinks present
  *                (informational — warn only)
@@ -31,6 +33,7 @@ import {
 import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parse, helpText } from "../src/lib/argv.mjs";
 import { createOutput } from "../src/lib/output.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
@@ -48,6 +51,7 @@ import {
 } from "../src/index.mjs";
 import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
 import { isRepoTrusted } from "../src/trust-allowlist.mjs";
+import { hookRegistrationReport, listShippedHooks, readSettingsSources } from "../src/hook-registration.mjs";
 import {
   RUNTIMES,
   anyRuntimePresent,
@@ -190,6 +194,34 @@ if (existsSync(hookPath)) {
   else out.fail("guard-destructive-git.sh present but NOT executable (chmod +x)");
 } else {
   out.warn("guard-destructive-git.sh missing — destructive git commands are unguarded");
+}
+
+// hook registration. Installed is not enabled: bootstrap links the hooks but
+// never edits settings.json. Never out.fail, for the reason the trust check
+// below gives: an unregistered hook is a valid choice, not a broken install.
+{
+  const shippedHooks = listShippedHooks(fileURLToPath(new URL("../hooks/", import.meta.url)));
+  const { sources, errors } = readSettingsSources({
+    home: homedir(),
+    repoRoot: ctx.repoRoot,
+    env: process.env,
+  });
+  for (const e of errors) out.warn(`hooks: ${e.path} ${e.message} — its hook registrations were not read`);
+  const report = hookRegistrationReport({ shippedHooks, sources, env: process.env });
+  if (report.registered.length > 0) {
+    const listed = report.registered.map((r) => `${r.hook} (${r.events.join(", ")})`).join(", ");
+    out.pass(`hooks registered: ${listed}`);
+  }
+  for (const r of report.registered) {
+    if (r.missing.length === 0) continue;
+    out.warn(
+      `hooks: ${r.hook} is registered for ${r.events.join(", ")} but not for ${r.missing.join(", ")} — see docs/hooks.md`,
+    );
+  }
+  for (const u of report.unregistered) {
+    const expects = u.expected.length > 0 ? ` — expects ${u.expected.join(", ")}` : "";
+    out.warn(`hooks: ${u.hook} is shipped but not registered${expects} — see docs/hooks.md#registering-a-hook`);
+  }
 }
 
 // check-on-stop trust. Never out.fail: the exit code is derived from the fail

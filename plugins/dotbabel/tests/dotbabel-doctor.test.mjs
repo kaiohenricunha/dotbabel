@@ -43,6 +43,7 @@ function runDoctor({
   extraPath,
   trustedFile,
   repoRoot,
+  shellPrefix,
 }) {
   // Build a hermetic PATH that does NOT inherit the user's PATH (which on a
   // dev machine likely contains a real codex/gemini install in nvm's bin dir).
@@ -65,6 +66,12 @@ function runDoctor({
   delete env.CHECK_ON_STOP_TRUST_ALL;
   if (trustedFile) env.CHECK_ON_STOP_TRUSTED_FILE = trustedFile;
   else delete env.CHECK_ON_STOP_TRUSTED_FILE;
+  // The hook registration check reads the user settings from CLAUDE_CONFIG_DIR
+  // and the shell prefix from the environment. A Claude Code session exports
+  // both, so inheriting them would make the output depend on the developer.
+  delete env.CLAUDE_CONFIG_DIR;
+  if (shellPrefix) env.CLAUDE_CODE_SHELL_PREFIX = shellPrefix;
+  else delete env.CLAUDE_CODE_SHELL_PREFIX;
 
   const result = spawnSync(process.execPath, [DOCTOR, "--repo-root", repoRoot ?? REPO_ROOT], {
     env,
@@ -178,6 +185,88 @@ describe("dotbabel-doctor fan-out check", () => {
     const result = runDoctor({ home, extraPath: stub });
 
     expect(result.stdout).not.toMatch(/Antigravity skills fan-out/);
+  });
+});
+
+describe("dotbabel-doctor hook registration check", () => {
+  function writeSettings(dir, name, value) {
+    fs.mkdirSync(path.join(dir, ".claude"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, ".claude", name),
+      typeof value === "string" ? value : JSON.stringify(value),
+    );
+  }
+  const command = (cmd) => ({ hooks: [{ type: "command", command: cmd }] });
+
+  it("lists registered hooks with their events and warns once per unregistered hook", () => {
+    const home = makeTmpDir("home-");
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    writeSettings(home, "settings.json", {
+      hooks: { PreToolUse: [command("$HOME/.claude/hooks/guard-destructive-git.sh")] },
+    });
+    writeSettings(repoRoot, "settings.json", {
+      hooks: { PreToolUse: [command(".claude/hooks/guard-criteria-evidence.sh")] },
+    });
+
+    const res = runDoctor({ home, repoRoot });
+
+    expect(res.stdout).toMatch(
+      /hooks registered: guard-criteria-evidence\.sh \(PreToolUse\), guard-destructive-git\.sh \(PreToolUse\)/,
+    );
+    expect(res.stdout).toMatch(/check-on-write\.sh is shipped but not registered — expects PostToolUse/);
+    expect(res.stdout).toMatch(/check-on-stop\.sh is shipped but not registered — expects Stop/);
+    expect(res.stdout).toMatch(
+      /fleet-shell-prefix\.sh is shipped but not registered — expects CLAUDE_CODE_SHELL_PREFIX/,
+    );
+    expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(4);
+  });
+
+  it("names the events a partly registered hook still lacks", () => {
+    const home = makeTmpDir("home-");
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    writeSettings(home, "settings.json", {
+      hooks: { PreToolUse: [command("$HOME/.claude/hooks/fleet-guard.sh pre-edit")] },
+    });
+
+    const res = runDoctor({ home, repoRoot });
+
+    expect(res.stdout).toMatch(/fleet-guard\.sh \(PreToolUse\)/);
+    expect(res.stdout).toMatch(
+      /fleet-guard\.sh is registered for PreToolUse but not for SessionStart, PostToolUse, UserPromptSubmit/,
+    );
+  });
+
+  it("counts the shell prefix from the environment", () => {
+    const home = makeTmpDir("home-");
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+
+    const res = runDoctor({ home, repoRoot, shellPrefix: "/opt/hooks/fleet-shell-prefix.sh" });
+
+    expect(res.stdout).toMatch(/hooks registered: fleet-shell-prefix\.sh \(CLAUDE_CODE_SHELL_PREFIX\)/);
+    expect(res.stdout).not.toMatch(/fleet-shell-prefix\.sh is shipped but not registered/);
+  });
+
+  it("warns about an unparseable settings file by name", () => {
+    const home = makeTmpDir("home-");
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    writeSettings(repoRoot, "settings.local.json", "{ not json");
+
+    const res = runDoctor({ home, repoRoot });
+
+    expect(res.stdout).toContain(path.join(repoRoot, ".claude", "settings.local.json"));
+    expect(res.stdout).toMatch(/settings\.local\.json.*does not parse/);
+  });
+
+  it("never changes the exit code", () => {
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    const bare = runDoctor({ home: makeTmpDir("home-"), repoRoot });
+
+    const home = makeTmpDir("home-");
+    writeSettings(home, "settings.json", "{ not json");
+    const broken = runDoctor({ home, repoRoot });
+
+    expect(bare.stdout).toMatch(/is shipped but not registered/);
+    expect(broken.status).toBe(bare.status);
   });
 });
 
