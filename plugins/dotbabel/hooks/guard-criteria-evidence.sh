@@ -23,13 +23,15 @@
 # — as did chaining a real invocation in front of a hand-written marker. A
 # guard whose allow-rule the attacker controls is not a guard.
 #
-# SCOPE, stated plainly rather than overclaimed. This stops the marker reaching
-# a comment through the command text or a `--body-file` this hook can read. It
-# does NOT stop an agent that assembles the marker out of band — splitting it
-# across shell variables, base64, a heredoc, or writing the body with the Write
-# tool (which this PreToolUse matcher does not cover) and then posting it with
-# `--body-file`. Those remain open by construction: no textual guard on one
-# Bash call can close them.
+# SCOPE, stated plainly rather than overclaimed. This stops a marker that
+# reaches a comment through the command text, or through a file that the
+# command names in one of the forms listed at step 2 below, when this hook can
+# resolve and read that file. It does NOT stop an agent that assembles the
+# marker out of band: a file path through any other shell variable, text split
+# across shell words, variables or a heredoc, text encoded (base64, a JSON
+# escape), or a body written with the Write tool (which this PreToolUse matcher
+# does not cover) and then posted. Those remain open by construction: no
+# textual guard on one Bash call can close them.
 #
 # So treat this as a guardrail against the casual and accidental path, not as a
 # security boundary. The durable fix is for the gate to stop trusting comment
@@ -50,9 +52,12 @@
 # still: the merge gate skips the full test suite AND the quality profile on it,
 # so a forged one removes verification rather than misreporting it. The payload
 # line is listed too — a marker without it is refused by the gate as INVALID, so
-# guarding only the marker would leave the working forgery shape open. The
-# criteria payload entry covers both of its forms: the compressed form's prefix
-# (`… z1:`) begins with the plain one.
+# guarding only the marker would leave the working forgery shape open. Each
+# payload entry starts with the `<!-- ` opener, because each payload reader
+# accepts line 2 only when it starts with that opener and the token. So a
+# read-only search for the bare token (`grep`, `git log -S`) is not blocked.
+# The compressed criteria prefix, `<!-- dotbabel-criteria-payload z1:`, begins
+# with the plain criteria entry below, so one entry covers both forms.
 # `review-complete` evidence lets `/pr-conductor` skip the review stage on a
 # commit, so a forged one skips a review nobody did. The `post-pr-review`
 # receipt is guarded with it because it is what the sanctioned writer reads to
@@ -63,11 +68,11 @@
 MARKER='dotbabel-criteria verified-sha='
 MARKERS=(
   "$MARKER"
-  'dotbabel-criteria-payload '
+  '<!-- dotbabel-criteria-payload '
   'local-attest verified-sha='
-  'local-attest-payload '
+  '<!-- local-attest-payload '
   'review-complete verified-sha='
-  'review-complete-payload '
+  '<!-- review-complete-payload '
   'post-pr-review:v1:receipt'
 )
 
@@ -117,6 +122,10 @@ CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty')
 # a call split across lines would otherwise hide the marker from them.
 CMD=${CMD//$'\\\n'/ }
 NORM=$(printf '%s' "$CMD" | tr '\t' ' ' | tr -s ' ')
+# The directory the command runs in, from the hook input. A relative body-file
+# path resolves against it; without it, the path resolves against this hook's
+# own directory.
+HOOK_CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty')
 
 block() {
   cat >&2 <<MSG
@@ -146,23 +155,97 @@ if has_marker "$NORM"; then
   block ""
 fi
 
-# 2. The marker inside a file the command posts with `--body-file <path>` or
-#    `-F body=@<path>`. Reading the file is what keeps the obvious indirection
-#    from being a free pass; `--body-file -` reads stdin and cannot be checked.
-while IFS= read -r candidate; do
-  [ -n "$candidate" ] || continue
-  [ "$candidate" = "-" ] && continue
-  # Strip one layer of surrounding quotes, which the command line usually has.
-  candidate=${candidate%\"}
-  candidate=${candidate#\"}
-  candidate=${candidate%\'}
-  candidate=${candidate#\'}
-  [ -f "$candidate" ] || continue
+# Remove the shell quoting from one word: `"a b"`, `'a b'` and `a\ b` all give
+# `a b`. It follows the quoting rules of the shell, but it expands nothing.
+unquote_word() {
+  local word=$1 out='' quote='' ch i
+  for ((i = 0; i < ${#word}; i++)); do
+    ch=${word:i:1}
+    if [ -n "$quote" ]; then
+      if [ "$ch" = "$quote" ]; then quote=''; else out+=$ch; fi
+    elif [ "$ch" = '"' ] || [ "$ch" = "'" ]; then
+      quote=$ch
+    elif [ "$ch" = '\' ]; then
+      i=$((i + 1))
+      out+=${word:i:1}
+    else
+      out+=$ch
+    fi
+  done
+  printf '%s' "$out"
+}
+
+# Print the file that a body-file value names, or nothing when this hook cannot
+# tell. It expands only a leading `~/`, `$HOME`, `${HOME}`, `$TMPDIR` or
+# `${TMPDIR}`, from this hook's own environment, and it evaluates nothing. A
+# relative path resolves against HOOK_CWD when the hook input gives one.
+resolve_body_path() {
+  local p=$1 name='' rest=''
+  case $p in
+    \~/*) name=HOME rest=${p#\~} ;;
+    '${HOME}'*) name=HOME rest=${p#'${HOME}'} ;;
+    '${TMPDIR}'*) name=TMPDIR rest=${p#'${TMPDIR}'} ;;
+    '$HOME' | '$HOME'[!A-Za-z0-9_]*) name=HOME rest=${p#'$HOME'} ;;
+    '$TMPDIR' | '$TMPDIR'[!A-Za-z0-9_]*) name=TMPDIR rest=${p#'$TMPDIR'} ;;
+  esac
+  if [ -n "$name" ]; then
+    [ -n "${!name:-}" ] || return 0
+    p=${!name}$rest
+  fi
+  case $p in
+    /*) ;;
+    *) [ -z "$HOOK_CWD" ] || p=$HOOK_CWD/$p ;;
+  esac
+  printf '%s' "$p"
+}
+
+# 2. The marker inside a file the command posts. The hook reads the file that
+#    each of these forms names:
+#      --body-file <path>, --body-file=<path>
+#      -F <path>          a value with no `=`; `gh pr comment` and `gh pr create`
+#                         read it as the body file
+#      --input <path>     the request body of `gh api`
+#      -F body=@<path>    and `--field body=@<path>`
+#    The value can be in single or double quotes, and it can contain spaces.
+#    Reading the file is what keeps the obvious indirection from being a free
+#    pass. A value of `-` reads stdin and cannot be checked, and a path that
+#    resolve_body_path cannot resolve, or that is not a readable file, is
+#    skipped: a legitimate command can name a file through any variable.
+#
+#    WORD is one shell word: plain characters, a backslash escape, or a quoted
+#    run. The match runs on CMD, not NORM, so the spaces in a quoted path stay.
+WORD="([^[:space:]\"'\\\\]|\\\\.|\"[^\"]*\"|'[^']*')+"
+FILE_FLAGS="(^|[[:blank:]])(--body-file|--input|--field|-F)(=|[[:blank:]]+)$WORD"
+while IFS= read -r found; do
+  [ -n "$found" ] || continue
+  found=${found#"${found%%[![:blank:]]*}"}
+  flag=${found%%[=[:blank:]]*}
+  value=${found#"$flag"}
+  value=${value#=}
+  value=${value#"${value%%[![:blank:]]*}"}
+  value=$(unquote_word "$value")
+  case $flag in
+    -F | --field)
+      case $value in
+        body=@*) value=${value#body=@} ;;
+        *=*) continue ;;
+        # Only -F, never --field, names a body file without a `key=`.
+        *) [ "$flag" = "-F" ] || continue ;;
+      esac
+      ;;
+  esac
+  if [ -z "$value" ] || [ "$value" = "-" ]; then
+    continue
+  fi
+  candidate=$(resolve_body_path "$value")
+  if [ -z "$candidate" ] || [ ! -f "$candidate" ]; then
+    continue
+  fi
   if file_has_marker "$candidate"; then
     block " (via ${candidate})"
   fi
 done <<EOF
-$(printf '%s' "$NORM" | grep -oE -- '--body-file[= ][^ ]+|-F body=@[^ ]+' | sed -E 's/^--body-file[= ]//; s/^-F body=@//')
+$(printf '%s' "$CMD" | grep -oE -- "$FILE_FLAGS")
 EOF
 
 exit 0

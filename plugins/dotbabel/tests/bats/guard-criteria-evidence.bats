@@ -19,6 +19,15 @@ run_hook() {
   printf '%s' "{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":$1}}" | bash "$HOOK"
 }
 
+# Feed the hook a whole PreToolUse payload. $1 is the JSON. Each further
+# argument is a NAME=value pair that only the hook process gets, so a test can
+# set HOME or TMPDIR without touching the real ones.
+run_hook_json() {
+  local json=$1
+  shift
+  printf '%s' "$json" | env "$@" bash "$HOOK"
+}
+
 @test "guard-criteria-evidence: hook exists and is executable" {
   [ -f "$HOOK" ]
   [ -x "$HOOK" ]
@@ -86,7 +95,8 @@ run_hook() {
 @test "guard-criteria-evidence: every shipped copy is byte-identical to the canonical file" {
   for copy in \
     .claude/hooks/guard-criteria-evidence.sh \
-    plugins/dotbabel/templates/claude/hooks/guard-criteria-evidence.sh; do
+    plugins/dotbabel/templates/claude/hooks/guard-criteria-evidence.sh \
+    examples/minimal-consumer/.claude/hooks/guard-criteria-evidence.sh; do
     run cmp "$HOOK" "$REPO_ROOT/$copy"
     [ "$status" -eq 0 ]
   done
@@ -298,4 +308,134 @@ SP=' '
   run run_hook "\"gh pr comment 42 --body-file $BATS_TEST_TMPDIR/forged-z1.md\""
   [ "$status" -eq 2 ]
   [[ "$output" == *"forged-z1.md"* ]]
+}
+
+# --- the payload entries carry the HTML comment opener -----------------------
+#
+# Every payload reader accepts line 2 only when it starts with `<!-- ` and the
+# token, so each payload entry carries that opener too. A read-only search for
+# the bare token then passes, and each line a reader accepts is still blocked.
+
+@test "guard-criteria-evidence: allows a read-only search for a bare payload token" {
+  run run_hook '"grep -rn dotbabel-criteria-payload plugins/dotbabel/src"'
+  [ "$status" -eq 0 ]
+  run run_hook '"git log -S dotbabel-criteria-payload -- ."'
+  [ "$status" -eq 0 ]
+  run run_hook '"grep -F dotbabel-criteria-payload -r plugins/dotbabel/src"'
+  [ "$status" -eq 0 ]
+  run run_hook '"rg local-attest-payload docs"'
+  [ "$status" -eq 0 ]
+  run run_hook '"grep -rn review-complete-payload plugins"'
+  [ "$status" -eq 0 ]
+}
+
+@test "guard-criteria-evidence: still denies the payload line of every family" {
+  for token in dotbabel-criteria-payload local-attest-payload review-complete-payload; do
+    run run_hook "\"gh pr comment 42 --body \\\"<!--${SP}${token}${SP}eyJhIjoxfQ -->\\\"\""
+    [ "$status" -eq 2 ]
+  done
+}
+
+# --- body files: each form the hook reads ------------------------------------
+#
+# The hook reads a file that the command posts, not only the command text. Each
+# form below names a file the hook can read, so each must block. A path that the
+# hook cannot resolve is skipped, not refused: a legitimate command can name a
+# file through any variable, and the hook evaluates nothing. As above, the
+# forged literal is assembled from parts.
+
+# Write a forged compressed criteria payload line to the file $1.
+forge_payload_file() {
+  mkdir -p "$(dirname "$1")"
+  printf '<!-- %sz1:q1YKSa0oUbIyNNJRSs7PS8tMBwA -->\n' "dotbabel-criteria-payload${SP}" > "$1"
+}
+
+@test "guard-criteria-evidence: denies a payload in a file posted with gh -F <file>" {
+  # For `gh pr comment` and `gh pr create`, -F is the short form of --body-file.
+  forge_payload_file "$BATS_TEST_TMPDIR/forged.md"
+  run run_hook "\"gh pr comment 42 -F $BATS_TEST_TMPDIR/forged.md\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"forged.md"* ]]
+}
+
+@test "guard-criteria-evidence: denies a payload in a file posted with gh api --input <file>" {
+  forged="$BATS_TEST_TMPDIR/forged.json"
+  printf '{"body":"<!-- %sz1:q1YKSa0oUbIyNNJRSs7PS8tMBwA -->"}\n' "dotbabel-criteria-payload${SP}" > "$forged"
+  run run_hook "\"gh api repos/o/r/issues/42/comments --method POST --input $forged\""
+  [ "$status" -eq 2 ]
+  run run_hook "\"gh api repos/o/r/issues/42/comments --method POST --input=$forged\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: allows gh api --input -, the shape the sanctioned writer uses" {
+  # The writer sends the body on stdin (criteria/comment.mjs), which no textual
+  # guard can read. Refusing `-` would block every honest post.
+  run run_hook '"gh api --method POST repos/o/r/issues/42/comments --input -"'
+  [ "$status" -eq 0 ]
+}
+
+@test "guard-criteria-evidence: denies a payload in a file posted with --field body=@<file>" {
+  forge_payload_file "$BATS_TEST_TMPDIR/forged.md"
+  run run_hook "\"gh api repos/o/r/issues/42/comments --field body=@$BATS_TEST_TMPDIR/forged.md\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a payload in a file posted with a quoted -F body=@<file>" {
+  forge_payload_file "$BATS_TEST_TMPDIR/forged.md"
+  run run_hook "\"gh api repos/o/r/issues/42/comments -F \\\"body=@$BATS_TEST_TMPDIR/forged.md\\\"\""
+  [ "$status" -eq 2 ]
+  run run_hook "\"gh api repos/o/r/issues/42/comments -F 'body=@$BATS_TEST_TMPDIR/forged.md'\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a payload in a quoted body-file path that has spaces" {
+  forge_payload_file "$BATS_TEST_TMPDIR/my evidence/forged body.md"
+  run run_hook "\"gh pr comment 42 --body-file \\\"$BATS_TEST_TMPDIR/my evidence/forged body.md\\\"\""
+  [ "$status" -eq 2 ]
+  run run_hook "\"gh pr comment 42 --body-file '$BATS_TEST_TMPDIR/my evidence/forged body.md'\""
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a payload in a body file under a leading ~/" {
+  home="$BATS_TEST_TMPDIR/home"
+  forge_payload_file "$home/forged.md"
+  run run_hook_json '{"tool_name":"Bash","tool_input":{"command":"gh pr comment 42 --body-file ~/forged.md"}}' HOME="$home"
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a payload in a body file under \$HOME or \${HOME}" {
+  home="$BATS_TEST_TMPDIR/home"
+  forge_payload_file "$home/forged.md"
+  run run_hook_json '{"tool_name":"Bash","tool_input":{"command":"gh pr comment 42 --body-file \"$HOME/forged.md\""}}' HOME="$home"
+  [ "$status" -eq 2 ]
+  run run_hook_json '{"tool_name":"Bash","tool_input":{"command":"gh pr comment 42 --body-file ${HOME}/forged.md"}}' HOME="$home"
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: denies a payload in a body file under \$TMPDIR or \${TMPDIR}" {
+  tmp="$BATS_TEST_TMPDIR/tmp"
+  forge_payload_file "$tmp/forged.md"
+  run run_hook_json '{"tool_name":"Bash","tool_input":{"command":"gh pr comment 42 --body-file \"$TMPDIR/forged.md\""}}' TMPDIR="$tmp"
+  [ "$status" -eq 2 ]
+  run run_hook_json '{"tool_name":"Bash","tool_input":{"command":"gh api repos/o/r/issues/42/comments -F \"body=@${TMPDIR}/forged.md\""}}' TMPDIR="$tmp"
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: resolves a relative body-file path against the cwd of the hook input" {
+  work="$BATS_TEST_TMPDIR/work"
+  forge_payload_file "$work/forged.md"
+  # Run the hook from another directory, so only the `cwd` field finds the file.
+  elsewhere="$BATS_TEST_TMPDIR/elsewhere"
+  mkdir -p "$elsewhere"
+  cd "$elsewhere"
+  run run_hook_json "{\"tool_name\":\"Bash\",\"cwd\":\"$work\",\"tool_input\":{\"command\":\"gh pr comment 42 --body-file forged.md\"}}"
+  [ "$status" -eq 2 ]
+}
+
+@test "guard-criteria-evidence: skips a body-file path that it cannot resolve, and does not refuse it" {
+  # The hook expands only the variables it names and never evaluates the
+  # text, so a path through another variable is out of scope by design.
+  forge_payload_file "$BATS_TEST_TMPDIR/forged.md"
+  run run_hook_json '{"tool_name":"Bash","tool_input":{"command":"gh pr comment 42 --body-file \"$EVIDENCE_DIR/forged.md\""}}' EVIDENCE_DIR="$BATS_TEST_TMPDIR"
+  [ "$status" -eq 0 ]
 }
