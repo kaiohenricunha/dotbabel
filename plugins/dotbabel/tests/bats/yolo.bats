@@ -245,6 +245,21 @@ assert_declines() {
   assert_declines
 }
 
+@test "permission: a merge in the scope may delete the merged pull request's own branch" {
+  # /merge-pr merges with --delete-branch (commands/merge-pr.md), so a gate
+  # that refused it would prompt at every merge.
+  local cmd
+  for cmd in "gh pr merge 12 --squash --delete-branch" "gh pr merge 12 -s -d" \
+    "gh pr merge 12 --squash --delete-branch --subject x --body-file /tmp/b.md"; do
+    grant_file "$SID" 3600 true
+    ask_bash "$cmd"
+    assert_allows
+    grant_file "$SID" 3600 false
+    ask_bash "$cmd"
+    assert_declines
+  done
+}
+
 @test "permission: a recursive rm inside the worktree passes" {
   grant_file "$SID" 3600
   ask_bash "rm -rf node_modules dist"
@@ -269,8 +284,6 @@ assert_declines() {
     "git push origin +feat/x" \
     "gh repo delete acme/widget --yes" \
     "gh api -X DELETE repos/acme/widget/git/refs/heads/x" \
-    "gh pr merge 12 --squash --delete-branch" \
-    "gh pr merge 12 -s -d" \
     "rm -rf /" \
     "rm -rf ~/projects" \
     "rm -rf ../sibling" \

@@ -173,7 +173,7 @@ grant() {
 
   local yes=no
   [ "$merge" = true ] && yes=yes
-  context "YOLO GRANT ACTIVE for session $SID until $(iso "$expires") ($((seconds / 60)) minutes). Grant file: $file. merge: $yes. Scope: $scope. While it lives, the PermissionRequest hook approves each permission dialog in this session except the denylist (force push, reset --hard, branch or repository deletion, rm -r outside the worktree, terraform/tofu destroy, production deploys and releases, edits under docs/specs/, changes to settings files, hooks, ~/.claude, or a grant, and gh pr merge when merge is no)."
+  context "YOLO GRANT ACTIVE for session $SID until $(iso "$expires") ($((seconds / 60)) minutes). Grant file: $file. merge: $yes. Scope: $scope. While it lives, the PermissionRequest hook approves each permission dialog in this session except the denylist (force push, reset --hard, branch or repository deletion (except the head branch of a pull request merged in the scope), rm -r outside the worktree, terraform/tofu destroy, production deploys and releases, edits under docs/specs/, changes to settings files, hooks, ~/.claude, or a grant, and gh pr merge when merge is no)."
 }
 
 # ---------------- the typed /yolo ----------------
@@ -281,7 +281,6 @@ DENY_BASH=(
   "${GIT}push[[:space:]]${REST}(-d|--delete|--mirror|--prune|:[^[:space:]]+|\+[^[:space:]]+)${END}"
   "${B}gh[[:space:]]+repo[[:space:]]+delete${END}"
   "${B}gh[[:space:]]+api[[:space:]]${REST}(-X|--method)[[:space:]=]*DELETE${END}"
-  "${B}gh[[:space:]]+pr[[:space:]]+merge[[:space:]]${REST}(-[a-zA-Z]*d[a-zA-Z]*|--delete-branch(=[^[:space:]]*)?)${END}"
   "${B}(terraform|tofu|terragrunt)[[:space:]]${REST}-?destroy${END}"
   "[[:space:]]--prod(uction)?([[:space:]=]|$)"
   "${B}vercel[[:space:]]${REST}(promote|rollback)${END}"
@@ -289,6 +288,9 @@ DENY_BASH=(
   "${B}(npm|pnpm|yarn)[[:space:]]${REST}publish${END}"
   "${B}gh[[:space:]]+release[[:space:]]+create${END}"
 )
+# gh pr merge, with or without --delete-branch, passes only when merges are in
+# the scope: deleting the merged pull request's own head branch is part of the
+# merge (/merge-pr always passes it), and GitHub can restore it from the PR.
 MERGE_RX="${B}gh[[:space:]]+pr[[:space:]]+merge${END}"
 
 # rm_outside COMMAND CWD: true when a recursive rm may reach outside the

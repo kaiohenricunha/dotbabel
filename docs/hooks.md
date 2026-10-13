@@ -279,7 +279,7 @@ prefix does not reach the gate.
   `clean -f`, `checkout .`, `branch -D`, `worktree remove --force`.
 - A branch or repository deletion: `git branch -d`, `git push --delete`,
   `git push <remote> :<ref>`, `git push +<ref>`, `--mirror`, `--prune`,
-  `gh repo delete`, `gh api -X DELETE`, and `gh pr merge --delete-branch`.
+  `gh repo delete`, and `gh api -X DELETE`.
 - A recursive `rm` that can reach outside the worktree: an absolute path
   outside it, `..`, `~`, a variable, a glob, a quote, `.`, a relative path
   after a `cd`, or an `rm` that `xargs` feeds.
@@ -296,7 +296,10 @@ prefix does not reach the gate.
   names, a `.claude/settings*.json` file, `.claude/hooks/`, `~/.claude/`, or a
   grant file. A change there would outlive the grant. The one exception is
   `rm -f` of the session's own grant file, which is how the skill ends it.
-- `gh pr merge` and `Skill(merge-pr)` when merges are not in the scope.
+- `gh pr merge` and `Skill(merge-pr)` when merges are not in the scope. When
+  they are, `gh pr merge --delete-branch` passes: deleting the merged pull
+  request's own head branch is part of the merge, `/merge-pr` always passes
+  it, and GitHub can restore the branch from the pull request.
 
 The skill tells the session to stop for the same items, and also for a check
 it cannot fix and for any work outside the scope, which no hook can see.
