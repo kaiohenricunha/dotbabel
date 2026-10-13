@@ -18,19 +18,32 @@ function inside(root, candidate) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+const COVERAGE_RULES = ["coverage.no_regression", "coverage.changed_lines", "coverage.changed_branches"];
+
+/** The rule ids an execution's reports would have fed, merged into the ids it already carries. */
+function withReportRules(execution, capabilities) {
+  const reportRules = capabilities.flatMap((capability) => (capability === "coverage" ? COVERAGE_RULES : capabilityRules(capability)));
+  return [...new Set([...(execution.ruleIds ?? []), ...reportRules])];
+}
+
 function parseExecutionReports(repoRoot, executions, scope) {
   const metrics = [];
   const findings = [];
   for (const execution of executions) {
     const capabilities = execution.capabilities ?? [execution.capability];
+    // A plan whose paths did not match the diff never ran, so it has no exit
+    // code and no report. Leave it `not_triggered`: the exit-code branch below
+    // would otherwise read its missing exit code as a crashed coverage command
+    // and fail a docs-only change on a coverage tool scoped to source paths.
+    if (execution.state === "not_triggered") {
+      if (capabilities.includes("coverage")) execution.ruleIds = withReportRules(execution, capabilities);
+      continue;
+    }
     if (execution.exitCode !== 0) {
       if (capabilities.includes("coverage")) {
         execution.state = "unavailable";
         execution.stderr = execution.stderr || "coverage command exited non-zero";
-        const reportRules = capabilities.flatMap((capability) => capability === "coverage"
-          ? ["coverage.no_regression", "coverage.changed_lines", "coverage.changed_branches"]
-          : capabilityRules(capability));
-        execution.ruleIds = [...new Set([...(execution.ruleIds ?? []), ...reportRules])];
+        execution.ruleIds = withReportRules(execution, capabilities);
       }
       continue;
     }
@@ -41,10 +54,7 @@ function parseExecutionReports(repoRoot, executions, scope) {
       if (!fs.existsSync(reportPath) || !fs.statSync(reportPath).isFile() || !inside(repoRoot, reportPath)) {
         execution.state = "unavailable";
         execution.stderr = "configured report is missing or escapes the repository";
-        const reportRules = capabilities.flatMap((capability) => capability === "coverage"
-          ? ["coverage.no_regression", "coverage.changed_lines", "coverage.changed_branches"]
-          : capabilityRules(capability));
-        execution.ruleIds = [...new Set([...(execution.ruleIds ?? []), ...reportRules])];
+        execution.ruleIds = withReportRules(execution, capabilities);
         continue;
       }
       const parsed = parseQualityReport({ format: report.format, text: fs.readFileSync(reportPath, "utf8") });

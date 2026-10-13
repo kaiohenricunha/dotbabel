@@ -9,7 +9,7 @@ import { runQualityCheck } from "../src/quality/index.mjs";
 
 const dirs = [];
 const qualityBin = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../bin/dotbabel-quality.mjs");
-function repository({ missingReport = false, crashingCoverage = false } = {}) {
+function repository({ missingReport = false, crashingCoverage = false, coveragePaths = null, docsOnlyChange = false } = {}) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-quality-index-"));
   dirs.push(repoRoot);
   fs.mkdirSync(path.join(repoRoot, "coverage"));
@@ -22,16 +22,18 @@ function repository({ missingReport = false, crashingCoverage = false } = {}) {
     base_ref: "main",
     components: [{ root: ".", languages: ["javascript"], tools: {
       lint: { argv: ["node", "-e", "process.exit(0)"] },
-      coverage: { argv: ["node", "-e", coverageScript], report: { format: "lcov", path: "coverage/lcov.info" } },
+      coverage: { argv: ["node", "-e", coverageScript], report: { format: "lcov", path: "coverage/lcov.info" }, ...(coveragePaths ? { paths: coveragePaths } : {}) },
     } }],
   } }));
   fs.writeFileSync(path.join(repoRoot, "index.js"), "const first = 1;\n");
+  fs.writeFileSync(path.join(repoRoot, "README.md"), "# base\n");
   execFileSync("git", ["init", "-q", "-b", "main", repoRoot]);
   execFileSync("git", ["-C", repoRoot, "config", "user.email", "test@example.com"]);
   execFileSync("git", ["-C", repoRoot, "config", "user.name", "Test"]);
   execFileSync("git", ["-C", repoRoot, "add", "."]);
   execFileSync("git", ["-C", repoRoot, "commit", "-qm", "base"]);
-  fs.appendFileSync(path.join(repoRoot, "index.js"), "const second = 2;\n");
+  if (docsOnlyChange) fs.appendFileSync(path.join(repoRoot, "README.md"), "docs only\n");
+  else fs.appendFileSync(path.join(repoRoot, "index.js"), "const second = 2;\n");
   return repoRoot;
 }
 
@@ -195,6 +197,23 @@ describe("quality check orchestration", () => {
     });
     expect(result.all_files).toBe(true);
     expect(result.scope.mergeBase).toBeNull();
+  });
+
+  it("reports a path-scoped coverage tool as not_triggered on a diff outside its paths", async () => {
+    const repoRoot = repository({ coveragePaths: ["src/**"], docsOnlyChange: true });
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "pr",
+      base: "main",
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    const changedLines = result.results.find((item) => item.rule === "coverage.changed_lines");
+    expect(changedLines).toMatchObject({ state: "not_triggered", verdict: "info" });
+    expect(changedLines.message).toContain("changed files did not match");
+    expect(result.results.find((item) => item.rule === "coverage.no_regression")).toMatchObject({ state: "not_triggered", verdict: "info" });
+    expect(result.environment_error).toBe(false);
+    expect(result.verdict).toBe("pass");
   });
 
   it("treats a crashing coverage command as an environment failure instead of not-configured", async () => {
