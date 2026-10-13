@@ -21,7 +21,7 @@
  */
 
 import { hostname } from "node:os";
-import { CONFIDENCE_LEVELS, PROVIDERS } from "../domain/index.mjs";
+import { PROVIDERS } from "../domain/index.mjs";
 import { DESCRIPTOR_KINDS, deepFreeze, isPlainObject } from "../sources/contract.mjs";
 import {
   MAX_CACHE_ENTRY_BYTES,
@@ -136,14 +136,13 @@ export function deriveFreshness({ observedAt, policy, now, failedAttemptAt }) {
 }
 
 /**
- * The confidence of a fact with the given freshness. P-9 derives it from freshness alone; the resolver's
- * own confidence (P-11) also weighs which facts it used.
+ * The confidence of a fact with the given freshness, one of the domain's `CONFIDENCE_LEVELS`. P-9
+ * derives it from freshness alone; the resolver's own confidence (P-11) also weighs which facts it used.
  * @param {string} freshness
  * @returns {"high" | "medium" | "low"}
  */
 export function confidenceFor(freshness) {
-  const level = freshness === "fresh" ? "high" : freshness === "stale" ? "medium" : "low";
-  return /** @type {any} */ (CONFIDENCE_LEVELS.includes(level) ? level : "low");
+  return freshness === "fresh" ? "high" : freshness === "stale" ? "medium" : "low";
 }
 
 /**
@@ -337,7 +336,16 @@ export async function refreshSource(source, options = {}) {
   const requestedAt = now();
   const request = kind === "knowledge-source" ? { providers: canonicalProviders(context.providers) } : undefined;
 
-  const lock = acquireLock(lockPathFor(root, id), { resource: id, now: () => Date.parse(now()) });
+  let lock;
+  try {
+    lock = acquireLock(lockPathFor(root, id), { resource: id, now: () => Date.parse(now()) });
+  } catch (err) {
+    // A cache directory that cannot be written is an environment problem of this source, reported like
+    // any other failure, so the other sources still run. Nothing was written, so no attempt is recorded.
+    const summary = cachedSummary(readEntry(root, id), policy, now(), readAttempt(root, id)?.attemptedAt);
+    const code = String(/** @type {any} */ (err)?.code ?? "unknown_error");
+    return { sourceId: id, outcome: "failed", refresh: "idle", cached: summary, diagnostic: { code: "cache_unavailable", message: `the refresh lock could not be created (${code})` } };
+  }
   if (!lock.acquired) {
     const summary = cachedSummary(readEntry(root, id), policy, now(), readAttempt(root, id)?.attemptedAt);
     return { sourceId: id, outcome: "in_progress", refresh: "in_progress", cached: summary, lock: { state: lock.state, reason: lock.reason } };

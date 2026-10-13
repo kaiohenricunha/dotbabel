@@ -228,18 +228,22 @@ function removeStale(path, judged) {
     if (/** @type {any} */ (err)?.code === "ENOENT") return true;
     throw err;
   }
-  const moved = readLockOwner(aside);
-  if (moved?.token === judged.token) {
-    unlinkSync(aside);
-    return true;
+  const text = readFileSync(aside, "utf8");
+  let moved;
+  try {
+    moved = JSON.parse(text);
+  } catch {
+    moved = null;
   }
   try {
-    linkSync(aside, path);
-  } catch {
-    // Yet another owner holds the path now; theirs stands.
+    if (moved?.token === judged.token) return true;
+    // A new owner took the lock between the judgement and the rename, so its lock goes back. If yet
+    // another owner holds the path by now, `tryCreate` refuses and that owner's lock stands.
+    tryCreate(path, text);
+    return false;
+  } finally {
+    unlinkSync(aside);
   }
-  unlinkSync(aside);
-  return false;
 }
 
 /**

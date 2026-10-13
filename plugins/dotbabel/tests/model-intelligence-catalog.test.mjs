@@ -186,7 +186,7 @@ describe("model-intelligence catalog normalization (P-9)", () => {
     const b = knowledgeOk(
       "other-catalog",
       catalogEvidence([
-        { id: "anthropic", models: [{ id: "shared", contextWindow: 3 }] },
+        { id: "anthropic", sourceKey: "claude", models: [{ id: "shared", contextWindow: 3 }] },
         { id: "models-dev.xai", models: [{ id: "grok", contextWindow: 4 }] },
       ]),
       T0,
@@ -199,6 +199,8 @@ describe("model-intelligence catalog normalization (P-9)", () => {
     expect(joined).toHaveLength(1);
     expect(joined[0].joined).toBe(true);
     expect(joined[0].fields.contextWindow.map((e) => e.value)).toEqual([1, 3]);
+    // A source that keys the provider differently keeps its own key, so the joined fact stays traceable (ARCH-28).
+    expect(joined[0].sourceKeys).toEqual([{ sourceId: "other-catalog", sourceKey: "claude" }]);
 
     const scoped = catalog.models.filter((r) => r.provider === "models-dev.xai");
     expect(scoped).toHaveLength(2);
@@ -540,6 +542,19 @@ describe("model-intelligence refresh coordination (P-9)", () => {
     expect(existsSync(lockPathFor(root, "fake-catalog"))).toBe(false);
   });
 
+  it("a cache root that cannot be written fails that source with cache_unavailable, and the next source still runs", async () => {
+    const dir = tempRoot();
+    const root = join(dir, "not-a-directory");
+    writeFileSync(root, "a file where the cache root should be");
+    const first = runtimeModule("codex", () => runtimeOk("codex", [{ id: "gpt-x" }], T0));
+    const outcomes = await refreshSources([{ module: first }, { module: knowledgeModule("fake-catalog", () => knowledgeOk("fake-catalog", catalogEvidence(ANTHROPIC_ONLY), T0)), context: { providers: ["anthropic"] } }], { root, now: clockAt(T0) });
+    expect(outcomes.map((o) => [o.outcome, o.diagnostic?.code])).toEqual([
+      ["failed", "cache_unavailable"],
+      ["failed", "cache_unavailable"],
+    ]);
+    expect(first.discover).not.toHaveBeenCalled();
+  });
+
   it("many simultaneous refreshes of one key run exactly one discovery", async () => {
     const root = tempRoot();
     const work = tempRoot();
@@ -679,6 +694,23 @@ describe("model-intelligence refresh locks (P-9)", () => {
     expect(readLockOwner(path).pid).toBe(process.pid);
     recovered.release();
     expect(existsSync(path)).toBe(false);
+  });
+
+  it("a recoverer that loses the race to a new owner puts that owner's lock back instead of deleting it", () => {
+    const root = tempRoot();
+    const path = lockPathFor(root, "fake-catalog");
+    mkdirSync(join(root, "locks"), { recursive: true });
+    writeFileSync(path, JSON.stringify(owner()));
+    const newcomer = JSON.stringify(owner({ token: "n".repeat(32), pid: process.pid, acquiredAt: at(HOUR) }));
+    // While this process judges the stale lock, another recovers it and takes the lock itself.
+    const isAlive = () => {
+      writeFileSync(path, newcomer);
+      return false;
+    };
+    const attempt = acquireLock(path, { resource: "fake-catalog", now: () => Date.parse(T0) + HOUR, isAlive, processStartOf: () => undefined });
+    expect(attempt).toMatchObject({ acquired: false, state: "held", reason: "contended" });
+    expect(readFileSync(path, "utf8")).toBe(newcomer);
+    expect(readdirSync(join(root, "locks"))).toEqual(["fake-catalog.lock"]);
   });
 
   it("a stale lock whose owner pid is dead is recovered only by the conservative rule", async () => {
