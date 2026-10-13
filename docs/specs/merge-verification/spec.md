@@ -4,15 +4,15 @@
 
 `/merge-pr` trusts a SHA-pinned `local-attest` comment and skips its own test
 run (`docs/attestation.md`, `commands/merge-pr.md` step 4). The merge gate
-checks that the comment is from a trusted author, is not edited, names the
-current head, and was produced under the base branch's configuration. It
-cannot check that a real run produced it. An AI agent that drives `gh` with the
+checks that a trusted author wrote the comment and did not edit it. It also
+checks that the comment names the current head and that the base branch's
+configuration produced it. It cannot check that a real run produced it. An AI agent that drives `gh` with the
 user's token is that trusted author, so it can post the comment without
 running anything.
 
 Signatures from a key that the agent cannot use would close this gap. That
 design is in `docs/specs/unforgeable-evidence`, and it is parked as an opt-in
-design: a generic open-source tool cannot require each user to own a hardware
+design. A generic open-source tool cannot require each user to own a hardware
 key. This spec is the soft path that every repository gets.
 
 A second fact shapes the design. Private consumer repositories often reach the
@@ -45,8 +45,8 @@ policy with both rates at 0, so no spot check runs. The defaults in the table
 apply to the keys that a block leaves unset.
 
 The resolver is strict. An unknown key, a value outside 0 to 1, or a glob with
-`!`, braces or brackets is an error (exit `2`), never a silent default, because
-a typo must not lower the check rate.
+`!`, braces or brackets is an error (exit `2`). It is never a silent default,
+because a typo must not lower the check rate.
 
 The policy is off when both rates are `0` and no `always_paths` is set. Then the
 command reads the pull request once to find its base commit, decides `off`, and
