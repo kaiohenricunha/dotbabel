@@ -357,7 +357,7 @@ describe("provider namespace mapping (§5 Provider namespace)", () => {
     expect(toSourceKey("models-dev", "models-dev.anthropic")).toBeUndefined();
     expect(toSourceKey("codex", "codex.oai", { oai: "openai" })).toBeUndefined();
     // A bare id outside PROVIDERS, another source's scoped id, or no key at all is not this namespace.
-    for (const bad of ["xai", "other-source.xai", "models-dev.", "models-dev", "", 7, null]) {
+    for (const bad of ["xai", "other-source.xai", "models-devXxai", "models-dev.", "models-dev", "", 7, null]) {
       expect(toSourceKey("models-dev", bad), String(bad)).toBeUndefined();
     }
   });
