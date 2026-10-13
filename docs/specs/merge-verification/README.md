@@ -8,7 +8,7 @@
 
 ## Status
 
-The spec is `implementing`. Every acceptance criterion is `active`. Run them with:
+The spec is `done`: it shipped in #465, and the evidence payload fix it needed shipped in #468. Every acceptance criterion is `active` and still runs as a regression check. Run them with:
 
 ```bash
 dotbabel criteria verify --spec merge-verification

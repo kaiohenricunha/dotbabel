@@ -2,7 +2,7 @@
 id: git
 name: git
 type: skill
-version: 1.0.0
+version: 1.1.0
 domain: [devex]
 platform: [none]
 task: [review]
@@ -239,6 +239,8 @@ git log "$BASE..$BRANCH" --oneline
 git diff "$BASE...$BRANCH" --stat
 gh pr create --title "<generated-title>" --body "<generated-body>"
 ```
+
+**Task state.** If this worktree has an open task (`dotbabel task list`), record the pull request on it: `dotbabel task update <slug> --phase pr --decision "PR #<N>"`. Under `/pr-conductor`, the conductor records the later phases. When there is no task, or `dotbabel` is not installed, skip this step.
 
 **Title rules:**
 

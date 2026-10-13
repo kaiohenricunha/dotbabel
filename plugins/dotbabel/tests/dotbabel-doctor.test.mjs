@@ -513,3 +513,85 @@ export default { matrix: [{ name: "test", mode: "hard", command: "true" }] };
     expect(res.stdout).toMatch(/attestation enforcement is on and its configuration is coherent/);
   });
 });
+
+describe("dotbabel-doctor run receipt check", () => {
+  const HEAD = "b".repeat(40);
+  const NOW = "2026-10-13T12:00:00.000Z";
+  const attempt = (n, phase, outcome) => ({
+    phase,
+    n,
+    at: NOW,
+    head_sha: HEAD,
+    base_ref: null,
+    merge_base: null,
+    outcome,
+    reason_code: null,
+    evidence: [],
+    requested_model: null,
+    tool_version: null,
+  });
+  const receipt = (pr, attempts) => ({
+    schema_version: 1,
+    tool: "dotbabel-pr-stack",
+    pr,
+    created_at: NOW,
+    updated_at: NOW,
+    attempts,
+  });
+
+  // A git repository whose common directory holds the given receipt files.
+  function repoWithReceipts(files) {
+    const root = repoWithFacts({ protected_paths: [] });
+    spawnSync("git", ["init", "-q", root], { encoding: "utf8" });
+    const dir = path.join(root, ".git", "dotbabel", "receipts");
+    fs.mkdirSync(dir, { recursive: true });
+    for (const [name, value] of Object.entries(files)) {
+      fs.writeFileSync(path.join(dir, name), typeof value === "string" ? value : JSON.stringify(value));
+    }
+    return root;
+  }
+
+  it("counts the receipts by verdict and warns once per damaged file, naming its pull request", () => {
+    const repoRoot = repoWithReceipts({
+      "pr-1.json": receipt(1, [attempt(1, "pre-pr", "pass"), attempt(2, "stop", "pass")]),
+      "pr-2.json": receipt(2, [attempt(1, "review-pr", "fail")]),
+      "pr-3.json": "{not json",
+    });
+    const res = runDoctor({ home: makeTmpDir("home-"), repoRoot });
+    expect(res.stdout).toMatch(/run receipts: 2 pull request\(s\) recorded — latest verdict: 1 ready, 1 blocked, 0 in progress/);
+    expect(res.stdout).toMatch(/run receipts: pr-3\.json \(receipt for #3\) is damaged: not readable JSON/);
+    expect(res.stdout).toMatch(/Leave the file as it is and ask a person: a new receipt resets the attempt cap/);
+    expect(res.stdout).not.toMatch(/move it aside|delete it|start a new one/);
+    expect(res.stdout.match(/is damaged/g)).toHaveLength(1);
+  });
+
+  it("never fails the run for a damaged receipt", () => {
+    const repoRoot = repoWithReceipts({ "pr-4.json": receipt(5, []) });
+    const res = runDoctorJson({ home: makeTmpDir("home-"), repoRoot });
+    const events = res.events.filter((e) => e.message.startsWith("run receipts"));
+    expect(events.map((e) => e.kind)).toEqual(["warn"]);
+    expect(events[0].message).toMatch(/pr is 5, but the file is for #4/);
+  });
+
+  it("reads the receipts of the main repository from a linked worktree", () => {
+    const repoRoot = repoWithReceipts({ "pr-6.json": receipt(6, [attempt(1, "stop", "pass")]) });
+    const git = (...args) => spawnSync("git", ["-C", repoRoot, ...args], { encoding: "utf8" });
+    git("add", "-A");
+    git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "init");
+    const worktree = path.join(makeTmpDir("doctor-wt-"), "wt");
+    expect(git("worktree", "add", "-q", worktree).status).toBe(0);
+    const res = runDoctor({ home: makeTmpDir("home-"), repoRoot: worktree });
+    expect(res.stdout).toMatch(/run receipts: 1 pull request\(s\) recorded — latest verdict: 1 ready/);
+  });
+
+  it("names the spot-check effect, not the receipt one, for a damaged spot-check log", () => {
+    const repoRoot = repoWithReceipts({ "pr-7.spot-checks.json": "[]" });
+    const res = runDoctor({ home: makeTmpDir("home-"), repoRoot });
+    expect(res.stdout).toMatch(/pr-7\.spot-checks\.json \(spot-check log for #7\) is damaged: .* `pr-stack spot-check` stops with exit 2 for #7, and main-status skips it/);
+  });
+
+  it("says nothing about receipts in a repository that has none", () => {
+    const res = runDoctor({ home: makeTmpDir("home-"), repoRoot: repoWithFacts({ protected_paths: [] }) });
+    expect(res.stdout).not.toMatch(/run receipts/);
+  });
+});

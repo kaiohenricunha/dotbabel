@@ -1,7 +1,7 @@
 {
   "id": "merge-verification",
   "title": "Merge verification — spot checks, the cumulative rule, and the contradiction alarm",
-  "status": "implementing",
+  "status": "done",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/merge-verification.mjs",

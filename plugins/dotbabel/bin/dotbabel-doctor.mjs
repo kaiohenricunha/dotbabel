@@ -14,6 +14,8 @@
  *   hook         plugins/dotbabel/hooks/guard-destructive-git.sh present + exec bit
  *   hooks        each shipped hook registered in a Claude Code settings file
  *                (user, project, local) or the shell prefix (warn only)
+ *   receipts     /pr-conductor run receipts and spot-check logs under the git
+ *                common directory read with their writers' validators (warn only)
  *   attestation  .dotbabel.json attestation policy coherent with the local-attest config
  *   bootstrap    ~/.claude/CLAUDE.md and supported CLI symlinks present
  *                (informational — warn only)
@@ -50,6 +52,8 @@ import {
   pathExists,
 } from "../src/index.mjs";
 import { USER_OVERLAY_BEGIN } from "../src/lib/user-overlay.mjs";
+import { readReceiptDir, receiptHealthReport } from "../src/receipt-health.mjs";
+import { RECEIPT_DIR } from "../src/run-receipt.mjs";
 import { isRepoTrusted } from "../src/trust-allowlist.mjs";
 import {
   SHELL_PREFIX_EVENT,
@@ -244,6 +248,44 @@ let stopHookRegistered = false;
     );
   }
   stopHookRegistered = report.registered.some((r) => r.hook === "check-on-stop.sh");
+}
+
+// run receipts. /pr-conductor's receipts and the spot-check logs live under
+// the git COMMON directory, and pr-stack refuses a damaged one with exit 2 for
+// that pull request. Never out.fail: it blocks one pull request's retries, not
+// the install. A repository that is not a git work tree has no receipts.
+{
+  let commonDir = null;
+  try {
+    commonDir = execFileSync(
+      "git",
+      ["-C", ctx.repoRoot, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+    ).trim();
+  } catch {
+    commonDir = null;
+  }
+  if (commonDir) {
+    const dir = join(commonDir, RECEIPT_DIR);
+    const { files, error } = readReceiptDir(dir);
+    if (error) out.warn(`run receipts: ${dir} is unreadable (${printable(error)})`);
+    const r = receiptHealthReport(files);
+    if (r.receipts + r.spotCheckLogs > 0) {
+      const logs = r.spotCheckLogs > 0 ? `, ${r.spotCheckLogs} spot-check log(s)` : "";
+      out.pass(
+        `run receipts: ${r.receipts} pull request(s) recorded — latest verdict: ${r.verdicts.ready} ready, ${r.verdicts.blocked} blocked, ${r.verdicts["in-progress"]} in progress${logs}`,
+      );
+    }
+    // Never suggest deleting or replacing a damaged file: a new receipt resets
+    // the attempt cap for that pull request (skills/pr-conductor/SKILL.md).
+    for (const d of r.damaged) {
+      const effect =
+        d.kind === "receipt"
+          ? `\`pr-stack record\`, \`receipt\` and the attempt cap stop with exit 2 for #${d.pr}. Leave the file as it is and ask a person: a new receipt resets the attempt cap`
+          : `\`pr-stack spot-check\` stops with exit 2 for #${d.pr}, and main-status skips it. Leave the file as it is and ask a person`;
+      out.warn(`run receipts: ${d.name} (${d.kind} for #${d.pr}) is damaged: ${printable(d.problem)} — ${effect}`);
+    }
+  }
 }
 
 // check-on-stop trust. Never out.fail: the exit code is derived from the fail
