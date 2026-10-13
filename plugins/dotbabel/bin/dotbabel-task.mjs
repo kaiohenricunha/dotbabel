@@ -176,8 +176,7 @@ function cmdNew(args) {
   // and the new edges close no cycle. A slug this worktree holds is left to
   // writeTask's exclusive create, which reports TASK_EXISTS and also catches
   // a same-worktree race.
-  const clone = listCloneTasks(root);
-  for (const p of clone.problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+  const clone = readClone(root);
   const owner = findSlugOwner(clone.tasks, slug);
   if (owner !== null && owner !== root) {
     throw new TaskError(TASK_ERROR_CODES.TASK_SLUG_TAKEN, `task "${slug}" already exists in worktree ${owner}`);
@@ -203,8 +202,7 @@ function cmdUpdate(args) {
     const next = updateTask(t, change);
     if (change.dependsOn.length > 0) {
       // Under the task's lock, so the edges checked are the edges written.
-      const clone = listCloneTasks(root);
-      for (const p of clone.problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+      const clone = readClone(root);
       assertNoCycle(next, clone.tasks.filter((other) => other.slug !== slug));
     }
     return next;

@@ -186,8 +186,8 @@ export function topologicalOrder(tasks) {
   const remaining = new Map();
   const dependents = new Map();
   for (const task of open) {
-    const deps = new Set(cloneEdges([task]).map(([, to]) => to).filter((to) => slugs.has(to) && to !== task.slug));
-    if (cloneEdges([task]).some(([, to]) => to === task.slug)) deps.add(task.slug);
+    // A self reference stays in the set: it keeps the task off the order and in the cycle.
+    const deps = new Set(cloneEdges([task]).map(([, to]) => to).filter((to) => slugs.has(to)));
     remaining.set(task.slug, deps);
     for (const to of deps) {
       if (!dependents.has(to)) dependents.set(to, []);
