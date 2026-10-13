@@ -146,3 +146,39 @@ describe("model-intelligence domain shape guards", () => {
     expect(() => makeProvenance({ sourceId: "codex", sourceKind: "runtime", adapterVersion: {} })).toThrow(/adapterVersion must be a string/);
   });
 });
+
+describe("model-intelligence provider namespace and opaque values (P-8c)", () => {
+  it("PROVIDERS is frozen, and every id matches ^[a-z0-9-]{1,48}$", () => {
+    const { PROVIDERS } = domain;
+    expect(Object.isFrozen(PROVIDERS)).toBe(true);
+    // The seeds are the Models.dev keys of the providers Dotbabel uses, because OpenCode already uses them (DOC-3).
+    expect(PROVIDERS).toEqual(["anthropic", "openai", "google", "github-copilot", "opencode"]);
+    for (const id of PROVIDERS) expect(id).toMatch(/^[a-z0-9-]{1,48}$/);
+    // No id holds a dot, so a source-scoped id such as models-dev.xai can never equal one.
+    expect(PROVIDERS.filter((id) => id.includes("."))).toEqual([]);
+    expect(new Set(PROVIDERS).size).toBe(PROVIDERS.length);
+  });
+
+  it("domain/ exports checkOpaqueValue and assertOpaqueValue with the verdicts they had in sources/runtime/process.mjs", async () => {
+    const { assertOpaqueValue, checkOpaqueValue } = domain;
+    const C = (code) => String.fromCharCode(code);
+    for (const good of ["opus", "claude-opus-5[1m]", "gpt-6-astra", "local-qwen/model#variant", "a-", "a".repeat(200)]) {
+      expect(assertOpaqueValue("model", good), good).toBe(good);
+      expect(checkOpaqueValue("model", good), good).toBe(true);
+    }
+    // A leading dash would be parsed as a flag; a control or format character could forge output.
+    for (const bad of ["-x", "--model", "", "a".repeat(201), "line" + C(10) + "break", "nul" + C(0), "tab" + C(9), "zero" + C(0x200b) + "width"]) {
+      expect(() => assertOpaqueValue("model", bad), JSON.stringify(bad).slice(0, 12)).toThrow(/model must be a printable string/);
+      expect(checkOpaqueValue("model", bad), JSON.stringify(bad).slice(0, 12)).toBe(false);
+    }
+    // A value that is not a string is a caller breach for both, so both throw (§5 Failure channels).
+    for (const notString of [7, null, undefined, {}, ["opus"]]) {
+      expect(() => assertOpaqueValue("reasoning", notString)).toThrow(/reasoning must be a printable string/);
+      expect(() => checkOpaqueValue("reasoning", notString)).toThrow(/reasoning must be a string/);
+    }
+    // Moved, not copied: resolver/ may not import sources/ (ARCH-57 rule 1), so one rule lives in domain/.
+    const runtimeProcess = await import("../src/model-intelligence/sources/runtime/process.mjs");
+    expect(Object.hasOwn(runtimeProcess, "assertOpaqueValue")).toBe(false);
+    expect(Object.hasOwn(runtimeProcess, "checkOpaqueValue")).toBe(false);
+  });
+});

@@ -132,7 +132,7 @@ describe("claude source adapter", () => {
     // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so the answer reflects only
     // the flags carried in plus Claude's defaults, and the evidence names those flags.
     expect(result.evidence.configurationBasis).toBe("reconstructed");
-    expect(result.evidence.reconstructedFrom).toEqual(["--model", "--effort"]);
+    expect(result.evidence.reconstructedFrom).toEqual(["axes.model", "axes.reasoning"]);
     // Provenance carries the version the runtime itself reported.
     expect(result.provenance.sourceVersion).toBe("2.1.278");
 
@@ -149,6 +149,84 @@ describe("claude source adapter", () => {
     const bare = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl") }));
     await claude.observe(bare.ctx);
     expect(bare.runner.calls.find((c) => c.args[0] !== "--version").args).toEqual(["-p", "x", "--output-format", "stream-json", "--verbose", "--no-session-persistence"]);
+  });
+
+  it("observe() records reconstructedFrom as axes.model and axes.reasoning, never a flag", async () => {
+    const probeArgs = (runner) => runner.calls.find((c) => c.args[0] !== "--version").args;
+    const both = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), stoppedEarly: true }));
+    const result = await claude.observe({ ...both.ctx, model: "opus", reasoning: "high" });
+    // §5: carried inputs use the fieldSources vocabulary, so catalog/ needs no mapping per runtime. The
+    // stream reports no effort, so axes.reasoning names an input no observed field reflects (§5 allows it).
+    expect(result.evidence.reconstructedFrom).toEqual(["axes.model", "axes.reasoning"]);
+    expect(Object.hasOwn(result.evidence.axes, "reasoning")).toBe(false);
+    // The CLI flag is still --effort; only the evidence speaks in axis names.
+    expect(probeArgs(both.runner)).toEqual(["-p", "x", "--model", "opus", "--effort", "high", "--output-format", "stream-json", "--verbose", "--no-session-persistence"]);
+
+    const modelOnly = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), stoppedEarly: true }));
+    expect((await claude.observe({ ...modelOnly.ctx, model: "opus" })).evidence.reconstructedFrom).toEqual(["axes.model"]);
+    const reasoningOnly = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), stoppedEarly: true }));
+    expect((await claude.observe({ ...reasoningOnly.ctx, reasoning: "max" })).evidence.reconstructedFrom).toEqual(["axes.reasoning"]);
+    const bare = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), stoppedEarly: true }));
+    expect((await claude.observe(bare.ctx)).evidence.reconstructedFrom).toEqual([]);
+  });
+
+  it("validate() and observe() take reasoning, accept effort as a deprecated alias, and throw when both are given with different values", async () => {
+    const probeArgs = (runner) => runner.calls.find((c) => c.args[0] !== "--version").args;
+    // One name for one axis (§5): reasoning is the input key, as in the evidence and in Codex.
+    const viaReasoning = context(() => recorded("validate-known-alias.json"));
+    const result = await claude.validate({ model: "opus", reasoning: "high" }, viaReasoning.ctx);
+    expect(result.status).toBe("ok");
+    expect(result.evidence.checks.map((c) => [c.axis, c.value])).toEqual([["model", "opus"], ["reasoning", "high"]]);
+    expect(probeArgs(viaReasoning.runner)).toEqual(["-p", "x", "--model", "opus", "--effort", "high", "--no-session-persistence"]);
+    // The deprecated alias still works and gives the same probe and the same evidence.
+    const viaEffort = context(() => recorded("validate-known-alias.json"));
+    const aliased = await claude.validate({ model: "opus", effort: "high" }, viaEffort.ctx);
+    expect(probeArgs(viaEffort.runner)).toEqual(probeArgs(viaReasoning.runner));
+    expect(aliased.evidence.checks).toEqual(result.evidence.checks);
+    const observeEffort = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), stoppedEarly: true }));
+    expect((await claude.observe({ ...observeEffort.ctx, effort: "max" })).evidence.reconstructedFrom).toEqual(["axes.reasoning"]);
+    expect(probeArgs(observeEffort.runner)).toContain("max");
+    // A bad value under either name is data, reported under the axis name and never echoed (OPS-4).
+    for (const input of [{ reasoning: "--model" }, { effort: "--model" }]) {
+      const bad = await claude.validate(input, viaReasoning.ctx);
+      expect(bad.diagnostic.code, JSON.stringify(input)).toBe("invalid_axis_value");
+      expect(bad.diagnostic.message, JSON.stringify(input)).toMatch(/the reasoning value/);
+    }
+    // Two different values for one axis is a caller breach, so it throws before anything runs.
+    const conflict = context(() => {
+      throw new Error("a conflicting input must not run anything");
+    });
+    await expect(claude.validate({ reasoning: "high", effort: "low" }, conflict.ctx)).rejects.toThrow(/^claude validate: reasoning and effort/);
+    await expect(claude.validate({ model: "opus", reasoning: "high", effort: 7 }, conflict.ctx)).rejects.toThrow(TypeError);
+    await expect(claude.observe({ ...conflict.ctx, reasoning: "high", effort: "low" })).rejects.toThrow(/^claude observe: reasoning and effort/);
+    expect(conflict.runner.calls).toHaveLength(0);
+  });
+
+  it("validate() accepts reasoning and effort together when they are equal", async () => {
+    const { runner, ctx } = context(() => recorded("validate-known-alias.json"));
+    const result = await claude.validate({ reasoning: "high", effort: "high" }, ctx);
+    expect(result.status).toBe("ok");
+    // One axis, one check, one flag: the alias does not count twice.
+    expect(result.evidence.checks.map((c) => [c.axis, c.value])).toEqual([["reasoning", "high"]]);
+    expect(runner.calls.find((c) => c.args[0] !== "--version").args).toEqual(["-p", "x", "--effort", "high", "--no-session-persistence"]);
+    const observed = context(() => outcome({ stdout: stream("stream-init-no-turn.jsonl"), stoppedEarly: true }));
+    expect((await claude.observe({ ...observed.ctx, reasoning: "high", effort: "high" })).evidence.reconstructedFrom).toEqual(["axes.reasoning"]);
+  });
+
+  it("observe() maps a usage provider into PROVIDERS, and scopes one it does not know as claude.<key>", async () => {
+    const lines = [
+      { type: "system", subtype: "init", model: "claude-opus-5", claude_code_version: "2.1.278" },
+      { type: "result", is_error: false, modelUsage: { "claude-opus-5": { provider: "anthropic" }, "claude-haiku-4-5": { provider: "bedrock" }, "m-3": { provider: "Not An Id" } } },
+    ];
+    const result = await claude.observe({ stream: lines.map((l) => JSON.stringify(l)).join("\n"), now: fixedNow });
+    expect(result.status).toBe("ok");
+    // §5: usage[].provider is a runtime-reported provider id, mapped like every other one. A key whose
+    // scoped form is not a provider id is dropped, as a field of the wrong shape always is here.
+    expect(result.evidence.usage).toEqual([
+      { model: "claude-opus-5", provider: "anthropic" },
+      { model: "claude-haiku-4-5", provider: "claude.bedrock" },
+      { model: "m-3" },
+    ]);
   });
 
   it("returns unavailable with code timeout when the CLI does not answer, and aborts it", async () => {
@@ -241,8 +319,8 @@ describe("claude source adapter", () => {
 
   it("validate() throws when the caller breaks the input contract: no axis, a non-object, or a value that is not a string", async () => {
     const { runner, ctx } = context(() => recorded("validate-known-alias.json"));
-    await expect(claude.validate({}, ctx)).rejects.toThrow(/model or an effort/);
-    await expect(claude.validate(null, ctx)).rejects.toThrow(/model or an effort/);
+    await expect(claude.validate({}, ctx)).rejects.toThrow(/model or a reasoning value/);
+    await expect(claude.validate(null, ctx)).rejects.toThrow(/model or a reasoning value/);
     await expect(claude.validate({ model: 7 }, ctx)).rejects.toThrow(/model must be a string/);
     // Nothing was run for any of them.
     expect(runner.calls).toHaveLength(0);

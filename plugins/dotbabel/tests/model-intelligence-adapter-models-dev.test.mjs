@@ -28,6 +28,9 @@ const reply = (body, init = {}) => new Response(body, { status: 200, headers: { 
 /** The recorded document, parsed, so a test can change one record without touching the file. */
 const recorded = () => JSON.parse(RECORDED.toString("utf8"));
 
+/** The recorded document plus one provider whose key is not a Dotbabel id. */
+const withXai = () => ({ ...recorded(), xai: { id: "xai", name: "xAI", models: { "grok-5": { id: "grok-5", name: "Grok 5" } } } });
+
 const discoverWith = (respond, extra = {}) => {
   const double = fakeFetch(respond);
   return { double, run: modelsDev.discover({ providers: ["anthropic", "github-copilot", "openai"], fetch: double.fetch, now: fixedNow, ...extra }) };
@@ -95,16 +98,16 @@ describe("models-dev knowledge-source adapter", () => {
   });
 
   it("reduces the document to the requested providers, and lists a requested provider the source lacks", async () => {
-    const { run } = discoverWith(() => reply(RECORDED), { providers: ["openai", "no-such-provider"] });
+    const { run } = discoverWith(() => reply(RECORDED), { providers: ["openai", "models-dev.no-such-provider"] });
     const result = await run;
     expect(result.status).toBe("ok");
     expect(result.evidence.providers.map((p) => p.id)).toEqual(["openai"]);
-    expect(result.evidence.missingProviders).toEqual(["no-such-provider"]);
+    expect(result.evidence.missingProviders).toEqual(["models-dev.no-such-provider"]);
     expect(JSON.stringify(result.evidence)).not.toContain("claude");
   });
 
   it("reports a document holding none of the requested providers as unknown, never as an empty success (ARCH-30)", async () => {
-    const { run } = discoverWith(() => reply(RECORDED), { providers: ["no-such-provider"] });
+    const { run } = discoverWith(() => reply(RECORDED), { providers: ["models-dev.no-such-provider"] });
     const result = await run;
     expect(result.status).toBe("unknown");
     expect(result.diagnostic.code).toBe("insufficient_evidence");
@@ -296,6 +299,34 @@ describe("models-dev knowledge-source adapter", () => {
     const { fetch } = fakeFetch(() => reply(RECORDED));
     for (const providers of [undefined, [], "anthropic", ["__proto__"], ["Bad Id"], ["a/b"], [7]]) {
       await expect(modelsDev.discover({ providers, fetch, now: fixedNow }), JSON.stringify(providers)).rejects.toThrow(TypeError);
+    }
+  });
+
+  it("maps a Models.dev key into PROVIDERS, and emits an unmapped key as models-dev.<key>", async () => {
+    const { run } = discoverWith(() => reply(JSON.stringify(withXai())), { providers: ["anthropic", "models-dev.xai"] });
+    const result = await run;
+    expect(result.status).toBe("ok");
+    const [anthropic, xai] = result.evidence.providers;
+    // A seed key is already a Dotbabel id, so it maps to itself and carries no sourceKey.
+    expect(anthropic.id).toBe("anthropic");
+    expect(Object.hasOwn(anthropic, "sourceKey")).toBe(false);
+    // An unmapped key is kept, scoped, so it can never join a fact from another source by accident (§5).
+    expect(xai).toMatchObject({ id: "models-dev.xai", sourceKey: "xai", displayName: "xAI" });
+    expect(xai.discovery.models.map((m) => m.id)).toEqual(["grok-5"]);
+  });
+
+  it("context.providers takes Dotbabel ids and maps them back to the source keys", async () => {
+    const doc = JSON.stringify(withXai());
+    const { run } = discoverWith(() => reply(doc), { providers: ["models-dev.xai", "github-copilot", "models-dev.no-such-provider"] });
+    const result = await run;
+    expect(result.evidence.providers.map((p) => [p.id, p.sourceKey])).toEqual([["models-dev.xai", "xai"], ["github-copilot", undefined]]);
+    // A provider the source lacks is listed under the id the caller used, not the source key.
+    expect(result.evidence.missingProviders).toEqual(["models-dev.no-such-provider"]);
+    // A bare source key, the scoped form of a seed key, and another source's id are not ids of this namespace.
+    for (const providers of [["xai"], ["models-dev.anthropic"], ["other-source.xai"], ["anthropic", "models-dev.anthropic"]]) {
+      const refused = fakeFetch(() => reply(doc));
+      await expect(modelsDev.discover({ providers, fetch: refused.fetch, now: fixedNow }), providers.join()).rejects.toThrow(/Dotbabel provider id/);
+      expect(refused.calls).toHaveLength(0);
     }
   });
 

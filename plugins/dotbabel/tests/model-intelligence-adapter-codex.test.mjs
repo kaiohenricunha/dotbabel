@@ -241,13 +241,45 @@ describe("codex source adapter", () => {
     // The banner reflects a scratch config that carries exactly these keys, and the evidence says so,
     // so a caller never reads a reconstruction as the user's full configuration (ARCH-28).
     expect(result.evidence.configurationBasis).toBe("reconstructed");
-    expect(result.evidence.reconstructedFrom).toEqual(["model", "model_provider", "model_reasoning_effort"]);
+    expect(result.evidence.reconstructedFrom).toEqual(["axes.model", "provider", "axes.reasoning"]);
 
     // Only the four model keys, read from the top of the file. The plugin and project sections, and
     // a `model` key inside a table, are private and irrelevant, and are not carried.
     expect(scratchConfig).toBe('model = "gpt-5.5"\nmodel_provider = "openai"\nmodel_reasoning_effort = "high"\n');
     expect(scratchRootFiles).not.toContain("auth.json");
     expect(scratchConfig).not.toMatch(/plugins|projects|personality|approval|trusted|private/);
+  });
+
+  it("observe() records reconstructedFrom as axes.<name> or provider, never a native config key, and model_verbosity as axes.verbosity", async () => {
+    const home = makeTempDir("mi-codex-home-");
+    const realRoot = join(home, ".codex");
+    mkdirSync(realRoot, { recursive: true });
+    writeFileSync(join(realRoot, "config.toml"), 'model = "gpt-5.5"\nmodel_provider = "openai"\nmodel_reasoning_effort = "high"\nmodel_verbosity = "low"\n');
+    const runner = fakeRunner(responder(() => outcome({ stderr: banner(), stoppedEarly: true })));
+    const result = await codex.observe({ runCommand: runner.runCommand, env: { PATH: "/usr/bin", CODEX_HOME: realRoot }, homeDir: home, now: fixedNow });
+    // §5: the carried inputs use the fieldSources vocabulary. model_verbosity has no axis of its own,
+    // so the adapter names one, and catalog/ never needs to know Codex's configuration keys.
+    expect(result.evidence.reconstructedFrom).toEqual(["axes.model", "provider", "axes.reasoning", "axes.verbosity"]);
+    // The banner prints no verbosity, so axes.verbosity names an input no observed field reflects.
+    expect(Object.hasOwn(result.evidence.axes, "verbosity")).toBe(false);
+    expect(result.evidence.reconstructedFrom.filter((entry) => entry.startsWith("model"))).toEqual([]);
+  });
+
+  it("observe() maps the banner provider into PROVIDERS", async () => {
+    const withProvider = (provider) => banner().replace("provider: openai", `provider: ${provider}`);
+    // A Dotbabel id stays as it is; an unmapped key is scoped, so it can never join by accident (§5).
+    for (const [reported, expected] of [["openai", "openai"], ["ollama", "codex.ollama"]]) {
+      const { ctx } = context(() => outcome({ stderr: withProvider(reported), stoppedEarly: true }));
+      const observed = (await codex.observe(ctx)).evidence;
+      expect(observed.provider, reported).toBe(expected);
+      expect(observed.fieldSources.provider, reported).toBe("exec-banner:provider");
+    }
+    // A key whose scoped form is not a provider id is left out with its field source, never invented.
+    const { ctx } = context(() => outcome({ stderr: withProvider("Azure Foundry"), stoppedEarly: true }));
+    const observed = (await codex.observe(ctx)).evidence;
+    expect(Object.hasOwn(observed, "provider")).toBe(false);
+    expect(Object.hasOwn(observed.fieldSources, "provider")).toBe(false);
+    expect(observed.axes.model).toBe("gpt-6-astra");
   });
 
   it("starts from an empty scratch config when the user has none, and ignores a value it cannot read safely", async () => {

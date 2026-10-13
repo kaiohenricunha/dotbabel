@@ -471,8 +471,9 @@ export function assertDescriptor(descriptor) {
  * One exception, split by operation rather than by source: `renderInvocation` is
  * synchronous and returns a plain Invocation, so it throws on any invalid value, even one
  * that came from frontmatter. Its caller is the resolver, which must have validated each
- * value first, so a bad value there is a caller breach. Spec §5 declares
- * `renderInvocation(...): InvocationResult`; this divergence is open until §5 is amended.
+ * value first, so a bad value there is a caller breach. §5 `Failure channels` states this
+ * exception and its precondition: the caller checks each value with `checkOpaqueValue`
+ * from `domain/` before it renders.
  * @param {object} input
  * @returns {object} A result frozen at the top level. Its provenance and diagnostic are frozen too, and `evidence` is passed by reference.
  */

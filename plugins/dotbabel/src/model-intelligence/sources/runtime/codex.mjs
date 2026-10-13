@@ -26,16 +26,17 @@
 
 import { join } from "node:path";
 import { writeFile } from "node:fs/promises";
+import { assertOpaqueValue, checkOpaqueValue } from "../../domain/index.mjs";
 import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
-import { makeDiscoveryEvidence, makeModelFact, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { makeDiscoveryEvidence, makeModelFact, makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier, toProviderId } from "../evidence.mjs";
 import { invalidAxisValue, renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
-import { assertOpaqueValue, checkOpaqueValue, firstLine, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { firstLine, parseVersion, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "codex";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "1";
+export const ADAPTER_VERSION = "2";
 
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CODEX_HOME", rootDirName: ".codex" });
@@ -175,8 +176,21 @@ function bannerComplete({ stderr }) {
   return (stderr.match(/^-{8}$/gm) ?? []).length >= 2;
 }
 
+/**
+ * The four configuration keys a banner depends on, in the order they are written, each with the name a
+ * `reconstructedFrom` entry gives it (§5: `axes.<name>` or `provider`). `model_verbosity` has no axis of
+ * its own elsewhere, so this adapter names one.
+ */
+const CARRIED_AS = Object.freeze({ model: "axes.model", model_provider: "provider", model_reasoning_effort: "axes.reasoning", model_verbosity: "axes.verbosity" });
+
 /** The four configuration keys a banner depends on, and the order they are written in. */
-const MODEL_KEYS = Object.freeze(["model", "model_provider", "model_reasoning_effort", "model_verbosity"]);
+const MODEL_KEYS = Object.freeze(Object.keys(CARRIED_AS));
+
+/**
+ * Provider keys Codex reports that differ from their Dotbabel id. None is measured: its built-in
+ * `openai` is already a `PROVIDERS` id. Any other key, such as a user-defined provider, is scoped as `codex.<key>`.
+ */
+const PROVIDER_ALIASES = Object.freeze({});
 
 /**
  * Read the four model keys from the TOP of a `config.toml`, before its first table.
@@ -296,7 +310,8 @@ export async function observe(context) {
   const banner = parseExecBanner(text);
   const model = optionalIdentifier(banner.fields.model);
   if (model === undefined) return unknown("insufficient_evidence", `no banner naming a model: ${firstLine(text)}`);
-  const provider = optionalIdentifier(banner.fields.provider);
+  // Mapped into the Dotbabel namespace (§5). A key whose scoped form is not a provider id is left out.
+  const provider = toProviderId(RUNTIME_ID, optionalIdentifier(banner.fields.provider), PROVIDER_ALIASES);
   const effort = optionalIdentifier(banner.fields["reasoning effort"]);
   const observed = makeObservedConfiguration({
     runtimeId: RUNTIME_ID,
@@ -304,7 +319,7 @@ export async function observe(context) {
     // The banner reflects a scratch config seeded with only the carried keys, never the user's full
     // configuration (profiles, providers, CODEX_* variables), so this is a reconstruction (ARCH-28).
     configurationBasis: "reconstructed",
-    reconstructedFrom: carried,
+    reconstructedFrom: carried.map((key) => /** @type {Record<string, string>} */ (CARRIED_AS)[key]),
     // `reasoning` is the axis name this adapter's invocation contract already uses (AXIS_KEYS,
     // renderInvocation), so an observed effort and a resolved one compare under the same name.
     axes: { model, ...(effort === undefined ? {} : { reasoning: effort }) },

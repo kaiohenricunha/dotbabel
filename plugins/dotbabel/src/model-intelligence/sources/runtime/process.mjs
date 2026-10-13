@@ -259,48 +259,6 @@ export function runProcess(spec, { signal } = {}) {
 }
 
 /**
- * Require a value safe to hand to a runtime as one argument: a printable string that cannot be read as
- * an option.
- *
- * A leading dash would make the runtime parse the value as a flag, so a value that reached here from a
- * repository's own frontmatter could carry an option nobody asked for. A control character could
- * forge output or split a line.
- * @param {string} name
- * @param {unknown} value
- * @returns {string}
- */
-export function assertOpaqueValue(name, value) {
-  if (typeof value !== "string" || !isOpaqueString(value)) {
-    throw new TypeError(`${name} must be a printable string of at most 200 characters that does not start with a dash`);
-  }
-  return value;
-}
-
-/**
- * True when a string is safe to hand to a runtime as one argument (see `assertOpaqueValue`).
- * @param {string} value
- * @returns {boolean}
- */
-function isOpaqueString(value) {
-  return value !== "" && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value) && !value.startsWith("-");
-}
-
-/**
- * Check a caller-supplied value under the failure-channel rule in `contract.mjs`.
- *
- * A value that is not a string breaks the caller's contract and throws. A string that fails the
- * opaque rules is data, which may come from a repository's own frontmatter, so it returns `false`
- * for the caller to report as an `invalid_axis_value` result instead of an exception.
- * @param {string} name
- * @param {unknown} value
- * @returns {boolean} True when the value is safe to pass on.
- */
-export function checkOpaqueValue(name, value) {
-  if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
-  return isOpaqueString(value);
-}
-
-/**
  * Extract a version from the text a runtime prints for `--version`. Never echoes the text.
  * @param {unknown} text
  * @returns {string | undefined}

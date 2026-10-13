@@ -3,9 +3,9 @@
  * (docs/specs/model-intelligence, §5 `Source Adapter Contract`, ARCH-13, ARCH-14, ARCH-17,
  * ARCH-28, ARCH-47, ARCH-49).
  *
- * §5 names `ObservedEffectiveConfiguration`, `DiscoveryEvidence`, `ValidationEvidence` and an
- * invocation result, but defines none of their fields. The first two adapters define them here, so
- * P-8 (catalog) and P-10 (resolver) consume one shape instead of one per runtime.
+ * The first two adapters defined these shapes here, so P-9 (catalog) and P-10 (resolver) consume one
+ * shape instead of one per runtime. §5 now states `ObservedEffectiveConfiguration`,
+ * `ProviderCatalogEvidence` and `Invocation` as the contract (owner decisions of 2026-10-12).
  *
  * Four rules run through every constructor:
  *
@@ -30,7 +30,7 @@
  * The module is pure: it validates data it is given and performs no I/O.
  */
 
-import { RUNTIME_IDS, isRuntimeId } from "../domain/index.mjs";
+import { PROVIDERS, RUNTIME_IDS, isRuntimeId } from "../domain/index.mjs";
 import { boundText, deepFreeze, isPlainObject, isVersionString } from "./contract.mjs";
 
 /** Freeze a value and everything reachable from it; defined once, in `contract.mjs`. */
@@ -155,11 +155,18 @@ export const CONFIGURATION_BASES = Object.freeze(["as-run", "reconstructed"]);
 const AXIS_NAME_RE = /^[a-z][A-Za-z0-9]{0,63}$/;
 
 /**
+ * A `reconstructedFrom` entry: `axes.<name>` or `provider`, the key vocabulary of `fieldSources` (§5
+ * `Observed effective configuration`). An adapter translates its own flags and configuration keys, so
+ * `catalog/` tells a carried value from a runtime default without a mapping per runtime.
+ */
+const CARRIED_INPUT_RE = /^(?:axes\.[a-z][A-Za-z0-9]{0,63}|provider)$/;
+
+/**
  * @typedef {object} ObservedEffectiveConfiguration
  * @property {string} runtimeId A `RUNTIMES` id.
  * @property {boolean} turnExecuted Whether a model turn ran to produce this. Absence of usage means no turn, not zero usage.
  * @property {"as-run"|"reconstructed"} configurationBasis Whether this is the configuration a real run used, or a probe's reconstruction of it.
- * @property {ReadonlyArray<string>} [reconstructedFrom] Present only when reconstructed: the inputs carried into the probe, such as config keys or flags. Empty means every value is the runtime's default.
+ * @property {ReadonlyArray<string>} [reconstructedFrom] Present only when reconstructed: the inputs carried into the probe, as `axes.<name>` or `provider`, never a native flag or key. Empty means every value is the runtime's default.
  * @property {Readonly<Record<string, string>>} axes Each configuration value the runtime reported, under the runtime-owned axis name the adapter uses (`model`, `reasoning`, a fused `selector`, ...). Opaque, and present only when reported; the map itself is always present.
  * @property {string} [provider] Opaque, and only when the runtime reported one. Never derived from the model.
  * @property {ReadonlyArray<{model: string, canonicalModel?: string, provider?: string, contextWindow?: number, maxOutputTokens?: number, thinkingTokens?: number}>} usage Per-model usage, empty when no turn ran.
@@ -205,7 +212,15 @@ export function makeObservedConfiguration(input) {
   if (fields.configurationBasis === "reconstructed") {
     // A reconstruction must say what it carried in, or a default would read as the user's own setting.
     if (!Array.isArray(fields.reconstructedFrom)) throw new TypeError("ObservedEffectiveConfiguration.reconstructedFrom must list the inputs a reconstructed configuration carried in");
-    out.reconstructedFrom = Object.freeze(fields.reconstructedFrom.map((v) => identifier("ObservedEffectiveConfiguration.reconstructedFrom entry", v)));
+    out.reconstructedFrom = Object.freeze(
+      fields.reconstructedFrom.map((v) => {
+        const entry = identifier("ObservedEffectiveConfiguration.reconstructedFrom entry", v);
+        if (!CARRIED_INPUT_RE.test(entry)) {
+          throw new TypeError(`ObservedEffectiveConfiguration.reconstructedFrom entry ${JSON.stringify(entry.slice(0, 70))} must be axes.<name> or provider, never a native flag or key`);
+        }
+        return entry;
+      }),
+    );
   } else if (fields.reconstructedFrom !== undefined) {
     throw new TypeError("ObservedEffectiveConfiguration.reconstructedFrom is only meaningful for a reconstructed configuration");
   }
@@ -384,8 +399,46 @@ function providerId(name, value) {
 }
 
 /**
+ * Map a source's own provider key into the Dotbabel namespace (§5 `Provider namespace`).
+ *
+ * The mechanics are shared; the knowledge stays with each adapter, which passes its `aliases` (source key
+ * to `PROVIDERS` id, for a key that differs from its id). A key that is a `PROVIDERS` id maps to itself.
+ * Any other key is kept as `<sourceId>.<key>`, which holds a dot and so never equals a `PROVIDERS` id.
+ * @param {string} sourceId
+ * @param {unknown} key
+ * @param {Readonly<Record<string, string>>} [aliases]
+ * @returns {string | undefined} The Dotbabel id, or `undefined` when the scoped form is not a provider id (longer than 64, or outside the charset).
+ */
+export function toProviderId(sourceId, key, aliases = {}) {
+  if (typeof key !== "string" || key === "") return undefined;
+  const mapped = Object.hasOwn(aliases, key) ? aliases[key] : key;
+  if (PROVIDERS.includes(mapped)) return mapped;
+  const scoped = `${sourceId}.${key}`;
+  return isProviderId(scoped) ? scoped : undefined;
+}
+
+/**
+ * Map a Dotbabel provider id back to a source's own key: the reverse of `toProviderId`.
+ *
+ * A `PROVIDERS` id maps through `aliases`, or to itself. A scoped id maps only when it is the form
+ * `toProviderId` gives for its key, so the scoped form of a key that maps into `PROVIDERS` is not a
+ * second name for that provider. Anything else is not an id of this source.
+ * @param {string} sourceId
+ * @param {unknown} id
+ * @param {Readonly<Record<string, string>>} [aliases]
+ * @returns {string | undefined}
+ */
+export function toSourceKey(sourceId, id, aliases = {}) {
+  if (typeof id !== "string") return undefined;
+  if (PROVIDERS.includes(id)) return Object.keys(aliases).find((key) => aliases[key] === id) ?? id;
+  // The round trip holds only for `<sourceId>.<key>` of an unmapped key, so it also refuses another source's id.
+  const key = id.slice(sourceId.length + 1);
+  return toProviderId(sourceId, key, aliases) === id ? key : undefined;
+}
+
+/**
  * @typedef {object} ProviderCatalogEvidence
- * @property {ReadonlyArray<Readonly<{id: string, displayName?: string, discovery: DiscoveryEvidence}>>} providers One discovery per provider: the same model id under two providers stays two facts (ARCH-3).
+ * @property {ReadonlyArray<Readonly<{id: string, sourceKey?: string, displayName?: string, discovery: DiscoveryEvidence}>>} providers One discovery per provider: the same model id under two providers stays two facts (ARCH-3). `id` is a Dotbabel provider id, and `sourceKey` is the source's own key, present only when it differs.
  * @property {ReadonlyArray<string>} missingProviders Requested providers the source does not describe.
  * @property {number} skipped Requested providers the source describes, but in a shape that could not be used.
  */
@@ -396,7 +449,7 @@ function providerId(name, value) {
  * A `ModelFact` carries no provider, so the provider is the group, never a field derived from an id.
  * No field states availability: presence in a knowledge source is not proof of invocability (ARCH-14).
  * @param {object} input
- * @param {ReadonlyArray<{id: string, displayName?: string, discovery: DiscoveryEvidence}>} input.providers Each discovery already built by `makeDiscoveryEvidence`.
+ * @param {ReadonlyArray<{id: string, sourceKey?: string, displayName?: string, discovery: DiscoveryEvidence}>} input.providers Each discovery already built by `makeDiscoveryEvidence`.
  * @param {ReadonlyArray<string>} input.missingProviders
  * @param {number} [input.skipped]
  * @returns {Readonly<ProviderCatalogEvidence>}
@@ -407,7 +460,7 @@ export function makeProviderCatalogEvidence(input) {
   if (!Array.isArray(fields.missingProviders)) throw new TypeError("ProviderCatalogEvidence.missingProviders must be an array");
   const seen = new Set();
   const providers = fields.providers.map((entry) => {
-    const provider = knownFields("ProviderCatalogEvidence provider", entry, ["id", "displayName", "discovery"]);
+    const provider = knownFields("ProviderCatalogEvidence provider", entry, ["id", "sourceKey", "displayName", "discovery"]);
     const id = providerId("ProviderCatalogEvidence provider id", provider.id);
     if (seen.has(id)) throw new TypeError(`ProviderCatalogEvidence: duplicate provider "${id}"`);
     seen.add(id);
@@ -416,6 +469,12 @@ export function makeProviderCatalogEvidence(input) {
     }
     /** @type {Record<string, unknown>} */
     const out = { id };
+    if (provider.sourceKey !== undefined) {
+      // The source key traces a fact back to the source (ARCH-28); one equal to the id traces nothing.
+      const sourceKey = identifier("ProviderCatalogEvidence provider sourceKey", provider.sourceKey);
+      if (sourceKey === id) throw new TypeError(`ProviderCatalogEvidence provider sourceKey must differ from the provider id "${id}"`);
+      out.sourceKey = sourceKey;
+    }
     if (provider.displayName !== undefined) out.displayName = identifier("ProviderCatalogEvidence provider displayName", provider.displayName);
     out.discovery = provider.discovery;
     return Object.freeze(out);

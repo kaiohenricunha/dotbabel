@@ -12,8 +12,8 @@
  */
 
 import { isPlainObject, isVersionString, makeAdapterResult } from "../contract.mjs";
+import { assertOpaqueValue } from "../../domain/index.mjs";
 import { makeInvocation } from "../evidence.mjs";
-import { assertOpaqueValue } from "./process.mjs";
 
 /**
  * The provenance every result from one runtime adapter starts from. A fresh object on each call.
