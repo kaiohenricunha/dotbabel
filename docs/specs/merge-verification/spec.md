@@ -72,17 +72,18 @@ The entries never count toward a phase, the attempt cap, or the receipt verdict.
 `classifyRun` reads one workflow run, its jobs, and the check-run annotations
 of its failed jobs:
 
-| State        | When                                                                                                                                                                                                                                                                  |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `green`      | The run succeeded.                                                                                                                                                                                                                                                    |
-| `red`        | A job failed after it ran at least one step. A real failure.                                                                                                                                                                                                          |
-| `unverified` | Any annotation matches `spending limit`, `recent account payments` or `billing`; the run conclusion is `startup_failure`, `cancelled`, `skipped`, `stale`, `action_required` or `neutral`; every failed job never started; the jobs cannot be read; or no run exists. |
+| State        | When                                                                                                                                                                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `green`      | The run succeeded.                                                                                                                                                                                                                                              |
+| `red`        | A job failed after it ran at least one step. A real failure.                                                                                                                                                                                                    |
+| `unverified` | Any annotation matches `spending limit`, `recent account payments` or `billing`; the run conclusion is `startup_failure`, `cancelled`, `skipped`, `stale`, `action_required` or `neutral`; no failed job ran a step; the jobs cannot be read; or no run exists. |
 
 A job that never started has a failed conclusion, zero steps, and no runner.
 That is the billing-blocked shape, and its run conclusion is a plain `failure`,
-not `startup_failure`. A `skipped` job downstream of a real failure also has
-zero steps and no runner, but its conclusion is `skipped`, so the run stays
-`red`.
+not `startup_failure`. A failed job with zero steps is never read as a real
+failure, with or without a runner. A `skipped` job downstream of a real failure
+also has zero steps and no runner, but its conclusion is `skipped`, so the run
+stays `red`.
 
 The default branch is squash-merged and linear. So a green run on commit X
 verifies X and every older commit: the tree at X contains them all, and the

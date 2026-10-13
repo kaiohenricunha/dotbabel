@@ -59,8 +59,6 @@ const UNSUPPORTED_GLOB_CHARS = /[!{}[\]]/;
 const BILLING_RE = /spending limit|recent account payments|billing/i;
 // Run conclusions that say nothing about the code.
 const NOT_RUN_CONCLUSIONS = new Set(["startup_failure", "cancelled", "skipped", "stale", "action_required", "neutral"]);
-// Job conclusions that mean the job did not succeed.
-const FAILED_JOB_CONCLUSIONS = new Set(["failure", "timed_out", "startup_failure", "cancelled"]);
 const RUN_RANK = { green: 3, red: 2, unverified: 1 };
 
 /**
@@ -179,21 +177,12 @@ export function decideSpotCheck({ policy, changedPaths, ciAvailable, random }) {
 }
 
 /**
- * True when a job never started: it did not succeed, it has no steps, and no
- * runner picked it up. A `skipped` job downstream of a real failure also has
- * zero steps and no runner, so the conclusion is what separates the two.
- *
- * @param {any} job
- * @returns {boolean}
- */
-function neverStarted(job) {
-  const steps = Array.isArray(job?.steps) ? job.steps : [];
-  const runner = typeof job?.runner_name === "string" ? job.runner_name : "";
-  return FAILED_JOB_CONCLUSIONS.has(job?.conclusion) && steps.length === 0 && runner === "";
-}
-
-/**
  * True when a job failed after it ran at least one step: a real failure.
+ *
+ * A job that never started (the billing-blocked shape: a failed conclusion,
+ * zero steps, no runner) is not one. Neither is a `skipped` job downstream of
+ * a real failure, which also has zero steps and no runner; its run is red
+ * because of the upstream job, not because of it.
  *
  * @param {any} job
  * @returns {boolean}
@@ -210,10 +199,10 @@ function failedAfterStart(job) {
  *  - `red`: a job failed after it ran steps. A real failure.
  *  - `unverified`: the run proves nothing. The billing annotation is present
  *    on any job, the run conclusion is `startup_failure`, `cancelled`,
- *    `skipped`, `stale`, `action_required` or `neutral`, every failed job
- *    never started (zero steps, no runner — the billing-blocked shape, whose
- *    run conclusion is a plain `failure`), the jobs could not be read, or the
- *    run is missing or still running with no failed job yet.
+ *    `skipped`, `stale`, `action_required` or `neutral`, no failed job ran a
+ *    step (the billing-blocked shape is a failed job with zero steps and no
+ *    runner, under a run conclusion of plain `failure`), the jobs could not
+ *    be read, or the run is missing or still running with no failed job yet.
  *
  * A run in progress is classified from its jobs: the contradiction job reads
  * its own run, which has not finished when it runs.

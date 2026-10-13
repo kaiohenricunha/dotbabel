@@ -238,6 +238,9 @@ describe("classifyRun", () => {
     const f = billingRunFixture();
     expect(classifyRun({ ...f, annotations: [] })).toBe("unverified");
     expect(classifyRun({ ...f, annotations: null })).toBe("unverified");
+    // Zero steps never reads as a real failure, even when a runner was named.
+    const withRunner = [{ ...f.jobs[0], runner_name: "GitHub Actions 9" }];
+    expect(classifyRun({ ...f, jobs: withRunner, annotations: [] })).toBe("unverified");
   });
 
   it("finds the billing annotation in any position", () => {

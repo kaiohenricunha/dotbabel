@@ -31,6 +31,7 @@
     ".dotbabel.json",
     "docs/attestation.md",
     "docs/cli-reference.md",
+    "docs/specs/merge-verification/spec.json",
     "docs/specs/merge-verification/README.md",
     "docs/specs/merge-verification/spec.md"
   ],
