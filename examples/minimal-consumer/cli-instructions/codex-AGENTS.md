@@ -23,7 +23,7 @@ Universal behavior for every Codex CLI session in every repo. Project-level `CLA
 - Cite `file:line` references in every analysis. Claims without citations are not grounded.
 - Do not propose edits until the analysis is confirmed against real code. "The file is probably named X" is not grounding — open it.
 - When unsure, invoke the `/ground-first` skill to enforce the read-first discipline.
-- **Surface assumptions before coding.** If a request has multiple valid interpretations, list them explicitly. In interactive sessions, ask before picking one. In autonomous/headless mode, state the chosen interpretation and proceed. "Make it faster" → clarify which dimension (latency, throughput, perceived UX) before writing code.
+- **Surface assumptions before coding.** If a request has multiple valid interpretations, list them explicitly. In interactive sessions, ask before picking one. In autonomous/headless mode, state the chosen interpretation and proceed. A `/deliver` task or a task contract (goal, done_when) counts as autonomous here: state the chosen reading in the PR and proceed, and ask only when two readings lead to different results. "Make it faster" → clarify which dimension (latency, throughput, perceived UX) before writing code.
 - **Surgical orphan cleanup.** When your changes make an import or variable unused, remove it. Remove a function only after verifying it is not part of a public/exported API and has no remaining references (use a repo-wide search); otherwise keep it or deprecate it. Don't remove pre-existing dead code your changes didn't create — mention it instead.
 
 ## Root Cause Before Fix
@@ -31,7 +31,7 @@ Universal behavior for every Codex CLI session in every repo. Project-level `CLA
 - For any bug or data discrepancy, perform a grounded audit (read the actual code paths, check deployment state, verify data sources) BEFORE proposing a fix or plan. Do not accept the first plausible hypothesis.
 - State evidence (file:line, log snippet, commit sha) for each claim in the diagnosis.
 - Present at least two candidate root causes with evidence for and against each before settling on one.
-- **Do not write code until the user approves the audit.** In interactive sessions, wait for explicit sign-off. In autonomous/headless mode, emit the audit and state the chosen root cause before proceeding.
+- **Do not write code until the user approves the audit.** In interactive sessions, wait for explicit sign-off. In autonomous/headless mode, emit the audit and state the chosen root cause before proceeding. A `/deliver` task or a task contract is the sign-off: put the audit and the chosen root cause in the PR body, and proceed.
 
 ## Testing
 
