@@ -119,7 +119,7 @@ Run one review of the branch diff: `/code-review` on the changed files, or `/qua
 ## 9. Open the pull request
 
 1. Commit with conventional messages. Do not add `[skip ci]`: CI on the head is the merge evidence.
-2. Push the branch and open the pull request with `gh pr create --body-file <file>` (add `--draft` for `--draft`).
+2. Push the branch once, when the proof is complete, and open the pull request with `gh pr create --body-file <file>` (add `--draft` for `--draft`). Where CI minutes are metered (a private repository without a self-hosted runner), every push of the head starts a paid run, so push the fixes of step 10 in one batch.
 3. Write the body with these sections, in this order:
    - `## Summary` — one to three bullets.
    - `## Test plan` — a checklist; tick only the items you ran.

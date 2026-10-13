@@ -134,6 +134,7 @@ The project follows Spec-Driven Development.
 
 - **Prove that each change works.** Write tests for the behavior: unit tests, and integration tests where the change crosses a process, file, network, or database boundary. Then run the feature itself when it has a runnable surface (a command, a page, an endpoint, a public function), and record the command and its output. This proof is part of the deliverable and goes in the PR body.
 - CI on the PR head is the merge evidence. Do not put `[skip ci]` on the head commit outside `/pr-conductor`. Where `.dotbabel.json` sets `attestation.enforce: true`, a current `local-attest` comment is the evidence instead.
+- **Where CI minutes are metered** (a private repository without a self-hosted runner), each push of an unmarked head starts a paid run. Push when the proof is complete, and push later fixes in one batch. Put `[skip ci]` only on a push that is not ready for review.
 - The default path from a task to a PR is `/deliver`: test, run the feature, review once, open the PR. Run `/pr-conductor`, the review fleet (`/post-pr-review`, `/review-pr`), and `local-attest` only on demand.
 - Run the **full** test suite only on demand (`local-attest --full`, or the deep quality job) or before a release. CI on `main` runs it after each merge.
 - Never claim a test failure is "pre-existing" without proving it. Required proof:

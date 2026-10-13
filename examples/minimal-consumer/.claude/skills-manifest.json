@@ -82,7 +82,7 @@
     {
       "name": "deliver",
       "path": ".claude/skills/deliver/SKILL.md",
-      "checksum": "sha256:61ced97daa7c17c2c3a8f097aa1da45ad9df834025ed3baa6ffe1290cc49388e",
+      "checksum": "sha256:9a9ae45b2f8e3525f50a4ce5b41a73175780cfa2f5fe5190fa565d29c389203c",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },

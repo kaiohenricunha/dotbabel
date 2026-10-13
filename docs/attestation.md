@@ -24,8 +24,10 @@ local run, and a code pull request waits for CI instead of a local matrix.
 
 The cost moves to CI: each push to a pull request starts the `test` matrix. A
 newer push cancels the older pull request run, and standard runners cost
-nothing on a public repository. If the account's Actions minutes are metered
-or blocked, turn enforcement on.
+nothing on a public repository. A private repository spends the account's
+included minutes. For it, register a self-hosted runner: its jobs use no
+minutes, and CI stays the evidence. Without one, push each pull request head
+once, when it is ready, or turn enforcement on.
 
 With enforcement off, `local-attest` is a local check you run on demand, and it
 is not merge evidence: the gate validates an attestation only when enforcement
