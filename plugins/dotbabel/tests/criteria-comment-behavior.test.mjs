@@ -12,18 +12,32 @@
 // `gh` argv and the readable-section layout are asserted verbatim on purpose:
 // GitHub's renderer and `gh` are the consumers, and both are exact about them.
 
+import { createHash } from "node:crypto";
+
 import { describe, expect, it } from "vitest";
 
-import { buildCriteriaMarker, postEvidenceComment, renderEvidenceComment, CRITERIA_MARKER_PREFIX, PAYLOAD_LINE_PREFIX } from "../src/criteria/comment.mjs";
+import { buildCriteriaMarker, encodeCriteriaPayloadLine, postEvidenceComment, renderEvidenceComment, CRITERIA_MARKER_PREFIX, PAYLOAD_LINE_PREFIX_Z1 } from "../src/criteria/comment.mjs";
 
 const LIMIT = 60000;
 const SHA = "a".repeat(40);
 
+/**
+ * Hex text that deflate cannot shrink much, the same on every run. The payload
+ * line is compressed, so repeated filler ("f" repeated) would add almost
+ * nothing to it. This filler grows the line by about two characters for every
+ * three, which lets a search step through nearly every line length.
+ */
+const NOISE = (() => {
+  let out = "";
+  for (let i = 0; out.length < 200000; i += 1) out += createHash("sha256").update(String(i)).digest("hex");
+  return out;
+})();
+
 const criterion = (id, extra = {}) => ({ id, status: "pass", ...extra });
-const payloadOf = (criteria, { specId = "example", filler = 0 } = {}) => ({
-  head_sha: SHA,
+const payloadOf = (criteria, { specId = "example", filler = 0, sha = SHA } = {}) => ({
+  head_sha: sha,
   specs: [{ id: specId, criteria }],
-  ...(filler > 0 ? { filler: "f".repeat(filler) } : {}),
+  ...(filler > 0 ? { filler: NOISE.slice(0, filler) } : {}),
 });
 
 /**
@@ -43,28 +57,56 @@ const uniqueText = (length) => {
 const readable = (body) => body.split("\n").slice(2).join("\n");
 const count = (haystack, needle) => haystack.split(needle).length - 1;
 
-/** The marker line plus the payload line, computed from the documented format. */
-const fixedLength = (payload) =>
-  buildCriteriaMarker(payload.head_sha).length + 1 + PAYLOAD_LINE_PREFIX.length + Buffer.from(JSON.stringify(payload)).toString("base64url").length + " -->".length;
+/** The marker line plus the payload line, measured with the writer's own encoder. */
+const fixedLength = (payload) => buildCriteriaMarker(payload.head_sha).length + 1 + encodeCriteriaPayloadLine(payload).length;
+
+/** The part of the fixed lines that is not base64url: marker, newline, prefix and closing text. */
+const overhead = (sha) => buildCriteriaMarker(sha).length + 1 + PAYLOAD_LINE_PREFIX_Z1.length + " -->".length;
+
+/**
+ * The smallest filler whose `measure` reaches `target`, by bisection.
+ *
+ * Deflate output grows with incompressible input but not strictly one step at
+ * a time, so this only places the search window. The callers then scan around
+ * it for an exact hit.
+ */
+function fillerReaching(target, measure) {
+  let low = 0;
+  let high = NOISE.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (measure(mid) >= target) high = mid;
+    else low = mid + 1;
+  }
+  return low;
+}
+
+/**
+ * A payload for the searches below. `pad` lengthens the spec id; `trim`
+ * shortens the head SHA, which the marker accepts down to 7 characters.
+ */
+const tuned = (criteria, filler, pad, trim = 0) => payloadOf(criteria, { specId: `example${"s".repeat(pad)}`, filler, sha: SHA.slice(0, SHA.length - trim) });
 
 /**
  * Find a payload whose marker and payload lines are exactly `target` long.
  *
- * The length is a constant plus ceil(4n/3) for n payload bytes, so it can only
- * take three of every four values: some targets are unreachable however the
- * payload is padded. Both knobs below add bytes, so the second one only widens
- * the search around the estimate rather than reaching new residues. Callers that
- * need "just over" rather than an exact value use {@link payloadJustOver}.
+ * The line is base64url of a deflate stream, so its length is a constant plus
+ * ceil(4n/3) for n compressed bytes. That skips one length in every four,
+ * however the payload is padded, because padding only adds bytes. A shorter
+ * head SHA shortens the marker line itself, which moves the constant and so
+ * reaches the skipped lengths. Callers that need "just over" rather than an
+ * exact value use {@link payloadJustOver}.
  */
 function payloadWithFixedLength(criteria, target) {
-  const at = (filler, pad) => payloadOf(criteria, { specId: `example${"s".repeat(pad)}`, filler });
-  const low = fixedLength(at(1000, 0));
-  const high = fixedLength(at(31000, 0));
-  const estimate = Math.round(1000 + ((target - low) * 30000) / (high - low));
-  for (let filler = estimate - 12; filler <= estimate + 12; filler += 1) {
-    for (let pad = 0; pad < 6; pad += 1) {
-      const candidate = at(filler, pad);
-      if (fixedLength(candidate) === target) return candidate;
+  for (let trim = 0; trim < 4; trim += 1) {
+    // Skip a SHA length that leaves base64url one more than a multiple of four: no payload reaches it.
+    if ((target - overhead(SHA.slice(0, SHA.length - trim))) % 4 === 1) continue;
+    const estimate = fillerReaching(target, (filler) => fixedLength(tuned(criteria, filler, 0, trim)));
+    for (let filler = Math.max(0, estimate - 8); filler <= estimate + 8; filler += 1) {
+      for (let pad = 0; pad < 6; pad += 1) {
+        const candidate = tuned(criteria, filler, pad, trim);
+        if (fixedLength(candidate) === target) return candidate;
+      }
     }
   }
   throw new Error(`could not tune a payload to a fixed length of ${target}`);
@@ -88,16 +130,18 @@ function payloadJustOver(criteria, limit) {
  * returned whole, so the measurement is exact until the target is crossed.
  */
 function payloadWithRenderLength(criteria, target, tails, accept = () => true) {
-  const at = (filler, pad) => payloadOf(criteria, { specId: `example${"s".repeat(pad)}`, filler });
-  const measure = (payload) => renderEvidenceComment(payload, tails(payload)).length;
-  const low = measure(at(1000, 0));
-  const high = measure(at(31000, 0));
-  const estimate = Math.round(1000 + ((target - low) * 30000) / (high - low));
-  for (let filler = estimate - 14; filler <= estimate + 14; filler += 1) {
-    for (let pad = 0; pad < 6; pad += 1) {
-      const candidate = at(filler, pad);
-      const body = renderEvidenceComment(candidate, tails(candidate));
-      if (body.length === target && accept(body)) return candidate;
+  // The filler is never rendered, so the readable part is the same length for
+  // every filler: the unshrunk render is the fixed lines plus a constant.
+  const small = tuned(criteria, 0, 0);
+  const readableLength = renderEvidenceComment(small, tails(small)).length - fixedLength(small);
+  const estimate = fillerReaching(target, (filler) => fixedLength(tuned(criteria, filler, 0)) + readableLength);
+  for (let filler = Math.max(0, estimate - 8); filler <= estimate + 8; filler += 1) {
+    for (let trim = 0; trim < 4; trim += 1) {
+      for (let pad = 0; pad < 6; pad += 1) {
+        const candidate = tuned(criteria, filler, pad, trim);
+        const body = renderEvidenceComment(candidate, tails(candidate));
+        if (body.length === target && accept(body)) return candidate;
+      }
     }
   }
   throw new Error(`could not tune a payload to a render length of ${target}`);
@@ -237,7 +281,9 @@ describe("fencing output", () => {
 
 describe("the size limit", () => {
   const one = [criterion("AC-1")];
-  const marker = buildCriteriaMarker(SHA);
+  // Enough rows to overflow the limit on their own. The compressed payload
+  // line no longer takes most of the limit, so 1000 rows now fit whole.
+  const MANY = 2000;
 
   it("refuses when the marker and payload lines alone are over the limit, but renders at exactly the limit", () => {
     const exact = payloadWithFixedLength(one, LIMIT);
@@ -255,7 +301,7 @@ describe("the size limit", () => {
     const body = renderEvidenceComment(payload, {});
     expect(body.length).toBe(LIMIT);
     expect(body.split("\n")).toHaveLength(2);
-    expect(body.startsWith(marker)).toBe(true);
+    expect(body.startsWith(buildCriteriaMarker(payload.head_sha))).toBe(true);
   });
 
   it("returns a comment of exactly the limit whole, and shrinks one that is a character over", () => {
@@ -327,7 +373,7 @@ describe("the size limit", () => {
   });
 
   it("caps the rows and says how many were left out, so shown plus omitted is everything", () => {
-    const criteria = Array.from({ length: 1000 }, (_, i) => criterion(`AC-${i + 1}`));
+    const criteria = Array.from({ length: MANY }, (_, i) => criterion(`AC-${i + 1}`));
     const payload = payloadOf(criteria);
     const body = renderEvidenceComment(payload, { example: { "AC-1": "tail" } });
     expect(body.length).toBeLessThanOrEqual(LIMIT);
@@ -335,8 +381,8 @@ describe("the size limit", () => {
     const shown = lines.filter((l) => /^\| example \| AC-\d+ \|/.test(l)).length;
     const omitted = Number(/\| … \| (\d+) more criteria not shown \|/.exec(readable(body))?.[1]);
     expect(shown).toBeGreaterThan(0);
-    expect(shown).toBeLessThan(1000);
-    expect(shown + omitted).toBe(1000);
+    expect(shown).toBeLessThan(MANY);
+    expect(shown + omitted).toBe(MANY);
     // The rows kept are the first ones, in order.
     expect(lines.find((l) => l.startsWith("| example | AC-1 |"))).toBeDefined();
     expect(body).not.toContain(`| AC-${shown + 1} |`);
@@ -347,7 +393,7 @@ describe("the size limit", () => {
     // Rows are equal width here, so the room left after the last one is always
     // smaller than the next row. A search that settles one row early leaves a
     // gap at least a full row wide.
-    const criteria = Array.from({ length: 1000 }, (_, i) => criterion(`AC-${String(i + 1).padStart(4, "0")}`));
+    const criteria = Array.from({ length: MANY }, (_, i) => criterion(`AC-${String(i + 1).padStart(4, "0")}`));
     for (const filler of [0, 7, 19, 33, 48, 61]) {
       const body = renderEvidenceComment(payloadOf(criteria, { filler }), undefined);
       const rowWidth = readable(body).split("\n").find((l) => l.startsWith("| example | AC-0001 |")).length + 1;
@@ -360,7 +406,7 @@ describe("the size limit", () => {
     // Same room check as above, but with a tail present. Once output has been
     // dropped, a tail's block must not be counted against the rows: doing so
     // would leave a gap far wider than a row.
-    const criteria = Array.from({ length: 1000 }, (_, i) => criterion(`AC-${String(i + 1).padStart(4, "0")}`));
+    const criteria = Array.from({ length: MANY }, (_, i) => criterion(`AC-${String(i + 1).padStart(4, "0")}`));
     for (const filler of [0, 7, 19, 33, 48, 61]) {
       const body = renderEvidenceComment(payloadOf(criteria, { filler }), { example: { "AC-0001": "a tail worth keeping" } });
       const rowWidth = readable(body).split("\n").find((l) => l.startsWith("| example | AC-0001 |")).length + 1;
@@ -371,7 +417,7 @@ describe("the size limit", () => {
   });
 
   it("places the row cut exactly on the limit when a row count lands there", () => {
-    const criteria = Array.from({ length: 1000 }, (_, i) => criterion(`AC-${String(i + 1).padStart(4, "0")}`));
+    const criteria = Array.from({ length: MANY }, (_, i) => criterion(`AC-${String(i + 1).padStart(4, "0")}`));
     let found = null;
     for (let filler = 0; filler < 1400 && found === null; filler += 1) {
       const body = renderEvidenceComment(payloadOf(criteria, { filler }), undefined);

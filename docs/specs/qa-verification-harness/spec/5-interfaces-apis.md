@@ -103,7 +103,7 @@ The schema is `schemas/dotbabel.criteria-evidence.schema.json`. The example is i
 
 ```text
 <!-- dotbabel-criteria verified-sha=<40-character head SHA> -->
-<!-- dotbabel-criteria-payload <base64url-encoded evidence payload> -->
+<!-- dotbabel-criteria-payload z1:<base64url of the raw-deflated evidence payload> -->
 ### Acceptance criteria evidence
 
 | Spec | Criterion | Status | Tests | Duration |
@@ -118,6 +118,10 @@ The schema is `schemas/dotbabel.criteria-evidence.schema.json`. The example is i
 
 - Line 1 must match exactly, like the local-attest marker (`plugins/dotbabel/src/local-attest-lib.mjs:53`).
 - Line 2 carries the whole payload, and the payload holds no output text (OPS-3).
+- Line 2 has two forms. The command writes the compressed form: the prefix `<!-- dotbabel-criteria-payload z1:`, then base64url of the payload JSON after raw deflate (`deflateRawSync`, level 9). The plain form has the prefix `<!-- dotbabel-criteria-payload` and one space, then base64url of the payload JSON. Earlier versions wrote the plain form, and the gate still reads it, so evidence on open pull requests stays valid.
+- The compressed form exists because of the 60,000-character limit. Pull request #465 had 57 criteria and 137 named tests. Its plain base64url text was 66,022 characters, which is more than the limit before the readable part starts. Its compressed text was 9,647 characters.
+- The gate tells the two forms apart by the prefix only. The `:` after `z1` is not in the base64url alphabet, so a plain payload cannot start with `z1:`.
+- The payload JSON is at most 1,048,576 bytes (1 MiB) in UTF-8. The gate stops inflation at this bound. The command refuses to write a larger payload, so it never posts a payload that the gate cannot read. A compressed line that does not inflate, that inflates past the bound, or that is not a JSON object gets the same result as any other unreadable payload: `CRITERIA_EVIDENCE_INVALID`, never a pass.
 - The readable part holds the table and each criterion's redacted output tail. The gate never reads it.
 - Every full `--post` run creates a new comment. The command then minimizes the older evidence comments that the authenticated user wrote, with `minimizeComment` and the `OUTDATED` classifier. It never edits a comment (OPS-4).
 - The rendered body stays at or under 60,000 characters, and output tails shrink first (OPS-3).

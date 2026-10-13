@@ -10,7 +10,9 @@
  * junk" can never read as "no evidence" (which a later comment could then
  * satisfy) or as a pass.
  */
-import { CRITERIA_MARKER_PREFIX, PAYLOAD_LINE_PREFIX } from "./comment.mjs";
+import { inflateRawSync } from "node:zlib";
+
+import { CRITERIA_MARKER_PREFIX, MAX_PAYLOAD_JSON_BYTES, PAYLOAD_LINE_PREFIX, PAYLOAD_LINE_PREFIX_Z1 } from "./comment.mjs";
 import { createMarker } from "../lib/attest-marker.mjs";
 
 const marker = createMarker(CRITERIA_MARKER_PREFIX);
@@ -32,6 +34,14 @@ const marker = createMarker(CRITERIA_MARKER_PREFIX);
  * disagree would let a trusted-looking marker vouch for someone else's
  * results.
  *
+ * Line 2 has two accepted forms, told apart by prefix alone: the z1 form
+ * (`PAYLOAD_LINE_PREFIX_Z1`, base64url of raw-deflated JSON) that the writer
+ * emits now, and the plain form (`PAYLOAD_LINE_PREFIX`, base64url of JSON)
+ * that older versions posted and open pull requests still carry. Inflation
+ * stops at `MAX_PAYLOAD_JSON_BYTES`, so a decompression bomb, a corrupt
+ * stream and text that is not JSON all land on `undecodable` with the plain
+ * form's own detail, never on a pass.
+ *
  * @param {string} body
  * @returns {ParsedEvidence}
  */
@@ -44,10 +54,14 @@ export function parseEvidenceComment(body) {
     return { state: "undecodable", sha, payload: null, detail: "line 2 is not the payload comment" };
   }
 
-  const encoded = line.slice(PAYLOAD_LINE_PREFIX.length, -" -->".length).trim();
+  const compressed = line.startsWith(PAYLOAD_LINE_PREFIX_Z1);
+  const prefix = compressed ? PAYLOAD_LINE_PREFIX_Z1 : PAYLOAD_LINE_PREFIX;
+  const encoded = line.slice(prefix.length, -" -->".length).trim();
   let payload;
   try {
-    payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    const bytes = Buffer.from(encoded, "base64url");
+    const json = compressed ? inflateRawSync(bytes, { maxOutputLength: MAX_PAYLOAD_JSON_BYTES }) : bytes;
+    payload = JSON.parse(json.toString("utf8"));
   } catch (err) {
     return { state: "undecodable", sha, payload: null, detail: `payload did not decode: ${err.message}` };
   }

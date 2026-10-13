@@ -1,8 +1,12 @@
+import { createHash } from "node:crypto";
+import { inflateRawSync } from "node:zlib";
 import { describe, it, expect } from "vitest";
 import { buildCriteriaMarker, renderEvidenceComment, postEvidenceComment, CRITERIA_MARKER_PREFIX } from "../src/criteria/comment.mjs";
 
 const SHA = "a".repeat(40);
 const PAYLOAD_PREFIX = "<!-- dotbabel-criteria-payload ";
+// The writer emits the compressed (z1) form; criteria-payload-compression.test.mjs pins it.
+const PAYLOAD_PREFIX_Z1 = `${PAYLOAD_PREFIX}z1:`;
 
 function samplePayload(overrides = {}) {
   return {
@@ -18,7 +22,8 @@ function samplePayload(overrides = {}) {
 }
 
 function decodePayloadLine(line) {
-  return JSON.parse(Buffer.from(line.slice(PAYLOAD_PREFIX.length, -" -->".length), "base64url").toString("utf8"));
+  if (!line.startsWith(PAYLOAD_PREFIX_Z1)) throw new Error(`line 2 is not a z1 payload line: ${line.slice(0, 40)}`);
+  return JSON.parse(inflateRawSync(Buffer.from(line.slice(PAYLOAD_PREFIX_Z1.length, -" -->".length), "base64url")).toString("utf8"));
 }
 
 function count(haystack, needle) {
@@ -150,8 +155,10 @@ describe("renderEvidenceComment", () => {
   });
 
   it("refuses to render when the marker and payload lines alone exceed the comment limit", () => {
-    const criteria = Array.from({ length: 3000 }, (_, i) => ({ id: `AC-${i + 1}`, status: "error", error_message: "e".repeat(20) }));
-    expect(() => renderEvidenceComment(samplePayload({ specs: [{ id: "example", criteria }] }), {})).toThrow(/exceeds/);
+    // Each message is a distinct SHA-256 hex digest, which deflate cannot
+    // shrink much: repeated text would compress under the limit.
+    const criteria = Array.from({ length: 3000 }, (_, i) => ({ id: `AC-${i + 1}`, status: "error", error_message: createHash("sha256").update(String(i)).digest("hex") }));
+    expect(() => renderEvidenceComment(samplePayload({ specs: [{ id: "example", criteria }] }), {})).toThrow(/exceeds the comment limit/);
   });
 });
 
