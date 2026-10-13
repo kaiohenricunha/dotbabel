@@ -165,3 +165,65 @@ jobs:
           name: criteria-report
           path: .dotbabel/criteria-report.json
           if-no-files-found: warn
+
+  # The contradiction alarm (docs/attestation.md, "Spot checks and the
+  # contradiction alarm"). An agent with the owner's token can forge the
+  # attestation that lets /merge-pr skip the suite. This push run on main is
+  # the only check off the agent's machine. When the test job fails here, this
+  # job asks whether the failure contradicts a passing attestation on a pull
+  # request merged since the last green run. If it does, it labels each such
+  # pull request and opens one issue.
+  #
+  # It detects a contradiction only when this run completes, on unchanged
+  # detector code, while the attestation comment exists. A [skip ci] marker in
+  # the merge message or a cancelled run stops it, and main-status then still
+  # shows the commit as unverified debt. A deleted comment also stops it.
+  #
+  # The detector runs from the FIRST PARENT (github.event.before, the tip of
+  # main before this push), so the merged pull request cannot rewrite it.
+  # GitHub still reads THIS file from the pushed commit. A repository that
+  # enforces attestation lists it in attestation.governance_files, so a change
+  # to it forces the explicit path. This repository does not enforce
+  # attestation: CI on the pull request head is its merge evidence.
+  #
+  # Push only: a pull_request run would hand a token that can write issues to
+  # code a fork controls. It costs minutes only when main is already red, and
+  # a run that never started (a billing limit) never reaches it. The command
+  # still classifies this run before it believes the failure, which is why it
+  # reads actions and checks.
+  contradiction:
+    needs: test
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The detector code, as main had it before this push. Full history
+          # also brings the pushed commit (on origin/main) and the range
+          # before it, so no credentialed fetch is needed later.
+          ref: ${{ github.event.before }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: "npm"
+      - run: npm ci
+      # The in-tree bin of the first parent: this repository checks itself
+      # with its own tree, not the last published release, and not with the
+      # tree under judgment.
+      - name: Raise the alarm on a contradicted attestation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          MERGE_SHA: ${{ github.sha }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          node plugins/dotbabel/bin/dotbabel-pr-stack.mjs contradiction \
+            --sha "$MERGE_SHA" --test-result "$TEST_RESULT" --post

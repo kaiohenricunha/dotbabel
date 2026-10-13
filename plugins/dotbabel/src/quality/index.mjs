@@ -18,11 +18,22 @@ function inside(root, candidate) {
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
 
+const COVERAGE_RULES = ["coverage.no_regression", "coverage.changed_lines", "coverage.changed_branches"];
+
 function parseExecutionReports(repoRoot, executions, scope) {
   const metrics = [];
   const findings = [];
   for (const execution of executions) {
     const capabilities = execution.capabilities ?? [execution.capability];
+    // A plan whose paths did not match the diff never ran, so it has no exit
+    // code and no report. Leave it `not_triggered` and let it carry the rules
+    // its report would have fed: the exit-code branch below would otherwise
+    // read the missing exit code as a crashed coverage command and fail a
+    // docs-only change on a coverage tool scoped to source paths.
+    if (execution.state === "not_triggered") {
+      if (capabilities.includes("coverage")) execution.ruleIds = [...new Set([...(execution.ruleIds ?? []), ...COVERAGE_RULES])];
+      continue;
+    }
     if (execution.exitCode !== 0) {
       if (capabilities.includes("coverage")) {
         execution.state = "unavailable";

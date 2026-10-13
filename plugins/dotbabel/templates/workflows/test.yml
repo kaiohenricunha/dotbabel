@@ -4,7 +4,9 @@
 # not a trusted author, and a second writer would race the developer's local
 # run, so `dotbabel criteria verify` is called WITHOUT `--post` here. The
 # evidence comment is written by the local run; this job is the independent
-# re-run that confirms it.
+# re-run that confirms it. The one job that writes is `contradiction`: on a
+# failed push to the default branch it may add a label and open an issue.
+# Those are alarms, never evidence the merge gate reads.
 #
 # SEC-7: every action is pinned to a full commit SHA, the top-level token is
 # read-only, each job adds only the scopes it needs, and the trigger is
@@ -81,7 +83,9 @@ jobs:
       - run: npm ci
       - name: Check the pull-request quality policy
         env:
-          QUALITY_BASE_REF: ${{ github.event.pull_request.base.sha }}
+          # On a push there is no pull request: grade the pushed range instead.
+          # An empty --base exits 2, which would read as a failure of main.
+          QUALITY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
           npx dotbabel quality check \
             --profile pr \
@@ -130,3 +134,65 @@ jobs:
         with:
           name: criteria-report
           path: criteria-report.json
+
+  # The contradiction alarm (docs/attestation.md, "Spot checks and the
+  # contradiction alarm"). Anyone who holds the maintainer's token, an AI agent
+  # included, can post the attestation comment that lets the verify job and
+  # /merge-pr skip their runs. This push run on the default branch is the only
+  # check off that machine. When verify fails here, this job asks whether the
+  # failure contradicts a passing attestation on a pull request merged since
+  # the last green run. If it does, it labels each such pull request and opens
+  # one issue.
+  #
+  # It detects a contradiction only when this run completes, on unchanged
+  # detector code, while the attestation comment exists. A [skip ci] marker in
+  # the merge message or a cancelled run stops it, and `dotbabel pr-stack
+  # main-status` then still shows the commit as unverified debt. A deleted
+  # comment also stops it.
+  #
+  # The detector runs from the FIRST PARENT (github.event.before, the tip of
+  # the default branch before this push), and `npx dotbabel` resolves from
+  # that checkout's lockfile, so the merged pull request cannot swap the
+  # detector. GitHub still reads THIS file from the pushed commit: list it in
+  # `attestation.governance_files`, so that a change to it forces the explicit
+  # path of /merge-pr.
+  #
+  # Push only: a pull_request run would hand a token that can write issues to
+  # code a fork controls. It costs minutes only when the default branch is
+  # already red, and a run that never started (a billing limit) never reaches
+  # it. The command still classifies this run before it believes the failure,
+  # which is why it reads actions and checks.
+  contradiction:
+    needs: verify
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The detector and its lockfile, as the default branch had them
+          # before this push. Full history also brings the pushed commit and
+          # the range before it, so no credentialed fetch is needed later.
+          ref: ${{ github.event.before }}
+          fetch-depth: 0
+          persist-credentials: false
+      # EDIT FOR YOUR PROJECT: dotbabel needs Node even in a non-Node project.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Raise the alarm on a contradicted attestation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          MERGE_SHA: ${{ github.sha }}
+          TEST_RESULT: ${{ needs.verify.result }}
+        run: |
+          npx dotbabel pr-stack contradiction \
+            --sha "$MERGE_SHA" --test-result "$TEST_RESULT" --post
