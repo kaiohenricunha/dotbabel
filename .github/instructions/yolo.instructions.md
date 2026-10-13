@@ -60,9 +60,9 @@ it is the explicit instruction that these rules ask for:
   `/pr-conductor` or local attestation only when the scope asks for them.
 - **Merge, only when `merge: yes`.** Merge each pull request in the scope when
   its required checks are green and its evidence covers the head SHA. Use the
-  repository's merge path (`/merge-pr`, or `gh pr merge --squash`). Do not pass
-  `--delete-branch`, because a branch deletion stays a stop. When `merge: no`,
-  stop at a green pull request and report it.
+  repository's merge path (`/merge-pr`, or `gh pr merge --squash --delete-branch`).
+  Deleting the merged pull request's own head branch is part of the merge. When
+  `merge: no`, stop at a green pull request and report it.
 
 Do not ask "push?", "merge?", "approved?", or "should I continue?" about a
 decision inside the scope. Make the decision, and record it in the final
@@ -79,7 +79,8 @@ each of these:
 
 1. A force push, `git reset --hard`, or any other command
    `guard-destructive-git.sh` asks for.
-2. A deletion of a branch or a repository, including `gh pr merge --delete-branch`.
+2. A deletion of a branch or a repository, except the head branch of a pull
+   request you merge in the scope.
 3. An `rm -r` outside your worktree.
 4. `terraform destroy`, `tofu destroy`, or `apply -destroy`.
 5. A production deploy or a release.
