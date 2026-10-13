@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-13T10:22:06.261Z",
+  "generatedAt": "2026-10-13T10:24:34.821Z",
   "skills": [
     {
       "name": "agents-search",
@@ -89,7 +89,7 @@
     {
       "name": "deliver",
       "path": ".claude/skills/deliver/SKILL.md",
-      "checksum": "sha256:ebbdcce248e4cf135a394560508a9d5d4e3802a19dcbb66a0aa61eef5c617c2a",
+      "checksum": "sha256:e29c8ff6f56de046bacad278ea0118a1c5a422672bb7f889d82f26fb624fe05a",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },

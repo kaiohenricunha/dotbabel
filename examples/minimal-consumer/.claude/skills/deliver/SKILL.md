@@ -162,6 +162,6 @@ Give the completion status: the `done_when` table with each result, the pull req
 - The proof is the contract. Never tick a `done_when` item or a test-plan item without evidence in the pull request body.
 - One review pass. No review fleet, no comment rounds, no local attestation, unless the user asks.
 - Never weaken a test, a check, a constraint, or a threshold to reach done.
-- Never add `[skip ci]` to the head commit.
+- Never add `[skip ci]` to the head commit, and never write the marker in any commit message, even to describe it: GitHub matches it anywhere in the message and skips the whole run. Check with `git log --format=%B -1` before you push.
 - Never merge, and never force-push.
 - Stop and ask only for: an ambiguity that changes the result, a constraint the goal cannot meet, a check that stays red after three fixes, or a destructive action.
