@@ -9,7 +9,7 @@
  * 1. **Static support** — what Dotbabel has verified an adapter can do, in
  *    `supported` / `unsupported` / `unverified`.
  * 2. **Current operation outcome** — what happened on one call, in `ok` /
- *    `unsupported` / `unavailable` / `unknown`.
+ *    `not_modified` / `unsupported` / `unavailable` / `unknown`.
  * 3. **Freshness and refresh** — derived later by `catalog/`, never reported here.
  *
  * No consumer may collapse those into one boolean such as `available`, so this module
@@ -522,6 +522,8 @@ export function makeAdapterResult(input) {
   // treat an empty success as a real answer — the OpenCode exit-0 case (ARCH-30).
   if (status === "ok" && evidence === undefined) throw new TypeError("adapter result: status ok requires evidence");
   if (status !== "ok" && evidence !== undefined) throw new TypeError(`adapter result: status ${status} must carry no evidence`);
+  // `not_modified` renews the time the stored evidence was last confirmed, so it is useless without one (§5).
+  if (status === "not_modified" && observedAt === undefined) throw new TypeError("adapter result: status not_modified requires observedAt");
 
   /** @type {Record<string, unknown>} */
   const result = {

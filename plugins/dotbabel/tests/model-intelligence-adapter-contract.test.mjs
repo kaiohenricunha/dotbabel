@@ -90,9 +90,11 @@ describe("source adapter contract", () => {
   it("an AdapterResult carries provenance even when status is unavailable", () => {
     const prov = { sourceId: "codex", sourceKind: "runtime" };
     for (const status of ADAPTER_RESULT_STATUSES) {
-      // `ok` is the one status that must carry evidence, so it supplies some here;
-      // the point of the loop is that provenance is required in every case.
-      const r = makeAdapterResult({ status, provenance: prov, ...(status === "ok" ? { evidence: { models: [] } } : {}) });
+      // `ok` is the one status that must carry evidence, and `not_modified` the one that must carry
+      // the time the source confirmed the stored evidence, so each supplies it here; the point of the
+      // loop is that provenance is required in every case.
+      const extra = status === "ok" ? { evidence: { models: [] } } : status === "not_modified" ? { observedAt: "2026-10-13T12:00:00.000Z" } : {};
+      const r = makeAdapterResult({ status, provenance: prov, ...extra });
       expect(r.status, status).toBe(status);
       // Provenance is not a success-path luxury: a failure a caller cannot attribute
       // to a source is a failure it cannot act on or cache against.
@@ -105,6 +107,10 @@ describe("source adapter contract", () => {
     // contradiction the helper refuses rather than papering over.
     expect(() => makeAdapterResult({ status: "unsupported", provenance: prov, evidence: { models: [] } })).toThrow(/evidence/);
     expect(() => makeAdapterResult({ status: "ok", provenance: prov })).toThrow(/evidence/);
+    // `not_modified` returns no evidence, so it never reads as an empty catalog (ARCH-30), and it needs
+    // the confirmation time that catalog/ renews the stored entry with (§5 `Adapter result`).
+    expect(() => makeAdapterResult({ status: "not_modified", provenance: prov, observedAt: "2026-10-13T12:00:00.000Z", evidence: { models: [] } })).toThrow(/evidence/);
+    expect(() => makeAdapterResult({ status: "not_modified", provenance: prov })).toThrow(/not_modified requires observedAt/);
 
     // The three dimensions stay independent (§5 `Invariant`): freshness and refresh
     // are derived by catalog/, never reported by an adapter.
@@ -409,7 +415,7 @@ describe("source adapter contract", () => {
     expect(validateDescriptor({ id: "", kind: "nope", capabilities: {} }).errors.length).toBeGreaterThan(2);
 
     const prov = { sourceId: "codex", sourceKind: "runtime" };
-    expect(() => makeAdapterResult({ status: "nope", provenance: prov })).toThrow(/status must be one of ok, unsupported, unavailable, unknown/);
+    expect(() => makeAdapterResult({ status: "nope", provenance: prov })).toThrow(/status must be one of ok, not_modified, unsupported, unavailable, unknown/);
     expect(() => makeAdapterResult({ status: "unknown", provenance: { sourceId: "", sourceKind: "runtime" } })).toThrow(/sourceId must be a non-empty string/);
     expect(() => makeAdapterResult({ status: "unknown", provenance: { sourceId: "x", sourceKind: "artifact" } })).toThrow(/sourceKind must be one of/);
     expect(() => makeAdapterResult({ status: "unknown", provenance: prov, diagnostic: "boom" })).toThrow(/diagnostic must be an object, got string/);

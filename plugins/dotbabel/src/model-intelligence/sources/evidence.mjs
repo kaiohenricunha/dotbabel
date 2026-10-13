@@ -441,6 +441,7 @@ export function toSourceKey(sourceId, id, aliases = {}) {
  * @property {ReadonlyArray<Readonly<{id: string, sourceKey?: string, displayName?: string, discovery: DiscoveryEvidence}>>} providers One discovery per provider: the same model id under two providers stays two facts (ARCH-3). `id` is a Dotbabel provider id, and `sourceKey` is the source's own key, present only when it differs.
  * @property {ReadonlyArray<string>} missingProviders Requested providers the source does not describe.
  * @property {number} skipped Requested providers the source describes, but in a shape that could not be used.
+ * @property {string} [etag] The validator the source sent with the whole document, when it sent one (§5 `Conditional GET`).
  */
 
 /**
@@ -452,10 +453,11 @@ export function toSourceKey(sourceId, id, aliases = {}) {
  * @param {ReadonlyArray<{id: string, sourceKey?: string, displayName?: string, discovery: DiscoveryEvidence}>} input.providers Each discovery already built by `makeDiscoveryEvidence`.
  * @param {ReadonlyArray<string>} input.missingProviders
  * @param {number} [input.skipped]
+ * @param {string} [input.etag] The source's validator for the whole document. It is sent back as `If-None-Match`, so a value with a control character could never be a header and is refused.
  * @returns {Readonly<ProviderCatalogEvidence>}
  */
 export function makeProviderCatalogEvidence(input) {
-  const fields = knownFields("ProviderCatalogEvidence", input, ["providers", "missingProviders", "skipped"]);
+  const fields = knownFields("ProviderCatalogEvidence", input, ["providers", "missingProviders", "skipped", "etag"]);
   if (!Array.isArray(fields.providers)) throw new TypeError("ProviderCatalogEvidence.providers must be an array");
   if (!Array.isArray(fields.missingProviders)) throw new TypeError("ProviderCatalogEvidence.missingProviders must be an array");
   const seen = new Set();
@@ -488,7 +490,8 @@ export function makeProviderCatalogEvidence(input) {
     return checked;
   });
   const skipped = fields.skipped === undefined ? 0 : count("ProviderCatalogEvidence.skipped", fields.skipped);
-  return Object.freeze({ providers: Object.freeze(providers), missingProviders: Object.freeze(missingProviders), skipped });
+  const etag = fields.etag === undefined ? {} : { etag: identifier("ProviderCatalogEvidence.etag", fields.etag) };
+  return Object.freeze({ providers: Object.freeze(providers), missingProviders: Object.freeze(missingProviders), skipped, ...etag });
 }
 
 const CHECK_FIELDS = Object.freeze(["axis", "value", "verdict", "scope", "runtimeText", "validValues"]);
