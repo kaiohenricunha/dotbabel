@@ -11,6 +11,7 @@
       "create-audit",
       "create-experiment",
       "create-inspection",
+      "deliver",
       "dependabot-sweep",
       "deploy-status",
       "deployment-engineer",
@@ -143,6 +144,7 @@
     ],
     "crossplane": ["crossplane-engineer", "crossplane-specialist"],
     "github-actions": [
+      "deliver",
       "dependabot-sweep",
       "devops-engineer",
       "local-attest",
@@ -211,6 +213,7 @@
       "create-inspection",
       "crossplane-specialist",
       "data-scientist",
+      "deliver",
       "dependabot-sweep",
       "gcp-specialist",
       "git",
@@ -280,18 +283,8 @@
       "security-auditor",
       "smoke-test"
     ],
-    "runtime-ops": [
-      "deploy-status",
-      "deployment-engineer",
-      "docker-engineer",
-      "flyctl",
-      "kubernetes-specialist",
-      "local-attest",
-      "release-conductor",
-      "smoke-test",
-      "yolo"
-    ],
     "testing": [
+      "deliver",
       "detect-flaky",
       "fix-with-evidence",
       "local-attest",
@@ -303,6 +296,17 @@
       "test-engineer",
       "validate-spec",
       "veracity-audit"
+    ],
+    "runtime-ops": [
+      "deploy-status",
+      "deployment-engineer",
+      "docker-engineer",
+      "flyctl",
+      "kubernetes-specialist",
+      "local-attest",
+      "release-conductor",
+      "smoke-test",
+      "yolo"
     ],
     "incident-response": ["flyctl", "rollback-prod"]
   },
@@ -347,6 +351,7 @@
       "container-engineer",
       "crossplane-engineer",
       "data-scientist",
+      "deliver",
       "deploy-status",
       "deployment-engineer",
       "devops-engineer",

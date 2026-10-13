@@ -76,6 +76,41 @@ line_of() {
   [ "$quality" -gt "$explicit" ]
 }
 
+@test "merge-pr: the off state reads CI on the head and starts a run before any local fallback" {
+  # With enforcement off, CI on the head SHA is the evidence. A head that CI
+  # did not test gets a dispatched run first; the expensive explicit path is
+  # the last resort, so the dispatch must sit between the two headings.
+  ci=$(line_of '\*\*CI path\*\*' "$MERGE")
+  explicit=$(line_of '\*\*Explicit path\*\*' "$MERGE")
+  dispatch=$(line_of 'gh workflow run test.yml' "$MERGE")
+
+  [ -n "$ci" ]
+  [ -n "$dispatch" ]
+  [ "$ci" -lt "$explicit" ]
+  [ "$dispatch" -gt "$ci" ]
+  [ "$dispatch" -lt "$explicit" ]
+  run grep -qF 'take the CI path in step 6' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: the off state never takes an attestation as the evidence" {
+  # The gate validates an attestation's trust, configuration and legs only
+  # when enforcement is on, so in the off state a comment is unchecked text.
+  run grep -qF 'Never accept a `/local-attest` comment as the evidence in the `off` state' "$MERGE"
+  [ "$status" -eq 0 ]
+}
+
+@test "merge-pr: the CI path asks for a diff review when the PR edits what CI runs" {
+  # CI runs the pull request's own workflow and scripts, so a PR can make its
+  # own run pass; the human diff review is the control that cannot be edited.
+  ci=$(line_of '\*\*CI path\*\*' "$MERGE")
+  review=$(line_of 'edits `.github/workflows/\*\*`' "$MERGE")
+  explicit=$(line_of '\*\*Explicit path\*\*' "$MERGE")
+  [ -n "$review" ]
+  [ "$review" -gt "$ci" ]
+  [ "$review" -lt "$explicit" ]
+}
+
 @test "merge-pr: the attested path installs nothing and creates no worktree" {
   # The attested path's saving is not only the suite: it also skips the
   # worktree and the dependency install. Both must be described below the
