@@ -5,7 +5,9 @@
  * Models.dev publishes one JSON document of model metadata, keyed by provider. This adapter fetches
  * it once, reduces it to the providers the caller names, and reports each provider's models as
  * `ModelFact`s. It holds no credential and sends none (§2, SEC-3), and it persists nothing: the
- * capability cache and the conditional GET that needs a stored `etag` belong to `catalog/` (P-9).
+ * capability cache belongs to `catalog/` (P-9). `catalog/` hands back a stored `etag` as `context.etag`,
+ * and this adapter sends it as `If-None-Match`, so an unchanged document costs one `304` (§5
+ * `Conditional GET`).
  *
  * What the evidence never claims: that a model is available. Presence in a public catalog is not
  * proof that this user or runtime can invoke a model (ARCH-14), so no field states availability.
@@ -137,6 +139,19 @@ function requestedProviders(value) {
 }
 
 /**
+ * The validator a caller sends back, or `undefined` when it sends none. It becomes a request header,
+ * so anything but a short printable string is a caller breach and throws.
+ * @param {unknown} value
+ * @returns {string | undefined}
+ */
+function requestEtag(value) {
+  if (value === undefined) return undefined;
+  const etag = optionalIdentifier(value);
+  if (etag === undefined) throw new TypeError("models-dev discover: etag must be a non-empty printable string of at most 200 characters");
+  return etag;
+}
+
+/**
  * Read a response body, stopping once it exceeds `MAX_RESPONSE_BYTES`. The declared length is checked
  * first, but the stream is counted too, because a declared length can be absent or wrong. An abort of
  * the operation cancels the read, so a stalled body cannot hold the connection open.
@@ -243,9 +258,10 @@ function providerDiscovery(models) {
  * Each provider keeps its Dotbabel id, and its Models.dev key only when the two differ.
  * @param {Record<string, unknown>} doc
  * @param {Array<{id: string, key: string}>} requested
+ * @param {string | undefined} etag The validator the source sent with this document, kept only when it is printable.
  * @returns {ReturnType<typeof makeProviderCatalogEvidence>}
  */
-function reduceDocument(doc, requested) {
+function reduceDocument(doc, requested, etag) {
   /** @type {Array<{id: string, sourceKey?: string, displayName?: string, discovery: ReturnType<typeof makeDiscoveryEvidence>}>} */
   const providers = [];
   /** @type {string[]} */
@@ -271,7 +287,7 @@ function reduceDocument(doc, requested) {
     const displayName = optionalIdentifier(/** @type {any} */ (provider).name);
     providers.push({ id, ...(key === id ? {} : { sourceKey: key }), ...(displayName === undefined ? {} : { displayName }), discovery });
   }
-  return makeProviderCatalogEvidence({ providers, missingProviders, skipped });
+  return makeProviderCatalogEvidence({ providers, missingProviders, skipped, ...(etag === undefined ? {} : { etag }) });
 }
 
 /**
@@ -279,10 +295,15 @@ function reduceDocument(doc, requested) {
  *
  * The request and the body read share one REL-1 network timeout. A refused connection, a timeout, or
  * an HTTP error is `unavailable`; a body that is too large, not the expected JSON, or holds none of the
- * requested providers is `unknown`. Neither case throws. Only a caller breach (no providers) or a
- * safety fault (a source URL that is not HTTPS) throws.
+ * requested providers is `unknown`. Neither case throws. Only a caller breach (no providers, a bad
+ * `etag`) or a safety fault (a source URL that is not HTTPS) throws.
+ *
+ * With `context.etag`, the request is conditional. A `304` returns `not_modified` with no evidence, and
+ * `catalog/` keeps the entry it already holds. A `304` to a request that sent no `etag` breaks HTTP, so
+ * it is `unknown`, never `not_modified`.
  * @param {object} context
  * @param {string[]} context.providers Dotbabel provider ids to keep: a `PROVIDERS` id such as `anthropic`, or `models-dev.<key>`, such as `models-dev.xai`.
+ * @param {string} [context.etag] The validator of the stored copy, sent as `If-None-Match`.
  * @param {string} [context.url] The source URL. HTTPS only, except plain HTTP on loopback for a local fixture.
  * @param {typeof fetch} [context.fetch] Injectable for tests. Defaults to the global `fetch`.
  * @param {() => string} [context.now]
@@ -292,6 +313,7 @@ function reduceDocument(doc, requested) {
 export async function discover(context) {
   const ctx = /** @type {any} */ (isPlainObject(context) ? context : {});
   const requested = requestedProviders(ctx.providers);
+  const etag = requestEtag(ctx.etag);
   const url = sourceUrl(ctx.url ?? SOURCE_URL);
   const fetchImpl = ctx.fetch ?? globalThis.fetch;
   const now = ctx.now ?? (() => new Date().toISOString());
@@ -305,12 +327,13 @@ export async function discover(context) {
         // No header, cookie or URL credential is ever sent, and a redirect is never followed, so the
         // request cannot be steered to a clear-text host after the checks above (SEC-3). `manual` hands
         // back the 3xx itself, which is refused below by status, not by an error message's wording.
-        const response = await fetchImpl(url.href, { method: "GET", headers: { accept: "application/json" }, redirect: "manual", credentials: "omit", signal });
+        const headers = { accept: "application/json", ...(etag === undefined ? {} : { "if-none-match": etag }) };
+        const response = await fetchImpl(url.href, { method: "GET", headers, redirect: "manual", credentials: "omit", signal });
         if (!response.ok) {
           await response.body?.cancel().catch(() => {});
           return { httpStatus: response.status };
         }
-        return { httpStatus: response.status, read: await readBounded(response, signal) };
+        return { httpStatus: response.status, etag: optionalIdentifier(response.headers.get("etag")), read: await readBounded(response, signal) };
       },
       { channel: "network", timeoutMs: ctx.timeoutMs, provenance, now },
     )
@@ -318,6 +341,11 @@ export async function discover(context) {
   if (ran.status !== "ok") return ran;
   const { httpStatus, read } = ran.evidence;
 
+  // 304 is a 3xx, so it is decided before the redirect branch below.
+  if (read === undefined && httpStatus === 304) {
+    if (etag !== undefined) return makeAdapterResult({ status: "not_modified", provenance, observedAt: now() });
+    return result("unknown", "unexpected_not_modified", "the source answered HTTP 304 to a request that sent no etag");
+  }
   if (read === undefined && httpStatus >= 300 && httpStatus < 400) {
     return result("unavailable", "redirect_refused", `the source answered HTTP ${httpStatus}, a redirect, which is never followed (SEC-3)`, false);
   }
@@ -334,7 +362,7 @@ export async function discover(context) {
   }
   if (!isPlainObject(doc)) return result("unknown", "malformed_output", "the response was not the JSON object keyed by provider that was expected");
 
-  const evidence = reduceDocument(doc, requested);
+  const evidence = reduceDocument(doc, requested, ran.evidence.etag);
   if (evidence.providers.length === 0) {
     return result("unknown", "insufficient_evidence", `none of the ${requested.length} requested providers had usable data (${evidence.missingProviders.length} absent, ${evidence.skipped} unusable)`);
   }

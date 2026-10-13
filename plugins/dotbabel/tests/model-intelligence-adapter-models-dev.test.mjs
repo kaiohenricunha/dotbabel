@@ -330,6 +330,44 @@ describe("models-dev knowledge-source adapter", () => {
     }
   });
 
+  it("a conditional GET sends context.etag as If-None-Match, and a 304 is not_modified with no evidence (§5 Conditional GET)", async () => {
+    const { double, run } = discoverWith(() => new Response(null, { status: 304, headers: { etag: '"v1"' } }), { etag: '"v1"' });
+    const result = await run;
+    expect(new Headers(double.calls[0].init.headers).get("if-none-match")).toBe('"v1"');
+    // No evidence, so a 304 can never read as an empty catalog (ARCH-30); provenance and the time stay.
+    expect(result).toEqual({ status: "not_modified", provenance: { sourceId: "models-dev", sourceKind: "knowledge-source", adapterVersion: "2" }, observedAt: fixedNow() });
+    // Without an etag, no validator is sent.
+    const plain = discoverWith(() => reply(RECORDED));
+    await plain.run;
+    expect(new Headers(plain.double.calls[0].init.headers).has("if-none-match")).toBe(false);
+  });
+
+  it("a 304 for a request that sent no etag breaks the protocol and is unknown, never not_modified", async () => {
+    const result = await discoverWith(() => new Response(null, { status: 304 })).run;
+    expect(result.status).toBe("unknown");
+    expect(result.diagnostic.code).toBe("unexpected_not_modified");
+    expect(result).not.toHaveProperty("evidence");
+  });
+
+  it("on 200 keeps the etag the source sent in the evidence, and drops one that is not printable", async () => {
+    const tagged = await discoverWith(() => reply(RECORDED, { headers: { "content-type": "application/json", etag: 'W/"5f2-abc"' } })).run;
+    expect(tagged.status).toBe("ok");
+    expect(tagged.evidence.etag).toBe('W/"5f2-abc"');
+    const untagged = await discoverWith(() => reply(RECORDED)).run;
+    expect(Object.hasOwn(untagged.evidence, "etag")).toBe(false);
+    const long = await discoverWith(() => reply(RECORDED, { headers: { "content-type": "application/json", etag: `"${"x".repeat(300)}"` } })).run;
+    expect(long.status).toBe("ok");
+    expect(Object.hasOwn(long.evidence, "etag")).toBe(false);
+  });
+
+  it("throws for a caller breach: an etag that is not a printable string", async () => {
+    for (const etag of ["", 7, '"a"' + String.fromCharCode(10) + "x: y", "x".repeat(201)]) {
+      const refused = fakeFetch(() => reply(RECORDED));
+      await expect(modelsDev.discover({ providers: ["anthropic"], etag, fetch: refused.fetch, now: fixedNow }), String(etag)).rejects.toThrow(/etag/);
+      expect(refused.calls).toEqual([]);
+    }
+  });
+
   it("exports the MIT notice that every stored copy must keep", () => {
     expect(modelsDev.MODELS_DEV_NOTICE).toContain("MIT");
     // `notice` is the export every knowledge adapter carries, so catalog/ finds it without naming this adapter.

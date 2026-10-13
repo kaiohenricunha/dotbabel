@@ -27,8 +27,14 @@ export const RESOLUTION_MODES = Object.freeze(["dynamic", "floor", "pin", "inher
 /** Static capability of an adapter. `unverified` is never treated as `supported` (ARCH-44). */
 export const SUPPORT_STATES = Object.freeze(["supported", "unsupported", "unverified"]);
 
-/** Outcome of one adapter operation. A successful exit code alone does not imply `ok`. */
-export const ADAPTER_RESULT_STATUSES = Object.freeze(["ok", "unsupported", "unavailable", "unknown"]);
+/**
+ * Outcome of one adapter operation. A successful exit code alone does not imply `ok`.
+ *
+ * `not_modified` is only for a `discover` that sent an `etag`: the source confirmed that the evidence
+ * the caller holds is still current, and returned none (§5 `Adapter result`). `catalog/` rejects it
+ * from any other call, because only the caller knows whether it sent an `etag`.
+ */
+export const ADAPTER_RESULT_STATUSES = Object.freeze(["ok", "not_modified", "unsupported", "unavailable", "unknown"]);
 
 /** Freshness that `catalog/` derives from `observedAt`; never an adapter status. */
 export const FRESHNESS_STATES = Object.freeze(["fresh", "stale", "expired", "unknown"]);
@@ -38,6 +44,15 @@ export const REFRESH_STATES = Object.freeze(["idle", "in_progress"]);
 
 /** Local availability of a catalog fact, separate from global existence (ARCH-14). */
 export const AVAILABILITY_STATES = Object.freeze(["available", "unavailable", "unknown"]);
+
+/**
+ * Confidence in one catalog fact, the `Confidence` of §5 `Catalog evidence envelope`.
+ *
+ * §5 `Confidence` leaves the values to the catalog contract (P-9). They are levels, never a number,
+ * so no fact becomes a model score (§2). `catalog/` derives them from freshness today; P-11 derives
+ * the resolver's own confidence from the facts it uses.
+ */
+export const CONFIDENCE_LEVELS = Object.freeze(["high", "medium", "low"]);
 
 /** Resolver result statuses. */
 export const RESOLVER_STATUSES = Object.freeze(["resolved", "unresolved", "conflict", "invalid"]);
@@ -285,7 +300,7 @@ export function makeResolvedRuntimeConfiguration(input) {
 /**
  * @template T
  * @typedef {object} AdapterResult
- * @property {"ok"|"unsupported"|"unavailable"|"unknown"} status
+ * @property {"ok"|"not_modified"|"unsupported"|"unavailable"|"unknown"} status
  * @property {T} [evidence]
  * @property {Provenance} provenance
  * @property {string} [observedAt] ISO 8601 time of the observation.
@@ -299,7 +314,7 @@ export function makeResolvedRuntimeConfiguration(input) {
  * @property {Provenance} provenance
  * @property {string} [observedAt]
  * @property {"fresh"|"stale"|"expired"|"unknown"} freshness
- * @property {string} confidence
+ * @property {"high"|"medium"|"low"} confidence
  * @property {"available"|"unavailable"|"unknown"} availability
  * @property {"idle"|"in_progress"} refresh
  */

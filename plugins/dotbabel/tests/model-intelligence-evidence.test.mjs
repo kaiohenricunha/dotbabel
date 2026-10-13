@@ -326,6 +326,16 @@ describe("provider catalog evidence (a knowledge source)", () => {
       expect(() => makeProviderCatalogEvidence({ providers: [{ id: "models-dev.xai", sourceKey: bad, discovery: d }], missingProviders: [] }), String(bad)).toThrow(/sourceKey/);
     }
   });
+  it("makeProviderCatalogEvidence keeps the etag the source sent with the document, and refuses one that is not printable", () => {
+    const d = discovery("claude-opus-5");
+    const withEtag = makeProviderCatalogEvidence({ providers: [{ id: "anthropic", discovery: d }], missingProviders: [], etag: 'W/"abc-123"' });
+    expect(withEtag.etag).toBe('W/"abc-123"');
+    // Absent is not empty: no etag field unless the source sent one.
+    expect(Object.hasOwn(makeProviderCatalogEvidence({ providers: [{ id: "anthropic", discovery: d }], missingProviders: [] }), "etag")).toBe(false);
+    for (const bad of ["", 7, null, '"a"' + String.fromCharCode(13, 10) + "x-injected: 1", "x".repeat(201)]) {
+      expect(() => makeProviderCatalogEvidence({ providers: [{ id: "anthropic", discovery: d }], missingProviders: [], etag: bad }), String(bad)).toThrow(/etag/);
+    }
+  });
 });
 
 describe("provider namespace mapping (§5 Provider namespace)", () => {
