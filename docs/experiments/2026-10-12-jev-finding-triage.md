@@ -1,6 +1,6 @@
 # Experiment: Jev as a triage gate for review findings — 2026-10-12
 
-**Status: NOT RUN. Results: none.** The harness and the dataset extraction are ready. The replay needs three things that this work does not have: the owner's approval to send review text, file paths and diff hunks to TypeSafe AI, a third party; a `TYPESAFE_API_KEY`; and hand labels for the replies that the text rules cannot read. Nothing in this document is a Jev result. See [Status and next steps](#status-and-next-steps).
+**Status: RUN on 2026-10-13. Decision: REJECT.** Jev does not separate the findings that `/review-pr` accepted from the ones it rejected, and it auto-decides too few of them. Nothing changes in `/review-pr`. See [Results](#results-2026-10-13).
 
 ## Question
 
@@ -101,6 +101,92 @@ The local files hold the same text, so keep each one outside the repository:
 
 The answers file holds ids, verdict metadata, the model, the answers and the usage. It holds no review text and never the key.
 
+## Results (2026-10-13)
+
+### Run
+
+- **Model:** `jev-1.13.0`. 1,750 requests for the primary set, 0 failed, 2.54M input tokens, about $0.11–$0.21. Latency p50 208 ms, p95 248 ms, max 1,152 ms.
+- **Dataset:** the 2026-10-12 snapshot of 1,989 findings, less 19. The 19 are the findings of squadranks #1218 and #1219, whose posted body holds the owner's answer after the title line, so Jev would see the verdict. They were removed before any Jev answer existed.
+- **Labels:** an AI agent labeled the 125 replies that the text rules cannot read, by the disposition that each reply records (82 valid, 21 false positive, 22 unknown). A second AI agent checked a 15-id sample (the first 15 by `sha256(id)`) against git and the pull-request history: 13 agree, 1 label changed (valid to false positive), and 1 stays `unknown` under the partial rule. The owner accepted that check. No human audited the labels.
+
+### Primary run
+
+#### Dataset
+
+- Findings: 1970 across 245 pull requests.
+- Jev answers: 1750 usable, 0 failed (an error, or no noul in [0, 1]).
+- Primary set, extracted: 1750 (false positive 54). With a usable answer: 1750 (false positive 54). Failed: 0 (false positive 0). Not sent: 0 (false positive 0).
+
+#### Agreement with the /review-pr verdict (p ≥ 0.5 means real defect)
+
+|              | verdict valid | verdict false positive |
+| ------------ | ------------- | ---------------------- |
+| Jev real     | 1637          | 48                     |
+| Jev not real | 59            | 6                      |
+
+Accuracy 93.9%, Cohen's kappa 0.069.
+
+#### Reliability
+
+| p bin   | n   | mean p | observed valid rate |
+| ------- | --- | ------ | ------------------- |
+| 0.0–0.1 | 0   | n/a    | n/a                 |
+| 0.1–0.2 | 4   | 0.15   | 0.50                |
+| 0.2–0.3 | 12  | 0.26   | 0.92                |
+| 0.3–0.4 | 14  | 0.34   | 0.86                |
+| 0.4–0.5 | 35  | 0.45   | 0.97                |
+| 0.5–0.6 | 77  | 0.55   | 0.95                |
+| 0.6–0.7 | 206 | 0.65   | 0.96                |
+| 0.7–0.8 | 537 | 0.75   | 0.96                |
+| 0.8–0.9 | 746 | 0.84   | 0.98                |
+| 0.9–1.0 | 119 | 0.91   | 1.00                |
+
+Brier 0.080, expected calibration error 0.202.
+
+#### Gates (locked: hi 0.9, lo 0.1; the point estimate decides)
+
+- Triage set: 1296 primary findings that state a severity; 454 state none and stay on full validation. Eligible for auto-decision (not critical): 1253. Critical findings held although Jev was outside the band: 10.
+- Auto-valid 84, auto-false-positive 0, full validation 1212.
+
+| Gate                                      | Value | Threshold | Over                                      | 95% PR-clustered bootstrap   | Fragile |
+| ----------------------------------------- | ----- | --------- | ----------------------------------------- | ---------------------------- | ------- |
+| Kappa (primary set)                       | 0.069 | ≥ 0.6     | 1750 findings                             | 0.002–0.146 (2000 resamples) | no      |
+| False positives auto-validated            | 0.000 | ≤ 0.25    | 0 of 41 eligible false positives          | 0.000–0.000 (2000 resamples) | no      |
+| Precision of the auto-false-positive band | n/a   | ≥ 0.8     | 0 of 0 findings at p ≤ 0.1                | n/a                          | no      |
+| Real defects auto-dismissed               | 0.000 | ≤ 0.005   | 0 of 1212 eligible valid findings         | 0.000–0.000 (2000 resamples) | no      |
+| Auto-decided                              | 0.065 | ≥ 0.2     | 84 of 1296 findings that state a severity | 0.047–0.084 (2000 resamples) | no      |
+
+#### Threshold sweep (informs a later experiment, never the decision)
+
+| hi / lo     | auto-decided | false positives auto-validated | real defects auto-dismissed |
+| ----------- | ------------ | ------------------------------ | --------------------------- |
+| 0.95 / 0.05 | 0.0%         | 0 of 41                        | 0 of 1212                   |
+| 0.9 / 0.1   | 6.5%         | 0 of 41                        | 0 of 1212                   |
+| 0.8 / 0.2   | 48.8%        | 12 of 41                       | 2 of 1212                   |
+| 0.7 / 0.3   | 79.2%        | 29 of 41                       | 9 of 1212                   |
+
+#### Secondary: category and severity
+
+- Category matches the posted one (9 options): 61.3% of 560.
+- Rounded severity matches the posted one: 23.2% of 1296.
+
+#### Decision under the locked rule
+
+**REJECT**
+
+- kappa 0.069 < 0.6
+- auto-decided 84 of 1296 (6.5%) < 20%
+
+### Sensitivity run (not used for the decision)
+
+The labeling agent also labeled the 58 findings that have no reply, from commits, pull-request summaries and the merged code. That evidence is weaker than a reply. With those labels, the primary set grows by 53 findings (one more false positive). The result does not change: kappa 0.064 (95% interval −0.001 to 0.138), 0 of 42 eligible false positives auto-validated, 0 of 1,247 eligible valid findings auto-dismissed, 86 of 1,338 auto-decided (6.4%). **REJECT.**
+
+### What could explain it
+
+- Jev sees the finding and a 60-line hunk, but the verdict came from a validation that read the whole file. A rejection often rests on intent or on code outside the hunk: 11 of the 33 false positives that the text rules found were rejected as intentional, kept on purpose, declined or not to fix.
+- 96.9% of the primary findings were accepted, and each finding is written to sound plausible. So Jev rates nearly all of them as likely real (most p between 0.6 and 0.9) and hedges instead of separating them. Its Brier score (0.080) is worse than a constant guess of the base rate (0.969 gives 0.030).
+- The labels are dispositions, not ground truth. That limits the agreement that any model can reach.
+
 ## Limits of the evidence
 
 - **The verdict is not ground truth.** It is the disposition that the review pipeline and the owner gave. A finding that was cheap to fix may be marked `Fixed` without being a real defect. Agreement with the verdict measures agreement with this pipeline, not correctness.
@@ -122,7 +208,7 @@ The answers file holds ids, verdict metadata, the model, the answers and the usa
 
 ## Status and next steps
 
-Done: the harness, its tests, and the counts above. Not done: everything that needs a Jev answer. In order:
+Done on 2026-10-13: steps 1 to 6 (see [Results](#results-2026-10-13)). The outcome is REJECT, so step 7 applies: change nothing in `/review-pr`. The steps, for a later run:
 
 1. **Owner approval, per repository,** to send its text to TypeSafe AI. A decision needs squadranks, because dotbabel alone is INCONCLUSIVE.
 2. **Key.** Provision `TYPESAFE_API_KEY`.
