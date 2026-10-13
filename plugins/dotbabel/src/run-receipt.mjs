@@ -31,18 +31,6 @@
  * @property {string|null} requested_model The phase artifact's frontmatter `model`.
  * @property {string|null} tool_version
  *
- * @typedef {object} SpotCheckEntry
- * @property {"spot-check"|"explicit-run"} kind
- * @property {string} at ISO time the entry was recorded.
- * @property {string} head_sha The pull request head it is about.
- * @property {boolean} [selected] spot-check: whether the explicit path was chosen.
- * @property {string} [reason] spot-check: one of `SPOT_CHECK_REASONS`.
- * @property {number} [rate] spot-check: the rate the roll was compared against.
- * @property {number} [roll] spot-check: the roll, in [0, 1).
- * @property {"available"|"unavailable"|"unknown"} [ci] spot-check: default-branch CI state.
- * @property {"pass"|"fail"} [outcome] explicit-run: the result of the explicit verification.
- * @property {string|null} tool_version
- *
  * @typedef {object} RunReceipt
  * @property {1} schema_version
  * @property {"dotbabel-pr-stack"} tool
@@ -50,9 +38,6 @@
  * @property {string} created_at
  * @property {string} updated_at
  * @property {ReceiptAttempt[]} attempts
- * @property {SpotCheckEntry[]} [spot_checks] Merge-time spot-check decisions
- *   and explicit verification results. Kept apart from `attempts`, so they
- *   never count toward a phase, the attempt cap, or the verdict.
  *
  * @typedef {object} PhaseSummary
  * @property {number} attempts
@@ -64,7 +49,6 @@
 
 import path from "node:path";
 
-import { SPOT_CHECK_REASONS } from "./merge-verification.mjs";
 import { CONDUCTOR_PHASES } from "./pr-gates.mjs";
 
 /** The outcomes an attempt may record. */
@@ -94,11 +78,7 @@ const VERSION_RE = /^[0-9A-Za-z.+-]+$/;
 const EVIDENCE_RE = /^\S+$/;
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 const FAILED = new Set(["fail", "blocked"]);
-const RECEIPT_KEYS = new Set(["schema_version", "tool", "pr", "created_at", "updated_at", "attempts", "spot_checks"]);
-const SPOT_CHECK_KEYS = new Set(["kind", "at", "head_sha", "selected", "reason", "rate", "roll", "ci", "tool_version"]);
-const EXPLICIT_RUN_KEYS = new Set(["kind", "at", "head_sha", "outcome", "tool_version"]);
-const CI_STATES = ["available", "unavailable", "unknown"];
-const EXPLICIT_OUTCOMES = ["pass", "fail"];
+const RECEIPT_KEYS = new Set(["schema_version", "tool", "pr", "created_at", "updated_at", "attempts"]);
 const ATTEMPT_KEYS = new Set([
   "phase",
   "n",
@@ -226,137 +206,6 @@ export function appendAttempt(receipt, attempt) {
 }
 
 /**
- * @param {unknown} v
- * @returns {boolean}
- */
-function isUnitRate(v) {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
-}
-
-/**
- * @param {unknown} v
- * @returns {boolean}
- */
-function isRoll(v) {
-  return typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1;
-}
-
-/**
- * Return a copy of `receipt` with one spot-check entry appended.
- *
- * Two kinds: `spot-check` records what `pr-stack spot-check` decided for a
- * head, and `explicit-run` records the result of the explicit verification
- * `/merge-pr` ran because of it. Together they answer, after the merge, "was
- * this pull request selected, and was it actually verified?".
- *
- * They go in `spot_checks`, never in `attempts`: a spot check is not a
- * conductor phase, so it must not number, count toward the attempt cap, or
- * move the verdict. Like the rest of the receipt it is self-reported — a log
- * of what the tool decided and what the session said it ran, not evidence.
- *
- * @param {RunReceipt} receipt
- * @param {{ kind: "spot-check"|"explicit-run", headSha: string, selected?: boolean, reason?: string,
- *           rate?: number, roll?: number, ci?: string, outcome?: string,
- *           toolVersion?: string|null, now?: Date }} entry
- * @returns {RunReceipt}
- */
-export function appendSpotCheck(receipt, entry) {
-  const { kind, headSha } = entry;
-  if (kind !== "spot-check" && kind !== "explicit-run") {
-    throw new Error(`kind must be spot-check or explicit-run, got ${JSON.stringify(kind)}`);
-  }
-  if (typeof headSha !== "string" || !SHA_RE.test(headSha)) throw new Error("head must be a full 40-character SHA");
-  const toolVersion = entry.toolVersion ?? null;
-  if (!nullOr(toolVersion, VERSION_RE)) throw new Error(`tool version is not a version: ${JSON.stringify(toolVersion)}`);
-  const at = (entry.now ?? new Date()).toISOString();
-  /** @type {SpotCheckEntry} */
-  let stored;
-  if (kind === "spot-check") {
-    if (typeof entry.selected !== "boolean") throw new Error("selected must be a boolean");
-    if (!SPOT_CHECK_REASONS.includes(/** @type {any} */ (entry.reason))) {
-      throw new Error(`reason must be one of ${SPOT_CHECK_REASONS.join(", ")}, got ${JSON.stringify(entry.reason)}`);
-    }
-    if (!isUnitRate(entry.rate)) throw new Error(`rate must be a number from 0 to 1, got ${JSON.stringify(entry.rate)}`);
-    if (!isRoll(entry.roll)) throw new Error(`roll must be a number in [0, 1), got ${JSON.stringify(entry.roll)}`);
-    if (!CI_STATES.includes(/** @type {any} */ (entry.ci))) {
-      throw new Error(`ci must be one of ${CI_STATES.join(", ")}, got ${JSON.stringify(entry.ci)}`);
-    }
-    stored = {
-      kind,
-      at,
-      head_sha: headSha.toLowerCase(),
-      selected: entry.selected,
-      reason: /** @type {string} */ (entry.reason),
-      rate: /** @type {number} */ (entry.rate),
-      roll: /** @type {number} */ (entry.roll),
-      ci: /** @type {any} */ (entry.ci),
-      tool_version: toolVersion,
-    };
-  } else {
-    if (!EXPLICIT_OUTCOMES.includes(/** @type {any} */ (entry.outcome))) {
-      throw new Error(`outcome must be one of ${EXPLICIT_OUTCOMES.join(", ")}, got ${JSON.stringify(entry.outcome)}`);
-    }
-    stored = { kind, at, head_sha: headSha.toLowerCase(), outcome: /** @type {any} */ (entry.outcome), tool_version: toolVersion };
-  }
-  return { ...receipt, updated_at: at, spot_checks: [...(receipt.spot_checks ?? []), stored] };
-}
-
-/**
- * Per head, in the order first seen: the latest spot-check decision and the
- * latest explicit-run result, null when none was recorded.
- *
- * @param {RunReceipt} receipt
- * @returns {Array<{ head_sha: string, selected: boolean|null, reason: string|null, rate: number|null,
- *                   explicit: "pass"|"fail"|null }>}
- */
-export function summarizeSpotChecks(receipt) {
-  /** @type {Map<string, { head_sha: string, selected: boolean|null, reason: string|null, rate: number|null, explicit: "pass"|"fail"|null }>} */
-  const byHead = new Map();
-  for (const e of receipt.spot_checks ?? []) {
-    const row = byHead.get(e.head_sha) ?? { head_sha: e.head_sha, selected: null, reason: null, rate: null, explicit: null };
-    if (e.kind === "spot-check") {
-      row.selected = /** @type {boolean} */ (e.selected);
-      row.reason = /** @type {string} */ (e.reason);
-      row.rate = /** @type {number} */ (e.rate);
-    } else {
-      row.explicit = /** @type {"pass"|"fail"} */ (e.outcome);
-    }
-    byHead.set(e.head_sha, row);
-  }
-  return [...byHead.values()];
-}
-
-/**
- * Why one `spot_checks` entry is not valid, or null.
- *
- * @param {unknown} e
- * @param {string} at
- * @returns {string|null}
- */
-function spotCheckEntryProblem(e, at) {
-  if (e === null || typeof e !== "object" || Array.isArray(e)) return `${at} must be an object`;
-  const entry = /** @type {Record<string, unknown>} */ (e);
-  const keys = entry.kind === "spot-check" ? SPOT_CHECK_KEYS : entry.kind === "explicit-run" ? EXPLICIT_RUN_KEYS : null;
-  if (keys === null) return `${at}.kind must be spot-check or explicit-run`;
-  const missing = [...keys].find((k) => !(k in entry));
-  if (missing !== undefined) return `${at}.${missing} is missing`;
-  const unknown = Object.keys(entry).find((k) => !keys.has(k));
-  if (unknown !== undefined) return `${at} has unknown key ${JSON.stringify(unknown)}`;
-  if (!isDateTime(entry.at)) return `${at}.at must be an ISO date-time`;
-  if (typeof entry.head_sha !== "string" || !STORED_SHA_RE.test(entry.head_sha)) return `${at}.head_sha must be a lowercase full SHA`;
-  if (!nullOr(entry.tool_version, VERSION_RE)) return `${at}.tool_version must be null or a version`;
-  if (entry.kind === "explicit-run") {
-    return EXPLICIT_OUTCOMES.includes(/** @type {any} */ (entry.outcome)) ? null : `${at}.outcome must be pass or fail`;
-  }
-  if (typeof entry.selected !== "boolean") return `${at}.selected must be a boolean`;
-  if (!SPOT_CHECK_REASONS.includes(/** @type {any} */ (entry.reason))) return `${at}.reason is not a spot-check reason`;
-  if (!isUnitRate(entry.rate)) return `${at}.rate must be a number from 0 to 1`;
-  if (!isRoll(entry.roll)) return `${at}.roll must be a number in [0, 1)`;
-  if (!CI_STATES.includes(/** @type {any} */ (entry.ci))) return `${at}.ci must be available, unavailable or unknown`;
-  return null;
-}
-
-/**
  * Per-phase counts, in conductor order, for the phases that were attempted.
  *
  * @param {RunReceipt} receipt
@@ -480,13 +329,6 @@ export function receiptProblem(value, expectedPr) {
     }
     if (!nullOr(a.requested_model, MODEL_RE)) return `${at}.requested_model must be null or a model id`;
     if (!nullOr(a.tool_version, VERSION_RE)) return `${at}.tool_version must be null or a version`;
-  }
-  if ("spot_checks" in r) {
-    if (!Array.isArray(r.spot_checks)) return "spot_checks must be an array";
-    for (const [i, e] of r.spot_checks.entries()) {
-      const problem = spotCheckEntryProblem(e, `spot_checks[${i}]`);
-      if (problem !== null) return problem;
-    }
   }
   return null;
 }

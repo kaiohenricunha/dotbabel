@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.spot-checks.schema.json",
+  "title": "dotbabel merge-time spot-check log",
+  "description": "The append-only, SELF-REPORTED spot-check log of one pull request (a log, never evidence: the merge gate does not read it), written by `dotbabel pr-stack spot-check` to <git-common-dir>/dotbabel/receipts/pr-<N>.spot-checks.json, next to the conductor run receipt and never inside it. Each `spot-check` entry is one decision for a head; each `explicit-run` entry is the result of the explicit verification that a selection caused. A selection is sticky: a later decision on the same head repeats it with `sticky: true`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "pr", "created_at", "updated_at", "entries"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "tool": {
+      "const": "dotbabel-pr-stack"
+    },
+    "pr": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "at",
+              "head_sha",
+              "selected",
+              "reason",
+              "rate",
+              "roll",
+              "ci",
+              "workflow",
+              "trunk",
+              "sticky",
+              "tool_version"
+            ],
+            "properties": {
+              "kind": { "const": "spot-check" },
+              "at": { "type": "string", "format": "date-time" },
+              "head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              "selected": { "type": "boolean" },
+              "reason": {
+                "enum": ["off", "always_path", "ci_unavailable", "rate", "not_selected"]
+              },
+              "rate": { "type": "number", "minimum": 0, "maximum": 1 },
+              "roll": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
+              "ci": { "enum": ["available", "unavailable", "unknown"] },
+              "workflow": { "type": "string", "pattern": "^[A-Za-z0-9._-]+\\.ya?ml$" },
+              "trunk": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" },
+              "sticky": { "type": "boolean" },
+              "tool_version": {
+                "oneOf": [{ "type": "string", "pattern": "^[0-9A-Za-z.+-]+$" }, { "type": "null" }]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "at", "head_sha", "outcome", "tool_version"],
+            "properties": {
+              "kind": { "const": "explicit-run" },
+              "at": { "type": "string", "format": "date-time" },
+              "head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              "outcome": { "enum": ["pass", "fail"] },
+              "tool_version": {
+                "oneOf": [{ "type": "string", "pattern": "^[0-9A-Za-z.+-]+$" }, { "type": "null" }]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

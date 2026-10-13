@@ -5,19 +5,19 @@
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/merge-verification.mjs",
+    "plugins/dotbabel/src/spot-check-store.mjs",
     "plugins/dotbabel/src/attestation-gate-inputs.mjs",
     "plugins/dotbabel/src/pr-gates.mjs",
-    "plugins/dotbabel/src/run-receipt.mjs",
     "plugins/dotbabel/bin/dotbabel-pr-stack.mjs",
     "plugins/dotbabel/tests/merge-verification.test.mjs",
     "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
-    "plugins/dotbabel/tests/run-receipt.test.mjs",
+    "plugins/dotbabel/tests/spot-check-store.test.mjs",
     "plugins/dotbabel/tests/attestation-gate-inputs.test.mjs",
     "plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
     "plugins/dotbabel/tests/workflow-templates.test.mjs",
     "plugins/dotbabel/tests/bats/merge-pr-spot-check.bats",
     "schemas/dotbabel.config.schema.json",
-    "schemas/dotbabel.run-receipt.schema.json",
+    "schemas/dotbabel.spot-checks.schema.json",
     ".github/workflows/test.yml",
     "plugins/dotbabel/templates/workflows/test.yml",
     "commands/merge-pr.md",
@@ -33,7 +33,7 @@
     "docs/specs/merge-verification/spec.md"
   ],
   "acceptance_commands": [
-    "npx vitest run plugins/dotbabel/tests/merge-verification.test.mjs plugins/dotbabel/tests/merge-verification-cli.test.mjs plugins/dotbabel/tests/run-receipt.test.mjs plugins/dotbabel/tests/workflow-templates.test.mjs plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/merge-verification.test.mjs plugins/dotbabel/tests/merge-verification-cli.test.mjs plugins/dotbabel/tests/spot-check-store.test.mjs plugins/dotbabel/tests/workflow-templates.test.mjs plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
     "npx bats plugins/dotbabel/tests/bats/merge-pr-spot-check.bats plugins/dotbabel/tests/bats/merge-pr-attestation.bats plugins/dotbabel/tests/bats/example-parity.bats",
     "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
     "node plugins/dotbabel/bin/dotbabel-criteria.mjs verify --spec merge-verification"
@@ -259,16 +259,16 @@
     {
       "id": "AC-8",
       "status": "active",
-      "given": "a receipt that is ready and holds phase attempts",
-      "when": "spot-check and explicit-run entries are appended",
-      "then": "they are stored apart from attempts, and the attempt numbers, the attempt cap count, and the ready verdict do not change",
+      "given": "a ready run receipt with phase attempts",
+      "when": "spot-check and explicit-run entries are recorded for the same pull request",
+      "then": "they go to the sibling log pr-<N>.spot-checks.json under its own strict schema, and the receipt keeps its v1 keys, its attempt numbers, its attempt cap count and its ready verdict",
       "tests": [
         {
-          "file": "plugins/dotbabel/tests/run-receipt.test.mjs",
+          "file": "plugins/dotbabel/tests/spot-check-store.test.mjs",
           "name": "records a spot-check decision as its own append-only entry"
         },
         {
-          "file": "plugins/dotbabel/tests/run-receipt.test.mjs",
+          "file": "plugins/dotbabel/tests/spot-check-store.test.mjs",
           "name": "keeps spot-check entries out of the attempt count, the cap, and the ready verdict"
         }
       ],
@@ -276,7 +276,7 @@
         "npx",
         "vitest",
         "run",
-        "plugins/dotbabel/tests/run-receipt.test.mjs",
+        "plugins/dotbabel/tests/spot-check-store.test.mjs",
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-8.junit.xml"
       ],

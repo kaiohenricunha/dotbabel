@@ -141,10 +141,13 @@ const billingAnnotations = {
   ],
 };
 
-function readReceipt(ctx, pr) {
-  const file = path.join(ctx.repo, ".git", "dotbabel", "receipts", `pr-${pr}.json`);
+/** The spot-check log, a sibling of the run receipt. */
+function readLog(ctx, pr) {
+  const file = path.join(ctx.repo, ".git", "dotbabel", "receipts", `pr-${pr}.spot-checks.json`);
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
+
+const receiptFile = (ctx, pr) => path.join(ctx.repo, ".git", "dotbabel", "receipts", `pr-${pr}.json`);
 
 describe("pr-stack spot-check", () => {
   it("selects a pull request whose changed path matches always_paths and records the decision", () => {
@@ -158,10 +161,11 @@ describe("pr-stack spot-check", () => {
     const out = r.json().result;
     expect(out.decision).toMatchObject({ selected: true, reason: "always_path", matched: "src/auth/login.js" });
     expect(out.ci.state).toBe("available");
-    const receipt = readReceipt(ctx, 7);
-    expect(receipt.attempts).toEqual([]);
-    expect(receipt.spot_checks).toHaveLength(1);
-    expect(receipt.spot_checks[0]).toMatchObject({ kind: "spot-check", head_sha: HEAD, selected: true, reason: "always_path", ci: "available" });
+    const log = readLog(ctx, 7);
+    expect(log.entries).toHaveLength(1);
+    expect(log.entries[0]).toMatchObject({ kind: "spot-check", head_sha: HEAD, selected: true, reason: "always_path", ci: "available", workflow: "test.yml", trunk: "main" });
+    // The conductor receipt keeps its v1 shape: an older CLI must still read it.
+    expect(fs.existsSync(receiptFile(ctx, 7))).toBe(false);
   });
 
   it("verifies every pull request when the latest default-branch run was billing-blocked", () => {
@@ -215,7 +219,7 @@ describe("pr-stack spot-check", () => {
     expect(second.roll).toBe(roll);
     expect(second.decision).toEqual(first.decision);
     expect(first.decision.selected).toBe(roll < 0.5);
-    expect(readReceipt(ctx, 7).spot_checks).toHaveLength(2);
+    expect(readLog(ctx, 7).entries).toHaveLength(2);
   });
 
   it("reads the policy from the base commit, not the working tree", () => {
@@ -243,7 +247,7 @@ describe("pr-stack spot-check", () => {
     expect(rec.status, rec.stderr).toBe(0);
     const show = runBin(ctx, ["spot-check", "--pr", "7", "--show", "--json"], []);
     expect(show.status, show.stderr).toBe(0);
-    expect(show.json().result.heads).toEqual([{ head_sha: HEAD, selected: true, reason: "rate", rate: 1, explicit: "fail" }]);
+    expect(show.json().result.heads).toEqual([{ head_sha: HEAD, selected: true, reason: "rate", rate: 1, sticky: false, explicit: "fail" }]);
     const text = runBin(ctx, ["spot-check", "--pr", "7", "--show"], []);
     expect(text.stdout).toMatch(/selected \(rate\), explicit run: fail/);
   });

@@ -86,58 +86,6 @@
           }
         }
       }
-    },
-    "spot_checks": {
-      "description": "Merge-time spot-check decisions (`dotbabel pr-stack spot-check`) and the explicit verification results recorded for them. Kept apart from `attempts`, so they never count toward a phase, the attempt cap, or the verdict. Self-reported, like the rest of the receipt.",
-      "type": "array",
-      "items": {
-        "oneOf": [
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "kind",
-              "at",
-              "head_sha",
-              "selected",
-              "reason",
-              "rate",
-              "roll",
-              "ci",
-              "tool_version"
-            ],
-            "properties": {
-              "kind": { "const": "spot-check" },
-              "at": { "type": "string", "format": "date-time" },
-              "head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-              "selected": { "type": "boolean" },
-              "reason": {
-                "enum": ["off", "always_path", "ci_unavailable", "rate", "not_selected"]
-              },
-              "rate": { "type": "number", "minimum": 0, "maximum": 1 },
-              "roll": { "type": "number", "minimum": 0, "exclusiveMaximum": 1 },
-              "ci": { "enum": ["available", "unavailable", "unknown"] },
-              "tool_version": {
-                "oneOf": [{ "type": "string", "pattern": "^[0-9A-Za-z.+-]+$" }, { "type": "null" }]
-              }
-            }
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "at", "head_sha", "outcome", "tool_version"],
-            "properties": {
-              "kind": { "const": "explicit-run" },
-              "at": { "type": "string", "format": "date-time" },
-              "head_sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-              "outcome": { "enum": ["pass", "fail"] },
-              "tool_version": {
-                "oneOf": [{ "type": "string", "pattern": "^[0-9A-Za-z.+-]+$" }, { "type": "null" }]
-              }
-            }
-          }
-        ]
-      }
     }
   }
 }

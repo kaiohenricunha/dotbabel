@@ -82,7 +82,6 @@ import { postReviewComplete } from "../src/review-complete.mjs";
 import {
   RECEIPT_OUTCOMES,
   appendAttempt,
-  appendSpotCheck,
   createReceipt,
   frontmatterModel,
   receiptPath,
@@ -90,8 +89,14 @@ import {
   receiptVerdict,
   rollbackPoint,
   summarizePhases,
-  summarizeSpotChecks,
 } from "../src/run-receipt.mjs";
+import {
+  appendSpotCheck,
+  createSpotCheckStore,
+  spotCheckStorePath,
+  spotCheckStoreProblem,
+  summarizeSpotChecks,
+} from "../src/spot-check-store.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
@@ -523,7 +528,8 @@ const RECEIPT_LOCK_STALE_MS = 30_000;
 /**
  * Run `fn` while holding `<file>.lock`. Every worktree of a repository
  * extends one receipt, so two `record` calls must not both read N attempts
- * and each write N+1. A lock older than RECEIPT_LOCK_STALE_MS belongs to a
+ * and each write N+1. The spot-check log beside the receipt takes its own
+ * lock the same way. A lock older than RECEIPT_LOCK_STALE_MS belongs to a
  * process that died holding it and is cleared. A live one that does not free
  * up within RECEIPT_LOCK_WAIT_MS is an environment error.
  *
@@ -532,7 +538,7 @@ const RECEIPT_LOCK_STALE_MS = 30_000;
  * @param {() => T} fn
  * @returns {T}
  */
-function withReceiptLock(file, fn) {
+function withFileLock(file, fn) {
   const lock = `${file}.lock`;
   mkdirSync(dirname(file), { recursive: true });
   const deadline = Date.now() + RECEIPT_LOCK_WAIT_MS;
@@ -552,7 +558,7 @@ function withReceiptLock(file, fn) {
         rmSync(lock, { recursive: true, force: true });
         continue;
       }
-      if (Date.now() >= deadline) return fail(EXIT_CODES.ENV, `receipt lock is busy: ${lock}`);
+      if (Date.now() >= deadline) return fail(EXIT_CODES.ENV, `lock is busy: ${lock}`);
       Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
     }
   }
@@ -564,18 +570,40 @@ function withReceiptLock(file, fn) {
 }
 
 /**
- * Replace the receipt atomically, so a crash mid-write leaves the previous
- * history rather than half a file.
+ * Replace a receipt or a spot-check log atomically, so a crash mid-write
+ * leaves the previous history rather than half a file.
  *
  * @param {string} file
- * @param {import("../src/run-receipt.mjs").RunReceipt} receipt
+ * @param {object} value
  * @returns {void}
  */
-function writeReceipt(file, receipt) {
+function writeJsonAtomic(file, value) {
   mkdirSync(dirname(file), { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`);
+  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`);
   renameSync(tmp, file);
+}
+
+/**
+ * Read and check the spot-check log at `file`, or null when none exists yet.
+ * Like `readReceipt`, a damaged log is an environment error and is left
+ * unchanged: it is history.
+ *
+ * @param {string} file
+ * @param {number} prNumber
+ * @returns {import("../src/spot-check-store.mjs").SpotCheckStore|null}
+ */
+function readSpotCheckStore(file, prNumber) {
+  if (!existsSync(file)) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (err) {
+    return fail(EXIT_CODES.ENV, `${file} is not readable JSON: ${err.message}`);
+  }
+  const problem = spotCheckStoreProblem(parsed, prNumber);
+  if (problem) return fail(EXIT_CODES.ENV, `${file} is not a spot-check log (${problem}); left unchanged`);
+  return parsed;
 }
 
 /**
@@ -797,16 +825,18 @@ function ciAvailability(workflow, trunk) {
 }
 
 /**
- * Append one spot-check entry to the pull request's receipt, under the lock.
+ * Append one entry to the pull request's spot-check log, under its own lock.
+ * The log is a sibling of the run receipt, never part of it: an older CLI
+ * refuses a receipt with an unknown key.
  *
  * @param {number} prNumber
  * @param {Parameters<typeof appendSpotCheck>[1]} entry
- * @returns {string} The receipt path.
+ * @returns {string} The log path.
  */
 function recordSpotCheck(prNumber, entry) {
-  const file = receiptPath(gitCommonDir(), prNumber);
-  withReceiptLock(file, () => {
-    writeReceipt(file, appendSpotCheck(readReceipt(file, prNumber) ?? createReceipt({ pr: prNumber }), entry));
+  const file = spotCheckStorePath(gitCommonDir(), prNumber);
+  withFileLock(file, () => {
+    writeJsonAtomic(file, appendSpotCheck(readSpotCheckStore(file, prNumber) ?? createSpotCheckStore({ pr: prNumber }), entry));
   });
   return file;
 }
@@ -838,9 +868,9 @@ function spotCheckWhy(decision, roll) {
 async function spotCheckCommand(flags, json) {
   const prNumber = requireNumber(flags.pr, "--pr");
   if (flags.show === true) {
-    const file = receiptPath(gitCommonDir(), prNumber);
-    const receipt = readReceipt(file, prNumber);
-    const heads = receipt ? summarizeSpotChecks(receipt) : [];
+    const file = spotCheckStorePath(gitCommonDir(), prNumber);
+    const store = readSpotCheckStore(file, prNumber);
+    const heads = store ? summarizeSpotChecks(store) : [];
     return emit({
       subcommand: "spot-check",
       ok: true,
@@ -873,7 +903,7 @@ async function spotCheckCommand(flags, json) {
       subcommand: "spot-check",
       ok: true,
       result: { path: file, headSha: headSha.toLowerCase(), explicit },
-      lines: [`spot-check #${prNumber}: recorded explicit run ${explicit} on ${headSha.slice(0, 8)}`, `  receipt: ${file}`],
+      lines: [`spot-check #${prNumber}: recorded explicit run ${explicit} on ${headSha.slice(0, 8)}`, `  log: ${file}`],
       json,
     });
   }
@@ -903,6 +933,8 @@ async function spotCheckCommand(flags, json) {
     rate: decision.rate,
     roll,
     ci: ci.state,
+    workflow,
+    trunk: String(flags.trunk),
     toolVersion: version,
   });
   const why = spotCheckWhy(decision, roll);
@@ -910,7 +942,7 @@ async function spotCheckCommand(flags, json) {
     subcommand: "spot-check",
     ok: true,
     trunk: String(flags.trunk),
-    result: { pr: prNumber, headSha: headSha.toLowerCase(), roll, decision, ci, policy, changedFilesKnown: files !== null, receipt: file },
+    result: { pr: prNumber, headSha: headSha.toLowerCase(), roll, decision, ci, policy, changedFilesKnown: files !== null, log: file },
     lines: [
       `spot-check #${prNumber}: ${decision.selected ? "SELECTED" : "not selected"} (${decision.reason}: ${why})`,
       `  ci on ${flags.trunk}: ${ci.state}${ci.run ? ` (latest ${workflow} run ${ci.run.classification}${ci.run.url ? `, ${ci.run.url}` : ""})` : ""}`,
@@ -1012,9 +1044,9 @@ async function runLocalMatrix(sha) {
 function latestSpotCheck(file, prNumber) {
   if (!existsSync(file)) return null;
   try {
-    const receipt = JSON.parse(readFileSync(file, "utf8"));
-    if (receiptProblem(receipt, prNumber) !== null) return null;
-    const latest = summarizeSpotChecks(receipt).at(-1);
+    const store = JSON.parse(readFileSync(file, "utf8"));
+    if (spotCheckStoreProblem(store, prNumber) !== null) return null;
+    const latest = summarizeSpotChecks(store).at(-1);
     if (!latest) return null;
     return { head_sha: latest.head_sha, selected: latest.selected, reason: latest.reason, explicit: latest.explicit };
   } catch {
@@ -1054,7 +1086,7 @@ async function mainStatusCommand(flags, json) {
   const rows = status.commits.map((c, i) => ({
     ...c,
     subject: commits[i].subject,
-    spotCheck: c.pr === null ? null : latestSpotCheck(receiptPath(common, c.pr), c.pr),
+    spotCheck: c.pr === null ? null : latestSpotCheck(spotCheckStorePath(common, c.pr), c.pr),
   }));
 
   const local = flags.local === true && commits.length > 0 ? await runLocalMatrix(commits[0].sha) : null;
@@ -1596,9 +1628,9 @@ async function main() {
     } catch (err) {
       return fail(EXIT_CODES.USAGE, err.message);
     }
-    const receipt = withReceiptLock(file, () => {
+    const receipt = withFileLock(file, () => {
       const next = appendAttempt(readReceipt(file, prNumber) ?? createReceipt({ pr: prNumber }), attemptInput);
-      writeReceipt(file, next);
+      writeJsonAtomic(file, next);
       return next;
     });
     const attempt = receipt.attempts.at(-1);
