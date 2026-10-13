@@ -50,7 +50,9 @@
 # still: the merge gate skips the full test suite AND the quality profile on it,
 # so a forged one removes verification rather than misreporting it. The payload
 # line is listed too — a marker without it is refused by the gate as INVALID, so
-# guarding only the marker would leave the working forgery shape open.
+# guarding only the marker would leave the working forgery shape open. The
+# criteria payload entry covers both of its forms: the compressed form's prefix
+# (`… z1:`) begins with the plain one.
 # `review-complete` evidence lets `/pr-conductor` skip the review stage on a
 # commit, so a forged one skips a review nobody did. The `post-pr-review`
 # receipt is guarded with it because it is what the sanctioned writer reads to
@@ -61,6 +63,7 @@
 MARKER='dotbabel-criteria verified-sha='
 MARKERS=(
   "$MARKER"
+  'dotbabel-criteria-payload '
   'local-attest verified-sha='
   'local-attest-payload '
   'review-complete verified-sha='

@@ -275,3 +275,27 @@ SP=' '
   [[ "$output" == *"dotbabel local-attest"* ]]
   [[ "$output" == *"dotbabel pr-stack review-complete"* ]]
 }
+
+# --- the criteria payload line, plain and compressed -------------------------
+#
+# The criteria payload line now has two forms: the plain base64url one and the
+# compressed one behind a `z1:` tag. The compressed prefix extends the plain
+# one, so one guarded entry covers both. As above, the literal is assembled
+# from parts.
+
+@test "guard-criteria-evidence: denies the criteria payload line in its plain and compressed forms" {
+  payload="dotbabel-criteria-payload${SP}"
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- ${payload}eyJhIjoxfQ -->\\\"\""
+  [ "$status" -eq 2 ]
+  run run_hook "\"gh pr comment 42 --body \\\"<!-- ${payload}z1:q1YKSa0oUbIyNNJRSs7PS8tMBwA -->\\\"\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"BLOCKED"* ]]
+}
+
+@test "guard-criteria-evidence: denies a compressed criteria payload line delivered via --body-file" {
+  payload="dotbabel-criteria-payload${SP}"
+  printf '<!-- %sz1:q1YKSa0oUbIyNNJRSs7PS8tMBwA -->\n' "$payload" > "$BATS_TEST_TMPDIR/forged-z1.md"
+  run run_hook "\"gh pr comment 42 --body-file $BATS_TEST_TMPDIR/forged-z1.md\""
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"forged-z1.md"* ]]
+}
