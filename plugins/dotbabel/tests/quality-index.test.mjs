@@ -9,7 +9,7 @@ import { runQualityCheck } from "../src/quality/index.mjs";
 
 const dirs = [];
 const qualityBin = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../bin/dotbabel-quality.mjs");
-function repository({ missingReport = false, crashingCoverage = false, coveragePaths = null, docsOnlyChange = false } = {}) {
+function repository({ missingReport = false, crashingCoverage = false, coveragePaths = null, lintPaths = null, docsOnlyChange = false } = {}) {
   const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-quality-index-"));
   dirs.push(repoRoot);
   fs.mkdirSync(path.join(repoRoot, "coverage"));
@@ -21,7 +21,7 @@ function repository({ missingReport = false, crashingCoverage = false, coverageP
   fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ quality: {
     base_ref: "main",
     components: [{ root: ".", languages: ["javascript"], tools: {
-      lint: { argv: ["node", "-e", "process.exit(0)"] },
+      lint: { argv: ["node", "-e", "process.exit(0)"], ...(lintPaths ? { paths: lintPaths } : {}) },
       coverage: { argv: ["node", "-e", coverageScript], report: { format: "lcov", path: "coverage/lcov.info" }, ...(coveragePaths ? { paths: coveragePaths } : {}) },
     } }],
   } }));
@@ -212,6 +212,23 @@ describe("quality check orchestration", () => {
     expect(changedLines).toMatchObject({ state: "not_triggered", verdict: "info" });
     expect(changedLines.message).toContain("changed files did not match");
     expect(result.results.find((item) => item.rule === "coverage.no_regression")).toMatchObject({ state: "not_triggered", verdict: "info" });
+    expect(result.environment_error).toBe(false);
+    expect(result.verdict).toBe("pass");
+  });
+
+  it("leaves a not_triggered tool without a report on its own rules", async () => {
+    const repoRoot = repository({ coveragePaths: ["src/**"], lintPaths: ["src/**"], docsOnlyChange: true });
+    const result = await runQualityCheck({
+      repoRoot,
+      profile: "pr",
+      base: "main",
+      allowProjectCommands: true,
+      env: { PATH: process.env.PATH, HOME: repoRoot, XDG_CONFIG_HOME: path.join(repoRoot, ".config") },
+    });
+    const lint = result.executions.find((execution) => execution.capability === "lint");
+    expect(lint).toMatchObject({ state: "not_triggered" });
+    expect(lint.ruleIds).not.toEqual(expect.arrayContaining(["coverage.changed_lines"]));
+    expect(result.results.find((item) => item.rule === "correctness.lint")).toMatchObject({ state: "not_triggered", verdict: "info" });
     expect(result.environment_error).toBe(false);
     expect(result.verdict).toBe("pass");
   });
