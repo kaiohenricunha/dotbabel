@@ -186,7 +186,9 @@ write_info() {
   {
     printf 'pid=%s\nprocstart=%s\nlabel=%s\nsession=%s\ncwd=%s\nstarted=%s\n' \
       "$$" "$self_start" "$name" "$session" "${PWD//$'\n'/ }" "$(date +%s)"
-    [ $# -ge 3 ] && printf 'lane=%s\ncpus=%s\n' "$2" "$3"
+    # An if, not `[ ] && printf`: as the last command of the group, a false
+    # test made the group exit 1, so a waiter's record never left .tmp (#431).
+    if [ $# -ge 3 ]; then printf 'lane=%s\ncpus=%s\n' "$2" "$3"; fi
   } >"$tmp" 2>/dev/null && mv -f "$tmp" "$1" 2>/dev/null
 }
 

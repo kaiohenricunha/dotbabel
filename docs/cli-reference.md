@@ -53,6 +53,9 @@ dotbabel show <id> [OPTIONS]
 
 # Language-aware quality (added v3.2.0)
 dotbabel quality [check|detect|explain|baseline] [OPTIONS]
+
+# Task contract and state for work without a spec
+dotbabel task <new|update|show|list|close|hook> [OPTIONS]
 ```
 
 Each subcommand also exists standalone — `npx dotbabel-doctor` and
@@ -170,11 +173,39 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook → check-on-stop trust → attestation policy. Prints `✓/✗/⚠` per check.
+hook → hook registration → check-on-stop trust → attestation policy. Prints
+`✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
 | `--repo-root <path>` | resolved via git | Override |
+
+The hook registration rows compare the hooks the package ships with the hooks
+that three settings files register: `$CLAUDE_CONFIG_DIR/settings.json` (default
+`~/.claude/settings.json`), `.claude/settings.json`, and
+`.claude/settings.local.json`. Doctor does not read managed settings, plugin
+hooks, or `--settings`, and it does not check matchers, so a hook registered
+only there shows as unregistered, and a hook under the wrong matcher still
+shows as registered.
+
+A registration counts when a shipped script's basename appears anywhere in the
+command, so a repository's own `.claude/hooks/` copy and a wrapped command such
+as `timeout 10 …/check-on-write.sh` both count. `fleet-guard.sh` needs five
+entries, told apart by the argument after the script: `PreToolUse` with
+`pre-edit` and with `pre-bash`, `SessionStart`, `PostToolUse`, and
+`UserPromptSubmit`. `fleet-shell-prefix.sh` counts when `CLAUDE_CODE_SHELL_PREFIX`
+names it. That variable is one slot: the highest-precedence settings file that
+sets it wins (local, then project, then user), else the environment.
+
+One `✓` row lists the registered hooks with their events and the scopes that
+register them. There is one `⚠` row for each unregistered hook, with the entries
+it expects, and one for each partly registered hook, with the entries it lacks.
+A settings file that does not parse or is not a JSON object is a `⚠` row, and so
+is a `hooks` key that is not an event name; doctor prints that key escaped,
+because a cloned repository controls the project files. A
+`CLAUDE_CODE_SHELL_PREFIX` set by the project or local settings is a `⚠` row as
+well, because it wraps every shell command. These rows never fail the run. See
+[hooks.md](./hooks.md#registering-a-hook).
 
 The trust row reports whether this repo may run turn-end project checks. It
 never fails the run — a repo deliberately left off the allowlist is a valid
@@ -612,27 +643,33 @@ npx dotbabel-quality check --json | jq -r '.results[] | select(.verdict=="fail")
 Reason about stacked pull requests — dependency graph, merge order, and the
 exact commands a child needs once its parent has merged.
 
-| Subcommand        | Purpose                                                          |
-| ----------------- | ---------------------------------------------------------------- |
-| `graph`           | Print the raw dependency graph                                   |
-| `plan`            | What can land now, what is blocked, and any structural problems  |
-| `next`            | The commands to move a child PR after its parent merged          |
-| `gate`            | Evaluate a precondition (`local-attest` \| `merge` \| `skip-ci`) |
-| `phases`          | The canonical pipeline phase order                               |
-| `entry`           | The phase the conductor should start at for this branch          |
-| `review-complete` | Post the SHA-pinned marker that the review stage finished        |
+| Subcommand        | Purpose                                                              |
+| ----------------- | -------------------------------------------------------------------- |
+| `graph`           | Print the raw dependency graph                                       |
+| `plan`            | What can land now, what is blocked, and any structural problems      |
+| `next`            | The commands to move a child PR after its parent merged              |
+| `gate`            | Evaluate a gate (`local-attest` \| `merge` \| `skip-ci` \| `budget`) |
+| `phases`          | The canonical pipeline phase order                                   |
+| `entry`           | The phase the conductor should start at for this branch              |
+| `review-complete` | Post the SHA-pinned marker that the review stage finished            |
+| `record`          | Append one phase attempt to the pull request's run receipt           |
+| `receipt`         | Print the run receipt: verdict, attempts, rollback point             |
 
-| Flag                 | Default  |                                                                     |
-| -------------------- | -------- | ------------------------------------------------------------------- |
-| `--trunk <ref>`      | `main`   | Trunk branch name                                                   |
-| `--limit <N>`        | 100      | Max PRs to enumerate                                                |
-| `--pr <N>`           | —        | Required by `next`, `gate`, `review-complete`; optional for `entry` |
-| `--parent <N>`       | —        | Required by `next`                                                  |
-| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging                        |
-| `--remote <name>`    | `origin` | Git remote                                                          |
-| `--gate <name>`      | —        | Gate to evaluate                                                    |
-| `--sha <rev>`        | `HEAD`   | Commit to inspect for `--gate skip-ci`                              |
-| `--dry-run`          | off      | `review-complete`: check and print, post nothing                    |
+| Flag                 | Default  |                                                                                               |
+| -------------------- | -------- | --------------------------------------------------------------------------------------------- |
+| `--trunk <ref>`      | `main`   | Trunk branch name                                                                             |
+| `--limit <N>`        | 100      | Max PRs to enumerate                                                                          |
+| `--pr <N>`           | —        | Required except by `graph`, `plan`, `phases`, `--gate skip-ci`; optional for `entry`          |
+| `--parent <N>`       | —        | Required by `next`                                                                            |
+| `--parent-sha <sha>` | —        | Parent head SHA, captured **before** merging                                                  |
+| `--remote <name>`    | `origin` | Git remote                                                                                    |
+| `--gate <name>`      | —        | Gate to evaluate                                                                              |
+| `--sha <rev>`        | `HEAD`   | `--gate skip-ci`: commit to inspect. `record`: full head SHA, used only when gh cannot answer |
+| `--dry-run`          | off      | `review-complete`: check and print, post nothing                                              |
+| `--phase <id>`       | —        | `record`, `--gate budget`: the conductor phase                                                |
+| `--outcome <o>`      | —        | `record`: `pass` \| `fail` \| `blocked` \| `skipped`                                          |
+| `--reason <CODE>`    | —        | `record`: the blocking reason code                                                            |
+| `--evidence <url>`   | —        | `record`: a link to evidence the phase produced; repeatable                                   |
 
 Capture `--parent-sha` before the parent merges. The repo squash-merges, so the
 parent's original commits are not ancestors of the squashed commit and
@@ -655,6 +692,60 @@ of the merge gate has no blocking reason, and it re-reads the head immediately
 before posting. Exit `0` posted (or dry run passed), `1` refused with a reason
 code, `2` environment error. See [`docs/attestation.md`](./attestation.md) for the
 sibling attestation evidence.
+
+`record` appends one attempt to the run receipt at
+`<git-common-dir>/dotbabel/receipts/pr-<N>.json`
+([schema](../schemas/dotbabel.run-receipt.schema.json)). The git common
+directory is shared by every worktree, so a phase that runs in another worktree
+extends the same history, and the file can never dirty a working tree. A lock
+file (`pr-<N>.json.lock`) stops two concurrent calls from losing an attempt; a
+lock held longer than 2 seconds is an environment error (exit `2`), and one
+older than 30 seconds is cleared as stale.
+
+Each attempt keeps the head it ran on, the outcome and reason code, the evidence
+links, the merge base as the rollback point, the `model` the phase artifact's
+frontmatter requests, and the dotbabel version. The head comes from
+`gh pr view`. `--sha` is a fallback for when gh cannot answer: it must be a full
+SHA of a local commit, and it is refused (exit `64`) when it differs from the
+head gh reports. The model is read in the order Claude Code loads the artifact:
+`~/.claude/<artifact>`, then the project's `.claude/<artifact>`; a copy that
+names no model falls through to the next. A value it cannot observe stays
+`null`: the receipt records no cost or model route. The log is append-only. A
+damaged receipt, or one whose `pr` is not the file's, is an environment error
+(exit `2`) and is left unchanged rather than started over.
+
+Warning: the receipt is self-reported. It records what the conductor says each
+phase did, and nothing checks that against the evidence comments. It is a log,
+not evidence, and the merge gate never reads it.
+
+`receipt` prints the verdict, each phase's attempt count, last outcome, and
+consecutive failures, and the rollback point. The verdict is `ready` only when
+the `stop` hand-off is the latest attempt and passed, no other phase's latest
+non-skipped attempt failed, and a passing `local-attest` names the same head as
+`stop`. It is `blocked` while the latest attempt, or a phase that `stop`
+contradicts, failed; otherwise it is `in-progress`. No receipt yet exits `0`.
+
+`gate --gate budget --pr <N> --phase <id>` is the conductor's attempt cap. It
+counts the phase's consecutive `fail` and `blocked` attempts in the receipt since
+the phase last passed, and fails with `CONDUCTOR_BUDGET_EXHAUSTED` when the count
+reaches the cap. A `skipped` attempt neither counts nor resets, except one with
+reason `USER_ALLOWED_RETRY`: that records the user's explicit permission to try
+again, and it resets the count without reading as a pass.
+
+The cap comes from `.dotbabel.json` on the pull request's base ref
+(`<remote>/<baseRefName>` from `gh pr view`, or `<remote>/<trunk>` when gh cannot
+answer), never from the working tree or the branch. The conductor edits and
+commits in that tree, so a cap it could read there is a cap it could raise:
+
+```json
+{ "conductor": { "max_attempts": 3, "phase_max_attempts": { "local-attest": 1 } } }
+```
+
+`max_attempts` defaults to 3, and every value must be from 1 to 10. A value out of
+range, a misspelled key, an unknown phase key, or a `conductor` block of the wrong
+shape is an environment error (exit `2`), never a silent default, because a typo
+must not raise or remove the cap. A base ref that is not in this clone is exit
+`2` as well: fetch it and retry. A damaged receipt is exit `2`, as for `receipt`.
 
 ---
 
@@ -705,6 +796,61 @@ fails open. `lane` exits with the command's own status, and 64 without a
 command. `event` exits 1 when the pull request is not merged, and 2 when
 `gh pr view` fails. `token take` exits 1 when a live session holds the token,
 and `token release` exits 1 when this session holds none.
+
+---
+
+## `dotbabel-task`
+
+The contract and the durable state of work that has no spec. `new` fixes the
+goal and the `done_when` checks before execution starts, so success is defined
+first. `update` records where the work stands. The
+[`task-context.sh`](./hooks.md#task-contextsh) hook prints the open tasks at
+session start, so a new or resumed session reads that state.
+
+| Subcommand           | Purpose                                                                       |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `new <slug>`         | Create an open task. Needs `--goal` and at least one `--done-when`            |
+| `update <slug>`      | Set the phase, append decisions and pending items, finish pending items       |
+| `show <slug>`        | Print one task                                                                |
+| `list [--all]`       | Print the open tasks, or every task with `--all`, most recently updated first |
+| `close <slug>`       | Mark a task closed. The record stays and `show` still prints it               |
+| `hook session-start` | `SessionStart` entry: print the open tasks as context                         |
+
+| Flag                 | Used by         | Meaning                                                               |
+| -------------------- | --------------- | --------------------------------------------------------------------- |
+| `--goal <text>`      | `new`           | What the work must achieve                                            |
+| `--done-when <text>` | `new`           | A check that decides the work is done. Repeatable                     |
+| `--constraint <t>`   | `new`           | A limit on how the work is done. Repeatable                           |
+| `--phase <p>`        | `new`, `update` | The phase, in the vocabulary of the driving skill (default `started`) |
+| `--decision <text>`  | `update`        | Append a decision with its time. Repeatable                           |
+| `--pending <text>`   | `update`        | Append a pending item. Repeatable                                     |
+| `--done <text>`      | `update`        | Remove a pending item, matched exactly. Repeatable                    |
+| `--all`              | `list`          | Include closed tasks                                                  |
+| `--json`             | all             | Print `{ok, task}` or `{ok, tasks, problems}`                         |
+
+A slug is lowercase letters, digits, and dashes, up to 64 characters. Tasks
+live in `<git-dir>/dotbabel/tasks/<slug>.json`
+([schema](../schemas/dotbabel.task-state.schema.json)), so they never appear in
+`git status`, and each worktree has its own. They survive a context reset, a
+crash, and a new session in that worktree. They do not travel to another
+machine; that is what [`/handoff`](./handoff-guide.md) is for.
+
+A task file's slug must be its file name; a copied or renamed file is reported
+as invalid rather than written to another task. `update` and `close` hold a
+per-task lock (`<slug>.json.lock`), so two writers cannot lose each other's
+decisions; a lock older than 30 seconds is cleared as stale. The record is
+self-reported and advisory: put deferred work in an issue, because the task
+goes away with the worktree.
+
+**Exits 1** when the task already exists (`new`), does not exist, is closed
+(`update`, `close`), or when `--done` names an item that is not pending.
+**Exits 2** outside a git repository, for a symbolic link on the task path, for
+a task file that does not parse or whose slug is not its file name, while
+another writer holds the task's lock, and for any filesystem error. `list`
+reports an unreadable file as a warning and still exits 0. **Exits 64** for a
+bad slug, a missing or blank `--goal` or `--done-when`, any other blank text
+value, or an `update` with nothing to change. `hook` always exits 0: it fails
+open.
 
 ---
 

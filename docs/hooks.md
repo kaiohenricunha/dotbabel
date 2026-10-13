@@ -2,7 +2,7 @@
 
 _Last updated: v3.4.0_
 
-dotbabel ships six Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
+dotbabel ships seven Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.
 
 | Hook                         | Event                                                           | Fires                                                                                       | Purpose                                                                                              |
@@ -13,10 +13,14 @@ symlinks all of them into `~/.claude/hooks/`.
 | `check-on-stop.sh`           | `Stop`                                                          | once per turn                                                                               | Project-wide checks when the build graph is coherent                                                 |
 | `fleet-guard.sh`             | `PreToolUse`, `SessionStart`, `PostToolUse`, `UserPromptSubmit` | before each file edit and Bash call, at session start, after each tool call, at each prompt | Blocks an edit to a file that another live session claims, holds the merge token, and reports merges |
 | `fleet-shell-prefix.sh`      | `CLAUDE_CODE_SHELL_PREFIX`                                      | around every shell command                                                                  | Sends heavy test commands to a free CPU lane                                                         |
+| `task-context.sh`            | `SessionStart`                                                  | at session start                                                                            | Prints the open tasks of the worktree: goal, done-when checks, phase, pending items, decisions       |
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
-> See [Registering a hook](#registering-a-hook).
+> See [Registering a hook](#registering-a-hook). `dotbabel doctor` lists the
+> registered hooks with their events, and warns for each shipped hook that no
+> settings file registers. It reads the user, project, and local settings files.
+> It never fails the run, because an unregistered hook is a valid choice.
 
 ---
 
@@ -131,6 +135,53 @@ entries: `pre-edit` on the edit tools, `pre-bash` on `Bash`, `session-start`,
 session's systemd scope an equal CPU weight (the fair CPU share). See
 [fleet.md](./fleet.md) for the settings block, the claim rules, and the
 limits.
+
+---
+
+## `task-context.sh`
+
+Prints the open [tasks](./cli-reference.md#dotbabel-task) of the session's
+worktree into its context at session start. A task is the contract and the
+state of work that has no spec: a goal and the `done_when` checks, fixed
+before execution, plus the phase, the decisions, and the pending items that a
+session records with `dotbabel task update`. With this hook, a new or resumed
+session reads where the work stands instead of a retelling of it.
+
+The hook prints nothing when the worktree has no open task. It prints at most
+five tasks, the most recently updated first. It bounds each list (five
+`done_when` checks, five pending items, the last three decisions), clips each
+field, and keeps the whole block under 6,000 characters; a task that does not
+fit is shortened to its slug and phase. It fails open: without Node, without
+the bin, or on any error, the session starts as usual.
+
+Warning: the text in a task can come from an issue anyone can write, and this
+hook replays it into every later session in the worktree. So the block is
+framed as recorded data between delimiters, with a line that tells the session
+not to follow directives inside it. Read it as a record of earlier work, never
+as instructions.
+
+Register it with one `SessionStart` entry:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/hooks/task-context.sh", "timeout": 10 }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Scope.** Tasks live in `<git-dir>/dotbabel/tasks/<slug>.json`, so they never
+appear in `git status`. Each worktree has its own tasks. A task survives a
+context reset, a crash, and a new session in that worktree. It does not travel
+to another machine, and it goes away when the worktree is removed. Use
+[`/handoff`](./handoff-guide.md) to move a session to another machine; a task
+complements it and does not replace it.
 
 ---
 

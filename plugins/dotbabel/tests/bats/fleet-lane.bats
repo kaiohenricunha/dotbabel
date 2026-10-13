@@ -157,6 +157,44 @@ await_file() {
   [[ "$output" == *"npm test"* ]]
 }
 
+@test "a waiting command records itself in wait-<pid>.info, and removes it when it runs (#431)" {
+  needs_tools
+  DOTBABEL_FLEET_LANES=0 bash "$LANE" --name "npm test" -- sleep 2 &
+  BG_PID=$!
+  await_file "$WORK/state/lanes/lane-1.holder"
+  DOTBABEL_FLEET_LANES=0 bash "$LANE" --name "queued job" -- true 2>/dev/null &
+  waiter=$!
+  # `fleet lanes` and lending read this record. Before #431 the waiter's
+  # write_info exited 1, so the record stayed a .tmp file and never appeared.
+  await_file "$WORK/state/lanes/wait-$waiter.info"
+  grep -qx "pid=$waiter" "$WORK/state/lanes/wait-$waiter.info"
+  grep -qx "procstart=$(start_time "$waiter")" "$WORK/state/lanes/wait-$waiter.info"
+  grep -qx "label=queued job" "$WORK/state/lanes/wait-$waiter.info"
+  ! compgen -G "$WORK/state/lanes/wait-*.tmp" >/dev/null
+  wait "$waiter"
+  [ ! -e "$WORK/state/lanes/wait-$waiter.info" ]
+}
+
+@test "auto lending: a real waiting command stops the next command from taking every lane (#431)" {
+  needs_tools
+  export DOTBABEL_FLEET_LANES='0;1;2'
+  # Nobody waits and no session is busy, so this one takes all 3 lanes.
+  bash "$LANE" -- sleep 2 &
+  BG_PID=$!
+  await_file "$WORK/state/lanes/lane-3.holder"
+  # It waits for a lane while it holds the queue lock ...
+  bash "$LANE" -- bash -c 'echo "$DOTBABEL_LANE_CPUS"' >"$WORK/first.out" 2>"$WORK/first.err" &
+  first=$!
+  for _ in $(seq 1 50); do grep -q 'waits for a free CPU lane' "$WORK/first.err" && break; sleep 0.1; done
+  # ... and this one waits behind it for the queue lock.
+  bash "$LANE" -- true 2>"$WORK/second.err" &
+  second=$!
+  for _ in $(seq 1 50); do grep -q 'waits for a free CPU lane' "$WORK/second.err" && break; sleep 0.1; done
+  wait "$first" "$second"
+  # The second command's waiter record makes the first take one lane, not 3.
+  [ "$(cat "$WORK/first.out")" = "0" ]
+}
+
 @test "records a short holder label while it runs, never the command line" {
   needs_tools
   DOTBABEL_FLEET_LANES=0 bash "$LANE" --name "npm test" -- bash -c 'sleep 1' _ --token=SECRET123 2>/dev/null &

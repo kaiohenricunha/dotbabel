@@ -16,9 +16,13 @@
  *   dotbabel pr-stack next   --pr <N> --parent <N> [--parent-sha <sha>] [--remote <name>]
  *   dotbabel pr-stack gate   --gate local-attest|merge --pr <N>
  *   dotbabel pr-stack gate   --gate skip-ci [--sha <rev>]
+ *   dotbabel pr-stack gate   --gate budget --pr <N> --phase <id>
  *   dotbabel pr-stack phases
  *   dotbabel pr-stack entry   [--pr <N>]
  *   dotbabel pr-stack review-complete --pr <N> [--dry-run]
+ *   dotbabel pr-stack record  --pr <N> --phase <id> --outcome <o> [--reason <CODE>]
+ *                             [--evidence <url>]... [--sha <full sha>]
+ *   dotbabel pr-stack receipt --pr <N>
  *
  * `next` prints the commands to run; it never executes them. A rebase after a
  * squash-merge needs `--onto`, so the parent's pre-merge head SHA matters —
@@ -32,7 +36,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 
 import { parse } from "../src/lib/argv.mjs";
@@ -40,10 +46,12 @@ import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { buildStackGraph, planStack, planChildTransition } from "../src/pr-stack.mjs";
 import {
   CONDUCTOR_PHASES,
+  checkAttemptBudget,
   checkLocalAttestGate,
   checkMergeGate,
   deriveEntryPhase,
   hasSkipCi,
+  resolveMaxAttempts,
   summarizeGates,
 } from "../src/pr-gates.mjs";
 import { GIT_MAX_BUFFER } from "../src/lib/limits.mjs";
@@ -51,12 +59,23 @@ import { criteriaGateInputs, prComments } from "../src/criteria/gate-inputs.mjs"
 import { attestationGateInputs } from "../src/attestation-gate-inputs.mjs";
 import { reviewEntryFacts } from "../src/review-gate-inputs.mjs";
 import { postReviewComplete } from "../src/review-complete.mjs";
+import {
+  RECEIPT_OUTCOMES,
+  appendAttempt,
+  createReceipt,
+  frontmatterModel,
+  receiptPath,
+  receiptProblem,
+  receiptVerdict,
+  rollbackPoint,
+  summarizePhases,
+} from "../src/run-receipt.mjs";
 
 const TOOL = "dotbabel-pr-stack";
 
 const PR_FIELDS = "number,headRefName,baseRefName,state,mergeStateStatus,headRefOid";
 
-const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry", "review-complete"]);
+const SUBCOMMANDS = new Set(["graph", "plan", "next", "gate", "phases", "entry", "review-complete", "record", "receipt"]);
 
 const FLAGS = {
   trunk: { type: "string", default: "main" },
@@ -68,6 +87,10 @@ const FLAGS = {
   gate: { type: "string" },
   sha: { type: "string" },
   "dry-run": { type: "boolean" },
+  phase: { type: "string" },
+  outcome: { type: "string" },
+  reason: { type: "string" },
+  evidence: { type: "string", multiple: true },
 };
 
 const HELP = `${TOOL} <subcommand> [options]
@@ -79,21 +102,30 @@ Subcommands:
   graph              Print the raw dependency graph
   plan               Print what can land now, what is blocked, and any problems
   next               Print the commands to move a child PR after its parent merged
-  gate               Evaluate a precondition gate (local-attest | merge | skip-ci)
+  gate               Evaluate a precondition gate (local-attest | merge | skip-ci | budget)
   phases             Print the canonical pipeline phase order
   entry              Print the phase the conductor should start at for this branch
   review-complete    Post the SHA-pinned marker that the review stage finished on the head
+  record             Append one phase attempt to the pull request's run receipt
+  receipt            Print the run receipt: verdict, per-phase attempts, rollback point
 
 Options:
   --trunk <ref>      Trunk branch name (default: main)
   --limit <N>        Max PRs to enumerate (default: 100)
-  --pr <N>           PR number (required by: next, gate, review-complete; optional for entry)
+  --pr <N>           PR number (required by: next, gate except --gate skip-ci,
+                     review-complete, record, receipt; optional for entry)
   --parent <N>       Parent PR number (required by: next)
   --parent-sha <sha> Parent head SHA captured before merging (recommended for: next)
   --remote <name>    Git remote name (default: origin)
-  --gate <name>      Gate to evaluate: local-attest | merge | skip-ci
-  --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD)
+  --gate <name>      Gate to evaluate: local-attest | merge | skip-ci | budget
+  --sha <rev>        Commit to inspect for --gate skip-ci (default: HEAD);
+                     record: the full head SHA to use when gh cannot answer
+                     (refused when it differs from the head gh reports)
   --dry-run          review-complete: check and print the comment, post nothing
+  --phase <id>       record, --gate budget: the conductor phase (see \`phases\`)
+  --outcome <o>      record: ${RECEIPT_OUTCOMES.join(" | ")}
+  --reason <CODE>    record: the blocking reason code, UPPER_SNAKE
+  --evidence <url>   record: a link to evidence the phase produced (repeatable)
   --json             Emit a single JSON object on stdout
   --help, -h         Show this help
   --version, -V      Show version
@@ -392,6 +424,175 @@ function renderPlan(plan) {
 }
 
 /**
+ * Absolute git common directory: one per repository, shared by every
+ * worktree, so all of a pull request's phases extend one receipt.
+ *
+ * @returns {string}
+ */
+function gitCommonDir() {
+  const r = run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"]);
+  if (r.status !== 0 || r.stdout.trim() === "") return fail(EXIT_CODES.ENV, "not inside a git repository");
+  return r.stdout.trim();
+}
+
+/**
+ * Read and check the receipt at `file`, or null when none exists yet. A file
+ * that is unreadable or fails `receiptProblem` is an environment error: it is
+ * history, and silently starting over would erase it.
+ *
+ * @param {string} file
+ * @param {number} prNumber The pull request the file is named for.
+ * @returns {import("../src/run-receipt.mjs").RunReceipt|null}
+ */
+function readReceipt(file, prNumber) {
+  if (!existsSync(file)) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (err) {
+    return fail(EXIT_CODES.ENV, `${file} is not readable JSON: ${err.message}`);
+  }
+  const problem = receiptProblem(parsed, prNumber);
+  if (problem) return fail(EXIT_CODES.ENV, `${file} is not a run receipt (${problem}); left unchanged`);
+  return parsed;
+}
+
+const RECEIPT_LOCK_WAIT_MS = 2_000;
+const RECEIPT_LOCK_STALE_MS = 30_000;
+
+/**
+ * Run `fn` while holding `<file>.lock`. Every worktree of a repository
+ * extends one receipt, so two `record` calls must not both read N attempts
+ * and each write N+1. A lock older than RECEIPT_LOCK_STALE_MS belongs to a
+ * process that died holding it and is cleared. A live one that does not free
+ * up within RECEIPT_LOCK_WAIT_MS is an environment error.
+ *
+ * @template T
+ * @param {string} file
+ * @param {() => T} fn
+ * @returns {T}
+ */
+function withReceiptLock(file, fn) {
+  const lock = `${file}.lock`;
+  mkdirSync(dirname(file), { recursive: true });
+  const deadline = Date.now() + RECEIPT_LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      mkdirSync(lock);
+      break;
+    } catch (err) {
+      if (err.code !== "EEXIST") throw err;
+      let age = 0;
+      try {
+        age = Date.now() - statSync(lock).mtimeMs;
+      } catch {
+        continue; // released between mkdir and stat
+      }
+      if (age > RECEIPT_LOCK_STALE_MS) {
+        rmSync(lock, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() >= deadline) return fail(EXIT_CODES.ENV, `receipt lock is busy: ${lock}`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25);
+    }
+  }
+  try {
+    return fn();
+  } finally {
+    rmSync(lock, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Replace the receipt atomically, so a crash mid-write leaves the previous
+ * history rather than half a file.
+ *
+ * @param {string} file
+ * @param {import("../src/run-receipt.mjs").RunReceipt} receipt
+ * @returns {void}
+ */
+function writeReceipt(file, receipt) {
+  mkdirSync(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, `${JSON.stringify(receipt, null, 2)}\n`);
+  renameSync(tmp, file);
+}
+
+/**
+ * The `model` a phase artifact's frontmatter requests, read in the order
+ * Claude Code loads a skill or command: the personal copy in `~/.claude/`
+ * (where `bootstrap` links it) wins over the project's `.claude/` copy. A
+ * copy that is unreadable or names no model falls through to the next. Null
+ * when none names one — that is what the receipt records, not a guess.
+ *
+ * @param {string} root
+ * @param {string} artifact
+ * @returns {string|null}
+ */
+function requestedModel(root, artifact) {
+  for (const file of [join(homedir(), ".claude", artifact), join(root, ".claude", artifact)]) {
+    if (!existsSync(file)) continue;
+    try {
+      const model = frontmatterModel(readFileSync(file, "utf8"));
+      if (model !== null) return model;
+    } catch {
+      // Unreadable: try the next copy.
+    }
+  }
+  return null;
+}
+
+/**
+ * The parsed `.dotbabel.json` at `<remote>/<baseRef>`, or undefined when the
+ * base has none. The cap is read from the BASE, never the working tree or the
+ * branch: the conductor edits and commits in that tree, so a cap it can read
+ * there is a cap it can raise. The merge gate reads its policy the same way.
+ *
+ * Throws when the base ref is not in this clone: an unfetched ref must not
+ * read as "no config", which would silently apply the default.
+ *
+ * @param {string} remote
+ * @param {string} baseRef
+ * @returns {unknown}
+ */
+function baseRefConfig(remote, baseRef) {
+  const ref = `${remote}/${baseRef}`;
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(ref)) throw new Error(`base ref ${JSON.stringify(ref)} is not a plain ref name`);
+  if (run(["git", "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]).status !== 0) {
+    throw new Error(`base ref ${ref} is not in this clone; run \`git fetch ${remote} ${baseRef}\` and retry`);
+  }
+  if (run(["git", "cat-file", "-e", `${ref}:.dotbabel.json`]).status !== 0) return undefined;
+  const shown = run(["git", "show", `${ref}:.dotbabel.json`]);
+  try {
+    return JSON.parse(shown.stdout);
+  } catch (err) {
+    throw new Error(`${ref}:.dotbabel.json is not readable JSON: ${err.message}`);
+  }
+}
+
+/**
+ * Render a receipt as human-readable lines.
+ *
+ * @param {import("../src/run-receipt.mjs").RunReceipt} receipt
+ * @returns {string[]}
+ */
+function renderReceipt(receipt) {
+  const rollback = rollbackPoint(receipt);
+  const lines = [`receipt #${receipt.pr}: ${receiptVerdict(receipt)}`];
+  for (const [phase, s] of Object.entries(summarizePhases(receipt))) {
+    const last = receipt.attempts.filter((a) => a.phase === phase).at(-1);
+    const reason = last?.reason_code ? ` (${last.reason_code})` : "";
+    lines.push(`  ${phase}: ${s.attempts} attempt(s), last ${s.last_outcome}${reason}, ${s.consecutive_failures} failed in a row`);
+  }
+  lines.push(
+    rollback
+      ? `  rollback point: ${rollback.base_ref ?? "(base unknown)"} @ ${rollback.merge_base.slice(0, 12)}`
+      : "  rollback point: unknown",
+  );
+  return lines;
+}
+
+/**
  * Entry point.
  *
  * @returns {Promise<void>}
@@ -606,6 +807,131 @@ async function main() {
     });
   }
 
+  if (sub === "record") {
+    const prNumber = requireNumber(flags.pr, "--pr");
+    const phase = CONDUCTOR_PHASES.find((p) => p.id === flags.phase);
+    if (!phase) return fail(EXIT_CODES.USAGE, `--phase must be one of: ${CONDUCTOR_PHASES.map((p) => p.id).join(", ")}`);
+    if (!RECEIPT_OUTCOMES.includes(/** @type {any} */ (flags.outcome))) {
+      return fail(EXIT_CODES.USAGE, `--outcome must be one of: ${RECEIPT_OUTCOMES.join(", ")}`);
+    }
+    if (flags.reason !== undefined && !/^[A-Z][A-Z0-9_]*$/.test(String(flags.reason))) {
+      return fail(EXIT_CODES.USAGE, "--reason must be an UPPER_SNAKE reason code");
+    }
+    const explicitSha = typeof flags.sha === "string" && flags.sha !== "" ? flags.sha : null;
+    if (explicitSha !== null && !/^[0-9a-f]{40}$/i.test(explicitSha)) {
+      return fail(EXIT_CODES.USAGE, "--sha must be a full 40-character SHA for record");
+    }
+    // The head comes from the pull request, not the local checkout: `/review-pr`
+    // pushes from its own worktree, so this checkout can lag behind the head
+    // the phase actually ran on. --sha is a FALLBACK for when gh cannot answer:
+    // it never overrides the head gh reports, so it cannot attach an outcome to
+    // a commit the pull request is not at.
+    const view = run(["gh", "pr", "view", String(prNumber), "--json", "headRefOid,baseRefName"]);
+    let ghHead = null;
+    let baseRef = null;
+    if (view.status === 0) {
+      try {
+        const parsed = JSON.parse(view.stdout);
+        if (typeof parsed.headRefOid === "string" && /^[0-9a-f]{40}$/i.test(parsed.headRefOid)) ghHead = parsed.headRefOid;
+        baseRef = typeof parsed.baseRefName === "string" && parsed.baseRefName !== "" ? parsed.baseRefName : null;
+      } catch {
+        // Fall through: an unparseable answer is no answer.
+      }
+    }
+    let headSha = ghHead;
+    if (explicitSha !== null && ghHead !== null && explicitSha.toLowerCase() !== ghHead.toLowerCase()) {
+      return fail(EXIT_CODES.USAGE, `--sha ${explicitSha} is not the head of #${prNumber} (${ghHead}); omit --sha`);
+    }
+    if (headSha === null && explicitSha !== null) {
+      if (run(["git", "cat-file", "-e", `${explicitSha}^{commit}`]).status !== 0) {
+        return fail(EXIT_CODES.USAGE, `--sha ${explicitSha} is not a commit in this repository`);
+      }
+      headSha = explicitSha;
+    }
+    if (headSha === null) {
+      return fail(EXIT_CODES.ENV, `could not read the head of #${prNumber}; pass --sha to record anyway\n${view.stderr.trim()}`);
+    }
+    let mergeBase = null;
+    if (baseRef !== null) {
+      const mb = run(["git", "merge-base", `${flags.remote}/${baseRef}`, headSha]);
+      if (mb.status === 0 && /^[0-9a-f]{40}$/i.test(mb.stdout.trim())) mergeBase = mb.stdout.trim();
+    }
+    const file = receiptPath(gitCommonDir(), prNumber);
+    const { version } = await import("../src/index.mjs");
+    const attemptInput = {
+      phase: phase.id,
+      outcome: String(flags.outcome),
+      headSha,
+      baseRef,
+      mergeBase,
+      reasonCode: flags.reason === undefined ? null : String(flags.reason),
+      evidence: Array.isArray(flags.evidence) ? flags.evidence.map(String) : [],
+      requestedModel: requestedModel(repoRoot(), phase.artifact),
+      toolVersion: version,
+    };
+    // Validate before taking the lock, so a usage error never waits on it.
+    try {
+      appendAttempt(createReceipt({ pr: prNumber }), attemptInput);
+    } catch (err) {
+      return fail(EXIT_CODES.USAGE, err.message);
+    }
+    const receipt = withReceiptLock(file, () => {
+      const next = appendAttempt(readReceipt(file, prNumber) ?? createReceipt({ pr: prNumber }), attemptInput);
+      writeReceipt(file, next);
+      return next;
+    });
+    const attempt = receipt.attempts.at(-1);
+    const summary = summarizePhases(receipt)[phase.id];
+    // Recording never fails on the cap: an unreadable cap is reported here and
+    // made an error by `gate --gate budget`, which is where the decision is.
+    let maxAttempts = null;
+    let capProblem = null;
+    try {
+      maxAttempts = resolveMaxAttempts(baseRefConfig(flags.remote, baseRef ?? flags.trunk), phase.id);
+    } catch (err) {
+      capProblem = err.message;
+    }
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: { path: file, attempt, phase: summary, verdict: receiptVerdict(receipt), maxAttempts },
+      lines: [
+        `record: ${attempt.phase} attempt ${attempt.n} ${attempt.outcome} on ${attempt.head_sha.slice(0, 8)}`,
+        `  consecutive failures: ${summary.consecutive_failures} of ${maxAttempts ?? `? (${capProblem})`}`,
+        `  receipt: ${file}`,
+      ],
+      json,
+    });
+  }
+
+  if (sub === "receipt") {
+    const prNumber = requireNumber(flags.pr, "--pr");
+    const file = receiptPath(gitCommonDir(), prNumber);
+    const receipt = readReceipt(file, prNumber);
+    if (receipt === null) {
+      return emit({
+        subcommand: sub,
+        ok: true,
+        result: { path: file, receipt: null },
+        lines: [`no receipt for #${prNumber} (${file})`],
+        json,
+      });
+    }
+    return emit({
+      subcommand: sub,
+      ok: true,
+      result: {
+        path: file,
+        verdict: receiptVerdict(receipt),
+        phases: summarizePhases(receipt),
+        rollback: rollbackPoint(receipt),
+        receipt,
+      },
+      lines: renderReceipt(receipt),
+      json,
+    });
+  }
+
   const which = flags.gate;
 
   // skip-ci inspects a local commit message, so it needs no PR number.
@@ -642,6 +968,45 @@ async function main() {
   }
 
   const prNumber = requireNumber(flags.pr, "--pr");
+
+  if (which === "budget") {
+    const phase = CONDUCTOR_PHASES.find((p) => p.id === flags.phase);
+    if (!phase) return fail(EXIT_CODES.USAGE, `--phase must be one of: ${CONDUCTOR_PHASES.map((p) => p.id).join(", ")}`);
+    // The base the pull request merges into; the trunk when gh cannot say.
+    let baseRef = flags.trunk;
+    const view = run(["gh", "pr", "view", String(prNumber), "--json", "baseRefName"]);
+    if (view.status === 0) {
+      try {
+        const name = JSON.parse(view.stdout).baseRefName;
+        if (typeof name === "string" && name !== "") baseRef = name;
+      } catch {
+        // Fall back to the trunk: an unparseable answer is no answer.
+      }
+    }
+    let maxAttempts;
+    try {
+      maxAttempts = resolveMaxAttempts(baseRefConfig(flags.remote, baseRef), phase.id);
+    } catch (err) {
+      // A cap that cannot be read must not become the default: a typo would
+      // then raise or remove the limit without anyone noticing.
+      return fail(EXIT_CODES.ENV, err.message);
+    }
+    const receipt = readReceipt(receiptPath(gitCommonDir(), prNumber), prNumber);
+    const consecutiveFailures = receipt ? (summarizePhases(receipt)[phase.id]?.consecutive_failures ?? 0) : 0;
+    const result = checkAttemptBudget({ phase: phase.id, consecutiveFailures, maxAttempts });
+    return emit({
+      subcommand: sub,
+      ok: result.ok,
+      result,
+      problems: result.reasons,
+      lines: [
+        `gate budget: ${result.ok ? "PASS" : "FAIL"} (${phase.id}: ${consecutiveFailures} of ${maxAttempts} failed in a row)`,
+        ...result.reasons.map((r) => `  ✗ ${r.message}`),
+        ...(result.hint ? [`  → ${result.hint}`] : []),
+      ],
+      json,
+    });
+  }
 
   if (which === "local-attest") {
     const view = ghJson(`gh pr view ${prNumber} --json headRefOid`);
@@ -682,7 +1047,7 @@ async function main() {
     });
   }
 
-  return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge, skip-ci`);
+  return fail(EXIT_CODES.USAGE, `--gate must be one of: local-attest, merge, skip-ci, budget`);
 }
 
 // Run only when invoked as a CLI, not when imported by tests. When argv[1]

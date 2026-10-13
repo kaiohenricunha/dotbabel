@@ -21,6 +21,10 @@ docs/articles/
 # Assessment docs — graded locally, not for distribution.
 docs/assessments/
 
+# Jev triage experiment data: review text, file paths and diff hunks, some from
+# a private repository. The harness writes outside the repository by default.
+docs/experiments/jev-finding-triage/*.jsonl
+
 # Node (for the plugin workspace)
 node_modules/
 *.log

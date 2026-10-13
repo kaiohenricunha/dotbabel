@@ -9,6 +9,7 @@ import { findUntrustedArgvChange } from "./trust-check.mjs";
 import { loadCriteriaConfigText } from "./config.mjs";
 import { listSpecDirs } from "../spec-harness-lib.mjs";
 import { parseSpecIds } from "../lib/spec-ids.mjs";
+import { implicatedSpecIds } from "./gate-inputs.mjs";
 import { ERROR_CODES, ValidationError } from "../lib/errors.mjs";
 
 function criteriaError(code, message) {
@@ -57,10 +58,31 @@ export function checkPrPreconditions(deps, { ctx, pr, repo, allowProjectCommands
     throw criteriaError(ERROR_CODES.CRITERIA_FORK_PR, `pull request #${pr} comes from a fork (pass --allow-project-commands to override for this run)`);
   }
 
-  const specIds = parseSpecIds(String(prJson.body ?? ""));
+  const declaredIds = parseSpecIds(String(prJson.body ?? ""));
   const knownSpecIds = new Set(listSpecDirs(ctx));
-  const unknownSpecId = specIds.find((id) => !knownSpecIds.has(id));
+  const unknownSpecId = declaredIds.find((id) => !knownSpecIds.has(id));
   if (unknownSpecId) throw criteriaError(ERROR_CODES.CRITERIA_UNKNOWN_SPEC, `unknown spec: ${unknownSpecId}`);
+
+  // REL-19: the merge gate requires evidence for the body's specs AND for every
+  // spec whose base linked_paths match the diff, so verify runs the same set.
+  // HEAD is the PR head (checked above), so the local three-dot diff is the
+  // PR's file list, with no 100-file page to truncate it.
+  const changedPaths = deps
+    .capture(["git", "diff", "--name-only", `${baseSha}...${headSha}`])
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const run = (argv) => {
+    try {
+      return { status: 0, stdout: deps.capture(argv) };
+    } catch {
+      return { status: 1, stdout: "" };
+    }
+  };
+  const implicated = implicatedSpecIds({ run }, baseSha, changedPaths) ?? [];
+  // A spec deleted at the head has no criteria left to run here; the gate
+  // reports that removal as weakening, not this command.
+  const specIds = [...new Set([...declaredIds, ...implicated.filter((id) => knownSpecIds.has(id))])];
 
   let baseConfigText = null;
   const baseFiles = deps.capture(["git", "ls-tree", "-r", "--name-only", baseSha, "--", ".dotbabel.json"]);
