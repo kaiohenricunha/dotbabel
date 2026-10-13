@@ -68,6 +68,14 @@ describe("checkAttestationAdoption: enforcement off", () => {
     expect(byCode(r, "ATTESTATION_OFF").message).toContain("docs/attestation.md");
   });
 
+  it("says that /merge-pr reads CI on the head when off, not that it always verifies explicitly", async () => {
+    const root = repo();
+    const r = await checkAttestationAdoption({ repoRoot: root, canExecuteConfig: false });
+    const message = byCode(r, "ATTESTATION_OFF").message;
+    expect(message).toMatch(/reads CI on the head SHA/);
+    expect(message).toMatch(/only when CI did not test/);
+  });
+
   it("warns, not fails, when .dotbabel.json is unparseable, because the gate treats it as no policy", async () => {
     const root = repo({ dotbabel: "{ not json" });
     const r = await checkAttestationAdoption({ repoRoot: root, canExecuteConfig: false });
@@ -232,7 +240,10 @@ describe("checkAttestationAdoption: enforcement on", () => {
   });
 
   it("does not warn while one required leg always runs — skipped required legs are satisfied beside it", async () => {
-    const root = repo({ dotbabel: enforcing({ required_legs: ["test", "quality"] }), files: { ".local-attest.config.mjs": "" } });
+    const root = repo({
+      dotbabel: enforcing({ required_legs: ["test", "quality"] }),
+      files: { ".local-attest.config.mjs": "" },
+    });
     const r = await checkAttestationAdoption({
       repoRoot: root,
       canExecuteConfig: true,
