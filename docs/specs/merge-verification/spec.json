@@ -24,10 +24,7 @@
     "plugins/dotbabel/templates/claude/commands/merge-pr.md",
     ".github/prompts/merge-pr.prompt.md",
     "examples/minimal-consumer/.claude/commands/merge-pr.md",
-    "examples/minimal-consumer/.claude/skills-manifest.json",
     "examples/minimal-consumer/.github/workflows/test.yml",
-    ".claude/skills-manifest.json",
-    "index/artifacts.json",
     ".dotbabel.json",
     "docs/attestation.md",
     "docs/cli-reference.md",
@@ -227,11 +224,15 @@
       "status": "active",
       "given": "a pull request whose base commit carries a spot-check policy that differs from the working tree",
       "when": "pr-stack spot-check runs, once with a billing-blocked latest default-branch run and twice on one head",
-      "then": "the policy comes from the base commit, a billing-blocked CI selects with ci_unavailable, and both runs on one head give the same decision",
+      "then": "the policy comes from the base commit, a billing-blocked CI selects with ci_unavailable when a spot_check block exists and selects nothing (reason off) without one, and both runs on one head give the same decision",
       "tests": [
         {
           "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
           "name": "verifies every pull request when the latest default-branch run was billing-blocked"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "selects nothing without a spot_check block, even when the default-branch run was billing-blocked"
         },
         {
           "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",

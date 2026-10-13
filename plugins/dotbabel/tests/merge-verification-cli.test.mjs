@@ -165,8 +165,8 @@ describe("pr-stack spot-check", () => {
   });
 
   it("verifies every pull request when the latest default-branch run was billing-blocked", () => {
-    // No spot_check block: the defaults apply, rate 0 and rate_when_ci_unavailable 1.
-    const ctx = makeRepo();
+    // An empty spot_check block opts in: rate 0, and rate_when_ci_unavailable defaults to 1.
+    const ctx = makeRepo({ attestation: { enforce: true, spot_check: {} } });
     const base = git(ctx.repo, "rev-parse", "HEAD");
     const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
       ...prRoutes({ base }),
@@ -176,6 +176,19 @@ describe("pr-stack spot-check", () => {
     const out = r.json().result;
     expect(out.ci.state).toBe("unavailable");
     expect(out.decision).toMatchObject({ selected: true, reason: "ci_unavailable", rate: 1 });
+  });
+
+  it("selects nothing without a spot_check block, even when the default-branch run was billing-blocked", () => {
+    const ctx = makeRepo();
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
+      ...prRoutes({ base }),
+      ...ciRoutes(billingRun, { jobs: billingJobs, annotations: billingAnnotations }),
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    const out = r.json().result;
+    expect(out.ci.state).toBe("unavailable");
+    expect(out.decision).toMatchObject({ selected: false, reason: "off", rate: 0 });
   });
 
   it("reports CI as unknown, never available, when the Actions API fails", () => {

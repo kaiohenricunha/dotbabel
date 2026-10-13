@@ -134,6 +134,10 @@ as the rest of the policy is:
 | `rate_when_ci_unavailable` | `1`     | The share to verify when the latest test run on the default branch did not run.            |
 | `always_paths`             | `[]`    | Globs of changed paths that always select the check. Only `**`, `*` and `?` are special.   |
 
+The control is opt-in. Without a `spot_check` block, no spot check runs, not
+even while CI is unavailable. The defaults in the table apply to the keys that
+a block leaves unset.
+
 An unknown key or a value outside 0 to 1 stops the command with exit `2`. It
 never falls back to the default, because a typo must not lower the check rate.
 

@@ -40,6 +40,10 @@ request cannot lower its own chance of a check.
 | `rate_when_ci_unavailable` | `1`     | The share to verify when the latest default-branch test run did not run. |
 | `always_paths`             | `[]`    | Globs (`**`, `*`, `?`) of changed paths that always select the check.    |
 
+The control is opt-in. Without a `spot_check` block, the resolver returns a
+policy with both rates at 0, so no spot check runs. The defaults in the table
+apply to the keys that a block leaves unset.
+
 The resolver is strict. An unknown key, a value outside 0 to 1, or a glob with
 `!`, braces or brackets is an error (exit `2`), never a silent default, because
 a typo must not lower the check rate.

@@ -34,10 +34,20 @@ import { createHash } from "node:crypto";
 import { hasCurrentAttestation } from "./attestation.mjs";
 import { globToRegExp } from "./pr-gates.mjs";
 
-/** The spot-check policy that applies when `.dotbabel.json` sets none. */
+/**
+ * The values a `spot_check` block gets for the keys it leaves unset. Without a
+ * block, spot checks are off (`SPOT_CHECK_OFF`): the control is opt-in.
+ */
 export const SPOT_CHECK_DEFAULTS = Object.freeze({
   rate: 0,
   rate_when_ci_unavailable: 1,
+  always_paths: Object.freeze([]),
+});
+
+/** The policy when the base `.dotbabel.json` has no `spot_check` block: no spot checks at all. */
+export const SPOT_CHECK_OFF = Object.freeze({
+  rate: 0,
+  rate_when_ci_unavailable: 0,
   always_paths: Object.freeze([]),
 });
 
@@ -93,16 +103,16 @@ function assertRate(value, name) {
  * @returns {{ rate: number, rate_when_ci_unavailable: number, always_paths: string[] }}
  */
 export function resolveSpotCheckPolicy(config) {
-  const defaults = { rate: SPOT_CHECK_DEFAULTS.rate, rate_when_ci_unavailable: SPOT_CHECK_DEFAULTS.rate_when_ci_unavailable, always_paths: [] };
-  if (!isPlainObject(config) || !("attestation" in config)) return defaults;
+  const off = { rate: SPOT_CHECK_OFF.rate, rate_when_ci_unavailable: SPOT_CHECK_OFF.rate_when_ci_unavailable, always_paths: [] };
+  if (!isPlainObject(config) || !("attestation" in config)) return off;
   const attestation = config.attestation;
   if (!isPlainObject(attestation)) throw new Error("attestation must be an object");
-  if (!("spot_check" in attestation)) return defaults;
+  if (!("spot_check" in attestation)) return off;
   const block = attestation.spot_check;
   if (!isPlainObject(block)) throw new Error("attestation.spot_check must be an object");
   const unknown = Object.keys(block).find((k) => !SPOT_CHECK_KEYS.has(k));
   if (unknown !== undefined) throw new Error(`attestation.spot_check has unknown key ${JSON.stringify(unknown)}`);
-  const out = { ...defaults };
+  const out = { rate: SPOT_CHECK_DEFAULTS.rate, rate_when_ci_unavailable: SPOT_CHECK_DEFAULTS.rate_when_ci_unavailable, always_paths: [] };
   if (block.rate !== undefined) out.rate = assertRate(block.rate, "rate");
   if (block.rate_when_ci_unavailable !== undefined) {
     out.rate_when_ci_unavailable = assertRate(block.rate_when_ci_unavailable, "rate_when_ci_unavailable");

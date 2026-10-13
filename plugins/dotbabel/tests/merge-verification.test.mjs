@@ -89,10 +89,16 @@ function billingRunFixture() {
 }
 
 describe("resolveSpotCheckPolicy", () => {
-  it("returns the defaults when the base config has no spot_check block", () => {
-    expect(resolveSpotCheckPolicy(undefined)).toEqual({ rate: 0, rate_when_ci_unavailable: 1, always_paths: [] });
-    expect(resolveSpotCheckPolicy({})).toEqual({ rate: 0, rate_when_ci_unavailable: 1, always_paths: [] });
-    expect(resolveSpotCheckPolicy({ attestation: { enforce: true } })).toEqual(SPOT_CHECK_DEFAULTS);
+  it("turns spot checks fully off when the base config has no spot_check block (opt-in)", () => {
+    const off = { rate: 0, rate_when_ci_unavailable: 0, always_paths: [] };
+    expect(resolveSpotCheckPolicy(undefined)).toEqual(off);
+    expect(resolveSpotCheckPolicy({})).toEqual(off);
+    expect(resolveSpotCheckPolicy({ attestation: { enforce: true } })).toEqual(off);
+  });
+
+  it("verifies every pull request while CI is unavailable once a spot_check block exists", () => {
+    expect(resolveSpotCheckPolicy({ attestation: { spot_check: {} } })).toEqual(SPOT_CHECK_DEFAULTS);
+    expect(SPOT_CHECK_DEFAULTS.rate_when_ci_unavailable).toBe(1);
   });
 
   it("fills unset keys with defaults and keeps the set ones", () => {

@@ -23,4 +23,4 @@ dotbabel criteria verify --spec merge-verification
 ## Related specs
 
 - `qa-verification-harness` — the attestation and the merge gate that this spec watches.
-- `unforgeable-evidence` — signed evidence that an agent cannot produce alone. It is parked as an opt-in design, because a generic open-source tool cannot require a hardware key. This spec is the soft path that every repository gets.
+- `unforgeable-evidence` — signed evidence that an agent cannot produce alone. It is parked as an opt-in design, because a generic open-source tool cannot require a hardware key. This spec is the soft path that any repository can turn on.
