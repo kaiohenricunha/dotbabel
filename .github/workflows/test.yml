@@ -162,9 +162,20 @@ jobs:
   # The contradiction alarm (docs/attestation.md, "Spot checks and the
   # contradiction alarm"). An agent with the owner's token can forge the
   # attestation that lets /merge-pr skip the suite. This push run on main is
-  # the one check it cannot skip, so when the test job fails here, this job
-  # asks whether the failure contradicts a passing attestation on the merged
-  # pull request. If it does, it labels the pull request and opens one issue.
+  # the only check off the agent's machine. When the test job fails here, this
+  # job asks whether the failure contradicts a passing attestation on a pull
+  # request merged since the last green run. If it does, it labels each such
+  # pull request and opens one issue.
+  #
+  # It detects a contradiction only when this run completes, on unchanged
+  # detector code, while the attestation comment exists. A [skip ci] marker in
+  # the merge message or a cancelled run stops it, and main-status then still
+  # shows the commit as unverified debt. A deleted comment also stops it.
+  #
+  # The detector runs from the FIRST PARENT (github.event.before, the tip of
+  # main before this push), so the merged pull request cannot rewrite it.
+  # GitHub still reads THIS file from the pushed commit. So this file is in
+  # attestation.governance_files, and a change to it forces the explicit path.
   #
   # Push only: a pull_request run would hand a token that can write issues to
   # code a fork controls. It costs minutes only when main is already red, and
@@ -184,17 +195,20 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The merge commit and its first parent: the trust list is read from
-          # the base the pull request merged into.
-          fetch-depth: 2
+          # The detector code, as main had it before this push. Full history
+          # also brings the pushed commit (on origin/main) and the range
+          # before it, so no credentialed fetch is needed later.
+          ref: ${{ github.event.before }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22
           cache: "npm"
       - run: npm ci
-      # The in-tree bin, as dotbabel-criteria does: this repository checks
-      # itself with its own tree, not the last published release.
+      # The in-tree bin of the first parent: this repository checks itself
+      # with its own tree, not the last published release, and not with the
+      # tree under judgment.
       - name: Raise the alarm on a contradicted attestation
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

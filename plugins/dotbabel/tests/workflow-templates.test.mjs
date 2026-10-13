@@ -199,12 +199,13 @@ describe("workflow templates", () => {
 
   // --- The contradiction alarm (spec merge-verification) ------------------
   //
-  // An agent with the user's token can forge an attestation. The default
-  // branch's own CI run is the one check it cannot skip, so when that run
-  // fails, a job asks whether the failure contradicts a passing attestation.
-  // It must cost nothing on a green run, never run on a pull request (a fork
-  // must not reach a token that can write issues), and hold only the scopes it
-  // uses.
+  // An agent with the user's token can forge an attestation. The push run on
+  // the default branch is the only check off the agent's machine, so when that
+  // run fails, a job asks whether the failure contradicts a passing
+  // attestation. It must cost nothing on a green run, never run on a pull
+  // request (a fork must not reach a token that can write issues), hold only
+  // the scopes it uses, and run detector code from the FIRST PARENT, so the
+  // pull request under judgment cannot rewrite the detector.
 
   const REPO_WORKFLOW = path.resolve(TEMPLATES_DIR, "../../../../.github/workflows/test.yml");
 
@@ -213,10 +214,14 @@ describe("workflow templates", () => {
     const job = doc.jobs.contradiction;
     expect(job, "a contradiction job").toBeDefined();
     expect([job.needs].flat()).toContain(testJob);
-    const condition = String(job.if);
-    expect(condition).toMatch(/failure\(\)/);
-    expect(condition).toMatch(/github\.event_name\s*==\s*'push'/);
+    // Exact: `failure() || github.event_name == 'push'` would run on every
+    // push and on a failed pull_request run with issues: write.
+    expect(String(job.if).trim()).toBe("failure() && github.event_name == 'push'");
     expect(job.permissions).toEqual({ contents: "read", actions: "read", checks: "read", issues: "write", "pull-requests": "write" });
+    // The detector comes from the first parent; full history keeps the pushed
+    // commit and the range before it readable without a credentialed fetch.
+    const checkout = job.steps.find((st) => typeof st.uses === "string" && st.uses.startsWith("actions/checkout@"));
+    expect(checkout.with).toMatchObject({ ref: "${{ github.event.before }}", "fetch-depth": 0, "persist-credentials": false });
     const scripts = runScripts(job).filter((script) => /pr-stack\.mjs contradiction|pr-stack contradiction/.test(script));
     expect(scripts.length, "the job runs the contradiction command").toBe(1);
     expect(scripts[0]).toContain(invocation);
