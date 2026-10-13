@@ -431,9 +431,8 @@ export function toProviderId(sourceId, key, aliases = {}) {
 export function toSourceKey(sourceId, id, aliases = {}) {
   if (typeof id !== "string") return undefined;
   if (PROVIDERS.includes(id)) return Object.keys(aliases).find((key) => aliases[key] === id) ?? id;
-  const prefix = `${sourceId}.`;
-  if (!id.startsWith(prefix)) return undefined;
-  const key = id.slice(prefix.length);
+  // The round trip holds only for `<sourceId>.<key>` of an unmapped key, so it also refuses another source's id.
+  const key = id.slice(sourceId.length + 1);
   return toProviderId(sourceId, key, aliases) === id ? key : undefined;
 }
 

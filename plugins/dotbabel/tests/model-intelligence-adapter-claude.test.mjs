@@ -196,9 +196,9 @@ describe("claude source adapter", () => {
     const conflict = context(() => {
       throw new Error("a conflicting input must not run anything");
     });
-    await expect(claude.validate({ reasoning: "high", effort: "low" }, conflict.ctx)).rejects.toThrow(/reasoning and effort/);
+    await expect(claude.validate({ reasoning: "high", effort: "low" }, conflict.ctx)).rejects.toThrow(/^claude validate: reasoning and effort/);
     await expect(claude.validate({ model: "opus", reasoning: "high", effort: 7 }, conflict.ctx)).rejects.toThrow(TypeError);
-    await expect(claude.observe({ ...conflict.ctx, reasoning: "high", effort: "low" })).rejects.toThrow(/reasoning and effort/);
+    await expect(claude.observe({ ...conflict.ctx, reasoning: "high", effort: "low" })).rejects.toThrow(/^claude observe: reasoning and effort/);
     expect(conflict.runner.calls).toHaveLength(0);
   });
 

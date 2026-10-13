@@ -119,6 +119,8 @@ describe("observed effective configuration", () => {
     for (const bad of ["--model", "--effort", "model", "model_reasoning_effort", "model_provider", "axes.", "axes", "axes.Model", "axes.model.extra", "axes.__proto__", "axes.a-b", "providers", "provider.id", " provider", "fieldSources.provider"]) {
       expect(() => makeObservedConfiguration({ ...base, reconstructedFrom: [bad] }), bad).toThrow(/reconstructedFrom/);
     }
+    // The message quotes at most 70 characters of a rejected entry, so a long one cannot flood a log.
+    expect(() => makeObservedConfiguration({ ...base, reconstructedFrom: ["x".repeat(150)] })).toThrow(new RegExp(`"${"x".repeat(70)}" must be`));
   });
 
   it("rejects a source for a field that was not reported, so provenance cannot describe nothing", () => {
@@ -349,6 +351,7 @@ describe("provider namespace mapping (§5 Provider namespace)", () => {
   it("maps a Dotbabel id back to the source key, and refuses an id that is not this source's", () => {
     expect(toSourceKey("models-dev", "anthropic")).toBe("anthropic");
     expect(toSourceKey("codex", "openai", { oai: "openai" })).toBe("oai");
+    expect(toSourceKey("codex", "anthropic", { oai: "openai", ant: "anthropic" })).toBe("ant");
     expect(toSourceKey("models-dev", "models-dev.xai")).toBe("xai");
     // The scoped form of a key that maps into PROVIDERS is not a second name for it.
     expect(toSourceKey("models-dev", "models-dev.anthropic")).toBeUndefined();
