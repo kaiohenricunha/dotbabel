@@ -1,6 +1,6 @@
-# Experiment: Windows Hello security key from WSL (unforgeable-evidence E-1) — 2026-10-12
+# Experiment: Windows Hello security key (E-1) and the Bitwarden SSH agent (A-6) from WSL (unforgeable-evidence) — 2026-10-12
 
-The unforgeable-evidence spec does not start enforcement until one key custody tier works on the maintainer's WSL host (`docs/specs/unforgeable-evidence/spec/6-implementation-plan.md`, PR-3 entry condition, OPS-4). Experiment E-1 asks if Windows OpenSSH (`ssh-keygen.exe`), started from WSL, can hold an OpenSSH security-key (`sk-`) key in Windows Hello. This record has the unattended probes, the three attended attempts, and the WebAuthN log lines.
+The unforgeable-evidence spec does not start enforcement until one key custody tier works on the maintainer's WSL host (`docs/specs/unforgeable-evidence/spec/6-implementation-plan.md`, PR-3 entry condition, OPS-4). Experiment E-1 asks if Windows OpenSSH (`ssh-keygen.exe`), started from WSL, can hold an OpenSSH security-key (`sk-`) key in Windows Hello. This record has the unattended probes, the three attended E-1 attempts, and the WebAuthN log lines. It also has the attended A-6 run with the Bitwarden desktop SSH agent, which measured the spec's A-6 tier (§8 A-6).
 
 ## Question (from the spec, written before the run)
 
@@ -41,7 +41,7 @@ The spec locked no numeric decision rule. A key must exist before it can sign, s
 | 2   | 22:24:53    | `ecdsa-sk`   | default             | the same                                  | none     |
 | 3   | 22:32:48    | `ecdsa-sk`   | phone, Bluetooth on | the same                                  | none     |
 
-The attended note for attempt 1 records a timeout at 180 s. In the log, each attempt ends with `0x800704C7` "The operation was canceled by the user" (22:23:12, 22:25:26, and 22:33:19).
+Two sources disagree on the end of attempt 1. The attended note records a timeout at 180 s. The log records `0x800704C7` "The operation was canceled by the user" at 22:23:12, about 115 s after the start at 22:21:17. A timeout does not give a user-cancel code, so this record takes the logged cancel as the end of attempt 1, and keeps the 180 s note only as the note. Attempts 2 and 3 end the same way in the log, at 22:25:26 and 22:33:19.
 
 Counts: 3 attempts, 2 key types, 3 Windows Hello refusals, 4 phone tunnels, 4 tunnel failures, 0 key files.
 
@@ -86,8 +86,9 @@ The phone (hybrid) tunnels. In each one, Windows reads one message from the phon
 ## Decision
 
 - **Q-3 is decided: no.** Windows Hello cannot hold an OpenSSH `sk-` key from WSL on this host.
-- **Tiers left on this host, all untested:** a USB FIDO2 key through `ssh-keygen.exe` (spec A-5, with the user-presence flag), the Bitwarden desktop SSH agent (spec A-6, with no user-presence flag), and the separate-user signer (spec A-4, weak while interop is on).
-- **Owner decision, 2026-10-12:** the Bitwarden desktop SSH agent. The spec records it as KD-13 and §8 A-6, with its measured facts pending.
+- **Tiers left on this host after E-1, all untested at that time:** a USB FIDO2 key through `ssh-keygen.exe` (spec A-5, with the user-presence flag), the Bitwarden desktop SSH agent (spec A-6, with no user-presence flag), and the separate-user signer (spec A-4, weak while interop is on).
+- **Owner decision, 2026-10-12, before the A-6 run:** the Bitwarden desktop SSH agent. The spec records it as KD-13 and §8 A-6. The A-6 run below then measured it. In the spec's predicates, facts (a) and (c) pass, (b) and (d) fail, and (e) is untested (spec §8 A-6).
+- **Owner decisions, 2026-10-12, after the A-6 run:** A-6 is accepted as a casual-only tier below the spec's §1 goal, and no FIDO or USB security key is planned on this host. The owner prefers that a generic open-source tool require no hardware key and no password manager, so the spec is parked: dotbabel does not implement signed evidence (spec §6 Status, §8 A-6).
 
 ## Attended A-6 run: Bitwarden SSH agent (2026-10-12)
 
@@ -102,6 +103,7 @@ Setup: Bitwarden desktop 2026.9.1 (per-user install), SSH agent on, authorizatio
 | sign 4 (23:05:34Z) | dialog not answered in time | refused after 61 s                       |
 | sign 5             | dialog not answered in time | refused after 62 s                       |
 
+- The owner did not answer the dialogs of requests 2 to 5. The owner's observation is that these dialogs were missed. This record has no other cause for the refusals.
 - The dialog text: "Confirm SSH key usage: `ssh-keygen.exe` is requesting access to `dotbabel-evidence` in order to sign a message" (Authorize, Deny). It is a modal inside the Bitwarden window.
 - Signature 1 verified on Linux (OpenSSH 9.6p1) against `namespaces="dotbabel-evidence@v1"`, and failed under the namespace `git`.
 - Writable from WSL: `%APPDATA%\Bitwarden\data.json`, `%LOCALAPPDATA%\Programs\Bitwarden\Bitwarden.exe`, `resources\app.asar`. The SSH-agent settings were not found in plain text.
@@ -122,3 +124,22 @@ command -v fido2-token ykman lsusb; ls /dev/hidraw*
 # The log, for a window around the attempt
 powershell.exe -NoProfile -Command "Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-WebAuthN/Operational'; StartTime=(Get-Date).AddMinutes(-15)} | Sort-Object TimeCreated | Format-List TimeCreated, Id, Message"
 ```
+
+The A-6 run. Bitwarden desktop is unlocked, its SSH agent is on with authorization "Always", the Windows `ssh-agent` service is disabled, and the vault holds the Ed25519 key `dotbabel-evidence`. The owner answers each dialog. `<user>` is the Windows user name.
+
+```bash
+# No dialog: list the public key, and save it on both sides
+"$W/ssh-add.exe" -L | tr -d '\r' | tee dotbabel-evidence.pub
+cp dotbabel-evidence.pub '/mnt/c/Users/<user>/.ssh/dotbabel-evidence.pub'
+
+# Attended: a Bitwarden dialog opens for each request
+printf 'dotbabel A-6 test\n' > msg.txt
+"$W/ssh-keygen.exe" -Y sign -n dotbabel-evidence@v1 -f 'C:\Users\<user>\.ssh\dotbabel-evidence.pub' < msg.txt | tr -d '\r' > msg.sig
+
+# Linux OpenSSH: verify against a namespace-pinned signers line
+printf 'dotbabel-evidence namespaces="dotbabel-evidence@v1" %s\n' "$(cut -d' ' -f1,2 dotbabel-evidence.pub)" > allowed_signers
+ssh-keygen -Y verify -f allowed_signers -I dotbabel-evidence -n dotbabel-evidence@v1 -s msg.sig < msg.txt   # passes
+ssh-keygen -Y verify -f allowed_signers -I dotbabel-evidence -n git -s msg.sig < msg.txt                    # fails
+```
+
+The run used the principal and the signers line above. This record does not keep its exact shell lines for the save and the message steps, so those two steps are equivalent commands, not a transcript.

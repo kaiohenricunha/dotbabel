@@ -1,5 +1,7 @@
 # §1 — Problem / Motivation
 
+**PARKED (owner decision, 2026-10-12).** dotbabel does not implement this spec. It stays as an opt-in, default-off design record (§6 Status).
+
 > What is broken, who does it hurt, and what is the threat?
 
 ## The problem

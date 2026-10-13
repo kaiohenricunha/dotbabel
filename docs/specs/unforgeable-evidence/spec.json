@@ -1,7 +1,7 @@
 {
   "id": "unforgeable-evidence",
   "title": "Unforgeable evidence — gate on signed evidence an agent cannot produce without the human",
-  "status": "implementing",
+  "status": "draft",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/lib/attest-marker.mjs",
