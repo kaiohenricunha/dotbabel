@@ -1,6 +1,6 @@
 # merge-verification — Engineering Spec
 
-> Detect a forged attestation. Do not try to prevent one. Verify a share of attested pull requests anyway, read what the default branch's own CI says about each merge, and raise an alarm when a real failure contradicts a passing attestation.
+> Detect a forged attestation. Do not try to prevent one. Verify a share of attested pull requests anyway, read what the default branch's own CI says about each merge, and raise an alarm when a real failure contradicts a passing attestation. The push run on the default branch is the only check off the agent's machine, and it can be avoided: see the limits in spec.md.
 >
 > Created: 2026-10-12
 > Branch: `feat/merge-verification`
@@ -16,7 +16,7 @@ dotbabel criteria verify --spec merge-verification
 
 ## Read this
 
-- [spec.md](spec.md) — the problem, the design, the three run states, the cumulative rule, the fallback when CI does not run, and the limits.
+- [spec.md](spec.md) — the problem, the design, the four run states, the cumulative rule, the contradiction range, the fallback when CI does not run, and the limits.
 - [docs/attestation.md](../../attestation.md), section "Spot checks and the contradiction alarm" — the user guide.
 - [docs/cli-reference.md](../../cli-reference.md), `dotbabel-pr-stack` — the three subcommands.
 

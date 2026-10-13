@@ -131,7 +131,7 @@ as the rest of the policy is:
 | Key                        | Default | Meaning                                                                                    |
 | -------------------------- | ------- | ------------------------------------------------------------------------------------------ |
 | `rate`                     | `0`     | The share of attested pull requests to verify explicitly while the default branch CI runs. |
-| `rate_when_ci_unavailable` | `1`     | The share to verify when the latest test run on the default branch did not run.            |
+| `rate_when_ci_unavailable` | `1`     | The share to verify while CI is unavailable (see "When CI does not run").                  |
 | `always_paths`             | `[]`    | Globs of changed paths that always select the check. Only `**`, `*` and `?` are special.   |
 
 The control is opt-in. Without a `spot_check` block, no spot check runs, not
@@ -141,78 +141,144 @@ a block leaves unset.
 An unknown key or a value outside 0 to 1 stops the command with exit `2`. It
 never falls back to the default, because a typo must not lower the check rate.
 
-The roll comes from the head: the first 32 bits of `sha256("<head>:<pr>")`. Run
-the command again on the same head and you get the same answer. A new head
-gives a new roll, and a new head also makes the attestation stale. Each
-decision goes into the run receipt. After the explicit run, `/merge-pr` records
-its result with `--record-explicit pass` or `--record-explicit fail`. Use
-`spot-check --pr <N> --show` to see both.
+The roll comes from the head: the first 32 bits of `sha256("<head>:<pr>")`. So
+the roll is fixed for a head. A new head gives a new roll, and a new head also
+makes the attestation stale. The rate can change: it follows the CI state and
+the base policy. So a selection stays. Once a head was selected, a later run on
+that head reports it selected again (`sticky`), with the first reason. A
+non-selection can change when the CI state or the base policy changes.
 
-### Three run states and the cumulative rule
+The policy is off when both rates are `0` and no `always_paths` is set. Then the command reads the pull request once to find its base, decides `off`, and stops. It
+reads no changed files and no CI runs, and it records nothing.
+
+Each other decision goes into the spot-check log,
+`<git-common-dir>/dotbabel/receipts/pr-<N>.spot-checks.json`
+([schema](../schemas/dotbabel.spot-checks.schema.json)). The log is next to the
+run receipt, not inside it, so an older `dotbabel` still reads the receipt.
+Each entry records the workflow file and the branch that were read. After the
+explicit run, `/merge-pr` records its result with `--record-explicit pass` or
+`--record-explicit fail`. Use `spot-check --pr <N> --show` to see both.
+
+`always_paths` matches each changed path, and also the old path of a renamed
+file. A pull request cannot move a file out of a watched directory to avoid the
+check.
+
+### Four run states and the cumulative rule
 
 `dotbabel pr-stack main-status` reads the test workflow's runs on the default
-branch. Each run gets one state:
+branch. The default branch is the repository default branch, from
+`gh repo view`, unless you pass `--trunk`. Each run gets one state:
 
-| State        | Meaning                                                                                                                      |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `green`      | The run succeeded.                                                                                                           |
-| `red`        | A job failed after it ran at least one step. The tests really failed.                                                        |
-| `unverified` | The run proves nothing: a billing limit, a startup failure, a cancelled or skipped run, a job that never started, or no run. |
+| State        | Meaning                                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------- |
+| `green`      | The run succeeded.                                                                                            |
+| `red`        | A job failed after it ran at least one step. The tests really failed. An annotation never changes this.       |
+| `unverified` | The run proves nothing: no failed job ran a step. That is a billing limit, a startup failure, or a cancel.    |
+| `unknown`    | The run or its jobs list could not be read: a rate limit, a server error, or a token without `actions: read`. |
+
+A job that never started has a failed, `startup_failure` or `cancelled`
+conclusion, zero steps, and no runner. A billing-blocked run has exactly this
+shape. A run cancelled after a job failed with steps is still `red`.
 
 The default branch is squash-merged and linear. A green run on one commit
 therefore verifies that commit and every older commit. `main-status` reports
-the last green commit and the **debt**: every `red` or `unverified` commit
-newer than it. If the runs cannot be read (a rate limit, a missing workflow),
-every commit is `unknown`. Unknown is never verified.
+the last green commit and the **debt**: every `red`, `unverified` or `unknown`
+commit newer than it. If the runs list cannot be read, every commit is
+`unknown`. Unknown is never verified.
 
 ### When CI does not run
 
 A private repository can reach its GitHub Actions spending limit. Then each run
-fails before a step runs, and GitHub adds an annotation such as "The job was
-not started because recent account payments have failed or your spending limit
-needs to be increased". That run is `unverified`. It never verifies a commit
+fails before a step runs. That run is `unverified`. It never verifies a commit
 and it never raises an alarm.
 
-While the latest default-branch run is `unverified`, nothing off your machine
-checks an attestation after the merge. So the spot check uses
-`rate_when_ci_unavailable`, and by default every attested pull request is
-verified explicitly. `main-status --local` runs the local-attest matrix on the
-default-branch tip in a temporary worktree and removes the worktree after. Its
-result is labelled "local (same machine as the agent; weaker than CI)" and it
-never verifies a commit.
+The spot check reads the newest completed run on the default branch. CI is `available` only when that run is green or red and tested one of the last 10 first-parent commits. An older run says nothing about the recent merges, so CI is then
+`unavailable`. CI is also `unavailable` when there is no completed run, or the
+newest one is `unverified`. If the runs cannot be read, CI is `unknown`, never
+`available`, and the normal `rate` applies.
+
+While CI is `unavailable`, nothing off your machine checks an attestation after
+the merge. So the spot check uses `rate_when_ci_unavailable`, and by default
+every attested pull request is verified explicitly.
+
+`main-status --local` runs the local-attest matrix on the default-branch tip in
+a temporary worktree and removes the worktree after. It runs repository code as
+you: the config module, the lifecycle scripts of the install, and every leg.
+So it needs the repository on the [trust allowlist](./hooks.md), or
+`--allow-project-commands` for one run. It installs from the lockfile with the
+same table as `/merge-pr`. With no supported lockfile, it installs nothing and
+says so. Its result is labelled "local (same machine as the agent; weaker than
+CI)" and it never verifies a commit.
 
 ### The contradiction alarm
 
-A real failure on code whose attestation said pass is the one fact a forgery
-cannot hide. Two places look for it:
+A real failure on code whose attestation said pass is the evidence this layer
+detects. It is not proof of a forgery, and a forgery can avoid it (see the
+limits below). Two places look for it:
 
 - **The `contradiction` job** in `.github/workflows/test.yml` runs only when
   the test job failed on a push to the default branch. It classifies its own
-  run, finds the pull request merged as that commit, and checks for a current,
-  trusted, passing attestation on that pull request's head. On a
-  contradiction, it adds the label `attestation-contradicted` and opens one
-  issue that names the pull request, the attested head, and the failed run. A
-  hidden marker stops a second issue for the same pull request and head.
-- **`/merge-pr`**, when a spot-checked pull request fails its explicit run,
-  stops and runs `dotbabel pr-stack contradiction --pr <N> --local-failure --post`.
+  run. A red run can come from any commit since the last green run. So the job checks every pull request merged in that first-parent range, at most 20 commits. Each one with a trusted, passing attestation for its head is a
+  suspect. The job adds the label `attestation-contradicted` to each suspect
+  and opens one issue for the failing commit. The issue names the range and
+  every suspect. A hidden marker stops a second issue for the same failing
+  commit. In CI, only an issue that the workflow opened counts, and a closed
+  one is reopened with a comment.
+- **`/merge-pr`**, when a spot-checked pull request really fails its explicit
+  run, stops and runs `dotbabel pr-stack contradiction --pr <N> --local-failure --post`.
 
-A contradiction is not proof of forgery. A flaky test or a difference between
-the attesting machine and CI also produces one. Find out which before you
-trust another attestation from the same source.
+The trust list comes from the merge commit's first parent, never from the
+merge commit, which the pull request controls. A first parent with no
+`.dotbabel.json` uses `["OWNER"]`. One that cannot be read or does not parse
+stops the command with exit `2`.
+
+An attestation comment that was edited after it was posted still counts, and
+the issue says that it was edited. The merge gate refused edited comments at
+merge time, so an edit after the merge is a warning sign.
+
+The job runs the detector from the first parent (`github.event.before`). The
+merged pull request therefore cannot change the detector code that judges it.
+GitHub still reads the workflow file itself from the pushed commit. So list
+the workflow file in `attestation.governance_files`: then a pull request that
+changes it must take the explicit path.
+
+A contradiction is not proof of forgery. The issue lists the possible causes:
+
+- The attestation is forged or wrong. A real run did not produce it.
+- A test is flaky, or the attesting machine and the run differ.
+- The merged tree differs from the attested head. A squash merge applies the
+  diff to the base as it was at merge time.
+
+Find the cause before you trust another attestation from the same source.
 
 ### Limits
 
-- The spot check detects. A forged attestation that is not selected still
-  merges, and the alarm comes later from the default branch's CI run.
+This layer detects. It does not prevent, and it can be avoided:
+
+- The spot check does not stop a forged attestation that it does not select.
+  The alarm comes later, from the push run on the default branch.
 - The roll is predictable. An agent can compute it and choose a head that is
   not selected. `always_paths` does not depend on the roll.
 - The explicit run and `main-status --local` run on the same machine, as the
   same user, as the agent. A determined agent can fake them too.
 - An agent can bypass `/merge-pr` and call `gh pr merge` directly.
-- The run receipt is self-reported. It is a log, not evidence.
-- The `push` run of the test workflow on the default branch is the only check
-  the agent cannot skip. It exists only while the repository has Actions
-  minutes.
+- The spot-check log and the run receipt are self-reported. They are logs, not
+  evidence.
+- The push run on the default branch is the only check off the agent's
+  machine. It detects a contradiction only when it runs to completion, on
+  unchanged detector code, while the attestation comment exists. These stop
+  it:
+  - A `[skip ci]` marker in the merge message. GitHub then starts no push run.
+  - A cancelled run. A cancel before any job fails gives `unverified`.
+  - A deleted attestation comment, or an edit that removes the attestation.
+  - A change to the workflow file. GitHub reads it from the pushed commit.
+    `governance_files` makes such a change take the explicit path.
+- In the first two cases, `main-status` still shows the commit as
+  `unverified` debt, but no alarm opens.
+- When the default branch is already red at the first parent, the job raises
+  no new alarm. It prints why and exits `0`. A forgery that merges onto a red
+  branch shows only as debt.
+- The push run exists only while the repository has Actions minutes.
 
 ## Doctor findings
 

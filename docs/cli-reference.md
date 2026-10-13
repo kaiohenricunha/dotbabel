@@ -652,28 +652,29 @@ exact commands a child needs once its parent has merged.
 | `main-status`     | Show which default-branch commits a CI run verified, and the debt     |
 | `contradiction`   | Raise the alarm when a real failure contradicts a passing attestation |
 
-| Flag                    | Default    |                                                                                                                                                                            |
-| ----------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--trunk <ref>`         | `main`     | Trunk branch name                                                                                                                                                          |
-| `--limit <N>`           | 100        | Max PRs to enumerate. `main-status`: commits to show (default 20)                                                                                                          |
-| `--pr <N>`              | —          | Required except by `graph`, `plan`, `phases`, `main-status`, `--gate skip-ci`, `contradiction --sha`; optional for `entry`                                                 |
-| `--parent <N>`          | —          | Required by `next`                                                                                                                                                         |
-| `--parent-sha <sha>`    | —          | Parent head SHA, captured **before** merging                                                                                                                               |
-| `--remote <name>`       | `origin`   | Git remote                                                                                                                                                                 |
-| `--gate <name>`         | —          | Gate to evaluate                                                                                                                                                           |
-| `--sha <rev>`           | `HEAD`     | `--gate skip-ci`: commit to inspect. `record`: full head SHA, used only when gh cannot answer. `contradiction`: the full SHA of the default-branch commit whose run failed |
-| `--dry-run`             | off        | `review-complete`: check and print, post nothing                                                                                                                           |
-| `--phase <id>`          | —          | `record`, `--gate budget`: the conductor phase                                                                                                                             |
-| `--outcome <o>`         | —          | `record`: `pass` \| `fail` \| `blocked` \| `skipped`                                                                                                                       |
-| `--reason <CODE>`       | —          | `record`: the blocking reason code                                                                                                                                         |
-| `--evidence <url>`      | —          | `record`: a link to evidence the phase produced; repeatable                                                                                                                |
-| `--workflow <file>`     | `test.yml` | `spot-check`, `main-status`, `contradiction`: the test workflow file on the default branch                                                                                 |
-| `--show`                | off        | `spot-check`: print the recorded decisions and explicit runs; decide nothing                                                                                               |
-| `--record-explicit <r>` | —          | `spot-check`: record the explicit run's result, `pass` or `fail`                                                                                                           |
-| `--local`               | off        | `main-status`: also run the local-attest matrix on the default-branch tip                                                                                                  |
-| `--test-result <r>`     | —          | `contradiction`: the test job's result: `success`, `failure`, `cancelled` or `skipped`                                                                                     |
-| `--local-failure`       | off        | `contradiction`: the explicit run of `--pr` failed on this machine                                                                                                         |
-| `--post`                | off        | `contradiction`: add the `attestation-contradicted` label and open one issue                                                                                               |
+| Flag                       | Default    |                                                                                                                                                                            |
+| -------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--trunk <ref>`            | `main`     | Trunk branch name. `spot-check`, `main-status`, `contradiction`: the repository default branch when not given                                                              |
+| `--limit <N>`              | 100        | Max PRs to enumerate. `main-status`: commits to show (default 20)                                                                                                          |
+| `--pr <N>`                 | —          | Required except by `graph`, `plan`, `phases`, `main-status`, `--gate skip-ci`, `contradiction --sha`; optional for `entry`                                                 |
+| `--parent <N>`             | —          | Required by `next`                                                                                                                                                         |
+| `--parent-sha <sha>`       | —          | Parent head SHA, captured **before** merging                                                                                                                               |
+| `--remote <name>`          | `origin`   | Git remote                                                                                                                                                                 |
+| `--gate <name>`            | —          | Gate to evaluate                                                                                                                                                           |
+| `--sha <rev>`              | `HEAD`     | `--gate skip-ci`: commit to inspect. `record`: full head SHA, used only when gh cannot answer. `contradiction`: the full SHA of the default-branch commit whose run failed |
+| `--dry-run`                | off        | `review-complete`: check and print, post nothing                                                                                                                           |
+| `--phase <id>`             | —          | `record`, `--gate budget`: the conductor phase                                                                                                                             |
+| `--outcome <o>`            | —          | `record`: `pass` \| `fail` \| `blocked` \| `skipped`                                                                                                                       |
+| `--reason <CODE>`          | —          | `record`: the blocking reason code                                                                                                                                         |
+| `--evidence <url>`         | —          | `record`: a link to evidence the phase produced; repeatable                                                                                                                |
+| `--workflow <file>`        | `test.yml` | `spot-check`, `main-status`, `contradiction`: the test workflow file on the default branch                                                                                 |
+| `--show`                   | off        | `spot-check`: print the recorded decisions and explicit runs; decide nothing                                                                                               |
+| `--record-explicit <r>`    | —          | `spot-check`: record the explicit run's result, `pass` or `fail`                                                                                                           |
+| `--local`                  | off        | `main-status`: also run the local-attest matrix on the default-branch tip. Needs project-command trust                                                                     |
+| `--allow-project-commands` | off        | `main-status --local`: run without the trust allowlist entry, for this run only                                                                                            |
+| `--test-result <r>`        | —          | `contradiction`: the test job's result: `success`, `failure`, `cancelled` or `skipped`                                                                                     |
+| `--local-failure`          | off        | `contradiction`: the explicit run of `--pr` failed on this machine                                                                                                         |
+| `--post`                   | off        | `contradiction`: add the `attestation-contradicted` label to each suspect and open one issue                                                                               |
 
 Capture `--parent-sha` before the parent merges. The repo squash-merges, so the
 parent's original commits are not ancestors of the squashed commit and
@@ -755,67 +756,112 @@ must not raise or remove the cap. A base ref that is not in this clone is exit
 
 These three subcommands detect a forged attestation. They do not prevent one.
 See [Spot checks and the contradiction alarm](./attestation.md#spot-checks-and-the-contradiction-alarm)
-for the design and its limits.
+for the design and its limits. All three read the repository default branch
+(`gh repo view --json defaultBranchRef`) unless you pass `--trunk`.
 
 `spot-check --pr <N>` decides whether `/merge-pr` verifies an attested pull
-request explicitly anyway. It reads `attestation.spot_check` from `.dotbabel.json`
-at the pull request's base commit, the changed files, and the latest completed
-run of `--workflow` on `--trunk`. The roll is the first 32 bits of
-`sha256("<head>:<pr>")`, so the same head always gets the same answer. It prints
-`SELECTED` or `not selected` with the reason (`off`, `always_path`,
-`ci_unavailable`, `rate`, or `not_selected`) and records the decision in the run
-receipt as a `spot-check` entry in `spot_checks`. Those entries never count as
-phase attempts.
+request explicitly anyway. It reads `attestation.spot_check` from
+`.dotbabel.json` at the pull request's base commit. When that policy is off
+(both rates `0` and no `always_paths`), it prints `not selected (off)` and
+stops. It then reads no changed files and no CI runs, and records nothing.
+Otherwise it reads the changed files with the old path of each rename, and the
+newest completed run of `--workflow` on the default branch.
+
+The roll is the first 32 bits of `sha256("<head>:<pr>")`, so it is fixed for a
+head. The command prints `SELECTED` or `not selected` with the reason (`off`,
+`always_path`, `ci_unavailable`, `rate`, or `not_selected`). It records the
+decision in the spot-check log,
+`<git-common-dir>/dotbabel/receipts/pr-<N>.spot-checks.json`
+([schema](../schemas/dotbabel.spot-checks.schema.json)). The log is a sibling
+of the run receipt, with its own lock (`pr-<N>.spot-checks.json.lock`), so an
+older `dotbabel` still reads `pr-<N>.json`. Each entry records the workflow
+file and the branch that were read.
+
+A selection stays. Once a head was selected, a later call on the same head
+prints `SELECTED` with the first reason, marked `sticky`. A non-selection can
+change when the CI state or the base policy changes.
 
 - `--record-explicit pass|fail` records the explicit run's result for the
   current head as an `explicit-run` entry.
-- `--show` prints, for each head, the latest decision and the recorded explicit
-  run. It reads only the receipt.
+- `--show` prints, for each head, the decision that stands and the recorded
+  explicit run. It reads only the log.
 
-CI is `available` when the latest completed run is green or red, `unavailable`
-when it is unverified, and `unknown` when the runs cannot be read or there is
-none. Exit `0` for any decision. Exit `2` when the pull request or the base
-commit cannot be read, or the policy is invalid: an invalid policy is never
-replaced by the default.
+CI is `available` when the newest completed run tested one of the last 10
+first-parent commits of the default branch and is green or red. It is
+`unavailable` when that run tested an older commit, when there is no completed
+run, or when the run is `unverified`. It is `unknown` when the runs, the jobs
+or the recent commits cannot be read. Unknown is never `available`, and the
+normal `rate` then applies.
 
-`main-status` lists the recent first-parent commits of `<remote>/<trunk>` (after
-a best-effort `git fetch`) and classifies the runs of `--workflow` for them:
-`green`, `red`, or `unverified` (a billing limit, a startup failure, a cancelled
-or skipped run, a job that never started, or no run). A green run verifies its
-commit and every older commit. The output names the last green commit and the
-debt: the `red` and `unverified` commits newer than it. When the runs cannot be
-read, every commit is `unknown`, never verified. For each merged pull request
-with a local receipt, it also shows the spot-check decision and the explicit
-run. Exit `0`.
+`spot-check` exits `0` for any decision. It exits `2` when the pull request, the base commit or the default branch cannot be read. It also exits `2` when the log is damaged or the policy is invalid. An invalid policy is never replaced by the default. It exits `64` on a usage error.
+
+`main-status` lists the recent first-parent commits of `<remote>/<trunk>`, after a best-effort `git fetch`. It classifies the runs of `--workflow` for them as `green`, `red`, `unverified` or `unknown`. `unverified` is a billing limit, a startup failure, a cancel, a job that never started, or no run. `unknown` means that the run or its jobs could not be read. A green run verifies its commit and every older commit. The output
+names the last green commit and the debt: the `red`, `unverified` and `unknown`
+commits newer than it. When the runs list cannot be read, every commit is
+`unknown`, never verified. For each merged pull request with a local
+spot-check log, it also shows the decision and the explicit run.
 
 `main-status --local` also runs the local-attest matrix on the default-branch
-tip. It creates a temporary detached worktree, installs dependencies from the
-lockfile (`npm ci`, `pnpm install --frozen-lockfile`, or `yarn install
---immutable`), runs `dotbabel local-attest --from <first leg>`, and removes the
-worktree. It uses the diagnostic mode because an attest run refuses a detached
-HEAD and needs an open pull request; the diagnostic mode runs the whole matrix,
-and never posts, labels, or pushes. The result is labelled "local (same machine
-as the agent; weaker than CI)" and never verifies a commit. Exit `1` when the
-local matrix fails.
+tip. Warning: this runs repository code as you, from that tip: the
+local-attest config module, the lifecycle scripts of the install, and every
+leg. So it needs the repository on the project-command trust allowlist, which `dotbabel quality` and `doctor` also use. Grant it with `dotbabel project-init --trust`, or pass `--allow-project-commands` for one run.
+Without either, it exits `2` before it runs anything.
+
+It creates a temporary detached worktree and installs dependencies from the
+lockfile with the table that `/merge-pr` uses: `npm ci`,
+`pnpm i --frozen-lockfile`, `yarn --immutable`, `go mod download`, or
+`uv sync`. With no supported lockfile, it installs nothing and says so in the
+detail. Then it runs `dotbabel local-attest --from <first leg>` and removes the
+worktree. An attest run refuses a detached HEAD and needs an open pull request,
+so the command uses the diagnostic mode. The diagnostic mode runs the whole
+matrix, and it never posts, labels or pushes.
+
+The local result is `pass`, `fail`, or `unknown`: the worktree, the config, the
+install, or the run itself failed. It is labelled "local (same machine as the
+agent; weaker than CI)", and it never verifies a commit. An `unknown` local
+result is not a pass.
+
+`main-status` exits `0` when it reports, even when the local result is
+`unknown`. It exits `1` when the `--local` matrix fails, and `2` when the
+default branch or `<remote>/<trunk>` cannot be read, or `--local` has no
+trust. It exits `64` on a usage error: a ref that is not a plain name, or a bad
+`--limit` or `--workflow`.
 
 `contradiction --sha <sha> --test-result <r>` is what the test workflow's
 `contradiction` job runs after a failed push. A result other than `failure` is
 no contradiction. Otherwise it classifies the run (`$GITHUB_RUN_ID` in CI, else
-the latest run of `--workflow` for the commit). An `unverified` run is never a
-contradiction. A `red` run is one when the pull request merged as `<sha>` has a
-current, trusted, never-edited, passing attestation for its head. The trust list
-is `attestation.trusted_associations` at the merge commit's first parent.
+the latest run of `--workflow` for the commit). A `green` or `unverified` run
+is no contradiction. An `unknown` run exits `2`.
+
+A `red` run can come from any commit since the last green run. So the command
+walks the first-parent history back from `<sha>` to the last commit with a
+green run, not included, and at most 20 commits. When the first parent's own
+run was already red, it raises no new alarm: it prints why and exits `0`. For
+each pull request merged in the range, it reads the trust list from that merge
+commit's first parent, never from the merge commit. A first parent with no
+`.dotbabel.json` uses `["OWNER"]`; the `trustListSource` field names the true
+source. A pull request with a trusted, passing attestation for its head is a
+suspect. A comment that was edited after it was posted still counts, and the
+result says so.
 
 `contradiction --pr <N> --local-failure` is the same check for an explicit run
-that failed on this machine, before the merge.
+that failed on this machine, before the merge. Its trust list comes from the
+pull request's base commit.
 
-With `--post`, a contradiction adds the label `attestation-contradicted` to the
-pull request (it creates the label when it is missing) and opens one issue. A
-hidden marker `<!-- dotbabel:attestation-contradicted pr=<N> sha=<head> -->`
-keeps the issue unique. The issue names the pull request, the attested head, the
-merge commit, and the failed run (`$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`).
-Exit `1` when a contradiction is found, `0` when none is, and `2` when the run,
-the pull request, or its comments cannot be read.
+With `--post`, the command adds the label `attestation-contradicted` to each
+suspect (it creates the label when it is missing) and opens one issue. On the
+default branch, a hidden marker
+`<!-- dotbabel:attestation-contradicted commit=<sha> -->` keeps one issue per
+failing commit. For `--local-failure`, the marker is
+`<!-- dotbabel:attestation-contradicted pr=<N> sha=<head> -->`. When
+`GITHUB_ACTIONS=true`, only an issue that the workflow identity opened counts.
+A closed match is reopened with a comment, and the output says so. The issue
+names the failing commit, the range, every suspect, and the failed run
+(`$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`).
+
+`contradiction` exits `1` when it finds a contradiction, and `0` when it finds
+none. It exits `2` when posting fails. It also exits `2` when it cannot read the run, its jobs, the first parent's
+run, the history, a trust list, a pull request, or its comments. It exits `64` on a usage error.
 
 ---
 

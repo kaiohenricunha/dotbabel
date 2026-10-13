@@ -42,12 +42,34 @@ line_of() {
 @test "merge-pr: the roll is not re-rolled, and an unreadable policy stops" {
   flat=$(tr '\n' ' ' < "$MERGE" | tr -s ' ')
   [[ "$flat" == *"Do not run it again to get a different one"* ]]
-  [[ "$flat" == *"Never treat exit \`2\` as \`not selected\`"* ]]
+  [[ "$flat" == *"Never treat a non-zero exit as \`not selected\`"* ]]
+  # An older CLI exits 64 for an unknown subcommand; that is not "not selected".
+  [[ "$flat" == *"Exit \`64\` usually means that the installed \`dotbabel\` has no \`spot-check\` yet"* ]]
 }
 
-@test "merge-pr: the explicit run's result is recorded in the receipt" {
+@test "merge-pr: the explicit run's result is recorded where the explicit run happens" {
   run grep -qF 'dotbabel pr-stack spot-check --pr <N> --record-explicit' "$MERGE"
   [ "$status" -eq 0 ]
+  explicit=$(line_of '\*\*Explicit path\*\*' "$MERGE")
+  record=$(line_of 'Record the explicit run if the spot check sent you here' "$MERGE")
+  interpret=$(line_of 'Interpret failures honestly' "$MERGE")
+  [ -n "$record" ]
+  [ "$record" -gt "$explicit" ]
+  [ "$record" -lt "$interpret" ]
+}
+
+@test "merge-pr: only a real failure raises the alarm; a gate that did not run raises none" {
+  flat=$(tr '\n' ' ' < "$MERGE" | tr -s ' ')
+  [[ "$flat" == *'Only a real failure counts: the suite exits non-zero after a clean dependency install, or the quality profile exits `1`'* ]]
+  [[ "$flat" == *'A quality exit `2`, `64` or `127`, or a failed dependency install, means the gate did not run'* ]]
+  [[ "$flat" == *"Record no result and raise no alarm"* ]]
+}
+
+@test "merge-pr: says what to do on a non-zero main-status exit" {
+  status_line=$(line_of 'dotbabel pr-stack main-status$' "$MERGE")
+  exits=$(line_of 'Read the exit code. Exit `0` means the report is complete' "$MERGE")
+  [ -n "$exits" ]
+  [ "$exits" -gt "$status_line" ]
 }
 
 @test "merge-pr: a failed spot check stops and raises the contradiction alarm" {
@@ -85,6 +107,8 @@ line_of() {
     run grep -qF 'dotbabel pr-stack contradiction --pr <N> --local-failure --post' "$file"
     [ "$status" -eq 0 ]
     run grep -qF 'dotbabel pr-stack main-status' "$file"
+    [ "$status" -eq 0 ]
+    run grep -qF 'Never treat a non-zero exit as `not selected`' "$file"
     [ "$status" -eq 0 ]
   done
 }
