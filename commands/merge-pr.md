@@ -23,9 +23,9 @@ Trigger: when the user asks to merge a PR. Also triggered directly via `/merge-p
 Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user which PR.
 
 **Deterministic evidence is produced once per commit SHA and reused until that SHA
-changes.** `/local-attest` runs the CI-equivalent matrix and posts a SHA-pinned
-attestation; this command reads that evidence rather than re-running the same work on
-the same tree. What it still checks fresh is everything that can change without the code
+changes.** `/local-attest` runs the CI-equivalent matrix on the scope of the pull
+request's changes and posts a SHA-pinned attestation; this command reads that evidence
+rather than re-running the same work on the same tree. What it still checks fresh is everything that can change without the code
 changing: the head SHA, mergeability, CI state, and the human's say-so.
 
 ## Steps
@@ -326,7 +326,7 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
 - Never merge past an `ATTESTATION_*` reason, and never re-run the matrix from inside this command to clear one. Producing evidence is `/local-attest`'s job; this command only decides whether existing evidence is current and trustworthy.
 - Never take the explicit path for an `explicit` state without first showing the user the governed-file diff and getting their acknowledgement. On that path the automated run executes the pull request's own scripts, so a change that weakens a check would pass its own verification; the human review of that diff is the only control that cannot be edited away.
 - Never treat an attested leg as something this command verified. Report it as attested, name the SHA, and never report an unrun check as a pass.
-- Never skip the full test suite on the explicit path, even if CI is green — CI config drift is real, and on a conductor-driven PR the remote suite did not run at all.
+- Never skip the full test suite on the explicit path, even if CI is green — CI config drift is real, and on a conductor-driven PR the remote suite did not run at all. The explicit path is an on-demand verification, which is where a full run belongs. The attested path never runs the suite: its evidence is the PR-scoped `/local-attest` run, in which a required leg with nothing of the diff in its scope is recorded `skipped`, and that counts as satisfied as long as at least one required leg passed.
 - Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 10's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
 - Never claim a failure already exists on the base branch without the `git stash` proof.
 - Never merge without explicit user confirmation. CI green alone is not authorization, and neither is a clean gate.

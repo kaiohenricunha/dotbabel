@@ -23,8 +23,11 @@
  * @property {(path: string, line: string) => void} appendLog
  * @property {(path: string) => Buffer|string|null} [readFile]  raw read (Buffer in
  *   realDeps; test stubs may return strings), null on any error
- * @property {(path: string, content: string) => void} [writeFile]  utf8 write; used only
- *   by the restoreFiles snapshot/restore
+ * @property {(path: string, content: string) => void} [writeFile]  utf8 write; used by
+ *   the restoreFiles snapshot/restore and to hand scope legs the changed-file list
+ * @property {() => string} [makeTempDir]  a fresh private directory for the scope legs'
+ *   changed-file list and skip files; absent in a stub, scope legs run in full
+ * @property {(dir: string) => void} [removeTempDir]  best-effort removal of that directory
  * @property {(leg: Leg) => Promise<import("./local-attest-lib.mjs").LegResult>} [runLeg]
  *   async leg executor enabling concurrent lanes; absent in a stub, runMatrix
  *   falls back to a promise-wrapped `run`, preserving fully synchronous tests
@@ -57,9 +60,9 @@
  */
 
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   ATTEST_MARKER_PREFIX,
@@ -68,6 +71,7 @@ import {
   isGovernablePath,
 } from "./attestation.mjs";
 import { createRunManifest, recordLeg, sha256File, writeRunManifest } from "./attest-run.mjs";
+import { CHANGED_FILES_ENV, SKIP_FILE_ENV } from "./attest-scope.mjs";
 import {
   buildAuditEntry,
   filterMatrix,
@@ -204,6 +208,12 @@ export function realDeps() {
     },
     writeFile(path, content) {
       writeFileSync(path, content);
+    },
+    makeTempDir() {
+      return mkdtempSync(join(os.tmpdir(), "local-attest-scope-"));
+    },
+    removeTempDir(dir) {
+      rmSync(dir, { recursive: true, force: true });
     },
     writeRunManifest(manifest) {
       writeRunManifest(process.cwd(), manifest);
@@ -684,6 +694,116 @@ function startRunManifest(deps, pre) {
 }
 
 /**
+ * The one-line reason a scope leg wrote to its skip file, or "" when it wrote
+ * none (no file, unreadable, or blank).
+ *
+ * @param {Deps} deps
+ * @param {string} path
+ * @returns {string}
+ */
+function readSkipReason(deps, path) {
+  const raw = deps.readFile ? deps.readFile(path) : null;
+  return raw === null || raw === undefined ? "" : String(raw).trim().split("\n")[0];
+}
+
+/**
+ * The PR's changed files from the paginated Files API, renamed-from paths
+ * included, or null when the list is unknown.
+ *
+ * One call serves every diff decision: `when`/`skipWhenDiffOnly` and the
+ * `scope: true` legs (the paginated endpoint, not `gh pr view --json files`,
+ * which caps at 100 files and would silently mis-classify a large PR).
+ * Fail-open: null runs everything — running too much is safe, an attested PR
+ * skipping too much is not.
+ *
+ * @param {Deps} deps
+ * @param {Preconditions} pre
+ * @returns {string[]|null}
+ */
+function fetchChangedFiles(deps, pre) {
+  // JSON output (not newline-splitting, which would fragment a legal
+  // newline-bearing path into non-matching pieces) plus a count cross-check
+  // against the PR's own changedFiles total: the Files endpoint silently caps
+  // at 3000 files, and a truncated list would bias every diff rule toward
+  // skipping \u2014 the one direction this design must never fail in.
+  try {
+    const raw = capture(
+      deps,
+      `gh api repos/${pre.repo}/pulls/${pre.pr}/files --paginate --jq '[.[] | [.filename, .previous_filename]]'`,
+    );
+    // One entry per changed file: [filename, previous_filename|null]. A plain
+    // string entry is accepted too.
+    const entries = raw
+      .split("\n")
+      .filter(Boolean)
+      .flatMap((page) => JSON.parse(page));
+    const declared = Number(capture(deps, `gh pr view ${pre.pr} --json changedFiles --jq .changedFiles`));
+    if (!Number.isFinite(declared) || declared !== entries.length || declared >= 3000) {
+      deps.warn(
+        `WARNING: PR file list looks incomplete (parsed ${entries.length}, PR declares ${declared}) \u2014 running every leg to be safe.`,
+      );
+      return null;
+    }
+    // A renamed file's old path is part of the change too: a leg that tests
+    // the old module, or a rule that matches it, must still see it.
+    const paths = entries.flatMap((e) => (Array.isArray(e) ? e : [e])).filter((p) => typeof p === "string" && p !== "");
+    return [...new Set(paths)];
+  } catch {
+    deps.warn("WARNING: could not read the PR file list \u2014 running every leg to be safe.");
+    return null;
+  }
+}
+
+/**
+ * Hand every `scope: true` leg the PR's changed-file list and its own skip
+ * file. Without a list, or without a place to write it, the legs get neither
+ * and run in full (fail-open). Legs a diff rule already skipped are left alone.
+ *
+ * @param {Deps} deps
+ * @param {Leg[]} matrix
+ * @param {string[]|null} changedFiles
+ * @returns {{ matrix: Leg[], dir: string|null }}
+ */
+function attachScope(deps, matrix, changedFiles) {
+  if (changedFiles === null || changedFiles.length === 0 || typeof deps.makeTempDir !== "function") {
+    return { matrix, dir: null };
+  }
+  let dir;
+  try {
+    dir = deps.makeTempDir();
+    const list = join(dir, "changed-files.json");
+    deps.writeFile(list, JSON.stringify(changedFiles));
+    return {
+      dir,
+      matrix: matrix.map((leg, i) => {
+        if (leg.scope !== true || leg.skipped) return leg;
+        const skipFile = join(dir, `skip-${i}`);
+        return { ...leg, scopeSkipFile: skipFile, env: { ...leg.env, [CHANGED_FILES_ENV]: list, [SKIP_FILE_ENV]: skipFile } };
+      }),
+    };
+  } catch (err) {
+    deps.warn(`WARNING: could not hand scope legs the changed-file list \u2014 they run in full: ${err?.message ?? err}`);
+    if (dir) removeScopeDir(deps, dir);
+    return { matrix, dir: null };
+  }
+}
+
+/**
+ * Best-effort removal of the scope directory.
+ *
+ * @param {Deps} deps
+ * @param {string|null} dir
+ */
+function removeScopeDir(deps, dir) {
+  if (!dir || typeof deps.removeTempDir !== "function") return;
+  try {
+    deps.removeTempDir(dir);
+  } catch {
+    // A leftover temp directory is untidy, never wrong.
+  }
+}
+
+/**
  * Execute the matrix as concurrent lanes: legs sharing a `lane` run serially
  * in matrix order; distinct lanes run in parallel; legs without a lane share
  * one default lane, so a lane-less matrix is fully sequential. Results are
@@ -759,6 +879,15 @@ export async function runMatrix(deps, matrix, { failFast = false, onLeg } = {}) 
       }
       deps.log(`\n=== ${leg.name} (${leg.mode}) ===`);
       const r = await runLeg(leg);
+      // A scope leg that exited 0 after writing a reason found nothing of the
+      // PR in its scope. A non-zero exit stays a failure whatever it wrote.
+      const scopeReason = r.passed && leg.scopeSkipFile ? readSkipReason(deps, leg.scopeSkipFile) : "";
+      if (scopeReason) {
+        results[i] = { ...r, skipped: true };
+        deps.log(`--- ${leg.name}: SKIPPED (out of scope: ${scopeReason})`);
+        onLeg?.(leg, results[i]);
+        continue;
+      }
       results[i] = r;
       deps.log(`--- ${leg.name}: ${r.passed ? "PASS" : "FAIL"} (${r.durationS}s)`);
       if (!r.passed) deps.log(r.tail);
@@ -1067,7 +1196,9 @@ function printSummary(deps, results) {
  * @param {Deps} deps
  * @param {Config} cfg
  * @param {{ prOverride?: string|null, push: boolean, dryRun: boolean,
- *           only?: string[], from?: string|null, failFast?: boolean }} flags
+ *           only?: string[], from?: string|null, failFast?: boolean, full?: boolean }} flags
+ *   `full`: the on-demand full run — every `when`, `skipWhenDiffOnly` and
+ *   `scope` is ignored and no leg receives the changed-file list
  * @returns {{ ok: boolean, body: string, results: LegResult[], pre: Preconditions|null, exitCode: number }}
  */
 export async function execute(deps, cfg, flags) {
@@ -1075,7 +1206,7 @@ export async function execute(deps, cfg, flags) {
   const from = flags.from ?? null;
   const failFast = flags.failFast === true;
   const diagnostic = only.length > 0 || from !== null;
-  const auditFlags = { only, from, failFast, push: flags.push, dryRun: flags.dryRun === true };
+  const auditFlags = { only, from, failFast, push: flags.push, dryRun: flags.dryRun === true, full: flags.full === true };
 
   if (diagnostic) {
     const matrix = filterMatrix(cfg.matrix, { only, from });
@@ -1131,47 +1262,25 @@ export async function execute(deps, cfg, flags) {
   const pre = checkPreconditions(deps, cfg, { prOverride: flags.prOverride });
   deps.log(`Attesting PR #${pre.pr} (${pre.repo}) at ${pre.headSha.slice(0, 8)}.`);
 
-  // Diff rules: one paginated Files API call drives every when/skipWhenDiffOnly
-  // decision (the paginated endpoint, not `gh pr view --json files`, which caps
-  // at 100 files and would silently mis-classify a large PR). Fail-open: an
-  // unreadable list runs everything — running too much is safe, an attested PR
-  // skipping too much is not.
+  // Diff rules and scope legs share one changed-file list. `--full` is the
+  // on-demand full run: it ignores both, fetches nothing, and runs every leg
+  // in full.
+  const full = flags.full === true;
   let matrix = cfg.matrix;
-  const usesDiffRules = cfg.matrix.some((l) => l.when || l.skipWhenDiffOnly);
-  if (usesDiffRules) {
-    // JSON output (not newline-splitting, which would fragment a legal
-    // newline-bearing path into non-matching pieces) plus a count cross-check
-    // against the PR's own changedFiles total: the Files endpoint silently
-    // caps at 3000 files, and a truncated list would bias BOTH diff rules
-    // toward skipping \u2014 the one direction this design must never fail in.
-    let changedFiles = null;
-    try {
-      const raw = capture(
-        deps,
-        `gh api repos/${pre.repo}/pulls/${pre.pr}/files --paginate --jq '[.[].filename]'`,
-      );
-      const parsed = raw
-        .split("\n")
-        .filter(Boolean)
-        .flatMap((page) => JSON.parse(page));
-      const declared = Number(
-        capture(deps, `gh pr view ${pre.pr} --json changedFiles --jq .changedFiles`),
-      );
-      if (!Number.isFinite(declared) || declared !== parsed.length || declared >= 3000) {
-        deps.warn(
-          `WARNING: PR file list looks incomplete (parsed ${parsed.length}, PR declares ${declared}) \u2014 running every leg to be safe.`,
-        );
-      } else {
-        changedFiles = parsed;
+  let scopeDir = null;
+  const usesDiffRules = !full && cfg.matrix.some((l) => l.when || l.skipWhenDiffOnly);
+  const usesScope = !full && cfg.matrix.some((l) => l.scope === true);
+  if (full) deps.log("--full: every leg runs in full; diff rules and leg scoping are ignored.");
+  if (usesDiffRules || usesScope) {
+    const changedFiles = fetchChangedFiles(deps, pre);
+    if (usesDiffRules) {
+      matrix = markSkips(cfg.matrix, changedFiles);
+      const skippedNames = matrix.filter((l) => l.skipped).map((l) => l.name);
+      if (skippedNames.length > 0) {
+        deps.log(`Diff rules skip ${skippedNames.length} leg(s): ${skippedNames.join(", ")}`);
       }
-    } catch {
-      deps.warn("WARNING: could not read the PR file list \u2014 running every leg to be safe.");
     }
-    matrix = markSkips(cfg.matrix, changedFiles);
-    const skippedNames = matrix.filter((l) => l.skipped).map((l) => l.name);
-    if (skippedNames.length > 0) {
-      deps.log(`Diff rules skip ${skippedNames.length} leg(s): ${skippedNames.join(", ")}`);
-    }
+    if (usesScope) ({ matrix, dir: scopeDir } = attachScope(deps, matrix, changedFiles));
   }
 
   // Every leg learns the pull request's real base branch. A diff-scoped leg
@@ -1204,6 +1313,7 @@ export async function execute(deps, cfg, flags) {
   } finally {
     disposeGuard();
     safeRestore(deps, snapshot);
+    removeScopeDir(deps, scopeDir);
   }
   const { hardFails, advisoryFails } = summarizeResults(results);
   printSummary(deps, results);
@@ -1227,6 +1337,7 @@ export async function execute(deps, cfg, flags) {
     toolchain: pre.toolchain,
     mergeBase: pre.mergeBase,
     configHash: pre.configHash,
+    full: flags.full === true,
   });
 
   // The mechanical bar: posting is only reachable through this predicate.

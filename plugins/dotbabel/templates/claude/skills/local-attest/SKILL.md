@@ -53,7 +53,31 @@ dotbabel local-attest --only lint
 
 # Re-run the matrix from the leg that failed, stopping at the first hard failure:
 dotbabel local-attest --from bats --fail-fast
+
+# The on-demand full run: ignore every leg's diff rules and scope:
+dotbabel local-attest --pr 123 --full
 ```
+
+## PR-scoped runs
+
+An attest run verifies the scope of the pull request's changes and nothing
+more. The full suite runs only on demand (`--full`) or on a schedule. Three
+config fields decide each leg's scope (schema in
+[references/config.md](references/config.md)):
+
+- **`scope: true`** — the leg scopes itself. When the runner knows the PR's
+  changed files, it writes them to a JSON file and passes its path as
+  `DOTBABEL_ATTEST_CHANGED_FILES`, plus a per-leg `DOTBABEL_ATTEST_SKIP_FILE`.
+  The leg runs only what the changes reach. When nothing is in scope, it writes
+  a one-line reason to the skip file and exits 0, and the leg is recorded
+  `skipped`. A non-zero exit is a failure, skip file or not. Without the file
+  list the leg gets neither variable and must run in full (fail-open).
+- **`when.changedPaths`** — the leg runs only when a changed file matches one
+  of its globs; use it for whole-repo invariant checks, listing their inputs.
+- **`skipWhenDiffOnly`** — the leg skips when every changed file matches.
+
+`--full` ignores all three: no file list is passed, every leg runs in full,
+and the attestation payload records `"full": true`.
 
 ## Diagnostic modes — the fix-retry loop
 
@@ -148,8 +172,9 @@ Full operator contract: [references/operator-guide.md](references/operator-guide
 2. **Run matrix.** Legs sharing a `lane` run serially in matrix order;
    distinct lanes run concurrently; a config without lanes runs fully
    sequentially. Diff rules (`when.changedPaths`, `skipWhenDiffOnly`) mark
-   legs skipped against the PR's changed files — skipped legs still appear in
-   every table, and the comment headline says so rather than claiming a full
+   legs skipped against the PR's changed files, and a `scope: true` leg that
+   reports nothing in scope is recorded skipped too — skipped legs still appear
+   in every table, and the comment headline says so rather than claiming a full
    run. Hard legs must pass to attest; advisory legs are reported but never
    block. Stdout + stderr are tailed at 10 lines per leg. With `--fail-fast`,
    the first hard failure stops launching further legs in every lane; the

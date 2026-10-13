@@ -44,6 +44,7 @@ import { createMarker } from "./lib/attest-marker.mjs";
  * @property {boolean} failFast
  * @property {boolean} init   draft a config from .github/workflows and exit; runs no legs
  * @property {boolean} force  allow --init to overwrite an existing config
+ * @property {boolean} full   on-demand full run: ignore every leg's `when` and `scope`
  */
 
 /**
@@ -121,6 +122,7 @@ export function parseArgs(argv, die) {
     failFast: false,
     init: false,
     force: false,
+    full: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -152,6 +154,8 @@ export function parseArgs(argv, die) {
       args.force = true;
     } else if (a === "--fail-fast") {
       args.failFast = true;
+    } else if (a === "--full") {
+      args.full = true;
     } else if (a === "--help" || a === "-h") {
       args.help = true;
     } else {
@@ -329,10 +333,10 @@ export function tail(text, n = 10) {
  * @param {LegResult[]} results
  * @param {{ headSha: string, hostname: string, toolchain?: object|null,
  *           mergeBase?: string|null, configHash?: string|null,
- *           toolVersion?: string, now?: Date }} ctx
+ *           toolVersion?: string, full?: boolean, now?: Date }} ctx
  * @returns {string}
  */
-export function renderComment(results, { headSha, hostname, toolchain, mergeBase, configHash, toolVersion, now }) {
+export function renderComment(results, { headSha, hostname, toolchain, mergeBase, configHash, toolVersion, full, now }) {
   const header = renderAttestationHeader(
     buildAttestationPayload({
       headSha,
@@ -341,6 +345,7 @@ export function renderComment(results, { headSha, hostname, toolchain, mergeBase
       legs: results.map((r) => ({ name: r?.name ?? "(unknown)", mode: r?.mode ?? "hard", status: legStatus(r) })),
       toolchain,
       toolVersion,
+      full,
       now,
     }),
   );
@@ -367,7 +372,8 @@ export function renderComment(results, { headSha, hostname, toolchain, mergeBase
     skippedCount > 0
       ? `The CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`. ` +
         `${skippedCount} leg(s) were skipped for this diff per this repo's local-attest diff rules ` +
-        "(see .local-attest config; the rules are the config author's mirror of CI's own path filters)."
+        "or leg scoping (see .local-attest config: `when`/`skipWhenDiffOnly` mirror CI's own path " +
+        "filters, and a `scope: true` leg skips when nothing of this diff is in its scope)."
       : `The full CI check matrix ran locally and the hard legs passed for \`${headSha.slice(0, 8)}\`.`;
   return [
     header,
@@ -478,7 +484,7 @@ export function shouldAttest({ diagnostic, results, expectedLegs }) {
  *
  * @param {{ result: string, pr: number|string|null, sha: string|null, hostname: string,
  *           advisoryFails: string[], results?: Array<LegResult|undefined>,
- *           flags?: { only?: string[], from?: string|null, failFast?: boolean, push?: boolean, dryRun?: boolean },
+ *           flags?: { only?: string[], from?: string|null, failFast?: boolean, push?: boolean, dryRun?: boolean, full?: boolean },
  *           dirty?: boolean, toolchain?: { node?: string, go?: string }|null, now?: Date }} input
  * @returns {object}
  */
@@ -517,6 +523,7 @@ export function buildAuditEntry({
       failFast: flags.failFast === true,
       push: flags.push !== false,
       dryRun: flags.dryRun === true,
+      full: flags.full === true,
     };
   }
   if (dirty !== undefined) entry.dirty = dirty;

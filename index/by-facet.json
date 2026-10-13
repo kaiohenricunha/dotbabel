@@ -45,7 +45,8 @@
       "tldr",
       "validate-spec",
       "veracity-audit",
-      "workflow-orchestrator"
+      "workflow-orchestrator",
+      "yolo"
     ],
     "infra": [
       "aws-engineer",
@@ -127,7 +128,8 @@
       "tldr",
       "validate-spec",
       "veracity-audit",
-      "workflow-orchestrator"
+      "workflow-orchestrator",
+      "yolo"
     ],
     "aws": ["aws-engineer", "aws-specialist", "deploy-status", "rollback-prod", "smoke-test"],
     "azure": ["azure-engineer", "azure-specialist"],
@@ -286,7 +288,8 @@
       "kubernetes-specialist",
       "local-attest",
       "release-conductor",
-      "smoke-test"
+      "smoke-test",
+      "yolo"
     ],
     "testing": [
       "detect-flaky",
@@ -376,7 +379,8 @@
       "test-engineer",
       "tldr",
       "veracity-audit",
-      "workflow-orchestrator"
+      "workflow-orchestrator",
+      "yolo"
     ]
   }
 }

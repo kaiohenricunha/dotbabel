@@ -221,6 +221,26 @@ describe("checkAttestationAdoption: enforcement on", () => {
     }
   });
 
+  it("counts a scope: true required leg as skippable", async () => {
+    const root = repo({ dotbabel: enforcing(), files: { ".local-attest.config.mjs": "" } });
+    const r = await checkAttestationAdoption({
+      repoRoot: root,
+      canExecuteConfig: true,
+      loadConfigFn: matrixOf(leg("test", { scope: true })),
+    });
+    expect(byCode(r, "REQUIRED_LEG_SKIPPABLE").level).toBe("warn");
+  });
+
+  it("does not warn while one required leg always runs — skipped required legs are satisfied beside it", async () => {
+    const root = repo({ dotbabel: enforcing({ required_legs: ["test", "quality"] }), files: { ".local-attest.config.mjs": "" } });
+    const r = await checkAttestationAdoption({
+      repoRoot: root,
+      canExecuteConfig: true,
+      loadConfigFn: matrixOf(leg("test", { scope: true }), leg("quality")),
+    });
+    expect(codes(r)).not.toContain("REQUIRED_LEG_SKIPPABLE");
+  });
+
   it("does not warn about skippable legs the policy does not require", async () => {
     const root = repo({ dotbabel: enforcing(), files: { ".local-attest.config.mjs": "" } });
     const r = await checkAttestationAdoption({
