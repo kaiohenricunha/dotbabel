@@ -10,9 +10,9 @@ import {
   withScratchRoot,
   assertOutsideRoot,
   runProcess,
-  assertOpaqueValue,
   parseVersion,
 } from "../src/model-intelligence/sources/runtime/process.mjs";
+import { assertOpaqueValue } from "../src/model-intelligence/domain/index.mjs";
 
 const node = process.execPath;
 /** Run a one-line script under the current node, the way an adapter would run a CLI. */

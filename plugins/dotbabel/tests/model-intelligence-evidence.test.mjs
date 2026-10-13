@@ -9,6 +9,8 @@ import {
   makeProviderCatalogEvidence,
   makeValidationEvidence,
   makeInvocation,
+  toProviderId,
+  toSourceKey,
 } from "../src/model-intelligence/sources/evidence.mjs";
 
 describe("observed effective configuration", () => {
@@ -86,9 +88,9 @@ describe("observed effective configuration", () => {
     // A probe runs in a scratch home, so its answer reflects only what was carried into it plus the
     // runtime's defaults. Recording that makes a reconstructed default distinguishable from the user's
     // real configuration, which catalog/ must know before it ranks the evidence (ARCH-28).
-    const seeded = makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: ["model", "model_reasoning_effort"] });
+    const seeded = makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: ["axes.model", "axes.reasoning"] });
     expect(seeded.configurationBasis).toBe("reconstructed");
-    expect(seeded.reconstructedFrom).toEqual(["model", "model_reasoning_effort"]);
+    expect(seeded.reconstructedFrom).toEqual(["axes.model", "axes.reasoning"]);
     expect(Object.isFrozen(seeded.reconstructedFrom)).toBe(true);
     // Nothing carried in means the values are the runtime's own defaults, and that is stated, not implied.
     expect(makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: [] }).reconstructedFrom).toEqual([]);
@@ -105,6 +107,18 @@ describe("observed effective configuration", () => {
     expect(() => makeObservedConfiguration({ ...base, configurationBasis: "as-run", reconstructedFrom: [] })).toThrow(/reconstructedFrom/);
     expect(() => makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: "model" })).toThrow(/reconstructedFrom/);
     expect(() => makeObservedConfiguration({ ...base, configurationBasis: "reconstructed", reconstructedFrom: [""] })).toThrow(/reconstructedFrom/);
+  });
+
+  it("rejects a reconstructedFrom entry that is not axes.<name> or provider", () => {
+    const base = { runtimeId: "codex", turnExecuted: false, configurationBasis: "reconstructed", axes: { model: "m" }, fieldSources: { "axes.model": "exec-banner:model" } };
+    // §5 puts the carried inputs in the fieldSources vocabulary, so catalog/ tells a carried value from a
+    // runtime default without a mapping per runtime. An entry may name an axis no field reflects.
+    const carried = ["axes.model", "axes.reasoning", "axes.verbosity", "axes.contextTier", "provider"];
+    expect(makeObservedConfiguration({ ...base, reconstructedFrom: carried }).reconstructedFrom).toEqual(carried);
+    // A native flag or configuration key is the adapter's to translate, never the consumer's.
+    for (const bad of ["--model", "--effort", "model", "model_reasoning_effort", "model_provider", "axes.", "axes", "axes.Model", "axes.model.extra", "axes.__proto__", "axes.a-b", "providers", "provider.id", " provider", "fieldSources.provider"]) {
+      expect(() => makeObservedConfiguration({ ...base, reconstructedFrom: [bad] }), bad).toThrow(/reconstructedFrom/);
+    }
   });
 
   it("rejects a source for a field that was not reported, so provenance cannot describe nothing", () => {
@@ -290,5 +304,58 @@ describe("provider catalog evidence (a knowledge source)", () => {
     expect(() => makeProviderCatalogEvidence({ providers: [{ id: "a", discovery: d, availability: "available" }], missingProviders: [] })).toThrow(/unknown field "availability"/);
     expect(() => makeProviderCatalogEvidence({ providers: {}, missingProviders: [] })).toThrow(/providers must be an array/);
     expect(() => makeProviderCatalogEvidence({ providers: [], missingProviders: "x" })).toThrow(/missingProviders must be an array/);
+  });
+
+  it("makeProviderCatalogEvidence accepts a sourceKey only when it differs from the provider id", () => {
+    const d = discovery("grok-5");
+    const evidence = makeProviderCatalogEvidence({
+      providers: [
+        { id: "models-dev.xai", sourceKey: "xai", displayName: "xAI", discovery: d },
+        { id: "anthropic", discovery: discovery("claude-opus-5") },
+      ],
+      missingProviders: [],
+    });
+    // The source key lets a person trace a fact back to the source (ARCH-28).
+    expect(evidence.providers[0]).toEqual({ id: "models-dev.xai", sourceKey: "xai", displayName: "xAI", discovery: d });
+    expect(Object.hasOwn(evidence.providers[1], "sourceKey")).toBe(false);
+    // A key equal to the id traces nothing, so it is refused rather than stored twice.
+    expect(() => makeProviderCatalogEvidence({ providers: [{ id: "anthropic", sourceKey: "anthropic", discovery: d }], missingProviders: [] })).toThrow(/sourceKey/);
+    for (const bad of ["", 7, null, "line" + String.fromCharCode(10) + "break", "x".repeat(201)]) {
+      expect(() => makeProviderCatalogEvidence({ providers: [{ id: "models-dev.xai", sourceKey: bad, discovery: d }], missingProviders: [] }), String(bad)).toThrow(/sourceKey/);
+    }
+  });
+});
+
+describe("provider namespace mapping (§5 Provider namespace)", () => {
+  it("maps a source key into PROVIDERS, scopes an unmapped key as <sourceId>.<key>, and refuses a scoped form that is not a provider id", () => {
+    // A key that is a Dotbabel id maps to itself; an alias maps a differing key.
+    expect(toProviderId("models-dev", "anthropic")).toBe("anthropic");
+    expect(toProviderId("codex", "oai", { oai: "openai" })).toBe("openai");
+    // An unmapped key is kept, scoped, so it can never equal a PROVIDERS id and join by accident.
+    expect(toProviderId("models-dev", "xai")).toBe("models-dev.xai");
+    expect(toProviderId("codex", "ollama")).toBe("codex.ollama");
+    // An alias to a value outside PROVIDERS is not a mapping, so the key is scoped instead.
+    expect(toProviderId("codex", "oai", { oai: "not-a-provider" })).toBe("codex.oai");
+    // The scoped form must pass the provider-id charset, at most 64 characters (sources/evidence.mjs).
+    expect(toProviderId("codex", "a".repeat(58))).toBe(`codex.${"a".repeat(58)}`);
+    expect(toProviderId("codex", "a".repeat(59))).toBeUndefined();
+    for (const bad of ["Azure Foundry", "UPPER", "", "a/b", "a b", 7, undefined]) {
+      expect(toProviderId("codex", bad), String(bad)).toBeUndefined();
+    }
+    // Own keys only: a prototype name is never read as an alias.
+    expect(toProviderId("codex", "constructor", {})).toBe("codex.constructor");
+  });
+
+  it("maps a Dotbabel id back to the source key, and refuses an id that is not this source's", () => {
+    expect(toSourceKey("models-dev", "anthropic")).toBe("anthropic");
+    expect(toSourceKey("codex", "openai", { oai: "openai" })).toBe("oai");
+    expect(toSourceKey("models-dev", "models-dev.xai")).toBe("xai");
+    // The scoped form of a key that maps into PROVIDERS is not a second name for it.
+    expect(toSourceKey("models-dev", "models-dev.anthropic")).toBeUndefined();
+    expect(toSourceKey("codex", "codex.oai", { oai: "openai" })).toBeUndefined();
+    // A bare id outside PROVIDERS, another source's scoped id, or no key at all is not this namespace.
+    for (const bad of ["xai", "other-source.xai", "models-dev.", "models-dev", "", 7, null]) {
+      expect(toSourceKey("models-dev", bad), String(bad)).toBeUndefined();
+    }
   });
 });

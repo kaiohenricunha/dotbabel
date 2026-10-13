@@ -31,25 +31,48 @@
  * remains the only barrier to a probe reaching the network.
  */
 
+import { checkOpaqueValue } from "../../domain/index.mjs";
 import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
-import { makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { makeObservedConfiguration, makeValidationEvidence, optionalCount, optionalIdentifier, toProviderId } from "../evidence.mjs";
 import { invalidAxisValue, renderInvocationFor, runtimeProvenance, runtimeVersionField, unknownResult, withSourceVersion } from "./adapter-kit.mjs";
-import { MAX_OUTPUT_BYTES, checkOpaqueValue, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
+import { MAX_OUTPUT_BYTES, firstLine, probeVersion, resolveContext, runIsolated } from "./process.mjs";
 
 /** The `RUNTIMES` id this adapter serves, and the `sourceId` of every result it returns. */
 export const RUNTIME_ID = "claude";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "1";
+export const ADAPTER_VERSION = "2";
 
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CLAUDE_CONFIG_DIR", rootDirName: ".claude" });
 
-/** The caller-supplied values a probe passes on, each as a flag and the name the caller uses. */
+/** The caller-supplied values a probe passes on, each as a flag and the axis it sets. */
 const PROBE_FLAGS = Object.freeze([
   ["--model", "model"],
-  ["--effort", "effort"],
+  ["--effort", "reasoning"],
 ]);
+
+/**
+ * Provider keys Claude may report in `modelUsage` that differ from their Dotbabel id. None is measured:
+ * the one key seen, `anthropic`, is already a `PROVIDERS` id. Any other key is scoped as `claude.<key>`.
+ */
+const PROVIDER_ALIASES = Object.freeze({});
+
+/**
+ * The axis values a caller passed, under the axis names (§5 `Configuration axes`, "One name for one
+ * axis"). `reasoning` is the input key and `effort` its deprecated alias, kept for callers since PR #414.
+ * Two different values for the one axis are a caller breach, so this throws.
+ * @param {string} operation
+ * @param {Record<string, unknown>} input
+ * @returns {{model: unknown, reasoning: unknown}}
+ */
+function axisValues(operation, input) {
+  const { model, reasoning, effort } = input;
+  if (reasoning !== undefined && effort !== undefined && reasoning !== effort) {
+    throw new TypeError(`claude ${operation}: reasoning and effort name the same axis, so when both are given they must be equal`);
+  }
+  return { model, reasoning: reasoning ?? effort };
+}
 
 /** A prompt is required by `-p`, but nothing is ever sent: there is no credential to send it with. */
 const PROBE_PROMPT = "x";
@@ -99,7 +122,9 @@ function parseUsage(modelUsage) {
     const e = /** @type {Record<string, unknown>} */ (entry);
     /** @type {Record<string, unknown>} */
     const record = { model };
-    for (const [field, read] of [["canonicalModel", optionalIdentifier], ["provider", optionalIdentifier], ["contextWindow", optionalCount], ["maxOutputTokens", optionalCount], ["thinkingTokens", optionalCount]]) {
+    // A provider is mapped into the Dotbabel namespace like every other provider id (§5).
+    const provider = (value) => toProviderId(RUNTIME_ID, optionalIdentifier(value), PROVIDER_ALIASES);
+    for (const [field, read] of [["canonicalModel", optionalIdentifier], ["provider", provider], ["contextWindow", optionalCount], ["maxOutputTokens", optionalCount], ["thinkingTokens", optionalCount]]) {
       const value = /** @type {(v: unknown) => unknown} */ (read)(e[/** @type {string} */ (field)]);
       if (value !== undefined) record[/** @type {string} */ (field)] = value;
     }
@@ -221,11 +246,13 @@ export async function discover(context) {
  * text is parsed. Without it, one credential-free probe runs in a scratch home and stops as soon as
  * `system/init` arrives, so the resolved model is read with no model turn (see the module header).
  *
- * `context.model` and `context.effort` are passed to the probe so the answer reflects those flags.
+ * `context.model` and `context.reasoning` are passed to the probe so the answer reflects those flags.
+ * `context.effort` is the deprecated alias of `context.reasoning`.
  * @param {object} [context]
  * @param {string} [context.stream]
  * @param {string} [context.model]
- * @param {string} [context.effort]
+ * @param {string} [context.reasoning]
+ * @param {string} [context.effort] Deprecated alias of `reasoning`; when both are given they must be equal.
  * @returns {Promise<object>}
  */
 export async function observe(context = {}) {
@@ -246,21 +273,22 @@ export async function observe(context = {}) {
     return classifyStream(parseStreamJson(options.stream), ctx, { basis: { configurationBasis: "as-run" } });
   }
 
+  const values = axisValues("observe", options);
   const args = ["-p", PROBE_PROMPT];
   /** @type {string[]} */
-  const carriedFlags = [];
-  for (const [flag, name] of PROBE_FLAGS) {
-    const value = options[name];
+  const carried = [];
+  for (const [flag, axis] of PROBE_FLAGS) {
+    const value = values[axis];
     if (value === undefined) continue;
-    // A bad value is data, not a caller breach, so it is a result with provenance (contract.mjs).
-    if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, baseProvenance(), name);
+    // A bad value is data, not a caller breach, so it is a result with provenance (§5 `Failure channels`).
+    if (!checkOpaqueValue(axis, value)) return invalidAxisValue(ctx, baseProvenance(), axis);
     args.push(flag, value);
-    carriedFlags.push(flag);
+    carried.push(`axes.${axis}`);
   }
   args.push("--output-format", "stream-json", "--verbose", "--no-session-persistence");
   // The probe's scratch CLAUDE_CONFIG_DIR hides the user's own settings, so its answer reflects only
-  // the flags carried in plus Claude's defaults. The evidence names those flags (ARCH-28).
-  const basis = { configurationBasis: /** @type {const} */ ("reconstructed"), reconstructedFrom: carriedFlags };
+  // the flags carried in plus Claude's defaults. The evidence names those inputs by axis (ARCH-28, §5).
+  const basis = { configurationBasis: /** @type {const} */ ("reconstructed"), reconstructedFrom: carried };
 
   const ran = /** @type {any} */ (await runIsolated(ctx, { prefix: "mi-claude", command: "claude", args, ...ROOT, stopWhen: initComplete, provenance: baseProvenance() }));
   if (ran.status !== "ok") return ran;
@@ -299,22 +327,23 @@ function lineMatching(text, pattern) {
  * stops at `Not logged in`, so it cannot bill; the runtime's own warnings answer for the rest. The verdict
  * is `recognized` or `unrecognized`, never "available": recognising a model is not proof an account can
  * invoke it (ARCH-14).
- * @param {{model?: string, effort?: string}} input
+ * @param {{model?: string, reasoning?: string, effort?: string}} input `effort` is the deprecated alias of `reasoning`; when both are given they must be equal.
  * @param {object} [context]
  * @returns {Promise<object>}
  */
 export async function validate(input, context) {
-  if (!isPlainObject(input) || (/** @type {any} */ (input).model === undefined && /** @type {any} */ (input).effort === undefined)) {
-    throw new TypeError("claude validate: input must name a model or an effort");
+  const values = isPlainObject(input) ? axisValues("validate", /** @type {any} */ (input)) : {};
+  if (values.model === undefined && values.reasoning === undefined) {
+    throw new TypeError("claude validate: input must name a model or a reasoning value");
   }
-  const { model, effort } = /** @type {any} */ (input);
+  const { model, reasoning } = /** @type {any} */ (values);
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
   const args = ["-p", PROBE_PROMPT];
-  for (const [flag, name] of PROBE_FLAGS) {
-    const value = /** @type {any} */ (input)[name];
+  for (const [flag, axis] of PROBE_FLAGS) {
+    const value = /** @type {any} */ (values)[axis];
     if (value === undefined) continue;
-    if (!checkOpaqueValue(name, value)) return invalidAxisValue(ctx, provenance, name);
+    if (!checkOpaqueValue(axis, value)) return invalidAxisValue(ctx, provenance, axis);
     args.push(flag, value);
   }
   args.push("--no-session-persistence");
@@ -336,7 +365,7 @@ export async function validate(input, context) {
       ...(missLine === undefined ? {} : { runtimeText: missLine }),
     });
   }
-  if (effort !== undefined) {
+  if (reasoning !== undefined) {
     // The warning is what marks the effort unrecognised. The list of valid values is a bonus on it, so a
     // later Claude that words the warning without the list still gives the right verdict.
     const warningLine = lineMatching(text, EFFORT_WARNING_RE);
@@ -344,7 +373,7 @@ export async function validate(input, context) {
     const validValues = listed === null ? [] : listed[1].split(",").map((v) => v.trim()).filter((v) => v !== "");
     checks.push({
       axis: "reasoning",
-      value: effort,
+      value: reasoning,
       verdict: warningLine !== undefined ? "unrecognized" : progressed ? "recognized" : "unverifiable",
       scope: "value",
       ...(warningLine === undefined ? {} : { runtimeText: warningLine, ...(validValues.length > 0 ? { validValues } : {}) }),

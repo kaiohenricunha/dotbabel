@@ -16,13 +16,13 @@
 
 import { createHash } from "node:crypto";
 import { MAX_CACHE_ENTRY_BYTES, assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult, runBounded } from "../contract.mjs";
-import { isProviderId, makeDiscoveryEvidence, makeModelFact, makeProviderCatalogEvidence, optionalCount, optionalIdentifier } from "../evidence.mjs";
+import { makeDiscoveryEvidence, makeModelFact, makeProviderCatalogEvidence, optionalCount, optionalIdentifier, toSourceKey } from "../evidence.mjs";
 
 /** The source's id, as the descriptor and every provenance name it. */
 export const SOURCE_ID = "models-dev";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "1";
+export const ADAPTER_VERSION = "2";
 
 /** The one endpoint Models.dev serves (DOC-3). */
 export const SOURCE_URL = "https://models.dev/api.json";
@@ -111,20 +111,29 @@ function sourceUrl(value) {
 }
 
 /**
- * The providers the caller asks for, in the caller's order. A missing or malformed list is a caller
- * breach, so it throws.
+ * Models.dev keys that differ from their Dotbabel id. The `PROVIDERS` seeds are Models.dev keys, so none
+ * does today. Any other key is scoped as `models-dev.<key>` (§5 `Provider namespace`).
+ */
+const PROVIDER_ALIASES = Object.freeze({});
+
+/**
+ * The providers the caller asks for, in the caller's order, each as its Dotbabel id and the Models.dev
+ * key it maps back to. A missing or malformed list, or an id outside the namespace, is a caller breach,
+ * so it throws.
  * @param {unknown} value
- * @returns {string[]}
+ * @returns {Array<{id: string, key: string}>}
  */
 function requestedProviders(value) {
   if (!Array.isArray(value) || value.length === 0) throw new TypeError("models-dev discover: providers must be a non-empty array of provider ids");
-  const seen = new Set();
+  /** @type {Map<string, string>} */
+  const seen = new Map();
   for (const id of value) {
-    if (!isProviderId(id)) throw new TypeError("models-dev discover: each provider must be a provider id: lower-case letters, digits, dot, underscore or hyphen, at most 64");
+    const key = toSourceKey(SOURCE_ID, id, PROVIDER_ALIASES);
+    if (key === undefined) throw new TypeError(`models-dev discover: each provider must be a Dotbabel provider id: a PROVIDERS id, or ${SOURCE_ID}.<key> for a Models.dev key with no mapping`);
     if (seen.has(id)) throw new TypeError(`models-dev discover: provider "${id}" is named twice`);
-    seen.add(id);
+    seen.set(id, key);
   }
-  return [...seen];
+  return [...seen].map(([id, key]) => ({ id, key }));
 }
 
 /**
@@ -231,22 +240,23 @@ function providerDiscovery(models) {
 /**
  * Reduce the parsed document to the requested providers. Provider keys come from the network, so each
  * is looked up by own key only, and the output is built as arrays, never as an object keyed by them.
+ * Each provider keeps its Dotbabel id, and its Models.dev key only when the two differ.
  * @param {Record<string, unknown>} doc
- * @param {string[]} requested
+ * @param {Array<{id: string, key: string}>} requested
  * @returns {ReturnType<typeof makeProviderCatalogEvidence>}
  */
 function reduceDocument(doc, requested) {
-  /** @type {Array<{id: string, displayName?: string, discovery: ReturnType<typeof makeDiscoveryEvidence>}>} */
+  /** @type {Array<{id: string, sourceKey?: string, displayName?: string, discovery: ReturnType<typeof makeDiscoveryEvidence>}>} */
   const providers = [];
   /** @type {string[]} */
   const missingProviders = [];
   let skipped = 0;
-  for (const id of requested) {
-    if (!Object.hasOwn(doc, id)) {
+  for (const { id, key } of requested) {
+    if (!Object.hasOwn(doc, key)) {
       missingProviders.push(id);
       continue;
     }
-    const provider = doc[id];
+    const provider = doc[key];
     if (!isPlainObject(provider) || !isPlainObject(/** @type {any} */ (provider).models)) {
       skipped += 1;
       continue;
@@ -259,7 +269,7 @@ function reduceDocument(doc, requested) {
       continue;
     }
     const displayName = optionalIdentifier(/** @type {any} */ (provider).name);
-    providers.push({ id, ...(displayName === undefined ? {} : { displayName }), discovery });
+    providers.push({ id, ...(key === id ? {} : { sourceKey: key }), ...(displayName === undefined ? {} : { displayName }), discovery });
   }
   return makeProviderCatalogEvidence({ providers, missingProviders, skipped });
 }
@@ -272,7 +282,7 @@ function reduceDocument(doc, requested) {
  * requested providers is `unknown`. Neither case throws. Only a caller breach (no providers) or a
  * safety fault (a source URL that is not HTTPS) throws.
  * @param {object} context
- * @param {string[]} context.providers Provider ids to keep, such as `anthropic` or `github-copilot`.
+ * @param {string[]} context.providers Dotbabel provider ids to keep: a `PROVIDERS` id such as `anthropic`, or `models-dev.<key>`, such as `models-dev.xai`.
  * @param {string} [context.url] The source URL. HTTPS only, except plain HTTP on loopback for a local fixture.
  * @param {typeof fetch} [context.fetch] Injectable for tests. Defaults to the global `fetch`.
  * @param {() => string} [context.now]

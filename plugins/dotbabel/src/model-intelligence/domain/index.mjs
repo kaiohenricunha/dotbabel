@@ -66,6 +66,15 @@ export const SOURCE_KINDS = Object.freeze(["runtime", "knowledge-source", "artif
 /** `$id` of the shipped JSON Schema for the `dotbabel` frontmatter namespace. */
 export const COMPUTE_SCHEMA_ID = "https://dotbabel.dev/schemas/dotbabel.compute.schema.json";
 
+/**
+ * Dotbabel provider ids (§5 `Provider namespace`). Catalog identity is the pair of provider and model id
+ * (ARCH-3), so facts from two sources join only when both name the provider the same way. Every adapter
+ * maps its source's own key into this table, and a key with no mapping is emitted as `<sourceId>.<key>`.
+ * No id holds a dot, so a scoped id can never equal one. The seeds are the Models.dev keys of the
+ * providers Dotbabel uses, because OpenCode already uses those keys (DOC-3). A new id is a reviewed change.
+ */
+export const PROVIDERS = Object.freeze(["anthropic", "openai", "google", "github-copilot", "opencode"]);
+
 /** Runtime ids, taken from the `RUNTIMES` registry. A runtime is a harness, not a model vendor (ARCH-2). */
 export const RUNTIME_IDS = Object.freeze(Object.keys(RUNTIMES));
 
@@ -76,6 +85,49 @@ export const RUNTIME_IDS = Object.freeze(Object.keys(RUNTIMES));
  */
 export function isRuntimeId(value) {
   return typeof value === "string" && RUNTIME_IDS.includes(value);
+}
+
+/**
+ * True when a string is safe to hand to a runtime as one argument (see `assertOpaqueValue`).
+ * @param {string} value
+ * @returns {boolean}
+ */
+function isOpaqueString(value) {
+  return value !== "" && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value) && !value.startsWith("-");
+}
+
+/**
+ * Require a value safe to hand to a runtime as one argument: a printable string that cannot be read as
+ * an option.
+ *
+ * A leading dash would make the runtime parse the value as a flag, so a value that reached here from a
+ * repository's own frontmatter could carry an option nobody asked for. A control character could
+ * forge output or split a line. `renderInvocation` uses this throwing form (§5 `Failure channels`).
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function assertOpaqueValue(name, value) {
+  if (typeof value !== "string" || !isOpaqueString(value)) {
+    throw new TypeError(`${name} must be a printable string of at most 200 characters that does not start with a dash`);
+  }
+  return value;
+}
+
+/**
+ * Check a caller-supplied value under §5 `Failure channels`.
+ *
+ * A value that is not a string breaks the caller's contract and throws. A string that fails the
+ * opaque rules is data, which may come from a repository's own frontmatter, so it returns `false`
+ * for the caller to report as an `invalid_axis_value` result instead of an exception. The adapters and
+ * the resolver share this one rule, which is why it lives in `domain/` (ARCH-57 rule 1).
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {boolean} True when the value is safe to pass on.
+ */
+export function checkOpaqueValue(name, value) {
+  if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
+  return isOpaqueString(value);
 }
 
 /**
