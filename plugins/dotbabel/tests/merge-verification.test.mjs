@@ -4,7 +4,7 @@
 // looks exactly like a local-attest attestation. This module cannot stop that.
 // It decides when /merge-pr verifies an attested pull request anyway (the spot
 // check), reads what the default branch's own CI said about each merge (the
-// cumulative rule), and recognizes the one fact that exposes a forgery: a real
+// cumulative rule), and recognizes the evidence this layer detects: a real
 // test failure on code whose attestation said pass (the contradiction).
 //
 // Every case here is a decision with no I/O, so the fixtures are hand-built
@@ -18,15 +18,25 @@ import path from "node:path";
 
 import {
   CONTRADICTION_LABEL,
+  LOCKFILE_INSTALLS,
+  RUN_STATES,
   SPOT_CHECK_DEFAULTS,
+  attestationMatch,
+  ciAvailabilityState,
   classifyRun,
   contradictionMarker,
+  contradictionRange,
   decideSpotCheck,
+  failingCommitMarker,
   findContradictionIssue,
+  installCommandsFor,
   isContradiction,
+  isSpotCheckOff,
+  isWorkflowAuthor,
   mainVerificationStatus,
   mergeSubjectPr,
   renderContradictionIssue,
+  renderLocalContradictionIssue,
   resolveSpotCheckPolicy,
   spotCheckRoll,
 } from "../src/merge-verification.mjs";
@@ -72,19 +82,18 @@ function redRunFixture() {
       // sign that CI did not run.
       { id: 23, name: "smoke", status: "completed", conclusion: "skipped", runner_name: null, steps: [] },
     ],
-    annotations: [],
   };
 }
 
-/** Billing-blocked: run conclusion failure, the one job never started. */
+/**
+ * Billing-blocked: run conclusion failure, the one job never started. GitHub
+ * also adds BILLING_MESSAGE as an annotation; classifyRun does not read it,
+ * because the zero steps already say the job never started.
+ */
 function billingRunFixture() {
   return {
     run: { id: 1, status: "completed", conclusion: "failure", event: "push", head_sha: HEAD },
     jobs: [{ id: 11, name: "test", status: "completed", conclusion: "failure", runner_name: "", steps: [] }],
-    annotations: [
-      { annotation_level: "failure", title: "", message: BILLING_MESSAGE },
-      { annotation_level: "notice", title: "", message: "The ubuntu-latest label will migrate to a new image soon." },
-    ],
   };
 }
 
@@ -235,27 +244,44 @@ describe("decideSpotCheck", () => {
   });
 });
 
+describe("isSpotCheckOff", () => {
+  it("is off only when both rates are 0 and no always path is set", () => {
+    expect(isSpotCheckOff(resolveSpotCheckPolicy(undefined))).toBe(true);
+    expect(isSpotCheckOff({ rate: 0, rate_when_ci_unavailable: 0, always_paths: [] })).toBe(true);
+    expect(isSpotCheckOff(resolveSpotCheckPolicy({ attestation: { spot_check: {} } }))).toBe(false);
+    expect(isSpotCheckOff({ rate: 0, rate_when_ci_unavailable: 0, always_paths: ["src/**"] })).toBe(false);
+    expect(isSpotCheckOff({ rate: 0.01, rate_when_ci_unavailable: 0, always_paths: [] })).toBe(false);
+  });
+});
+
 describe("classifyRun", () => {
   it("classifies a billing-blocked run as unverified", () => {
     expect(classifyRun(billingRunFixture())).toBe("unverified");
   });
 
-  it("classifies a job that never started as unverified even without the annotation", () => {
+  it("classifies a job that never started as unverified through the zero-step rule alone", () => {
     const f = billingRunFixture();
-    expect(classifyRun({ ...f, annotations: [] })).toBe("unverified");
-    expect(classifyRun({ ...f, annotations: null })).toBe("unverified");
     // Zero steps never reads as a real failure, even when a runner was named.
     const withRunner = [{ ...f.jobs[0], runner_name: "GitHub Actions 9" }];
-    expect(classifyRun({ ...f, jobs: withRunner, annotations: [] })).toBe("unverified");
+    expect(classifyRun({ ...f, jobs: withRunner })).toBe("unverified");
+    for (const conclusion of ["startup_failure", "cancelled"]) {
+      expect(classifyRun({ ...f, jobs: [{ ...f.jobs[0], conclusion }] }), conclusion).toBe("unverified");
+    }
   });
 
-  it("finds the billing annotation in any position", () => {
-    const f = redRunFixture();
+  it("keeps a red run red when an annotation names billing", () => {
+    // A test reporter writes failure messages as annotations, and code under
+    // test can print `::error::billing`. Neither may hide a real failure.
     const annotations = [
-      { annotation_level: "notice", message: "unrelated" },
-      { annotation_level: "failure", message: "Your spending limit needs to be increased" },
+      { annotation_level: "failure", message: BILLING_MESSAGE },
+      { annotation_level: "failure", message: "expected billing total to be 100" },
     ];
-    expect(classifyRun({ ...f, annotations })).toBe("unverified");
+    expect(classifyRun({ ...redRunFixture(), annotations })).toBe("red");
+  });
+
+  it("classifies a cancelled run as red when a job had already failed after its steps", () => {
+    const f = redRunFixture();
+    expect(classifyRun({ ...f, run: { ...f.run, conclusion: "cancelled" } })).toBe("red");
   });
 
   it("classifies a failed job with steps as red even when a dependent job was skipped with zero steps", () => {
@@ -268,48 +294,108 @@ describe("classifyRun", () => {
       classifyRun({
         run: { ...f.run, conclusion: "success" },
         jobs: [{ id: 1, name: "test", status: "completed", conclusion: "success", runner_name: "r", steps: [step(1)] }],
-        annotations: [],
       }),
     ).toBe("green");
     // Jobs are not fetched for a successful run; the run conclusion stands.
-    expect(classifyRun({ run: { ...f.run, conclusion: "success" }, jobs: null, annotations: null })).toBe("green");
+    expect(classifyRun({ run: { ...f.run, conclusion: "success" }, jobs: null })).toBe("green");
   });
 
   it("does not call a success green when no job ran a step", () => {
     const f = redRunFixture();
     const jobs = [{ id: 1, name: "test", status: "completed", conclusion: "skipped", runner_name: null, steps: [] }];
-    expect(classifyRun({ run: { ...f.run, conclusion: "success" }, jobs, annotations: [] })).toBe("unverified");
+    expect(classifyRun({ run: { ...f.run, conclusion: "success" }, jobs })).toBe("unverified");
   });
 
   it("classifies startup_failure, cancelled, and skipped runs as unverified", () => {
     for (const conclusion of ["startup_failure", "cancelled", "skipped", "stale", "action_required", "neutral"]) {
-      expect(classifyRun({ run: { status: "completed", conclusion }, jobs: [], annotations: [] }), conclusion).toBe("unverified");
+      expect(classifyRun({ run: { status: "completed", conclusion }, jobs: [] }), conclusion).toBe("unverified");
     }
   });
 
   it("classifies a timeout before any job started as unverified and one after as red", () => {
     const before = [{ id: 1, name: "test", status: "completed", conclusion: "timed_out", runner_name: "", steps: [] }];
-    expect(classifyRun({ run: { status: "completed", conclusion: "timed_out" }, jobs: before, annotations: [] })).toBe("unverified");
+    expect(classifyRun({ run: { status: "completed", conclusion: "timed_out" }, jobs: before })).toBe("unverified");
     const after = [{ id: 1, name: "test", status: "completed", conclusion: "timed_out", runner_name: "r", steps: [step(1), step(2, "cancelled")] }];
-    expect(classifyRun({ run: { status: "completed", conclusion: "timed_out" }, jobs: after, annotations: [] })).toBe("red");
+    expect(classifyRun({ run: { status: "completed", conclusion: "timed_out" }, jobs: after })).toBe("red");
   });
 
-  it("classifies a failure as unverified when the jobs are unknown", () => {
-    expect(classifyRun({ run: { status: "completed", conclusion: "failure" }, jobs: null, annotations: null })).toBe("unverified");
+  it("classifies a failed run as unknown, never unverified, when its jobs cannot be read", () => {
+    expect(classifyRun({ run: { status: "completed", conclusion: "failure" }, jobs: null })).toBe("unknown");
+    expect(classifyRun({ run: { status: "completed", conclusion: "cancelled" }, jobs: null })).toBe("unknown");
+    expect(classifyRun({ run: { status: "in_progress", conclusion: null } })).toBe("unknown");
   });
 
-  it("classifies a missing run or a run in progress with no failed job as unverified", () => {
-    expect(classifyRun({ run: null, jobs: null, annotations: null })).toBe("unverified");
-    expect(classifyRun(undefined)).toBe("unverified");
+  it("classifies a run that cannot be read as unknown", () => {
+    expect(classifyRun({ run: null, jobs: null })).toBe("unknown");
+    expect(classifyRun(undefined)).toBe("unknown");
+    expect(RUN_STATES).toEqual(["green", "red", "unverified", "unknown"]);
+  });
+
+  it("classifies a run in progress with no failed job as unverified", () => {
     const jobs = [{ id: 1, name: "test", status: "in_progress", conclusion: null, runner_name: "r", steps: [step(1)] }];
-    expect(classifyRun({ run: { status: "in_progress", conclusion: null }, jobs, annotations: [] })).toBe("unverified");
+    expect(classifyRun({ run: { status: "in_progress", conclusion: null }, jobs })).toBe("unverified");
   });
 
   it("classifies a run in progress as red once a job has failed with steps", () => {
     // The contradiction job reads its own run, which is still in progress.
     const f = redRunFixture();
     const jobs = [...f.jobs, { id: 24, name: "contradiction", status: "in_progress", conclusion: null, runner_name: "r", steps: [step(1)] }];
-    expect(classifyRun({ run: { ...f.run, status: "in_progress", conclusion: null }, jobs, annotations: [] })).toBe("red");
+    expect(classifyRun({ run: { ...f.run, status: "in_progress", conclusion: null }, jobs })).toBe("red");
+  });
+});
+
+describe("ciAvailabilityState", () => {
+  const recent = [C1, C2, C3];
+
+  it("accepts the newest completed run only when it tested a recent default-branch commit", () => {
+    expect(ciAvailabilityState({ recentShas: recent, runsRead: true, latestRun: { head_sha: C3 }, classification: "green" })).toMatchObject({
+      state: "available",
+      available: true,
+    });
+    expect(ciAvailabilityState({ recentShas: recent, runsRead: true, latestRun: { head_sha: C2 }, classification: "red" }).state).toBe("available");
+    // An old green run says nothing about recent merges that had no run.
+    const old = ciAvailabilityState({ recentShas: recent, runsRead: true, latestRun: { head_sha: C5 }, classification: "green" });
+    expect(old).toMatchObject({ state: "unavailable", available: false });
+    expect(old.reason).toMatch(/not one of the last 3 commits/);
+  });
+
+  it("reports CI unavailable when there is no completed run or the newest one did not run the tests", () => {
+    expect(ciAvailabilityState({ recentShas: recent, runsRead: true, latestRun: undefined }).state).toBe("unavailable");
+    expect(ciAvailabilityState({ recentShas: recent, runsRead: true, latestRun: { head_sha: C1 }, classification: "unverified" }).state).toBe(
+      "unavailable",
+    );
+  });
+
+  it("reports CI unknown, never available, when the runs, the run or the commits cannot be read", () => {
+    expect(ciAvailabilityState({ recentShas: recent, runsRead: false }).state).toBe("unknown");
+    expect(ciAvailabilityState({ recentShas: null, runsRead: true, latestRun: { head_sha: C1 }, classification: "green" }).state).toBe("unknown");
+    expect(ciAvailabilityState({ recentShas: recent, runsRead: true, latestRun: { head_sha: C1 }, classification: "unknown" })).toMatchObject({
+      state: "unknown",
+      available: null,
+    });
+  });
+});
+
+describe("installCommandsFor", () => {
+  it("installs from the first JavaScript lockfile, then go.sum, then uv.lock", () => {
+    expect(installCommandsFor(["yarn.lock", "package-lock.json"])).toEqual([{ lockfile: "package-lock.json", argv: ["npm", "ci"] }]);
+    expect(installCommandsFor(["uv.lock", "go.sum", "pnpm-lock.yaml"])).toEqual([
+      { lockfile: "pnpm-lock.yaml", argv: ["pnpm", "i", "--frozen-lockfile"] },
+      { lockfile: "go.sum", argv: ["go", "mod", "download"] },
+      { lockfile: "uv.lock", argv: ["uv", "sync"] },
+    ]);
+  });
+
+  it("installs nothing without a supported lockfile", () => {
+    expect(installCommandsFor([])).toEqual([]);
+    expect(installCommandsFor(["Gemfile.lock"])).toEqual([]);
+  });
+
+  it("uses the same install table as the explicit path of /merge-pr", () => {
+    const merge = readFileSync(path.resolve(import.meta.dirname, "..", "..", "..", "commands", "merge-pr.md"), "utf8");
+    const bullet = merge.slice(merge.indexOf("**Install dependencies first.**"), merge.indexOf("**Run the full project test suite.**"));
+    const pairs = [...bullet.matchAll(/`([^`]+)` →\s+`([^`]+)`/g)].map((m) => [m[1], m[2]]);
+    expect(pairs).toEqual(LOCKFILE_INSTALLS.map(([lockfile, argv]) => [lockfile, argv.join(" ")]));
   });
 });
 
@@ -366,6 +452,25 @@ describe("mainVerificationStatus", () => {
     expect(s.verified).toEqual([C1]);
   });
 
+  it("reports a commit whose run could not be read as unknown debt, never verified", () => {
+    const s = mainVerificationStatus({
+      commits,
+      runs: [
+        { headSha: C1, state: "unknown" },
+        { headSha: C2, state: "unknown" },
+        { headSha: C2, state: "red" },
+        { headSha: C3, state: "unknown" },
+        { headSha: C3, state: "unverified" },
+        { headSha: C4, state: "green" },
+      ],
+    });
+    expect(s.lastGreen).toBe(C4);
+    expect(s.unknown).toEqual([C1, C3]);
+    expect(s.red).toEqual([C2]);
+    expect(s.verified).toEqual([C4, C5]);
+    expect(s.commits.map((c) => c.run)).toEqual(["unknown", "red", "unknown", "green", null]);
+  });
+
   it("reports unknown, never verified, when the runs could not be read", () => {
     const s = mainVerificationStatus({ commits, runs: null });
     expect(s.known).toBe(false);
@@ -388,15 +493,26 @@ describe("isContradiction", () => {
 
   it("is not a contradiction when the run did not verify anything", () => {
     expect(isContradiction({ testResult: "unverified", attestation: { comments: [owner(passing)], headSha: HEAD } })).toBe(false);
+    expect(isContradiction({ testResult: "unknown", attestation: { comments: [owner(passing)], headSha: HEAD } })).toBe(false);
     expect(isContradiction({ testResult: "green", attestation: { comments: [owner(passing)], headSha: HEAD } })).toBe(false);
+  });
+
+  it("counts a trusted attestation that was edited after it was posted, and says so", () => {
+    const edited = owner(passing, { lastEditedAt: "2026-01-01T00:00:00Z" });
+    expect(isContradiction({ testResult: "red", attestation: { comments: [edited], headSha: HEAD } })).toBe(true);
+    expect(attestationMatch({ comments: [edited], headSha: HEAD })).toEqual({ found: true, edited: true });
+    expect(attestationMatch({ comments: [edited, owner(passing)], headSha: HEAD })).toEqual({ found: true, edited: false });
+    // An edit that removed the attestation, or a deleted comment, leaves nothing to find.
+    expect(attestationMatch({ comments: [owner("edited away", { lastEditedAt: "2026-01-01T00:00:00Z" })], headSha: HEAD })).toEqual({
+      found: false,
+      edited: false,
+    });
+    expect(attestationMatch(null)).toEqual({ found: false, edited: false });
   });
 
   it("is not a contradiction without a current trusted passing attestation for the head", () => {
     expect(isContradiction({ testResult: "red", attestation: { comments: [owner(passing)], headSha: OTHER } })).toBe(false);
     expect(isContradiction({ testResult: "red", attestation: { comments: [owner(passing, { authorAssociation: "CONTRIBUTOR" })], headSha: HEAD } })).toBe(
-      false,
-    );
-    expect(isContradiction({ testResult: "red", attestation: { comments: [owner(passing, { lastEditedAt: "2026-01-01T00:00:00Z" })], headSha: HEAD } })).toBe(
       false,
     );
     expect(isContradiction({ testResult: "red", attestation: { comments: [], headSha: HEAD } })).toBe(false);
@@ -412,33 +528,110 @@ describe("isContradiction", () => {
   });
 });
 
-describe("contradiction issue helpers", () => {
-  it("names the pull request and the attested head in one hidden marker", () => {
-    expect(contradictionMarker({ pr: 12, sha: HEAD })).toBe(`<!-- dotbabel:attestation-contradicted pr=12 sha=${HEAD} -->`);
-    expect(() => contradictionMarker({ pr: 12, sha: "nope" })).toThrow(/sha/);
+describe("contradictionRange", () => {
+  const history = [C1, C2, C3, C4, C5].map((sha) => ({ sha }));
+
+  it("walks back from the failing commit to the last green commit, not including it", () => {
+    expect(contradictionRange({ commits: history, greenShas: new Set([C4]) })).toEqual({
+      commits: [{ sha: C1 }, { sha: C2 }, { sha: C3 }],
+      lastGreen: C4,
+      bounded: false,
+    });
   });
 
-  it("finds an existing issue by its marker only", () => {
+  it("keeps the failing commit even when an older run of it was green", () => {
+    expect(contradictionRange({ commits: history, greenShas: new Set([C1, C2]) })).toEqual({ commits: [{ sha: C1 }], lastGreen: C2, bounded: false });
+  });
+
+  it("stops at the bound when no green run is found, and says it stopped", () => {
+    expect(contradictionRange({ commits: history, greenShas: new Set(), limit: 3 })).toEqual({
+      commits: [{ sha: C1 }, { sha: C2 }, { sha: C3 }],
+      lastGreen: null,
+      bounded: true,
+    });
+    // A green commit right after the bound still closes the range.
+    expect(contradictionRange({ commits: history, greenShas: new Set([C4]), limit: 3 }).bounded).toBe(false);
+  });
+
+  it("covers the whole history when it ends before a green run or the bound", () => {
+    expect(contradictionRange({ commits: history.slice(0, 2), greenShas: new Set() })).toEqual({
+      commits: [{ sha: C1 }, { sha: C2 }],
+      lastGreen: null,
+      bounded: false,
+    });
+  });
+});
+
+describe("contradiction issue helpers", () => {
+  it("names the pull request and the attested head in the local marker, and the failing commit in the CI marker", () => {
+    expect(contradictionMarker({ pr: 12, sha: HEAD })).toBe(`<!-- dotbabel:attestation-contradicted pr=12 sha=${HEAD} -->`);
+    expect(() => contradictionMarker({ pr: 12, sha: "nope" })).toThrow(/sha/);
+    expect(failingCommitMarker(OTHER.toUpperCase())).toBe(`<!-- dotbabel:attestation-contradicted commit=${OTHER} -->`);
+    expect(() => failingCommitMarker("HEAD")).toThrow(/sha/);
+  });
+
+  it("finds an existing issue by its marker only, and says when it is closed", () => {
     const marker = contradictionMarker({ pr: 12, sha: HEAD });
-    expect(findContradictionIssue([{ number: 3, body: "other" }, { number: 4, body: `x\n${marker}\n` }], marker)).toBe(4);
+    expect(findContradictionIssue([{ number: 3, body: "other" }, { number: 4, body: `x\n${marker}\n`, state: "OPEN" }], marker)).toEqual({
+      number: 4,
+      closed: false,
+    });
+    expect(findContradictionIssue([{ number: 5, body: marker, state: "CLOSED" }], marker)).toEqual({ number: 5, closed: true });
     expect(findContradictionIssue([{ number: 3, body: contradictionMarker({ pr: 13, sha: HEAD }) }], marker)).toBeNull();
     expect(findContradictionIssue(null, marker)).toBeNull();
   });
 
-  it("renders an issue with the pull request, the attested head, and the failed run", () => {
-    const issue = renderContradictionIssue({ pr: 12, attestedSha: HEAD, mergeSha: OTHER, runUrl: "https://example.test/runs/9" });
-    expect(issue.title).toBe("Attestation contradicted: #12");
+  it("accepts only an issue the workflow identity opened when asked to", () => {
+    const marker = failingCommitMarker(OTHER);
+    const planted = { number: 6, body: marker, state: "CLOSED", author: { login: "owner" } };
+    const bot = { number: 7, body: marker, state: "OPEN", author: { login: "app/github-actions" } };
+    expect(findContradictionIssue([planted, bot], marker, { workflowOnly: true })).toEqual({ number: 7, closed: false });
+    expect(findContradictionIssue([planted], marker, { workflowOnly: true })).toBeNull();
+    expect(findContradictionIssue([planted], marker)).toEqual({ number: 6, closed: true });
+    expect(isWorkflowAuthor({ login: "github-actions[bot]" })).toBe(true);
+    expect(isWorkflowAuthor({ login: "github-actions" })).toBe(false);
+    expect(isWorkflowAuthor(null)).toBe(false);
+  });
+
+  it("renders one issue for the failing commit with the range and every suspect", () => {
+    const issue = renderContradictionIssue({
+      failingSha: C1,
+      runUrl: "https://example.test/runs/9",
+      range: { commits: [{ sha: C1 }, { sha: C2 }], lastGreen: C3, bounded: false },
+      suspects: [
+        { pr: 12, attestedSha: HEAD, mergeSha: C1, edited: false },
+        { pr: 11, attestedSha: OTHER, mergeSha: C2, edited: true },
+      ],
+    });
+    expect(issue.title).toBe(`Attestation contradicted: ${C1.slice(0, 8)} (#12, #11)`);
     expect(issue.labels).toEqual([CONTRADICTION_LABEL]);
-    expect(issue.body).toContain(contradictionMarker({ pr: 12, sha: HEAD }));
-    expect(issue.body).toContain("#12");
-    expect(issue.body).toContain(HEAD);
-    expect(issue.body).toContain(OTHER);
-    expect(issue.body).toContain("https://example.test/runs/9");
+    expect(issue.body.startsWith(failingCommitMarker(C1))).toBe(true);
+    for (const text of ["#12", "#11", HEAD, OTHER, C1, C2, C3, "https://example.test/runs/9"]) expect(issue.body).toContain(text);
+    expect(issue.body).toMatch(/#11: .*edited after it was posted/);
+    expect(issue.body).not.toMatch(/#12: .*edited/);
+  });
+
+  it("lists the possible causes in short sentences, the merged tree among them", () => {
+    const issue = renderContradictionIssue({
+      failingSha: C1,
+      range: { commits: [{ sha: C1 }], lastGreen: null, bounded: true },
+      suspects: [{ pr: 12, attestedSha: HEAD, mergeSha: C1, edited: false }],
+    });
+    expect(issue.body).toMatch(/forged or wrong/);
+    expect(issue.body).toMatch(/flaky/);
+    expect(issue.body).toMatch(/merged tree differs from the attested head/);
+    expect(issue.body).toMatch(/walk stops at 1 commit\(s\)\./);
+    for (const sentence of issue.body.replace(/`[^`]*`/g, "x").split(/(?<=[.:])\s+/)) {
+      expect(sentence.split(/\s+/).filter(Boolean).length, sentence).toBeLessThanOrEqual(25);
+    }
   });
 
   it("labels a local failure as weaker than CI", () => {
-    const issue = renderContradictionIssue({ pr: 12, attestedSha: HEAD, mergeSha: null, runUrl: null, local: true });
+    const issue = renderLocalContradictionIssue({ pr: 12, attestedSha: HEAD, edited: true });
+    expect(issue.title).toBe("Attestation contradicted: #12");
+    expect(issue.body).toContain(contradictionMarker({ pr: 12, sha: HEAD }));
     expect(issue.body).toMatch(/same machine as the agent/);
+    expect(issue.body).toMatch(/edited after it was posted/);
     expect(issue.body).not.toContain("undefined");
   });
 });

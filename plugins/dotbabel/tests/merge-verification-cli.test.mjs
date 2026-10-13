@@ -1,11 +1,13 @@
 // `dotbabel pr-stack spot-check | main-status | contradiction` — the wiring.
 //
-// The decisions are unit-tested in merge-verification.test.mjs. These tests
-// drive the real bin against a throwaway git repository and a fake `gh` that
-// answers from a route table, so they pin what the decisions are fed: the
-// policy from the BASE commit, the changed files, the default-branch CI run,
-// the pull request a commit was merged from, and its comments. They also pin
-// the writes: the receipt entry, the label, and exactly one issue.
+// The decisions are unit-tested in merge-verification.test.mjs, and the reads
+// in merge-verification-inputs.test.mjs. These tests drive the real bin
+// against a throwaway git repository and a fake `gh` that answers from a route
+// table, so they pin what the decisions are fed: the policy from the BASE
+// commit, the default branch, the changed files and their old names, the
+// default-branch CI run, the range a red run can blame, and the comments.
+// They also pin the writes: the spot-check log, the labels, and exactly one
+// issue.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -13,15 +15,12 @@ import path from "node:path";
 import { describe, it, expect } from "vitest";
 
 import { buildAttestationPayload, renderAttestationHeader } from "../src/attestation.mjs";
-import { contradictionMarker, spotCheckRoll } from "../src/merge-verification.mjs";
+import { contradictionMarker, failingCommitMarker, spotCheckRoll } from "../src/merge-verification.mjs";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const BIN = path.resolve(import.meta.dirname, "..", "bin", "dotbabel-pr-stack.mjs");
 const HEAD = "a".repeat(40);
-
-const BILLING =
-  "The job was not started because recent account payments have failed or your spending limit needs to be increased. " +
-  "Please check the 'Billing & plans' section in your settings";
+const HEAD5 = "5".repeat(40);
 
 // A fake `gh`: logs every call (argv and stdin), answers from the first route
 // whose regex matches the joined argv, and fails on anything unrouted.
@@ -44,13 +43,19 @@ process.stderr.write("fake gh: unrouted: " + joined + "\\n");
 process.exit(1);
 `;
 
+// Every call may ask for the default branch; a test can route it first to change it.
+const DEFAULT_BRANCH_ROUTE = { match: "^repo view --json defaultBranchRef --jq \\.defaultBranchRef\\.name$", stdout: "main\n" };
+
 function git(cwd, ...args) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.trim();
 }
 
-/** A repository with an `origin` remote and `.dotbabel.json` on main. */
+/**
+ * A repository with an `origin` remote and a first commit on main that holds
+ * `.dotbabel.json` (raw text when a string, none when null).
+ */
 function makeRepo(config = { attestation: { enforce: true } }) {
   const root = makeTempDir("merge-verification-cli-");
   const repo = path.join(root, "repo");
@@ -62,7 +67,8 @@ function makeRepo(config = { attestation: { enforce: true } }) {
   git(repo, "config", "user.name", "t");
   git(repo, "config", "commit.gpgsign", "false");
   git(repo, "remote", "add", "origin", bare);
-  fs.writeFileSync(path.join(repo, ".dotbabel.json"), JSON.stringify(config));
+  if (config === null) fs.writeFileSync(path.join(repo, "README.md"), "x\n");
+  else fs.writeFileSync(path.join(repo, ".dotbabel.json"), typeof config === "string" ? config : JSON.stringify(config));
   git(repo, "add", ".");
   git(repo, "commit", "-q", "-m", "chore: config");
   git(repo, "push", "-q", "origin", "main");
@@ -82,14 +88,32 @@ function commitOnMain(ctx, subject, files = {}) {
 }
 
 function runBin(ctx, args, routes, env = {}) {
-  fs.writeFileSync(ctx.routesFile, JSON.stringify(routes));
+  fs.writeFileSync(ctx.routesFile, JSON.stringify([...routes, DEFAULT_BRANCH_ROUTE]));
   const base = { ...process.env };
-  // A CI runner sets these; a local call must not inherit them.
-  for (const k of ["GITHUB_RUN_ID", "GITHUB_SERVER_URL", "GITHUB_REPOSITORY", "GH_REPO", "GH_TOKEN"]) delete base[k];
+  // A CI runner or a trusted developer machine sets these; a test must not inherit them.
+  for (const k of [
+    "GITHUB_ACTIONS",
+    "GITHUB_RUN_ID",
+    "GITHUB_SERVER_URL",
+    "GITHUB_REPOSITORY",
+    "GH_REPO",
+    "GH_TOKEN",
+    "CHECK_ON_STOP_TRUST_ALL",
+    "CHECK_ON_STOP_TRUSTED_FILE",
+  ]) {
+    delete base[k];
+  }
   const r = spawnSync(process.execPath, [BIN, ...args], {
     cwd: ctx.repo,
     encoding: "utf8",
-    env: { ...base, PATH: `${ctx.bin}${path.delimiter}${process.env.PATH}`, FAKE_GH_LOG: ctx.log, FAKE_GH_ROUTES: ctx.routesFile, ...env },
+    env: {
+      ...base,
+      PATH: `${ctx.bin}${path.delimiter}${process.env.PATH}`,
+      FAKE_GH_LOG: ctx.log,
+      FAKE_GH_ROUTES: ctx.routesFile,
+      CHECK_ON_STOP_TRUSTED_FILE: path.join(ctx.root, "no-trust-file"),
+      ...env,
+    },
   });
   return { status: r.status, stdout: r.stdout, stderr: r.stderr, json: () => JSON.parse(r.stdout) };
 }
@@ -103,43 +127,40 @@ function ghCalls(ctx) {
     .map((l) => JSON.parse(l));
 }
 
+const joinedCalls = (ctx) => ghCalls(ctx).map((c) => c.args.join(" "));
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Routes for `gh pr view` and the paginated files list. */
-function prRoutes({ pr = 7, head = HEAD, base, files = ["README.md"] }) {
+/** Routes for `gh pr view`, the paginated files list, and the old paths of renames. */
+function prRoutes({ pr = 7, head = HEAD, base, files = ["README.md"], renamedFrom = [], renamesStatus = 0 }) {
   return [
     {
       match: `^pr view ${pr} --json headRefOid,baseRefName,baseRefOid,changedFiles$`,
       stdout: { headRefOid: head, baseRefName: "main", baseRefOid: base, changedFiles: files.length },
     },
-    { match: `^api repos/\\{owner\\}/\\{repo\\}/pulls/${pr}/files`, stdout: `${files.join("\n")}\n` },
+    {
+      match: `^api repos/\\{owner\\}/\\{repo\\}/pulls/${pr}/files --paginate --jq \\.\\[\\] \\| select\\(\\.previous_filename\\)`,
+      stdout: renamedFrom.map((f) => `${f}\n`).join(""),
+      status: renamesStatus,
+    },
+    { match: `^api repos/\\{owner\\}/\\{repo\\}/pulls/${pr}/files --paginate --jq \\.\\[\\]\\.filename$`, stdout: `${files.join("\n")}\n` },
   ];
 }
 
 /** Routes for the latest completed default-branch run and its jobs. */
-function ciRoutes(runObj, { jobs = [], annotations = {} } = {}) {
+function ciRoutes(runObj, { jobs = [], branch = "main" } = {}) {
   const routes = [
     {
-      match: "^api repos/\\{owner\\}/\\{repo\\}/actions/workflows/test\\.yml/runs\\?branch=main&status=completed&per_page=1$",
+      match: `^api repos/\\{owner\\}/\\{repo\\}/actions/workflows/test\\.yml/runs\\?branch=${branch}&status=completed&per_page=1$`,
       stdout: { total_count: runObj ? 1 : 0, workflow_runs: runObj ? [runObj] : [] },
     },
   ];
   if (runObj) routes.push({ match: `^api repos/\\{owner\\}/\\{repo\\}/actions/runs/${runObj.id}/jobs`, stdout: { jobs } });
-  for (const [jobId, list] of Object.entries(annotations)) {
-    routes.push({ match: `^api repos/\\{owner\\}/\\{repo\\}/check-runs/${jobId}/annotations`, stdout: list });
-  }
   return routes;
 }
 
-const greenRun = { id: 500, status: "completed", conclusion: "success", head_sha: "f".repeat(40), html_url: "https://example.test/runs/500" };
-const billingRun = { id: 501, status: "completed", conclusion: "failure", head_sha: "f".repeat(40), html_url: "https://example.test/runs/501" };
+const greenRunAt = (sha) => ({ id: 500, status: "completed", conclusion: "success", head_sha: sha, html_url: "https://example.test/runs/500" });
+const billingRunAt = (sha) => ({ id: 501, status: "completed", conclusion: "failure", head_sha: sha, html_url: "https://example.test/runs/501" });
 const billingJobs = [{ id: 9001, name: "test", status: "completed", conclusion: "failure", runner_name: "", steps: [] }];
-const billingAnnotations = {
-  9001: [
-    { annotation_level: "failure", message: BILLING },
-    { annotation_level: "notice", message: "unrelated notice" },
-  ],
-};
 
 /** The spot-check log, a sibling of the run receipt. */
 function readLog(ctx, pr) {
@@ -147,6 +168,7 @@ function readLog(ctx, pr) {
   return JSON.parse(fs.readFileSync(file, "utf8"));
 }
 
+const logFile = (ctx, pr) => path.join(ctx.repo, ".git", "dotbabel", "receipts", `pr-${pr}.spot-checks.json`);
 const receiptFile = (ctx, pr) => path.join(ctx.repo, ".git", "dotbabel", "receipts", `pr-${pr}.json`);
 
 describe("pr-stack spot-check", () => {
@@ -155,7 +177,7 @@ describe("pr-stack spot-check", () => {
     const base = git(ctx.repo, "rev-parse", "HEAD");
     const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
       ...prRoutes({ base, files: ["README.md", "src/auth/login.js"] }),
-      ...ciRoutes(greenRun),
+      ...ciRoutes(greenRunAt(base)),
     ]);
     expect(r.status, r.stderr).toBe(0);
     const out = r.json().result;
@@ -168,31 +190,53 @@ describe("pr-stack spot-check", () => {
     expect(fs.existsSync(receiptFile(ctx, 7))).toBe(false);
   });
 
+  it("selects a pull request that renames a file out of an always_paths directory", () => {
+    const ctx = makeRepo({ attestation: { spot_check: { always_paths: ["src/auth/**"] } } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
+      ...prRoutes({ base, files: ["src/session.js"], renamedFrom: ["src/auth/session.js"] }),
+      ...ciRoutes(greenRunAt(base)),
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json().result.decision).toMatchObject({ selected: true, reason: "always_path", matched: "src/auth/session.js" });
+  });
+
+  it("selects when always_paths is set and the old paths of renames cannot be read", () => {
+    const ctx = makeRepo({ attestation: { spot_check: { always_paths: ["src/auth/**"] } } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
+      ...prRoutes({ base, files: ["src/session.js"], renamesStatus: 1 }),
+      ...ciRoutes(greenRunAt(base)),
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json().result).toMatchObject({ changedFilesKnown: false, decision: { selected: true, reason: "always_path", matched: null } });
+  });
+
   it("verifies every pull request when the latest default-branch run was billing-blocked", () => {
     // An empty spot_check block opts in: rate 0, and rate_when_ci_unavailable defaults to 1.
     const ctx = makeRepo({ attestation: { enforce: true, spot_check: {} } });
     const base = git(ctx.repo, "rev-parse", "HEAD");
-    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
-      ...prRoutes({ base }),
-      ...ciRoutes(billingRun, { jobs: billingJobs, annotations: billingAnnotations }),
-    ]);
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(billingRunAt(base), { jobs: billingJobs })]);
     expect(r.status, r.stderr).toBe(0);
     const out = r.json().result;
     expect(out.ci.state).toBe("unavailable");
     expect(out.decision).toMatchObject({ selected: true, reason: "ci_unavailable", rate: 1 });
+    // The zero steps decide; no annotation is read.
+    expect(joinedCalls(ctx).some((c) => c.includes("annotations"))).toBe(false);
   });
 
   it("selects nothing without a spot_check block, even when the default-branch run was billing-blocked", () => {
     const ctx = makeRepo();
     const base = git(ctx.repo, "rev-parse", "HEAD");
-    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
-      ...prRoutes({ base }),
-      ...ciRoutes(billingRun, { jobs: billingJobs, annotations: billingAnnotations }),
-    ]);
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(billingRunAt(base), { jobs: billingJobs })]);
     expect(r.status, r.stderr).toBe(0);
     const out = r.json().result;
-    expect(out.ci.state).toBe("unavailable");
     expect(out.decision).toMatchObject({ selected: false, reason: "off", rate: 0 });
+    // Off is decided before the changed files, the default branch and the CI
+    // runs are read, and nothing is written.
+    expect(out.ci).toBeNull();
+    expect(joinedCalls(ctx)).toEqual(["pr view 7 --json headRefOid,baseRefName,baseRefOid,changedFiles"]);
+    expect(fs.existsSync(logFile(ctx, 7))).toBe(false);
   });
 
   it("reports CI as unknown, never available, when the Actions API fails", () => {
@@ -208,32 +252,105 @@ describe("pr-stack spot-check", () => {
     expect(out.decision).toMatchObject({ selected: false, reason: "off" });
   });
 
+  it("reports CI as unknown when the jobs of the newest run cannot be read", () => {
+    const ctx = makeRepo({ attestation: { spot_check: {} } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
+      ...prRoutes({ base }),
+      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/501/jobs", status: 1, stderr: "HTTP 403" },
+      ...ciRoutes(billingRunAt(base)),
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json().result.ci).toMatchObject({ state: "unknown", available: null });
+    expect(r.json().result.decision).toMatchObject({ selected: false, reason: "off", rate: 0 });
+  });
+
+  it("reports CI unavailable when the newest completed run tested none of the recent commits", () => {
+    const ctx = makeRepo({ attestation: { spot_check: {} } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(greenRunAt("f".repeat(40)))]);
+    expect(r.status, r.stderr).toBe(0);
+    const out = r.json().result;
+    expect(out.ci.state).toBe("unavailable");
+    expect(out.ci.reason).toMatch(/not one of the last 1 commits/);
+    expect(out.decision).toMatchObject({ selected: true, reason: "ci_unavailable" });
+  });
+
+  it("reads the repository default branch when --trunk is not given, and records it", () => {
+    const ctx = makeRepo({ attestation: { spot_check: {} } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    git(ctx.repo, "push", "-q", "origin", "main:develop");
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [
+      { match: "^repo view --json defaultBranchRef", stdout: "develop\n" },
+      ...prRoutes({ base }),
+      ...ciRoutes(greenRunAt(base), { branch: "develop" }),
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json()).toMatchObject({ trunk: "develop", result: { ci: { state: "available" } } });
+    expect(readLog(ctx, 7).entries[0]).toMatchObject({ trunk: "develop", workflow: "test.yml" });
+    expect(joinedCalls(ctx).some((c) => c.includes("runs?branch=develop&status=completed"))).toBe(true);
+  });
+
+  it("is an env error when the default branch cannot be read and --trunk is not given", () => {
+    const ctx = makeRepo({ attestation: { spot_check: {} } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const r = runBin(ctx, ["spot-check", "--pr", "7"], [{ match: "^repo view", status: 1, stderr: "HTTP 502" }, ...prRoutes({ base })]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/default branch/);
+  });
+
   it("gives the same answer on the same head, from a roll derived from the head", () => {
     const ctx = makeRepo({ attestation: { spot_check: { rate: 0.5 } } });
     const base = git(ctx.repo, "rev-parse", "HEAD");
-    const routes = [...prRoutes({ base }), ...ciRoutes(greenRun)];
+    const routes = [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))];
     const first = runBin(ctx, ["spot-check", "--pr", "7", "--json"], routes).json().result;
     const second = runBin(ctx, ["spot-check", "--pr", "7", "--json"], routes).json().result;
     const roll = spotCheckRoll({ headSha: HEAD, prNumber: 7 });
     expect(first.roll).toBe(roll);
     expect(second.roll).toBe(roll);
-    expect(second.decision).toEqual(first.decision);
     expect(first.decision.selected).toBe(roll < 0.5);
+    expect(second.decision).toMatchObject({ selected: first.decision.selected, reason: first.decision.reason, rate: first.decision.rate });
     expect(readLog(ctx, 7).entries).toHaveLength(2);
+  });
+
+  it("keeps a selection sticky for its head after the CI state changes", () => {
+    // rate 0: only an unavailable CI can select, so a green run would flip it back.
+    const ctx = makeRepo({ attestation: { spot_check: { rate: 0 } } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const first = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(billingRunAt(base), { jobs: billingJobs })]);
+    expect(first.json().result.decision).toMatchObject({ selected: true, reason: "ci_unavailable", sticky: false });
+    const second = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))]);
+    expect(second.status, second.stderr).toBe(0);
+    expect(second.json().result.decision).toMatchObject({ selected: true, reason: "ci_unavailable", sticky: true });
+    expect(readLog(ctx, 7).entries.map((e) => [e.selected, e.sticky])).toEqual([
+      [true, false],
+      [true, true],
+    ]);
+    const text = runBin(ctx, ["spot-check", "--pr", "7"], [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))]);
+    expect(text.stdout).toMatch(/SELECTED \(ci_unavailable: sticky/);
+  });
+
+  it("lets a non-selection change when CI becomes unavailable", () => {
+    const ctx = makeRepo({ attestation: { spot_check: { rate: 0 } } });
+    const base = git(ctx.repo, "rev-parse", "HEAD");
+    const first = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))]);
+    expect(first.json().result.decision).toMatchObject({ selected: false });
+    const second = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(billingRunAt(base), { jobs: billingJobs })]);
+    expect(second.json().result.decision).toMatchObject({ selected: true, reason: "ci_unavailable", sticky: false });
   });
 
   it("reads the policy from the base commit, not the working tree", () => {
     const ctx = makeRepo({ attestation: { spot_check: { rate: 1 } } });
     const base = git(ctx.repo, "rev-parse", "HEAD");
     fs.writeFileSync(path.join(ctx.repo, ".dotbabel.json"), JSON.stringify({ attestation: { spot_check: { rate: 0 } } }));
-    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(greenRun)]);
+    const r = runBin(ctx, ["spot-check", "--pr", "7", "--json"], [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))]);
     expect(r.json().result.decision).toMatchObject({ selected: true, reason: "rate", rate: 1 });
   });
 
   it("treats an invalid base policy as an env error, not a default", () => {
     const ctx = makeRepo({ attestation: { spot_check: { rate: 2 } } });
     const base = git(ctx.repo, "rev-parse", "HEAD");
-    const r = runBin(ctx, ["spot-check", "--pr", "7"], [...prRoutes({ base }), ...ciRoutes(greenRun)]);
+    const r = runBin(ctx, ["spot-check", "--pr", "7"], [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))]);
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/spot_check\.rate/);
   });
@@ -241,7 +358,7 @@ describe("pr-stack spot-check", () => {
   it("records an explicit run and shows it next to the decision", () => {
     const ctx = makeRepo({ attestation: { spot_check: { rate: 1 } } });
     const base = git(ctx.repo, "rev-parse", "HEAD");
-    const routes = [...prRoutes({ base }), ...ciRoutes(greenRun)];
+    const routes = [...prRoutes({ base }), ...ciRoutes(greenRunAt(base))];
     expect(runBin(ctx, ["spot-check", "--pr", "7"], routes).status).toBe(0);
     const rec = runBin(ctx, ["spot-check", "--pr", "7", "--record-explicit", "fail"], routes);
     expect(rec.status, rec.stderr).toBe(0);
@@ -261,8 +378,8 @@ describe("pr-stack spot-check", () => {
 });
 
 describe("pr-stack main-status", () => {
-  function mainWithRuns() {
-    const ctx = makeRepo();
+  function mainWithRuns(config) {
+    const ctx = makeRepo(config);
     const c1 = commitOnMain(ctx, "feat: one (#101)");
     const c2 = commitOnMain(ctx, "feat: two (#102)");
     const c3 = commitOnMain(ctx, "feat: three (#103)");
@@ -270,30 +387,22 @@ describe("pr-stack main-status", () => {
     return { ctx, c1, c2, c3, c4 };
   }
 
-  const runsRoute = (runs) => ({
-    match: "^api repos/\\{owner\\}/\\{repo\\}/actions/workflows/test\\.yml/runs\\?branch=main&per_page=100$",
+  const runsRoute = (runs, branch = "main") => ({
+    match: `^api repos/\\{owner\\}/\\{repo\\}/actions/workflows/test\\.yml/runs\\?branch=${branch}&per_page=100$`,
     stdout: { total_count: runs.length, workflow_runs: runs },
   });
+  const redJobs = [{ id: 9002, name: "test", status: "completed", conclusion: "failure", runner_name: "r", steps: [{ number: 1 }] }];
 
   it("applies the cumulative rule and reports the debt newer than the last green run", () => {
     const { ctx, c1, c2, c3, c4 } = mainWithRuns();
-    const red = { id: 602, status: "completed", conclusion: "failure", head_sha: c3 };
     const r = runBin(ctx, ["main-status", "--limit", "4", "--json"], [
       runsRoute([
         { id: 603, status: "completed", conclusion: "failure", head_sha: c4 },
-        red,
+        { id: 602, status: "completed", conclusion: "failure", head_sha: c3 },
         { id: 601, status: "completed", conclusion: "success", head_sha: c2 },
       ]),
-      {
-        match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/603/jobs",
-        stdout: { jobs: billingJobs },
-      },
-      { match: "^api repos/\\{owner\\}/\\{repo\\}/check-runs/9001/annotations", stdout: billingAnnotations[9001] },
-      {
-        match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/602/jobs",
-        stdout: { jobs: [{ id: 9002, name: "test", status: "completed", conclusion: "failure", runner_name: "r", steps: [{ number: 1 }] }] },
-      },
-      { match: "^api repos/\\{owner\\}/\\{repo\\}/check-runs/9002/annotations", stdout: [] },
+      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/603/jobs", stdout: { jobs: billingJobs } },
+      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/602/jobs", stdout: { jobs: redJobs } },
     ]);
     expect(r.status, r.stderr).toBe(0);
     const out = r.json().result;
@@ -302,9 +411,29 @@ describe("pr-stack main-status", () => {
     expect(out.status.red).toEqual([c3]);
     expect(out.status.unverified).toEqual([c4]);
     expect(out.status.commits.map((c) => c.pr)).toEqual([104, 103, 102, 101]);
+    expect(joinedCalls(ctx).some((c) => c.includes("annotations"))).toBe(false);
     const text = runBin(ctx, ["main-status", "--limit", "4"], [runsRoute([{ id: 601, status: "completed", conclusion: "success", head_sha: c2 }])]);
     expect(text.stdout).toMatch(new RegExp(`last green ${c2.slice(0, 8)}`));
-    expect(text.stdout).toMatch(/debt: 2 commit\(s\) newer than the last green run/);
+    expect(text.stdout).toMatch(/debt: 2 commit\(s\) newer than the last green run \(0 red, 2 unverified, 0 unknown\)/);
+  });
+
+  it("reports a commit whose run jobs cannot be read as unknown debt, never unverified", () => {
+    const { ctx, c3, c4 } = mainWithRuns();
+    const r = runBin(ctx, ["main-status", "--limit", "4", "--json"], [
+      runsRoute([
+        { id: 603, status: "completed", conclusion: "failure", head_sha: c4 },
+        { id: 601, status: "completed", conclusion: "success", head_sha: c3 },
+      ]),
+      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/603/jobs", status: 1, stderr: "HTTP 502" },
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json().result.status).toMatchObject({ unknown: [c4], unverified: [], lastGreen: c3 });
+    const text = runBin(ctx, ["main-status", "--limit", "4"], [
+      runsRoute([{ id: 603, status: "completed", conclusion: "failure", head_sha: c4 }]),
+      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/603/jobs", status: 1 },
+    ]);
+    expect(text.stdout).toMatch(new RegExp(`\\? unknown +${c4.slice(0, 8)}`));
+    expect(text.stdout).toMatch(/0 red, 3 unverified, 1 unknown/);
   });
 
   it("reports unknown, never verified, when the runs cannot be read", () => {
@@ -320,16 +449,29 @@ describe("pr-stack main-status", () => {
     expect(runBin(ctx, ["main-status", "--limit", "4"], [{ match: "^api ", status: 1 }]).stdout).toMatch(/unknown/);
   });
 
-  it("shows each merged pull request's spot-check decision and explicit run", () => {
+  it("reads the repository default branch, and exits 2 when it cannot", () => {
     const { ctx, c4 } = mainWithRuns();
+    git(ctx.repo, "push", "-q", "origin", "main:develop");
+    const r = runBin(ctx, ["main-status", "--limit", "4", "--json"], [
+      { match: "^repo view --json defaultBranchRef", stdout: "develop\n" },
+      runsRoute([{ id: 601, status: "completed", conclusion: "success", head_sha: c4 }], "develop"),
+    ]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json()).toMatchObject({ trunk: "develop", result: { ref: "origin/develop", status: { lastGreen: c4 } } });
+    const bad = runBin(ctx, ["main-status"], [{ match: "^repo view", status: 1 }]);
+    expect(bad.status).toBe(2);
+  });
+
+  it("shows each merged pull request's spot-check decision and explicit run", () => {
+    const { ctx, c4 } = mainWithRuns({ attestation: { spot_check: { rate: 1 } } });
     const base = git(ctx.repo, "rev-parse", "HEAD~4");
-    const pr = [...prRoutes({ pr: 104, base }), ...ciRoutes(greenRun)];
-    runBin(ctx, ["spot-check", "--pr", "104"], pr);
-    runBin(ctx, ["spot-check", "--pr", "104", "--record-explicit", "pass"], pr);
+    const pr = [...prRoutes({ pr: 104, base }), ...ciRoutes(greenRunAt(c4))];
+    expect(runBin(ctx, ["spot-check", "--pr", "104"], pr).status).toBe(0);
+    expect(runBin(ctx, ["spot-check", "--pr", "104", "--record-explicit", "pass"], pr).status).toBe(0);
     const r = runBin(ctx, ["main-status", "--limit", "4", "--json"], [runsRoute([{ id: 601, status: "completed", conclusion: "success", head_sha: c4 }])]);
     expect(r.status, r.stderr).toBe(0);
     const row = r.json().result.status.commits.find((c) => c.pr === 104);
-    expect(row.spotCheck).toMatchObject({ selected: expect.any(Boolean), explicit: "pass" });
+    expect(row.spotCheck).toMatchObject({ selected: true, explicit: "pass" });
     expect(r.json().result.status.commits.find((c) => c.pr === 103).spotCheck).toBeNull();
   });
 
@@ -338,15 +480,34 @@ describe("pr-stack main-status", () => {
     commitOnMain(ctx, "chore: matrix (#1)", {
       ".local-attest.config.json": JSON.stringify({ matrix: [{ name: "ok", mode: "hard", command: "node -e \"process.exit(0)\"" }] }),
     });
-    const r = runBin(ctx, ["main-status", "--limit", "1", "--local", "--json"], [{ match: "^api ", status: 1 }]);
+    // Trusted through the real allowlist file, as `dotbabel project-init --trust` writes it.
+    const trustFile = path.join(ctx.root, "trusted");
+    fs.writeFileSync(trustFile, `${fs.realpathSync(ctx.repo)}\n`);
+    const r = runBin(ctx, ["main-status", "--limit", "1", "--local", "--json"], [{ match: "^api ", status: 1 }], { CHECK_ON_STOP_TRUSTED_FILE: trustFile });
     expect(r.status, r.stderr).toBe(0);
     const local = r.json().result.local;
     expect(local.result).toBe("pass");
+    expect(local.trust).toBe("allowlist");
     expect(local.label).toBe("local (same machine as the agent; weaker than CI)");
+    // No lockfile: nothing is installed, and the result says so.
+    expect(local.detail).toMatch(/no supported lockfile; no install ran/);
     expect(fs.existsSync(local.worktree)).toBe(false);
     expect(git(ctx.repo, "worktree", "list", "--porcelain").match(/^worktree /gm)).toHaveLength(1);
     // A local pass never verifies a commit.
     expect(r.json().result.status.verified).toEqual([]);
+  });
+
+  it("refuses --local without project-command trust, before it runs anything", () => {
+    const ctx = makeRepo();
+    commitOnMain(ctx, "chore: matrix (#1)", {
+      ".local-attest.config.json": JSON.stringify({ matrix: [{ name: "ok", mode: "hard", command: "node -e \"process.exit(0)\"" }] }),
+    });
+    const r = runBin(ctx, ["main-status", "--limit", "1", "--local"], [{ match: "^api ", status: 1 }]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/project-command trust/);
+    expect(r.stderr).toMatch(/--allow-project-commands/);
+    expect(joinedCalls(ctx)).toEqual([]);
+    expect(git(ctx.repo, "worktree", "list", "--porcelain").match(/^worktree /gm)).toHaveLength(1);
   });
 
   it("reports a failing local matrix and exits 1", () => {
@@ -354,28 +515,41 @@ describe("pr-stack main-status", () => {
     commitOnMain(ctx, "chore: matrix (#1)", {
       ".local-attest.config.json": JSON.stringify({ matrix: [{ name: "bad", mode: "hard", command: "node -e \"process.exit(3)\"" }] }),
     });
-    const r = runBin(ctx, ["main-status", "--limit", "1", "--local"], [{ match: "^api ", status: 1 }]);
+    const r = runBin(ctx, ["main-status", "--limit", "1", "--local", "--allow-project-commands"], [{ match: "^api ", status: 1 }]);
     expect(r.status).toBe(1);
     expect(r.stdout).toMatch(/local \(same machine as the agent; weaker than CI\): fail/);
     expect(git(ctx.repo, "worktree", "list", "--porcelain").match(/^worktree /gm)).toHaveLength(1);
   });
+
+  it("reports a failed dependency install as unknown, never as a failing matrix", () => {
+    const ctx = makeRepo();
+    // A lockfile with no package.json: `npm ci` refuses it.
+    commitOnMain(ctx, "chore: matrix (#1)", {
+      ".local-attest.config.json": JSON.stringify({ matrix: [{ name: "ok", mode: "hard", command: "node -e \"process.exit(0)\"" }] }),
+      "package-lock.json": "{}\n",
+    });
+    const r = runBin(ctx, ["main-status", "--limit", "1", "--local", "--allow-project-commands", "--json"], [{ match: "^api ", status: 1 }]);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json().result.local).toMatchObject({ result: "unknown", trust: "flag" });
+    expect(r.json().result.local.detail).toMatch(/^npm ci (failed|could not start)/);
+  });
 });
 
 describe("pr-stack contradiction", () => {
-  const passingAttestation = renderAttestationHeader(
-    buildAttestationPayload({ headSha: HEAD, legs: [{ name: "test", mode: "hard", status: "pass" }], now: new Date(0) }),
-  );
+  const attest = (head) =>
+    renderAttestationHeader(buildAttestationPayload({ headSha: head, legs: [{ name: "test", mode: "hard", status: "pass" }], now: new Date(0) }));
+  const passingAttestation = attest(HEAD);
 
-  function commentsRoute(bodies) {
+  function commentsRoute(bodies, { pr = 7, lastEditedAt = null } = {}) {
     return {
-      match: "^api graphql",
+      match: `^api graphql .*number=${pr} `,
       stdout: {
         data: {
           repository: {
             pullRequest: {
               comments: {
                 pageInfo: { hasNextPage: false, endCursor: null },
-                nodes: bodies.map((body) => ({ body, authorAssociation: "OWNER", lastEditedAt: null, author: { login: "owner" } })),
+                nodes: bodies.map((body) => ({ body, authorAssociation: "OWNER", lastEditedAt, author: { login: "owner" } })),
               },
             },
           },
@@ -384,81 +558,222 @@ describe("pr-stack contradiction", () => {
     };
   }
 
-  /** A merged pull request #7 whose merge commit is the tip of main. */
-  function merged() {
-    const ctx = makeRepo({ attestation: { enforce: true, trusted_associations: ["OWNER"] } });
-    const sha = commitOnMain(ctx, "feat: thing (#7)");
-    return { ctx, sha };
+  /** A merged pull request #7 whose merge commit is the tip of main, on top of the config commit. */
+  function merged(config = { attestation: { enforce: true, trusted_associations: ["OWNER"] } }, files = {}) {
+    const ctx = makeRepo(config);
+    const parent = git(ctx.repo, "rev-parse", "HEAD");
+    const sha = commitOnMain(ctx, "feat: thing (#7)", files);
+    return { ctx, sha, parent };
   }
 
-  function routes(sha, { jobs, annotations = [], comments = [passingAttestation], issues = [] }) {
+  const runsListRoute = (runs) => ({
+    match: "^api repos/\\{owner\\}/\\{repo\\}/actions/workflows/test\\.yml/runs\\?branch=main&per_page=100$",
+    stdout: { total_count: runs.length, workflow_runs: runs },
+  });
+  const ownRun = (sha) => ({ id: 555, status: "in_progress", conclusion: null, head_sha: sha });
+  const greenAt = (sha, id = 554) => ({ id, status: "completed", conclusion: "success", head_sha: sha });
+
+  function routes(sha, { jobs, parent, comments = [passingAttestation], issues = [], runs, lastEditedAt = null }) {
     return [
-      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/555$", stdout: { id: 555, status: "in_progress", conclusion: null, head_sha: sha } },
+      { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/555$", stdout: ownRun(sha) },
       { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/555/jobs", stdout: { jobs } },
-      { match: "^api repos/\\{owner\\}/\\{repo\\}/check-runs/\\d+/annotations", stdout: annotations },
+      runsListRoute(runs ?? [ownRun(sha), greenAt(parent)]),
       { match: `^api repos/\\{owner\\}/\\{repo\\}/commits/${sha}/pulls$`, stdout: [{ number: 7, merge_commit_sha: sha, head: { sha: HEAD } }] },
-      commentsRoute(comments),
+      commentsRoute(comments, { lastEditedAt }),
+      ...postRoutes(issues),
+    ];
+  }
+
+  function postRoutes(issues = []) {
+    return [
       { match: "^api repos/\\{owner\\}/\\{repo\\}/labels/attestation-contradicted$", status: 1, stderr: "HTTP 404" },
       { match: "^api --method POST repos/\\{owner\\}/\\{repo\\}/labels --input -$", stdout: {} },
-      { match: "^api --method POST repos/\\{owner\\}/\\{repo\\}/issues/7/labels --input -$", stdout: [] },
-      { match: "^issue list --label attestation-contradicted --state all", stdout: issues },
+      { match: "^api --method POST repos/\\{owner\\}/\\{repo\\}/issues/\\d+/labels --input -$", stdout: [] },
+      { match: "^issue list --label attestation-contradicted --state all --limit 500 --json number,body,state,author$", stdout: issues },
+      { match: "^issue reopen \\d+ --comment ", stdout: "" },
       { match: "^api --method POST repos/\\{owner\\}/\\{repo\\}/issues --input -$", stdout: { number: 99, html_url: "https://example.test/issues/99" } },
     ];
   }
 
+  const issuePosts = (ctx) => ghCalls(ctx).filter((c) => c.args.join(" ") === "api --method POST repos/{owner}/{repo}/issues --input -");
   const realFailure = [{ id: 9101, name: "test", status: "completed", conclusion: "failure", runner_name: "r", steps: [{ number: 1 }, { number: 2 }] }];
-  const ciEnv = { GITHUB_RUN_ID: "555", GITHUB_SERVER_URL: "https://github.example", GITHUB_REPOSITORY: "o/r" };
+  const ciEnv = { GITHUB_ACTIONS: "true", GITHUB_RUN_ID: "555", GITHUB_SERVER_URL: "https://github.example", GITHUB_REPOSITORY: "o/r" };
+  const bot = { login: "app/github-actions" };
 
   it("labels the pull request and opens one issue when a real failure contradicts a passing attestation", () => {
-    const { ctx, sha } = merged();
-    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure }), ciEnv);
+    const { ctx, sha, parent } = merged();
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure, parent }), ciEnv);
     expect(r.status, r.stderr).toBe(1);
     const out = r.json().result;
     expect(out.contradiction).toBe(true);
-    expect(out.pr).toBe(7);
-    expect(out.attestedSha).toBe(HEAD);
-    const calls = ghCalls(ctx);
-    const issuePost = calls.find((c) => c.args.join(" ") === "api --method POST repos/{owner}/{repo}/issues --input -");
-    expect(issuePost).toBeDefined();
-    const body = JSON.parse(issuePost.stdin);
+    expect(out.range).toEqual({ commits: [sha], lastGreen: parent, bounded: false });
+    expect(out.suspects).toEqual([{ pr: 7, attestedSha: HEAD, mergeSha: sha, edited: false }]);
+    expect(out.checked[0]).toMatchObject({ pr: 7, trustedAssociations: ["OWNER"], trustListSource: `.dotbabel.json at the first parent ${parent.slice(0, 8)}` });
+    const posts = issuePosts(ctx);
+    expect(posts).toHaveLength(1);
+    const body = JSON.parse(posts[0].stdin);
     expect(body.labels).toEqual(["attestation-contradicted"]);
-    expect(body.body).toContain(contradictionMarker({ pr: 7, sha: HEAD }));
+    expect(body.body).toContain(failingCommitMarker(sha));
     expect(body.body).toContain("https://github.example/o/r/actions/runs/555");
     expect(body.body).toContain(sha);
+    expect(body.body).toContain(HEAD);
+    const calls = ghCalls(ctx);
     const labelPost = calls.find((c) => c.args.join(" ") === "api --method POST repos/{owner}/{repo}/issues/7/labels --input -");
     expect(JSON.parse(labelPost.stdin)).toEqual({ labels: ["attestation-contradicted"] });
     expect(calls.some((c) => c.args.join(" ") === "api --method POST repos/{owner}/{repo}/labels --input -")).toBe(true);
+    expect(joinedCalls(ctx).some((c) => c.includes("annotations"))).toBe(false);
   });
 
   it("does not open a second issue when one already carries the marker", () => {
-    const { ctx, sha } = merged();
-    const issues = [{ number: 12, body: `old\n${contradictionMarker({ pr: 7, sha: HEAD })}\n` }];
-    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure, issues }), ciEnv);
+    const { ctx, sha, parent } = merged();
+    const issues = [{ number: 12, body: `old\n${failingCommitMarker(sha)}\n`, state: "OPEN", author: bot }];
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure, parent, issues }), ciEnv);
     expect(r.status, r.stderr).toBe(1);
-    expect(r.json().result.issue).toMatchObject({ number: 12, created: false });
-    expect(ghCalls(ctx).some((c) => c.args.join(" ") === "api --method POST repos/{owner}/{repo}/issues --input -")).toBe(false);
+    expect(r.json().result.issue).toMatchObject({ number: 12, created: false, reopened: false });
+    expect(issuePosts(ctx)).toHaveLength(0);
+  });
+
+  it("reopens a closed issue that the workflow opened, and says so", () => {
+    const { ctx, sha, parent } = merged();
+    const issues = [{ number: 12, body: failingCommitMarker(sha), state: "CLOSED", author: bot }];
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post"], routes(sha, { jobs: realFailure, parent, issues }), ciEnv);
+    expect(r.status, r.stderr).toBe(1);
+    expect(r.stdout).toMatch(/issue reopened \(it was closed\): #12/);
+    expect(joinedCalls(ctx).some((c) => /^issue reopen 12 --comment /.test(c))).toBe(true);
+    expect(issuePosts(ctx)).toHaveLength(0);
+  });
+
+  it("ignores a matching issue that someone other than the workflow opened, in CI", () => {
+    const { ctx, sha, parent } = merged();
+    const issues = [{ number: 12, body: failingCommitMarker(sha), state: "CLOSED", author: { login: "owner" } }];
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure, parent, issues }), ciEnv);
+    expect(r.status, r.stderr).toBe(1);
+    expect(r.json().result.issue).toMatchObject({ number: 99, created: true });
+    expect(issuePosts(ctx)).toHaveLength(1);
   });
 
   it("never treats a billing-blocked run as a contradiction", () => {
-    const { ctx, sha } = merged();
+    const { ctx, sha, parent } = merged();
     const jobs = [{ id: 9001, name: "test", status: "completed", conclusion: "failure", runner_name: "", steps: [] }];
-    const r = runBin(
-      ctx,
-      ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"],
-      routes(sha, { jobs, annotations: billingAnnotations[9001] }),
-      ciEnv,
-    );
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs, parent }), ciEnv);
     expect(r.status, r.stderr).toBe(0);
     expect(r.json().result).toMatchObject({ contradiction: false, run: "unverified" });
     expect(ghCalls(ctx).some((c) => c.args.includes("POST"))).toBe(false);
+    expect(joinedCalls(ctx).some((c) => c.includes("annotations"))).toBe(false);
   });
 
   it("is not a contradiction when the pull request had no passing attestation", () => {
-    const { ctx, sha } = merged();
-    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure, comments: [] }), ciEnv);
+    const { ctx, sha, parent } = merged();
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"], routes(sha, { jobs: realFailure, parent, comments: [] }), ciEnv);
     expect(r.status, r.stderr).toBe(0);
     expect(r.json().result.contradiction).toBe(false);
     expect(ghCalls(ctx).some((c) => c.args.includes("POST"))).toBe(false);
+  });
+
+  it("counts an attestation comment that was edited after it was posted, and says so", () => {
+    const { ctx, sha, parent } = merged();
+    const r = runBin(
+      ctx,
+      ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"],
+      routes(sha, { jobs: realFailure, parent, lastEditedAt: "2026-10-12T12:00:00Z" }),
+      ciEnv,
+    );
+    expect(r.status, r.stderr).toBe(1);
+    expect(r.json().result.suspects).toEqual([{ pr: 7, attestedSha: HEAD, mergeSha: sha, edited: true }]);
+    expect(JSON.parse(issuePosts(ctx)[0].stdin).body).toMatch(/edited after it was posted/);
+  });
+
+  it("reads the trust list from the first parent only, never from the merge commit", () => {
+    // The merged pull request adds its own trust list without OWNER. It must
+    // not be able to remove its own alarm that way.
+    const { ctx, sha, parent } = merged(undefined, { ".dotbabel.json": JSON.stringify({ attestation: { trusted_associations: ["MEMBER"] } }) });
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--json"], routes(sha, { jobs: realFailure, parent }), ciEnv);
+    expect(r.status, r.stderr).toBe(1);
+    expect(r.json().result.checked[0]).toMatchObject({ trustedAssociations: ["OWNER"], trustListSource: `.dotbabel.json at the first parent ${parent.slice(0, 8)}` });
+  });
+
+  it("uses the default OWNER trust list when the first parent has no .dotbabel.json", () => {
+    const { ctx, sha, parent } = merged(null, { ".dotbabel.json": JSON.stringify({ attestation: { trusted_associations: ["MEMBER"] } }) });
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure", "--json"], routes(sha, { jobs: realFailure, parent }), ciEnv);
+    expect(r.status, r.stderr).toBe(1);
+    expect(r.json().result.checked[0]).toMatchObject({
+      trustedAssociations: ["OWNER"],
+      trustListSource: `default OWNER (the first parent ${parent.slice(0, 8)} has no .dotbabel.json)`,
+    });
+  });
+
+  it("is an env error when the first parent's .dotbabel.json does not parse", () => {
+    const { ctx, sha, parent } = merged("{ not json");
+    const r = runBin(ctx, ["contradiction", "--sha", sha, "--test-result", "failure"], routes(sha, { jobs: realFailure, parent }), ciEnv);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/trust list at the first parent/);
+  });
+
+  it("checks every pull request merged since the last green run and opens one issue that names each suspect", () => {
+    const ctx = makeRepo({ attestation: { enforce: true } });
+    const green = git(ctx.repo, "rev-parse", "HEAD");
+    // #5 merged with no push run of its own (a CI-skip marker); #7 then failed.
+    const skipped = commitOnMain(ctx, "feat: five (#5)");
+    const sha = commitOnMain(ctx, "feat: seven (#7)");
+    const r = runBin(
+      ctx,
+      ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"],
+      [
+        { match: `^api repos/\\{owner\\}/\\{repo\\}/commits/${skipped}/pulls$`, stdout: [{ number: 5, merge_commit_sha: skipped, head: { sha: HEAD5 } }] },
+        commentsRoute([attest(HEAD5)], { pr: 5 }),
+        ...routes(sha, { jobs: realFailure, parent: skipped, runs: [ownRun(sha), greenAt(green)] }),
+      ],
+      ciEnv,
+    );
+    expect(r.status, r.stderr).toBe(1);
+    const out = r.json().result;
+    expect(out.range).toEqual({ commits: [sha, skipped], lastGreen: green, bounded: false });
+    expect(out.suspects.map((s) => s.pr)).toEqual([7, 5]);
+    const posts = issuePosts(ctx);
+    expect(posts).toHaveLength(1);
+    const body = JSON.parse(posts[0].stdin).body;
+    for (const text of ["#7", "#5", HEAD, HEAD5, sha, skipped, green]) expect(body).toContain(text);
+    const labelled = joinedCalls(ctx).filter((c) => /issues\/\d+\/labels/.test(c));
+    expect(labelled).toEqual([
+      "api --method POST repos/{owner}/{repo}/issues/7/labels --input -",
+      "api --method POST repos/{owner}/{repo}/issues/5/labels --input -",
+    ]);
+  });
+
+  it("raises no new alarm when the first parent's run was already red", () => {
+    const ctx = makeRepo({ attestation: { enforce: true } });
+    const red = commitOnMain(ctx, "feat: five (#5)");
+    const sha = commitOnMain(ctx, "feat: seven (#7)");
+    const r = runBin(
+      ctx,
+      ["contradiction", "--sha", sha, "--test-result", "failure", "--post", "--json"],
+      [
+        { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/553/jobs", stdout: { jobs: realFailure } },
+        ...routes(sha, { jobs: realFailure, parent: red, runs: [ownRun(sha), { id: 553, status: "completed", conclusion: "failure", head_sha: red }] }),
+      ],
+      ciEnv,
+    );
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.json().result).toMatchObject({ contradiction: false, firstParent: red });
+    expect(r.json().result.reason).toMatch(/already red/);
+    expect(ghCalls(ctx).some((c) => c.args.includes("POST"))).toBe(false);
+  });
+
+  it("is an env error when the first parent's run cannot be read", () => {
+    const ctx = makeRepo({ attestation: { enforce: true } });
+    const parent = commitOnMain(ctx, "feat: five (#5)");
+    const sha = commitOnMain(ctx, "feat: seven (#7)");
+    const r = runBin(
+      ctx,
+      ["contradiction", "--sha", sha, "--test-result", "failure"],
+      [
+        { match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/553/jobs", status: 1, stderr: "HTTP 502" },
+        ...routes(sha, { jobs: realFailure, parent, runs: [ownRun(sha), { id: 553, status: "completed", conclusion: "failure", head_sha: parent }] }),
+      ],
+      ciEnv,
+    );
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/already red/);
   });
 
   it("is not a contradiction when the test job did not fail", () => {
@@ -474,6 +789,19 @@ describe("pr-stack contradiction", () => {
     expect(r.status).toBe(2);
   });
 
+  it("is an env error when the jobs of the run cannot be read, never a silent no", () => {
+    const { ctx, sha, parent } = merged();
+    const r = runBin(
+      ctx,
+      ["contradiction", "--sha", sha, "--test-result", "failure"],
+      [{ match: "^api repos/\\{owner\\}/\\{repo\\}/actions/runs/555/jobs", status: 1, stderr: "HTTP 403" }, ...routes(sha, { jobs: realFailure, parent })],
+      ciEnv,
+    );
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/could not read the jobs/);
+    expect(ghCalls(ctx).some((c) => c.args.includes("POST"))).toBe(false);
+  });
+
   it("refuses a --sha that is not a full SHA", () => {
     const { ctx } = merged();
     const r = runBin(ctx, ["contradiction", "--sha", "HEAD;rm", "--test-result", "failure"], []);
@@ -486,15 +814,15 @@ describe("pr-stack contradiction", () => {
     const r = runBin(
       ctx,
       ["contradiction", "--pr", "7", "--local-failure", "--post", "--json"],
-      [
-        { match: "^pr view 7 --json headRefOid,baseRefOid$", stdout: { headRefOid: HEAD, baseRefOid: base } },
-        ...routes(base, { jobs: [] }).slice(4),
-      ],
+      [{ match: "^pr view 7 --json headRefOid,baseRefOid$", stdout: { headRefOid: HEAD, baseRefOid: base } }, commentsRoute([passingAttestation]), ...postRoutes()],
     );
     expect(r.status, r.stderr).toBe(1);
     expect(r.json().result).toMatchObject({ contradiction: true, pr: 7, attestedSha: HEAD, local: true });
-    const issuePost = ghCalls(ctx).find((c) => c.args.join(" ") === "api --method POST repos/{owner}/{repo}/issues --input -");
-    expect(JSON.parse(issuePost.stdin).body).toMatch(/same machine as the agent/);
+    const posts = issuePosts(ctx);
+    expect(posts).toHaveLength(1);
+    const body = JSON.parse(posts[0].stdin).body;
+    expect(body).toMatch(/same machine as the agent/);
+    expect(body).toContain(contradictionMarker({ pr: 7, sha: HEAD }));
   });
 });
 

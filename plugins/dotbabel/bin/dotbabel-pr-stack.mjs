@@ -23,9 +23,9 @@
  *   dotbabel pr-stack record  --pr <N> --phase <id> --outcome <o> [--reason <CODE>]
  *                             [--evidence <url>]... [--sha <full sha>]
  *   dotbabel pr-stack receipt --pr <N>
- *   dotbabel pr-stack spot-check --pr <N> [--show | --record-explicit pass|fail] [--workflow <file>]
- *   dotbabel pr-stack main-status [--limit <N>] [--local] [--workflow <file>]
- *   dotbabel pr-stack contradiction --sha <full sha> --test-result <result> [--post]
+ *   dotbabel pr-stack spot-check --pr <N> [--show | --record-explicit pass|fail] [--workflow <file>] [--trunk <ref>]
+ *   dotbabel pr-stack main-status [--limit <N>] [--local [--allow-project-commands]] [--workflow <file>] [--trunk <ref>]
+ *   dotbabel pr-stack contradiction --sha <full sha> --test-result <result> [--post] [--trunk <ref>]
  *   dotbabel pr-stack contradiction --pr <N> --local-failure [--post]
  *
  * `next` prints the commands to run; it never executes them. A rebase after a
@@ -36,7 +36,8 @@
  *   0   ok (plan clean, gate passed)
  *   1   gate failed, the stack has a structural problem needing a human, a
  *       contradiction was found, or a `main-status --local` run failed
- *   2   environment error (gh missing/unauthenticated, not a git repo)
+ *   2   environment error (gh missing/unauthenticated, not a git repo, data
+ *       that could not be read, a `--local` run without project-command trust)
  *   64  bad CLI invocation (unknown flag/subcommand, malformed --pr)
  */
 
@@ -65,17 +66,40 @@ import { criteriaGateInputs, prComments } from "../src/criteria/gate-inputs.mjs"
 import { attestationGateInputs, baseConfigAtRev } from "../src/attestation-gate-inputs.mjs";
 import {
   CONTRADICTION_LABEL,
-  classifyRun,
+  CONTRADICTION_RANGE_LIMIT,
+  LOCKFILE_INSTALLS,
+  RECENT_TRUNK_COMMITS,
+  attestationMatch,
+  bestRunStates,
   contradictionMarker,
+  contradictionRange,
   decideSpotCheck,
-  findContradictionIssue,
-  isContradiction,
+  failingCommitMarker,
+  installCommandsFor,
+  isSpotCheckOff,
   mainVerificationStatus,
-  mergeSubjectPr,
   renderContradictionIssue,
+  renderLocalContradictionIssue,
   resolveSpotCheckPolicy,
   spotCheckRoll,
 } from "../src/merge-verification.mjs";
+import {
+  InputError,
+  ciAvailability,
+  classifyWorkflowRun,
+  defaultBranch,
+  firstParentHistory,
+  ghApiJson,
+  labelContradicted,
+  mergedPullFor,
+  openContradictionIssue,
+  prChangedPaths,
+  readPrHead,
+  trunkCommits,
+  trustListAt,
+  workflowRunsFor,
+} from "../src/merge-verification-inputs.mjs";
+import { isRepoTrusted } from "../src/trust-allowlist.mjs";
 import { loadConfig as loadLocalAttestConfig } from "../src/local-attest-config.mjs";
 import { reviewEntryFacts } from "../src/review-gate-inputs.mjs";
 import { postReviewComplete } from "../src/review-complete.mjs";
@@ -93,6 +117,7 @@ import {
 import {
   appendSpotCheck,
   createSpotCheckStore,
+  firstSelection,
   spotCheckStorePath,
   spotCheckStoreProblem,
   summarizeSpotChecks,
@@ -118,7 +143,9 @@ const SUBCOMMANDS = new Set([
 ]);
 
 const FLAGS = {
-  trunk: { type: "string", default: "main" },
+  // No default here: most subcommands fall back to "main" (main()), while
+  // spot-check, main-status and contradiction read the repository default branch.
+  trunk: { type: "string" },
   // No default here: graph/plan fall back to 100 (fetchPrs), main-status to 20.
   limit: { type: "string" },
   pr: { type: "string" },
@@ -139,6 +166,7 @@ const FLAGS = {
   "test-result": { type: "string" },
   "local-failure": { type: "boolean" },
   post: { type: "boolean" },
+  "allow-project-commands": { type: "boolean" },
 };
 
 const HELP = `${TOOL} <subcommand> [options]
@@ -161,7 +189,8 @@ Subcommands:
   contradiction      Raise the alarm when a real test failure contradicts a passing attestation
 
 Options:
-  --trunk <ref>      Trunk branch name (default: main)
+  --trunk <ref>      Trunk branch name (default: main; spot-check, main-status
+                     and contradiction: the repository default branch)
   --limit <N>        Max PRs to enumerate (default: 100); main-status: commits (default: 20)
   --pr <N>           PR number (required by: next, gate except --gate skip-ci,
                      review-complete, record, receipt, spot-check,
@@ -185,11 +214,14 @@ Options:
   --record-explicit <pass|fail>
                      spot-check: record the result of the explicit run
   --local            main-status: also run the local-attest matrix on the
-                     default-branch tip in a temporary worktree (weaker than CI)
+                     default-branch tip in a temporary worktree (weaker than CI);
+                     needs project-command trust
+  --allow-project-commands
+                     main-status --local: run without the trust allowlist entry
   --test-result <r>  contradiction: the test job result (success | failure |
                      cancelled | skipped)
   --local-failure    contradiction: the explicit run of --pr failed locally
-  --post             contradiction: label the PR and open one issue
+  --post             contradiction: label each suspect PR and open one issue
   --json             Emit a single JSON object on stdout
   --help, -h         Show this help
   --version, -V      Show version
@@ -683,21 +715,16 @@ function renderReceipt(receipt) {
 // ---------------------------------------------------------------------------
 // Merge verification: spot-check, main-status, contradiction.
 //
-// The decisions are pure (src/merge-verification.mjs). Everything here reads
-// GitHub or git and feeds them. One rule runs through all of it: data that
-// could not be read is reported as `unknown`, and unknown is never verified.
+// The decisions are pure (src/merge-verification.mjs), and the GitHub and git
+// reads are in src/merge-verification-inputs.mjs. What stays here is the
+// argument parsing, the local spot-check log, the local matrix run, and the
+// output. One rule runs through all of it: data that could not be read is
+// reported as `unknown`, and unknown is never verified.
 // ---------------------------------------------------------------------------
 
-const FULL_SHA_RE = /^[0-9a-f]{40}$/i;
 const WORKFLOW_FILE_RE = /^[A-Za-z0-9._-]+\.ya?ml$/;
 const LOCAL_LABEL = "local (same machine as the agent; weaker than CI)";
-const FAILED_JOB = new Set(["failure", "timed_out", "startup_failure", "cancelled"]);
-// The frozen install for each lockfile, in the order they are tried.
-const LOCKFILE_INSTALLS = [
-  ["package-lock.json", ["npm", "ci"]],
-  ["pnpm-lock.yaml", ["pnpm", "install", "--frozen-lockfile"]],
-  ["yarn.lock", ["yarn", "install", "--immutable"]],
-];
+const READ = { run };
 
 /**
  * The `--workflow` value, checked before it reaches an API path.
@@ -712,20 +739,31 @@ function requireWorkflow(raw) {
 }
 
 /**
- * `gh api <path>` parsed as JSON, or null on any failure. A rate limit, a 404
- * or a token without the scope all read as "unknown", never as an empty answer.
+ * Run one gather and map an `InputError` to its exit: `usage` is 64, `env` 2.
  *
- * @param {string} apiPath
- * @returns {any}
+ * @template T
+ * @param {() => T} fn
+ * @returns {T}
  */
-function ghApiJsonOrNull(apiPath) {
-  const r = run(["gh", "api", apiPath]);
-  if (r.status !== 0) return null;
+function gather(fn) {
   try {
-    return JSON.parse(r.stdout);
-  } catch {
-    return null;
+    return fn();
+  } catch (err) {
+    if (err instanceof InputError) return fail(err.code === "usage" ? EXIT_CODES.USAGE : EXIT_CODES.ENV, err.message);
+    throw err;
   }
+}
+
+/**
+ * The branch to read: `--trunk` when given, otherwise the repository's
+ * default branch. An unreadable default branch is exit 2.
+ *
+ * @param {Record<string, any>} flags
+ * @param {boolean} trunkGiven
+ * @returns {string}
+ */
+function resolveTrunk(flags, trunkGiven) {
+  return trunkGiven ? String(flags.trunk) : gather(() => defaultBranch(READ));
 }
 
 /**
@@ -752,77 +790,7 @@ function ghApiPost(argv, jsonBody) {
   }
 }
 
-/**
- * `gh pr view <N> --json <fields>` and its head SHA. Exits 2 when the view
- * cannot be read or parsed, or carries no full head SHA.
- *
- * @param {number} prNumber
- * @param {string} fields The `--json` field list; must include `headRefOid`.
- * @returns {{ view: any, headSha: string }}
- */
-function readPrHead(prNumber, fields) {
-  const viewR = run(["gh", "pr", "view", String(prNumber), "--json", fields]);
-  if (viewR.status !== 0) return fail(EXIT_CODES.ENV, `could not read #${prNumber}:\n${viewR.stderr.trim()}`);
-  let view;
-  try {
-    view = JSON.parse(viewR.stdout);
-  } catch {
-    return fail(EXIT_CODES.ENV, `could not parse gh pr view output for #${prNumber}`);
-  }
-  const headSha = String(view?.headRefOid ?? "");
-  if (!FULL_SHA_RE.test(headSha)) return fail(EXIT_CODES.ENV, `#${prNumber} has no readable head SHA`);
-  return { view, headSha };
-}
-
-/**
- * Classify one workflow run. A successful run is taken at its word; any other
- * run has its jobs read, and the check-run annotations of its failed jobs,
- * because only those separate a real failure from a run that never started.
- *
- * @param {any} runObj A workflow run from the Actions API.
- * @returns {"green"|"red"|"unverified"}
- */
-function classifyWorkflowRun(runObj) {
-  if (!runObj || typeof runObj !== "object") return classifyRun(null);
-  const succeeded = runObj.status === "completed" && runObj.conclusion === "success";
-  if (succeeded || !Number.isInteger(runObj.id) || runObj.id <= 0) {
-    return classifyRun({ run: runObj, jobs: null, annotations: null });
-  }
-  const jobsResp = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/runs/${runObj.id}/jobs?per_page=100`);
-  const jobs = Array.isArray(jobsResp?.jobs) ? jobsResp.jobs : null;
-  const annotations = [];
-  for (const job of jobs ?? []) {
-    if (!FAILED_JOB.has(job?.conclusion) || !Number.isInteger(job?.id) || job.id <= 0) continue;
-    const list = ghApiJsonOrNull(`repos/{owner}/{repo}/check-runs/${job.id}/annotations`);
-    if (Array.isArray(list)) annotations.push(...list);
-  }
-  return classifyRun({ run: runObj, jobs, annotations });
-}
-
-/**
- * Whether the default branch's CI runs, from its latest COMPLETED run of the
- * test workflow. A run in progress says nothing yet, so it is not the sample.
- *
- * `available: null` is unknown (the API failed, or there is no run at all);
- * the caller then applies the normal rate, as the design says, and reports
- * the state as `unknown`.
- *
- * @param {string} workflow
- * @param {string} trunk
- * @returns {{ state: "available"|"unavailable"|"unknown", available: boolean|null,
- *             run: { id: number, url: string|null, classification: string }|null }}
- */
-function ciAvailability(workflow, trunk) {
-  if (!/^[A-Za-z0-9._/-]+$/.test(trunk)) return { state: "unknown", available: null, run: null };
-  const resp = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/workflows/${workflow}/runs?branch=${trunk}&status=completed&per_page=1`);
-  const latest = Array.isArray(resp?.workflow_runs) ? resp.workflow_runs[0] : undefined;
-  if (!latest) return { state: "unknown", available: null, run: null };
-  const classification = classifyWorkflowRun(latest);
-  const info = { id: latest.id, url: latest.html_url ?? null, classification };
-  return classification === "unverified"
-    ? { state: "unavailable", available: false, run: info }
-    : { state: "available", available: true, run: info };
-}
+const WRITE = { run, post: ghApiPost };
 
 /**
  * Append one entry to the pull request's spot-check log, under its own lock.
@@ -858,17 +826,21 @@ function spotCheckWhy(decision, roll) {
   return `roll ${roll.toFixed(4)} ${decision.selected ? "<" : ">="} rate ${decision.rate}`;
 }
 
+const VERIFY_NEXT = (prNumber) =>
+  `  → verify explicitly (/merge-pr step 6), then record it: dotbabel pr-stack spot-check --pr ${prNumber} --record-explicit pass|fail`;
+
 /**
  * The `spot-check` subcommand.
  *
  * @param {Record<string, any>} flags
  * @param {boolean} json
+ * @param {boolean} trunkGiven
  * @returns {Promise<void>}
  */
-async function spotCheckCommand(flags, json) {
+async function spotCheckCommand(flags, json, trunkGiven) {
   const prNumber = requireNumber(flags.pr, "--pr");
+  const file = spotCheckStorePath(gitCommonDir(), prNumber);
   if (flags.show === true) {
-    const file = spotCheckStorePath(gitCommonDir(), prNumber);
     const store = readSpotCheckStore(file, prNumber);
     const heads = store ? summarizeSpotChecks(store) : [];
     return emit({
@@ -882,7 +854,7 @@ async function spotCheckCommand(flags, json) {
               `spot-check #${prNumber}:`,
               ...heads.map(
                 (h) =>
-                  `  ${h.head_sha.slice(0, 8)}: ${h.selected === null ? "no decision" : `${h.selected ? "selected" : "not selected"} (${h.reason})`}, ` +
+                  `  ${h.head_sha.slice(0, 8)}: ${h.selected === null ? "no decision" : `${h.selected ? "selected" : "not selected"} (${h.reason}${h.sticky ? ", sticky" : ""})`}, ` +
                   `explicit run: ${h.explicit ?? "none recorded"}`,
               ),
             ],
@@ -894,11 +866,13 @@ async function spotCheckCommand(flags, json) {
     return fail(EXIT_CODES.USAGE, "--record-explicit must be pass or fail");
   }
   const workflow = requireWorkflow(flags.workflow);
-  const { view, headSha } = readPrHead(prNumber, "headRefOid,baseRefName,baseRefOid,changedFiles");
+  // The one GitHub read that comes before every decision: the base commit
+  // holds the policy, and the head is what the decision is about.
+  const { view, headSha } = gather(() => readPrHead(READ, prNumber, "headRefOid,baseRefName,baseRefOid,changedFiles"));
   const { version } = await import("../src/index.mjs");
 
   if (explicit !== undefined) {
-    const file = recordSpotCheck(prNumber, { kind: "explicit-run", headSha, outcome: explicit, toolVersion: version });
+    recordSpotCheck(prNumber, { kind: "explicit-run", headSha, outcome: explicit, toolVersion: version });
     return emit({
       subcommand: "spot-check",
       ok: true,
@@ -910,22 +884,78 @@ async function spotCheckCommand(flags, json) {
 
   let policy;
   try {
-    policy = resolveSpotCheckPolicy(baseConfigAtRev({ run }, String(view.baseRefOid ?? "")));
+    policy = resolveSpotCheckPolicy(baseConfigAtRev(READ, String(view.baseRefOid ?? "")));
   } catch (err) {
     // A policy that cannot be read must not become the default: a typo would
     // then lower the check rate without anyone seeing it.
     return fail(EXIT_CODES.ENV, err.message);
   }
-  const files = paginatedPrFiles(prNumber, view.changedFiles);
-  const ci = ciAvailability(workflow, String(flags.trunk));
   const roll = spotCheckRoll({ headSha, prNumber });
-  const decision = decideSpotCheck({
-    policy,
-    changedPaths: files === null ? null : files.map((f) => f.path),
-    ciAvailable: ci.available,
-    random: roll,
+  const head = headSha.toLowerCase();
+
+  // A selection is sticky. The roll is fixed for a head, but the rate follows
+  // the CI state and the base policy; without this, asking again after one
+  // green run could turn SELECTED into "not selected".
+  const prior = firstSelection(readSpotCheckStore(file, prNumber), headSha);
+  if (prior !== null) {
+    const decision = { selected: true, reason: prior.reason, rate: prior.rate, matched: null, sticky: true };
+    recordSpotCheck(prNumber, {
+      kind: "spot-check",
+      headSha,
+      selected: true,
+      reason: prior.reason,
+      rate: prior.rate,
+      roll,
+      ci: prior.ci,
+      workflow: prior.workflow,
+      trunk: prior.trunk,
+      sticky: true,
+      toolVersion: version,
+    });
+    return emit({
+      subcommand: "spot-check",
+      ok: true,
+      trunk: prior.trunk,
+      result: { pr: prNumber, headSha: head, roll, decision, ci: { state: prior.ci }, policy, firstSelectedAt: prior.at, log: file },
+      lines: [
+        `spot-check #${prNumber}: SELECTED (${prior.reason}: sticky; this head was first selected at ${prior.at})`,
+        "  the roll is fixed for a head, and a selection stays",
+        VERIFY_NEXT(prNumber),
+      ],
+      json,
+    });
+  }
+
+  // Off: nothing can select. Decide before the changed files, the default
+  // branch and the CI runs are read, and record nothing.
+  if (isSpotCheckOff(policy)) {
+    const decision = { selected: false, reason: "off", rate: 0, matched: null, sticky: false };
+    return emit({
+      subcommand: "spot-check",
+      ok: true,
+      result: { pr: prNumber, headSha: head, roll, decision, ci: null, policy, changedFilesKnown: null, log: null },
+      lines: [
+        `spot-check #${prNumber}: not selected (off: the base .dotbabel.json turns spot checks off; nothing read or recorded)`,
+        "  → the attestation stands; no explicit run",
+      ],
+      json,
+    });
+  }
+
+  const trunk = resolveTrunk(flags, trunkGiven);
+  const paths = prChangedPaths(READ, prNumber, view.changedFiles);
+  const recentShas = gather(() => {
+    try {
+      return trunkCommits(READ, { remote: String(flags.remote), trunk, limit: RECENT_TRUNK_COMMITS }).commits.map((c) => c.sha);
+    } catch (err) {
+      // An unreadable trunk makes CI `unknown`; a malformed one is a usage error.
+      if (err instanceof InputError && err.code === "env") return null;
+      throw err;
+    }
   });
-  const file = recordSpotCheck(prNumber, {
+  const ci = gather(() => ciAvailability(READ, { workflow, trunk, recentShas }));
+  const decision = { ...decideSpotCheck({ policy, changedPaths: paths, ciAvailable: ci.available, random: roll }), sticky: false };
+  recordSpotCheck(prNumber, {
     kind: "spot-check",
     headSha,
     selected: decision.selected,
@@ -934,52 +964,45 @@ async function spotCheckCommand(flags, json) {
     roll,
     ci: ci.state,
     workflow,
-    trunk: String(flags.trunk),
+    trunk,
+    sticky: false,
     toolVersion: version,
   });
-  const why = spotCheckWhy(decision, roll);
   return emit({
     subcommand: "spot-check",
     ok: true,
-    trunk: String(flags.trunk),
-    result: { pr: prNumber, headSha: headSha.toLowerCase(), roll, decision, ci, policy, changedFilesKnown: files !== null, log: file },
+    trunk,
+    result: { pr: prNumber, headSha: head, roll, decision, ci, policy, changedFilesKnown: paths !== null, log: file },
     lines: [
-      `spot-check #${prNumber}: ${decision.selected ? "SELECTED" : "not selected"} (${decision.reason}: ${why})`,
-      `  ci on ${flags.trunk}: ${ci.state}${ci.run ? ` (latest ${workflow} run ${ci.run.classification}${ci.run.url ? `, ${ci.run.url}` : ""})` : ""}`,
-      decision.selected
-        ? "  → verify explicitly (/merge-pr step 6), then record it: dotbabel pr-stack spot-check --pr " +
-          `${prNumber} --record-explicit pass|fail`
-        : "  → the attestation stands; no explicit run",
+      `spot-check #${prNumber}: ${decision.selected ? "SELECTED" : "not selected"} (${decision.reason}: ${spotCheckWhy(decision, roll)})`,
+      `  ci on ${trunk}: ${ci.state} (${ci.reason}${ci.run?.url ? `; ${ci.run.url}` : ""})`,
+      decision.selected ? VERIFY_NEXT(prNumber) : "  → the attestation stands; no explicit run",
     ],
     json,
   });
 }
 
 /**
- * Recent first-parent commits of `<remote>/<trunk>`, newest first, after a
- * best-effort fetch. Local git, not the API, so a rate limit cannot hide the
- * list; `fetched: false` says it may be stale.
+ * Refuse `main-status --local` unless the repository is trusted to run its
+ * own commands. The local run executes repository code as the current user:
+ * the local-attest config module, the install's lifecycle scripts, and every
+ * matrix leg, all from the default-branch tip. Under this spec's threat model
+ * that tip can hold code that merged on a forged attestation.
  *
- * @param {string} remote
- * @param {string} trunk
- * @param {number} limit
- * @returns {{ ref: string, fetched: boolean, commits: Array<{sha: string, pr: number|null, subject: string}> }}
+ * @param {Record<string, any>} flags
+ * @returns {"flag"|"allowlist"}
  */
-function trunkCommits(remote, trunk, limit) {
-  const ref = `${remote}/${trunk}`;
-  if (!/^[A-Za-z0-9._][A-Za-z0-9._/-]*$/.test(ref)) return fail(EXIT_CODES.USAGE, `${JSON.stringify(ref)} is not a plain ref name`);
-  const fetched = run(["git", "fetch", "--quiet", remote, trunk]).status === 0;
-  const log = run(["git", "log", "--first-parent", `-n${limit}`, "--format=%H%x09%s", `${ref}^{commit}`, "--"]);
-  if (log.status !== 0) return fail(EXIT_CODES.ENV, `cannot read ${ref}; run \`git fetch ${remote} ${trunk}\` and retry\n${log.stderr.trim()}`);
-  const commits = log.stdout
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => {
-      const [sha, ...rest] = line.split("\t");
-      const subject = rest.join("\t");
-      return { sha, pr: mergeSubjectPr(subject), subject };
-    });
-  return { ref, fetched, commits };
+function requireProjectTrust(flags) {
+  if (flags["allow-project-commands"] === true) return "flag";
+  const root = repoRoot();
+  const trust = isRepoTrusted({ repoRoot: root });
+  if (trust.trusted) return "allowlist";
+  return fail(
+    EXIT_CODES.ENV,
+    "main-status --local runs this repository's code from the default-branch tip as you: the local-attest config, " +
+      `the install's lifecycle scripts, and every matrix leg. ${root} is not on the project-command trust allowlist ` +
+      `(${trust.trustFile}). Trust it with \`dotbabel project-init --trust\`, or pass --allow-project-commands for this run.`,
+  );
 }
 
 /**
@@ -989,8 +1012,10 @@ function trunkCommits(remote, trunk, limit) {
  * refuses a detached HEAD and needs an open pull request, and a precondition
  * failure exits 1, which would read here as a failing matrix. Diagnostic mode
  * runs the whole matrix from its first leg, never posts, labels or pushes, and
- * cannot attest. Dependencies are installed from the lockfile first, as the
- * explicit path of /merge-pr does; an install failure is `unknown`, not `fail`.
+ * cannot attest. Dependencies are installed first from the same lockfile
+ * table as the explicit path of /merge-pr; with no supported lockfile nothing
+ * is installed and the detail says so. An install failure is `unknown`, not
+ * `fail`.
  *
  * @param {string} sha
  * @returns {Promise<{ sha: string, result: "pass"|"fail"|"unknown", exitCode: number|null, label: string,
@@ -1014,17 +1039,19 @@ async function runLocalMatrix(sha) {
     }
     const first = cfg.matrix[0]?.name;
     if (typeof first !== "string" || first === "") return { ...out, detail: "the local-attest matrix has no legs" };
-    const install = LOCKFILE_INSTALLS.find(([lockfile]) => existsSync(join(worktree, lockfile)))?.[1];
-    if (install !== undefined) {
-      const r = spawnSync(install[0], install.slice(1), { cwd: worktree, stdio: ["ignore", 2, 2] });
-      if (r.status !== 0) return { ...out, detail: `${install.join(" ")} failed (exit ${r.status ?? "signal"})` };
+    const installs = installCommandsFor(LOCKFILE_INSTALLS.map(([lockfile]) => lockfile).filter((f) => existsSync(join(worktree, f))));
+    for (const { argv } of installs) {
+      const r = spawnSync(argv[0], argv.slice(1), { cwd: worktree, stdio: ["ignore", 2, 2] });
+      if (r.error) return { ...out, detail: `${argv.join(" ")} could not start: ${r.error.message}` };
+      if (r.status !== 0) return { ...out, detail: `${argv.join(" ")} failed (exit ${r.status ?? "signal"})` };
     }
+    const installed = installs.length === 0 ? "no supported lockfile; no install ran" : null;
     const bin = fileURLToPath(new URL("./dotbabel-local-attest.mjs", import.meta.url));
     // The child's stdout goes to our stderr, so --json output stays one object.
     const r = spawnSync(process.execPath, [bin, "--from", first], { cwd: worktree, stdio: ["ignore", 2, 2] });
     const code = r.status ?? null;
-    if (code === 0 || code === 1) return { ...out, exitCode: code, result: code === 0 ? "pass" : "fail" };
-    return { ...out, exitCode: code, detail: `local-attest exited ${code ?? "on a signal"}` };
+    if (code === 0 || code === 1) return { ...out, exitCode: code, result: code === 0 ? "pass" : "fail", detail: installed };
+    return { ...out, exitCode: code, detail: [`local-attest exited ${code ?? "on a signal"}`, installed].filter(Boolean).join("; ") };
   } finally {
     run(["git", "worktree", "remove", "--force", worktree]);
     run(["git", "worktree", "prune"]);
@@ -1033,13 +1060,13 @@ async function runLocalMatrix(sha) {
 }
 
 /**
- * The latest spot-check decision a pull request's receipt recorded, or null
- * when the receipt is absent, unreadable, invalid, or holds none. Unlike
- * `readReceipt` it never exits: one bad receipt must not stop the report.
+ * The spot-check decision that stands for a pull request's latest head, or
+ * null when its log is absent, unreadable, invalid, or holds none. Unlike
+ * `readSpotCheckStore` it never exits: one bad log must not stop the report.
  *
  * @param {string} file
  * @param {number} prNumber
- * @returns {{ head_sha: string, selected: boolean|null, reason: string|null, explicit: "pass"|"fail"|null }|null}
+ * @returns {{ head_sha: string, selected: boolean|null, reason: string|null, sticky: boolean, explicit: "pass"|"fail"|null }|null}
  */
 function latestSpotCheck(file, prNumber) {
   if (!existsSync(file)) return null;
@@ -1048,7 +1075,7 @@ function latestSpotCheck(file, prNumber) {
     if (spotCheckStoreProblem(store, prNumber) !== null) return null;
     const latest = summarizeSpotChecks(store).at(-1);
     if (!latest) return null;
-    return { head_sha: latest.head_sha, selected: latest.selected, reason: latest.reason, explicit: latest.explicit };
+    return { head_sha: latest.head_sha, selected: latest.selected, reason: latest.reason, sticky: latest.sticky, explicit: latest.explicit };
   } catch {
     return null;
   }
@@ -1059,28 +1086,20 @@ function latestSpotCheck(file, prNumber) {
  *
  * @param {Record<string, any>} flags
  * @param {boolean} json
+ * @param {boolean} trunkGiven
  * @returns {Promise<void>}
  */
-async function mainStatusCommand(flags, json) {
+async function mainStatusCommand(flags, json, trunkGiven) {
   const limit = flags.limit === undefined ? 20 : requireNumber(flags.limit, "--limit");
   const workflow = requireWorkflow(flags.workflow);
-  const trunk = String(flags.trunk);
-  const { ref, fetched, commits } = trunkCommits(String(flags.remote), trunk, limit);
-
-  // Runs for these commits. One page of the newest 100; an older commit with
-  // no run in it is debt unless a newer green run covers it.
-  const resp = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/workflows/${workflow}/runs?branch=${trunk}&per_page=100`);
-  let runs = null;
-  if (Array.isArray(resp?.workflow_runs)) {
-    const wanted = new Set(commits.map((c) => c.sha.toLowerCase()));
-    runs = resp.workflow_runs
-      .filter((r) => wanted.has(String(r?.head_sha ?? "").toLowerCase()))
-      .map((r) => ({ headSha: String(r.head_sha).toLowerCase(), state: classifyWorkflowRun(r) }));
-  }
+  const trust = flags.local === true ? requireProjectTrust(flags) : null;
+  const trunk = resolveTrunk(flags, trunkGiven);
+  const { ref, fetched, commits } = gather(() => trunkCommits(READ, { remote: String(flags.remote), trunk, limit }));
+  const runs = gather(() => workflowRunsFor(READ, { workflow, trunk, shas: commits.map((c) => c.sha) }));
   const status = mainVerificationStatus({ commits, runs });
 
-  // What the receipt recorded for each merged pull request: the latest
-  // spot-check decision and whether an explicit run followed. Local and
+  // What the spot-check log recorded for each merged pull request: the
+  // decision that stands and whether an explicit run followed. Local and
   // self-reported; absent on another machine.
   const common = gitCommonDir();
   const rows = status.commits.map((c, i) => ({
@@ -1089,9 +1108,9 @@ async function mainStatusCommand(flags, json) {
     spotCheck: c.pr === null ? null : latestSpotCheck(spotCheckStorePath(common, c.pr), c.pr),
   }));
 
-  const local = flags.local === true && commits.length > 0 ? await runLocalMatrix(commits[0].sha) : null;
+  const local = flags.local === true && commits.length > 0 ? { ...(await runLocalMatrix(commits[0].sha)), trust } : null;
   const icon = { verified: "✓", red: "✗", unverified: "·", unknown: "?" };
-  const debt = status.unverified.length + status.red.length;
+  const debt = status.unverified.length + status.red.length + status.unknown.length;
   const lines = [
     `main-status on ${ref}${fetched ? "" : " (fetch failed; may be stale)"}: ` +
       (status.known
@@ -1104,7 +1123,8 @@ async function mainStatusCommand(flags, json) {
       return `  ${icon[c.state]} ${c.state.padEnd(10)} ${c.sha.slice(0, 8)} ${c.pr === null ? "" : `#${c.pr} `}${c.subject}${spot}`;
     }),
     status.known
-      ? `  debt: ${debt} commit(s) newer than the last green run (${status.red.length} red, ${status.unverified.length} unverified)`
+      ? `  debt: ${debt} commit(s) newer than the last green run ` +
+        `(${status.red.length} red, ${status.unverified.length} unverified, ${status.unknown.length} unknown)`
       : `  debt: unknown (${status.unknown.length} commit(s) unknown)`,
     ...(local
       ? [`  ${LOCAL_LABEL}: ${local.result} on ${local.sha.slice(0, 8)}${local.detail ? ` (${local.detail})` : ""}`]
@@ -1121,225 +1141,221 @@ async function mainStatusCommand(flags, json) {
 }
 
 /**
- * Ensure the contradiction label exists, then put it on the pull request.
+ * Label each suspect and open (or reopen) the one issue for this alarm.
  *
- * @param {number} prNumber
- * @returns {void}
- */
-function labelContradicted(prNumber) {
-  if (run(["gh", "api", `repos/{owner}/{repo}/labels/${CONTRADICTION_LABEL}`]).status !== 0) {
-    try {
-      ghApiPost(["gh", "api", "--method", "POST", "repos/{owner}/{repo}/labels", "--input", "-"], {
-        name: CONTRADICTION_LABEL,
-        color: "b60205",
-        description: "A real test failure contradicted this pull request's passing attestation",
-      });
-    } catch (err) {
-      // Another run may have created it in between; the label POST below
-      // fails loudly if it really does not exist.
-      process.stderr.write(`${TOOL}: warning: could not create label ${CONTRADICTION_LABEL}: ${err.message}\n`);
-    }
-  }
-  ghApiPost(["gh", "api", "--method", "POST", `repos/{owner}/{repo}/issues/${prNumber}/labels`, "--input", "-"], {
-    labels: [CONTRADICTION_LABEL],
-  });
-}
-
-/**
- * Open the contradiction issue unless one already carries its marker.
- *
- * @param {ReturnType<typeof renderContradictionIssue>} issue
+ * @param {number[]} prs
+ * @param {{ title: string, body: string, labels: string[] }} issue
  * @param {string} marker
- * @returns {{ number: number|null, url: string|null, created: boolean }}
+ * @returns {ReturnType<typeof openContradictionIssue>}
  */
-function openContradictionIssue(issue, marker) {
-  const list = run(["gh", "issue", "list", "--label", CONTRADICTION_LABEL, "--state", "all", "--limit", "500", "--json", "number,body"]);
-  if (list.status !== 0) throw new Error(`could not list ${CONTRADICTION_LABEL} issues:\n${list.stderr.trim()}`);
-  let existing = null;
+function postContradiction(prs, issue, marker) {
   try {
-    existing = findContradictionIssue(JSON.parse(list.stdout), marker);
-  } catch {
-    throw new Error(`could not parse the ${CONTRADICTION_LABEL} issue list`);
+    for (const pr of prs) labelContradicted(WRITE, pr);
+    return openContradictionIssue(WRITE, { issue, marker, workflowOnly: process.env.GITHUB_ACTIONS === "true" });
+  } catch (err) {
+    return fail(EXIT_CODES.ENV, `contradiction found for ${prs.map((n) => `#${n}`).join(", ")}, but posting failed: ${err.message}`);
   }
-  if (existing !== null) return { number: existing, url: null, created: false };
-  const created = ghApiPost(["gh", "api", "--method", "POST", "repos/{owner}/{repo}/issues", "--input", "-"], issue);
-  return { number: Number.isInteger(created?.number) ? created.number : null, url: created?.html_url ?? null, created: true };
 }
 
 /**
- * The trusted associations from `.dotbabel.json` at `rev`, or null.
+ * One line that says what `--post` did.
  *
- * @param {string} rev A revision expression; resolved to a full SHA first.
- * @returns {string[]|null}
+ * @param {number[]} prs
+ * @param {ReturnType<typeof openContradictionIssue>|null} posted
+ * @returns {string}
  */
-function trustedAssociationsAt(rev) {
-  const resolved = run(["git", "rev-parse", "--verify", "--quiet", `${rev}^{commit}`]);
-  const sha = resolved.stdout.trim();
-  if (resolved.status !== 0 || !FULL_SHA_RE.test(sha)) return null;
-  try {
-    const cfg = /** @type {any} */ (baseConfigAtRev({ run }, sha));
-    if (cfg === undefined) return null;
-    const list = cfg?.attestation?.trusted_associations;
-    return Array.isArray(list) && list.length > 0 ? list.map(String) : ["OWNER"];
-  } catch {
-    return null;
-  }
+function postedLine(prs, posted) {
+  if (!posted) return "  not posted (pass --post to label the pull request and open an issue)";
+  const state = posted.created ? "opened" : posted.reopened ? "reopened (it was closed)" : "already open";
+  return `  labelled ${prs.map((n) => `#${n}`).join(", ")} ${CONTRADICTION_LABEL}; issue ${state}: #${posted.number ?? "?"}${posted.url ? ` ${posted.url}` : ""}`;
 }
 
 /**
- * The `contradiction` subcommand.
+ * `contradiction --pr <N> --local-failure`: an explicit run on this machine
+ * failed against the pull request head, before the merge.
  *
  * @param {Record<string, any>} flags
  * @param {boolean} json
  * @returns {Promise<void>}
  */
-async function contradictionCommand(flags, json) {
-  const localFailure = flags["local-failure"] === true;
-  let prNumber;
-  let attestedSha;
-  let mergeSha = null;
-  let runUrl = null;
-  let runState;
-  let trusted;
-
-  if (localFailure) {
-    prNumber = requireNumber(flags.pr, "--pr");
-    const { view, headSha } = readPrHead(prNumber, "headRefOid,baseRefOid");
-    attestedSha = headSha;
-    const base = String(view?.baseRefOid ?? "");
-    trusted = FULL_SHA_RE.test(base) ? trustedAssociationsAt(base) : null;
-    runState = "red";
-  } else {
-    const sha = typeof flags.sha === "string" ? flags.sha : "";
-    if (!FULL_SHA_RE.test(sha)) return fail(EXIT_CODES.USAGE, "--sha must be a full 40-character SHA (or pass --pr <N> --local-failure)");
-    const testResult = flags["test-result"];
-    if (!["success", "failure", "cancelled", "skipped"].includes(testResult)) {
-      return fail(EXIT_CODES.USAGE, "--test-result must be one of: success, failure, cancelled, skipped");
-    }
-    mergeSha = sha.toLowerCase();
-    if (testResult !== "failure") {
-      return emit({
-        subcommand: "contradiction",
-        ok: true,
-        result: { contradiction: false, sha: mergeSha, testResult, run: null, reason: "the test job did not fail" },
-        lines: [`contradiction: none (test result ${testResult})`],
-        json,
-      });
-    }
-    // Classify the run before believing the failure. In CI the run is this
-    // very workflow run; locally it is the latest run of the workflow for
-    // the commit. A run that never started tested nothing and contradicts
-    // nothing; a run that cannot be read is an environment error, never a
-    // silent "no".
-    const workflow = requireWorkflow(flags.workflow);
-    const runId = /^\d+$/.test(process.env.GITHUB_RUN_ID ?? "") ? process.env.GITHUB_RUN_ID : null;
-    let runObj = null;
-    if (runId !== null) {
-      runObj = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/runs/${runId}`);
-    } else {
-      const resp = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/workflows/${workflow}/runs?head_sha=${mergeSha}&per_page=1`);
-      runObj = Array.isArray(resp?.workflow_runs) ? (resp.workflow_runs[0] ?? null) : null;
-    }
-    if (!runObj) return fail(EXIT_CODES.ENV, `could not read the workflow run for ${mergeSha}; cannot tell a real failure from a run that never started`);
-    runState = classifyWorkflowRun(runObj);
-    const server = process.env.GITHUB_SERVER_URL;
-    const repo = process.env.GITHUB_REPOSITORY;
-    runUrl =
-      runId !== null && server && repo && /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo)
-        ? `${server}/${repo}/actions/runs/${runId}`
-        : (runObj.html_url ?? null);
-    if (runState !== "red") {
-      return emit({
-        subcommand: "contradiction",
-        ok: true,
-        result: {
-          contradiction: false,
-          sha: mergeSha,
-          testResult,
-          run: runState,
-          runUrl,
-          reason: runState === "green" ? "the run passed" : "the run did not test anything (unverified)",
-        },
-        lines: [
-          runState === "green"
-            ? "contradiction: none (the run passed)"
-            : "contradiction: none (the run is unverified: it never ran the tests, so it proves nothing either way)",
-        ],
-        json,
-      });
-    }
-    const pulls = ghApiJsonOrNull(`repos/{owner}/{repo}/commits/${mergeSha}/pulls`);
-    if (!Array.isArray(pulls)) return fail(EXIT_CODES.ENV, `could not read the pull request merged as ${mergeSha}`);
-    const pr = pulls.find((p) => String(p?.merge_commit_sha ?? "").toLowerCase() === mergeSha);
-    if (!pr) {
-      return emit({
-        subcommand: "contradiction",
-        ok: true,
-        result: { contradiction: false, sha: mergeSha, testResult, run: runState, runUrl, reason: "no pull request was merged as this commit" },
-        lines: [`contradiction: none (no pull request was merged as ${mergeSha.slice(0, 8)})`],
-        json,
-      });
-    }
-    prNumber = Number(pr.number);
-    attestedSha = String(pr?.head?.sha ?? "");
-    if (!Number.isInteger(prNumber) || prNumber <= 0 || !FULL_SHA_RE.test(attestedSha)) {
-      return fail(EXIT_CODES.ENV, `the pull request merged as ${mergeSha} has no readable number or head`);
-    }
-    // The trust list the merge gate used: the base the pull request merged
-    // into, which is the merge commit's first parent.
-    trusted = trustedAssociationsAt(`${mergeSha}^1`) ?? trustedAssociationsAt(mergeSha);
-  }
-
-  const comments = prComments({ run }, prNumber);
+async function localContradiction(flags, json) {
+  const prNumber = requireNumber(flags.pr, "--pr");
+  const { view, headSha } = gather(() => readPrHead(READ, prNumber, "headRefOid,baseRefOid"));
+  const base = String(view?.baseRefOid ?? "");
+  if (!/^[0-9a-f]{40}$/i.test(base)) return fail(EXIT_CODES.ENV, `#${prNumber} has no readable base SHA`);
+  const trust = gather(() => trustListAt(READ, base, "pull request base"));
+  const comments = prComments(READ, prNumber);
   if (comments === null) return fail(EXIT_CODES.ENV, `could not read the comments of #${prNumber}`);
-  const trustedAssociations = trusted ?? ["OWNER"];
-  const contradicted = isContradiction({
-    testResult: /** @type {any} */ (runState),
-    attestation: { comments, headSha: attestedSha, trustedAssociations },
-  });
-  const base = {
+  const match = attestationMatch({ comments, headSha, trustedAssociations: trust.list });
+  const attestedSha = headSha.toLowerCase();
+  const result = {
     pr: prNumber,
-    attestedSha: attestedSha.toLowerCase(),
-    sha: mergeSha,
-    local: localFailure,
-    run: runState,
-    runUrl,
-    trustedAssociations,
-    trustListSource: trusted === null ? "default OWNER (no trust list could be read from the base)" : "base .dotbabel.json",
+    attestedSha,
+    local: true,
+    run: "red",
+    trustedAssociations: trust.list,
+    trustListSource: trust.source,
+    edited: match.edited,
   };
-  if (!contradicted) {
+  if (!match.found) {
     return emit({
       subcommand: "contradiction",
       ok: true,
-      result: { ...base, contradiction: false, reason: "no current, trusted, passing attestation for the head" },
-      lines: [`contradiction: none (#${prNumber} had no current, trusted, passing attestation for ${attestedSha.slice(0, 8)})`],
+      result: { ...result, contradiction: false, reason: "no trusted, passing attestation for the head" },
+      lines: [`contradiction: none (#${prNumber} had no trusted, passing attestation for ${attestedSha.slice(0, 8)})`],
       json,
     });
   }
-
-  let posted = null;
-  if (flags.post === true) {
-    const issue = renderContradictionIssue({ pr: prNumber, attestedSha, mergeSha, runUrl, local: localFailure });
-    try {
-      labelContradicted(prNumber);
-      posted = openContradictionIssue(issue, contradictionMarker({ pr: prNumber, sha: attestedSha }));
-    } catch (err) {
-      return fail(EXIT_CODES.ENV, `contradiction found for #${prNumber}, but posting failed: ${err.message}`);
-    }
-  }
+  const posted =
+    flags.post === true
+      ? postContradiction([prNumber], renderLocalContradictionIssue({ pr: prNumber, attestedSha, edited: match.edited }), contradictionMarker({ pr: prNumber, sha: attestedSha }))
+      : null;
   return emit({
     subcommand: "contradiction",
     ok: false,
-    result: { ...base, contradiction: true, label: CONTRADICTION_LABEL, issue: posted },
-    problems: [{ code: "ATTESTATION_CONTRADICTED", message: `#${prNumber} was attested as passing at ${attestedSha}, and a real test run failed` }],
+    result: { ...result, contradiction: true, label: CONTRADICTION_LABEL, issue: posted },
+    problems: [{ code: "ATTESTATION_CONTRADICTED", message: `#${prNumber} was attested as passing at ${attestedSha}, and an explicit run failed` }],
     lines: [
-      `contradiction: FOUND — #${prNumber} was attested as passing at ${attestedSha.slice(0, 8)}, and ${
-        localFailure ? `an explicit run failed (${LOCAL_LABEL})` : `the ${mergeSha ? `run on ${mergeSha.slice(0, 8)}` : "run"} failed`
-      }`,
+      `contradiction: FOUND — #${prNumber} was attested as passing at ${attestedSha.slice(0, 8)}, and an explicit run failed (${LOCAL_LABEL})`,
+      ...(match.edited ? ["  the attestation comment was edited after it was posted"] : []),
+      postedLine([prNumber], posted),
+    ],
+    json,
+  });
+}
+
+/**
+ * The `contradiction` subcommand.
+ *
+ * With `--sha`, it judges a failed push run on the default branch. The run
+ * can blame every commit back to the last green run (the cumulative rule), so
+ * it checks every pull request merged in that first-parent range, at most
+ * CONTRADICTION_RANGE_LIMIT commits. Each one with a trusted, passing
+ * attestation is a suspect. All suspects get the label, and the failing
+ * commit gets one issue. When the first parent's own run was already red,
+ * the default branch was red before this push, so it raises no new alarm.
+ *
+ * @param {Record<string, any>} flags
+ * @param {boolean} json
+ * @param {boolean} trunkGiven
+ * @returns {Promise<void>}
+ */
+async function contradictionCommand(flags, json, trunkGiven) {
+  if (flags["local-failure"] === true) return localContradiction(flags, json);
+  const sha = typeof flags.sha === "string" ? flags.sha : "";
+  if (!/^[0-9a-f]{40}$/i.test(sha)) return fail(EXIT_CODES.USAGE, "--sha must be a full 40-character SHA (or pass --pr <N> --local-failure)");
+  const testResult = flags["test-result"];
+  if (!["success", "failure", "cancelled", "skipped"].includes(testResult)) {
+    return fail(EXIT_CODES.USAGE, "--test-result must be one of: success, failure, cancelled, skipped");
+  }
+  const failing = sha.toLowerCase();
+  const none = (result, line) =>
+    emit({ subcommand: "contradiction", ok: true, result: { sha: failing, testResult, ...result, contradiction: false }, lines: [line], json });
+  if (testResult !== "failure") return none({ run: null, reason: "the test job did not fail" }, `contradiction: none (test result ${testResult})`);
+
+  // Classify the run before believing the failure. In CI the run is this very
+  // workflow run; locally it is the latest run of the workflow for the
+  // commit. A run that never started tested nothing and contradicts nothing.
+  // A run or a jobs list that cannot be read is exit 2, never a silent "no".
+  const workflow = requireWorkflow(flags.workflow);
+  const runId = /^\d+$/.test(process.env.GITHUB_RUN_ID ?? "") ? process.env.GITHUB_RUN_ID : null;
+  let runObj;
+  if (runId !== null) {
+    runObj = ghApiJson(READ, `repos/{owner}/{repo}/actions/runs/${runId}`);
+  } else {
+    const resp = ghApiJson(READ, `repos/{owner}/{repo}/actions/workflows/${workflow}/runs?head_sha=${failing}&per_page=1`);
+    runObj = Array.isArray(resp?.workflow_runs) ? (resp.workflow_runs[0] ?? null) : null;
+  }
+  if (!runObj) return fail(EXIT_CODES.ENV, `could not read the workflow run for ${failing}; cannot tell a real failure from a run that never started`);
+  const runState = classifyWorkflowRun(READ, runObj);
+  const server = process.env.GITHUB_SERVER_URL;
+  const repo = process.env.GITHUB_REPOSITORY;
+  const runUrl =
+    runId !== null && server && repo && /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo)
+      ? `${server}/${repo}/actions/runs/${runId}`
+      : (runObj.html_url ?? null);
+  if (runState === "unknown") {
+    return fail(EXIT_CODES.ENV, `could not read the jobs of the run for ${failing}; cannot tell a real failure from a run that never started`);
+  }
+  if (runState === "green") return none({ run: runState, runUrl, reason: "the run passed" }, "contradiction: none (the run passed)");
+  if (runState === "unverified") {
+    return none(
+      { run: runState, runUrl, reason: "the run did not test anything (unverified)" },
+      "contradiction: none (the run is unverified: it never ran the tests, so it proves nothing either way)",
+    );
+  }
+
+  // The range the red run can blame: back to the last green run.
+  const trunk = resolveTrunk(flags, trunkGiven);
+  const history = gather(() => firstParentHistory(READ, failing, CONTRADICTION_RANGE_LIMIT + 1));
+  if (history[0]?.sha !== failing) return fail(EXIT_CODES.ENV, `cannot read the history of ${failing}`);
+  const parent = history[1]?.sha ?? null;
+  const runs = gather(() => workflowRunsFor(READ, { workflow, trunk, shas: history.map((c) => c.sha), classify: (s) => s === parent }));
+  if (runs === null) return fail(EXIT_CODES.ENV, `could not read the ${workflow} runs on ${trunk}; cannot find the last green commit`);
+  const best = bestRunStates(runs);
+  const parentState = parent === null ? null : (best.get(parent) ?? null);
+  if (parentState === "unknown") {
+    return fail(EXIT_CODES.ENV, `could not read the run of the first parent ${parent}; cannot tell whether ${trunk} was already red`);
+  }
+  if (parentState === "red") {
+    return none(
+      { run: runState, runUrl, firstParent: parent, reason: "the default branch was already red at the first parent" },
+      `contradiction: no new alarm (the first parent ${parent.slice(0, 8)} already had a red run, so ${trunk} was red before this push)`,
+    );
+  }
+  const greenShas = new Set([...best].filter(([, state]) => state === "green").map(([s]) => s));
+  const range = contradictionRange({ commits: history, greenShas });
+
+  const checked = [];
+  const suspects = [];
+  for (const c of range.commits) {
+    const pull = gather(() => mergedPullFor(READ, c.sha));
+    if (pull === null) {
+      checked.push({ sha: c.sha, pr: null });
+      continue;
+    }
+    // The trust list the merge gate used: the base the pull request merged
+    // into, which is the merge commit's first parent. Never the merge commit.
+    const trust = gather(() => trustListAt(READ, `${c.sha}^1`, "first parent"));
+    const comments = prComments(READ, pull.number);
+    if (comments === null) return fail(EXIT_CODES.ENV, `could not read the comments of #${pull.number}`);
+    const match = attestationMatch({ comments, headSha: pull.headSha, trustedAssociations: trust.list });
+    checked.push({ sha: c.sha, pr: pull.number, attestedSha: pull.headSha, trustedAssociations: trust.list, trustListSource: trust.source, attested: match.found, edited: match.edited });
+    if (match.found) suspects.push({ pr: pull.number, attestedSha: pull.headSha, mergeSha: c.sha, edited: match.edited });
+  }
+
+  const rangeOut = { commits: range.commits.map((c) => c.sha), lastGreen: range.lastGreen, bounded: range.bounded };
+  const span = `${failing.slice(0, 8)} back to ${range.lastGreen ? `the last green ${range.lastGreen.slice(0, 8)}` : range.bounded ? "the bound" : "the start of the history"} (${range.commits.length} commit(s))`;
+  const result = { sha: failing, testResult, run: runState, runUrl, trunk, range: rangeOut, checked, suspects };
+  if (suspects.length === 0) {
+    return emit({
+      subcommand: "contradiction",
+      ok: true,
+      result: { ...result, contradiction: false, reason: "no pull request in the range had a trusted, passing attestation" },
+      lines: [`contradiction: none (no pull request merged in ${span} had a trusted, passing attestation)`],
+      json,
+    });
+  }
+  const prs = suspects.map((s) => s.pr);
+  const posted =
+    flags.post === true
+      ? postContradiction(prs, renderContradictionIssue({ failingSha: failing, runUrl, range, suspects }), failingCommitMarker(failing))
+      : null;
+  return emit({
+    subcommand: "contradiction",
+    ok: false,
+    result: { ...result, contradiction: true, label: CONTRADICTION_LABEL, issue: posted },
+    problems: suspects.map((s) => ({
+      code: "ATTESTATION_CONTRADICTED",
+      message: `#${s.pr} was attested as passing at ${s.attestedSha}, and the run on ${failing} failed`,
+    })),
+    lines: [
+      `contradiction: FOUND — the run on ${failing.slice(0, 8)} failed, and ${suspects.length} pull request(s) merged in ${span} had a trusted, passing attestation`,
+      ...suspects.map(
+        (s) => `  #${s.pr}: attested at ${s.attestedSha.slice(0, 8)}, merged as ${s.mergeSha.slice(0, 8)}${s.edited ? " (the comment was edited after it was posted)" : ""}`,
+      ),
       ...(runUrl ? [`  failed run: ${runUrl}`] : []),
-      posted
-        ? `  labelled #${prNumber} ${CONTRADICTION_LABEL}; issue ${posted.created ? "opened" : "already open"}: #${posted.number ?? "?"}${posted.url ? ` ${posted.url}` : ""}`
-        : "  not posted (pass --post to label the pull request and open an issue)",
+      postedLine(prs, posted),
     ],
     json,
   });
@@ -1376,6 +1392,8 @@ async function main() {
   }
 
   const { flags, json } = argv;
+  const trunkGiven = typeof flags.trunk === "string";
+  if (!trunkGiven) flags.trunk = "main";
 
   if (sub === "phases") {
     return emit({
@@ -1685,9 +1703,9 @@ async function main() {
     });
   }
 
-  if (sub === "spot-check") return spotCheckCommand(flags, json);
-  if (sub === "main-status") return mainStatusCommand(flags, json);
-  if (sub === "contradiction") return contradictionCommand(flags, json);
+  if (sub === "spot-check") return spotCheckCommand(flags, json, trunkGiven);
+  if (sub === "main-status") return mainStatusCommand(flags, json, trunkGiven);
+  if (sub === "contradiction") return contradictionCommand(flags, json, trunkGiven);
 
   const which = flags.gate;
 

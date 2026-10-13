@@ -12,19 +12,24 @@
  * Three decisions live here:
  *
  *  - The SPOT CHECK. A share of attested pull requests is verified explicitly
- *    anyway. The roll comes from the head SHA, so asking again on the same
- *    head gives the same answer; a new roll needs a new head, and a new head
- *    already invalidates the attestation.
+ *    anyway. The roll comes from the head SHA, so it is fixed for a head; a
+ *    new roll needs a new head, and a new head already invalidates the
+ *    attestation. The rate can still change with the CI state and the base
+ *    policy, so the bin keeps a selection sticky for its head.
  *  - The CUMULATIVE RULE. The default branch is squash-merged and linear, so a
  *    green CI run on commit X verifies X and every older commit. Commits newer
  *    than the last green run are debt.
  *  - The CONTRADICTION. A real test failure on code whose attestation said
- *    pass is the one fact a forgery cannot hide, and it is raised as an alarm.
+ *    pass is the evidence this layer detects, and it is raised as an alarm.
+ *    It is not proof of a forgery, and a forgery can avoid it: see the limits
+ *    in docs/attestation.md.
  *
  * A run that did not run is never a failure and never a pass. Private
  * repositories hit the GitHub Actions spending limit, and then the run fails
  * with no step executed. That run is `unverified`: it proves nothing either
- * way, so it can neither verify a commit nor contradict an attestation.
+ * way, so it can neither verify a commit nor contradict an attestation. A run
+ * that could not be READ is `unknown`, which is different: the caller must
+ * report it, and never read it as "did not run".
  *
  * Pure apart from `node:crypto`: no I/O and no clock. The bin reads GitHub and
  * git and passes the facts in.
@@ -54,22 +59,45 @@ export const SPOT_CHECK_OFF = Object.freeze({
 /** Why `decideSpotCheck` decided what it did. */
 export const SPOT_CHECK_REASONS = Object.freeze(["off", "always_path", "ci_unavailable", "rate", "not_selected"]);
 
-/** What one CI run proves about its commit. */
-export const RUN_STATES = Object.freeze(["green", "red", "unverified"]);
+/**
+ * What one CI run proves about its commit. `unknown` is "could not be read"
+ * (a rate limit, a 5xx, a token without `actions: read`), never "did not run".
+ */
+export const RUN_STATES = Object.freeze(["green", "red", "unverified", "unknown"]);
 
 /** The label put on a pull request whose attestation a real failure contradicted. */
 export const CONTRADICTION_LABEL = "attestation-contradicted";
 
+/** How many recent first-parent default-branch commits a CI sample must fall in. */
+export const RECENT_TRUNK_COMMITS = 10;
+
+/** How many first-parent commits the contradiction walks back, at most. */
+export const CONTRADICTION_RANGE_LIMIT = 20;
+
+/**
+ * The frozen dependency install for each lockfile, in the order they are
+ * tried. The same table as the explicit path of /merge-pr step 6, which a
+ * test keeps in step.
+ */
+export const LOCKFILE_INSTALLS = Object.freeze([
+  Object.freeze(["package-lock.json", Object.freeze(["npm", "ci"])]),
+  Object.freeze(["pnpm-lock.yaml", Object.freeze(["pnpm", "i", "--frozen-lockfile"])]),
+  Object.freeze(["yarn.lock", Object.freeze(["yarn", "--immutable"])]),
+  Object.freeze(["go.sum", Object.freeze(["go", "mod", "download"])]),
+  Object.freeze(["uv.lock", Object.freeze(["uv", "sync"])]),
+]);
+
+// The logins GitHub gives the workflow identity: REST, then `gh --json author`.
+const WORKFLOW_LOGINS = new Set(["github-actions[bot]", "app/github-actions"]);
+const JS_LOCKFILES = new Set(["package-lock.json", "pnpm-lock.yaml", "yarn.lock"]);
 const SPOT_CHECK_KEYS = new Set(Object.keys(SPOT_CHECK_DEFAULTS));
 const SHA_RE = /^[0-9a-f]{40}$/i;
 // The glob dialect `globToRegExp` reads literally. A pattern written for a
 // richer dialect would silently match nothing, so it is refused instead.
 const UNSUPPORTED_GLOB_CHARS = /[!{}[\]]/;
-// The GitHub Actions message for a job that never started because of billing.
-const BILLING_RE = /spending limit|recent account payments|billing/i;
-// Run conclusions that say nothing about the code.
-const NOT_RUN_CONCLUSIONS = new Set(["startup_failure", "cancelled", "skipped", "stale", "action_required", "neutral"]);
-const RUN_RANK = { green: 3, red: 2, unverified: 1 };
+// A readable red beats an unreadable run; an unreadable run beats one that
+// proves nothing, because it may hide a red.
+const RUN_RANK = { green: 4, red: 3, unknown: 2, unverified: 1 };
 
 /**
  * @param {unknown} v
@@ -147,6 +175,19 @@ export function spotCheckRoll({ headSha, prNumber }) {
 }
 
 /**
+ * True when a policy can never select anything: both rates are 0 and no
+ * `always_paths` is set. The bin then decides `off` before it reads the
+ * changed files or the CI runs, and records nothing.
+ *
+ * @param {{ rate: number, rate_when_ci_unavailable: number, always_paths: string[] }} policy
+ * @returns {boolean}
+ */
+export function isSpotCheckOff(policy) {
+  const always = Array.isArray(policy?.always_paths) ? policy.always_paths : [];
+  return policy?.rate === 0 && policy?.rate_when_ci_unavailable === 0 && always.length === 0;
+}
+
+/**
  * @typedef {object} SpotCheckDecision
  * @property {boolean} selected True when /merge-pr must verify explicitly.
  * @property {"off"|"always_path"|"ci_unavailable"|"rate"|"not_selected"} reason
@@ -189,10 +230,10 @@ export function decideSpotCheck({ policy, changedPaths, ciAvailable, random }) {
 /**
  * True when a job failed after it ran at least one step: a real failure.
  *
- * A job that never started (the billing-blocked shape: a failed conclusion,
- * zero steps, no runner) is not one. Neither is a `skipped` job downstream of
- * a real failure, which also has zero steps and no runner; its run is red
- * because of the upstream job, not because of it.
+ * A job that never started is not one: a failed, `startup_failure` or
+ * `cancelled` conclusion with zero steps and no runner. That is the
+ * billing-blocked shape. A `skipped` job downstream of a real failure also has
+ * zero steps and no runner; its run is red because of the upstream job.
  *
  * @param {any} job
  * @returns {boolean}
@@ -203,45 +244,107 @@ function failedAfterStart(job) {
 }
 
 /**
+ * @param {any} job
+ * @returns {boolean}
+ */
+function ranAStep(job) {
+  return Array.isArray(job?.steps) && job.steps.length > 0;
+}
+
+/**
  * What one GitHub Actions workflow run proves about its commit.
  *
+ *  - `red`: a job failed after it ran at least one step. A real failure,
+ *    whatever the run conclusion says (a run cancelled after a job failed is
+ *    still red).
  *  - `green`: the run succeeded.
- *  - `red`: a job failed after it ran steps. A real failure.
- *  - `unverified`: the run proves nothing. The billing annotation is present
- *    on any job, the run conclusion is `startup_failure`, `cancelled`,
- *    `skipped`, `stale`, `action_required` or `neutral`, no failed job ran a
- *    step (the billing-blocked shape is a failed job with zero steps and no
- *    runner, under a run conclusion of plain `failure`), the jobs could not
- *    be read, or the run is missing or still running with no failed job yet.
+ *  - `unverified`: the run proves nothing. No failed job ran a step: the
+ *    billing-blocked shape (a failed job with zero steps and no runner, under
+ *    a plain `failure` run conclusion), a startup failure, a cancelled or
+ *    skipped run, or a run still in progress with no failed job yet.
+ *  - `unknown`: the run or its jobs could not be read.
+ *
+ * Annotations are not read. A billing annotation said nothing that the zero
+ * steps did not, and a test reporter can write the word "billing" into an
+ * annotation of a real failure.
  *
  * A run in progress is classified from its jobs: the contradiction job reads
  * its own run, which has not finished when it runs.
  *
- * @param {{ run: any, jobs?: any[]|null, annotations?: any[]|null }|null|undefined} input
- *   `run` is a `GET .../actions/runs/{id}` object, `jobs` its `.../jobs` list
- *   (null when unread), and `annotations` the check-run annotations of its
- *   jobs (null when unread).
- * @returns {"green"|"red"|"unverified"}
+ * @param {{ run: any, jobs?: any[]|null }|null|undefined} input
+ *   `run` is a `GET .../actions/runs/{id}` object, and `jobs` its `.../jobs`
+ *   list, or null when it was not read (a successful run) or could not be.
+ * @returns {"green"|"red"|"unverified"|"unknown"}
  */
 export function classifyRun(input) {
   const run = input?.run;
-  if (!isPlainObject(run)) return "unverified";
-  const annotations = Array.isArray(input?.annotations) ? input.annotations : [];
-  if (annotations.some((a) => BILLING_RE.test(String(a?.message ?? "")))) return "unverified";
+  if (!isPlainObject(run)) return "unknown";
   const jobs = Array.isArray(input?.jobs) ? input.jobs : null;
-
-  if (run.status === "completed") {
-    if (NOT_RUN_CONCLUSIONS.has(run.conclusion)) return "unverified";
-    if (run.conclusion === "success") {
-      // Jobs are only fetched for a run that did not succeed. When they are
-      // known, a success where no job ran a single step proved nothing.
-      if (jobs !== null && !jobs.some((j) => Array.isArray(j?.steps) && j.steps.length > 0)) return "unverified";
-      return "green";
-    }
+  if (run.status === "completed" && run.conclusion === "success") {
+    // Jobs are only fetched for a run that did not succeed. When they are
+    // known, a success where no job ran a single step proved nothing.
+    return jobs !== null && !jobs.some(ranAStep) ? "unverified" : "green";
   }
-  if (jobs === null) return "unverified";
-  if (jobs.some(failedAfterStart)) return "red";
-  return "unverified";
+  if (jobs === null) return "unknown";
+  return jobs.some(failedAfterStart) ? "red" : "unverified";
+}
+
+/**
+ * Whether the default branch's CI checks recent merges, from its newest
+ * COMPLETED run of the test workflow.
+ *
+ * That run counts only when it tested one of the last `RECENT_TRUNK_COMMITS`
+ * first-parent commits. An old green run says nothing about recent merges that
+ * had no push run (a CI-skip marker, a path filter, a billing limit), so then
+ * CI is `unavailable`: nothing off the machine checked them. "Could not read"
+ * is `unknown`, never `available`.
+ *
+ * @param {{ recentShas: string[]|null, runsRead: boolean, latestRun?: any, classification?: string|null }} input
+ *   `recentShas`: the recent first-parent commits, or null when unread.
+ *   `runsRead`: false when the runs list could not be read. `latestRun`: the
+ *   newest completed run, or undefined when there is none. `classification`:
+ *   `classifyRun` of that run, needed only when it is in range.
+ * @returns {{ state: "available"|"unavailable"|"unknown", available: boolean|null, reason: string }}
+ */
+export function ciAvailabilityState({ recentShas, runsRead, latestRun, classification = null }) {
+  const unknown = (reason) => ({ state: /** @type {const} */ ("unknown"), available: null, reason });
+  const unavailable = (reason) => ({ state: /** @type {const} */ ("unavailable"), available: false, reason });
+  if (!Array.isArray(recentShas) || recentShas.length === 0) return unknown("the recent default-branch commits could not be read");
+  if (!runsRead) return unknown("the workflow runs could not be read");
+  if (!isPlainObject(latestRun)) return unavailable("no completed run on the default branch");
+  const recent = new Set(recentShas.map((sha) => String(sha).toLowerCase()));
+  const tested = String(latestRun.head_sha ?? "").toLowerCase();
+  if (!recent.has(tested)) {
+    return unavailable(`the newest completed run tested ${tested.slice(0, 8) || "no commit"}, not one of the last ${recentShas.length} commits`);
+  }
+  if (classification === "unknown" || !RUN_STATES.includes(/** @type {any} */ (classification))) {
+    return unknown("the newest completed run could not be read");
+  }
+  if (classification === "unverified") return unavailable("the newest completed run did not run the tests");
+  return { state: "available", available: true, reason: `the newest completed run is ${classification}` };
+}
+
+/**
+ * The frozen installs for the lockfiles present in a checkout: the first
+ * JavaScript lockfile found, then `go.sum`, then `uv.lock`. Empty when none is
+ * present; the caller then installs nothing and says so.
+ *
+ * @param {Iterable<string>} lockfiles The lockfile names present.
+ * @returns {Array<{ lockfile: string, argv: string[] }>}
+ */
+export function installCommandsFor(lockfiles) {
+  const present = new Set(lockfiles);
+  const out = [];
+  let js = false;
+  for (const [lockfile, argv] of LOCKFILE_INSTALLS) {
+    if (!present.has(lockfile)) continue;
+    if (JS_LOCKFILES.has(lockfile)) {
+      if (js) continue;
+      js = true;
+    }
+    out.push({ lockfile, argv: [...argv] });
+  }
+  return out;
 }
 
 /**
@@ -251,11 +354,33 @@ export function classifyRun(input) {
  * @property {string[]} verified The last green commit and every older one.
  * @property {string[]} red Newer than the last green commit, with a red run.
  * @property {string[]} unverified Newer than the last green commit, with no
- *   green or red run: no run, or only unverified runs.
- * @property {string[]} unknown Every commit, when the runs could not be read.
+ *   green, red or unreadable run: no run, or only unverified runs.
+ * @property {string[]} unknown Newer than the last green commit, with a run
+ *   that could not be read and no green or red run; every commit when the
+ *   runs list itself could not be read.
  * @property {Array<{sha: string, pr: number|null, state: "verified"|"red"|"unverified"|"unknown",
- *                   run: "green"|"red"|"unverified"|null}>} commits
+ *                   run: "green"|"red"|"unverified"|"unknown"|null}>} commits
  */
+
+/**
+ * The strongest state each commit's runs show: green, then red, then
+ * unknown, then unverified. A readable red beats an unreadable run, and an
+ * unreadable run beats one that proves nothing, because it may hide a red.
+ *
+ * @param {Array<{headSha: string, state: string}>} runs
+ * @returns {Map<string, "green"|"red"|"unverified"|"unknown">} Keyed by lowercase SHA.
+ */
+export function bestRunStates(runs) {
+  /** @type {Map<string, "green"|"red"|"unverified"|"unknown">} */
+  const best = new Map();
+  for (const r of Array.isArray(runs) ? runs : []) {
+    const sha = String(r?.headSha ?? "").toLowerCase();
+    const state = RUN_STATES.includes(/** @type {any} */ (r?.state)) ? /** @type {any} */ (r.state) : "unverified";
+    const prior = best.get(sha);
+    if (prior === undefined || RUN_RANK[state] > RUN_RANK[prior]) best.set(sha, state);
+  }
+  return best;
+}
 
 /**
  * The verification state of recent default-branch commits.
@@ -267,9 +392,12 @@ export function classifyRun(input) {
  *
  * `runs: null` means the runs could not be read (a rate limit, a missing
  * workflow, no Actions data). Then every commit is `unknown`, never verified.
+ * One run that could not be read makes its commit `unknown` unless the commit
+ * also has a readable green or red run. Unknown commits newer than the last
+ * green run are debt, like red and unverified ones.
  *
  * @param {{ commits: Array<{sha: string, pr: number|null}>,
- *           runs: Array<{headSha: string, state: "green"|"red"|"unverified"}>|null }} input
+ *           runs: Array<{headSha: string, state: "green"|"red"|"unverified"|"unknown"}>|null }} input
  *   `commits` newest first.
  * @returns {MainStatus}
  */
@@ -286,21 +414,14 @@ export function mainVerificationStatus({ commits, runs }) {
       commits: list.map((c) => ({ sha: c.sha, pr: c.pr ?? null, state: "unknown", run: null })),
     };
   }
-  /** @type {Map<string, "green"|"red"|"unverified">} */
-  const best = new Map();
-  for (const r of runs) {
-    const sha = String(r?.headSha ?? "").toLowerCase();
-    const state = RUN_STATES.includes(r?.state) ? r.state : "unverified";
-    const prior = best.get(sha);
-    if (prior === undefined || RUN_RANK[state] > RUN_RANK[prior]) best.set(sha, state);
-  }
+  const best = bestRunStates(runs);
   const greenIndex = list.findIndex((c) => best.get(String(c.sha).toLowerCase()) === "green");
   const out = { known: true, lastGreen: greenIndex === -1 ? null : list[greenIndex].sha, verified: [], red: [], unverified: [], unknown: [], commits: [] };
   list.forEach((c, i) => {
     const run = best.get(String(c.sha).toLowerCase()) ?? null;
     let state;
     if (greenIndex !== -1 && i >= greenIndex) state = "verified";
-    else if (run === "red") state = "red";
+    else if (run === "red" || run === "unknown") state = run;
     else state = "unverified";
     out[state].push(c.sha);
     out.commits.push({ sha: c.sha, pr: c.pr ?? null, state, run });
@@ -309,28 +430,75 @@ export function mainVerificationStatus({ commits, runs }) {
 }
 
 /**
- * True when a real failure contradicts a passing attestation.
+ * Whether a pull request carries a trusted, passing attestation for `headSha`,
+ * and whether every such comment was edited after it was posted.
  *
- * The attestation half is `hasCurrentAttestation`: a trusted, never-edited
- * comment carrying a valid, passing attestation for exactly this head. An
- * unverified run is never a contradiction, because it tested nothing.
+ * The merge gate refuses an edited comment, because edited text is not what
+ * the tool wrote. This check counts one anyway. The gate accepted the comment
+ * at merge time, so an edit after the merge is itself a warning sign, and one
+ * edit must not silence the alarm. A deleted comment, or an edit that removes
+ * the attestation, still silences it: that is a stated limit.
  *
- * @param {{ testResult: "green"|"red"|"unverified",
+ * @param {{ comments: object[]|null, headSha: string, trustedAssociations?: string[] }|null|undefined} attestation
+ * @returns {{ found: boolean, edited: boolean }}
+ */
+export function attestationMatch(attestation) {
+  if (!isPlainObject(attestation) || !Array.isArray(attestation.comments)) return { found: false, edited: false };
+  const hits = attestation.comments.filter(
+    (c) =>
+      isPlainObject(c) &&
+      hasCurrentAttestation({
+        comments: /** @type {any} */ ([{ ...c, lastEditedAt: null }]),
+        headSha: attestation.headSha,
+        trustedAssociations: /** @type {any} */ (attestation.trustedAssociations),
+      }),
+  );
+  if (hits.length === 0) return { found: false, edited: false };
+  return { found: true, edited: hits.every((c) => (/** @type {any} */ (c).lastEditedAt ?? null) !== null) };
+}
+
+/**
+ * True when a real failure contradicts a passing attestation: the run is
+ * `red`, and `attestationMatch` finds a trusted, passing attestation for the
+ * head, edited or not. An unverified or unknown run is never a contradiction,
+ * because it tested nothing that anyone saw.
+ *
+ * @param {{ testResult: "green"|"red"|"unverified"|"unknown",
  *           attestation: { comments: object[]|null, headSha: string, trustedAssociations?: string[] }|null }} input
  * @returns {boolean}
  */
 export function isContradiction({ testResult, attestation }) {
-  if (testResult !== "red" || !isPlainObject(attestation)) return false;
-  return hasCurrentAttestation({
-    comments: /** @type {any} */ (attestation.comments),
-    headSha: attestation.headSha,
-    trustedAssociations: /** @type {any} */ (attestation.trustedAssociations),
-  });
+  return testResult === "red" && attestationMatch(attestation).found;
 }
 
 /**
- * The hidden marker that makes the contradiction issue idempotent: one issue
- * per pull request and attested head.
+ * The first-parent range a red run on the default branch can blame.
+ *
+ * A green run on commit G verifies G and every older commit (the cumulative
+ * rule). So a red run on X can come from X or from any commit after G that
+ * had no run of its own: a CI-skip marker, a cancelled run, a billing limit.
+ * The range is X back to G, not including G, and at most `limit` commits.
+ *
+ * @param {{ commits: Array<{sha: string}>, greenShas: Set<string>, limit?: number }} input
+ *   `commits`: first-parent history newest first, starting at the failing
+ *   commit. `greenShas`: lowercase SHAs with a green run.
+ * @returns {{ commits: Array<{sha: string}>, lastGreen: string|null, bounded: boolean }}
+ *   `bounded` is true when the walk stopped at `limit` with no green run.
+ */
+export function contradictionRange({ commits, greenShas, limit = CONTRADICTION_RANGE_LIMIT }) {
+  const list = Array.isArray(commits) ? commits : [];
+  const range = [];
+  for (const [i, c] of list.entries()) {
+    if (i > 0 && greenShas.has(String(c.sha).toLowerCase())) return { commits: range, lastGreen: c.sha, bounded: false };
+    if (range.length === limit) return { commits: range, lastGreen: null, bounded: true };
+    range.push(c);
+  }
+  return { commits: range, lastGreen: null, bounded: false };
+}
+
+/**
+ * The hidden marker of a local contradiction issue: one issue per pull
+ * request and attested head.
  *
  * @param {{ pr: number, sha: string }} input
  * @returns {string}
@@ -342,46 +510,126 @@ export function contradictionMarker({ pr, sha }) {
 }
 
 /**
- * The number of an existing issue that carries `marker`, or null.
+ * The hidden marker of a default-branch contradiction issue: one issue per
+ * failing commit, whatever the number of suspects.
  *
- * @param {Array<{number: number, body?: string|null}>|null|undefined} issues
- * @param {string} marker
- * @returns {number|null}
+ * @param {string} sha The default-branch commit whose run failed.
+ * @returns {string}
  */
-export function findContradictionIssue(issues, marker) {
-  if (!Array.isArray(issues)) return null;
-  const hit = issues.find((i) => typeof i?.body === "string" && i.body.includes(marker));
-  return hit ? hit.number : null;
+export function failingCommitMarker(sha) {
+  if (typeof sha !== "string" || !SHA_RE.test(sha)) throw new Error("sha must be a full 40-character SHA");
+  return `<!-- dotbabel:attestation-contradicted commit=${sha.toLowerCase()} -->`;
 }
 
 /**
- * The issue that reports a contradicted attestation.
+ * True when an issue author is the GitHub Actions workflow identity.
  *
- * @param {{ pr: number, attestedSha: string, mergeSha?: string|null, runUrl?: string|null, local?: boolean }} input
+ * @param {unknown} author `{ login }` from the REST API or `gh --json author`.
+ * @returns {boolean}
+ */
+export function isWorkflowAuthor(author) {
+  return isPlainObject(author) && WORKFLOW_LOGINS.has(String(author.login ?? ""));
+}
+
+/**
+ * The existing issue that carries `marker`, or null.
+ *
+ * The marker is public and its values are known before the merge, so in CI
+ * (`workflowOnly`) only an issue that the workflow identity opened counts.
+ * Anyone else could open and close one in advance to silence the alarm.
+ *
+ * @param {Array<{number: number, body?: string|null, state?: string, author?: unknown}>|null|undefined} issues
+ * @param {string} marker
+ * @param {{ workflowOnly?: boolean }} [options]
+ * @returns {{ number: number, closed: boolean }|null}
+ */
+export function findContradictionIssue(issues, marker, { workflowOnly = false } = {}) {
+  if (!Array.isArray(issues)) return null;
+  const hit = issues.find(
+    (i) => typeof i?.body === "string" && i.body.includes(marker) && (!workflowOnly || isWorkflowAuthor(i.author)),
+  );
+  return hit ? { number: hit.number, closed: String(hit.state ?? "").toUpperCase() === "CLOSED" } : null;
+}
+
+// Short sentences, no pull request text: only numbers, SHAs and a run URL
+// reach the issue, so nothing in it can be injected.
+const POSSIBLE_CAUSES = [
+  "Possible causes:",
+  "",
+  "- The attestation is forged or wrong. A real run did not produce it.",
+  "- A test is flaky, or the attesting machine and this run differ.",
+  "- The merged tree differs from the attested head. A squash merge applies the diff to the base as it was at merge time.",
+  "",
+  "Find the cause before you trust another attestation from the same source.",
+];
+const EDITED_NOTE = "The attestation comment was edited after it was posted.";
+const SEE_ALSO = 'See "Spot checks and the contradiction alarm" in the dotbabel attestation guide (docs/attestation.md).';
+
+/**
+ * The issue that reports a contradiction on the default branch: one failing
+ * commit, the range it can blame, and every suspect in that range.
+ *
+ * @param {{ failingSha: string, runUrl?: string|null,
+ *           range: { commits: Array<{sha: string}>, lastGreen: string|null, bounded: boolean },
+ *           suspects: Array<{ pr: number, attestedSha: string, mergeSha: string, edited: boolean }> }} input
  * @returns {{ title: string, body: string, labels: string[] }}
  */
-export function renderContradictionIssue({ pr, attestedSha, mergeSha = null, runUrl = null, local = false }) {
-  const marker = contradictionMarker({ pr, sha: attestedSha });
-  const failure = local
-    ? "An explicit verification run of the pull request head failed. The run was local (same machine as the agent; weaker than CI)."
-    : `The \`test\` workflow failed on the default branch${mergeSha ? ` at the merge commit \`${mergeSha}\`` : ""}.`;
+export function renderContradictionIssue({ failingSha, runUrl = null, range, suspects }) {
+  const failing = failingSha.toLowerCase();
+  const count = range.commits.length;
+  let span;
+  if (range.lastGreen) span = `\`${failing}\` back to the last green commit \`${range.lastGreen.toLowerCase()}\` (not included), ${count} commit(s)`;
+  else if (range.bounded) span = `\`${failing}\` and the ${count - 1} commit(s) before it. No green run was found, and the walk stops at ${count} commit(s)`;
+  else span = `\`${failing}\` back to the start of the history, ${count} commit(s). No green run was found`;
   const lines = [
-    marker,
+    failingCommitMarker(failing),
     "",
-    `A trusted, current attestation said the test matrix passed for #${pr}, but a real test run failed.`,
+    "A real test run failed on the default branch. A pull request in the untested range had a trusted attestation that said the tests passed.",
+    "",
+    `- Failing commit: \`${failing}\``,
+    ...(runUrl ? [`- Failed run: ${runUrl}`] : []),
+    `- Range: ${span}.`,
+    "",
+    "A green run verifies its commit and every older commit, so this range holds every commit that no run tested.",
+    "",
+    "Suspects:",
+    "",
+    ...suspects.map(
+      (s) =>
+        `- #${s.pr}: attested head \`${s.attestedSha.toLowerCase()}\`, merged as \`${s.mergeSha.toLowerCase()}\`.` +
+        (s.edited ? ` ${EDITED_NOTE}` : ""),
+    ),
+    "",
+    ...POSSIBLE_CAUSES,
+    "",
+    SEE_ALSO,
+  ];
+  const prs = suspects.map((s) => `#${s.pr}`).join(", ");
+  return { title: `Attestation contradicted: ${failing.slice(0, 8)} (${prs})`, body: `${lines.join("\n")}\n`, labels: [CONTRADICTION_LABEL] };
+}
+
+/**
+ * The issue that reports a contradiction found by an explicit run on this
+ * machine, before the merge.
+ *
+ * @param {{ pr: number, attestedSha: string, edited?: boolean }} input
+ * @returns {{ title: string, body: string, labels: string[] }}
+ */
+export function renderLocalContradictionIssue({ pr, attestedSha, edited = false }) {
+  const lines = [
+    contradictionMarker({ pr, sha: attestedSha }),
+    "",
+    `A trusted attestation said the test matrix passed for #${pr}, but a real test run failed.`,
     "",
     `- Pull request: #${pr}`,
     `- Attested head: \`${attestedSha.toLowerCase()}\``,
-    ...(mergeSha ? [`- Merge commit: \`${mergeSha}\``] : []),
-    ...(runUrl ? [`- Failed run: ${runUrl}`] : []),
+    ...(edited ? [`- ${EDITED_NOTE}`] : []),
     "",
-    failure,
+    "An explicit verification run of the pull request head failed. The run was local (same machine as the agent; weaker than CI).",
     "",
-    "One of two things is true: the attestation was not produced by a real run (a forged or hand-written comment), " +
-      "or the tests behave differently between the attesting machine and this run (a flaky test or an environment " +
-      "difference). Find out which before you trust another attestation from the same source.",
+    ...POSSIBLE_CAUSES,
     "",
-    "See docs/attestation.md, section \"Spot checks and the contradiction alarm\".",
+    SEE_ALSO,
   ];
   return { title: `Attestation contradicted: #${pr}`, body: `${lines.join("\n")}\n`, labels: [CONTRADICTION_LABEL] };
 }
