@@ -25,6 +25,10 @@
 # guard-destructive-git.sh beside it (for Bash), or on any error, it declines.
 # It can only approve a dialog that Claude Code was about to show; it never
 # turns an allowed call into a prompt, so the skill text carries the same stops.
+# The session's own permission surface (settings files, .claude/hooks/,
+# ~/.claude/, the grants) keeps its dialog too: a change there would outlive
+# the grant. The one exception is `rm -f` of the session's own grant file,
+# which is how the skill ends the grant.
 #
 # State: $DOTBABEL_YOLO_STATE_DIR, else $XDG_STATE_HOME/dotbabel/yolo, else
 # ~/.local/state/dotbabel/yolo. Each permission call also removes expired
@@ -133,7 +137,7 @@ grant() {
 
   local yes=no
   [ "$merge" = true ] && yes=yes
-  context "YOLO GRANT ACTIVE for session $SID until $(iso "$expires") ($((seconds / 60)) minutes). Grant file: $file. merge: $yes. Scope: $scope. While it lives, the PermissionRequest hook approves each permission dialog in this session except the denylist (force push, reset --hard, branch or repository deletion, rm -r outside the worktree, terraform/tofu destroy, production deploys and releases, edits under docs/specs/, and gh pr merge when merge is no)."
+  context "YOLO GRANT ACTIVE for session $SID until $(iso "$expires") ($((seconds / 60)) minutes). Grant file: $file. merge: $yes. Scope: $scope. While it lives, the PermissionRequest hook approves each permission dialog in this session except the denylist (force push, reset --hard, branch or repository deletion, rm -r outside the worktree, terraform/tofu destroy, production deploys and releases, edits under docs/specs/, changes to settings files, hooks, ~/.claude, or a grant, and gh pr merge when merge is no)."
 }
 
 # ---------------- permission ----------------
@@ -242,6 +246,18 @@ rm_outside() {
   return 1
 }
 
+# surface PATH: true when PATH is part of the session's own permission
+# surface: a Claude Code settings file, a project hook, the user's Claude
+# Code directory, or a grant. A change there would outlive the grant.
+surface() {
+  case "$1" in
+    .claude/settings*.json | */.claude/settings*.json | .claude/hooks/* | */.claude/hooks/*) return 0 ;;
+    "${CLAUDE_CONFIG_DIR:-${HOME:-}/.claude}"/* | "${HOME:-/nonexistent}"/.claude/*) return 0 ;;
+    "$STATE"/*) return 0 ;;
+  esac
+  return 1
+}
+
 # bash_denied MERGE: true when the Bash call must keep its dialog.
 bash_denied() {
   local cmd norm out rx
@@ -253,6 +269,13 @@ bash_denied() {
   [ -z "$out" ] || return 0
   norm=${cmd//$'\\\n'/ }
   norm=$(printf '%s' "$norm" | tr '\t' ' ' | tr -s ' ')
+  # The skill ends the grant with `rm -f <grant file>`; any other command that
+  # names the permission surface keeps its dialog.
+  if [[ $norm == *.claude/settings* || $norm == *.claude/hooks* || $norm == *"$STATE"* ||
+    $norm == *"${CLAUDE_CONFIG_DIR:-${HOME:-/nonexistent}/.claude}"* || $norm == *"${HOME:-/nonexistent}/.claude"* ]]; then
+    [[ $norm =~ ^[[:space:]]*rm[[:space:]]+-f[[:space:]]+([^[:space:];&|\`$]+)[[:space:]]*$ ]] || return 0
+    [ "${BASH_REMATCH[1]}" = "$STATE/$SID.json" ] || return 0
+  fi
   for rx in "${DENY_BASH[@]}"; do
     printf '%s' "$norm" | grep -qE -- "$rx" && return 0
   done
@@ -293,6 +316,7 @@ permission() {
     Edit | Write | MultiEdit | NotebookEdit)
       path=$(field '(.tool_input.file_path // .tool_input.notebook_path)')
       [[ $path == docs/specs/* || $path == */docs/specs/* ]] && exit 0
+      surface "$path" && exit 0
       ;;
     mcp__*)
       [[ $tool =~ (deploy|promote|rollback|release|publish|delete|destroy) ]] && exit 0

@@ -93,8 +93,10 @@ each of these:
 7. A change to owner-approved spec text (`docs/specs/`).
 8. Any work outside the scope. If the scope does not clearly cover a step,
    treat it as outside.
+9. A change to a settings file, a hook, `~/.claude/`, or the grant file
+   (except the `rm -f` in step 4). A change there outlives the grant.
 
-The hook keeps the dialog for items 1 to 5 and 7 when Claude Code would show
+The hook keeps the dialog for items 1 to 5, 7, and 9 when Claude Code would show
 one. It cannot see items 6 and 8, and it cannot add a dialog that your
 settings or auto mode would skip. So these stops are your duty, not only the
 hook's. Do not route around a stop: no bypass variable, no split or encoded

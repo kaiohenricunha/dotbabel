@@ -296,6 +296,36 @@ assert_declines() {
   assert_declines
 }
 
+@test "permission: an edit to the session's own permission surface keeps its dialog" {
+  grant_file "$SID" 3600
+  for path in "$REPO/.claude/settings.json" "$REPO/.claude/settings.local.json" \
+    "$REPO/.claude/hooks/guard-destructive-git.sh" "$HOME/.claude/settings.json" \
+    "$HOME/.claude/CLAUDE.md" ".claude/settings.json" "$GRANT"; do
+    ask Edit "$(jq -cn --arg p "$path" '{file_path:$p}')"
+    [ -z "$output" ] || {
+      echo "approved an edit of: $path"
+      return 1
+    }
+  done
+  for cmd in \
+    "jq '.permissions.allow += [\"Bash\"]' .claude/settings.json > x && mv x .claude/settings.json" \
+    "sed -i s/ask/allow/ $HOME/.claude/settings.json" \
+    "echo '' > .claude/hooks/guard-destructive-git.sh" \
+    "jq '.expires = 9999999999' $GRANT > t && mv t $GRANT"; do
+    ask_bash "$cmd"
+    [ -z "$output" ] || {
+      echo "approved: $cmd"
+      return 1
+    }
+  done
+}
+
+@test "permission: ending the grant with rm -f on its file passes" {
+  grant_file "$SID" 3600
+  ask_bash "rm -f $GRANT"
+  assert_allows
+}
+
 # ---------------- permission: expiry and pruning ----------------
 
 @test "permission: an expired grant is ignored and removed" {

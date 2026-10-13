@@ -254,6 +254,10 @@ prefix does not reach the gate.
   `promote`, `rollback`, `release`, `publish`, `delete`, or `destroy`.
 - An `Edit`, `Write`, `MultiEdit`, or `NotebookEdit` of a file under
   `docs/specs/`, which holds owner-approved spec text.
+- The session's own permission surface: an edit of, or a Bash command that
+  names, a `.claude/settings*.json` file, `.claude/hooks/`, `~/.claude/`, or a
+  grant file. A change there would outlive the grant. The one exception is
+  `rm -f` of the session's own grant file, which is how the skill ends it.
 - `gh pr merge` and `Skill(merge-pr)` when merges are not in the scope.
 
 The skill tells the session to stop for the same items, and also for a check
@@ -268,6 +272,10 @@ it cannot fix and for any work outside the scope, which no hook can see.
 - The denylist is textual, like `guard-destructive-git.sh`. A command built
   out of band (a variable, `eval`, a script file) can hide from it. It errs
   toward a dialog: a doubtful command keeps its prompt.
+- The gate reads the session `cwd` from the hook input. A relative `rm -r`
+  after a `cd` in an earlier Bash call can resolve to another directory.
+- A subagent's dialog passes only when its request carries the session's
+  `session_id`. If it does not, the dialog shows, which is the safe direction.
 - A headless `claude -p` session sends a PreToolUse `"ask"` straight to
   "deny", without a `PermissionRequest`. The grant still clears ask rules
   there.

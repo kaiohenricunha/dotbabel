@@ -327,7 +327,7 @@
     {
       "name": "yolo",
       "path": ".claude/skills/yolo/SKILL.md",
-      "checksum": "sha256:a76880d616f1e50a42ac5df95f5b04917f32fd150f87bf5d7cc9a04d19e40eb2",
+      "checksum": "sha256:dfad0f6f7eb3c61e9d2be74a59a75bd95c183bbb3a7cda4ae416dc6508e0f89d",
       "dependencies": [],
       "lastValidated": "2026-10-12"
     }
