@@ -214,12 +214,19 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
    branch's own configuration, and that every required leg passed. Go to
    step 8.
 
-   **CI path** (step 4 sent you here from `off`). Find the `test` workflow run
-   for the head SHA and read its conclusion:
+   **CI path** (step 4 sent you here from `off`). First, read what the pull
+   request changes. CI runs the pull request's own workflow files and scripts,
+   so a pull request that edits `.github/workflows/**` or a file listed in
+   `attestation.governance_files` (`package.json`, a script a test leg runs)
+   can make its own run pass. When it edits one, show the user that diff and
+   get their acknowledgement before you trust the run, the same review as for
+   the `explicit` state. If the diff weakens a check, **STOP**.
+
+   Then read the newest `test` workflow run for the head SHA:
 
    ```bash
-   gh run list --workflow test.yml --commit <headRefOid> --json databaseId,conclusion,status,event \
-     --jq '.[] | select(.event == "pull_request")'
+   gh run list --workflow test.yml --commit <headRefOid> --json databaseId,conclusion,status,event,createdAt \
+     --jq '[.[] | select(.event == "pull_request" or .event == "workflow_dispatch")] | sort_by(.createdAt) | last'
    gh run view <databaseId> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
    ```
 
@@ -233,15 +240,30 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
 
    - **A run that is still in progress** — wait for it (`gh run watch <id>`).
    - **A failed run** — **STOP** and report the failing job. Do not merge.
-   - **No run for the head, or the test jobs were skipped** — CI did not test
-     this head: the head commit carried `[skip ci]`, the run was cancelled, or
-     the account could not start the job. A current, trusted `/local-attest`
-     comment for the head is the evidence then; report it the way the attested
-     path does. Without one, take the explicit path below.
+   - **No run for the head, or its test jobs were skipped or cancelled** — CI
+     did not test this head: the head commit carried `[skip ci]`, a newer push
+     cancelled the run, or a posted attestation made `classify` skip the job.
+     Start a run for the head, then read it as above:
+
+     ```bash
+     gh workflow run test.yml --ref <headRefName>
+     ```
+
+     If CI cannot start a job for it (a job with no steps and no runner, the
+     shape of a billing block), or the workflow has no `workflow_dispatch`
+     trigger, take the explicit path below. A `/local-attest` comment is not
+     the evidence in this state: the gate validates an attestation only when
+     enforcement is on.
+
+   - **Quality.** The CI path covers the PR quality profile only when a CI job
+     runs the `pr` quality profile (in this repository, the
+     `Language-aware quality` workflow) and step 8 sees it green. When the
+     repository has a quality policy and no CI job runs it, run the quality
+     step of the explicit path.
 
    **Explicit path** (step 4 sent you here from `explicit` after the user
-   acknowledged the governed-file diff, or the CI path found no test run for
-   the head). Create the worktree from step 5 if you have not already, then:
+   acknowledged the governed-file diff, or CI could not start a job for the
+   head). Create the worktree from step 5 if you have not already, then:
 
    - **Install dependencies first.** A fresh worktree has none, and a suite run
      without them reports a failure that is about the checkout, not the code.
@@ -285,8 +307,8 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
    If any check is `failing` or `pending`, STOP and wait or ask the user. Note
    that an attested pull request legitimately shows a skipped `test` job — that
    is what the attestation bought — but every check that did run must be green.
-   On the CI path, a skipped `test` job is not evidence: step 6 sent you to an
-   attestation or to the explicit path for it.
+   On the CI path, a skipped `test` job is not evidence: step 6 started a run
+   for the head, or sent you to the explicit path.
 
 9. **Re-run the merge gate, then request confirmation from the user.**
 
@@ -303,7 +325,7 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
    Then show:
 
 - How this PR was verified: the CI run on the head SHA, the attested SHA and legs, or the explicit run's results
-- Quality gate result (attested, or this run's exit code)
+- Quality gate result (attested, the CI quality job, or this run's exit code)
 - CI status
 - The exact merge command you will run
   Wait for the user to say "merge" (or equivalent).
@@ -353,7 +375,8 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
 - Never merge past an `ATTESTATION_*` reason, and never re-run the matrix from inside this command to clear one. Producing evidence is `/local-attest`'s job; this command only decides whether existing evidence is current and trustworthy.
 - Never take the explicit path for an `explicit` state without first showing the user the governed-file diff and getting their acknowledgement. On that path the automated run executes the pull request's own scripts, so a change that weakens a check would pass its own verification; the human review of that diff is the only control that cannot be edited away.
 - Never treat an attested leg as something this command verified. Report it as attested, name the SHA, and never report an unrun check as a pass.
-- Never re-run the suite on the CI path. A completed `test` run that passed on the head SHA is the evidence; a second local run of the same tree buys nothing.
+- Never re-run the suite on the CI path. A completed `test` run that passed on the head SHA is the evidence; a second local run of the same tree buys nothing. When no run tested the head, start one before you fall back to a local run.
+- Never accept a `/local-attest` comment as the evidence in the `off` state. The gate checks its trust, configuration, and legs only when enforcement is on.
 - Never skip the full test suite on the explicit path. That path runs only for a governed change or for a head that CI did not test, so nothing else verified it. The attested path never runs the suite: its evidence is the PR-scoped `/local-attest` run, in which a required leg with nothing of the diff in its scope is recorded `skipped`, and that counts as satisfied as long as at least one required leg passed.
 - Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 10's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
 - Never claim a failure already exists on the base branch without the `git stash` proof.

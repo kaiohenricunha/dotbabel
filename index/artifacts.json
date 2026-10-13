@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-10-13T10:12:08.849Z",
+  "generatedAt": "2026-10-13T10:18:13.594Z",
   "version": "3.4.0",
   "artifacts": [
     {
@@ -309,7 +309,7 @@
       "type": "skill",
       "path": "skills/deliver/SKILL.md",
       "name": "deliver",
-      "description": "Take one task contract (goal, inputs, constraints, done_when) from a prompt to a reviewable pull request in one run: test first, implement, prove the change works by running it, review the diff once, and open the pull request with the proof. CI on the head is the merge evidence. No review rounds, no local attestation, no merge. Triggers on: \"deliver this\", \"implement this issue\", \"build this and open a PR\", \"take this task to a PR\", or a task contract with a goal and done_when.\n",
+      "description": "Take one task contract (goal, inputs, constraints, done_when) from a prompt to a reviewable pull request in one run: test first, implement, prove the change works by running it, review the diff once, and open the pull request with the proof. CI on the head is the merge evidence. No review rounds, no local attestation, no merge. Triggers on: \"deliver this\", \"build this and open a PR\", \"implement this issue and open a PR\", \"take this task to a PR\", or a task contract whose output is a pull request.\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["github-actions"],

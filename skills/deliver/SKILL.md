@@ -15,13 +15,13 @@ description: >
   a reviewable pull request in one run: test first, implement, prove the change
   works by running it, review the diff once, and open the pull request with the
   proof. CI on the head is the merge evidence. No review rounds, no local
-  attestation, no merge. Triggers on: "deliver this", "implement this issue",
-  "build this and open a PR", "take this task to a PR", or a task contract with
-  a goal and done_when.
+  attestation, no merge. Triggers on: "deliver this", "build this and open a
+  PR", "implement this issue and open a PR", "take this task to a PR", or a
+  task contract whose output is a pull request.
 argument-hint: "<task contract as JSON or prose> [--draft]"
 user-invocable: true
 disable-model-invocation: false
-headless_safe: true
+headless_safe: false
 ---
 
 Take one task from its contract to a reviewable pull request, back to back. The proof that the change works is part of the deliverable, not a later phase. Review rounds, `/pr-conductor`, and `local-attest` are not steps of this flow: the user runs them on demand.
@@ -43,7 +43,7 @@ Arguments: `$ARGUMENTS`
 - `<contract>` — the task, as JSON or prose.
 - `--draft` — open the pull request as a draft.
 
-**Consent.** The user's prompt starts this skill, and a prompt that asks for a pull request is the consent to push the task's branch and open its pull request. That consent covers this one task. This skill never merges: merging stays an explicit instruction, handed to `/merge-pr`.
+**Consent.** Start this skill only when the user's prompt asks for the task to end in a pull request, in words or as the contract's `output`. That prompt is the consent to push the task's branch and open its pull request, for this one task. A task that does not ask for a pull request gets the same steps up to step 8, and then stops with local commits. This skill never merges: merging stays an explicit instruction, handed to `/merge-pr`.
 
 ## 1. Read the contract
 
@@ -56,14 +56,6 @@ Normalize the contract to five fields:
 | `output`      | what the run ends with                     | a reviewable pull request                         |
 | `constraints` | what the change must not do                | none beyond the rule floor                        |
 | `done_when`   | the checks that make the task done         | `tests pass`, `the feature runs`, `review passes` |
-
-Record it, so a later session can resume the task:
-
-```bash
-dotbabel task new <slug> --goal "<goal>" --done-when "<item>" ... --constraint "<item>" ...
-```
-
-Skip the record when `dotbabel` is not installed, and say so in the report.
 
 ## 2. Map every item to a check
 
@@ -86,6 +78,13 @@ An item you cannot map to a check is not done. Write it in the proof as unverifi
 1. Read the inputs and the code the goal touches. Cite `file:line` for each claim.
 2. If the contract has two readings that lead to different code, ask one question. Otherwise state the reading you chose and continue.
 3. Create a worktree from the latest `origin/main` under `.claude/worktrees/<slug>/`, per the rule floor. Where `dotbabel fleet` runs, claim the paths you will edit.
+4. From inside the worktree, record the contract, so a later session in that worktree can resume the task. A task record belongs to the worktree it is written from.
+
+   ```bash
+   dotbabel task new <slug> --goal "<goal>" --done-when "<item>" ... --constraint "<item>" ...
+   ```
+
+   Skip the record when `dotbabel` is not installed, and say so in the report.
 
 ## 4. Plan
 
@@ -159,7 +158,7 @@ Run `gh pr checks <N> --watch`. Fix a red check on the branch with a new commit,
 
 ## 11. Report
 
-Give the completion status: the `done_when` table with each result, the pull request link, and the CI state. Close the task record with `dotbabel task close <slug>`. Name the next step: `/merge-pr <N>` when the user says merge, or a review the user may want to run on demand.
+Give the completion status: the `done_when` table with each result, the pull request link, and the CI state. Close the task record from the worktree with `dotbabel task close <slug>`. Name the next step: `/merge-pr <N>` when the user says merge, or a review the user may want to run on demand.
 
 ## Rules
 

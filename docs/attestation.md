@@ -22,9 +22,16 @@ runs on every pull request at no cost to you. dotbabel itself keeps it off: CI
 on the pull request head is its merge evidence, so a docs pull request needs no
 local run, and a code pull request waits for CI instead of a local matrix.
 
-With enforcement off, `local-attest` is an accelerator you run on demand. A
-trusted attestation for the head still skips the remote `test` job, and
-`/merge-pr` accepts it as the evidence when CI did not test the head.
+The cost moves to CI: each push to a pull request starts the `test` matrix. A
+newer push cancels the older pull request run, and standard runners cost
+nothing on a public repository. If the account's Actions minutes are metered
+or blocked, turn enforcement on.
+
+With enforcement off, `local-attest` is a local check you run on demand, and it
+is not merge evidence: the gate validates an attestation only when enforcement
+is on. Pass `--dry-run` to run the matrix and post nothing. A posted
+attestation makes the remote `test` job skip, so `/merge-pr` then has to start
+a CI run for the head.
 
 ### The release checkpoint
 

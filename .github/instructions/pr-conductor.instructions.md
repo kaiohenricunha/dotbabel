@@ -48,6 +48,8 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 | 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally on the PR's scope, posts the attestation |
 | 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                         |
 
+> **Where the base does not enforce attestation**, CI on the head is the merge evidence. `[skip ci]` still saves the intermediate runs, but the head then has no CI run: `/merge-pr` starts one for it, and phase 5 runs only when the user asks.
+>
 > **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
 ## Run receipt
