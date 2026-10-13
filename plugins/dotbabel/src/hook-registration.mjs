@@ -65,6 +65,7 @@ export const SHIPPED_HOOK_EVENTS = Object.freeze({
   "yolo.sh": Object.freeze([
     "UserPromptExpansion:grant",
     "PermissionRequest:permission",
+    "UserPromptSubmit:prompt",
     "SessionEnd:session-end",
   ]),
 });

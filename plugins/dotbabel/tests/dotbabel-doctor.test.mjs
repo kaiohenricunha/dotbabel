@@ -229,7 +229,7 @@ describe("dotbabel-doctor hook registration check", () => {
     );
     expect(res.stdout).toMatch(/task-context\.sh is shipped but not registered — expects SessionStart/);
     expect(res.stdout).toMatch(
-      /yolo\.sh is shipped but not registered — expects UserPromptExpansion \(grant\), PermissionRequest \(permission\), SessionEnd \(session-end\)/,
+      /yolo\.sh is shipped but not registered — expects UserPromptExpansion \(grant\), PermissionRequest \(permission\), UserPromptSubmit \(prompt\), SessionEnd \(session-end\)/,
     );
     expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(6);
   });

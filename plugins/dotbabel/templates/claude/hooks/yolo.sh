@@ -2,9 +2,10 @@
 # Claude Code hook entry for /yolo: a per-session autonomy grant that the
 # owner starts with one approval and that reverts by itself.
 #
-# Register it with three entries (see docs/hooks.md#yolosh):
+# Register it with four entries (see docs/hooks.md#yolosh):
 #   UserPromptExpansion, matcher "yolo":  yolo.sh grant
 #   PermissionRequest:                    yolo.sh permission
+#   UserPromptSubmit:                     yolo.sh prompt
 #   SessionEnd:                           yolo.sh session-end
 #
 # grant        `/yolo <scope> [--for 2h] [--merge|--no-merge]` writes
@@ -13,12 +14,23 @@
 #              context line that tells the skill the grant exists, because a
 #              skill cannot learn its own session id. `/yolo off` removes it.
 # permission   While the session's grant lives, approves the permission
-#              dialog, except for the denylist below. A PermissionRequest
+#              dialog, except for the denylist below. The grant file alone is
+#              not enough: the session's transcript must hold the typed /yolo
+#              that backs it (see `typed` below), and that line, not the file,
+#              sets the scope, the expiry, and whether merges are in it. A PermissionRequest
 #              "allow" also clears a dialog from a `permissions.ask` rule and
 #              from a PreToolUse "ask", so the denylist re-runs
 #              guard-destructive-git.sh itself. It never returns
 #              updatedPermissions: nothing outlives the grant.
+# prompt       Shows the owner a live grant at each prompt, or warns of a
+#              grant file that no typed /yolo backs.
 # session-end  Removes the session's grant.
+#
+# Limit: the hook and the agent run as the same user, so nothing here is a
+# hard boundary. A session that can write files with no dialog can also forge
+# a transcript line. Only the Claude Code sandbox, which keeps Bash writes in
+# the worktree, stops that. The transcript check and the prompt line make a
+# forged grant harder to make and easy to see.
 #
 # The gate declines by printing nothing, and then the dialog shows as it does
 # with no grant. It fails closed: without jq, without a readable grant, without
@@ -44,6 +56,13 @@ DEFAULT_SECONDS=14400
 MAX_SECONDS=86400
 USAGE='Usage: /yolo <scope> [--for 2h|90m] [--merge|--no-merge], or /yolo off'
 
+# The prompt entry runs at every prompt: with no grant on disk, stop before
+# any work.
+if [ "${1:-}" = prompt ]; then
+  set -- prompt "$STATE"/*.json
+  [ -e "$2" ] || exit 0
+fi
+
 INPUT=$(cat)
 SID=$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null) || exit 0
 
@@ -67,9 +86,62 @@ context() {
   exit 0
 }
 
-grant() {
-  local name args seconds="" merge="" word scope="" i
+# parse_args ARGS: the /yolo arguments into P_OFF, P_SCOPE, P_SECONDS, and
+# P_MERGE. Returns 1 with the reason in P_ERR when they are not a valid grant.
+parse_args() {
+  local word i value
   local -a words=()
+  P_OFF=0 P_SCOPE="" P_SECONDS="" P_MERGE="" P_ERR=""
+  read -r -d '' -a words <<<"$1"
+  if [ "${#words[@]}" -eq 1 ] && [ "${words[0]}" = off ]; then
+    P_OFF=1
+    return 0
+  fi
+  i=0
+  while [ "$i" -lt "${#words[@]}" ]; do
+    word=${words[$i]}
+    case "$word" in
+      --for)
+        i=$((i + 1))
+        value=${words[$i]:-}
+        if [[ $value =~ ^([0-9]{1,5})([hm])$ ]]; then
+          P_SECONDS=${BASH_REMATCH[1]}
+          [ "${BASH_REMATCH[2]}" = h ] && P_SECONDS=$((10#$P_SECONDS * 3600)) || P_SECONDS=$((10#$P_SECONDS * 60))
+        else
+          P_ERR="--for needs a lifetime such as 2h or 90m. $USAGE"
+          return 1
+        fi
+        ;;
+      --merge) P_MERGE=true ;;
+      --no-merge) P_MERGE=false ;;
+      *) P_SCOPE="${P_SCOPE:+$P_SCOPE }$word" ;;
+    esac
+    i=$((i + 1))
+  done
+
+  if [ -z "$P_SCOPE" ]; then
+    P_ERR="Give the scope of the work. $USAGE"
+    return 1
+  fi
+  P_SECONDS=${P_SECONDS:-$DEFAULT_SECONDS}
+  if [ "$P_SECONDS" -le 0 ] || [ "$P_SECONDS" -gt "$MAX_SECONDS" ]; then
+    P_ERR="The lifetime must be more than 0 and at most 24h. $USAGE"
+    return 1
+  fi
+  if [ -z "$P_MERGE" ]; then
+    shopt -s nocasematch
+    P_MERGE=false
+    if [[ $P_SCOPE =~ (^|[^a-z])merg(e|es|ed|ing)?([^a-z]|$) ]]; then
+      P_MERGE=true
+      [[ $P_SCOPE =~ (do[[:space:]]+not|don\'?t|never|no|not|without|skip)[[:space:]]+(auto-?)?merg ]] && P_MERGE=false
+    fi
+    shopt -u nocasematch
+  fi
+  return 0
+}
+
+grant() {
+  local name
   name=$(field .command_name)
   case "$name" in
     yolo | *:yolo) ;;
@@ -78,48 +150,12 @@ grant() {
   [[ $SID =~ $SID_RX ]] || block "No usable session id, so no grant was written. $USAGE"
   local file="$STATE/$SID.json"
 
-  args=$(field .command_args)
-  read -r -d '' -a words <<<"$args"
-  if [ "${#words[@]}" -eq 1 ] && [ "${words[0]}" = off ]; then
+  parse_args "$(field .command_args)" || block "$P_ERR"
+  if [ "$P_OFF" = 1 ]; then
     rm -f "$file"
     context "YOLO GRANT REMOVED for session $SID. Every permission default is back: each dialog and each ask rule prompts again."
   fi
-
-  i=0
-  while [ "$i" -lt "${#words[@]}" ]; do
-    word=${words[$i]}
-    case "$word" in
-      --for)
-        i=$((i + 1))
-        local value=${words[$i]:-}
-        if [[ $value =~ ^([0-9]{1,5})([hm])$ ]]; then
-          seconds=${BASH_REMATCH[1]}
-          [ "${BASH_REMATCH[2]}" = h ] && seconds=$((10#$seconds * 3600)) || seconds=$((10#$seconds * 60))
-        else
-          block "--for needs a lifetime such as 2h or 90m. $USAGE"
-        fi
-        ;;
-      --merge) merge=true ;;
-      --no-merge) merge=false ;;
-      *) scope="${scope:+$scope }$word" ;;
-    esac
-    i=$((i + 1))
-  done
-
-  [ -n "$scope" ] || block "Give the scope of the work. $USAGE"
-  seconds=${seconds:-$DEFAULT_SECONDS}
-  if [ "$seconds" -le 0 ] || [ "$seconds" -gt "$MAX_SECONDS" ]; then
-    block "The lifetime must be more than 0 and at most 24h. $USAGE"
-  fi
-  if [ -z "$merge" ]; then
-    shopt -s nocasematch
-    merge=false
-    if [[ $scope =~ (^|[^a-z])merg(e|es|ed|ing)?([^a-z]|$) ]]; then
-      merge=true
-      [[ $scope =~ (do[[:space:]]+not|don\'?t|never|no|not|without|skip)[[:space:]]+(auto-?)?merg ]] && merge=false
-    fi
-    shopt -u nocasematch
-  fi
+  local scope=$P_SCOPE seconds=$P_SECONDS merge=$P_MERGE
 
   local now expires tmp
   now=$(date +%s)
@@ -138,6 +174,72 @@ grant() {
   local yes=no
   [ "$merge" = true ] && yes=yes
   context "YOLO GRANT ACTIVE for session $SID until $(iso "$expires") ($((seconds / 60)) minutes). Grant file: $file. merge: $yes. Scope: $scope. While it lives, the PermissionRequest hook approves each permission dialog in this session except the denylist (force push, reset --hard, branch or repository deletion, rm -r outside the worktree, terraform/tofu destroy, production deploys and releases, edits under docs/specs/, changes to settings files, hooks, ~/.claude, or a grant, and gh pr merge when merge is no)."
+}
+
+# ---------------- the typed /yolo ----------------
+
+# typed: true when the session's transcript holds the typed /yolo that backs
+# its grant. It reads the last /yolo line that Claude Code wrote for a prompt
+# the owner typed in this session: a user line with string content that starts
+# with the command markup, a human origin, and not from a subagent. A tool
+# result is a user line too, but its content is an array, so a file the agent
+# reads cannot count. That line, not the grant file, sets T_SCOPE, T_MERGE,
+# and T_EXPIRES (its timestamp plus its lifetime). A later `/yolo off` line,
+# or no line, is false.
+typed() {
+  local transcript row ts args
+  transcript=$(field .transcript_path)
+  [ -n "$transcript" ] && [ -r "$transcript" ] || return 1
+  row=$(grep -F 'yolo</command-name>' "$transcript" 2>/dev/null | jq -c --arg sid "$SID" '
+    select(.type == "user" and (.isSidechain | not) and .sessionId == $sid
+      and ((.origin.kind // "human") == "human")
+      and (.message.content | type) == "string"
+      and (.message.content | startswith("<command-message>")))
+    | (.message.content | capture("<command-name>/(?<name>[^<]*)</command-name>\\s*<command-args>(?<args>[\\s\\S]*)</command-args>")) as $m
+    | select($m.name == "yolo" or ($m.name | endswith(":yolo")))
+    | [(.timestamp | sub("\\.[0-9]+"; "") | fromdateiso8601), $m.args]' 2>/dev/null | tail -n 1)
+  [ -n "$row" ] || return 1
+  ts=$(printf '%s' "$row" | jq -r '.[0]') || return 1
+  args=$(printf '%s' "$row" | jq -r '.[1]') || return 1
+  [[ $ts =~ ^[0-9]+$ ]] || return 1
+  parse_args "$args" || return 1
+  [ "$P_OFF" = 0 ] || return 1
+  T_SCOPE=$P_SCOPE T_MERGE=$P_MERGE T_EXPIRES=$((ts + P_SECONDS))
+  return 0
+}
+
+# ---------------- prompt ----------------
+
+message() {
+  jq -cn --arg m "$1" '{systemMessage: $m}'
+  exit 0
+}
+
+clock() {
+  date -d "@$1" +%H:%M 2>/dev/null || date -r "$1" +%H:%M
+}
+
+prompt() {
+  [[ $SID =~ $SID_RX ]] || exit 0
+  local file="$STATE/$SID.json" now expires
+  [ -f "$file" ] || exit 0
+  now=$(date +%s)
+  expires=$(jq -r '.expires // empty' "$file" 2>/dev/null)
+  if typed; then
+    [[ $expires =~ ^[0-9]+$ ]] && [ "$expires" -lt "$T_EXPIRES" ] && T_EXPIRES=$expires
+    if [ "$T_EXPIRES" -le "$now" ]; then
+      rm -f "$file"
+      message "YOLO grant expired. Every permission default is back."
+    fi
+    local yes=no
+    [ "$T_MERGE" = true ] && yes=yes
+    message "YOLO active until $(clock "$T_EXPIRES") · merge: $yes · scope: $T_SCOPE · /yolo off to end it"
+  fi
+  if [[ $expires =~ ^[0-9]+$ ]] && [ "$expires" -le "$now" ]; then
+    rm -f "$file"
+    message "YOLO grant expired. Every permission default is back."
+  fi
+  message "Warning: a YOLO grant file exists for this session ($file), but no typed /yolo in this session backs it, so the permission gate ignores it. If you did not type /yolo, something wrote it: remove it and check what did."
 }
 
 # ---------------- permission ----------------
@@ -299,7 +401,9 @@ permission() {
     rm -f "$file"
     exit 0
   fi
-  merge=$(jq -r '.merge == true' "$file" 2>/dev/null) || exit 0
+  typed || exit 0
+  [ "$T_EXPIRES" -gt "$now" ] || exit 0
+  merge=$T_MERGE
   tool=$(field .tool_name)
   [ -n "$tool" ] || exit 0
 
@@ -348,6 +452,7 @@ HERE="$(cd -P "$(dirname "$src")" && pwd)" || exit 0
 case "${1:-}" in
   grant) grant ;;
   permission) permission ;;
+  prompt) prompt ;;
   session-end) session_end ;;
 esac
 exit 0

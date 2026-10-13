@@ -5,16 +5,16 @@ _Last updated: v3.4.0_
 dotbabel ships eight Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.
 
-| Hook                         | Event                                                           | Fires                                                                                       | Purpose                                                                                              |
-| ---------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `guard-destructive-git.sh`   | `PreToolUse`                                                    | before each Bash call                                                                       | Asks the user before a destructive git command runs                                                  |
-| `guard-criteria-evidence.sh` | `PreToolUse`                                                    | before each Bash call                                                                       | Blocks a hand-written evidence marker (criteria, attestation, review)                                |
-| `check-on-write.sh`          | `PostToolUse`                                                   | after each file edit                                                                        | Per-file syntax check of the edited file                                                             |
-| `check-on-stop.sh`           | `Stop`                                                          | once per turn                                                                               | Project-wide checks when the build graph is coherent                                                 |
-| `fleet-guard.sh`             | `PreToolUse`, `SessionStart`, `PostToolUse`, `UserPromptSubmit` | before each file edit and Bash call, at session start, after each tool call, at each prompt | Blocks an edit to a file that another live session claims, holds the merge token, and reports merges |
-| `fleet-shell-prefix.sh`      | `CLAUDE_CODE_SHELL_PREFIX`                                      | around every shell command                                                                  | Sends heavy test commands to a free CPU lane                                                         |
-| `task-context.sh`            | `SessionStart`                                                  | at session start                                                                            | Prints the open tasks of the worktree: goal, done-when checks, phase, pending items, decisions       |
-| `yolo.sh`                    | `UserPromptExpansion`, `PermissionRequest`, `SessionEnd`        | at `/yolo`, at each permission dialog, at session end                                       | Approves the permission dialogs of one session while its `/yolo` grant lives, except a denylist      |
+| Hook                         | Event                                                                        | Fires                                                                                       | Purpose                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `guard-destructive-git.sh`   | `PreToolUse`                                                                 | before each Bash call                                                                       | Asks the user before a destructive git command runs                                                  |
+| `guard-criteria-evidence.sh` | `PreToolUse`                                                                 | before each Bash call                                                                       | Blocks a hand-written evidence marker (criteria, attestation, review)                                |
+| `check-on-write.sh`          | `PostToolUse`                                                                | after each file edit                                                                        | Per-file syntax check of the edited file                                                             |
+| `check-on-stop.sh`           | `Stop`                                                                       | once per turn                                                                               | Project-wide checks when the build graph is coherent                                                 |
+| `fleet-guard.sh`             | `PreToolUse`, `SessionStart`, `PostToolUse`, `UserPromptSubmit`              | before each file edit and Bash call, at session start, after each tool call, at each prompt | Blocks an edit to a file that another live session claims, holds the merge token, and reports merges |
+| `fleet-shell-prefix.sh`      | `CLAUDE_CODE_SHELL_PREFIX`                                                   | around every shell command                                                                  | Sends heavy test commands to a free CPU lane                                                         |
+| `task-context.sh`            | `SessionStart`                                                               | at session start                                                                            | Prints the open tasks of the worktree: goal, done-when checks, phase, pending items, decisions       |
+| `yolo.sh`                    | `UserPromptExpansion`, `PermissionRequest`, `UserPromptSubmit`, `SessionEnd` | at `/yolo`, at each permission dialog, at each prompt, at session end                       | Approves the permission dialogs of one session while its `/yolo` grant lives, except a denylist      |
 
 > **Installed is not enabled.** `bootstrap.sh` puts the files in `~/.claude/hooks/`,
 > but it never edits `settings.json`. Nothing runs until you register it yourself.
@@ -201,13 +201,14 @@ as without the hook.
 /yolo off
 ```
 
-It has three entries:
+It has four entries:
 
-| Argument      | Event                 | Does                                                                           |
-| ------------- | --------------------- | ------------------------------------------------------------------------------ |
-| `grant`       | `UserPromptExpansion` | Writes or removes the grant, and tells the skill the grant exists              |
-| `permission`  | `PermissionRequest`   | While the grant lives, approves the permission dialog, except for the denylist |
-| `session-end` | `SessionEnd`          | Removes the grant of the session                                               |
+| Argument      | Event                 | Does                                                                                         |
+| ------------- | --------------------- | -------------------------------------------------------------------------------------------- |
+| `grant`       | `UserPromptExpansion` | Writes or removes the grant, and tells the skill the grant exists                            |
+| `permission`  | `PermissionRequest`   | While the grant lives, approves the permission dialog, except for the denylist               |
+| `prompt`      | `UserPromptSubmit`    | Shows the owner a live grant at each prompt, or warns of a grant that no typed `/yolo` backs |
+| `session-end` | `SessionEnd`          | Removes the grant of the session                                                             |
 
 **The grant.** `$XDG_STATE_HOME/dotbabel/yolo/<session_id>.json` (default
 `~/.local/state/dotbabel/yolo/`, override with `DOTBABEL_YOLO_STATE_DIR`), mode
@@ -219,6 +220,23 @@ merge", "no merge", or "without merging". `--merge` and `--no-merge` set it
 explicitly. A hook writes the grant because a skill cannot learn its own
 session id, and the `UserPromptExpansion` input carries `session_id`,
 `command_name`, and `command_args`.
+
+**A grant must be typed.** The grant file alone does not make the gate
+approve. The PermissionRequest input carries `transcript_path`, and the gate
+reads the last `/yolo` line in the session's transcript. That line must be a
+prompt the owner typed: a `user` line of this `sessionId` whose content is a
+string that starts with the command markup, with `origin.kind` `human`, and
+not from a subagent (`isSidechain`). A tool result is a `user` line too, but
+its content is an array, so a file the agent reads or prints does not count.
+That line, not the file, sets the scope, `merge`, and the expiry (its
+timestamp plus its `--for`). A later `/yolo off` line, a replay of an old line
+past its lifetime, or no line at all makes the gate decline.
+
+**Seeing a grant.** At each prompt, the `prompt` entry shows the owner a
+one-line `systemMessage`: `YOLO active until 14:30 · merge: yes · scope: …`.
+If a grant file exists that no typed `/yolo` backs, it shows a warning
+instead, so a grant the owner did not start is visible at once. With no grant
+file it exits before it reads its input.
 
 **Why a `PermissionRequest` hook.** A PreToolUse `"allow"` does not clear a
 prompt from a `permissions.ask` rule. A `PermissionRequest` `"allow"` does:
@@ -265,6 +283,16 @@ it cannot fix and for any work outside the scope, which no hook can see.
 
 **Limits, stated plainly.**
 
+- **The hook and the agent run as the same user, so this is not a hard
+  boundary.** A session that can write files with no dialog (an allow rule,
+  or auto mode) can write a grant file, and it can also append a forged line
+  to its own transcript. The gate keeps the dialog for an edit or a command
+  that names the grants, the settings, the hooks, or `~/.claude/` (which holds
+  the transcripts), and the `prompt` line shows a grant, but a command built
+  out of band can get past a textual check. Only the Claude Code sandbox,
+  which keeps Bash writes inside the worktree, stops a forged grant. Turn it
+  on where that matters.
+
 - The gate can only approve a dialog Claude Code was about to show. It never
   adds a prompt: a denylist command that your settings already allow, or
   that auto mode's classifier approves, runs as it does today. The skill text
@@ -287,11 +315,11 @@ session registry (`~/.claude/sessions/<pid>.json`) shows with no live
 process. The `SessionEnd` entry removes the grant of the session that ends,
 including at `/clear`.
 
-**Fails closed.** Without `jq`, without a readable grant, without
+**Fails closed.** Without `jq`, without a readable grant or transcript, without
 `guard-destructive-git.sh` beside it (for a Bash call), or on any error, the
 gate prints nothing, and the dialog shows.
 
-Register it with three entries. With `bootstrap.sh`, the user settings are:
+Register it with four entries. With `bootstrap.sh`, the user settings are:
 
 ```json
 {
@@ -312,6 +340,13 @@ Register it with three entries. With `bootstrap.sh`, the user settings are:
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/hooks/yolo.sh prompt", "timeout": 10 }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [
@@ -323,7 +358,7 @@ Register it with three entries. With `bootstrap.sh`, the user settings are:
 }
 ```
 
-The settings template (`dotbabel init`) registers the same three entries with
+The settings template (`dotbabel init`) registers the same four entries with
 the repository's `.claude/hooks/yolo.sh`.
 
 ---

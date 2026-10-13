@@ -207,7 +207,7 @@ describe("hookRegistrationReport", () => {
       {
         hook: "yolo.sh",
         events: ["PermissionRequest", "UserPromptExpansion"],
-        missing: ["SessionEnd:session-end"],
+        missing: ["UserPromptSubmit:prompt", "SessionEnd:session-end"],
         scopes: [],
       },
     ]);

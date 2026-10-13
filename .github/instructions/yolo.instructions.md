@@ -33,12 +33,14 @@ one of these:
 - `YOLO GRANT ACTIVE` — read the session, the expiry, the grant file path,
   `merge: yes|no`, and the scope from it. Go to step 2.
 - Neither line — the hook is not registered, so no grant exists and every
-  dialog still prompts. Tell the owner that `/yolo` needs the three `yolo.sh`
+  dialog still prompts. Tell the owner that `/yolo` needs the four `yolo.sh`
   entries from `docs/hooks.md#yolosh`, and stop. Do not start the scope as if
   it were autonomous.
 
 Do not edit any settings file to make the mode work. The mode must never
-change `settings.json` at runtime.
+change `settings.json` at runtime. Never write or change a grant file or a
+transcript. Only a `/yolo` that the owner types starts the mode, and the
+permission gate checks the transcript for it.
 
 ## 2. The standing grant
 
