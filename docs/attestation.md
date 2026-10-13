@@ -103,6 +103,113 @@ or shell characters. An entry that is not is refused, and because the gate and
 `local-attest` then disagree about what to hash, every pull request is blocked with
 `ATTESTATION_CONFIG_CHANGED` until the entry is fixed on the base branch.
 
+## Spot checks and the contradiction alarm
+
+The merge gate checks who wrote an attestation comment, not whether a real run
+produced it. Anyone who holds the maintainer's `gh` token can post the comment,
+and that includes an AI agent that runs `gh` for you. Signatures would prevent
+this, but they need a key that the agent cannot use. That design is parked as
+an opt-in spec (`docs/specs/unforgeable-evidence`). The soft path below works
+in every repository. It detects a forgery. It does not prevent one.
+
+### Configure the spot check
+
+`/merge-pr` runs `dotbabel pr-stack spot-check --pr <N>` when the gate reports
+`verified`. A selected pull request takes the explicit path anyway: the suite
+and the quality profile run again. The policy is read from the **base** branch,
+as the rest of the policy is:
+
+```json
+{
+  "attestation": {
+    "enforce": true,
+    "spot_check": { "rate": 0.2, "rate_when_ci_unavailable": 1, "always_paths": ["src/auth/**"] }
+  }
+}
+```
+
+| Key                        | Default | Meaning                                                                                    |
+| -------------------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `rate`                     | `0`     | The share of attested pull requests to verify explicitly while the default branch CI runs. |
+| `rate_when_ci_unavailable` | `1`     | The share to verify when the latest test run on the default branch did not run.            |
+| `always_paths`             | `[]`    | Globs of changed paths that always select the check. Only `**`, `*` and `?` are special.   |
+
+An unknown key or a value outside 0 to 1 stops the command with exit `2`. It
+never falls back to the default, because a typo must not lower the check rate.
+
+The roll comes from the head: the first 32 bits of `sha256("<head>:<pr>")`. Run
+the command again on the same head and you get the same answer. A new head
+gives a new roll, and a new head also makes the attestation stale. Each
+decision goes into the run receipt. After the explicit run, `/merge-pr` records
+its result with `--record-explicit pass` or `--record-explicit fail`. Use
+`spot-check --pr <N> --show` to see both.
+
+### Three run states and the cumulative rule
+
+`dotbabel pr-stack main-status` reads the test workflow's runs on the default
+branch. Each run gets one state:
+
+| State        | Meaning                                                                                                                      |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `green`      | The run succeeded.                                                                                                           |
+| `red`        | A job failed after it ran at least one step. The tests really failed.                                                        |
+| `unverified` | The run proves nothing: a billing limit, a startup failure, a cancelled or skipped run, a job that never started, or no run. |
+
+The default branch is squash-merged and linear. A green run on one commit
+therefore verifies that commit and every older commit. `main-status` reports
+the last green commit and the **debt**: every `red` or `unverified` commit
+newer than it. If the runs cannot be read (a rate limit, a missing workflow),
+every commit is `unknown`. Unknown is never verified.
+
+### When CI does not run
+
+A private repository can reach its GitHub Actions spending limit. Then each run
+fails before a step runs, and GitHub adds an annotation such as "The job was
+not started because recent account payments have failed or your spending limit
+needs to be increased". That run is `unverified`. It never verifies a commit
+and it never raises an alarm.
+
+While the latest default-branch run is `unverified`, nothing off your machine
+checks an attestation after the merge. So the spot check uses
+`rate_when_ci_unavailable`, and by default every attested pull request is
+verified explicitly. `main-status --local` runs the local-attest matrix on the
+default-branch tip in a temporary worktree and removes the worktree after. Its
+result is labelled "local (same machine as the agent; weaker than CI)" and it
+never verifies a commit.
+
+### The contradiction alarm
+
+A real failure on code whose attestation said pass is the one fact a forgery
+cannot hide. Two places look for it:
+
+- **The `contradiction` job** in `.github/workflows/test.yml` runs only when
+  the test job failed on a push to the default branch. It classifies its own
+  run, finds the pull request merged as that commit, and checks for a current,
+  trusted, passing attestation on that pull request's head. On a
+  contradiction, it adds the label `attestation-contradicted` and opens one
+  issue that names the pull request, the attested head, and the failed run. A
+  hidden marker stops a second issue for the same pull request and head.
+- **`/merge-pr`**, when a spot-checked pull request fails its explicit run,
+  stops and runs `dotbabel pr-stack contradiction --pr <N> --local-failure --post`.
+
+A contradiction is not proof of forgery. A flaky test or a difference between
+the attesting machine and CI also produces one. Find out which before you
+trust another attestation from the same source.
+
+### Limits
+
+- The spot check detects. A forged attestation that is not selected still
+  merges, and the alarm comes later from the default branch's CI run.
+- The roll is predictable. An agent can compute it and choose a head that is
+  not selected. `always_paths` does not depend on the roll.
+- The explicit run and `main-status --local` run on the same machine, as the
+  same user, as the agent. A determined agent can fake them too.
+- An agent can bypass `/merge-pr` and call `gh pr merge` directly.
+- The run receipt is self-reported. It is a log, not evidence.
+- The `push` run of the test workflow on the default branch is the only check
+  the agent cannot skip. It exists only while the repository has Actions
+  minutes.
+
 ## Doctor findings
 
 `dotbabel doctor` checks the policy against the config whenever `.dotbabel.json`

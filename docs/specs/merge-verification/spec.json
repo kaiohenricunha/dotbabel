@@ -1,0 +1,432 @@
+{
+  "id": "merge-verification",
+  "title": "Merge verification — spot checks, the cumulative rule, and the contradiction alarm",
+  "status": "implementing",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "plugins/dotbabel/src/merge-verification.mjs",
+    "plugins/dotbabel/src/attestation-gate-inputs.mjs",
+    "plugins/dotbabel/src/pr-gates.mjs",
+    "plugins/dotbabel/src/run-receipt.mjs",
+    "plugins/dotbabel/bin/dotbabel-pr-stack.mjs",
+    "plugins/dotbabel/tests/merge-verification.test.mjs",
+    "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+    "plugins/dotbabel/tests/run-receipt.test.mjs",
+    "plugins/dotbabel/tests/attestation-gate-inputs.test.mjs",
+    "plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
+    "plugins/dotbabel/tests/workflow-templates.test.mjs",
+    "plugins/dotbabel/tests/bats/merge-pr-spot-check.bats",
+    "schemas/dotbabel.config.schema.json",
+    "schemas/dotbabel.run-receipt.schema.json",
+    ".github/workflows/test.yml",
+    "plugins/dotbabel/templates/workflows/test.yml",
+    "commands/merge-pr.md",
+    "plugins/dotbabel/templates/claude/commands/merge-pr.md",
+    ".github/prompts/merge-pr.prompt.md",
+    "examples/minimal-consumer/.claude/commands/merge-pr.md",
+    "examples/minimal-consumer/.claude/skills-manifest.json",
+    "examples/minimal-consumer/.github/workflows/test.yml",
+    ".claude/skills-manifest.json",
+    "index/artifacts.json",
+    ".dotbabel.json",
+    "docs/attestation.md",
+    "docs/cli-reference.md",
+    "docs/specs/merge-verification/README.md",
+    "docs/specs/merge-verification/spec.md"
+  ],
+  "acceptance_commands": [
+    "npx vitest run plugins/dotbabel/tests/merge-verification.test.mjs plugins/dotbabel/tests/merge-verification-cli.test.mjs plugins/dotbabel/tests/run-receipt.test.mjs plugins/dotbabel/tests/workflow-templates.test.mjs plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
+    "npx bats plugins/dotbabel/tests/bats/merge-pr-spot-check.bats plugins/dotbabel/tests/bats/merge-pr-attestation.bats plugins/dotbabel/tests/bats/example-parity.bats",
+    "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
+    "node plugins/dotbabel/bin/dotbabel-criteria.mjs verify --spec merge-verification"
+  ],
+  "depends_on_specs": ["dotbabel-core", "qa-verification-harness"],
+  "active_prs": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "active",
+      "given": "a base .dotbabel.json whose attestation.spot_check has an unknown key, or a rate outside 0 to 1",
+      "when": "the spot-check policy is resolved",
+      "then": "it throws, and never falls back to the default rate",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "throws on an unknown key, never silently defaulting"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "throws on a rate outside 0 to 1 or not a number"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-1.junit.xml"
+      }
+    },
+    {
+      "id": "AC-2",
+      "status": "active",
+      "given": "a pull request head SHA and number",
+      "when": "the spot-check roll is computed twice",
+      "then": "both rolls are the first 32 bits of sha256 of the head and the number, so the same head always gets the same answer",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "derives the same roll from the same head and pull request"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "is the first 32 bits of sha256 of head and pull request"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-2.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-2.junit.xml"
+      }
+    },
+    {
+      "id": "AC-3",
+      "status": "active",
+      "given": "a resolved spot-check policy, the changed paths, the CI availability, and a roll",
+      "when": "the spot check decides",
+      "then": "an always_paths match selects whatever the rate, an unavailable CI applies rate_when_ci_unavailable, and otherwise the roll is compared with rate",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "selects an always path whatever the rate"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "uses rate_when_ci_unavailable when the default branch CI did not run"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "selects by rate when the roll is below the rate"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-3.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-3.junit.xml"
+      }
+    },
+    {
+      "id": "AC-4",
+      "status": "active",
+      "given": "a run whose only job failed with zero steps and no runner under a billing annotation, and a run where one job failed after its steps ran while a dependent job was skipped with zero steps",
+      "when": "each run is classified",
+      "then": "the first is unverified and the second is red",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "classifies a billing-blocked run as unverified"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "classifies a failed job with steps as red even when a dependent job was skipped with zero steps"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-4.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-4.junit.xml"
+      }
+    },
+    {
+      "id": "AC-5",
+      "status": "active",
+      "given": "default-branch commits newest first and the classified runs for them, or runs that could not be read",
+      "when": "the main verification status is computed",
+      "then": "a green run verifies its commit and every older commit, newer commits are red or unverified, and unreadable runs make every commit unknown and none verified",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "lets a green run verify its commit and every older commit"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "reports unknown, never verified, when the runs could not be read"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-5.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-5.junit.xml"
+      }
+    },
+    {
+      "id": "AC-6",
+      "status": "active",
+      "given": "a red run, an unverified run, and a trusted current passing attestation for the head",
+      "when": "the contradiction is decided",
+      "then": "only the red run with the passing attestation is a contradiction",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "is a contradiction when a real failure meets a current trusted passing attestation"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification.test.mjs",
+          "name": "is not a contradiction when the run did not verify anything"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-6.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-6.junit.xml"
+      }
+    },
+    {
+      "id": "AC-7",
+      "status": "active",
+      "given": "a pull request whose base commit carries a spot-check policy that differs from the working tree",
+      "when": "pr-stack spot-check runs, once with a billing-blocked latest default-branch run and twice on one head",
+      "then": "the policy comes from the base commit, a billing-blocked CI selects with ci_unavailable, and both runs on one head give the same decision",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "verifies every pull request when the latest default-branch run was billing-blocked"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "reads the policy from the base commit, not the working tree"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "gives the same answer on the same head, from a roll derived from the head"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-7.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-7.junit.xml"
+      }
+    },
+    {
+      "id": "AC-8",
+      "status": "active",
+      "given": "a receipt that is ready and holds phase attempts",
+      "when": "spot-check and explicit-run entries are appended",
+      "then": "they are stored apart from attempts, and the attempt numbers, the attempt cap count, and the ready verdict do not change",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/run-receipt.test.mjs",
+          "name": "records a spot-check decision as its own append-only entry"
+        },
+        {
+          "file": "plugins/dotbabel/tests/run-receipt.test.mjs",
+          "name": "keeps spot-check entries out of the attempt count, the cap, and the ready verdict"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/run-receipt.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-8.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-8.junit.xml"
+      }
+    },
+    {
+      "id": "AC-9",
+      "status": "active",
+      "given": "default-branch commits with a green, a red, and a billing-blocked run, or an Actions API that fails",
+      "when": "pr-stack main-status runs, once with --local",
+      "then": "it reports the last green commit and the debt newer than it, reports unknown when the runs cannot be read, and runs the local matrix in a temporary worktree that it labels weaker than CI and removes",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "applies the cumulative rule and reports the debt newer than the last green run"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "reports unknown, never verified, when the runs cannot be read"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "runs the matrix locally in a temporary worktree, labels it weaker than CI, and removes the worktree"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-9.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-9.junit.xml"
+      }
+    },
+    {
+      "id": "AC-10",
+      "status": "active",
+      "given": "a merge commit whose test run failed after its steps ran, for a pull request with a trusted passing attestation",
+      "when": "pr-stack contradiction runs with --post, again when an issue already carries the marker, and for a billing-blocked run",
+      "then": "it labels the pull request and opens exactly one issue, opens no second issue, and posts nothing for the billing-blocked run",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "labels the pull request and opens one issue when a real failure contradicts a passing attestation"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "does not open a second issue when one already carries the marker"
+        },
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "never treats a billing-blocked run as a contradiction"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-10.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-10.junit.xml"
+      }
+    },
+    {
+      "id": "AC-11",
+      "status": "active",
+      "given": "a pull request with a trusted passing attestation for its head",
+      "when": "pr-stack contradiction runs with --local-failure and --post",
+      "then": "it labels the pull request and opens one issue that says the run was on the same machine as the agent",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+          "name": "labels a pull request whose local explicit run failed against a passing attestation"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/merge-verification-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-11.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-11.junit.xml"
+      }
+    },
+    {
+      "id": "AC-12",
+      "status": "active",
+      "given": "the parsed test workflow of this repository and of the consumer template",
+      "when": "the contradiction job is read",
+      "then": "it needs the test job, runs only on failure() of a push, holds only contents read, actions read, checks read, issues write and pull-requests write, and runs the contradiction command with --post",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/workflow-templates.test.mjs",
+          "name": "runs the template contradiction job only after a failed push, through the published CLI"
+        },
+        {
+          "file": "plugins/dotbabel/tests/workflow-templates.test.mjs",
+          "name": "runs this repository's contradiction job only after a failed push, through the in-tree bin"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/workflow-templates.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-12.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-12.junit.xml"
+      }
+    },
+    {
+      "id": "AC-13",
+      "status": "active",
+      "given": "the published config schema",
+      "when": "a spot_check block with a rate outside 0 to 1, a bad path list, or an unknown key is validated",
+      "then": "the schema rejects it",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
+          "name": "rejects a spot-check rate outside 0 to 1, a bad path list, or an unknown key"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/dotbabel-config-schema.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-13.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-13.junit.xml"
+      }
+    }
+  ]
+}
