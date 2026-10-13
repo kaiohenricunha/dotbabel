@@ -11,7 +11,33 @@ SHA changing (mergeability, required checks, review threads, your explicit
 authorization to merge) is still checked fresh at merge time.
 
 Enforcement is off until you turn it on. A repository that never sets the policy
-below behaves exactly as before: `/merge-pr` verifies the branch itself.
+below behaves exactly as before: `/merge-pr` reads the `test` run that CI made
+on the head SHA, and runs the suite itself only when CI did not test that head.
+
+## When to turn it on
+
+Turn enforcement on when CI cannot be the evidence: a private repository whose
+Actions minutes run out, or a matrix that CI cannot run. Keep it off when CI
+runs on every pull request at no cost to you. dotbabel itself keeps it off: CI
+on the pull request head is its merge evidence, so a docs pull request needs no
+local run, and a code pull request waits for CI instead of a local matrix.
+
+With enforcement off, `local-attest` is an accelerator you run on demand. A
+trusted attestation for the head still skips the remote `test` job, and
+`/merge-pr` accepts it as the evidence when CI did not test the head.
+
+### The release checkpoint
+
+CI on `main` runs the full suite after every merge, so a merge that breaks
+`main` shows at once. The deep checks belong to the release, not to a count of
+merges: before you merge the release pull request, run the full matrix and one
+deep review of everything the release ships.
+
+```bash
+# from a checkout of the release pull request's branch
+dotbabel local-attest --pr <release-PR> --full               # the whole matrix, every leg in full
+git diff "$(git describe --tags --abbrev=0)"..origin/main    # what the release ships; review it with /code-review
+```
 
 ## Adopt it
 
@@ -61,7 +87,7 @@ so a pull request cannot relax its own enforcement.
 | State      | Meaning                                                                                                                                                                      |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `verified` | Enforcement is on and the evidence is current, trusted, and complete. `/merge-pr` skips its own suite and quality run.                                                       |
-| `off`      | The base branch does not enforce. `/merge-pr` verifies explicitly.                                                                                                           |
+| `off`      | The base branch does not enforce. `/merge-pr` reads CI on the head SHA, and verifies explicitly only when CI did not test that head.                                         |
 | `explicit` | Enforcement is on, but this pull request edits a governance file, so its own evidence cannot vouch for it. `/merge-pr` verifies explicitly and you review the governed diff. |
 | `failed`   | Enforcement is on and the evidence is missing, stale, untrusted, or incomplete. The merge is blocked. `/merge-pr` never launches the matrix itself.                          |
 

@@ -2,14 +2,14 @@
 id: yolo
 name: yolo
 type: skill
-version: 1.0.0
+version: 1.1.0
 domain: [devex]
 platform: [none]
 task: [runtime-ops]
 maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-10-12
-updated: 2026-10-12
+updated: 2026-10-13
 description: >
   Start a temporary autonomy mode for this session: one approval from the owner
   covers a stated scope, and the session asks nothing else for work inside it
@@ -66,8 +66,9 @@ it is the explicit instruction that these rules ask for:
 - **Push.** Push the branches you create for the scope. Never force-push.
 - **Plan and audit sign-off.** Where a rule says to wait for approval of a plan
   or an audit, write the plan or audit, state your choice, and continue.
-- **Pull requests.** Open the pull requests the scope needs, run `/pr-conductor`,
-  apply review fixes, and run local attestation.
+- **Pull requests.** Open the pull requests the scope needs with `/deliver`:
+  prove each change works, review it once, and fix the findings. Run
+  `/pr-conductor` or local attestation only when the scope asks for them.
 - **Merge, only when `merge: yes`.** Merge each pull request in the scope when
   its required checks are green and its evidence covers the head SHA. Use the
   repository's merge path (`/merge-pr`, or `gh pr merge --squash`). Do not pass
@@ -78,8 +79,8 @@ Do not ask "push?", "merge?", "approved?", or "should I continue?" about a
 decision inside the scope. Make the decision, and record it in the final
 report.
 
-Every other rule still applies: worktrees from `origin/main`, TDD, the full
-test suite before a merge, the PR body sections, the protected-path Spec ID or
+Every other rule still applies: worktrees from `origin/main`, TDD, the merge
+evidence (CI on the head, or the explicit path), the PR body sections, the protected-path Spec ID or
 no-spec rationale, and the coordination with other sessions.
 
 ## 3. Where you still stop

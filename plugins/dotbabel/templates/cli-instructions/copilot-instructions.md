@@ -35,8 +35,10 @@ Universal behavior for every Copilot CLI session in every repo. Project-level `C
 
 ## Testing
 
-- Verify a PR on the scope of its changes. `local-attest` runs only that scope for every PR, including a PR that modifies a file matching `critical_paths` (see the `quality` key in `.dotbabel.json`).
-- Run the **full** test suite only on demand (`local-attest --full`, or the deep quality job) or on a schedule. It is not part of `local-attest`.
+- **Prove that each change works.** Write tests for the behavior: unit tests, and integration tests where the change crosses a process, file, network, or database boundary. Then run the feature itself when it has a runnable surface (a command, a page, an endpoint, a public function), and record the command and its output. This proof is part of the deliverable and goes in the PR body.
+- CI on the PR head is the merge evidence. Do not put `[skip ci]` on the head commit. Where `.dotbabel.json` sets `attestation.enforce: true`, a current `local-attest` comment is the evidence instead.
+- The default path from a task to a PR is `/deliver`: test, run the feature, review once, open the PR. Run `/pr-conductor`, the review fleet (`/post-pr-review`, `/review-pr`), and `local-attest` only on demand.
+- Run the **full** test suite only on demand (`local-attest --full`, or the deep quality job) or before a release. CI on `main` runs it after each merge.
 - Never claim a test failure is "pre-existing" without proving it. Required proof:
   ```bash
   git stash && <test-command> ; git stash pop
@@ -47,7 +49,7 @@ Universal behavior for every Copilot CLI session in every repo. Project-level `C
   - `package.json` → `npm test` (or `pnpm test` / `yarn test` based on the lockfile)
   - `go.mod` → `go test ./...`
   - `pyproject.toml` → `pytest` or `uv run pytest`
-- Partial test subsets are fine for iteration. Before pushing or merging, the PR-scoped `local-attest` run is the requirement.
+- Partial test subsets are fine for iteration. Before you open a PR, run the tests that cover the changed code and the feature run above.
 
 ## TDD and verification
 
