@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-10-12T12:44:23.703Z",
+  "generatedAt": "2026-10-13T00:28:30.489Z",
   "version": "3.4.0",
   "artifacts": [
     {
@@ -617,7 +617,7 @@
         "task": ["review", "testing"],
         "maturity": "validated"
       },
-      "version": "2.0.0",
+      "version": "2.1.0",
       "owner": "@kaiohenricunha"
     },
     {

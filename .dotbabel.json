@@ -18,7 +18,8 @@
       "plugins/dotbabel/tests/test_validate_settings.sh"
     ],
     "required_legs": ["lint", "test", "quality"],
-    "trusted_associations": ["OWNER"]
+    "trusted_associations": ["OWNER"],
+    "spot_check": { "rate": 0.2 }
   },
   "quality": {
     "enabled": true,

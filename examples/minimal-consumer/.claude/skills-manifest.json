@@ -166,7 +166,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:19f0de1151e7a591f7071de41c44bc20392e8a4284f973527a69c74f0d28b08c",
+      "checksum": "sha256:eddc445119bf15c27be3deff50f420c8bdae6c114a9e2e0143c67c970aafb885",
       "dependencies": [],
       "lastValidated": "2026-10-12"
     },
