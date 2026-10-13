@@ -277,6 +277,22 @@ Conventions used by every prompt:
 4. **Commands** — narrow test; `npx vitest run plugins/dotbabel/tests/dotbabel-config-schema.test.mjs`; `npm run lint`; `npm test`; `npx stryker run --mutate 'plugins/dotbabel/src/model-intelligence/policy/**/*.mjs'`.
 5. **Acceptance evidence** — the five named tests pass; Bats not required.
 
+### P-4b — Monotonic evidence-trust preferences (`policy/`) — `/plan`
+
+Added by the owner on 2026-10-12. It implements the ARCH-23 amendment, so that a repository cannot weaken the evidence a user accepts. It must land before P-10 reads `EffectivePolicy.preferences`.
+
+1. **Tests first** — extend `plugins/dotbabel/tests/model-intelligence-policy.test.mjs`
+   - `a project or artifact layer cannot relax an evidence-trust key that the user set, and mergePolicy records the attempt in shadowed with its layer`
+   - `a layer that gives an evidence-trust key a non-boolean value, such as the string "true", is a layer error`
+   - `a project or artifact layer cannot relax an evidence-trust key below the shipped default when the user set none`
+   - `the user layer may relax a shipped evidence-trust default`
+   - `a project layer may make an evidence-trust key stricter, and an ordinary preference such as representation keeps the ARCH-23 order`
+   - Expected before implementation: the first two and the fifth fail, because the later layer wins today and no layer checks the type.
+2. **Read first** — `SPEC/spec/3-high-level-architecture.md` (ARCH-23 and its 2026-10-12 amendment); `plugins/dotbabel/src/model-intelligence/policy/index.mjs` (`mergePolicy`, the `shadowed` entries of pins); `plugins/dotbabel/src/model-intelligence/policy/shipped.json` (`preferences`).
+3. **Implement** — in `policy/index.mjs`, add a frozen table of the four evidence-trust keys and the strict value of each (`false` for `allow_*`, `true` for `prefer_*`). In `mergePolicy`, a value of any other type for those keys throws, in every layer. A `project` or `artifact` value that relaxes the value in force is not applied, and it is recorded in `shadowed` as `{layer, declaration: {key, value}, reason}`. `layer` has the meaning it has for a shadowed pin: the layer whose declaration did not take effect, here the `project` or `artifact` layer that tried to relax the key. `reason` is `a ${layer} layer may only make ${key} stricter; the ${inForceLayer} value stays in force`. The values are checked booleans, so the record holds no secret and no free text (OPS-4). Constraints: ARCH-23, ARCH-56 (`mergePolicy` stays pure). Out of scope: pins, floors, and the resolver.
+4. **Commands** — narrow test; `npm run lint`; `npm test`; `npx stryker run --mutate 'plugins/dotbabel/src/model-intelligence/policy/**/*.mjs'`.
+5. **Acceptance evidence** — the four named tests pass; Bats not required.
+
 ### P-5 — Source adapter contract and fixtures (`sources/contract`) — `/plan`
 
 1. **Tests first** — `plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs`
@@ -342,6 +358,22 @@ Blocked until RQ-1 closes (IMPL-1). Split into `P-8a` Models.dev and `P-8b` offi
 4. **Commands** — narrow test; `npm run lint`; `npm test`.
 5. **Acceptance evidence** — the six named tests pass on recorded fixtures (TEST-1); Bats not required.
 
+### P-8c — Adapter contract alignment (`domain/`, `sources/`) — `/plan`
+
+Added by the owner on 2026-10-12. It applies that date's §5 decisions to the three adapters that exist, before P-9 joins their evidence and before P-10 calls them. It changes `sources/knowledge/models-dev.mjs`, so it lands after P-8a.
+
+1. **Tests first**
+   - `plugins/dotbabel/tests/model-intelligence-domain.test.mjs`: `PROVIDERS is frozen, and every id matches ^[a-z0-9-]{1,48}$`; `domain/ exports checkOpaqueValue and assertOpaqueValue with the verdicts they had in sources/runtime/process.mjs`
+   - `plugins/dotbabel/tests/model-intelligence-adapter-models-dev.test.mjs`: `maps a Models.dev key into PROVIDERS, and emits an unmapped key as models-dev.<key>`; `context.providers takes Dotbabel ids and maps them back to the source keys`
+   - `plugins/dotbabel/tests/model-intelligence-adapter-codex.test.mjs`: `observe() records reconstructedFrom as axes.<name> or provider, never a native config key, and model_verbosity as axes.verbosity`; `observe() maps the banner provider into PROVIDERS`
+   - `plugins/dotbabel/tests/model-intelligence-adapter-claude.test.mjs`: `observe() records reconstructedFrom as axes.model and axes.reasoning, never a flag`; `validate() and observe() take reasoning, accept effort as a deprecated alias, and throw when both are given with different values`; `validate() accepts reasoning and effort together when they are equal`
+   - `plugins/dotbabel/tests/model-intelligence-evidence.test.mjs`: `rejects a reconstructedFrom entry that is not axes.<name> or provider`; `makeProviderCatalogEvidence accepts a sourceKey only when it differs from the provider id`
+   - Expected before implementation: `PROVIDERS` is missing, the adapters record native names, and Claude ignores `reasoning`.
+2. **Read first** — `SPEC/spec/5-interfaces-apis.md` (`Configuration axes`, `Adapter calls`, `Observed effective configuration`, `Knowledge-source adapters`); `plugins/dotbabel/src/model-intelligence/sources/evidence.mjs`; `sources/runtime/claude.mjs`; `sources/runtime/codex.mjs`; `sources/runtime/process.mjs:272-310`; `sources/knowledge/models-dev.mjs`; `sources/contract.mjs:460-476` (the failure-channel comment).
+3. **Implement** — add `PROVIDERS` to `domain/index.mjs`, and move `checkOpaqueValue` and `assertOpaqueValue` there. Change their importers, including `plugins/dotbabel/tests/model-intelligence-runtime-process.test.mjs`, and then remove the old exports from `process.mjs`. Translate `reconstructedFrom` to the §5 key vocabulary in the Claude and Codex adapters, and make `makeObservedConfiguration` reject any other entry. Map provider ids in the Models.dev and Codex adapters, and let `makeProviderCatalogEvidence` accept `sourceKey` (its field list is `sources/evidence.mjs:410`). Make `reasoning` the Claude input key, with `effort` as a deprecated alias. Replace the "divergence is open" sentence in `contract.mjs` with a reference to §5 `Failure channels`. Constraints: ARCH-3, ARCH-28, ARCH-57 rule 1. Out of scope: the conditional GET and `not_modified` (P-9), and every catalog join.
+4. **Commands** — narrow tests; `npm run lint`; `npm test`; `npx stryker run --mutate` over each changed module.
+5. **Acceptance evidence** — the named tests pass; Bats not required.
+
 ### P-9 — Catalog normalization, cache, and refresh locking (`catalog/`, `refresh`, `status`) — `/think`
 
 1. **Tests first** — `plugins/dotbabel/tests/model-intelligence-catalog.test.mjs`
@@ -361,12 +393,15 @@ Blocked until RQ-1 closes (IMPL-1). Split into `P-8a` Models.dev and `P-8b` offi
    - `a knowledge-source cache entry is stored with its adapter's notice export` (DOC-3, the Models.dev MIT license)
    - `refuses a serialized cache entry above MAX_CACHE_ENTRY_BYTES, envelope and notice included` (OPS-2; the adapter checks only its evidence)
    - `rebuilds cached knowledge-source evidence from JSON through the evidence builders, so the cache read path runs the same validation`
-   - `a conditional GET sends the stored etag, and a 304 keeps the previous entry fresh without replacing it` (amends the §5 adapter result and `sources/knowledge/models-dev.mjs`)
+   - `a conditional GET sends the stored etag, and a not_modified result keeps the previous entry, renews its observedAt, and never replaces it` (§5 `Conditional GET`; adds `not_modified` to `ADAPTER_RESULT_STATUSES` in `domain/index.mjs`, which `sources/contract.mjs` checks, the `etag` field to `makeProviderCatalogEvidence`, and the conditional GET to `sources/knowledge/models-dev.mjs`)
+   - `sends a stored etag only for a cache entry whose provider set and adapterVersion equal those of the request`
+   - `rejects a not_modified result from any operation other than a discover that sent an etag`
+   - `joins facts from two sources only under a PROVIDERS id, and never joins a source-scoped id such as models-dev.xai`
    - Expected before implementation: module missing; the two verbs do not exist.
-2. **Read first** — `SPEC/spec/4-data-flow-components.md` (`Shared State`, ARCH-59 to ARCH-65); `SPEC/spec/5-interfaces-apis.md` (`Catalog evidence envelope`, `Freshness is separate`, `Refresh state is separate`); `plugins/dotbabel/src/lib/handoff-preflight.mjs:93-110` (`writeCacheAtomic`); `plugins/dotbabel/src/lib/paths.mjs:45-55`; `plugins/dotbabel/src/model-intelligence/sources/contract.mjs`.
+2. **Read first** — `SPEC/spec/4-data-flow-components.md` (`Shared State`, ARCH-59 to ARCH-65); `SPEC/spec/5-interfaces-apis.md` (`Adapter result`, `Catalog evidence envelope`, `Freshness is separate`, `Refresh state is separate`, `Knowledge-source adapters`); `plugins/dotbabel/src/lib/handoff-preflight.mjs:93-110` (`writeCacheAtomic`); `plugins/dotbabel/src/model-intelligence/domain/index.mjs` (`ADAPTER_RESULT_STATUSES`); `plugins/dotbabel/src/lib/paths.mjs:45-55`; `plugins/dotbabel/src/model-intelligence/sources/contract.mjs`.
 3. **Implement** — create `plugins/dotbabel/src/model-intelligence/catalog/index.mjs`, `catalog/cache.mjs`, `catalog/lock.mjs`; add the `refresh` and `status` verbs to `plugins/dotbabel/bin/dotbabel-models.mjs`. Constraints: ARCH-28, ARCH-30, ARCH-59, ARCH-60, ARCH-61, ARCH-65. P-9 consumes adapter output through fixtures and does not wait for P-8 (IMPL-3, IMPL-5). P-9 also changes `sources/knowledge/models-dev.mjs` for the conditional GET, and it does not key the cache by `sourceVersion` alone, because that hashes the full Models.dev document, not the reduced evidence. Out of scope: resolution, snapshot, drift of generated files.
 4. **Commands** — narrow test; bats file; `npm run lint`; `npm test`.
-5. **Acceptance evidence** — the six vitest names and the two bats tests pass; Bats required.
+5. **Acceptance evidence** — the named vitest tests and the two bats tests pass; Bats required.
 
 ### P-10 — Resolver: constraint composition (`resolver/`) — `/think`
 
@@ -831,12 +866,14 @@ An implementation unit is not mechanically one pull request. The planning target
 | PR-11 | P-14        | PR-24 | P-22c + P-22d |
 | PR-12 | P-15        | PR-25 | P-23          |
 | PR-13 | P-16        | PR-26 | P-8b          |
+| PR-27 | P-8c        | PR-28 | P-4b          |
 
 Why each group exists:
 
 - **P-1 + P-2** — the domain vocabulary and the canonical requirement/schema are one foundation. Landed as PR #387 and PR #389; the split was incidental, not a precedent.
 - **P-6 + P-7** — the Claude and Codex adapters implement the same stabilised adapter contract and keep separate tests.
 - **P-8a + P-8b** — the knowledge-source implementations share one boundary. Split this PR if the official-provider adapter proves materially larger than expected. Split on 2026-09-27: RQ-1 closed for Models.dev only, so P-8a lands alone as PR-06, and P-8b follows as PR-26 once the OpenAI response shape is known. The plan becomes 26 PRs.
+- **P-8c and P-4b** — added on 2026-10-12 by the owner's §3 and §5 decisions of that date. They are two pull requests, because `sources/` and `policy/` are different dependency boundaries (IMPL-15). The numbers do not give the order. PR-27 (P-8c) lands after PR-06 and before PR-07, because P-9 joins only `PROVIDERS` ids. PR-28 (P-4b) lands before PR-08, because the resolver reads the preferences. The plan becomes 28 PRs.
 - **P-10 + P-11** — P-10 deliberately leaves enforcement and explanation stubbed, and P-11 completes the resolver. Grouping avoids merging that artificial intermediate state.
 - **P-19a + P-19b** — both are low-risk, unambiguous migration batches.
 - **P-22a + P-22b** and **P-22c + P-22d** — adapter-only runtime coverage under the current scope. These PRs do not introduce cross-runtime agent fan-out, which §2 puts out of scope.

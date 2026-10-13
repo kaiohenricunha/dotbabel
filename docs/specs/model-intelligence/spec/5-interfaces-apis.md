@@ -275,6 +275,8 @@ binding:
 
 Axis identifiers belong to the runtime adapter contract. They are **not** a universal Dotbabel enum. Examples include `model`, `reasoning`, `contextTier`, and `selector`, but the domain layer does not infer semantic equivalence merely from an axis name. An Antigravity selector that fuses model and effort remains one opaque runtime axis rather than being synthetically split into `model` and `reasoning`. This preserves ARCH-1, ARCH-17, and the measured runtime differences from DOC-2.
 
+**One name for one axis.** Decided by the owner on 2026-10-12. An adapter uses its axis names everywhere: in its binding and invocation capabilities, in the input of `validate` and `observe`, in `renderInvocation`, and in its evidence. A caller can therefore pass `ResolvedRuntimeConfiguration.axes` to any operation unchanged. The Claude adapter took `{model, effort}` as input since PR #414, while its evidence and the Codex adapter use `reasoning`. P-8c makes `reasoning` the Claude input key and keeps `effort` as a deprecated alias. When a caller supplies both, they must be equal, or the call is a caller breach.
+
 ### Invocation capability
 
 Invocation configuration is also per axis:
@@ -295,14 +297,27 @@ Supported adapters expose operations conceptually equivalent to:
 
 ```ts
 discover(context): Promise<AdapterResult<DiscoveryEvidence>> // kind: runtime
-discover(context): Promise<AdapterResult<ProviderCatalogEvidence>> // kind: knowledge-source; context.providers is required
+discover(context): Promise<AdapterResult<ProviderCatalogEvidence>> // kind: knowledge-source; context.providers is required, context.etag is optional
 
-observe(context): Promise<AdapterResult<ObservationEvidence>>
+observe(context): Promise<AdapterResult<ObservedEffectiveConfiguration>>
 
 validate(input, context): Promise<AdapterResult<ValidationEvidence>>
 
-renderInvocation(resolvedConfig, context): InvocationResult
+renderInvocation(resolvedConfig: ResolvedRuntimeConfiguration, context): Invocation // synchronous; throws on an invalid value
 ```
+
+```ts
+interface Invocation {
+  runtimeId: RuntimeId;
+  command: string;
+  args: string[]; // structured arguments; nothing is executed and nothing is joined into a shell string (ARCH-47)
+  unsupportedAxes: string[]; // every axis of the configuration this runtime cannot express, sorted (ARCH-49)
+}
+```
+
+**Failure channels.** Decided by the owner on 2026-09-26 (split by source) and on 2026-10-12 (`renderInvocation`). An asynchronous operation reports a failure that comes from data, such as the runtime's behavior or a value from a repository's frontmatter, as an `AdapterResult` with provenance. A value that fails the adapter's value check is `status: unknown` with the diagnostic code `invalid_axis_value`. An operation throws only for a caller-contract breach, such as a missing or wrongly typed input, and for a safety fault, such as the SEC-1 root check or a knowledge-source URL that is not HTTPS (SEC-3).
+
+`renderInvocation` is the one exception. It is synchronous, it returns a plain `Invocation`, and it throws `TypeError` on any invalid value, even one that came from frontmatter. **Precondition:** its caller validates each axis value first, with the non-throwing `checkOpaqueValue`, so a bad value becomes a diagnostic before render time. The resolver does this before it produces a `ResolvedRuntimeConfiguration` (P-10), so a value that reaches `renderInvocation` invalid is a caller breach, not data. `renderInvocation` itself uses the throwing `assertOpaqueValue`. Both functions are today in `plugins/dotbabel/src/model-intelligence/sources/runtime/process.mjs:272-310`. ARCH-57 rule 1 forbids `resolver/` to import from `sources/`, so P-8c moves `checkOpaqueValue` and `assertOpaqueValue` to `domain/`, where both the adapters and the resolver can import them.
 
 Artifact materialization is not performed by the source adapter. `materialize/` consumes the adapter's binding contract and runtime-native translation helpers. The exact JavaScript export shape may be chosen during implementation, but all adapters expose the same semantic contract.
 
@@ -310,7 +325,7 @@ Artifact materialization is not performed by the source adapter. `materialize/` 
 
 ```ts
 interface AdapterResult<T> {
-  status: "ok" | "unsupported" | "unavailable" | "unknown";
+  status: "ok" | "not_modified" | "unsupported" | "unavailable" | "unknown";
 
   evidence?: T;
 
@@ -331,18 +346,59 @@ interface AdapterResult<T> {
 }
 ```
 
-| Result        | Meaning                                                                                                                                        |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ok`          | The operation completed and produced usable evidence.                                                                                          |
-| `unsupported` | The capability is not available for the detected source/runtime contract.                                                                      |
-| `unavailable` | The capability exists, but it cannot be used now: missing binary, network failure, missing existing auth, runtime failure, and similar causes. |
-| `unknown`     | The operation ran or evidence was inspected, but Dotbabel cannot make a reliable determination.                                                |
+| Result         | Meaning                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ok`           | The operation completed and produced usable evidence.                                                                                          |
+| `not_modified` | The source confirmed that the caller's stored evidence is still current. No evidence is returned. Only a `discover` with an `etag`.            |
+| `unsupported`  | The capability is not available for the detected source/runtime contract.                                                                      |
+| `unavailable`  | The capability exists, but it cannot be used now: missing binary, network failure, missing existing auth, runtime failure, and similar causes. |
+| `unknown`      | The operation ran or evidence was inspected, but Dotbabel cannot make a reliable determination.                                                |
 
 A successful exit code alone does not imply `ok`. The measured OpenCode case of exit `0` with empty output (DOC-2, "`opencode models` Grammar and Stability") is classified according to adapter semantics, not automatically converted into an empty successful model catalog (ARCH-30).
 
+**`not_modified`.** Decided by the owner on 2026-10-12. The source confirmed that the evidence the caller already holds is still current, so no new evidence came back. A conditional GET that receives `304 Not Modified` gives this result. Only a `discover` call whose context named an `etag` may return it. Any other operation, or a `discover` without an `etag`, that returns it breaks the contract. The result builder cannot see the request, so `catalog/`, which knows whether it sent an `etag`, rejects such a result. A `not_modified` result carries no `evidence`, so it can never be read as an empty catalog (ARCH-30). It carries `provenance` and `observedAt`. `catalog/` keeps the stored entry and its evidence unchanged. It stores the `observedAt` of the `not_modified` result as the time the source last confirmed the entry, and freshness counts from that time. The source vouched for the stored evidence again at that time, so this keeps the meaning of `observedAt`: the time the evidence was last observed.
+
+### Observed effective configuration
+
+Decided by the owner on 2026-10-12. `observe` returns the configuration that a runtime reports as in effect. PR #425 shipped this shape (`plugins/dotbabel/src/model-intelligence/sources/evidence.mjs:157-196`), and this section makes it the contract:
+
+```ts
+interface ObservedEffectiveConfiguration {
+  runtimeId: RuntimeId;
+
+  turnExecuted: boolean; // whether a model turn ran; no usage means no turn, not zero usage
+
+  configurationBasis: "as-run" | "reconstructed";
+
+  reconstructedFrom?: string[]; // present only when reconstructed; see below
+
+  axes: Record<string, string>; // each value the runtime reported, under the adapter's axis name; opaque
+
+  provider?: string; // only when the runtime reported one; never derived from the model
+
+  usage: Array<{
+    model: string;
+    canonicalModel?: string;
+    provider?: string;
+    contextWindow?: number;
+    maxOutputTokens?: number;
+    thinkingTokens?: number;
+  }>; // empty when no turn ran
+
+  fieldSources: Record<string, string>; // keyed "axes.<name>" or "provider"; the runtime surface that supplied the value (ARCH-28)
+
+  runtimeVersion?: string;
+}
+```
+
+- `configurationBasis` tells `catalog/` and W8 whether they see a real run or a probe. `as-run` is evidence from a run that the caller made, such as a Claude stream that the caller supplies. `reconstructed` is a probe in a scratch home. The probe sees only the inputs that the adapter carried into it, plus the runtime's defaults, and never the user's full configuration (SEC-1). A consumer never reports a reconstructed value as the user's own setting.
+- `reconstructedFrom` lists the carried inputs in the **same key vocabulary as `fieldSources`**: `axes.<name>` or `provider`. The adapter translates its own flags and configuration keys. For example, Claude's `--effort` becomes `axes.reasoning`, and Codex's `model_reasoning_effort` becomes `axes.reasoning`. An entry may name an input that no observed field reflects, such as `axes.reasoning` from Claude, whose stream does not report effort. An empty list means that every reported value is the runtime's default. A reported `axes.<name>` that is not in `reconstructedFrom` is therefore a runtime default, and `catalog/` needs no mapping per runtime to tell the two apart. A carried input with no axis of its own gets an axis name from its adapter: Codex's `model_verbosity` becomes `axes.verbosity`. Today the adapters still record native names (`claude.mjs:263`, `codex.mjs:307`). P-8c changes them.
+- Every reported value has exactly one `fieldSources` entry, and every entry names a reported value. The builder rejects a configuration that breaks either rule.
+- `provider` and `usage[].provider` are runtime-reported provider ids. Both are mapped into the Dotbabel provider namespace like every other provider id (`Knowledge-source adapters`, below).
+
 ### Diagnostics
 
-`diagnostic.code` is machine-readable and adapter-specific enough to preserve the real failure mode. Examples: `binary_missing`, `auth_required`, `network_unavailable`, `timeout`, `nonzero_exit`, `empty_output`, `malformed_output`, `version_unsupported`, `insufficient_evidence`. Consumers may render these differently, but they do not infer capability facts from diagnostic text.
+`diagnostic.code` is machine-readable and adapter-specific enough to preserve the real failure mode. Examples: `binary_missing`, `auth_required`, `network_unavailable`, `timeout`, `nonzero_exit`, `empty_output`, `malformed_output`, `version_unsupported`, `insufficient_evidence`, `invalid_axis_value`. The last one means that a caller-supplied axis value failed the value check. Its message names the axis and never repeats the value (OPS-4). Consumers may render these differently, but they do not infer capability facts from diagnostic text.
 
 ### Freshness is separate
 
@@ -425,12 +481,14 @@ capabilities:
 ```ts
 interface ProviderCatalogEvidence {
   providers: Array<{
-    id: string; // the provider id, as the source keys it (source-scoped; see below)
+    id: string; // a Dotbabel provider id (see "Provider namespace" below)
+    sourceKey?: string; // the source's own key, only when it differs from id
     displayName?: string;
     discovery: DiscoveryEvidence; // models, effortSupport, skipped
   }>;
   missingProviders: string[]; // requested providers the source does not describe
   skipped: number; // requested providers present in the source but unusable
+  etag?: string; // the validator the source sent with this document, when it sent one
 }
 ```
 
@@ -438,7 +496,16 @@ The caller names the providers to keep. The adapter reduces the document to them
 
 `provenance.sourceKind` tells `catalog/` which of the two evidence shapes a `discover` result holds. Every knowledge adapter module also exports `notice`, the text that must be stored with each copy of its data (`null` when the source needs none), so `catalog/` can honor a license without naming the adapter.
 
-**Open decision before P-9 joins sources.** A provider id is source-scoped: it is the key the source itself uses. Catalog identity is the pair of provider and model id (ARCH-3), so a fact from Models.dev and a fact from an official API (P-8b) join only when both name the provider the same way. Before P-9 merges two knowledge sources, the owner decides one of two rules: every knowledge adapter emits a Dotbabel provider namespace, or `catalog/` owns an explicit alias table.
+**Provider namespace.** Decided by the owner on 2026-10-12. Catalog identity is the pair of provider and model id (ARCH-3). So a fact from Models.dev, a fact from an official API (P-8b), and a provider that a runtime reports join only when all three name the provider the same way. Each source keys providers its own way, and an official model API states no provider at all. The rule:
+
+- `domain/` owns `PROVIDERS`, a frozen table of Dotbabel provider ids. Each id matches `^[a-z0-9-]{1,48}$`, so it holds no dot. The table starts with the Models.dev keys of the providers Dotbabel uses, because OpenCode already uses those keys: `anthropic`, `openai`, `google`, `github-copilot`, and `opencode` (DOC-3). A new id is a reviewed change to that table.
+- Every adapter that emits a provider id maps its source key into `PROVIDERS` before it emits the evidence. The adapter owns the mapping, because the mapping is knowledge about its source. `context.providers` names ids in the same namespace, and the adapter maps them back to its source keys. `catalog/` holds no alias table and no knowledge of any source's naming.
+- A source key with no mapping is not dropped. The adapter emits it as `<sourceId>.<key>`, such as `models-dev.xai`. That form stays inside the provider-id charset of `sources/evidence.mjs:381`. It always holds a dot, so it can never equal a `PROVIDERS` id, and a join by accident is not possible. `catalog/` stores it, but never joins it with a fact from another source. A key whose scoped form is longer than 64 characters counts in `skipped`.
+- When the Dotbabel id differs from the source key, the evidence keeps the source key in `sourceKey`, so a person can trace the fact back to the source (ARCH-28).
+
+P-8c adds `PROVIDERS` and the mapping to the Models.dev and Codex adapters. P-9 joins only ids from that table.
+
+**Conditional GET.** Decided by the owner on 2026-10-12. A knowledge adapter whose source supports HTTP validators accepts an optional `context.etag` and sends it as `If-None-Match`. On `200`, it returns `ok` with the received `etag` in the evidence. On `304`, it returns `not_modified` (`Adapter result`). The reduced evidence depends on the requested providers, but the `etag` belongs to the full source document. So `catalog/` sends a stored `etag` only for a cache entry whose provider set equals the provider set of the request, and whose `adapterVersion` equals the current adapter's. A new adapter version can change the reduction or the provider mapping, and a `304` would otherwise keep the old reduced evidence. P-9 implements this in `catalog/` and in `sources/knowledge/models-dev.mjs`.
 
 This keeps one adapter contract without pretending that runtime and catalog sources expose the same operations.
 
@@ -975,15 +1042,15 @@ The third-party APIs that the knowledge-source adapters consume are the official
 
 Measured in DOC-3 on 2026-09-18 and again on 2026-09-27.
 
-| Property     | Contract                                                                                                                                                                                                                                                                                            |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Request      | `GET https://models.dev/api.json`. No authentication, and Dotbabel sends no credential and no cookie (SEC-3). A redirect is refused.                                                                                                                                                                |
-| Response     | One JSON object keyed by provider id. Each provider has `id`, `name`, and `models`, an object keyed by model id. No top-level schema or version marker exists.                                                                                                                                      |
-| Model record | `id`, `name`, `limit.context`, and `reasoning_options` feed a `ModelFact`. Only `reasoning_options` entries of type `effort` give effort values (ARCH-1).                                                                                                                                           |
-| Version      | The document states none. `sourceVersion` is Dotbabel-derived: `sha256:` and the first 32 hex digits of the SHA-256 of the received bytes.                                                                                                                                                          |
-| Caching      | `etag` and `cache-control: public, max-age=0, must-revalidate`. A conditional GET returns `304`. It needs the stored `etag`, so it lands with the cache in P-9, which amends this contract: an `etag` input to `discover`, the received `etag` in the result, and a `304` reported as not modified. |
-| Size         | 4.69 MiB on 2026-09-27 and growing. The adapter caps the raw read at 32 MiB, and the reduced evidence must stay within the OPS-2 per-entry limit of 8 MiB.                                                                                                                                          |
-| License      | MIT, "Copyright (c) 2025 models.dev", confirmed for the served `api.json` (DOC-3). Every stored or committed copy keeps the adapter's `notice`.                                                                                                                                                     |
+| Property     | Contract                                                                                                                                                                                                                                                                                                          |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request      | `GET https://models.dev/api.json`. No authentication, and Dotbabel sends no credential and no cookie (SEC-3). A redirect is refused.                                                                                                                                                                              |
+| Response     | One JSON object keyed by provider id. Each provider has `id`, `name`, and `models`, an object keyed by model id. No top-level schema or version marker exists.                                                                                                                                                    |
+| Model record | `id`, `name`, `limit.context`, and `reasoning_options` feed a `ModelFact`. Only `reasoning_options` entries of type `effort` give effort values (ARCH-1).                                                                                                                                                         |
+| Version      | The document states none. `sourceVersion` is Dotbabel-derived: `sha256:` and the first 32 hex digits of the SHA-256 of the received bytes.                                                                                                                                                                        |
+| Caching      | `etag` and `cache-control: public, max-age=0, must-revalidate`. A conditional GET returns `304`. It needs the stored `etag`, so it lands with the cache in P-9, under the contract that `Knowledge-source adapters` fixes: `context.etag` in, the received `etag` in the evidence, and a `304` as `not_modified`. |
+| Size         | 4.69 MiB on 2026-09-27 and growing. The adapter caps the raw read at 32 MiB, and the reduced evidence must stay within the OPS-2 per-entry limit of 8 MiB.                                                                                                                                                        |
+| License      | MIT, "Copyright (c) 2025 models.dev", confirmed for the served `api.json` (DOC-3). Every stored or committed copy keeps the adapter's `notice`.                                                                                                                                                                   |
 
 The official provider APIs stay open under RQ-1: the OpenAI response shape is unknown, so P-8b waits. The runtime CLI surfaces that the runtime adapters call are recorded in DOC-2, "Runtime Capability Matrix".
 
