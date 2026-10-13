@@ -148,8 +148,9 @@ the base policy. So a selection stays. Once a head was selected, a later run on
 that head reports it selected again (`sticky`), with the first reason. A
 non-selection can change when the CI state or the base policy changes.
 
-The policy is off when both rates are `0` and no `always_paths` is set. Then the command reads the pull request once to find its base, decides `off`, and stops. It
-reads no changed files and no CI runs, and it records nothing.
+The policy is off when both rates are `0` and no `always_paths` is set. Then the
+command reads the pull request once to find its base, decides `off`, and stops.
+It reads no changed files and no CI runs, and it records nothing.
 
 Each other decision goes into the spot-check log,
 `<git-common-dir>/dotbabel/receipts/pr-<N>.spot-checks.json`
@@ -192,10 +193,12 @@ A private repository can reach its GitHub Actions spending limit. Then each run
 fails before a step runs. That run is `unverified`. It never verifies a commit
 and it never raises an alarm.
 
-The spot check reads the newest completed run on the default branch. CI is `available` only when that run is green or red and tested one of the last 10 first-parent commits. An older run says nothing about the recent merges, so CI is then
-`unavailable`. CI is also `unavailable` when there is no completed run, or the
-newest one is `unverified`. If the runs cannot be read, CI is `unknown`, never
-`available`, and the normal `rate` applies.
+The spot check reads the newest completed run on the default branch. CI is
+`available` only when that run is green or red and tested one of the last 10
+first-parent commits. An older run says nothing about the recent merges, so CI
+is then `unavailable`. CI is also `unavailable` when there is no completed run,
+or the newest one is `unverified`. If the runs cannot be read, CI is `unknown`,
+never `available`, and the normal `rate` applies.
 
 While CI is `unavailable`, nothing off your machine checks an attestation after
 the merge. So the spot check uses `rate_when_ci_unavailable`, and by default
@@ -216,14 +219,15 @@ A real failure on code whose attestation said pass is the evidence this layer
 detects. It is not proof of a forgery, and a forgery can avoid it (see the
 limits below). Two places look for it:
 
-- **The `contradiction` job** in `.github/workflows/test.yml` runs only when
-  the test job failed on a push to the default branch. It classifies its own
-  run. A red run can come from any commit since the last green run. So the job checks every pull request merged in that first-parent range, at most 20 commits. Each one with a trusted, passing attestation for its head is a
-  suspect. The job adds the label `attestation-contradicted` to each suspect
-  and opens one issue for the failing commit. The issue names the range and
-  every suspect. A hidden marker stops a second issue for the same failing
-  commit. In CI, only an issue that the workflow opened counts, and a closed
-  one is reopened with a comment.
+- **The `contradiction` job** in `.github/workflows/test.yml` runs only when the
+  test job failed on a push to the default branch. It classifies its own run. A
+  red run can come from any commit since the last green run. So the job checks
+  every pull request merged in that first-parent range, at most 20 commits. Each
+  one with a trusted, passing attestation for its head is a suspect. The job
+  adds the label `attestation-contradicted` to each suspect and opens one issue
+  for the failing commit. The issue names the range and every suspect. A hidden
+  marker stops a second issue for the same failing commit. In CI, only an issue
+  that the workflow opened counts, and a closed one is reopened with a comment.
 - **`/merge-pr`**, when a spot-checked pull request really fails its explicit
   run, stops and runs `dotbabel pr-stack contradiction --pr <N> --local-failure --post`.
 

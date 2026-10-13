@@ -793,19 +793,29 @@ run, or when the run is `unverified`. It is `unknown` when the runs, the jobs
 or the recent commits cannot be read. Unknown is never `available`, and the
 normal `rate` then applies.
 
-`spot-check` exits `0` for any decision. It exits `2` when the pull request, the base commit or the default branch cannot be read. It also exits `2` when the log is damaged or the policy is invalid. An invalid policy is never replaced by the default. It exits `64` on a usage error.
+`spot-check` exits `0` for any decision. It exits `2` when the pull request, the
+base commit or the default branch cannot be read. It also exits `2` when the log
+is damaged or the policy is invalid. An invalid policy is never replaced by the
+default. It exits `64` on a usage error.
 
-`main-status` lists the recent first-parent commits of `<remote>/<trunk>`, after a best-effort `git fetch`. It classifies the runs of `--workflow` for them as `green`, `red`, `unverified` or `unknown`. `unverified` is a billing limit, a startup failure, a cancel, a job that never started, or no run. `unknown` means that the run or its jobs could not be read. A green run verifies its commit and every older commit. The output
-names the last green commit and the debt: the `red`, `unverified` and `unknown`
-commits newer than it. When the runs list cannot be read, every commit is
-`unknown`, never verified. For each merged pull request with a local
-spot-check log, it also shows the decision and the explicit run.
+`main-status` lists the recent first-parent commits of `<remote>/<trunk>`, after
+a best-effort `git fetch`. It classifies the runs of `--workflow` for them as
+`green`, `red`, `unverified` or `unknown`. `unverified` is a billing limit, a
+startup failure, a cancel, a job that never started, or no run. `unknown` means
+that the run or its jobs could not be read. A green run verifies its commit and
+every older commit. The output names the last green commit and the debt: the
+`red`, `unverified` and `unknown` commits newer than it. When the runs list
+cannot be read, every commit is `unknown`, never verified. For each merged pull
+request with a local spot-check log, it also shows the decision and the explicit
+run.
 
 `main-status --local` also runs the local-attest matrix on the default-branch
-tip. Warning: this runs repository code as you, from that tip: the
-local-attest config module, the lifecycle scripts of the install, and every
-leg. So it needs the repository on the project-command trust allowlist, which `dotbabel quality` and `doctor` also use. Grant it with `dotbabel project-init --trust`, or pass `--allow-project-commands` for one run.
-Without either, it exits `2` before it runs anything.
+tip. Warning: this runs repository code as you, from that tip: the local-attest
+config module, the lifecycle scripts of the install, and every leg. So it needs
+the repository on the project-command trust allowlist, which `dotbabel quality`
+and `doctor` also use. Grant it with `dotbabel project-init --trust`, or pass
+`--allow-project-commands` for one run. Without either, it exits `2` before it
+runs anything.
 
 It creates a temporary detached worktree and installs dependencies from the
 lockfile with the table that `/merge-pr` uses: `npm ci`,
@@ -860,8 +870,9 @@ names the failing commit, the range, every suspect, and the failed run
 (`$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID`).
 
 `contradiction` exits `1` when it finds a contradiction, and `0` when it finds
-none. It exits `2` when posting fails. It also exits `2` when it cannot read the run, its jobs, the first parent's
-run, the history, a trust list, a pull request, or its comments. It exits `64` on a usage error.
+none. It exits `2` when posting fails. It also exits `2` when it cannot read the
+run, its jobs, the first parent's run, the history, a trust list, a pull
+request, or its comments. It exits `64` on a usage error.
 
 ---
 

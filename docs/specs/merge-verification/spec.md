@@ -48,9 +48,10 @@ The resolver is strict. An unknown key, a value outside 0 to 1, or a glob with
 `!`, braces or brackets is an error (exit `2`), never a silent default, because
 a typo must not lower the check rate.
 
-The policy is off when both rates are `0` and no `always_paths` is set. Then the command reads the pull request once to find its base commit, decides `off`, and stops.
-It reads no changed files, no default branch and no CI runs, and it records
-nothing.
+The policy is off when both rates are `0` and no `always_paths` is set. Then the
+command reads the pull request once to find its base commit, decides `off`, and
+stops. It reads no changed files, no default branch and no CI runs, and it
+records nothing.
 
 The decision, in order:
 
@@ -76,11 +77,13 @@ can still change when the CI state or the base policy changes.
 Every decision except that early `off` goes into the spot-check log,
 `<git-common-dir>/dotbabel/receipts/pr-<N>.spot-checks.json`
 (`schemas/dotbabel.spot-checks.schema.json`, `schema_version` 1). The log is a
-sibling of the conductor run receipt, with its own lock. It is never part of the receipt. An older CLI refuses a receipt with an unknown key, and every installed CLI version shares the receipt directory. Each entry records the
-workflow file and the branch that were read. `--record-explicit pass|fail`
-records the result of the explicit run as an `explicit-run` entry.
-`spot-check --show` and `main-status` report, for each pull request, whether it
-was selected and whether an explicit run was recorded.
+sibling of the conductor run receipt, with its own lock. It is never part of the
+receipt. An older CLI refuses a receipt with an unknown key, and every installed
+CLI version shares the receipt directory. Each entry records the workflow file
+and the branch that were read. `--record-explicit pass|fail` records the result
+of the explicit run as an `explicit-run` entry. `spot-check --show` and
+`main-status` report, for each pull request, whether it was selected and whether
+an explicit run was recorded.
 
 ### 2.2 The four run states and the cumulative rule
 
@@ -113,28 +116,37 @@ of the three as the debt. When the runs list cannot be read, every commit is
 branch (`gh repo view --json defaultBranchRef`) when `--trunk` is not given.
 
 `main-status --local` also runs the local-attest matrix on the default-branch
-tip in a temporary detached worktree, and removes the worktree afterwards. It runs repository code as the current user. So it needs project-command trust (the allowlist that `dotbabel quality` and `doctor` use) or `--allow-project-commands`. Otherwise it exits `2`. It installs from the same
+tip in a temporary detached worktree, and removes the worktree afterwards. It
+runs repository code as the current user. So it needs project-command trust (the
+allowlist that `dotbabel quality` and `doctor` use) or
+`--allow-project-commands`. Otherwise it exits `2`. It installs from the same
 lockfile table as `/merge-pr`, and with no supported lockfile it installs
-nothing and says so. The result is `pass`, `fail` or `unknown`, labelled
-"local (same machine as the agent; weaker than CI)". It never verifies a
-commit.
+nothing and says so. The result is `pass`, `fail` or `unknown`, labelled "local
+(same machine as the agent; weaker than CI)". It never verifies a commit.
 
 ### 2.3 The contradiction alarm
 
 A real test failure on code whose attestation said pass is the evidence this
 layer detects. It is not proof of a forgery, and a forgery can avoid it (§3).
 `isContradiction` is true only when the run is `red` and the pull request
-carries a trusted, passing attestation for its head. A comment that was edited after it was posted still counts, and the issue says that it was edited. The merge gate refused edited comments at merge time.
+carries a trusted, passing attestation for its head. A comment that was edited
+after it was posted still counts, and the issue says that it was edited. The
+merge gate refused edited comments at merge time.
 
 Two places raise it:
 
 - **After the merge.** The test workflow has a `contradiction` job that runs
-  only when the test job failed on a push to the default branch. It
-  classifies its own run; an `unknown` run exits `2`. A red run can come from any commit since the last green run. So the job walks first-parent history from the failing commit back to the last green commit, not included, at most 20 commits. It checks every pull request merged in that range. Each one with a
+  only when the test job failed on a push to the default branch. It classifies
+  its own run; an `unknown` run exits `2`. A red run can come from any commit
+  since the last green run. So the job walks first-parent history from the
+  failing commit back to the last green commit, not included, at most 20
+  commits. It checks every pull request merged in that range. Each one with a
   trusted, passing attestation is a suspect. The job labels each suspect
   `attestation-contradicted` and opens ONE issue for the failing commit. The
   issue names the range and every suspect, and a hidden marker per failing
-  commit keeps it unique. When the first parent's own run was already red, the default branch was red before this push. Then the job opens no new alarm, prints why, and exits `0`.
+  commit keeps it unique. When the first parent's own run was already red, the
+  default branch was red before this push. Then the job opens no new alarm,
+  prints why, and exits `0`.
 - **Before the merge.** When a spot check selects a pull request and the
   explicit run really fails, `/merge-pr` stops and runs
   `dotbabel pr-stack contradiction --pr <N> --local-failure --post`.
@@ -148,24 +160,30 @@ In GitHub Actions (`GITHUB_ACTIONS=true`), an existing issue with the marker
 counts only when the workflow identity opened it, because the marker is
 public. A closed match is reopened with a comment.
 
-The job checks out the first parent (`github.event.before`) and runs the detector from there against `github.sha`. So the merged pull request cannot change the detector code that judges it. GitHub still reads the workflow file
-from the pushed commit, so this repository lists `.github/workflows/test.yml`
-in `attestation.governance_files`. A change to it then forces the explicit
-path. The template tells consumers to do the same, and its `npx dotbabel`
-resolves from the first parent's lockfile.
+The job checks out the first parent (`github.event.before`) and runs the
+detector from there against `github.sha`. So the merged pull request cannot
+change the detector code that judges it. GitHub still reads the workflow file
+from the pushed commit, so this repository lists `.github/workflows/test.yml` in
+`attestation.governance_files`. A change to it then forces the explicit path.
+The template tells consumers to do the same, and its `npx dotbabel` resolves
+from the first parent's lockfile.
 
-The issue lists the possible causes in short sentences. They are a forged or wrong attestation, a flaky test or an environment difference, or a merged tree that is not the attested head.
+The issue lists the possible causes in short sentences. They are a forged or
+wrong attestation, a flaky test or an environment difference, or a merged tree
+that is not the attested head.
 
 ### 2.4 When CI does not run
 
-The spot check reads the newest completed test run on the default branch. CI is `available` only when that run is green or red and tested one of the last 10 first-parent commits. An older run says nothing about recent merges that had no push
-run, so CI is then `unavailable`: nothing off the machine checked them. CI is
-also `unavailable` when there is no completed run or the newest one is
+The spot check reads the newest completed test run on the default branch. CI is
+`available` only when that run is green or red and tested one of the last 10
+first-parent commits. An older run says nothing about recent merges that had no
+push run, so CI is then `unavailable`: nothing off the machine checked them. CI
+is also `unavailable` when there is no completed run or the newest one is
 `unverified`. Then the spot check applies `rate_when_ci_unavailable`, which
 defaults to `1`: every attested pull request is verified explicitly. If the
 runs, the jobs or the recent commits cannot be read, the state is `unknown`,
-never `available`, and the normal `rate` applies. An `unverified` run is never
-a contradiction, and an `unverified` commit is debt, not a pass.
+never `available`, and the normal `rate` applies. An `unverified` run is never a
+contradiction, and an `unverified` commit is debt, not a pass.
 
 ## 3. Limits
 
