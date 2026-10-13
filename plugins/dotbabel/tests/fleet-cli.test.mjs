@@ -35,7 +35,8 @@ function cleanEnv(extra = {}) {
     if (k.startsWith("DOTBABEL_FLEET_") || k.startsWith("GIT_") || k === "CLAUDE_PROJECT_DIR") delete env[k];
   }
   delete env.XDG_STATE_HOME;
-  return { ...env, ...extra };
+  // The session-start hook would give the real session scope a CPU weight.
+  return { ...env, DOTBABEL_FLEET_CPU_WEIGHT: "off", ...extra };
 }
 
 function startSleeper() {

@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dotbabel.dev/schemas/dotbabel.run-receipt.schema.json",
+  "title": "dotbabel conductor run receipt",
+  "description": "The append-only, SELF-REPORTED history of one pull request's conductor runs (a log, never evidence: the merge gate does not read it), written by `dotbabel pr-stack record` to <git-common-dir>/dotbabel/receipts/pr-<N>.json (never the working tree). Every phase attempt is kept, with the head it ran on, its outcome, its evidence links, the rollback point, and the model its artifact requested. A field nobody observed is null; the receipt never records a cost or a model route it did not see.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "tool", "pr", "created_at", "updated_at", "attempts"],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "tool": {
+      "const": "dotbabel-pr-stack"
+    },
+    "pr": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "attempts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "phase",
+          "n",
+          "at",
+          "head_sha",
+          "base_ref",
+          "merge_base",
+          "outcome",
+          "reason_code",
+          "evidence",
+          "requested_model",
+          "tool_version"
+        ],
+        "properties": {
+          "phase": {
+            "enum": ["pre-pr", "open-pr", "post-pr-review", "review-pr", "local-attest", "stop"]
+          },
+          "n": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "head_sha": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "base_ref": {
+            "oneOf": [{ "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" }, { "type": "null" }]
+          },
+          "merge_base": {
+            "oneOf": [{ "type": "string", "pattern": "^[0-9a-f]{40}$" }, { "type": "null" }]
+          },
+          "outcome": {
+            "enum": ["pass", "fail", "blocked", "skipped"]
+          },
+          "reason_code": {
+            "oneOf": [{ "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }, { "type": "null" }]
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\S+$"
+            }
+          },
+          "requested_model": {
+            "oneOf": [{ "type": "string", "pattern": "^[A-Za-z0-9._:/-]+$" }, { "type": "null" }]
+          },
+          "tool_version": {
+            "oneOf": [{ "type": "string", "pattern": "^[0-9A-Za-z.+-]+$" }, { "type": "null" }]
+          }
+        }
+      }
+    }
+  }
+}

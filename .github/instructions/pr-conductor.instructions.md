@@ -47,6 +47,38 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 
 > **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
+## Run receipt
+
+Record every phase attempt, so the history of this pull request lives outside the conversation. When a phase ends — pass, fail, a hard stop, or a self-skip — run:
+
+```bash
+dotbabel pr-stack record --pr <N> --phase <id> --outcome pass|fail|blocked|skipped [--reason <CODE>] [--evidence <url>]
+```
+
+Pass `--reason` with the blocking code a phase stopped on, and `--evidence` with the link to each evidence comment it posted. Record the outcome you observed, never the one you hope for: the receipt is self-reported, nothing checks it against the evidence comments, and it is never evidence itself — the merge gate does not read it. Under `NO_PR`, phase 1 has no number yet: record it right after phase 2 opens the pull request. Exit `2` means the receipt is unavailable (no `gh`, a damaged file): say so in the summary and continue the current attempt. A missing receipt never blocks a phase's first attempt, but it does block a retry: the attempt cap counts only what was recorded (see Attempt cap).
+
+## Attempt cap
+
+The model decides how to repair a failure; the cap decides whether another attempt is allowed. Before you retry any phase, run:
+
+```bash
+dotbabel pr-stack gate --gate budget --pr <N> --phase <id>
+```
+
+It counts the phase's consecutive `fail` and `blocked` attempts in the run receipt, since the phase last passed, against `conductor.max_attempts` (default 3, at most 10; `conductor.phase_max_attempts` overrides it per phase). The cap is read from `.dotbabel.json` on the pull request's **base** ref, so nothing committed on this branch changes it.
+
+- **`FAIL` (`CONDUCTOR_BUDGET_EXHAUSTED`) — stop.** Report the phase, each recorded failure and its reason code, and the receipt. Only the user can allow another attempt.
+- **Exit `2` — stop retrying.** The cap or the receipt cannot be read (an invalid `conductor` block, an unfetched base ref, a damaged receipt). Report which one. Without a readable cap and count, no retry is allowed.
+- **A `record` that failed for this phase also stops retries.** The cap cannot count an attempt it never saw, so a passing gate after a failed `record` proves nothing.
+
+When the user explicitly allows another attempt, record it, then retry:
+
+```bash
+dotbabel pr-stack record --pr <N> --phase <id> --outcome skipped --reason USER_ALLOWED_RETRY
+```
+
+That resets the phase's count and never reads as a pass. Record it only on the user's explicit go-ahead in this session. Never record a `pass`, edit or delete the receipt, or change `conductor` in `.dotbabel.json` to free the budget.
+
 ## Steps
 
 ### 0. Stack check (always run first)
@@ -105,7 +137,7 @@ Otherwise run `/git pr` (`skills/git/SKILL.md`).
 dotbabel pr-stack gate --gate merge --pr <N>
 ```
 
-Fix every reason it reports via `gh pr edit <N> --body-file <file>` — use a file, never a heredoc, so backticks and the Spec ID block survive. Re-run until it passes, or until only `BEHIND_BASE` remains (phase 4 handles that).
+Fix every reason it reports via `gh pr edit <N> --body-file <file>` — use a file, never a heredoc, so backticks and the Spec ID block survive. Re-run until it passes, or until only `BEHIND_BASE` remains (phase 4 handles that). Each failing run is an `open-pr` attempt: record it, and check the attempt cap before the next one (see Attempt cap above).
 
 ### 3. `post-pr-review`
 
@@ -180,6 +212,13 @@ Stack: <this PR is standalone | #<N> lands first, then #<M> needs a rebase>
 Status: READY  |  BLOCKED — <reason>
 ```
 
+Record this phase, then print the receipt under the summary. It shows each phase's attempts and the rollback point. Record `stop` as `pass` for `Status: READY`, or as `blocked` with the reason code for `Status: BLOCKED`. The receipt reads `ready` only when the `stop` hand-off is its latest pass and no earlier phase contradicts it:
+
+```bash
+dotbabel pr-stack record --pr <N> --phase stop --outcome pass   # or: --outcome blocked --reason <CODE>
+dotbabel pr-stack receipt --pr <N>
+```
+
 **This is the end of the skill.** Merging is a separate, explicit instruction from the user. Do not call `/merge-pr` yourself, and do not run the merge command directly.
 
 ## Stacked PRs
@@ -217,4 +256,6 @@ It prints the retarget, fetch, checkout, rebase, and push steps in order. **The 
 - **Do not review the same code twice.** Phase 3 owns the security pass and the comment validation; phases 1 and 4 run in `--conductor` mode so they narrow to a secrets grep and a fix delta.
 - **Stop at hard stops.** A CRITICAL security finding or a branch-introduced test failure ends the run.
 - **Never claim a test failure is pre-existing** without the `git stash` proof that `commands/pre-pr.md` requires.
+- **Record every phase attempt** in the run receipt (see Run receipt above). Never edit the receipt file by hand.
+- **Check the attempt cap before every retry.** A failed `gate --gate budget` is a hard stop. Only the user lifts it, through a `USER_ALLOWED_RETRY` record; never by editing the receipt or the `conductor` config.
 - **One PR at a time.** For a batch, the caller loops; this skill stays single-PR.

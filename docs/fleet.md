@@ -145,6 +145,7 @@ In `.dotbabel.json`:
 | `shared`                 | `[]`    | Extra globs that are never claimed                  |
 | `escalate_after_minutes` | `15`    | Minutes of blocks before `ask`; `0` means never ask |
 | `token_idle_minutes`     | `60`    | Minutes before an unused merge token is free        |
+| `heavy`                  | `[]`    | More commands that run in a CPU lane (see below)    |
 
 Environment variables take precedence:
 
@@ -178,9 +179,12 @@ Environment variables take precedence:
 ## CPU lanes
 
 A lane is a fixed set of CPUs. The online CPUs are split into lanes of about
-5, and the last CPU stays free for shells, editors, and the sessions
-themselves. A machine with 16 CPUs gets 3 lanes: CPUs 0-4, 5-9, and 10-14. A
-machine with fewer than 6 CPUs keeps no CPU free.
+7, and the last CPU stays free for shells, editors, and the sessions
+themselves. A machine with 16 CPUs gets 2 lanes: CPUs 0-7 and 8-14. A machine
+with 8 or more usable CPUs always gets at least 2 lanes, and a machine with
+fewer than 6 CPUs keeps no CPU free. The
+[lane size benchmark](./experiments/2026-09-27-cpu-lane-size.md) measured 2
+lanes of 7-8 against 3 lanes of 5 on a 16-CPU machine.
 
 A heavy test command waits in a queue until a lane is free, then runs pinned
 to that lane with `taskset`. The first command to wait is the first to get a
@@ -190,6 +194,21 @@ CPU: Node's `os.availableParallelism()` (vitest, jest), Go's `GOMAXPROCS`, and
 the lane also sets `PYTEST_XDIST_AUTO_NUM_WORKERS`. The lane is free the
 moment the command exits. If the lane process dies, the kernel releases its
 lock.
+
+**Lending.** A test run of a session that works alone is not limited to one
+lane. With `DOTBABEL_FLEET_LEND=auto`, the default, a command takes every free
+lane, so all CPUs but the free one, when no other Claude Code session is busy
+and no command waits. Otherwise it takes one lane. Only sessions with the
+status `busy` count; `idle`, `waiting`, and `shell` sessions do not. A command
+whose own session is not in `~/.claude/sessions/` counts every busy session,
+so it does not lend. The cost: a session that becomes busy during a lent run
+waits until that run ends.
+
+With a number, `DOTBABEL_FLEET_LEND=2` for example, a command takes up to that
+many free lanes. It never takes the last free lane, so the next command still
+starts at once, and it takes only one lane while another command waits. On 4
+lanes, 3 commands in a row get 2, 1, and 1 lanes. `DOTBABEL_FLEET_LEND=1` turns
+lending off.
 
 ### Set up the lanes
 
@@ -218,6 +237,24 @@ command:
 - `pytest` (also through `python -m`, `uv run`, and `poetry run`), `tox`, and
   `nox`
 - `dotbabel local-attest` and `dotbabel quality check`
+- the commands that the repository lists in `fleet.heavy`
+
+A repository names its own heavy commands in its `.dotbabel.json`:
+
+```json
+{ "fleet": { "heavy": ["./scripts/run-tests.sh", "npm run ci"] } }
+```
+
+An entry matches a command whose first words are the entry's words. An entry
+whose first word has no `/` matches that word in any directory, so
+`run-tests.sh` matches `./run-tests.sh` and `scripts/run-tests.sh`. The lane
+holder shows the entry as its label. The wrapper reads the nearest
+`.dotbabel.json` from the command's directory up to the git top level, without
+starting a process. This adds about 0.4 ms to each Bash call in a directory
+with a `.dotbabel.json`. It starts Node only when the command contains the
+first word of an entry. Give each entry a distinctive first word: an entry
+that starts with `make` or `go` starts Node for almost every command, and each
+start costs about 18 ms.
 
 Watch modes (`vitest --watch`, `npm run test:watch`) never go to a lane,
 because they never end. Every other command, and every hook and MCP server,
@@ -248,16 +285,26 @@ carry secrets.
 | --------------------------- | ----------------------------------------------------------------- |
 | `DOTBABEL_FLEET_LANES`      | `off`, or explicit lanes as CPU lists joined by `;`: `0-4;5-9`    |
 | `DOTBABEL_FLEET_LANE_COUNT` | The number of lanes in the automatic layout                       |
+| `DOTBABEL_FLEET_LANE_WIDTH` | CPUs per lane in the automatic layout (default `7`, see below)    |
+| `DOTBABEL_FLEET_LEND`       | `auto` (default), a lane count, or `1` to turn lending off        |
 | `DOTBABEL_FLEET_NCPU`       | The CPU count for the automatic layout (default: the online CPUs) |
+
+The automatic layout makes `round(usable CPUs / width)` lanes, at least 2 from
+8 usable CPUs, and gives the CPUs left over one each to the first lanes. On 16
+CPUs, width 7 (the default) gives `0-7;8-14`, width 5 gives `0-4;5-9;10-14`,
+and width 4 gives `0-3;4-7;8-11;12-14`.
 
 ### Limits of the lanes
 
+- **A lent lane is not taken back.** A command that took 2 lanes keeps both
+  until it ends, even when other commands start to wait.
 - **Linux only.** A lane needs `flock` and `taskset` (util-linux). Without
   them, or with bash older than 4, the command runs at once, with no lane.
 - **Only the command text is read.** A script that starts a test runner, such
-  as `./run-tests.sh`, is not seen. Run it with `dotbabel fleet lane --`. A
-  heredoc stops the reading, so a test command after a heredoc in the same
-  Bash call runs with no lane.
+  as `./run-tests.sh`, is not seen unless the repository lists it in
+  `fleet.heavy`. Otherwise run it with `dotbabel fleet lane --`. A heredoc
+  stops the reading, so a test command after a heredoc in the same Bash call
+  runs with no lane.
 - **The wrapper reads Claude Code's internal form of a Bash call**
   (`eval '<command>' && pwd -P >| <file>`). If a new Claude Code version
   changes that form, heavy commands run with no lane. No command breaks.
@@ -359,6 +406,40 @@ running `event` after the hook recorded the same merge does nothing.
   you send it the next prompt.
 - **`gh` must be signed in** in the merging session, because the event comes
   from `gh pr view`.
+
+## Fair CPU share
+
+Lanes cover test runs. Builds, scripts, and servers run outside the lanes, and
+without CPU weights the kernel shares the CPUs thread by thread. A session with
+48 busy threads then gets 12 times the CPU of a session with 4. The fair CPU
+share gives each Claude Code session's systemd scope the same `CPUWeight`, so
+the scopes share the CPUs as groups. A session that works alone still uses all
+CPUs; a light session keeps its CPUs next to a heavy one. On a 16-CPU machine,
+4 busy threads next to 48 got 1.05 CPUs without the weights and 3.37 with
+them.
+
+The `session-start` hook gives its own session scope `CPUWeight=100` with
+`systemctl --user set-property --runtime`, in every repository. It acts only on
+a `*.scope` in the user manager's `app.slice` (tmux, for example, makes one per
+pane), and it does nothing when systemd is missing, as on macOS. For sessions
+that started before the hook, run once:
+
+```bash
+dotbabel fleet cpu-share            # set the weight on every live session's scope
+dotbabel fleet cpu-share --status   # only show each session and its scope
+```
+
+| Variable                    | Effect                                                     |
+| --------------------------- | ---------------------------------------------------------- |
+| `DOTBABEL_FLEET_CPU_WEIGHT` | The weight of each session scope (default `100`), or `off` |
+
+The weights last until the scope ends or the next boot. To undo them sooner,
+run `systemctl --user set-property --runtime <scope> CPUWeight=` for each
+scope, or set `DOTBABEL_FLEET_CPU_WEIGHT=off` and start new sessions. systemd
+turns the `cpu` controller of `app.slice` off by itself when no scope with a
+weight is left. Docker containers run in `system.slice`, outside the sessions;
+at the top level, `system.slice` and `user.slice` already share the CPUs 50/50
+under load. The lane size benchmarks ran without the fair share.
 
 ## Merge token
 

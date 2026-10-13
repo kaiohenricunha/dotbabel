@@ -37,7 +37,8 @@
     "dotbabel-quality": "./plugins/dotbabel/bin/dotbabel-quality.mjs",
     "dotbabel-criteria": "./plugins/dotbabel/bin/dotbabel-criteria.mjs",
     "dotbabel-models": "./plugins/dotbabel/bin/dotbabel-models.mjs",
-    "dotbabel-fleet": "./plugins/dotbabel/bin/dotbabel-fleet.mjs"
+    "dotbabel-fleet": "./plugins/dotbabel/bin/dotbabel-fleet.mjs",
+    "dotbabel-task": "./plugins/dotbabel/bin/dotbabel-task.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",
