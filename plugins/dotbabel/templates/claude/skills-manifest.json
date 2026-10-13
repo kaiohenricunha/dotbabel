@@ -323,6 +323,13 @@
       "checksum": "",
       "dependencies": [],
       "lastValidated": null
+    },
+    {
+      "name": "yolo",
+      "path": ".claude/skills/yolo/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
     }
   ]
 }
