@@ -284,6 +284,9 @@ Each prompt should include:
 - Command recommendation (/think, /ultraplan, /plan)
 - TDD test names (the test is the first deliverable)
 - Exact file paths to create/modify
+- A <proof> block: the tests, the command that runs the new behavior, what the
+  run must show, and the done_when list (references/cc-prompt-templates.md).
+  Each unit is one /deliver contract.
 -->
 
 ## 6.4 Testing Strategy
@@ -303,11 +306,14 @@ An unexplained blank is not an answer.
                       scored: name the metric, the baseline, and the sample size
   · load/torture    — behavior at full scale
   · post-deploy     — what reality reports back after shipping
+  · QA (run it)     — REQUIRED per unit: the command, page, or call that runs
+                      the new behavior, and what it must show; "N/A" only when
+                      the unit has no runnable surface
 -->
 
-| Unit | Kinds applied | N/A + reason |
-| ---- | ------------- | ------------ |
-|      |               |              |
+| Unit | Kinds applied | QA (run it) | N/A + reason |
+| ---- | ------------- | ----------- | ------------ |
+|      |               |             |              |
 
 ## 6.5 Migration Sequence
 
