@@ -516,6 +516,13 @@ STUB
 }
 
 # ---------------- one real end-to-end ----------------
+#
+# These two tests run a genuine shellcheck, so they set a wide checker timeout.
+# The hook's 5 s default is for an interactive edit. On a busy CI runner with
+# parallel bats jobs, the real checker can pass it, and the hook then exits 0
+# by design (a timeout kill is not a code defect). That made the exit-2 test
+# fail at random, and it let the exit-0 test pass without checking anything.
+# The timeout path itself is covered by the stubbed tests above.
 
 @test "e2e: a shebang-less .sh file is not reported as broken" {
   # SC2148 ("cannot determine the shell dialect") is error-severity, so a bare
@@ -523,9 +530,10 @@ STUB
   # shebang. Regression guard for that false positive.
   PATH="/usr/bin:/bin"
   command -v shellcheck >/dev/null || skip "shellcheck not installed"
+  export CHECK_ON_WRITE_TIMEOUT=60
   printf 'greet() {\n  echo hi\n}\n' > "$WORK/lib.sh"
   feed_post_tooluse_json "$HOOK" Edit "$WORK/lib.sh"
-  [ "$status" -eq 0 ]
+  [ "$status" -eq 0 ] || { echo "hook exited $status: $output"; false; }
   [ -z "$output" ]
 }
 
@@ -534,8 +542,9 @@ STUB
   # the wiring works against a genuine checker.
   PATH="/usr/bin:/bin"
   command -v shellcheck >/dev/null || skip "shellcheck not installed"
+  export CHECK_ON_WRITE_TIMEOUT=60
   printf '#!/usr/bin/env bash\nif [ -z "$x" ; then echo hi; fi\n' > "$WORK/real.sh"
   feed_post_tooluse_json "$HOOK" Edit "$WORK/real.sh"
-  [ "$status" -eq 2 ]
+  [ "$status" -eq 2 ] || { echo "hook exited $status: $output"; false; }
   [ -n "$output" ]
 }
