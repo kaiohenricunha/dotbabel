@@ -21,7 +21,9 @@ import {
   formatSessionContext,
   isValidSlug,
   listTasks,
+  listWorktrees,
   mutateTask,
+  parseDependencyRef,
   readTask,
   resolveWorktree,
   tasksDir,
@@ -91,7 +93,8 @@ describe("createTask", () => {
   it("builds an open task whose contract is the goal and the done_when list", () => {
     const task = sample();
     expect(task).toEqual({
-      schema_version: 1,
+      schema_version: 2,
+      depends_on: [],
       slug: "fix-login",
       status: "open",
       goal: "Login redirects to the page the user asked for",
@@ -188,7 +191,8 @@ describe("validateTask and the schema agree", () => {
 
   it("accepts a created, updated, and closed task", () => {
     const updated = updateTask(sample(), { phase: "verify", decisions: ["d"], pending: ["p"], now: T1 });
-    for (const task of [sample(), updated, closeTask(updated, { now: T1 })]) {
+    const linked = sample({ dependsOn: ["fix-api", "github.com/acme/web:fix-css", "acme/web#12"] });
+    for (const task of [sample(), updated, closeTask(updated, { now: T1 }), linked]) {
       expect(validateTask(task)).toEqual([]);
       expect(schemaValid(task)).toBe(true);
     }
@@ -198,7 +202,12 @@ describe("validateTask and the schema agree", () => {
     const good = sample();
     const bad = [
       { ...good, extra: 1 },
-      { ...good, schema_version: 2 },
+      { ...good, schema_version: 3 },
+      { ...good, schema_version: 1 },
+      (({ depends_on, ...rest }) => rest)(good),
+      { ...good, depends_on: "fix-api" },
+      { ...good, depends_on: ["Not A Ref"] },
+      { ...good, depends_on: ["fix-api", "fix-api"] },
       { ...good, status: "paused" },
       { ...good, done_when: [] },
       { ...good, decisions: [{ text: "no time" }] },
@@ -281,6 +290,122 @@ describe("formatSessionContext", () => {
     const text = formatSessionContext([sample({ goal: "g".repeat(5000) })]);
     expect(text.length).toBeLessThan(1500);
     expect(text).toContain("…");
+  });
+});
+
+describe("dependency references", () => {
+  it("recognizes a task, a task in another clone, and a pull request or issue", () => {
+    expect(parseDependencyRef("fix-api")).toEqual({ kind: "task", slug: "fix-api" });
+    expect(parseDependencyRef("github.com/acme/web:fix-css")).toEqual({
+      kind: "clone-task",
+      repo: "github.com/acme/web",
+      slug: "fix-css",
+    });
+    expect(parseDependencyRef("acme/web#12")).toEqual({ kind: "github", repo: "acme/web", number: 12 });
+  });
+
+  it("rejects anything else", () => {
+    for (const ref of ["", "Fix-API", "acme/web#0", "acme/web#", "github.com/acme:fix", "gitlab.com/acme/web:fix", "a/b/c#1", 7, null]) {
+      expect(parseDependencyRef(ref)).toBeNull();
+    }
+  });
+
+  it("records dependencies on a new task, once each, and refuses a bad or self reference", () => {
+    const t = sample({ dependsOn: ["fix-api", "acme/web#12", "fix-api"] });
+    expect(t.schema_version).toBe(2);
+    expect(t.depends_on).toEqual(["fix-api", "acme/web#12"]);
+    expect(sample().depends_on).toEqual([]);
+    expectCode(() => sample({ dependsOn: ["Not A Ref"] }), TASK_ERROR_CODES.TASK_DEPENDENCY_INVALID);
+    expectCode(() => sample({ dependsOn: ["fix-login"] }), TASK_ERROR_CODES.TASK_CYCLE);
+  });
+
+  it("adds and drops dependencies on update, and refuses to drop one the task does not have", () => {
+    const t = sample({ dependsOn: ["fix-api"] });
+    const added = updateTask(t, { dependsOn: ["acme/web#12", "fix-api"], now: T1 });
+    expect(added.depends_on).toEqual(["fix-api", "acme/web#12"]);
+    expect(added.updated_at).toBe(T1.toISOString());
+    const dropped = updateTask(added, { dropDependsOn: ["fix-api"], now: T1 });
+    expect(dropped.depends_on).toEqual(["acme/web#12"]);
+    expect(t.depends_on).toEqual(["fix-api"]);
+    expectCode(() => updateTask(t, { dropDependsOn: ["acme/web#12"] }), TASK_ERROR_CODES.TASK_DEPENDENCY_UNKNOWN);
+    expectCode(() => updateTask(t, { dependsOn: ["Not A Ref"] }), TASK_ERROR_CODES.TASK_DEPENDENCY_INVALID);
+    expectCode(() => updateTask(t, { dependsOn: ["fix-login"] }), TASK_ERROR_CODES.TASK_CYCLE);
+    expectCode(() => updateTask(t, {}), TASK_ERROR_CODES.TASK_UPDATE_EMPTY);
+  });
+});
+
+function commitEmpty(root) {
+  execFileSync("git", ["-C", root, "commit", "-q", "--allow-empty", "-m", "init"], {
+    env: { ...cleanGitEnv(), GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" },
+  });
+}
+
+function addWorktree(root, name) {
+  const linked = path.join(makeTempDir("task-state-wt-"), name);
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", name, linked], { env: cleanGitEnv() });
+  return fs.realpathSync(linked);
+}
+
+describe("schema version 2 reads version 1", () => {
+  function writeVersionOne(root, slug) {
+    const { schema_version, depends_on, ...rest } = sample({ slug });
+    const dir = tasksDir(root);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${slug}.json`), `${JSON.stringify({ schema_version: 1, ...rest }, null, 2)}\n`);
+    void schema_version;
+    void depends_on;
+  }
+
+  it("reads a version-1 task as version 2 with no dependencies", () => {
+    const root = repo();
+    writeVersionOne(root, "old-task");
+    const read = readTask(root, "old-task");
+    expect(read.schema_version).toBe(2);
+    expect(read.depends_on).toEqual([]);
+    expect(validateTask(read)).toEqual([]);
+    expect(listTasks(root).tasks.map((t) => [t.slug, t.schema_version, t.depends_on])).toEqual([["old-task", 2, []]]);
+  });
+
+  it("writes a version-1 task back as version 2 on its first change", () => {
+    const root = repo();
+    writeVersionOne(root, "old-task");
+    mutateTask(root, "old-task", (t) => updateTask(t, { dependsOn: ["fix-api"], now: T1 }));
+    const onDisk = JSON.parse(fs.readFileSync(path.join(tasksDir(root), "old-task.json"), "utf8"));
+    expect(onDisk.schema_version).toBe(2);
+    expect(onDisk.depends_on).toEqual(["fix-api"]);
+  });
+
+  it("still reports a version-1 file with a dependency field, or any other version, as invalid", () => {
+    const root = repo();
+    writeVersionOne(root, "old-task");
+    const file = path.join(tasksDir(root), "old-task.json");
+    const v1 = JSON.parse(fs.readFileSync(file, "utf8"));
+    fs.writeFileSync(file, JSON.stringify({ ...v1, depends_on: [] }));
+    expectCode(() => readTask(root, "old-task"), TASK_ERROR_CODES.TASK_INVALID);
+    fs.writeFileSync(file, JSON.stringify({ ...v1, schema_version: 3, depends_on: [] }));
+    expectCode(() => readTask(root, "old-task"), TASK_ERROR_CODES.TASK_INVALID);
+  });
+});
+
+describe("listWorktrees", () => {
+  it("lists the main checkout and every linked worktree of the clone, from any of them", () => {
+    const root = repo();
+    commitEmpty(root);
+    const side = addWorktree(root, "side");
+    expect(listWorktrees(root)).toEqual([root, side]);
+    expect(listWorktrees(side)).toEqual([root, side]);
+  });
+
+  it("drops a worktree whose directory is gone", () => {
+    const root = repo();
+    commitEmpty(root);
+    const side = addWorktree(root, "gone");
+    fs.rmSync(side, { recursive: true, force: true });
+    expect(listWorktrees(root)).toEqual([root]);
+  });
+
+  it("reports a directory outside a repository as TASK_NO_REPO", () => {
+    expectCode(() => listWorktrees(makeTempDir("task-state-norepo-")), TASK_ERROR_CODES.TASK_NO_REPO);
   });
 });
 

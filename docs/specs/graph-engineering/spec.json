@@ -1,10 +1,11 @@
 {
   "id": "graph-engineering",
-  "title": "Graph engineering — a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
-  "status": "approved",
+  "title": "Graph engineering \u2014 a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
+  "status": "implementing",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/task-state.mjs",
+    "plugins/dotbabel/src/work-graph.mjs",
     "plugins/dotbabel/bin/dotbabel-task.mjs",
     "schemas/dotbabel.task-state.schema.json"
   ],
@@ -17,7 +18,7 @@
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "status": "planned",
+      "status": "active",
       "given": "a task file with schema_version 1",
       "when": "dotbabel reads it",
       "then": "it reads as version 2 with depends_on []",
@@ -42,7 +43,7 @@
     },
     {
       "id": "AC-2",
-      "status": "planned",
+      "status": "active",
       "given": "a worktree of the clone that has a task with slug s",
       "when": "dotbabel task new s runs in another worktree of the clone",
       "then": "it exits 1 and writes no task",
@@ -67,7 +68,7 @@
     },
     {
       "id": "AC-3",
-      "status": "planned",
+      "status": "active",
       "given": "task b depends on task a",
       "when": "dotbabel task update a --depends-on b runs",
       "then": "it exits 1 and writes no change",

@@ -940,33 +940,44 @@ first. `update` records where the work stands. The
 [`task-context.sh`](./hooks.md#task-contextsh) hook prints the open tasks at
 session start, so a new or resumed session reads that state.
 
-| Subcommand           | Purpose                                                                       |
-| -------------------- | ----------------------------------------------------------------------------- |
-| `new <slug>`         | Create an open task. Needs `--goal` and at least one `--done-when`            |
-| `update <slug>`      | Set the phase, append decisions and pending items, finish pending items       |
-| `show <slug>`        | Print one task                                                                |
-| `list [--all]`       | Print the open tasks, or every task with `--all`, most recently updated first |
-| `close <slug>`       | Mark a task closed. The record stays and `show` still prints it               |
-| `hook session-start` | `SessionStart` entry: print the open tasks as context                         |
+| Subcommand           | Purpose                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| `new <slug>`         | Create an open task. Needs `--goal` and at least one `--done-when`                                |
+| `update <slug>`      | Set the phase, append decisions and pending items, finish pending items, add or drop dependencies |
+| `show <slug>`        | Print one task                                                                                    |
+| `list [--all]`       | Print the open tasks, or every task with `--all`, most recently updated first                     |
+| `close <slug>`       | Mark a task closed. The record stays and `show` still prints it                                   |
+| `hook session-start` | `SessionStart` entry: print the open tasks as context                                             |
 
-| Flag                 | Used by         | Meaning                                                               |
-| -------------------- | --------------- | --------------------------------------------------------------------- |
-| `--goal <text>`      | `new`           | What the work must achieve                                            |
-| `--done-when <text>` | `new`           | A check that decides the work is done. Repeatable                     |
-| `--constraint <t>`   | `new`           | A limit on how the work is done. Repeatable                           |
-| `--phase <p>`        | `new`, `update` | The phase, in the vocabulary of the driving skill (default `started`) |
-| `--decision <text>`  | `update`        | Append a decision with its time. Repeatable                           |
-| `--pending <text>`   | `update`        | Append a pending item. Repeatable                                     |
-| `--done <text>`      | `update`        | Remove a pending item, matched exactly. Repeatable                    |
-| `--all`              | `list`          | Include closed tasks                                                  |
-| `--json`             | all             | Print `{ok, task}` or `{ok, tasks, problems}`                         |
+| Flag                      | Used by         | Meaning                                                               |
+| ------------------------- | --------------- | --------------------------------------------------------------------- |
+| `--goal <text>`           | `new`           | What the work must achieve                                            |
+| `--done-when <text>`      | `new`           | A check that decides the work is done. Repeatable                     |
+| `--constraint <t>`        | `new`           | A limit on how the work is done. Repeatable                           |
+| `--phase <p>`             | `new`, `update` | The phase, in the vocabulary of the driving skill (default `started`) |
+| `--decision <text>`       | `update`        | Append a decision with its time. Repeatable                           |
+| `--pending <text>`        | `update`        | Append a pending item. Repeatable                                     |
+| `--done <text>`           | `update`        | Remove a pending item, matched exactly. Repeatable                    |
+| `--depends-on <ref>`      | `new`, `update` | A reference this task waits on (see below). Repeatable                |
+| `--drop-depends-on <ref>` | `update`        | Remove a dependency, matched exactly. Repeatable                      |
+| `--all`                   | `list`          | Include closed tasks                                                  |
+| `--json`                  | all             | Print `{ok, task}` or `{ok, tasks, problems}`                         |
 
-A slug is lowercase letters, digits, and dashes, up to 64 characters. Tasks
-live in `<git-dir>/dotbabel/tasks/<slug>.json`
-([schema](../schemas/dotbabel.task-state.schema.json)), so they never appear in
+A slug is lowercase letters, digits, and dashes, up to 64 characters, and it is
+unique across the worktrees of the clone: `new` refuses a slug that another
+worktree already holds. Tasks live in `<git-dir>/dotbabel/tasks/<slug>.json`
+([schema](../schemas/dotbabel.task-state.schema.json), version 2; a version-1
+file reads as version 2 with no dependencies), so they never appear in
 `git status`, and each worktree has its own. They survive a context reset, a
 crash, and a new session in that worktree. They do not travel to another
 machine; that is what [`/handoff`](./handoff-guide.md) is for.
+
+A dependency reference takes one of three forms: a task of this clone
+(`<slug>`), a task of another clone on this machine
+(`github.com/owner/repo:<slug>`), or a pull request or issue
+(`owner/repo#123`). A task may name a slug that no worktree holds yet. `new`
+and `update` refuse a reference that closes a cycle through the tasks of the
+clone, including a task that names itself, and write nothing when they do.
 
 A task file's slug must be its file name; a copied or renamed file is reported
 as invalid rather than written to another task. `update` and `close` hold a
@@ -975,14 +986,16 @@ decisions; a lock older than 30 seconds is cleared as stale. The record is
 self-reported and advisory: put deferred work in an issue, because the task
 goes away with the worktree.
 
-**Exits 1** when the task already exists (`new`), does not exist, is closed
-(`update`, `close`), or when `--done` names an item that is not pending.
+**Exits 1** when the task already exists (`new`), its slug is held by another
+worktree of the clone (`new`), does not exist, is closed (`update`, `close`),
+when `--done` names an item that is not pending, when `--drop-depends-on` names
+a reference the task does not have, or when a dependency closes a cycle.
 **Exits 2** outside a git repository, for a symbolic link on the task path, for
 a task file that does not parse or whose slug is not its file name, while
 another writer holds the task's lock, and for any filesystem error. `list`
 reports an unreadable file as a warning and still exits 0. **Exits 64** for a
 bad slug, a missing or blank `--goal` or `--done-when`, any other blank text
-value, or an `update` with nothing to change. `hook` always exits 0: it fails
+value, a malformed dependency reference, or an `update` with nothing to change. `hook` always exits 0: it fails
 open.
 
 ---
