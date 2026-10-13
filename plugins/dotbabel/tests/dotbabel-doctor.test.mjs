@@ -228,7 +228,10 @@ describe("dotbabel-doctor hook registration check", () => {
       /fleet-shell-prefix\.sh is shipped but not registered — expects CLAUDE_CODE_SHELL_PREFIX/,
     );
     expect(res.stdout).toMatch(/task-context\.sh is shipped but not registered — expects SessionStart/);
-    expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(5);
+    expect(res.stdout).toMatch(
+      /yolo\.sh is shipped but not registered — expects UserPromptExpansion \(grant\), PermissionRequest \(permission\), UserPromptSubmit \(prompt\), SessionEnd \(session-end\)/,
+    );
+    expect(res.stdout.match(/is shipped but not registered/g)).toHaveLength(6);
   });
 
   it("never fails the run for an unregistered or partly registered hook", () => {

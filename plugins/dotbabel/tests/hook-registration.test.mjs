@@ -191,6 +191,28 @@ describe("hookRegistrationReport", () => {
     expect(report.registered[0].missing).toEqual(["PreToolUse:pre-bash"]);
   });
 
+  it("names the yolo entries a template-style registration lacks", () => {
+    const entry = (arg) => commandHook(`bash "$CLAUDE_PROJECT_DIR/.claude/hooks/yolo.sh" ${arg}`);
+    const report = hookRegistrationReport({
+      shippedHooks: ["yolo.sh"],
+      sources: [
+        {
+          path: "/r/.claude/settings.json",
+          settings: { hooks: { UserPromptExpansion: [entry("grant")], PermissionRequest: [entry("permission")] } },
+        },
+      ],
+      env: {},
+    });
+    expect(report.registered).toEqual([
+      {
+        hook: "yolo.sh",
+        events: ["PermissionRequest", "UserPromptExpansion"],
+        missing: ["UserPromptSubmit:prompt", "SessionEnd:session-end"],
+        scopes: [],
+      },
+    ]);
+  });
+
   it("finds a shipped hook behind a wrapper command, a guard, or an interpreter flag", () => {
     const report = hookRegistrationReport({
       shippedHooks: ["check-on-write.sh", "check-on-stop.sh", "guard-destructive-git.sh"],
