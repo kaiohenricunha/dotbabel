@@ -62,6 +62,11 @@ export const SHIPPED_HOOK_EVENTS = Object.freeze({
   "guard-criteria-evidence.sh": Object.freeze(["PreToolUse"]),
   "guard-destructive-git.sh": Object.freeze(["PreToolUse"]),
   "task-context.sh": Object.freeze(["SessionStart"]),
+  "yolo.sh": Object.freeze([
+    "UserPromptExpansion:grant",
+    "PermissionRequest:permission",
+    "SessionEnd:session-end",
+  ]),
 });
 
 const INTERPRETERS = new Set(["bash", "sh", "zsh", "env"]);
