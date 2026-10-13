@@ -197,6 +197,62 @@ describe("workflow templates", () => {
     }
   });
 
+  // --- The contradiction alarm (spec merge-verification) ------------------
+  //
+  // An agent with the user's token can forge an attestation. The push run on
+  // the default branch is the only check off the agent's machine, so when that
+  // run fails, a job asks whether the failure contradicts a passing
+  // attestation. It must cost nothing on a green run, never run on a pull
+  // request (a fork must not reach a token that can write issues), hold only
+  // the scopes it uses, and run detector code from the FIRST PARENT, so the
+  // pull request under judgment cannot rewrite the detector.
+
+  const REPO_WORKFLOW = path.resolve(TEMPLATES_DIR, "../../../../.github/workflows/test.yml");
+
+  /** Assert the contradiction job's shape in one parsed workflow. */
+  function expectContradictionJob(doc, { testJob, invocation }) {
+    const job = doc.jobs.contradiction;
+    expect(job, "a contradiction job").toBeDefined();
+    expect([job.needs].flat()).toContain(testJob);
+    // Exact: `failure() || github.event_name == 'push'` would run on every
+    // push and on a failed pull_request run with issues: write.
+    expect(String(job.if).trim()).toBe("failure() && github.event_name == 'push'");
+    expect(job.permissions).toEqual({ contents: "read", actions: "read", checks: "read", issues: "write", "pull-requests": "write" });
+    // The detector comes from the first parent; full history keeps the pushed
+    // commit and the range before it readable without a credentialed fetch.
+    const checkout = job.steps.find((st) => typeof st.uses === "string" && st.uses.startsWith("actions/checkout@"));
+    expect(checkout.with).toMatchObject({ ref: "${{ github.event.before }}", "fetch-depth": 0, "persist-credentials": false });
+    const scripts = runScripts(job).filter((script) => /pr-stack\.mjs contradiction|pr-stack contradiction/.test(script));
+    expect(scripts.length, "the job runs the contradiction command").toBe(1);
+    expect(scripts[0]).toContain(invocation);
+    expect(scripts[0]).toMatch(/--post\b/);
+    expect(scripts[0]).toMatch(/--sha\s+"\$MERGE_SHA"/);
+    expect(scripts[0]).toMatch(/--test-result\s+"\$TEST_RESULT"/);
+    const step = job.steps.find((st) => typeof st.run === "string" && st.run.includes("contradiction"));
+    expect(step.env.MERGE_SHA).toBe("${{ github.sha }}");
+    expect(step.env.TEST_RESULT).toBe(`\${{ needs.${testJob}.result }}`);
+  }
+
+  it("runs the template contradiction job only after a failed push, through the published CLI", () => {
+    expectContradictionJob(loadTemplate("test.yml"), { testJob: "verify", invocation: "npx dotbabel pr-stack contradiction" });
+  });
+
+  it("runs this repository's contradiction job only after a failed push, through the in-tree bin", () => {
+    const doc = yaml.load(fs.readFileSync(REPO_WORKFLOW, "utf8"));
+    expectContradictionJob(doc, { testJob: "test", invocation: "node plugins/dotbabel/bin/dotbabel-pr-stack.mjs contradiction" });
+    const events = Object.keys(triggers(doc) ?? {});
+    expect(events).not.toContain("pull_request_target");
+  });
+
+  it("grades the pushed diff on a push, so the verify job does not fail on an empty base", () => {
+    // On a push there is no pull_request payload, and an empty --base makes the
+    // quality check exit 2. The contradiction job would then read every push
+    // to the default branch as a failure.
+    const verify = loadTemplate("test.yml").jobs.verify;
+    const step = verify.steps.find((st) => typeof st.run === "string" && /dotbabel quality check/.test(st.run));
+    expect(step.env.QUALITY_BASE_REF).toBe("${{ github.event.pull_request.base.sha || github.event.before }}");
+  });
+
   it("scaffolds test.yml and quality.yml into .github/workflows with dotbabel init", () => {
     const target = fs.mkdtempSync(path.join(os.tmpdir(), "dotbabel-scaffold-wf-"));
     try {

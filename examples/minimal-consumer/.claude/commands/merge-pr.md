@@ -2,7 +2,7 @@
 id: merge-pr
 name: merge-pr
 type: command
-version: 2.0.0
+version: 2.1.0
 domain: [devex]
 platform: [github-actions]
 task: [review, testing]
@@ -76,12 +76,36 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
 
    | `.state`   | Meaning                                                      | Do                                                                                                    |
    | ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-   | `verified` | trusted, current, complete evidence for this head            | skip the worktree, skip the suite and the quality profile; report `.sha` and `.legs` in step 6        |
+   | `verified` | trusted, current, complete evidence for this head            | run the spot check below; unless it selects this PR, take the attested path in step 6                 |
    | `off`      | the base ref does not enable `attestation.enforce`           | take the CI path in step 6                                                                            |
    | `explicit` | this PR edits a file that governs what an attestation proves | show the governed-file diff and get the user's acknowledgement, then take the explicit path in step 6 |
    | `failed`   | evidence is missing, stale, untrusted or invalid             | **STOP** — see the reason codes below                                                                 |
 
    `verified` is the normal path once the policy is on the trunk.
+
+   **`.state` is `verified` — run the spot check.** Anyone who holds the
+   user's `gh` token, an agent included, can post an attestation comment
+   without running anything. So a share of attested pull requests is verified
+   explicitly anyway (`attestation.spot_check` in the base `.dotbabel.json`):
+
+   ```bash
+   dotbabel pr-stack spot-check --pr <N>
+   ```
+
+   The roll comes from the head SHA, so it is fixed for a head. A selection
+   stays: a later run on the same head reports it selected again. A
+   non-selection can change when the CI state or the base policy changes. Do
+   not run it again to get a different one. The command records its decision
+   in the spot-check log, next to the run receipt.
+   - `not selected` — the attestation stands. Skip the worktree, the suite and
+     the quality profile, and report `.sha` and `.legs` in step 6.
+   - `SELECTED` — take the explicit path in step 6 anyway, and tell the user why
+     (the reason it prints: `always_path`, `rate`, or `ci_unavailable`). Step 6
+     says how to record the result.
+   - any non-zero exit — **STOP** and report it. Exit `2` is an environment
+     error: the policy, the pull request, the default branch, or the CI runs
+     could not be read. Exit `64` usually means that the installed `dotbabel`
+     has no `spot-check` yet. Never treat a non-zero exit as `not selected`.
 
    **`.state` is `failed`** — **STOP**. Do not re-run the matrix from here;
    producing evidence is `/local-attest`'s job and keeping that boundary
@@ -262,8 +286,9 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
      step of the explicit path.
 
    **Explicit path** (step 4 sent you here from `explicit` after the user
-   acknowledged the governed-file diff, or CI could not start a job for the
-   head). Create the worktree from step 5 if you have not already, then:
+   acknowledged the governed-file diff, from a `verified` state that the spot
+   check selected, or because CI could not start a job for the head). Create
+   the worktree from step 5 if you have not already, then:
 
    - **Install dependencies first.** A fresh worktree has none, and a suite run
      without them reports a failure that is about the checkout, not the code.
@@ -288,7 +313,46 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
 
      Expect exit `2` on the first run: you are in a throwaway `/tmp/merge-pr-<N>` worktree, and project-command trust matches the repository path exactly, so a fresh worktree is never trusted. Resolve it deliberately, per PR — read the branch's own diff to `.dotbabel.json` and to any `package.json` scripts the tools invoke, then either trust that one path or run this step from your own checkout of the branch. Do not reach for a blanket `--allow-project-commands` here: in this flow it would execute commands defined by the pull request under review.
 
-7. **Interpret failures honestly** (explicit path only). If the test suite fails:
+   - **Record the explicit run if the spot check sent you here.** When step 4
+     selected this pull request, record the result after the suite and the
+     quality profile finish:
+
+     ```bash
+     dotbabel pr-stack spot-check --pr <N> --record-explicit pass
+     ```
+
+     Record `pass` only when the suite and the quality profile both passed.
+     Record `fail` only for a real failure, as step 7 defines it. When a gate
+     did not run, record nothing: **STOP** and report it.
+
+7. **Interpret failures honestly** (explicit path only).
+
+   **A spot-checked pull request failed.** Only a real failure counts: the
+   suite exits non-zero after a clean dependency install, or the quality
+   profile exits `1`. If the spot check in step 4 selected this pull request
+   and one of those happened, the attestation said pass for this same head.
+   **STOP**: this is contradicted evidence, not an ordinary failure. Do not
+   merge, do not re-attest to clear it, and do not run the baseline proof below
+   first. Record the result and raise the alarm:
+
+   ```bash
+   dotbabel pr-stack spot-check --pr <N> --record-explicit fail
+   dotbabel pr-stack contradiction --pr <N> --local-failure --post
+   ```
+
+   The second command labels the pull request `attestation-contradicted` and
+   opens one issue, only when a trusted, passing attestation covers this head
+   (exit `1`). Exit `0` means that no such attestation exists. Exit `2` means
+   that the pull request, its base, or its comments could not be read: report
+   it. Report the result to the user. The run was on this machine, so it is
+   weaker than CI. A flaky test or an environment difference can also explain
+   it, and the issue says so.
+
+   **A gate that did not run is not a contradiction.** A quality exit `2`, `64`
+   or `127`, or a failed dependency install, means the gate did not run (step
+   6). **STOP** and report it. Record no result and raise no alarm.
+
+   Otherwise, if the test suite fails:
 
    ```bash
    git stash push -u -m "merge-pr-<N>-baseline"
@@ -370,6 +434,28 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
     git worktree remove /tmp/merge-pr-<N>
     ```
 
+11. **Report the default branch's verification debt.**
+
+    ```bash
+    dotbabel pr-stack main-status
+    ```
+
+    The default branch is squash-merged and linear, so a green CI run on one
+    commit verifies it and every older commit. Report the last green commit and
+    every `red`, `unverified` or `unknown` commit newer than it. The merge you
+    just made stays `unverified` until its own CI run completes. `unverified`
+    also covers a run that never started (a billing limit, a startup failure):
+    it proves nothing either way. If the command prints `unknown`, the runs
+    could not be read: report it as unknown, never as verified. The test
+    workflow's `contradiction` job raises the alarm on a red push by itself;
+    this step only makes the debt visible.
+
+    Read the exit code. Exit `0` means the report is complete. Exit `2` means
+    the default branch or its history could not be read: report the debt as
+    unknown, never as verified. Exit `64` usually means that the installed
+    `dotbabel` has no `main-status` yet: report that no debt check ran. The
+    merge is already done, so do not undo it for any of these exits.
+
 ## Rules
 
 - Never merge past an `ATTESTATION_*` reason, and never re-run the matrix from inside this command to clear one. Producing evidence is `/local-attest`'s job; this command only decides whether existing evidence is current and trustworthy.
@@ -377,7 +463,8 @@ code changing: the head SHA, mergeability, CI state, and the human's say-so.
 - Never treat an attested leg as something this command verified. Report it as attested, name the SHA, and never report an unrun check as a pass.
 - Never re-run the suite on the CI path. A completed `test` run that passed on the head SHA is the evidence; a second local run of the same tree buys nothing. When no run tested the head, start one before you fall back to a local run.
 - Never accept a `/local-attest` comment as the evidence in the `off` state. The gate checks its trust, configuration, and legs only when enforcement is on.
-- Never skip the full test suite on the explicit path. That path runs only for a governed change or for a head that CI did not test, so nothing else verified it. The attested path never runs the suite: its evidence is the PR-scoped `/local-attest` run, in which a required leg with nothing of the diff in its scope is recorded `skipped`, and that counts as satisfied as long as at least one required leg passed.
+- Never skip the full test suite on the explicit path. That path runs only for a governed change, for a head that CI did not test, or for an attested pull request that the spot check selected, so nothing else verified it. The attested path never runs the suite: its evidence is the PR-scoped `/local-attest` run, in which a required leg with nothing of the diff in its scope is recorded `skipped`, and that counts as satisfied as long as at least one required leg passed.
+- Never take the attested path for a pull request the spot check selected, and never run the spot check again to change its answer. Never treat a non-zero exit of the spot check as `not selected`. When the selected run really fails (step 7), stop and raise the contradiction alarm; when a gate did not run, stop and raise no alarm.
 - Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 10's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
 - Never claim a failure already exists on the base branch without the `git stash` proof.
 - Never merge without explicit user confirmation. CI green alone is not authorization, and neither is a clean gate.

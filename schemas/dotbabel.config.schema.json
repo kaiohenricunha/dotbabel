@@ -111,6 +111,33 @@
           "minItems": 1,
           "items": { "enum": ["OWNER", "MEMBER", "COLLABORATOR"] },
           "description": "GitHub author associations whose attestation the gate believes. Defaults to ['OWNER']. Associations weaker than COLLABORATOR are refused: anyone who can open a pull request could then authorize its own merge by skipping the suite and the quality profile."
+        },
+        "spot_check": {
+          "type": "object",
+          "description": "How often /merge-pr verifies an attested pull request explicitly anyway (`dotbabel pr-stack spot-check`). Detection, not prevention: a spot check that fails while the attestation said pass is reported as contradicted evidence. The roll is derived from the pull request head, so running the check again on the same head gives the same answer. Read from the BASE ref; an invalid value is an error, never a silent default. Opt-in: without this block, no spot check runs.",
+          "additionalProperties": false,
+          "properties": {
+            "rate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0,
+              "description": "The share of attested pull requests to verify explicitly while the default branch CI runs. 0 turns random spot checks off."
+            },
+            "rate_when_ci_unavailable": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 1,
+              "description": "The share to verify explicitly when the latest test run on the default branch did not run (a billing limit, a startup failure, a cancelled run). Without that run nothing off the machine checks the attestation, so the default verifies every pull request. Applies only when the `spot_check` block exists: without the block, spot checks are off."
+            },
+            "always_paths": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1, "pattern": "^[^!{}\\[\\]]+$" },
+              "default": [],
+              "description": "Globs of changed paths that always select the explicit path, whatever the rate. Only `**`, `*` and `?` are special (the merge gate's protected-path dialect); `!`, braces and brackets are refused, because the matcher would read them literally and match nothing."
+            }
+          }
         }
       }
     },

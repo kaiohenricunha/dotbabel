@@ -61,6 +61,38 @@ function showAtRev(deps, rev, path) {
 }
 
 /**
+ * The whole parsed `.dotbabel.json` at a base commit, or undefined when that
+ * commit has none.
+ *
+ * For callers that must read policy from the same base the merge gate reads
+ * (`pr-stack spot-check` reads `attestation.spot_check` here), and must not
+ * share `attestationGateInputs`' leniency: that gather turns an unparseable
+ * config into "no policy" because enforcement off is its safe default, but a
+ * spot-check policy that silently became the default would lower the check
+ * rate without anyone seeing it. So this throws on an unreadable commit and on
+ * JSON that does not parse.
+ *
+ * @param {GateDeps} deps
+ * @param {string} baseSha The pull request's `baseRefOid`.
+ * @returns {unknown}
+ */
+export function baseConfigAtRev(deps, baseSha) {
+  if (typeof baseSha !== "string" || !SHA_RE.test(baseSha)) {
+    throw new Error(`base must be a full 40-character SHA, got ${JSON.stringify(baseSha)}`);
+  }
+  if (!refIsReadable(deps, baseSha)) {
+    throw new Error(`base commit ${baseSha} is not in this clone; run \`git fetch\` and retry`);
+  }
+  const raw = showAtRev(deps, baseSha, ".dotbabel.json");
+  if (raw === null) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`${baseSha}:.dotbabel.json is not readable JSON: ${err.message}`);
+  }
+}
+
+/**
  * Build the attestation half of the merge-gate input.
  *
  * Returns `{}` when the base ref has not opted in, leaving `checkMergeGate` on
