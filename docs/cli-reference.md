@@ -173,8 +173,8 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook → hook registration → check-on-stop trust → attestation policy. Prints
-`✓/✗/⚠` per check.
+hook → hook registration → run receipts → check-on-stop trust → attestation
+policy. Prints `✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
@@ -206,6 +206,18 @@ because a cloned repository controls the project files. A
 `CLAUDE_CODE_SHELL_PREFIX` set by the project or local settings is a `⚠` row as
 well, because it wraps every shell command. These rows never fail the run. See
 [hooks.md](./hooks.md#registering-a-hook).
+
+The run receipt rows read the `/pr-conductor` run receipts (`pr-<N>.json`) and
+spot-check logs (`pr-<N>.spot-checks.json`) under
+`<git-common-dir>/dotbabel/receipts/`, with the validators their writers use, so
+a linked worktree reads the main repository's receipts. One `✓` row counts the
+recorded pull requests by their latest verdict; the counts cover every past
+pull request, not only open ones. There is one `⚠` row for each file that
+cannot be read or does not validate, with the reason and what stops on it:
+`pr-stack record`, `receipt`, and the attempt cap for a receipt, or
+`pr-stack spot-check` for a spot-check log. Leave such a file as it is and ask
+a person: a new receipt resets the attempt cap. These rows never fail the run.
+A repository with no receipts prints no row.
 
 The trust row reports whether this repo may run turn-end project checks. It
 never fails the run — a repo deliberately left off the allowlist is a valid
