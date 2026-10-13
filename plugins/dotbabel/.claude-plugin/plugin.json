@@ -75,6 +75,7 @@
     "./templates/claude/skills/terraform-specialist",
     "./templates/claude/skills/terragrunt-specialist",
     "./templates/claude/skills/validate-spec",
-    "./templates/claude/skills/veracity-audit"
+    "./templates/claude/skills/veracity-audit",
+    "./templates/claude/skills/yolo"
   ]
 }

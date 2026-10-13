@@ -336,6 +336,13 @@
       "checksum": "sha256:2f66c14a71e88734d8a734bf1ce6f220f74ce28a9e302635e4e225edc1f9300e",
       "dependencies": [],
       "lastValidated": "2026-10-12"
+    },
+    {
+      "name": "yolo",
+      "path": ".claude/skills/yolo/SKILL.md",
+      "checksum": "sha256:67a815bd05e7106d451e659d036cc87f6365525111edc41ddc5b8afa7c87c5ea",
+      "dependencies": [],
+      "lastValidated": "2026-10-12"
     }
   ]
 }
