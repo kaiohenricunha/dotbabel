@@ -13,7 +13,9 @@ import { makeDiscoveryEvidence, makeModelFact, makeProviderCatalogEvidence } fro
 import {
   CACHE_SUBDIR,
   MAX_CACHE_TREE_BYTES,
+  attemptPath,
   cacheRoot,
+  canonicalProviders,
   entryPath,
   lockPathFor,
   maintainCache,
@@ -24,7 +26,7 @@ import {
   writeEntry,
   writeFileAtomic,
 } from "../src/model-intelligence/catalog/cache.mjs";
-import { STALE_LOCK_MIN_AGE_MS, acquireLock, judgeLock, readLockOwner } from "../src/model-intelligence/catalog/lock.mjs";
+import { STALE_LOCK_MIN_AGE_MS, acquireLock, isPidAlive, judgeLock, processStartIdentity, readLockOwner } from "../src/model-intelligence/catalog/lock.mjs";
 import {
   EVIDENCE_CLASSES,
   buildCatalog,
@@ -814,5 +816,71 @@ describe("model-intelligence conditional GET (P-9)", () => {
     const outcome = await refreshSource({ module: liar, context: { providers: ["anthropic"] } }, { root, now: clockAt(at(HOUR)) });
     expect(outcome).toMatchObject({ outcome: "failed", diagnostic: { code: "adapter_contract_breach" } });
     expect(readFileSync(entryPath(root, "fake-catalog")).equals(before)).toBe(true);
+  });
+});
+
+describe("model-intelligence catalog boundaries (P-9)", () => {
+  it("probes pid liveness and the process-start identity, and answers undefined where it cannot know", () => {
+    expect(isPidAlive(process.pid)).toBe(true);
+    // pid 1 always exists; a process of another user answers EPERM, which still proves it exists.
+    expect(isPidAlive(1)).toBe(true);
+    const dead = Number(spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.pid))"], { encoding: "utf8" }).stdout);
+    expect(isPidAlive(dead)).toBe(false);
+    for (const bad of [0, -1, 1.5, Number.NaN, "42"]) expect(isPidAlive(bad), String(bad)).toBeUndefined();
+    for (const bad of [0, -1, 1.5]) expect(processStartIdentity(bad), String(bad)).toBeUndefined();
+    expect(processStartIdentity(dead)).toBeUndefined();
+    if (process.platform === "linux") expect(processStartIdentity(process.pid)).toMatch(/^\d+$/);
+  });
+
+  it("reads a lock or attempt file that is not a JSON object as unknown, never as a valid owner or failure", async () => {
+    const root = tempRoot();
+    const path = lockPathFor(root, "fake-catalog");
+    mkdirSync(join(root, "locks"), { recursive: true });
+    for (const text of ["not json", "[1, 2]", "42", "null"]) {
+      writeFileSync(path, text);
+      expect(readLockOwner(path), text).toBeNull();
+      // An owner nobody can identify is never removed automatically.
+      expect(acquireLock(path, { resource: "fake-catalog", now: () => Date.parse(T0) + 24 * HOUR })).toMatchObject({ acquired: false, state: "manual_recovery", reason: "insufficient_metadata" });
+    }
+    expect(readLockOwner(join(root, "locks", "absent.lock"))).toBeUndefined();
+
+    rmSync(path);
+    await seed(root);
+    mkdirSync(join(root, "attempts"), { recursive: true });
+    for (const text of ["not json", "[]", '{"attemptedAt": 7, "code": "x"}']) {
+      writeFileSync(attemptPath(root, "fake-catalog"), text);
+      const status = catalogStatus({ root, sources: [{ module: knowledgeModule("fake-catalog", () => null) }], now: at(HOUR) });
+      expect(status.sources[0], text).not.toHaveProperty("lastFailure");
+      expect(status.sources[0].cache.freshness, text).toBe("fresh");
+    }
+  });
+
+  it("stores a provider set unique and sorted, and refuses a cached set in any other form", async () => {
+    expect(canonicalProviders(["openai", "anthropic", "openai"])).toEqual(["anthropic", "openai"]);
+    for (const bad of [[], "anthropic", ["Anthropic"], [""], undefined]) expect(() => canonicalProviders(bad), String(bad)).toThrow(TypeError);
+    const root = tempRoot();
+    await seed(root);
+    const path = entryPath(root, "fake-catalog");
+    const stored = JSON.parse(readFileSync(path, "utf8"));
+    stored.request.providers = ["openai", "anthropic"];
+    writeFileSync(path, JSON.stringify(stored));
+    expect(readEntry(root, "fake-catalog")).toMatchObject({ state: "invalid", code: "invalid_entry" });
+  });
+
+  it("refuses a result attributed to another source, and skips a refresh another process completed after this call began", async () => {
+    const root = tempRoot();
+    await seed(root);
+    const before = readFileSync(entryPath(root, "fake-catalog"));
+    const impostor = knowledgeModule("fake-catalog", () => knowledgeOk("someone-else", catalogEvidence(ANTHROPIC_ONLY), at(HOUR)));
+    const refused = await refreshSource({ module: impostor, context: { providers: ["anthropic"] } }, { root, now: clockAt(at(HOUR)) });
+    expect(refused).toMatchObject({ outcome: "failed", diagnostic: { code: "adapter_contract_breach" } });
+    expect(readFileSync(entryPath(root, "fake-catalog")).equals(before)).toBe(true);
+
+    // The stored evidence was observed at T0. A call that began before T0 finds it already newer, so it
+    // starts no discovery of its own (ARCH-61 step 2).
+    const late = knowledgeModule("fake-catalog", () => knowledgeOk("fake-catalog", catalogEvidence(ANTHROPIC_ONLY), at(2 * HOUR)));
+    const outcome = await refreshSource({ module: late, context: { providers: ["anthropic"] } }, { root, now: clockAt(at(-MINUTE)) });
+    expect(outcome).toMatchObject({ outcome: "concurrent", refresh: "idle" });
+    expect(late.discover).not.toHaveBeenCalled();
   });
 });
