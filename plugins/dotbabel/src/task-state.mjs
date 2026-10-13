@@ -32,8 +32,14 @@
  * @property {string} at    ISO timestamp.
  * @property {string} text
  *
+ * Schema version 2 adds `depends_on`: the references this task waits on, in
+ * the three forms `parseDependencyRef` reads. The reader accepts a version-1
+ * file and reads it as version 2 with no dependencies (REL-4); the writer
+ * always writes version 2. Slugs are unique per clone (KD-4): `listWorktrees`
+ * is the scan the slug check and the cycle check share with the work graph.
+ *
  * @typedef {object} Task
- * @property {1} schema_version
+ * @property {2} schema_version
  * @property {string} slug
  * @property {"open"|"closed"} status
  * @property {string} goal
@@ -42,6 +48,7 @@
  * @property {string} phase
  * @property {TaskDecision[]} decisions
  * @property {string[]} pending
+ * @property {string[]} depends_on
  * @property {string} created_at
  * @property {string} updated_at
  * @property {string|null} closed_at
@@ -54,8 +61,17 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-/** The `schema_version` this module writes and reads. */
-export const TASK_SCHEMA_VERSION = 1;
+import { parseDependencyRef, parseWorktreeList } from "./work-graph.mjs";
+
+// The reference grammar lives with the graph that follows the references;
+// it is re-exported here because a task record is where it is validated.
+export { parseDependencyRef };
+
+/** The `schema_version` this module writes. It also reads the version before it. */
+export const TASK_SCHEMA_VERSION = 2;
+
+/** The `schema_version` a reader of this module upgrades on read: it had no `depends_on`. */
+const TASK_SCHEMA_VERSION_PREVIOUS = 1;
 
 /** The tasks directory, relative to the worktree's git directory. */
 export const TASK_STATE_DIR = path.join("dotbabel", "tasks");
@@ -72,6 +88,10 @@ export const TASK_ERROR_CODES = Object.freeze({
   TASK_PATH_UNSAFE: "TASK_PATH_UNSAFE",
   TASK_NO_REPO: "TASK_NO_REPO",
   TASK_LOCKED: "TASK_LOCKED",
+  TASK_DEPENDENCY_INVALID: "TASK_DEPENDENCY_INVALID",
+  TASK_DEPENDENCY_UNKNOWN: "TASK_DEPENDENCY_UNKNOWN",
+  TASK_SLUG_TAKEN: "TASK_SLUG_TAKEN",
+  TASK_CYCLE: "TASK_CYCLE",
 });
 
 /** An error with a stable `code` from `TASK_ERROR_CODES`. */
@@ -99,6 +119,7 @@ const KEYS = Object.freeze([
   "phase",
   "decisions",
   "pending",
+  "depends_on",
   "created_at",
   "updated_at",
   "closed_at",
@@ -159,6 +180,11 @@ export function validateTask(value) {
     problems.push("decisions must be a list of {at, text}");
   }
   if (!isTextList(t.pending)) problems.push("pending must be a list of non-empty strings");
+  if (!Array.isArray(t.depends_on) || t.depends_on.some((ref) => parseDependencyRef(ref) === null)) {
+    problems.push("depends_on must be a list of references: <slug>, github.com/owner/repo:<slug>, or owner/repo#123");
+  } else if (new Set(t.depends_on).size !== t.depends_on.length) {
+    problems.push("depends_on must not repeat a reference");
+  }
   if (!isTime(t.created_at)) problems.push("created_at must be an ISO timestamp");
   if (!isTime(t.updated_at)) problems.push("updated_at must be an ISO timestamp");
   if (t.closed_at !== null && !isTime(t.closed_at)) problems.push("closed_at must be null or an ISO timestamp");
@@ -171,6 +197,29 @@ function assertValid(task) {
   const problems = validateTask(task);
   if (problems.length > 0) throw new TaskError(TASK_ERROR_CODES.TASK_INVALID, problems.join("; "));
   return task;
+}
+
+/**
+ * `refs` with the parse check applied, each kept once, in order. A self
+ * reference is the smallest cycle and is refused here, before any scan.
+ *
+ * @param {string} slug
+ * @param {string[]} refs
+ * @returns {string[]}
+ */
+function dependencyRefs(slug, refs) {
+  const kept = [];
+  for (const ref of refs) {
+    if (parseDependencyRef(ref) === null) {
+      throw new TaskError(
+        TASK_ERROR_CODES.TASK_DEPENDENCY_INVALID,
+        `"${String(ref)}" is not a dependency reference (<slug>, github.com/owner/repo:<slug>, or owner/repo#123)`,
+      );
+    }
+    if (ref === slug) throw new TaskError(TASK_ERROR_CODES.TASK_CYCLE, `task "${slug}" cannot depend on itself`);
+    if (!kept.includes(ref)) kept.push(ref);
+  }
+  return kept;
 }
 
 function assertSlug(slug) {
@@ -188,10 +237,10 @@ function assertSlug(slug) {
  * refused.
  *
  * @param {{ slug: string, goal: string, doneWhen: string[], constraints?: string[], phase?: string,
- *   branch?: string|null, worktree: string, now?: Date }} input
+ *   dependsOn?: string[], branch?: string|null, worktree: string, now?: Date }} input
  * @returns {Task}
  */
-export function createTask({ slug, goal, doneWhen, constraints = [], phase = "started", branch = null, worktree, now }) {
+export function createTask({ slug, goal, doneWhen, constraints = [], phase = "started", dependsOn = [], branch = null, worktree, now }) {
   assertSlug(slug);
   const at = (now ?? new Date()).toISOString();
   return assertValid({
@@ -204,6 +253,7 @@ export function createTask({ slug, goal, doneWhen, constraints = [], phase = "st
     phase,
     decisions: [],
     pending: [],
+    depends_on: dependencyRefs(slug, dependsOn),
     created_at: at,
     updated_at: at,
     closed_at: null,
@@ -213,17 +263,32 @@ export function createTask({ slug, goal, doneWhen, constraints = [], phase = "st
 }
 
 /**
- * A copy of `task` with a new phase, appended decisions and pending items, and
- * finished pending items removed. The input is never changed.
+ * A copy of `task` with a new phase, appended decisions and pending items,
+ * finished pending items removed, and dependencies added or dropped. The input
+ * is never changed. Adding a dependency the task already has changes nothing;
+ * dropping one it does not have is refused. Whether an added task reference
+ * closes a cycle through other tasks of the clone is the caller's check
+ * (`work-graph.mjs`), because it needs every worktree's tasks.
  *
  * @param {Task} task
- * @param {{ phase?: string, decisions?: string[], pending?: string[], done?: string[], now?: Date }} change
+ * @param {{ phase?: string, decisions?: string[], pending?: string[], done?: string[],
+ *   dependsOn?: string[], dropDependsOn?: string[], now?: Date }} change
  * @returns {Task}
  */
-export function updateTask(task, { phase, decisions = [], pending = [], done = [], now } = {}) {
+export function updateTask(task, { phase, decisions = [], pending = [], done = [], dependsOn = [], dropDependsOn = [], now } = {}) {
   if (task.status === "closed") throw new TaskError(TASK_ERROR_CODES.TASK_CLOSED, `task "${task.slug}" is closed`);
-  if (phase === undefined && decisions.length === 0 && pending.length === 0 && done.length === 0) {
-    throw new TaskError(TASK_ERROR_CODES.TASK_UPDATE_EMPTY, "give --phase, --decision, --pending, or --done");
+  if (
+    phase === undefined &&
+    decisions.length === 0 &&
+    pending.length === 0 &&
+    done.length === 0 &&
+    dependsOn.length === 0 &&
+    dropDependsOn.length === 0
+  ) {
+    throw new TaskError(
+      TASK_ERROR_CODES.TASK_UPDATE_EMPTY,
+      "give --phase, --decision, --pending, --done, --depends-on, or --drop-depends-on",
+    );
   }
   const at = (now ?? new Date()).toISOString();
   const remaining = [...task.pending, ...pending];
@@ -232,11 +297,18 @@ export function updateTask(task, { phase, decisions = [], pending = [], done = [
     if (i === -1) throw new TaskError(TASK_ERROR_CODES.TASK_PENDING_UNKNOWN, `"${item}" is not a pending item of "${task.slug}"`);
     remaining.splice(i, 1);
   }
+  const dependencies = dependencyRefs(task.slug, [...task.depends_on, ...dependsOn]);
+  for (const ref of dropDependsOn) {
+    const i = dependencies.indexOf(ref);
+    if (i === -1) throw new TaskError(TASK_ERROR_CODES.TASK_DEPENDENCY_UNKNOWN, `"${ref}" is not a dependency of "${task.slug}"`);
+    dependencies.splice(i, 1);
+  }
   return assertValid({
     ...task,
     phase: phase ?? task.phase,
     decisions: [...task.decisions, ...decisions.map((text) => ({ at, text }))],
     pending: remaining,
+    depends_on: dependencies,
     updated_at: at,
   });
 }
@@ -297,6 +369,7 @@ function taskLines(t) {
   lines.push(`  goal: ${clip(t.goal)}`);
   lines.push(`  done when: ${bounded(t.done_when, MAX_DONE_WHEN, (d, i) => `(${i + 1}) ${d}`, " ")}`);
   if (t.pending.length > 0) lines.push(`  pending: ${bounded(t.pending, MAX_PENDING, (p) => p, "; ")}`);
+  if (t.depends_on.length > 0) lines.push(`  depends on: ${bounded(t.depends_on, MAX_PENDING, (r) => r, ", ")}`);
   for (const d of t.decisions.slice(-MAX_DECISIONS)) lines.push(`  decision (${d.at}): ${clip(d.text)}`);
   return lines;
 }
@@ -370,6 +443,53 @@ export function resolveWorktree(cwd) {
   return { root, branch: git(["-C", root, "symbolic-ref", "--short", "-q", "HEAD"]) };
 }
 
+/**
+ * The root of every worktree of the clone that contains `worktreeRoot`, the
+ * main checkout first, as `git worktree list` orders them. Each root is
+ * resolved to its real path; a worktree whose directory is gone is dropped,
+ * and a bare entry is never a worktree. This is the scan the clone-wide slug
+ * check and the cycle check share with the work graph (KD-1, KD-4).
+ *
+ * @param {string} worktreeRoot
+ * @returns {string[]}
+ */
+export function listWorktrees(worktreeRoot) {
+  const text = git(["-C", worktreeRoot, "worktree", "list", "--porcelain"]);
+  if (text === null) throw new TaskError(TASK_ERROR_CODES.TASK_NO_REPO, `${worktreeRoot} is not inside a git repository`);
+  const roots = [];
+  for (const root of parseWorktreeList(text)) {
+    try {
+      roots.push(fs.realpathSync(root));
+    } catch {
+      // the directory is gone: `git worktree prune` would drop it too
+    }
+  }
+  return roots;
+}
+
+/**
+ * Every task of every worktree of the clone, each with the worktree it lives
+ * in. A worktree that cannot be read is reported in `problems` and skipped,
+ * as a bad task file is.
+ *
+ * @param {string} worktreeRoot
+ * @returns {{ tasks: Task[], problems: string[] }}
+ */
+export function listCloneTasks(worktreeRoot) {
+  const tasks = [];
+  const problems = [];
+  for (const root of listWorktrees(worktreeRoot)) {
+    try {
+      const listed = listTasks(root);
+      tasks.push(...listed.tasks);
+      problems.push(...listed.problems.map((p) => `${root}: ${p}`));
+    } catch (err) {
+      problems.push(`${root}: ${/** @type {Error} */ (err).message}`);
+    }
+  }
+  return { tasks, problems };
+}
+
 function isSymlink(p) {
   try {
     return fs.lstatSync(p).isSymbolicLink();
@@ -415,6 +535,12 @@ function parseTaskFile(file, label, expectedSlug) {
     value = JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (err) {
     throw new TaskError(TASK_ERROR_CODES.TASK_INVALID, `${label} does not parse: ${/** @type {Error} */ (err).message}`);
+  }
+  // A version-1 file has no dependency field: it reads as version 2 with none
+  // (REL-4). A version-1 file that carries one was not written by any
+  // dotbabel, so it stays invalid.
+  if (value !== null && typeof value === "object" && value.schema_version === TASK_SCHEMA_VERSION_PREVIOUS && !("depends_on" in value)) {
+    value = { ...value, schema_version: TASK_SCHEMA_VERSION, depends_on: [] };
   }
   const problems = validateTask(value);
   if (problems.length > 0) throw new TaskError(TASK_ERROR_CODES.TASK_INVALID, `${label}: ${problems.join("; ")}`);

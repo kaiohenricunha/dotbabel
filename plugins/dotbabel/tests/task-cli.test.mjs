@@ -192,6 +192,100 @@ describe("dotbabel task update / close / list", () => {
   });
 });
 
+function commitEmpty(root) {
+  execFileSync("git", ["-C", root, "commit", "-q", "--allow-empty", "-m", "init"], {
+    env: { ...cleanEnv(), GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" },
+  });
+}
+
+function addWorktree(root, name) {
+  const linked = path.join(makeTempDir("task-cli-wt-"), name);
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", name, linked], { env: cleanEnv() });
+  return fs.realpathSync(linked);
+}
+
+function newTask(cwd, slug, ...extra) {
+  return task(cwd, ["new", slug, "--goal", `goal of ${slug}`, "--done-when", "it works", ...extra]);
+}
+
+describe("dotbabel task dependencies", () => {
+  it("records --depends-on on a new task and shows it", () => {
+    const root = repo();
+    const created = task(root, [...NEW, "--depends-on", "fix-api", "--depends-on", "acme/web#12", "--json"]);
+    expect(created.code).toBe(0);
+    expect(json(created).task).toMatchObject({ schema_version: 2, depends_on: ["fix-api", "acme/web#12"] });
+    const shown = task(root, ["show", "fix-login"]);
+    expect(shown.stdout).toContain("depends on:");
+    expect(shown.stdout).toContain("acme/web#12");
+    expect(task(root, ["show", "fix-login", "--json"]).stdout).not.toContain("depends on:");
+  });
+
+  it("adds and drops dependencies on update, and refuses to drop one the task lacks (exit 1)", () => {
+    const root = repo();
+    task(root, NEW);
+    const added = task(root, ["update", "fix-login", "--depends-on", "fix-api", "--json"]);
+    expect(added.code).toBe(0);
+    expect(json(added).task.depends_on).toEqual(["fix-api"]);
+    const dropped = task(root, ["update", "fix-login", "--drop-depends-on", "fix-api", "--json"]);
+    expect(dropped.code).toBe(0);
+    expect(json(dropped).task.depends_on).toEqual([]);
+    const missing = task(root, ["update", "fix-login", "--drop-depends-on", "fix-api"]);
+    expect(missing.code).toBe(1);
+    expect(missing.stderr).toContain("TASK_DEPENDENCY_UNKNOWN");
+  });
+
+  it("refuses a malformed reference as a usage error (exit 64) and a self reference (exit 1)", () => {
+    const root = repo();
+    task(root, NEW);
+    const bad = task(root, ["update", "fix-login", "--depends-on", "Not A Ref"]);
+    expect(bad.code).toBe(64);
+    expect(bad.stderr).toContain("TASK_DEPENDENCY_INVALID");
+    const self = task(root, ["update", "fix-login", "--depends-on", "fix-login"]);
+    expect(self.code).toBe(1);
+    expect(self.stderr).toContain("TASK_CYCLE");
+    expect(json(task(root, ["show", "fix-login", "--json"])).task.depends_on).toEqual([]);
+  });
+
+  it("task new refuses a slug that another worktree of the clone uses", () => {
+    const root = repo();
+    commitEmpty(root);
+    const side = addWorktree(root, "side");
+    expect(newTask(root, "shared").code).toBe(0);
+    const refused = newTask(side, "shared");
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("TASK_SLUG_TAKEN");
+    expect(refused.stderr).toContain(root);
+    expect(task(side, ["list", "--json"]).stdout).toContain('"tasks": []');
+    expect(newTask(side, "other").code).toBe(0);
+  });
+
+  it("task update refuses an edge that closes a cycle", () => {
+    const root = repo();
+    commitEmpty(root);
+    const side = addWorktree(root, "side");
+    expect(newTask(root, "a").code).toBe(0);
+    expect(newTask(side, "b", "--depends-on", "a").code).toBe(0);
+    expect(newTask(side, "c", "--depends-on", "b").code).toBe(0);
+    const before = json(task(root, ["show", "a", "--json"])).task;
+    const refused = task(root, ["update", "a", "--depends-on", "c"]);
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("TASK_CYCLE");
+    expect(refused.stderr).toContain("a -> c -> b -> a");
+    expect(json(task(root, ["show", "a", "--json"])).task).toEqual(before);
+    expect(task(root, ["update", "a", "--depends-on", "acme/web#1"]).code).toBe(0);
+  });
+
+  it("task new refuses a cycle that a forward reference would close, and writes no task", () => {
+    const root = repo();
+    expect(newTask(root, "a", "--depends-on", "b").code).toBe(0);
+    const refused = newTask(root, "b", "--depends-on", "a");
+    expect(refused.code).toBe(1);
+    expect(refused.stderr).toContain("TASK_CYCLE");
+    expect(task(root, ["show", "b"]).code).toBe(1);
+    expect(newTask(root, "b", "--depends-on", "acme/web#2").code).toBe(0);
+  });
+});
+
 describe("dotbabel task hook session-start", () => {
   it("prints the open tasks as SessionStart additionalContext", () => {
     const root = repo();
