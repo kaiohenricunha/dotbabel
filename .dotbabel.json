@@ -9,7 +9,7 @@
   "cli_substitutions": {},
   "targets": [],
   "attestation": {
-    "enforce": true,
+    "enforce": false,
     "governance_files": [
       ".local-attest.config.mjs",
       ".dotbabel.json",

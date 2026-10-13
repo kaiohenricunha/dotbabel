@@ -111,7 +111,7 @@ export async function checkAttestationAdoption({
     add(
       "info",
       "ATTESTATION_OFF",
-      "attestation enforcement is off, so /merge-pr verifies explicitly instead of reusing local-attest evidence" +
+      "attestation enforcement is off, so /merge-pr reads CI on the head SHA and verifies explicitly only when CI did not test that head" +
         `${hasConfig ? " (a local-attest config exists, so this repository can adopt enforcement)" : ""}; ` +
         "see docs/attestation.md to adopt it",
     );

@@ -2,14 +2,14 @@
 id: spec
 name: spec
 type: skill
-version: 1.0.0
+version: 1.1.0
 domain: [devex]
 platform: [none]
 task: [documentation]
 maturity: validated
 owner: "@kaiohenricunha"
 created: 2025-01-01
-updated: 2026-08-07
+updated: 2026-10-13
 description: >
   Create structured engineering specs through interactive pairing.
   Use when the user wants to create a spec, design doc, technical specification,
@@ -295,6 +295,9 @@ Each prompt should include:
 - Command recommendation (/think, /ultraplan, /plan)
 - TDD test names (the test is the first deliverable)
 - Exact file paths to create/modify
+- A <proof> block: the tests, the command that runs the new behavior, what the
+  run must show, and the done_when list (references/cc-prompt-templates.md).
+  Each unit is one /deliver contract.
 -->
 
 ## 6.4 Testing Strategy
@@ -314,11 +317,14 @@ An unexplained blank is not an answer.
                       scored: name the metric, the baseline, and the sample size
   · load/torture    — behavior at full scale
   · post-deploy     — what reality reports back after shipping
+  · QA (run it)     — REQUIRED per unit: the command, page, or call that runs
+                      the new behavior, and what it must show; "N/A" only when
+                      the unit has no runnable surface
 -->
 
-| Unit | Kinds applied | N/A + reason |
-| ---- | ------------- | ------------ |
-|      |               |              |
+| Unit | Kinds applied | QA (run it) | N/A + reason |
+| ---- | ------------- | ----------- | ------------ |
+|      |               |             |              |
 
 ## 6.5 Migration Sequence
 

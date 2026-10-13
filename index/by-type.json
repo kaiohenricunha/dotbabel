@@ -36,6 +36,7 @@
     "create-experiment",
     "create-inspection",
     "crossplane-specialist",
+    "deliver",
     "deploy-status",
     "detect-flaky",
     "fix-with-evidence",
