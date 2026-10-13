@@ -39,16 +39,30 @@ that is where it has to be enforced. Without this hook, "post the evidence
 comment" is something an agent can simply do, and the evidence chain collapses
 to the agent's own assertion.
 
-**Scope, stated plainly.** This stops the marker reaching a comment through the
-command text or a `--body-file` the hook can read. It does **not** stop an agent
-that assembles the marker out of band — splitting it across shell variables,
-base64, a heredoc, or writing the body with the Write tool (which this
-`PreToolUse` matcher does not cover) and posting it with `--body-file`. Those
-are open by construction: no textual guard on a single Bash call can close
-them. Treat this as a guardrail against the casual path, not a security
-boundary. The durable fix is for the gate to stop trusting comment text — an
-unforgeable value derived from the run, or a check-run artifact the agent
-cannot author.
+**Scope, stated plainly.** The hook looks for a guarded line in the command
+text. It also reads each file that the command names in one of these forms:
+
+- `--body-file <path>` or `--body-file=<path>`.
+- `-F <path>`, when the value has no `=`. `gh pr comment` and `gh pr create`
+  read this value as the body file.
+- `--input <path>`, the request body of `gh api`. The value `-` reads stdin, so
+  the hook cannot check it and skips it.
+- `-F body=@<path>` or `--field body=@<path>`.
+
+The value can be in single or double quotes and can contain spaces. The hook
+expands a leading `~/`, `$HOME`, `${HOME}`, `$TMPDIR` or `${TMPDIR}` from its
+own environment, and it evaluates nothing. It resolves a relative path against
+the `cwd` field of the hook input. It skips a path that it cannot resolve or
+read, because a legitimate command can name a file through any variable.
+
+The hook does **not** stop an agent that assembles the marker out of band: a
+path through another shell variable, text split across shell words, variables
+or a heredoc, text encoded as base64 or a JSON escape, or a body written with
+the Write tool (which this `PreToolUse` matcher does not cover). Those are open
+by construction: no textual guard on a single Bash call can close them. Treat
+this as a guardrail against the casual path, not a security boundary. The
+durable fix is for the gate to stop trusting comment text — an unforgeable
+value derived from the run, or a check-run artifact the agent cannot author.
 
 It guards three evidence families, each with its own sanctioned writer:
 
@@ -57,6 +71,12 @@ It guards three evidence families, each with its own sanctioned writer:
 | criteria    | `dotbabel criteria verify --pr <N> --post`   | the merge gate                             |
 | attestation | `dotbabel local-attest --pr <N>`             | the merge gate and CI                      |
 | review      | `dotbabel pr-stack review-complete --pr <N>` | `/pr-conductor`, to skip a finished review |
+
+The hook also blocks the payload line of each family, because the gate refuses a
+marker without it as invalid. For criteria, this covers the plain form and the
+compressed `z1:` form. Each payload entry starts with `<!--` and one space, as
+each reader requires. So a read-only search for the bare token, such as `grep`
+or `git log -S`, is not blocked.
 
 The `post-pr-review` receipt is guarded too, because the review-complete writer
 reads it to believe a review ran. The per-finding idempotency marker on ordinary

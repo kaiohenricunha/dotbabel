@@ -1,13 +1,18 @@
 /**
  * The base64url payload line that rides under an evidence marker.
  *
- * Two evidence families now carry a machine-readable payload — `dotbabel
- * criteria` (`criteria/comment.mjs`) and `local-attest` (`attestation.mjs`) —
- * and both encode it the same way: line 1 is the SHA-pinned marker a grep can
- * find, line 2 is the whole payload, base64url-encoded so Markdown rendering
- * cannot touch it. Keeping one codec means the producer and the gate that
- * judges it cannot drift apart per family, which is the failure mode that
- * leaves a command posting evidence its own gate cannot read.
+ * `local-attest` (`attestation.mjs`) and review-complete
+ * (`review-evidence.mjs`) evidence carry a machine-readable payload and both
+ * encode it the same way: line 1 is the SHA-pinned marker a grep can find,
+ * line 2 is the whole payload, base64url-encoded so Markdown rendering cannot
+ * touch it. Keeping one codec means the producer and the gate that judges it
+ * cannot drift apart per family, which is the failure mode that leaves a
+ * command posting evidence its own gate cannot read.
+ *
+ * The `dotbabel criteria` payload line does not use this codec. It is
+ * raw-deflated before base64url so a large payload fits the comment cap, and
+ * its writer and reader share their prefixes and bound in
+ * `criteria/comment.mjs`.
  *
  * Pure: no I/O, no crypto, no clock.
  */
