@@ -75,7 +75,7 @@ The rule is not "adapters do all I/O".
   - `domain/` — no I/O.
   - `requirement/` — parsing/validation over supplied data; no filesystem ownership.
   - `compat/` — pure interpretation over supplied artifact data.
-  - `policy/` — pure merge/evaluation over supplied policy layers.
+  - `policy/` — pure merge/evaluation over supplied policy layers, plus read-only loading of those layers. Amended by the owner on 2026-10-12: `loadPolicyLayers` is the one I/O function of `policy/`. It reads the user policy under `configDir()` and the `model_intelligence` key of `.dotbabel.json`, and it never writes (ARCH-63). `mergePolicy` and every evaluation function stay pure. `quality/config.mjs` sets the same precedent: the module that owns a policy also owns the read of its layers.
   - `resolver/` — strictly pure and deterministic for identical inputs.
   - `recommend/` — pure presentation/advisory composition over supplied resolver/observation results.
   - `sources/` — subprocess, runtime inspection, and network I/O.
@@ -83,7 +83,7 @@ The rule is not "adapters do all I/O".
   - `snapshot/` — version-controlled snapshot filesystem/build I/O.
   - `materialize/` — generated-artifact filesystem I/O and drift checks.
 
-The CLI or existing Dotbabel consumer orchestrates these boundaries: it loads configuration and requirements, requests discovery/cache data, invokes the resolver, and optionally materializes or renders the result.
+The CLI or existing Dotbabel consumer orchestrates these boundaries: it loads configuration and requirements (the policy layers through `loadPolicyLayers`), requests discovery/cache data, invokes the resolver, and optionally materializes or renders the result.
 
 Consequence for §5: the resolver cannot read the clock, so a freshness state reaches it as data. `catalog/` or the caller computes that state before the call.
 
