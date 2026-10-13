@@ -61,7 +61,11 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-import { parseWorktreeList } from "./work-graph.mjs";
+import { parseDependencyRef, parseWorktreeList } from "./work-graph.mjs";
+
+// The reference grammar lives with the graph that follows the references;
+// it is re-exported here because a task record is where it is validated.
+export { parseDependencyRef };
 
 /** The `schema_version` this module writes. It also reads the version before it. */
 export const TASK_SCHEMA_VERSION = 2;
@@ -104,10 +108,6 @@ export class TaskError extends Error {
 }
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const SLUG = "[a-z0-9][a-z0-9-]{0,63}";
-const REPO_NAME = "[A-Za-z0-9_.-]+";
-const CLONE_TASK_RE = new RegExp(`^(github\\.com/${REPO_NAME}/${REPO_NAME}):(${SLUG})$`);
-const GITHUB_REF_RE = new RegExp(`^(${REPO_NAME}/${REPO_NAME})#([1-9][0-9]*)$`);
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 const KEYS = Object.freeze([
   "schema_version",
@@ -137,31 +137,6 @@ const KEYS = Object.freeze([
  */
 export function isValidSlug(slug) {
   return typeof slug === "string" && SLUG_RE.test(slug);
-}
-
-/**
- * @typedef {{ kind: "task", slug: string }
- *   | { kind: "clone-task", repo: string, slug: string }
- *   | { kind: "github", repo: string, number: number }} DependencyRef
- */
-
-/**
- * The parts of one `depends_on` entry, or null when it has none of the three
- * forms: a task of this clone (`<slug>`), a task of another clone on this
- * machine (`github.com/owner/repo:<slug>`), or a pull request or issue
- * (`owner/repo#123`).
- *
- * @param {unknown} ref
- * @returns {DependencyRef|null}
- */
-export function parseDependencyRef(ref) {
-  if (typeof ref !== "string") return null;
-  if (SLUG_RE.test(ref)) return { kind: "task", slug: ref };
-  const clone = CLONE_TASK_RE.exec(ref);
-  if (clone) return { kind: "clone-task", repo: clone[1], slug: clone[2] };
-  const github = GITHUB_REF_RE.exec(ref);
-  if (github) return { kind: "github", repo: github[1], number: Number(github[2]) };
-  return null;
 }
 
 const isText = (v) => typeof v === "string" && v.trim() !== "";

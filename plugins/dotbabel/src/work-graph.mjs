@@ -3,7 +3,8 @@
  * their same-clone dependencies as edges, and the questions the task commands
  * ask of that graph.
  *
- * Nothing here runs git, reads the disk, or calls the network (ARCH-3). The
+ * Nothing here runs git, reads the disk, calls the network (ARCH-3), or
+ * imports another dotbabel module: `task-state.mjs` imports this one. The
  * worktree list arrives as the text `git worktree list --porcelain` prints,
  * and the tasks arrive as records; `task-state.mjs` does the reading. Each
  * read of the graph collects every worktree's task files again (KD-1): the
@@ -19,7 +20,37 @@
  * pull request numbers, and this module sorts task references.
  */
 
-import { parseDependencyRef } from "./task-state.mjs";
+const SLUG = "[a-z0-9][a-z0-9-]{0,63}";
+const REPO_NAME = "[A-Za-z0-9_.-]+";
+const TASK_REF_RE = new RegExp(`^${SLUG}$`);
+const CLONE_TASK_RE = new RegExp(`^(github\\.com/${REPO_NAME}/${REPO_NAME}):(${SLUG})$`);
+const GITHUB_REF_RE = new RegExp(`^(${REPO_NAME}/${REPO_NAME})#([1-9][0-9]*)$`);
+
+/**
+ * @typedef {{ kind: "task", slug: string }
+ *   | { kind: "clone-task", repo: string, slug: string }
+ *   | { kind: "github", repo: string, number: number }} DependencyRef
+ */
+
+/**
+ * The parts of one `depends_on` entry, or null when it has none of the three
+ * forms: a task of this clone (`<slug>`), a task of another clone on this
+ * machine (`github.com/owner/repo:<slug>`), or a pull request or issue
+ * (`owner/repo#123`). The slug grammar is the one `task-state.mjs` accepts
+ * for a file name.
+ *
+ * @param {unknown} ref
+ * @returns {DependencyRef|null}
+ */
+export function parseDependencyRef(ref) {
+  if (typeof ref !== "string") return null;
+  if (TASK_REF_RE.test(ref)) return { kind: "task", slug: ref };
+  const clone = CLONE_TASK_RE.exec(ref);
+  if (clone) return { kind: "clone-task", repo: clone[1], slug: clone[2] };
+  const github = GITHUB_REF_RE.exec(ref);
+  if (github) return { kind: "github", repo: github[1], number: Number(github[2]) };
+  return null;
+}
 
 /**
  * The paths that `git worktree list --porcelain` names, in its order. A bare
