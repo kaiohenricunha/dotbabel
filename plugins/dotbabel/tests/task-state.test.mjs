@@ -286,6 +286,30 @@ describe("formatSessionContext", () => {
     expect(text).toContain("dotbabel task list");
   });
 
+  it("marks each task ready or blocked when given the states, and bounds the blocking list", () => {
+    const a = sample({ slug: "a" });
+    const b = sample({ slug: "b", dependsOn: ["a", "acme/web#1", "x1", "x2", "x3", "x4", "x5"] });
+    const states = new Map([
+      ["a", { ready: true, waits_on: [] }],
+      [
+        "b",
+        {
+          ready: false,
+          waits_on: [
+            { ref: "a", kind: "task", state: "open" },
+            { ref: "acme/web#1", kind: "github", state: "unknown" },
+            ...["x1", "x2", "x3", "x4", "x5"].map((ref) => ({ ref, kind: "task", state: "missing" })),
+          ],
+        },
+      ],
+    ]);
+    const text = formatSessionContext([a, b], states);
+    expect(text).toMatch(/- a \(phase[\s\S]*?\n\s+ready\n/);
+    expect(text).toContain("blocked by: a (open), acme/web#1 (unknown), x1 (missing), x2 (missing), x3 (missing), and 2 more");
+    expect(text).toContain("dotbabel task next");
+    expect(formatSessionContext([a, b])).not.toContain("ready");
+  });
+
   it("truncates a very long field so the context stays small", () => {
     const text = formatSessionContext([sample({ goal: "g".repeat(5000) })]);
     expect(text.length).toBeLessThan(1500);

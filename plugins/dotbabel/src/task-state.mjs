@@ -359,17 +359,30 @@ function bounded(items, max, format, sep) {
 }
 
 /**
+ * @typedef {object} TaskReadiness
+ * @property {boolean} ready
+ * @property {{ ref: string, state: string }[]} waits_on
+ */
+
+/**
  * The full lines for one task in the SessionStart view.
  *
  * @param {Task} t
+ * @param {TaskReadiness|undefined} readiness
  * @returns {string[]}
  */
-function taskLines(t) {
+function taskLines(t, readiness) {
   const lines = [`- ${t.slug} (phase: ${clip(t.phase)}, updated ${t.updated_at}) — \`dotbabel task show ${t.slug}\``];
   lines.push(`  goal: ${clip(t.goal)}`);
   lines.push(`  done when: ${bounded(t.done_when, MAX_DONE_WHEN, (d, i) => `(${i + 1}) ${d}`, " ")}`);
   if (t.pending.length > 0) lines.push(`  pending: ${bounded(t.pending, MAX_PENDING, (p) => p, "; ")}`);
-  if (t.depends_on.length > 0) lines.push(`  depends on: ${bounded(t.depends_on, MAX_PENDING, (r) => r, ", ")}`);
+  if (readiness === undefined) {
+    if (t.depends_on.length > 0) lines.push(`  depends on: ${bounded(t.depends_on, MAX_PENDING, (r) => r, ", ")}`);
+  } else if (readiness.ready) {
+    lines.push("  ready");
+  } else {
+    lines.push(`  blocked by: ${bounded(readiness.waits_on.map((w) => `${w.ref} (${w.state})`), MAX_PENDING, (w) => w, ", ")}`);
+  }
   for (const d of t.decisions.slice(-MAX_DECISIONS)) lines.push(`  decision (${d.at}): ${clip(d.text)}`);
   return lines;
 }
@@ -380,12 +393,15 @@ function taskLines(t) {
  * budget; a task that does not fit is shortened to its slug and phase. The
  * block is framed as recorded data, because its text may have been copied from
  * an issue anyone can write, and a later session must not take it as an
- * instruction. Empty when no task is open.
+ * instruction. Empty when no task is open. With `states`, from the work graph
+ * of the clone, each task is marked ready or blocked by the references it
+ * waits on, and the block names `dotbabel task next`.
  *
  * @param {Task[]} tasks
+ * @param {Map<string, TaskReadiness>} [states]
  * @returns {string}
  */
-export function formatSessionContext(tasks) {
+export function formatSessionContext(tasks, states) {
   const open = tasks
     .filter((t) => t.status === "open")
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
@@ -394,7 +410,7 @@ export function formatSessionContext(tasks) {
   let size = CONTEXT_HEAD.length + CONTEXT_TAIL.length + 200;
   let shortened = 0;
   for (const t of open.slice(0, MAX_TASKS)) {
-    const full = taskLines(t);
+    const full = taskLines(t, states?.get(t.slug));
     const fullSize = full.join("\n").length + 1;
     if (size + fullSize <= MAX_CONTEXT) {
       lines.push(...full);
@@ -410,6 +426,7 @@ export function formatSessionContext(tasks) {
   const omitted = open.length - Math.min(open.length, MAX_TASKS);
   if (omitted > 0) lines.push(`(${omitted} more open task(s): \`dotbabel task list\`)`);
   if (shortened > 0) lines.push(`(${shortened} task(s) shortened to fit: \`dotbabel task list\`)`);
+  if (states !== undefined) lines.push("(ready and blocked tasks of the whole clone: `dotbabel task next`)");
   lines.push(CONTEXT_TAIL);
   return lines.join("\n");
 }
@@ -424,7 +441,25 @@ function git(args) {
   return r.status === 0 && r.stdout.trim() !== "" ? r.stdout.trim() : null;
 }
 
+/**
+ * The git directory of `worktreeRoot`. A worktree root holds either a `.git`
+ * directory (the main checkout) or a `.git` file whose one line names the
+ * linked worktree's directory, so both are read without a process; a graph
+ * read over twenty worktrees would otherwise spawn git twenty times (PERF-1).
+ * Anything else, a subdirectory of a worktree for one, is asked of git.
+ */
 function gitDir(worktreeRoot) {
+  const dotGit = path.join(worktreeRoot, ".git");
+  try {
+    const stat = fs.lstatSync(dotGit);
+    if (stat.isDirectory()) return dotGit;
+    if (stat.isFile()) {
+      const pointer = fs.readFileSync(dotGit, "utf8").trim();
+      if (pointer.startsWith("gitdir: ")) return path.resolve(worktreeRoot, pointer.slice("gitdir: ".length));
+    }
+  } catch {
+    // no .git entry here: fall through to git
+  }
   const dir = git(["-C", worktreeRoot, "rev-parse", "--absolute-git-dir"]);
   if (dir === null) throw new TaskError(TASK_ERROR_CODES.TASK_NO_REPO, `${worktreeRoot} is not inside a git repository`);
   return dir;

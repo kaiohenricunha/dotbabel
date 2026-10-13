@@ -309,6 +309,22 @@ describe("dotbabel task hook session-start", () => {
     expect(r.stdout).toContain("fix-login");
   });
 
+  it("the session-start context lists ready and blocked tasks", () => {
+    const root = repo();
+    commitEmpty(root);
+    const side = addWorktree(root, "side");
+    expect(newTask(root, "a").code).toBe(0);
+    expect(newTask(root, "b", "--depends-on", "a", "--depends-on", "acme/web#1").code).toBe(0);
+    expect(newTask(side, "c").code).toBe(0);
+    const r = task(root, ["hook", "session-start"], JSON.stringify({ cwd: root }));
+    expect(r.code).toBe(0);
+    const context = json(r).hookSpecificOutput.additionalContext;
+    expect(context).toMatch(/- a \(phase: started[^\n]*\n[^\n]*\n[^\n]*\n\s+ready\n/);
+    expect(context).toMatch(/- b \(phase: started[\s\S]*?blocked by: a \(open\), acme\/web#1 \(unknown\)/);
+    expect(context).not.toContain("- c (");
+    expect(context).toContain("dotbabel task next");
+  });
+
   it("is silent when no task is open", () => {
     const root = repo();
     task(root, NEW);
@@ -330,6 +346,22 @@ describe("dotbabel task hook session-start", () => {
       expect(r.code).toBe(0);
       expect(r.stdout).toBe("");
     }
+  });
+});
+
+describe("dotbabel task graph / next usage", () => {
+  it("refuses a positional argument (exit 64)", () => {
+    const root = repo();
+    for (const sub of ["graph", "next"]) {
+      const r = task(root, [sub, "extra"]);
+      expect(r.code).toBe(64);
+      expect(r.stderr).toContain("takes no positional argument");
+    }
+  });
+
+  it("exits 2 outside a git repository", () => {
+    const dir = makeTempDir("task-cli-nogit-");
+    for (const sub of ["graph", "next"]) expect(task(dir, [sub]).code).toBe(2);
   });
 });
 

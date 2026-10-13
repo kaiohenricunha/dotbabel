@@ -141,3 +141,136 @@ export function findSlugOwner(tasks, slug) {
   const owner = tasks.find((task) => task.slug === slug);
   return owner === undefined ? null : owner.worktree;
 }
+
+/**
+ * @typedef {"satisfied"|"open"|"missing"|"unknown"} DependencyState
+ *
+ * @typedef {object} DependencyStatus
+ * @property {string} ref
+ * @property {DependencyRef["kind"]} kind
+ * @property {DependencyState} state  `satisfied` when the task is closed; `open` when it
+ *   is open; `missing` when no worktree of the clone holds the slug; `unknown` for a task
+ *   of another clone or a pull request or issue, which Phase 1b does not resolve. Only
+ *   `satisfied` lets a task go ahead; `unknown` counts as blocked (KD-2).
+ */
+
+/**
+ * The state of each reference `task` waits on, in the task's order.
+ *
+ * @param {import("./task-state.mjs").Task} task
+ * @param {import("./task-state.mjs").Task[]} tasks  every task of the clone
+ * @returns {DependencyStatus[]}
+ */
+export function dependencyStates(task, tasks) {
+  const bySlug = new Map(tasks.map((other) => [other.slug, other]));
+  return task.depends_on.map((ref) => {
+    const parsed = /** @type {DependencyRef} */ (parseDependencyRef(ref));
+    if (parsed.kind !== "task") return { ref, kind: parsed.kind, state: "unknown" };
+    const target = bySlug.get(parsed.slug);
+    return { ref, kind: "task", state: target === undefined ? "missing" : target.status === "closed" ? "satisfied" : "open" };
+  });
+}
+
+/**
+ * The open tasks of the clone in dependency order: each task after the open
+ * tasks it depends on, ties broken by slug, so the order is the same on every
+ * read (KD-7). A closed or missing dependency constrains nothing. Tasks on a
+ * cycle are left out of `order` and one cycle is reported.
+ *
+ * @param {import("./task-state.mjs").Task[]} tasks
+ * @returns {{ order: string[], cycle: string[]|null }}
+ */
+export function topologicalOrder(tasks) {
+  const open = tasks.filter((task) => task.status === "open");
+  const slugs = new Set(open.map((task) => task.slug));
+  const remaining = new Map();
+  const dependents = new Map();
+  for (const task of open) {
+    const deps = new Set(cloneEdges([task]).map(([, to]) => to).filter((to) => slugs.has(to) && to !== task.slug));
+    if (cloneEdges([task]).some(([, to]) => to === task.slug)) deps.add(task.slug);
+    remaining.set(task.slug, deps);
+    for (const to of deps) {
+      if (!dependents.has(to)) dependents.set(to, []);
+      dependents.get(to).push(task.slug);
+    }
+  }
+  const order = [];
+  let ready = [...remaining].filter(([, deps]) => deps.size === 0).map(([slug]) => slug).sort();
+  while (ready.length > 0) {
+    const slug = /** @type {string} */ (ready.shift());
+    order.push(slug);
+    remaining.delete(slug);
+    const freed = [];
+    for (const dependent of dependents.get(slug) ?? []) {
+      const deps = remaining.get(dependent);
+      if (deps === undefined) continue;
+      deps.delete(slug);
+      if (deps.size === 0) freed.push(dependent);
+    }
+    if (freed.length > 0) ready = [...ready, ...freed].sort();
+  }
+  const cycle = remaining.size === 0 ? null : findCycle(open.filter((task) => remaining.has(task.slug)), [...remaining.keys()].sort()[0]);
+  return { order, cycle };
+}
+
+/**
+ * @typedef {object} WorkGraphNode
+ * @property {string} slug
+ * @property {string} worktree
+ * @property {string} phase
+ * @property {string[]} depends_on
+ */
+
+/**
+ * The graph `dotbabel task graph` prints: every open task of the clone, the
+ * same-clone edges between open tasks, the dependency order, and one cycle
+ * when the files hold one.
+ *
+ * @param {import("./task-state.mjs").Task[]} tasks
+ * @returns {{ tasks: WorkGraphNode[], edges: [string, string][], order: string[], cycle: string[]|null }}
+ */
+export function buildWorkGraph(tasks) {
+  const open = tasks.filter((task) => task.status === "open");
+  const slugs = new Set(open.map((task) => task.slug));
+  const { order, cycle } = topologicalOrder(open);
+  return {
+    tasks: open.map(({ slug, worktree, phase, depends_on }) => ({ slug, worktree, phase, depends_on: [...depends_on] })),
+    edges: cloneEdges(open).filter(([, to]) => slugs.has(to)),
+    order,
+    cycle,
+  };
+}
+
+/**
+ * @typedef {object} ReadyTask
+ * @property {string} slug
+ * @property {string} worktree
+ * @property {string} phase
+ *
+ * @typedef {ReadyTask & { waits_on: DependencyStatus[] }} BlockedTask
+ */
+
+/**
+ * What `dotbabel task next` prints: the open tasks whose every dependency is
+ * satisfied, then the ones that wait, each with the references it waits on.
+ * Both lists follow the dependency order; a task on a cycle comes last, by
+ * slug, and is never ready because its dependency is open.
+ *
+ * @param {import("./task-state.mjs").Task[]} tasks
+ * @returns {{ order: string[], ready: ReadyTask[], blocked: BlockedTask[] }}
+ */
+export function nextTasks(tasks) {
+  const open = tasks.filter((task) => task.status === "open");
+  const { order } = topologicalOrder(open);
+  const rank = new Map(order.map((slug, i) => [slug, i]));
+  const sorted = [...open].sort((a, b) => (rank.get(a.slug) ?? Infinity) - (rank.get(b.slug) ?? Infinity) || a.slug.localeCompare(b.slug));
+  const ready = [];
+  const blocked = [];
+  for (const task of sorted) {
+    const waitsOn = dependencyStates(task, tasks);
+    const node = { slug: task.slug, worktree: task.worktree, phase: task.phase };
+    if (waitsOn.every((status) => status.state === "satisfied")) ready.push(node);
+    else blocked.push({ ...node, waits_on: waitsOn });
+  }
+  return { order, ready, blocked };
+}
