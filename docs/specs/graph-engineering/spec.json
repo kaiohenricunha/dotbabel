@@ -1,0 +1,369 @@
+{
+  "id": "graph-engineering",
+  "title": "Graph engineering — a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
+  "status": "draft",
+  "owners": ["dotbabel maintainers"],
+  "linked_paths": [
+    "plugins/dotbabel/src/task-state.mjs",
+    "plugins/dotbabel/bin/dotbabel-task.mjs",
+    "schemas/dotbabel.task-state.schema.json"
+  ],
+  "acceptance_commands": [
+    "npx vitest run plugins/dotbabel/tests/task-state.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/work-graph.test.mjs"
+  ],
+  "depends_on_specs": [],
+  "active_prs": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "planned",
+      "given": "a task file with schema_version 1",
+      "when": "dotbabel reads it",
+      "then": "it reads as version 2 with depends_on []",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/task-state.test.mjs",
+          "name": "reads a version-1 task as version 2 with no dependencies"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/task-state.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-1.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-1.junit.xml"
+      }
+    },
+    {
+      "id": "AC-2",
+      "status": "planned",
+      "given": "a worktree of the clone that has a task with slug s",
+      "when": "dotbabel task new s runs in another worktree of the clone",
+      "then": "it exits 1 and writes no task",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/task-cli.test.mjs",
+          "name": "task new refuses a slug that another worktree of the clone uses"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/task-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-2.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-2.junit.xml"
+      }
+    },
+    {
+      "id": "AC-3",
+      "status": "planned",
+      "given": "task b depends on task a",
+      "when": "dotbabel task update a --depends-on b runs",
+      "then": "it exits 1 and writes no change",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/task-cli.test.mjs",
+          "name": "task update refuses an edge that closes a cycle"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/task-cli.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-3.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-3.junit.xml"
+      }
+    },
+    {
+      "id": "AC-4",
+      "status": "planned",
+      "given": "open task a, and open task b that depends on a",
+      "when": "dotbabel task next --json runs",
+      "then": "a is ready and b is blocked by a",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/work-graph.test.mjs",
+          "name": "task next lists a as ready and b as blocked by a"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/work-graph.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-4.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-4.junit.xml"
+      }
+    },
+    {
+      "id": "AC-5",
+      "status": "planned",
+      "given": "a task that depends on owner/repo#123",
+      "when": "dotbabel task next runs without --online",
+      "then": "the task is blocked on that reference with state unknown, and no gh process starts",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/work-graph.test.mjs",
+          "name": "an offline pull request reference is unknown and blocks without calling gh"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/work-graph.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-5.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-5.junit.xml"
+      }
+    },
+    {
+      "id": "AC-6",
+      "status": "planned",
+      "given": "a fixture clone with 20 worktrees and 200 tasks",
+      "when": "dotbabel task graph and dotbabel task next run offline",
+      "then": "each finishes in at most 1 second",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/work-graph.test.mjs",
+          "name": "graph and next finish within 1 second for 20 worktrees and 200 tasks"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/work-graph.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-6.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-6.junit.xml"
+      }
+    },
+    {
+      "id": "AC-7",
+      "status": "planned",
+      "given": "session A holds the merge token, and session B runs a token command",
+      "when": "the hook denies B and A's merge is then recorded",
+      "then": "B sees its queue position in the deny reason and is the only session that can take the freed token",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/fleet-token.test.mjs",
+          "name": "a blocked session sees its queue position, and only the head takes a freed token"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/fleet-token.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-7.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-7.junit.xml"
+      }
+    },
+    {
+      "id": "AC-8",
+      "status": "planned",
+      "given": "session B heads the queue with a reservation",
+      "when": "10 minutes pass and B does not retry",
+      "then": "B loses the reservation and the next entry heads the queue",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/fleet-token.test.mjs",
+          "name": "a head that does not retry loses its reservation after 10 minutes"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/fleet-token.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-8.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-8.junit.xml"
+      }
+    },
+    {
+      "id": "AC-9",
+      "status": "planned",
+      "given": "a review finding with critical severity or no severity",
+      "when": "dotbabel decide --step review-triage runs with any adapter answer",
+      "then": "the answer is full-validation",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/decider.test.mjs",
+          "name": "a critical or missing severity always gets full-validation for any adapter answer"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/decider.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-9.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-9.junit.xml"
+      }
+    },
+    {
+      "id": "AC-10",
+      "status": "planned",
+      "given": "a model adapter that does not answer within 5 seconds",
+      "when": "dotbabel decide runs",
+      "then": "it prints the built-in answer with fallback true and exits 0",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/decider.test.mjs",
+          "name": "an adapter timeout returns the built-in answer with fallback true and exit 0"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/decider.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-10.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-10.junit.xml"
+      }
+    },
+    {
+      "id": "AC-11",
+      "status": "planned",
+      "given": "a canary adapter key",
+      "when": "dotbabel decide, pr-stack record, and both exports run",
+      "then": "the key appears in no receipt, export file, or log line",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/decider.test.mjs",
+          "name": "a canary key never reaches the receipt, an export, or a log line"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/decider.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-11.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-11.junit.xml"
+      }
+    },
+    {
+      "id": "AC-12",
+      "status": "planned",
+      "given": "the merge gate modules",
+      "when": "their imports are read",
+      "then": "none of them imports the decider module",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/decider-boundary.test.mjs",
+          "name": "no merge gate module imports the decider module"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/decider-boundary.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-12.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-12.junit.xml"
+      }
+    },
+    {
+      "id": "AC-13",
+      "status": "planned",
+      "given": "package.json",
+      "when": "its runtime dependencies are counted",
+      "then": "there are four",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/runtime-deps.test.mjs",
+          "name": "the package has four runtime dependencies"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/runtime-deps.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-13.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-13.junit.xml"
+      }
+    },
+    {
+      "id": "AC-14",
+      "status": "planned",
+      "given": "an open task without a phase, an open task with a phase, and a closed task",
+      "when": "dotbabel export --a2a runs",
+      "then": "they map to TASK_STATE_SUBMITTED, TASK_STATE_WORKING, and TASK_STATE_COMPLETED",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/export.test.mjs",
+          "name": "the A2A export maps open, phase-set, and closed tasks"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/export.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AC-14.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AC-14.junit.xml"
+      }
+    }
+  ]
+}
