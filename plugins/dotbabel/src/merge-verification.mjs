@@ -103,7 +103,7 @@ function assertRate(value, name) {
  * @returns {{ rate: number, rate_when_ci_unavailable: number, always_paths: string[] }}
  */
 export function resolveSpotCheckPolicy(config) {
-  const off = { rate: SPOT_CHECK_OFF.rate, rate_when_ci_unavailable: SPOT_CHECK_OFF.rate_when_ci_unavailable, always_paths: [] };
+  const off = { ...SPOT_CHECK_OFF, always_paths: [] };
   if (!isPlainObject(config) || !("attestation" in config)) return off;
   const attestation = config.attestation;
   if (!isPlainObject(attestation)) throw new Error("attestation must be an object");
@@ -112,7 +112,7 @@ export function resolveSpotCheckPolicy(config) {
   if (!isPlainObject(block)) throw new Error("attestation.spot_check must be an object");
   const unknown = Object.keys(block).find((k) => !SPOT_CHECK_KEYS.has(k));
   if (unknown !== undefined) throw new Error(`attestation.spot_check has unknown key ${JSON.stringify(unknown)}`);
-  const out = { rate: SPOT_CHECK_DEFAULTS.rate, rate_when_ci_unavailable: SPOT_CHECK_DEFAULTS.rate_when_ci_unavailable, always_paths: [] };
+  const out = { ...SPOT_CHECK_DEFAULTS, always_paths: [] };
   if (block.rate !== undefined) out.rate = assertRate(block.rate, "rate");
   if (block.rate_when_ci_unavailable !== undefined) {
     out.rate_when_ci_unavailable = assertRate(block.rate_when_ci_unavailable, "rate_when_ci_unavailable");

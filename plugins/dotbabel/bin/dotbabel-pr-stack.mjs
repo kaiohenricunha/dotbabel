@@ -664,6 +664,12 @@ const FULL_SHA_RE = /^[0-9a-f]{40}$/i;
 const WORKFLOW_FILE_RE = /^[A-Za-z0-9._-]+\.ya?ml$/;
 const LOCAL_LABEL = "local (same machine as the agent; weaker than CI)";
 const FAILED_JOB = new Set(["failure", "timed_out", "startup_failure", "cancelled"]);
+// The frozen install for each lockfile, in the order they are tried.
+const LOCKFILE_INSTALLS = [
+  ["package-lock.json", ["npm", "ci"]],
+  ["pnpm-lock.yaml", ["pnpm", "install", "--frozen-lockfile"]],
+  ["yarn.lock", ["yarn", "install", "--immutable"]],
+];
 
 /**
  * The `--workflow` value, checked before it reaches an API path.
@@ -719,6 +725,28 @@ function ghApiPost(argv, jsonBody) {
 }
 
 /**
+ * `gh pr view <N> --json <fields>` and its head SHA. Exits 2 when the view
+ * cannot be read or parsed, or carries no full head SHA.
+ *
+ * @param {number} prNumber
+ * @param {string} fields The `--json` field list; must include `headRefOid`.
+ * @returns {{ view: any, headSha: string }}
+ */
+function readPrHead(prNumber, fields) {
+  const viewR = run(["gh", "pr", "view", String(prNumber), "--json", fields]);
+  if (viewR.status !== 0) return fail(EXIT_CODES.ENV, `could not read #${prNumber}:\n${viewR.stderr.trim()}`);
+  let view;
+  try {
+    view = JSON.parse(viewR.stdout);
+  } catch {
+    return fail(EXIT_CODES.ENV, `could not parse gh pr view output for #${prNumber}`);
+  }
+  const headSha = String(view?.headRefOid ?? "");
+  if (!FULL_SHA_RE.test(headSha)) return fail(EXIT_CODES.ENV, `#${prNumber} has no readable head SHA`);
+  return { view, headSha };
+}
+
+/**
  * Classify one workflow run. A successful run is taken at its word; any other
  * run has its jobs read, and the check-run annotations of its failed jobs,
  * because only those separate a real failure from a run that never started.
@@ -728,10 +756,10 @@ function ghApiPost(argv, jsonBody) {
  */
 function classifyWorkflowRun(runObj) {
   if (!runObj || typeof runObj !== "object") return classifyRun(null);
-  if (runObj.status === "completed" && runObj.conclusion === "success") {
+  const succeeded = runObj.status === "completed" && runObj.conclusion === "success";
+  if (succeeded || !Number.isInteger(runObj.id) || runObj.id <= 0) {
     return classifyRun({ run: runObj, jobs: null, annotations: null });
   }
-  if (!Number.isInteger(runObj.id) || runObj.id <= 0) return classifyRun({ run: runObj, jobs: null, annotations: null });
   const jobsResp = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/runs/${runObj.id}/jobs?per_page=100`);
   const jobs = Array.isArray(jobsResp?.jobs) ? jobsResp.jobs : null;
   const annotations = [];
@@ -784,6 +812,23 @@ function recordSpotCheck(prNumber, entry) {
 }
 
 /**
+ * Why a spot-check decision came out as it did, in words.
+ *
+ * @param {ReturnType<typeof decideSpotCheck>} decision
+ * @param {number} roll
+ * @returns {string}
+ */
+function spotCheckWhy(decision, roll) {
+  if (decision.reason === "always_path") {
+    return decision.matched
+      ? `changed path ${decision.matched} matches always_paths`
+      : "always_paths is set and the changed files could not be read";
+  }
+  if (decision.reason === "off") return "the applicable rate is 0";
+  return `roll ${roll.toFixed(4)} ${decision.selected ? "<" : ">="} rate ${decision.rate}`;
+}
+
+/**
  * The `spot-check` subcommand.
  *
  * @param {Record<string, any>} flags
@@ -819,16 +864,7 @@ async function spotCheckCommand(flags, json) {
     return fail(EXIT_CODES.USAGE, "--record-explicit must be pass or fail");
   }
   const workflow = requireWorkflow(flags.workflow);
-  const viewR = run(["gh", "pr", "view", String(prNumber), "--json", "headRefOid,baseRefName,baseRefOid,changedFiles"]);
-  if (viewR.status !== 0) return fail(EXIT_CODES.ENV, `could not read #${prNumber}:\n${viewR.stderr.trim()}`);
-  let view;
-  try {
-    view = JSON.parse(viewR.stdout);
-  } catch {
-    return fail(EXIT_CODES.ENV, `could not parse gh pr view output for #${prNumber}`);
-  }
-  const headSha = String(view?.headRefOid ?? "");
-  if (!FULL_SHA_RE.test(headSha)) return fail(EXIT_CODES.ENV, `#${prNumber} has no readable head SHA`);
+  const { view, headSha } = readPrHead(prNumber, "headRefOid,baseRefName,baseRefOid,changedFiles");
   const { version } = await import("../src/index.mjs");
 
   if (explicit !== undefined) {
@@ -869,14 +905,7 @@ async function spotCheckCommand(flags, json) {
     ci: ci.state,
     toolVersion: version,
   });
-  const why =
-    decision.reason === "always_path"
-      ? decision.matched
-        ? `changed path ${decision.matched} matches always_paths`
-        : "always_paths is set and the changed files could not be read"
-      : decision.reason === "off"
-        ? "the applicable rate is 0"
-        : `roll ${roll.toFixed(4)} ${decision.selected ? "<" : ">="} rate ${decision.rate}`;
+  const why = spotCheckWhy(decision, roll);
   return emit({
     subcommand: "spot-check",
     ok: true,
@@ -953,14 +982,8 @@ async function runLocalMatrix(sha) {
     }
     const first = cfg.matrix[0]?.name;
     if (typeof first !== "string" || first === "") return { ...out, detail: "the local-attest matrix has no legs" };
-    const install = existsSync(join(worktree, "package-lock.json"))
-      ? ["npm", "ci"]
-      : existsSync(join(worktree, "pnpm-lock.yaml"))
-        ? ["pnpm", "install", "--frozen-lockfile"]
-        : existsSync(join(worktree, "yarn.lock"))
-          ? ["yarn", "install", "--immutable"]
-          : null;
-    if (install !== null) {
+    const install = LOCKFILE_INSTALLS.find(([lockfile]) => existsSync(join(worktree, lockfile)))?.[1];
+    if (install !== undefined) {
       const r = spawnSync(install[0], install.slice(1), { cwd: worktree, stdio: ["ignore", 2, 2] });
       if (r.status !== 0) return { ...out, detail: `${install.join(" ")} failed (exit ${r.status ?? "signal"})` };
     }
@@ -968,11 +991,34 @@ async function runLocalMatrix(sha) {
     // The child's stdout goes to our stderr, so --json output stays one object.
     const r = spawnSync(process.execPath, [bin, "--from", first], { cwd: worktree, stdio: ["ignore", 2, 2] });
     const code = r.status ?? null;
-    return { ...out, exitCode: code, result: code === 0 ? "pass" : code === 1 ? "fail" : "unknown", detail: code === 0 || code === 1 ? null : `local-attest exited ${code ?? "on a signal"}` };
+    if (code === 0 || code === 1) return { ...out, exitCode: code, result: code === 0 ? "pass" : "fail" };
+    return { ...out, exitCode: code, detail: `local-attest exited ${code ?? "on a signal"}` };
   } finally {
     run(["git", "worktree", "remove", "--force", worktree]);
     run(["git", "worktree", "prune"]);
     rmSync(holder, { recursive: true, force: true });
+  }
+}
+
+/**
+ * The latest spot-check decision a pull request's receipt recorded, or null
+ * when the receipt is absent, unreadable, invalid, or holds none. Unlike
+ * `readReceipt` it never exits: one bad receipt must not stop the report.
+ *
+ * @param {string} file
+ * @param {number} prNumber
+ * @returns {{ head_sha: string, selected: boolean|null, reason: string|null, explicit: "pass"|"fail"|null }|null}
+ */
+function latestSpotCheck(file, prNumber) {
+  if (!existsSync(file)) return null;
+  try {
+    const receipt = JSON.parse(readFileSync(file, "utf8"));
+    if (receiptProblem(receipt, prNumber) !== null) return null;
+    const latest = summarizeSpotChecks(receipt).at(-1);
+    if (!latest) return null;
+    return { head_sha: latest.head_sha, selected: latest.selected, reason: latest.reason, explicit: latest.explicit };
+  } catch {
+    return null;
   }
 }
 
@@ -1005,24 +1051,11 @@ async function mainStatusCommand(flags, json) {
   // spot-check decision and whether an explicit run followed. Local and
   // self-reported; absent on another machine.
   const common = gitCommonDir();
-  const rows = status.commits.map((c, i) => {
-    let spotCheck = null;
-    if (c.pr !== null) {
-      const file = receiptPath(common, c.pr);
-      if (existsSync(file)) {
-        try {
-          const receipt = JSON.parse(readFileSync(file, "utf8"));
-          if (receiptProblem(receipt, c.pr) === null) {
-            const latest = summarizeSpotChecks(receipt).at(-1);
-            if (latest) spotCheck = { head_sha: latest.head_sha, selected: latest.selected, reason: latest.reason, explicit: latest.explicit };
-          }
-        } catch {
-          spotCheck = null;
-        }
-      }
-    }
-    return { ...c, subject: commits[i].subject, spotCheck };
-  });
+  const rows = status.commits.map((c, i) => ({
+    ...c,
+    subject: commits[i].subject,
+    spotCheck: c.pr === null ? null : latestSpotCheck(receiptPath(common, c.pr), c.pr),
+  }));
 
   const local = flags.local === true && commits.length > 0 ? await runLocalMatrix(commits[0].sha) : null;
   const icon = { verified: "✓", red: "✗", unverified: "·", unknown: "?" };
@@ -1113,8 +1146,9 @@ function trustedAssociationsAt(rev) {
   if (resolved.status !== 0 || !FULL_SHA_RE.test(sha)) return null;
   try {
     const cfg = /** @type {any} */ (baseConfigAtRev({ run }, sha));
+    if (cfg === undefined) return null;
     const list = cfg?.attestation?.trusted_associations;
-    return Array.isArray(list) && list.length > 0 ? list.map(String) : cfg === undefined ? null : ["OWNER"];
+    return Array.isArray(list) && list.length > 0 ? list.map(String) : ["OWNER"];
   } catch {
     return null;
   }
@@ -1138,16 +1172,8 @@ async function contradictionCommand(flags, json) {
 
   if (localFailure) {
     prNumber = requireNumber(flags.pr, "--pr");
-    const viewR = run(["gh", "pr", "view", String(prNumber), "--json", "headRefOid,baseRefOid"]);
-    if (viewR.status !== 0) return fail(EXIT_CODES.ENV, `could not read #${prNumber}:\n${viewR.stderr.trim()}`);
-    let view;
-    try {
-      view = JSON.parse(viewR.stdout);
-    } catch {
-      return fail(EXIT_CODES.ENV, `could not parse gh pr view output for #${prNumber}`);
-    }
-    attestedSha = String(view?.headRefOid ?? "");
-    if (!FULL_SHA_RE.test(attestedSha)) return fail(EXIT_CODES.ENV, `#${prNumber} has no readable head SHA`);
+    const { view, headSha } = readPrHead(prNumber, "headRefOid,baseRefOid");
+    attestedSha = headSha;
     const base = String(view?.baseRefOid ?? "");
     trusted = FULL_SHA_RE.test(base) ? trustedAssociationsAt(base) : null;
     runState = "red";
@@ -1174,9 +1200,9 @@ async function contradictionCommand(flags, json) {
     // nothing; a run that cannot be read is an environment error, never a
     // silent "no".
     const workflow = requireWorkflow(flags.workflow);
-    const runId = process.env.GITHUB_RUN_ID;
+    const runId = /^\d+$/.test(process.env.GITHUB_RUN_ID ?? "") ? process.env.GITHUB_RUN_ID : null;
     let runObj = null;
-    if (runId !== undefined && /^\d+$/.test(runId)) {
+    if (runId !== null) {
       runObj = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/runs/${runId}`);
     } else {
       const resp = ghApiJsonOrNull(`repos/{owner}/{repo}/actions/workflows/${workflow}/runs?head_sha=${mergeSha}&per_page=1`);
@@ -1187,7 +1213,7 @@ async function contradictionCommand(flags, json) {
     const server = process.env.GITHUB_SERVER_URL;
     const repo = process.env.GITHUB_REPOSITORY;
     runUrl =
-      runId && server && repo && /^\d+$/.test(runId) && /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo)
+      runId !== null && server && repo && /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(repo)
         ? `${server}/${repo}/actions/runs/${runId}`
         : (runObj.html_url ?? null);
     if (runState !== "red") {
