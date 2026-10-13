@@ -158,3 +158,49 @@ jobs:
           name: criteria-report
           path: .dotbabel/criteria-report.json
           if-no-files-found: warn
+
+  # The contradiction alarm (docs/attestation.md, "Spot checks and the
+  # contradiction alarm"). An agent with the owner's token can forge the
+  # attestation that lets /merge-pr skip the suite. This push run on main is
+  # the one check it cannot skip, so when the test job fails here, this job
+  # asks whether the failure contradicts a passing attestation on the merged
+  # pull request. If it does, it labels the pull request and opens one issue.
+  #
+  # Push only: a pull_request run would hand a token that can write issues to
+  # code a fork controls. It costs minutes only when main is already red, and
+  # a run that never started (a billing limit) never reaches it. The command
+  # still classifies this run before it believes the failure, which is why it
+  # reads actions and checks.
+  contradiction:
+    needs: test
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The merge commit and its first parent: the trust list is read from
+          # the base the pull request merged into.
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: "npm"
+      - run: npm ci
+      # The in-tree bin, as dotbabel-criteria does: this repository checks
+      # itself with its own tree, not the last published release.
+      - name: Raise the alarm on a contradicted attestation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          MERGE_SHA: ${{ github.sha }}
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          node plugins/dotbabel/bin/dotbabel-pr-stack.mjs contradiction \
+            --sha "$MERGE_SHA" --test-result "$TEST_RESULT" --post
