@@ -11,11 +11,11 @@ Universal behavior for every Copilot CLI session in every repo. Project-level `C
 
 ## Disk hygiene
 
-- The Windows C: drive on this machine is small. The WSL virtual disk only grows; it never shrinks on its own. Every gigabyte you write inside the distro stays allocated on C: until a manual compact.
+- The WSL virtual disk of this machine lives on E: (`E:\WSL\Ubuntu-24.04\ext4.vhdx`), not on the small C: drive. It only grows; it never shrinks on its own. Reclaim space with the manual, elevated `C:\WSL\compact-wsl.ps1`.
 - After you run containerized tests (testcontainers), run `docker volume prune -f`. Anonymous test volumes leak ~70 MB per run and are the main growth driver.
-- Keep large artifacts, datasets, and clones on `/mnt/wsl/storage`, not on the distro disk.
+- Keep large artifacts, datasets, and clones inside the distro, not under `/mnt/c`: C: is small.
 - Do not download large toolchains or browser bundles (Playwright browsers, Go module trees) unless the task needs them. Prefer existing installed versions.
-- Cleanup is automated on the Windows side: scheduled tasks `WSL Weekly Maintenance` and `WSL Monthly Compact` run `C:\WSL\wsl-maintenance.ps1` (log: `C:\WSL\maintenance.log`). Do not build ad-hoc cleanup scripts; extend that one.
+- Cleanup is automated on the Windows side: the scheduled task `WSL Weekly Maintenance` runs `C:\WSL\wsl-maintenance.ps1 -Weekly` (log: `C:\WSL\maintenance.log`). Monthly compaction is retired. Do not build ad-hoc cleanup scripts; extend that one.
 
 ## Code Changes
 
