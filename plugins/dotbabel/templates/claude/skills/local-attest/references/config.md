@@ -25,6 +25,7 @@ type Config = {
     when?: { changedPaths: string[] }; // run only when SOME changed PR file matches a glob (CI path filter, mirrored)
     skipWhenDiffOnly?: string[]; // skip when EVERY changed PR file matches a glob (docs-only classify, mirrored)
     passPrBody?: boolean; // inject the PR body as env.PR_BODY for this leg
+    scope?: boolean; // the leg scopes itself to the PR's changes (see "Scoped legs" below)
     produces?: string[]; // report files this leg writes; hashed after it PASSES so a later leg can reuse them
   }>;
 
@@ -68,6 +69,39 @@ parsed list against the PR's declared `changedFiles` count), or is empty,
 `when`/`skipWhenDiffOnly` skip nothing and every leg runs. Running too much
 is safe; an attested PR that skipped too much has disabled CI on unverified
 code. An all-skipped run refuses to attest for the same reason.
+
+### Scoped legs: `scope: true`
+
+A scoped leg verifies only what the pull request's changes reach. When the
+runner has the PR's changed-file list (the same fail-open fetch the diff rules
+use, renamed-from paths included), it writes the list as a JSON array of
+repository-relative paths to a private temp file and runs the leg with:
+
+- `DOTBABEL_ATTEST_CHANGED_FILES` — the path of that JSON file;
+- `DOTBABEL_ATTEST_SKIP_FILE` — a path only this leg writes to.
+
+The leg selects its own work from the list. When nothing of the leg is in
+scope, it writes a one-line reason to the skip file and exits 0: the leg is
+recorded `skipped` with the reason in the log, and the merge gate counts a
+skipped required leg as satisfied as long as at least one required leg
+passed. A non-zero exit is a failure even if the skip file was written. When
+the list is unavailable, the leg receives neither variable and must run in
+full — that is the fail-open contract every scoped command has to honour.
+
+Two rules keep a scoped leg honest. **Exit 0 must not mean "ran nothing"**:
+a scoped run that reached zero tests writes the skip file (or runs in full)
+instead of passing. **A changed shared input means a full run**: a changed
+config, manifest, lockfile or test setup file is an input of every test, so
+the whole suite is the scope. `plugins/dotbabel/src/attest-scope.mjs` holds
+repository-neutral helpers for this (changed-file reader, full-run rule,
+import-graph and path-search test selection, vitest arguments); dotbabel's
+own wrapper is `plugins/dotbabel/scripts/attest-scope.mjs`. Name the wrapper
+in `.dotbabel.json` `attestation.governance_files`, or a pull request could
+rewrite it to skip everything and attest itself.
+
+`dotbabel local-attest --full` is the on-demand full run: it ignores `when`,
+`skipWhenDiffOnly` and `scope`, passes no file list, runs every leg in full,
+and records `"full": true` in the attestation payload.
 
 **The superset burden is yours.** Nothing verifies these globs against
 `.github/workflows/**`. A `when` glob narrower than the mirrored CI job's
@@ -176,7 +210,7 @@ export default {
 - `trustedAssociations` must be a non-empty array of strings.
 - `env` values must be strings; `lane` non-empty; `when` exactly
   `{ changedPaths: [globs] }` (non-empty); `skipWhenDiffOnly` a non-empty glob
-  array; `passPrBody` boolean; `produces` a non-empty array of plain repository-relative
+  array; `passPrBody` and `scope` booleans; `produces` a non-empty array of plain repository-relative
   file paths (no globs, no `..`, no absolute or backslash paths); `restoreFiles` relative
   paths without `..`.
 - **`produces` and reuse.** A full attest run writes `<git-dir>/dotbabel/attest-run.json` (inside the worktree's git

@@ -31,6 +31,15 @@
  *                                                    classify rule mirrored locally
  * @property {boolean} [passPrBody]                   inject the PR body as env.PR_BODY for
  *                                                    this leg (fetched once, empty on error)
+ * @property {boolean} [scope]                       the leg scopes itself to the PR's changes: when
+ *                                                    the changed-file list is known, the runner
+ *                                                    passes its path as DOTBABEL_ATTEST_CHANGED_FILES
+ *                                                    plus a per-leg DOTBABEL_ATTEST_SKIP_FILE; a leg
+ *                                                    that exits 0 after writing a reason there is
+ *                                                    recorded as skipped. Without the list it gets
+ *                                                    neither and must run in full
+ * @property {string} [scopeSkipFile]                runner-internal, never read from a config:
+ *                                                    the skip file handed to this scope leg
  * @property {string[]} [produces]                    repository-relative report files this leg
  *                                                    writes. Once the leg PASSES they are hashed
  *                                                    into the run manifest so a later leg can
@@ -275,6 +284,9 @@ export function validateConfig(input) {
     if (leg.passPrBody !== undefined && typeof leg.passPrBody !== "boolean") {
       throw new ConfigError(`config.matrix[${i}].passPrBody must be a boolean`);
     }
+    if (leg.scope !== undefined && typeof leg.scope !== "boolean") {
+      throw new ConfigError(`config.matrix[${i}].scope must be a boolean`);
+    }
     if (leg.produces !== undefined) {
       // These are hashed after the leg passes and read back by ANOTHER process
       // (`dotbabel quality --reuse`), so a path that escapes the repository
@@ -312,6 +324,7 @@ export function validateConfig(input) {
           ? { skipWhenDiffOnly: [.../** @type {string[]} */ (leg.skipWhenDiffOnly)] }
           : {}),
         ...(leg.passPrBody !== undefined ? { passPrBody: leg.passPrBody } : {}),
+        ...(leg.scope !== undefined ? { scope: leg.scope } : {}),
         ...(leg.produces !== undefined ? { produces: [.../** @type {string[]} */ (leg.produces)] } : {}),
       }),
     );

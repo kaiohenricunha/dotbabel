@@ -35,7 +35,8 @@ Universal behavior for every OpenCode CLI session in every repo. Project-level `
 
 ## Testing
 
-- Run the project's **full** test suite locally before merging any PR that modifies a file matching `critical_paths` (see the `quality` key in `.dotbabel.json`) or anything consumed by downstream consumers.
+- Verify a PR on the scope of its changes. `local-attest` runs only that scope for every PR, including a PR that modifies a file matching `critical_paths` (see the `quality` key in `.dotbabel.json`).
+- Run the **full** test suite only on demand (`local-attest --full`, or the deep quality job) or on a schedule. It is not part of `local-attest`.
 - Never claim a test failure is "pre-existing" without proving it. Required proof:
   ```bash
   git stash && <test-command> ; git stash pop
@@ -46,7 +47,7 @@ Universal behavior for every OpenCode CLI session in every repo. Project-level `
   - `package.json` → `npm test` (or `pnpm test` / `yarn test` based on the lockfile)
   - `go.mod` → `go test ./...`
   - `pyproject.toml` → `pytest` or `uv run pytest`
-- Partial test subsets are fine for iteration. Full suite is required before pushing or merging.
+- Partial test subsets are fine for iteration. Before pushing or merging, the PR-scoped `local-attest` run is the requirement.
 
 ## TDD and verification
 
