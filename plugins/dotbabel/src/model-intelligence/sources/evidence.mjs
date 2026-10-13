@@ -347,7 +347,89 @@ export function makeDiscoveryEvidence(input) {
     return model;
   });
   const skipped = fields.skipped === undefined ? 0 : count("DiscoveryEvidence.skipped", fields.skipped);
-  return Object.freeze({ models: Object.freeze(models), effortSupport: effortSupport(models), skipped });
+  const discovery = Object.freeze({ models: Object.freeze(models), effortSupport: effortSupport(models), skipped });
+  BUILT_DISCOVERIES.add(discovery);
+  return discovery;
+}
+
+/**
+ * Every discovery `makeDiscoveryEvidence` has returned, for the same reason as `BUILT_FACTS`.
+ * @type {WeakSet<object>}
+ */
+const BUILT_DISCOVERIES = new WeakSet();
+
+/** A provider id as a knowledge source keys it: lower case. `__proto__` fails the pattern, and `isProviderId` refuses the other prototype names. */
+const PROVIDER_ID_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+/** Names that pass the pattern but are `Object.prototype` members, so they are never a provider id. */
+const PROTOTYPE_NAMES = Object.freeze(["constructor", "prototype"]);
+
+/**
+ * Whether `value` has the shape of a provider id.
+ * @param {unknown} value
+ * @returns {value is string}
+ */
+export function isProviderId(value) {
+  return typeof value === "string" && PROVIDER_ID_RE.test(value) && !PROTOTYPE_NAMES.includes(value);
+}
+
+/**
+ * @param {string} name
+ * @param {unknown} value
+ * @returns {string}
+ */
+function providerId(name, value) {
+  if (!isProviderId(value)) throw new TypeError(`${name} must be a provider id: lower-case letters, digits, dot, underscore or hyphen, at most 64`);
+  return value;
+}
+
+/**
+ * @typedef {object} ProviderCatalogEvidence
+ * @property {ReadonlyArray<Readonly<{id: string, displayName?: string, discovery: DiscoveryEvidence}>>} providers One discovery per provider: the same model id under two providers stays two facts (ARCH-3).
+ * @property {ReadonlyArray<string>} missingProviders Requested providers the source does not describe.
+ * @property {number} skipped Requested providers the source describes, but in a shape that could not be used.
+ */
+
+/**
+ * Build what a knowledge source reported, grouped by provider (§5 `Knowledge-source adapters`).
+ *
+ * A `ModelFact` carries no provider, so the provider is the group, never a field derived from an id.
+ * No field states availability: presence in a knowledge source is not proof of invocability (ARCH-14).
+ * @param {object} input
+ * @param {ReadonlyArray<{id: string, displayName?: string, discovery: DiscoveryEvidence}>} input.providers Each discovery already built by `makeDiscoveryEvidence`.
+ * @param {ReadonlyArray<string>} input.missingProviders
+ * @param {number} [input.skipped]
+ * @returns {Readonly<ProviderCatalogEvidence>}
+ */
+export function makeProviderCatalogEvidence(input) {
+  const fields = knownFields("ProviderCatalogEvidence", input, ["providers", "missingProviders", "skipped"]);
+  if (!Array.isArray(fields.providers)) throw new TypeError("ProviderCatalogEvidence.providers must be an array");
+  if (!Array.isArray(fields.missingProviders)) throw new TypeError("ProviderCatalogEvidence.missingProviders must be an array");
+  const seen = new Set();
+  const providers = fields.providers.map((entry) => {
+    const provider = knownFields("ProviderCatalogEvidence provider", entry, ["id", "displayName", "discovery"]);
+    const id = providerId("ProviderCatalogEvidence provider id", provider.id);
+    if (seen.has(id)) throw new TypeError(`ProviderCatalogEvidence: duplicate provider "${id}"`);
+    seen.add(id);
+    if (typeof provider.discovery !== "object" || provider.discovery === null || !BUILT_DISCOVERIES.has(provider.discovery)) {
+      throw new TypeError("ProviderCatalogEvidence provider discovery must be built discovery evidence");
+    }
+    /** @type {Record<string, unknown>} */
+    const out = { id };
+    if (provider.displayName !== undefined) out.displayName = identifier("ProviderCatalogEvidence provider displayName", provider.displayName);
+    out.discovery = provider.discovery;
+    return Object.freeze(out);
+  });
+  const missing = new Set();
+  const missingProviders = fields.missingProviders.map((id) => {
+    const checked = providerId("ProviderCatalogEvidence missing provider id", id);
+    if (seen.has(checked)) throw new TypeError(`ProviderCatalogEvidence: provider "${checked}" is both present and missing`);
+    if (missing.has(checked)) throw new TypeError(`ProviderCatalogEvidence: duplicate missing provider "${checked}"`);
+    missing.add(checked);
+    return checked;
+  });
+  const skipped = fields.skipped === undefined ? 0 : count("ProviderCatalogEvidence.skipped", fields.skipped);
+  return Object.freeze({ providers: Object.freeze(providers), missingProviders: Object.freeze(missingProviders), skipped });
 }
 
 const CHECK_FIELDS = Object.freeze(["axis", "value", "verdict", "scope", "runtimeText", "validValues"]);
