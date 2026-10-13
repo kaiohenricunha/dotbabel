@@ -18,6 +18,12 @@ import { createMarker } from "../lib/attest-marker.mjs";
 const marker = createMarker(CRITERIA_MARKER_PREFIX);
 
 /**
+ * An encoding tag after the plain prefix, such as the `z2` of `z2:`. A plain
+ * payload is base64url, which has no `:`, so a match is always a later format.
+ */
+const UNKNOWN_TAG = /^([A-Za-z0-9]{1,16}):/;
+
+/**
  * @typedef {object} ParsedEvidence
  * @property {"ok"|"not-evidence"|"undecodable"|"sha-mismatch"} state
  * @property {string|null} sha        The SHA the marker names.
@@ -40,7 +46,11 @@ const marker = createMarker(CRITERIA_MARKER_PREFIX);
  * that older versions posted and open pull requests still carry. Inflation
  * stops at `MAX_PAYLOAD_JSON_BYTES`, so a decompression bomb, a corrupt
  * stream and text that is not JSON all land on `undecodable` with the plain
- * form's own detail, never on a pass.
+ * form's own detail, never on a pass. A third path is a line whose text after
+ * the plain prefix starts with an encoding tag other than `z1`, such as `z2:`.
+ * That line is also `undecodable`, but its detail names the tag and tells the
+ * operator to upgrade dotbabel, because a later format is a version gap, not a
+ * corrupt comment.
  *
  * @param {string} body
  * @returns {ParsedEvidence}
@@ -56,6 +66,11 @@ export function parseEvidenceComment(body) {
 
   const compressed = line.startsWith(PAYLOAD_LINE_PREFIX_Z1);
   const prefix = compressed ? PAYLOAD_LINE_PREFIX_Z1 : PAYLOAD_LINE_PREFIX;
+  // Tested before the trim: a tag sits right after the prefix, as `z1:` does.
+  const tag = compressed ? null : UNKNOWN_TAG.exec(line.slice(prefix.length))?.[1];
+  if (tag) {
+    return { state: "undecodable", sha, payload: null, detail: `payload encoding ${tag} is not known to this dotbabel version; upgrade dotbabel and run the gate again` };
+  }
   const encoded = line.slice(prefix.length, -" -->".length).trim();
   let payload;
   try {

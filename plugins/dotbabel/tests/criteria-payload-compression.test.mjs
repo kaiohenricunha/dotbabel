@@ -4,7 +4,10 @@
 // tests. Its evidence payload was 49,516 characters of JSON, and 66,022 once
 // base64url-encoded, so `dotbabel criteria verify --post` refused to post it:
 // the marker and payload lines alone were over the 60,000-character comment
-// cap. Raw deflate before base64url brings the same payload to about 9,600.
+// cap. Raw deflate before base64url brought that payload to 9,647 characters.
+// `pr465SizedPayload()` below is a size match for it, not that payload: it has
+// the same counts of criteria and named tests, with generated names. The tests
+// assert size ranges, not exact figures.
 //
 // Three things are pinned here. The writer emits the compressed form behind
 // its own prefix, deterministically. The reader still accepts the plain form,
@@ -301,6 +304,36 @@ describe("an unreadable z1 line is refused like any unreadable payload", () => {
   });
 });
 
+describe("a payload line with an encoding tag that this version does not know", () => {
+  // A later format would add its own tag, as z1 did. This version cannot read
+  // it, and the operator must see a version gap, not a corrupt comment.
+  const tagged = (tag) => `${PAYLOAD_LINE_PREFIX}${tag}:${deflateRawSync(Buffer.from(JSON.stringify(samplePayload()))).toString("base64url")}${SUFFIX}`;
+  const unknown = (tag) => `payload encoding ${tag} is not known to this dotbabel version; upgrade dotbabel and run the gate again`;
+
+  it("is refused as undecodable, with a detail that names the tag and the fix", () => {
+    expect(parseEvidenceComment(comment(tagged("z2")))).toEqual({ state: "undecodable", sha: SHA, payload: null, detail: unknown("z2") });
+  });
+
+  it("makes the gate report CRITERIA_EVIDENCE_INVALID with that detail, never CRITERIA_EVIDENCE_MISSING", () => {
+    const result = gate(comment(tagged("z2")));
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContainEqual(expect.objectContaining({ code: "CRITERIA_EVIDENCE_INVALID", detail: unknown("z2") }));
+    expect(codes(result)).not.toContain("CRITERIA_EVIDENCE_MISSING");
+  });
+
+  it("reads a tag of up to 16 letters and digits, and treats longer text as a corrupt payload", () => {
+    const longest = "v".repeat(15) + "9";
+    expect(parseEvidenceComment(comment(tagged(longest))).detail).toBe(unknown(longest));
+    expect(parseEvidenceComment(comment(tagged(`${longest}x`))).detail).toMatch(/^payload did not decode: /);
+  });
+
+  it("never reads a tag into the z1 form or into a plain payload", () => {
+    const p = samplePayload();
+    expect(parseEvidenceComment(renderEvidenceComment(p, {}))).toMatchObject({ state: "ok", payload: p });
+    expect(parseEvidenceComment(comment(plainLine(JSON.stringify(p))))).toMatchObject({ state: "ok", payload: p });
+  });
+});
+
 describe("the writer and the reader share one bound", () => {
   it("is one mebibyte", () => {
     expect(MAX_PAYLOAD_JSON_BYTES).toBe(1024 * 1024);
@@ -309,8 +342,13 @@ describe("the writer and the reader share one bound", () => {
   it("refuses to write a payload its own reader would refuse, even when it compresses under the comment cap", () => {
     const over = samplePayload({ filler: "a".repeat(MAX_PAYLOAD_JSON_BYTES) });
     expect(Buffer.byteLength(JSON.stringify(over))).toBeGreaterThan(MAX_PAYLOAD_JSON_BYTES);
-    expect(() => encodeCriteriaPayloadLine(over)).toThrow(/exceeds the 1048576-byte decode bound/);
-    expect(() => renderEvidenceComment(over, {})).toThrow(/exceeds the 1048576-byte decode bound/);
+    const size = Buffer.byteLength(JSON.stringify(over));
+    // The refusal happens while the writer encodes, before any post, so the
+    // message says so and gives the size against the limit.
+    const refusal = `criteria evidence payload JSON is ${size} bytes, over the 1048576-byte limit; refused while encoding the payload line, so nothing was posted`;
+    expect(() => encodeCriteriaPayloadLine(over)).toThrow(refusal);
+    expect(() => renderEvidenceComment(over, {})).toThrow(refusal);
+    expect(() => encodeCriteriaPayloadLine(over)).not.toThrow(/decode/);
   });
 
   it("writes a payload of exactly the bound, and the reader takes it back", () => {
@@ -327,6 +365,6 @@ describe("the writer and the reader share one bound", () => {
     const chars = Math.ceil((MAX_PAYLOAD_JSON_BYTES - base) / 2) + 1;
     const wide = samplePayload({ filler: "é".repeat(chars) });
     expect(JSON.stringify(wide).length).toBeLessThan(MAX_PAYLOAD_JSON_BYTES);
-    expect(() => encodeCriteriaPayloadLine(wide)).toThrow(/decode bound/);
+    expect(() => encodeCriteriaPayloadLine(wide)).toThrow(`is ${Buffer.byteLength(JSON.stringify(wide))} bytes, over the 1048576-byte limit`);
   });
 });

@@ -6,22 +6,24 @@ import { createMarker } from "../lib/attest-marker.mjs";
  * The `dotbabel criteria` evidence comment (§5 "Evidence comment", KD-2).
  *
  * Line 1 is the hidden marker the merge gate greps for, byte-exact like
- * local-attest's own marker (`local-attest-lib.mjs:53`) — both are built by
+ * local-attest's own marker (`local-attest-lib.mjs:55`) — both are built by
  * the same shared factory (`lib/attest-marker.mjs`). Line 2 carries the
  * whole evidence payload, raw-deflated and then base64url-encoded so it
- * survives Markdown rendering untouched and fits the comment cap; the payload
- * itself holds no output text (OPS-3), only a SHA-256 hash per criterion. The
- * readable part below the marker lines is for humans only — the merge gate
- * never reads it.
+ * survives Markdown rendering untouched and so that realistic payloads fit
+ * the comment cap; the payload itself holds no output text (OPS-3), only a
+ * SHA-256 hash per criterion. The readable part below the marker lines is for
+ * humans only — the merge gate never reads it.
  */
 export const CRITERIA_MARKER_PREFIX = "<!-- dotbabel-criteria verified-sha=";
 /**
- * Opening text of the base64url payload line.
+ * Opening text of the plain (pre-z1) payload line: base64url of the JSON.
  *
- * Exported so `evidence.mjs` parses the exact prefix this module writes. The
- * producer and the gate that judges it must never drift apart: a mismatch here
- * would leave the command posting evidence the gate cannot see, and neither
- * side would look broken on its own.
+ * The writer no longer emits this form. It emits `PAYLOAD_LINE_PREFIX_Z1`,
+ * which begins with this text. The reader in `evidence.mjs` accepts both, and
+ * it uses this prefix to find line 2 and to read the plain form that older
+ * versions posted. The producer and the gate that judges it must never drift
+ * apart: a mismatch here would leave the command posting evidence the gate
+ * cannot see, and neither side would look broken on its own.
  */
 export const PAYLOAD_LINE_PREFIX = "<!-- dotbabel-criteria-payload ";
 /**
@@ -58,17 +60,22 @@ export function buildCriteriaMarker(headSha) {
 /**
  * Encode the evidence payload into its z1 comment line.
  *
- * Deterministic: the same payload gives the same bytes, because
- * `JSON.stringify` keeps key order and the deflate settings are fixed.
+ * Deterministic within one Node build: the same payload gives the same bytes,
+ * because `JSON.stringify` keeps key order and the deflate settings are fixed.
+ * zlib does not promise the same bytes across versions, so compare decoded
+ * payloads, never encoded lines.
  *
  * @param {object} payload The evidence payload.
  * @returns {string} `PAYLOAD_LINE_PREFIX_Z1`, then base64url(deflateRaw(JSON)), then ` -->`.
- * @throws {Error} When the payload JSON is over `MAX_PAYLOAD_JSON_BYTES`.
+ * @throws {Error} When the payload JSON is over `MAX_PAYLOAD_JSON_BYTES`. The
+ *   writer encodes before it posts, so the message says that nothing was posted.
  */
 export function encodeCriteriaPayloadLine(payload) {
   const json = Buffer.from(JSON.stringify(payload), "utf8");
   if (json.length > MAX_PAYLOAD_JSON_BYTES) {
-    throw new Error(`criteria evidence payload is ${json.length} bytes and exceeds the ${MAX_PAYLOAD_JSON_BYTES}-byte decode bound`);
+    throw new Error(
+      `criteria evidence payload JSON is ${json.length} bytes, over the ${MAX_PAYLOAD_JSON_BYTES}-byte limit; refused while encoding the payload line, so nothing was posted`,
+    );
   }
   return `${PAYLOAD_LINE_PREFIX_Z1}${deflateRawSync(json, { level: 9 }).toString("base64url")}${LINE_SUFFIX}`;
 }
@@ -106,13 +113,20 @@ function fenced(text) {
  * @param {object} payload The evidence payload (already built by `verifyCriteria`/the CLI).
  * @param {{ [specId: string]: { [criterionId: string]: string } }} tails Redacted output tails grouped by spec id.
  * @returns {string}
- * @throws {Error} When the marker and payload lines alone exceed `MAX_BODY_CHARS`, or the payload JSON exceeds `MAX_PAYLOAD_JSON_BYTES`.
+ * @throws {Error} When the marker and payload lines alone exceed `MAX_BODY_CHARS`
+ *   (the message gives their length, the limit, and the criteria and spec
+ *   counts), or the payload JSON exceeds `MAX_PAYLOAD_JSON_BYTES`.
  */
 export function renderEvidenceComment(payload, tails) {
   const markerLine = buildCriteriaMarker(payload.head_sha);
   const payloadLine = encodeCriteriaPayloadLine(payload);
   const fixed = `${markerLine}\n${payloadLine}`;
-  if (fixed.length > MAX_BODY_CHARS) throw new Error("criteria evidence size exceeds the comment limit before readable output");
+  if (fixed.length > MAX_BODY_CHARS) {
+    const criteria = payload.specs.reduce((n, spec) => n + spec.criteria.length, 0);
+    throw new Error(
+      `criteria evidence marker and payload lines are ${fixed.length} characters, over the ${MAX_BODY_CHARS}-character comment limit before any readable output, for ${criteria} criterion(s) in ${payload.specs.length} spec(s); nothing was posted`,
+    );
+  }
 
   const entries = [];
   for (const spec of payload.specs) {

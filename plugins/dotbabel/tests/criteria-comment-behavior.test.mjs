@@ -293,7 +293,9 @@ describe("the size limit", () => {
     const over = payloadJustOver(one, LIMIT);
     expect(fixedLength(over)).toBeGreaterThan(LIMIT);
     expect(fixedLength(over)).toBeLessThanOrEqual(LIMIT + 4);
-    expect(() => renderEvidenceComment(over, {})).toThrow(/exceeds/);
+    expect(() => renderEvidenceComment(over, {})).toThrow(
+      `criteria evidence marker and payload lines are ${fixedLength(over)} characters, over the ${LIMIT}-character comment limit before any readable output, for 1 criterion(s) in 1 spec(s); nothing was posted`,
+    );
   });
 
   it("falls back to the marker and payload lines alone when not even the table header fits beside them", () => {

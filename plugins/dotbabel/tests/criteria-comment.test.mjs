@@ -158,7 +158,10 @@ describe("renderEvidenceComment", () => {
     // Each message is a distinct SHA-256 hex digest, which deflate cannot
     // shrink much: repeated text would compress under the limit.
     const criteria = Array.from({ length: 3000 }, (_, i) => ({ id: `AC-${i + 1}`, status: "error", error_message: createHash("sha256").update(String(i)).digest("hex") }));
-    expect(() => renderEvidenceComment(samplePayload({ specs: [{ id: "example", criteria }] }), {})).toThrow(/exceeds the comment limit/);
+    // The message gives the size and the counts, so the operator sees how far over the run is.
+    expect(() => renderEvidenceComment(samplePayload({ specs: [{ id: "example", criteria }] }), {})).toThrow(
+      /^criteria evidence marker and payload lines are \d+ characters, over the 60000-character comment limit before any readable output, for 3000 criterion\(s\) in 1 spec\(s\); nothing was posted$/,
+    );
   });
 });
 
