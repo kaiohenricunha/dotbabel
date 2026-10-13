@@ -4,6 +4,7 @@
 > Branch: `spec/graph-engineering`
 > Worktree: `.claude/worktrees/spec-graph-engineering/`
 > Base: `origin/main` @ `33f66a8`
+> Status: approved on 2026-10-13
 
 ## Status
 
