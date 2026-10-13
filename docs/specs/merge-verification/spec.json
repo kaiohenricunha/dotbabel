@@ -27,7 +27,6 @@
     ".github/prompts/merge-pr.prompt.md",
     "examples/minimal-consumer/.claude/commands/merge-pr.md",
     "examples/minimal-consumer/.github/workflows/test.yml",
-    ".dotbabel.json",
     "docs/attestation.md",
     "docs/cli-reference.md",
     "docs/specs/merge-verification/spec.json",

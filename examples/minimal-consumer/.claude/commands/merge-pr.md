@@ -20,10 +20,13 @@ Trigger: when the user asks to merge a PR. Also triggered directly via `/merge-p
 Arguments: `$ARGUMENTS` — the PR number (e.g. `125`). If missing, ask the user which PR.
 
 **Deterministic evidence is produced once per commit SHA and reused until that SHA
-changes.** `/local-attest` runs the CI-equivalent matrix and posts a SHA-pinned
-attestation; this command reads that evidence rather than re-running the same work on
-the same tree. What it still checks fresh is everything that can change without the code
-changing: the head SHA, mergeability, CI state, and the human's say-so.
+changes.** By default that evidence is CI: the `test` workflow that ran on the
+pull request's head SHA. A repository that sets `attestation.enforce: true` reads
+a `/local-attest` comment instead, which runs the CI-equivalent matrix on the
+scope of the pull request's changes and posts a SHA-pinned attestation. Either
+way, this command reads the evidence rather than re-running the same work on the
+same tree. What it still checks fresh is everything that can change without the
+code changing: the head SHA, mergeability, CI state, and the human's say-so.
 
 ## Steps
 
@@ -74,7 +77,7 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    | `.state`   | Meaning                                                      | Do                                                                                                    |
    | ---------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
    | `verified` | trusted, current, complete evidence for this head            | run the spot check below; unless it selects this PR, take the attested path in step 6                 |
-   | `off`      | the base ref never enabled `attestation.enforce`             | take the explicit path in step 6                                                                      |
+   | `off`      | the base ref does not enable `attestation.enforce`           | take the CI path in step 6                                                                            |
    | `explicit` | this PR edits a file that governs what an attestation proves | show the governed-file diff and get the user's acknowledgement, then take the explicit path in step 6 |
    | `failed`   | evidence is missing, stale, untrusted or invalid             | **STOP** — see the reason codes below                                                                 |
 
@@ -149,9 +152,9 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    - `ATTESTATION_INCOMPLETE` / `ATTESTATION_FAILED` — a required check is
      missing from the evidence or did not pass. Read the named legs.
 
-   **`.state` is `off`** — the base ref has no `attestation.enforce`. Take the
-   explicit verification path in step 6. That is the state of any repository
-   that has not adopted this, and of the pull request that adopts it.
+   **`.state` is `off`** — the base ref does not enforce attestation. Take the
+   CI path in step 6: a `test` run that passed on the head SHA is the evidence.
+   That is the default state of a repository, and of this one.
 
    **`.state` is `explicit`** — the repository enforces attestation, but this
    pull request edits a governed file (`.local-attest.config.mjs`,
@@ -235,10 +238,57 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    branch's own configuration, and that every required leg passed. Go to
    step 8.
 
-   **Explicit path** (step 4 sent you here, from `off`, from `explicit` after the
-   user acknowledged the governed-file diff, or from a `verified` state that the
-   spot check selected). Create the worktree from step 5 if you have not already,
-   then:
+   **CI path** (step 4 sent you here from `off`). First, read what the pull
+   request changes. CI runs the pull request's own workflow files and scripts,
+   so a pull request that edits `.github/workflows/**` or a file listed in
+   `attestation.governance_files` (`package.json`, a script a test leg runs)
+   can make its own run pass. When it edits one, show the user that diff and
+   get their acknowledgement before you trust the run, the same review as for
+   the `explicit` state. If the diff weakens a check, **STOP**.
+
+   Then read the newest `test` workflow run for the head SHA:
+
+   ```bash
+   gh run list --workflow test.yml --commit <headRefOid> --json databaseId,conclusion,status,event,createdAt \
+     --jq '[.[] | select(.event == "pull_request" or .event == "workflow_dispatch")] | sort_by(.createdAt) | last'
+   gh run view <databaseId> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
+   ```
+
+   - **A completed run whose test jobs passed** — that is the evidence. Do not
+     run the suite again. Report it in this shape and go to step 8:
+
+     ```text
+     verification: CI at 6115a98c (run 123456789)
+       jobs: test (20), test (22), dotbabel-criteria
+     ```
+
+   - **A run that is still in progress** — wait for it (`gh run watch <id>`).
+   - **A failed run** — **STOP** and report the failing job. Do not merge.
+   - **No run for the head, or its test jobs were skipped or cancelled** — CI
+     did not test this head: the head commit carried `[skip ci]`, a newer push
+     cancelled the run, or a posted attestation made `classify` skip the job.
+     Start a run for the head, then read it as above:
+
+     ```bash
+     gh workflow run test.yml --ref <headRefName>
+     ```
+
+     If CI cannot start a job for it (a job with no steps and no runner, the
+     shape of a billing block), or the workflow has no `workflow_dispatch`
+     trigger, take the explicit path below. A `/local-attest` comment is not
+     the evidence in this state: the gate validates an attestation only when
+     enforcement is on.
+
+   - **Quality.** The CI path covers the PR quality profile only when a CI job
+     runs the `pr` quality profile (in this repository, the
+     `Language-aware quality` workflow) and step 8 sees it green. When the
+     repository has a quality policy and no CI job runs it, run the quality
+     step of the explicit path.
+
+   **Explicit path** (step 4 sent you here from `explicit` after the user
+   acknowledged the governed-file diff, from a `verified` state that the spot
+   check selected, or because CI could not start a job for the head). Create
+   the worktree from step 5 if you have not already, then:
 
    - **Install dependencies first.** A fresh worktree has none, and a suite run
      without them reports a failure that is about the checkout, not the code.
@@ -321,6 +371,8 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
    If any check is `failing` or `pending`, STOP and wait or ask the user. Note
    that an attested pull request legitimately shows a skipped `test` job — that
    is what the attestation bought — but every check that did run must be green.
+   On the CI path, a skipped `test` job is not evidence: step 6 started a run
+   for the head, or sent you to the explicit path.
 
 9. **Re-run the merge gate, then request confirmation from the user.**
 
@@ -336,8 +388,8 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
 
    Then show:
 
-- How this PR was verified: the attested SHA and legs, or the explicit run's results
-- Quality gate result (attested, or this run's exit code)
+- How this PR was verified: the CI run on the head SHA, the attested SHA and legs, or the explicit run's results
+- Quality gate result (attested, the CI quality job, or this run's exit code)
 - CI status
 - The exact merge command you will run
   Wait for the user to say "merge" (or equivalent).
@@ -409,8 +461,10 @@ changing: the head SHA, mergeability, CI state, and the human's say-so.
 - Never merge past an `ATTESTATION_*` reason, and never re-run the matrix from inside this command to clear one. Producing evidence is `/local-attest`'s job; this command only decides whether existing evidence is current and trustworthy.
 - Never take the explicit path for an `explicit` state without first showing the user the governed-file diff and getting their acknowledgement. On that path the automated run executes the pull request's own scripts, so a change that weakens a check would pass its own verification; the human review of that diff is the only control that cannot be edited away.
 - Never treat an attested leg as something this command verified. Report it as attested, name the SHA, and never report an unrun check as a pass.
+- Never re-run the suite on the CI path. A completed `test` run that passed on the head SHA is the evidence; a second local run of the same tree buys nothing. When no run tested the head, start one before you fall back to a local run.
+- Never accept a `/local-attest` comment as the evidence in the `off` state. The gate checks its trust, configuration, and legs only when enforcement is on.
+- Never skip the full test suite on the explicit path. That path runs only for a governed change, for a head that CI did not test, or for an attested pull request that the spot check selected, so nothing else verified it. The attested path never runs the suite: its evidence is the PR-scoped `/local-attest` run, in which a required leg with nothing of the diff in its scope is recorded `skipped`, and that counts as satisfied as long as at least one required leg passed.
 - Never take the attested path for a pull request the spot check selected, and never run the spot check again to change its answer. Never treat a non-zero exit of the spot check as `not selected`. When the selected run really fails (step 7), stop and raise the contradiction alarm; when a gate did not run, stop and raise no alarm.
-- Never skip the full test suite on the explicit path, even if CI is green — CI config drift is real, and on a conductor-driven PR the remote suite did not run at all.
 - Never let a squash merge carry a `[skip ci]` / `[ci skip]` / `skip-checks:` marker into main's history — it suppresses push-triggered workflows (release-please included) for the merge itself. Step 10's explicit `--subject`/`--body-file` flow exists for exactly this; the single-commit-PR default subject is the trap that bites after the body is fixed.
 - Never claim a failure already exists on the base branch without the `git stash` proof.
 - Never merge without explicit user confirmation. CI green alone is not authorization, and neither is a clean gate.

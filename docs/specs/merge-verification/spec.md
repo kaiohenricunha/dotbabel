@@ -163,10 +163,12 @@ public. A closed match is reopened with a comment.
 The job checks out the first parent (`github.event.before`) and runs the
 detector from there against `github.sha`. So the merged pull request cannot
 change the detector code that judges it. GitHub still reads the workflow file
-from the pushed commit, so this repository lists `.github/workflows/test.yml` in
-`attestation.governance_files`. A change to it then forces the explicit path.
-The template tells consumers to do the same, and its `npx dotbabel` resolves
-from the first parent's lockfile.
+from the pushed commit. So a repository that enforces attestation lists its
+workflow file in `attestation.governance_files`, and a change to it then
+forces the explicit path. The template tells consumers to do this, and its
+`npx dotbabel` resolves from the first parent's lockfile. This repository does
+not enforce attestation (`attestation.enforce` is `false`): CI on the head is
+its merge evidence, so it sets no `spot_check` block.
 
 The issue lists the possible causes in short sentences. They are a forged or
 wrong attestation, a flaky test or an environment difference, or a merged tree

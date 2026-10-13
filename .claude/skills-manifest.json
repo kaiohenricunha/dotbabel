@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-13T02:16:44.755Z",
+  "generatedAt": "2026-10-13T11:02:26.444Z",
   "skills": [
     {
       "name": "agents-search",
@@ -87,6 +87,13 @@
       "lastValidated": "2026-10-13"
     },
     {
+      "name": "deliver",
+      "path": ".claude/skills/deliver/SKILL.md",
+      "checksum": "sha256:4faf4c4a0d7b8c57df72c4f3c7050509a9cda1929d759e68d8e631b64dd98f97",
+      "dependencies": [],
+      "lastValidated": "2026-10-13"
+    },
+    {
       "name": "deploy-status",
       "path": ".claude/skills/deploy-status/SKILL.md",
       "checksum": "sha256:3c3a351a405a82b7e294e1f5782b2077c104ac9f9d4aa755991f081873de3f25",
@@ -152,7 +159,7 @@
     {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
-      "checksum": "sha256:21ec80869ec8637675dc762acb38ff314cba1ef5b661275124d554db78500a17",
+      "checksum": "sha256:9296c936c3f39e38d61bbe5311fc9e7682b8b84867c45ec2264731a7a86deed3",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },
@@ -166,7 +173,7 @@
     {
       "name": "merge-pr",
       "path": ".claude/commands/merge-pr.md",
-      "checksum": "sha256:05355aa46bdefa6de5a41a71e3002f6119d4f4c3a02763afef511549de2d55cc",
+      "checksum": "sha256:2f30c4b667b941b9440a8e57440d58bd1b7f74b74bfb296d5284006e16be7f8b",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },
@@ -189,7 +196,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:bdee523dbec9b3ca75c2d61db8df59b99a1e7edfa6e87b2a05c12e46a9f09223",
+      "checksum": "sha256:8a690aad93921ffb2c995afd6bf7f829fa749bf9be8e325eaf41c13929ff1474",
       "dependencies": [
         "pre-pr",
         "git",
@@ -254,7 +261,7 @@
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:85bc7703aefc536760db18d3104b5662eea852f650e7c84d994099b71b135b5a",
+      "checksum": "sha256:797744586193d7da3dc4ab23f1cade13bac0a942fc8395b2f99bd1ec91ed4264",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },
@@ -298,7 +305,7 @@
     {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
-      "checksum": "sha256:d7a0f1afdbe80d89011995c97975e544db554d69b78aa3fa4a4e5bd915bad05d",
+      "checksum": "sha256:d4e069c172b0bd14f9dbed18276051f3b8d85211d8a2d217cd02d8b0650ae182",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },
@@ -334,6 +341,13 @@
       "name": "veracity-audit",
       "path": ".claude/skills/veracity-audit/SKILL.md",
       "checksum": "sha256:2f66c14a71e88734d8a734bf1ce6f220f74ce28a9e302635e4e225edc1f9300e",
+      "dependencies": [],
+      "lastValidated": "2026-10-13"
+    },
+    {
+      "name": "yolo",
+      "path": ".claude/skills/yolo/SKILL.md",
+      "checksum": "sha256:82a85578c0fa1637fc1c53ebc4684d71c7e64629601b03b88d55fd1a3dce75cf",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     }

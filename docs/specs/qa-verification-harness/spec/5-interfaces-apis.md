@@ -103,7 +103,7 @@ The schema is `schemas/dotbabel.criteria-evidence.schema.json`. The example is i
 
 ```text
 <!-- dotbabel-criteria verified-sha=<40-character head SHA> -->
-<!-- dotbabel-criteria-payload <base64url-encoded evidence payload> -->
+<!-- dotbabel-criteria-payload z1:<base64url of the raw-deflated evidence payload> -->
 ### Acceptance criteria evidence
 
 | Spec | Criterion | Status | Tests | Duration |
@@ -116,8 +116,18 @@ The schema is `schemas/dotbabel.criteria-evidence.schema.json`. The example is i
 </details>
 ```
 
-- Line 1 must match exactly, like the local-attest marker (`plugins/dotbabel/src/local-attest-lib.mjs:53`).
+- Line 1 must match exactly, like the local-attest marker (`plugins/dotbabel/src/local-attest-lib.mjs:55`).
 - Line 2 carries the whole payload, and the payload holds no output text (OPS-3).
+- Line 2 has two forms. The command writes the compressed form: the prefix `<!-- dotbabel-criteria-payload z1:`, then base64url of the payload JSON after raw deflate (`deflateRawSync`, level 9). The plain form has the prefix `<!-- dotbabel-criteria-payload` and one space, then base64url of the payload JSON. Earlier versions wrote the plain form. The gate still reads it, so evidence on open pull requests stays valid.
+- A gate from before the compressed form does not read it. That gate decodes the `z1:` text as plain base64url, and `JSON.parse` fails. It refuses the comment as `CRITERIA_EVIDENCE_INVALID` with the detail `payload did not decode: …`. This fails closed, but the detail does not name a version.
+- Only the merge gate reads line 2. `dotbabel pr-stack gate --gate merge` and `dotbabel pr-stack review-complete` reach it through `gatherMergeGate` (`plugins/dotbabel/bin/dotbabel-pr-stack.mjs:330-358`). The CI `dotbabel criteria` job runs `verify` without `--post` and reads no comment (`.github/workflows/test.yml:150-154`, `plugins/dotbabel/templates/workflows/test.yml:125-127`).
+- When you upgrade the writer, upgrade every machine that runs the gate at the same time. When a linked CLI runs from a checkout, fast-forward that checkout right after the merge.
+- The compressed form exists because of the 60,000-character limit. Pull request #465 had 57 criteria and 137 named tests. Its plain base64url text was 66,022 characters. That is more than the limit before the readable part starts. Its compressed text was 9,647 characters.
+- The gate tells the two forms apart by the prefix only. The `:` after `z1` is not in the base64url alphabet, so a plain payload cannot start with `z1:`.
+- A later format adds its own tag, as `z1` did. A tag is 1 to 16 letters and digits, then `:`. When the text after the plain prefix starts with a tag other than `z1`, the gate reports `CRITERIA_EVIDENCE_INVALID`. The detail names the tag and tells the operator to upgrade dotbabel and run the gate again.
+- The payload JSON is at most 1,048,576 bytes (1 MiB) in UTF-8. The gate stops inflation at this bound. The command refuses to write a larger payload, so a gate at this version or later can read each payload that the command posts.
+- The gate refuses a compressed line that does not inflate. It refuses a line that inflates past the bound. It refuses a line that is not a JSON object. Each refusal gives `CRITERIA_EVIDENCE_INVALID`, never a pass.
+- The command has two bounds: payload JSON over 1 MiB, and marker and payload lines over 60,000 characters. When it hits a bound, it posts nothing and exits 2. It minimizes no older comment and prints no `--json` report. The previous evidence stays on the pull request, and this run adds no evidence for the head. The message gives the size and the limit. For the 60,000-character bound, it also gives the counts of criteria and specs.
 - The readable part holds the table and each criterion's redacted output tail. The gate never reads it.
 - Every full `--post` run creates a new comment. The command then minimizes the older evidence comments that the authenticated user wrote, with `minimizeComment` and the `OUTDATED` classifier. It never edits a comment (OPS-4).
 - The rendered body stays at or under 60,000 characters, and output tails shrink first (OPS-3).

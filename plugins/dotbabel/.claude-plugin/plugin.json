@@ -47,6 +47,7 @@
     "./templates/claude/skills/create-experiment",
     "./templates/claude/skills/create-inspection",
     "./templates/claude/skills/crossplane-specialist",
+    "./templates/claude/skills/deliver",
     "./templates/claude/skills/deploy-status",
     "./templates/claude/skills/detect-flaky",
     "./templates/claude/skills/fix-with-evidence",
@@ -75,6 +76,7 @@
     "./templates/claude/skills/terraform-specialist",
     "./templates/claude/skills/terragrunt-specialist",
     "./templates/claude/skills/validate-spec",
-    "./templates/claude/skills/veracity-audit"
+    "./templates/claude/skills/veracity-audit",
+    "./templates/claude/skills/yolo"
   ]
 }

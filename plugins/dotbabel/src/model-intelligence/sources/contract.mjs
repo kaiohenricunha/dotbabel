@@ -78,6 +78,13 @@ export const TIMEOUT_CHANNELS = Object.freeze(["subprocess", "network"]);
 export const OPERATION_TIMEOUTS_MS = Object.freeze({ subprocess: 10_000, network: 20_000 });
 
 /**
+ * The OPS-2 limit on one capability-cache entry, in bytes. A source adapter rejects or reduces a
+ * candidate above it before anything could persist it (SEC-3), and `catalog/` checks the whole
+ * serialized entry against the same number, so the two can never drift apart.
+ */
+export const MAX_CACHE_ENTRY_BYTES = 8 * 1024 * 1024;
+
+/**
  * The largest delay `setTimeout` honours. Node clamps anything above it to 1 ms, which
  * would turn a generous timeout into an immediate one.
  */
@@ -458,7 +465,8 @@ export function assertDescriptor(descriptor) {
  * frontmatter. A value that fails validation is `unknown` with code `invalid_axis_value`,
  * with provenance intact. An operation THROWS only for a caller-contract breach (a missing
  * or wrongly typed input, such as a model that is not a string) and for a safety fault
- * such as the SEC-1 root check, which must never be absorbed.
+ * such as the SEC-1 root check or a knowledge-source URL that is not HTTPS (SEC-3), which
+ * must never be absorbed.
  *
  * One exception, split by operation rather than by source: `renderInvocation` is
  * synchronous and returns a plain Invocation, so it throws on any invalid value, even one
@@ -889,12 +897,20 @@ export function resolveTimeoutMs({ channel, timeoutMs }) {
 
 /**
  * Map a thrown error to a diagnostic code.
+ *
+ * A missing binary is a subprocess condition only. On the network channel, `EACCES` or `EPERM` is
+ * a firewall or sandbox refusing the connection, so it is `network_unavailable`, never `binary_missing`.
  * @param {unknown} err
+ * @param {string} channel
  * @returns {string}
  */
-function codeForError(err) {
-  const code = isPlainObject(err) ? /** @type {any} */ (err).code : undefined;
-  if (code === "ENOENT" || code === "EACCES" || code === "EPERM") return "binary_missing";
+function codeForError(err, channel) {
+  // Node's fetch rejects with `TypeError: fetch failed` and keeps the errno on `cause`, so
+  // reading only the error's own code would report a refused connection as `runtime_error`.
+  const own = isPlainObject(err) ? /** @type {any} */ (err).code : undefined;
+  const cause = isPlainObject(err) && isPlainObject(/** @type {any} */ (err).cause) ? /** @type {any} */ (err).cause.code : undefined;
+  const code = own ?? cause;
+  if (code === "ENOENT" || code === "EACCES" || code === "EPERM") return channel === "network" ? "network_unavailable" : "binary_missing";
   if (code === "ENOTFOUND" || code === "ECONNREFUSED" || code === "ENETUNREACH" || code === "EAI_AGAIN") return "network_unavailable";
   if (code === "ETIMEDOUT") return "timeout";
   return "runtime_error";
@@ -965,9 +981,9 @@ export async function runBounded(operation, { channel, timeoutMs, provenance, no
       provenance,
       observedAt: clock(),
       diagnostic: {
-        code: codeForError(err),
+        code: codeForError(err, channel),
         // Masked and bounded by makeAdapterResult, like every diagnostic message.
-        message: String(isPlainObject(err) ? (/** @type {any} */ (err).message ?? err) : err) || codeForError(err),
+        message: String(isPlainObject(err) ? (/** @type {any} */ (err).message ?? err) : err) || codeForError(err, channel),
         retryable: true,
       },
     });

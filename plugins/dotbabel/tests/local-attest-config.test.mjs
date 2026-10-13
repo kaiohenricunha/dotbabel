@@ -241,6 +241,20 @@ describe("validateConfig", () => {
     expect(cfg.restoreFiles).toEqual(["src/a.js"]);
   });
 
+  it("accepts scope: true and scope: false on a leg, and omits it when absent", () => {
+    const leg = (extra) => ({ matrix: [{ name: "a", mode: "hard", command: "true", ...extra }] });
+    expect(validateConfig(leg({ scope: true })).matrix[0].scope).toBe(true);
+    expect(validateConfig(leg({ scope: false })).matrix[0].scope).toBe(false);
+    expect("scope" in validateConfig(leg({})).matrix[0]).toBe(false);
+  });
+
+  it("rejects a non-boolean scope", () => {
+    const leg = (extra) => ({ matrix: [{ name: "a", mode: "hard", command: "true", ...extra }] });
+    for (const bad of ["yes", 1, null, {}]) {
+      expect(() => validateConfig(leg({ scope: bad }))).toThrow(/scope must be a boolean/);
+    }
+  });
+
   it("defaults restoreFiles to an empty array", () => {
     expect(validateConfig(base()).restoreFiles).toEqual([]);
   });

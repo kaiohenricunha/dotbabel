@@ -75,13 +75,30 @@ since that is the pull request that makes their tests real.
 go test ./path/to/... -race -v
 {additional verification commands}
 </verify>
+
+<proof>
+tests: {the unit tests above; integration tests where the unit crosses a
+        process, file, network, or database boundary}
+run:   {the exact command, page, or call that exercises the new behavior the
+        way a user does}
+expect: {what the run must show: an output line, a file, a screen state}
+done_when:
+- tests pass
+- the run shows the expected result
+- {one line per extra check: a constraint, a visual check, a review pass}
+</proof>
 ```
+
+The `<proof>` block is the unit's task contract. `/deliver` takes it as
+`done_when`, runs every line, and puts the evidence in the pull request's
+`## Proof` section. Write `N/A — <reason>` for `run` only when the unit has no
+runnable surface, such as a pure refactor that the tests already cover.
 
 ## Key Rules for Prompts
 
 1. **Always include `<read-first>`** — CC must scan files before writing
 2. **Always list test names** — TDD is non-negotiable
-3. **Always include `<verify>`** — automated check that work is correct
+3. **Always include `<verify>` and `<proof>`** — automated check that work is correct, and a run of the feature that shows it works
 4. **Always specify file scope** — modified, created, do-not-touch
 5. **Reference the spec doc by section** — not by line number (lines change)
 6. **One prompt = one deliverable** — don't combine unrelated work

@@ -2,7 +2,7 @@
 id: pr-conductor
 name: pr-conductor
 type: skill
-version: 1.2.0
+version: 1.3.0
 domain: [devex]
 platform: [github-actions]
 task: [review, testing]
@@ -13,8 +13,9 @@ description: >
   Never merges; merging stays an explicit human call handed to /merge-pr.
   Understands stacked PRs, where a child must retarget and rebase --onto after
   its parent squash-merges. Delegates every phase to an existing artifact rather
-  than reimplementing it. Triggers on: "land this PR", "run the PR pipeline",
-  "take this branch to a PR", "ship this branch", "what's blocking my PR".
+  than reimplementing it. On demand only: the default path from a task to a
+  pull request is /deliver. Triggers on: "land this PR", "run the PR pipeline",
+  "run the review pipeline", "ship this branch", "what's blocking my PR".
 argument-hint: "[PR#] [--stack] [--from <phase>] [--dry-run]"
 model: sonnet
 user-invocable: true
@@ -27,7 +28,9 @@ Land one pull request end to end. This skill is a conductor: it sequences existi
 
 Trigger: when the user says "land this PR", "run the PR pipeline", "ship this branch", "what's blocking my PR", or invokes `/pr-conductor`.
 
-**Invocation consent.** An agent can start this skill itself, but only with the user's approval. The shipped `.claude/settings.json` puts `Skill(pr-conductor)` in `permissions.ask`, so Claude Code prompts the user before each agent-started run. Call the skill only when the branch is committed and ready for a pull request. Treat the approved prompt as consent for that one run, not for later runs. Never edit the `ask` rule to skip the prompt. A user who wants no prompt adds `Skill(pr-conductor)` to `permissions.allow` in their own settings.
+**On demand only.** This pipeline is not the default path to a pull request. The default is `/deliver`: it tests the change, runs the feature, reviews the diff once, and opens the pull request, and CI on the head is the merge evidence. Run this skill when the user asks for the review fleet, for a local attestation, or for a stacked-PR landing.
+
+**Invocation consent.** An agent can start this skill itself, but only with the user's approval. The shipped `.claude/settings.json` puts `Skill(pr-conductor)` in `permissions.ask`, so Claude Code prompts the user before each agent-started run. Call the skill only when the user asked for this pipeline and the branch is committed. Treat the approved prompt as consent for that one run, not for later runs. Never edit the `ask` rule to skip the prompt. A user who wants no prompt adds `Skill(pr-conductor)` to `permissions.allow` in their own settings.
 
 Arguments: `$ARGUMENTS`
 
@@ -47,15 +50,17 @@ Arguments: `$ARGUMENTS`
 
 The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotbabel/src/pr-gates.mjs`. `dotbabel pr-stack phases` prints it, and a bats contract test fails if this document and that array ever disagree.
 
-| #   | Phase            | Delegates to                     | Owns                                                              |
-| --- | ---------------- | -------------------------------- | ----------------------------------------------------------------- |
-| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate, cheap `fast` quality profile              |
-| 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                      |
-| 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                                   |
-| 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads, verifies criteria |
-| 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally, posts the SHA-pinned attestation      |
-| 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                       |
+| #   | Phase            | Delegates to                     | Owns                                                                |
+| --- | ---------------- | -------------------------------- | ------------------------------------------------------------------- |
+| 1   | `pre-pr`         | `commands/pre-pr.md`             | simplify, secrets gate, cheap `fast` quality profile                |
+| 2   | `open-pr`        | `skills/git/SKILL.md`            | branch push + `gh pr create`                                        |
+| 3   | `post-pr-review` | `skills/post-pr-review/SKILL.md` | produces inline review comments                                     |
+| 4   | `review-pr`      | `skills/review-pr/SKILL.md`      | consumes them, applies fixes, resolves threads, verifies criteria   |
+| 5   | `local-attest`   | `skills/local-attest/SKILL.md`   | runs the CI matrix locally on the PR's scope, posts the attestation |
+| 6   | `stop`           | `commands/merge-pr.md`           | **hand-off only — this skill never merges**                         |
 
+> **Where the base does not enforce attestation**, CI on the head is the merge evidence. `[skip ci]` still saves the intermediate runs, but the head then has no CI run: `/merge-pr` starts one for it, and phase 5 runs only when the user asks.
+>
 > **CI minutes are the constraint.** Every intermediate commit must carry `[skip ci]`, and `local-attest` is the only step that gates CI. Verify with `dotbabel pr-stack gate --gate skip-ci` rather than by eye. Warning: GitHub matches the marker **anywhere** in the message, so never write the token in prose unless you mean it — a commit message explaining that it is _not_ skipping CI will skip CI.
 
 ## Run receipt
@@ -186,9 +191,11 @@ A `WORKTREE_DIRTY` or `HEAD_MISMATCH` failure means `local-attest` would abort a
 dotbabel local-attest --pr <N>
 ```
 
+The run is PR-scoped: each leg verifies only the scope of this pull request's changes, and a leg with nothing in scope is recorded `skipped`. Do not pass `--full` here; the full suite runs only on demand or on a schedule.
+
 Phase 4 deferred the test plan to this phase and left a `<!-- test-plan: deferred -->` marker in the PR body to record it, so **every** exit here owes the plan a disposition. There are four:
 
-- **Attest passes** — tick each `## Test plan` checkbox the matrix covered, using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
+- **Attest passes** — tick each `## Test plan` checkbox the matrix covered (a leg recorded `skipped` covered nothing), using the `printf` and PATCH shape in `skills/review-pr/SKILL.md` step 11, and post the evidence comment pinned to the attested SHA. Leave items the matrix did not cover unticked and list them in the summary.
 - **Attest fails** — record the failure and mark the PR blocked. **Do not push "fix CI" commits in a loop.** The test plan is now unowned: say so explicitly and list every unticked item, so a BLOCKED summary states what still needs verification.
 - **No `.local-attest` config** — skip the attestation and say so plainly; CI will run remotely as normal. **Run the test-plan items now**, per `skills/review-pr/SKILL.md` step 11, before the summary — otherwise the deferral means nothing ever runs them.
 - **Entered here via `--from local-attest`** — no phase 4 ran in this session, so nothing deferred anything. Run the test-plan items as above before the summary rather than assuming a previous session ticked them.
@@ -261,7 +268,7 @@ It prints the retarget, fetch, checkout, rebase, and push steps in order. **The 
 - **Never merge.** Phase 6 is a full stop. `commands/merge-pr.md` is named as a hand-off target and is never invoked from here.
 - **Never force-push without explicit confirmation**, including the stacked-PR rebase.
 - **`[skip ci]` on every intermediate commit.** GitHub matches the marker anywhere in the message, so it also fires when you only meant to mention it — never write the token in prose unless you want the skip.
-- **`local-attest` is the only CI gate.** If its config is absent, say so — do not invent a substitute.
+- **Inside this pipeline, `local-attest` is the CI gate.** If its config is absent, say so — do not invent a substitute.
 - **Do not re-run simplification.** Phase 1 already did it.
 - **One review dispatch.** Phase 3 posts once with `--auto --confirm-post`; never preview-then-post — that doubles the agent fleet for zero information.
 - **Do not review the same code twice.** Phase 3 owns the security pass and the comment validation; phases 1 and 4 run in `--conductor` mode so they narrow to a secrets grep and a fix delta.

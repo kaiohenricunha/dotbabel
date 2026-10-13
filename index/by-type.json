@@ -36,6 +36,7 @@
     "create-experiment",
     "create-inspection",
     "crossplane-specialist",
+    "deliver",
     "deploy-status",
     "detect-flaky",
     "fix-with-evidence",
@@ -64,7 +65,8 @@
     "terraform-specialist",
     "terragrunt-specialist",
     "validate-spec",
-    "veracity-audit"
+    "veracity-audit",
+    "yolo"
   ],
   "command": ["changelog", "dependabot-sweep", "markdown", "merge-pr", "pr-tldr", "pre-pr", "tldr"],
   "hook": [],

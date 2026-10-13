@@ -6,7 +6,7 @@
 
 ## The problem
 
-The merge gate decides whether a pull request may skip work because of evidence comments. Three families of evidence exist, plus one receipt that a writer reads. Each one is a hidden first-line marker, and each evidence family adds a base64url JSON payload on line 2 (`encodePayloadLine` and `decodePayloadLine`, `plugins/dotbabel/src/lib/evidence-payload.mjs:25-26,49-59`).
+The merge gate decides whether a pull request may skip work because of evidence comments. Three families of evidence exist, plus one receipt that a writer reads. Each one is a hidden first-line marker, and each evidence family adds a JSON payload on line 2. The local-attest and review-complete families encode it as base64url through one codec (`encodePayloadLine` and `decodePayloadLine`, `plugins/dotbabel/src/lib/evidence-payload.mjs:30-31,54-64`). The criteria family never used that codec. Its writer raw-deflates the JSON before base64url, the `z1:` form (`plugins/dotbabel/src/criteria/comment.mjs:73-81`). Its reader also accepts the plain base64url form that older versions posted (`plugins/dotbabel/src/criteria/evidence.mjs:67-82`).
 
 The gate believes a comment when two facts hold:
 

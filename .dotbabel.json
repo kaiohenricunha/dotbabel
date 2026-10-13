@@ -9,18 +9,18 @@
   "cli_substitutions": {},
   "targets": [],
   "attestation": {
-    "enforce": true,
+    "enforce": false,
     "governance_files": [
       ".local-attest.config.mjs",
       ".dotbabel.json",
       "package.json",
       "plugins/dotbabel/scripts/run-bats.sh",
       "plugins/dotbabel/tests/test_validate_settings.sh",
-      ".github/workflows/test.yml"
+      "plugins/dotbabel/scripts/attest-scope.mjs",
+      "plugins/dotbabel/src/attest-scope.mjs"
     ],
     "required_legs": ["lint", "test", "quality"],
-    "trusted_associations": ["OWNER"],
-    "spot_check": { "rate": 0.2 }
+    "trusted_associations": ["OWNER"]
   },
   "quality": {
     "enabled": true,
@@ -47,6 +47,23 @@
         "tools": {
           "lint": {
             "argv": ["npm", "run", "lint"],
+            "paths": [
+              "*.json",
+              "**/*.json",
+              "*.yml",
+              "**/*.yml",
+              "*.yaml",
+              "**/*.yaml",
+              "*.md",
+              "**/*.md",
+              "plugins/dotbabel/src/**",
+              ".gitignore",
+              ".prettierignore",
+              ".prettierrc.json",
+              ".markdownlint-cli2.jsonc",
+              "scripts/check-jsdoc-coverage.mjs",
+              "package-lock.json"
+            ],
             "timeout_seconds": 600,
             "report": {
               "format": "exit-code"
@@ -54,6 +71,7 @@
           },
           "test": {
             "argv": ["npm", "test"],
+            "paths": ["plugins/dotbabel/src/**"],
             "timeout_seconds": 900,
             "report": {
               "format": "exit-code"
@@ -61,6 +79,7 @@
           },
           "coverage": {
             "argv": ["npm", "run", "coverage"],
+            "paths": ["plugins/dotbabel/src/**"],
             "timeout_seconds": 900,
             "report": {
               "format": "lcov",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-10-13T00:28:30.489Z",
+  "generatedAt": "2026-10-13T11:02:27.419Z",
   "version": "3.4.0",
   "artifacts": [
     {
@@ -299,6 +299,21 @@
         "domain": ["data"],
         "platform": ["none"],
         "task": ["review", "diagnostics"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "deliver",
+      "type": "skill",
+      "path": "skills/deliver/SKILL.md",
+      "name": "deliver",
+      "description": "Take one task contract (goal, inputs, constraints, done_when) from a prompt to a reviewable pull request in one run: test first, implement, prove the change works by running it, review the diff once, and open the pull request with the proof. CI on the head is the merge evidence. No review rounds, no local attestation, no merge. Triggers on: \"deliver this\", \"build this and open a PR\", \"implement this issue and open a PR\", \"take this task to a PR\", or a task contract whose output is a pull request.\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["testing", "review"],
         "maturity": "draft"
       },
       "version": "1.0.0",
@@ -670,14 +685,14 @@
       "type": "skill",
       "path": "skills/pr-conductor/SKILL.md",
       "name": "pr-conductor",
-      "description": "Land one pull request end to end: pre-PR quality gate, open the PR, AI review, apply review fixes, local CI attestation — then STOP with a go/no-go summary. Never merges; merging stays an explicit human call handed to /merge-pr. Understands stacked PRs, where a child must retarget and rebase --onto after its parent squash-merges. Delegates every phase to an existing artifact rather than reimplementing it. Triggers on: \"land this PR\", \"run the PR pipeline\", \"take this branch to a PR\", \"ship this branch\", \"what's blocking my PR\".\n",
+      "description": "Land one pull request end to end: pre-PR quality gate, open the PR, AI review, apply review fixes, local CI attestation — then STOP with a go/no-go summary. Never merges; merging stays an explicit human call handed to /merge-pr. Understands stacked PRs, where a child must retarget and rebase --onto after its parent squash-merges. Delegates every phase to an existing artifact rather than reimplementing it. On demand only: the default path from a task to a pull request is /deliver. Triggers on: \"land this PR\", \"run the PR pipeline\", \"run the review pipeline\", \"ship this branch\", \"what's blocking my PR\".\n",
       "facets": {
         "domain": ["devex"],
         "platform": ["github-actions"],
         "task": ["review", "testing"],
         "maturity": "draft"
       },
-      "version": "1.2.0",
+      "version": "1.3.0",
       "owner": "@kaiohenricunha"
     },
     {
@@ -933,7 +948,7 @@
         "task": ["documentation"],
         "maturity": "validated"
       },
-      "version": "1.0.0",
+      "version": "1.1.0",
       "owner": "@kaiohenricunha"
     },
     {
@@ -1055,6 +1070,21 @@
         "maturity": "draft"
       },
       "version": "1.0.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "yolo",
+      "type": "skill",
+      "path": "skills/yolo/SKILL.md",
+      "name": "yolo",
+      "description": "Start a temporary autonomy mode for this session: one approval from the owner covers a stated scope, and the session asks nothing else for work inside it until the scope is done, `/yolo off`, the expiry (4 h by default), or the end of the session. It still stops for force pushes, hard resets, deletions, production deploys, destroys, spec-text edits, a check it cannot fix, and work outside the scope.\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["runtime-ops"],
+        "maturity": "draft"
+      },
+      "version": "1.1.0",
       "owner": "@kaiohenricunha"
     }
   ]
