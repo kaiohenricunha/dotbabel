@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { findHeavyCommand } from "../src/fleet/heavy.mjs";
+import { findCustomHeavy, findHeavyCommand, parseHeavyConfig } from "../src/fleet/heavy.mjs";
 import { cpuCount, formatLanes, parseKeyValue, parseLayout, readLaneState } from "../src/fleet/lanes.mjs";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
@@ -199,10 +199,64 @@ describe("formatLanes", () => {
   });
 });
 
+describe("findCustomHeavy", () => {
+  const entries = ["npm run ci", "run-suite.sh", "./scripts/e2e.sh"];
+
+  it.each([
+    ["npm run ci", "npm run ci"],
+    ["npm run ci -- --shard=1/2", "npm run ci"],
+    ["./run-suite.sh", "run-suite.sh"],
+    ["scripts/run-suite.sh --fast", "run-suite.sh"],
+    ["cd api && ./run-suite.sh", "run-suite.sh"],
+    ["timeout 600 FOO=1 ./scripts/e2e.sh", "./scripts/e2e.sh"],
+  ])("finds %j", (command, label) => {
+    expect(findCustomHeavy(command, entries)).toBe(label);
+  });
+
+  it.each([
+    "npm run cia",
+    "npm run",
+    'echo "npm run ci"',
+    "e2e.sh",
+    "other/scripts/e2e.sh",
+    "",
+  ])("ignores %j", (command) => {
+    expect(findCustomHeavy(command, entries)).toBeNull();
+  });
+
+  it("returns a short, single-line label from the entry, never from the command", () => {
+    const long = `make ${"x".repeat(100)}`;
+    expect(findCustomHeavy(`${long} --token=SECRET`, [long])).toBe(long.slice(0, 60));
+    expect(findCustomHeavy("make bench", ["make\nbench"])).toBe("make bench");
+  });
+});
+
+describe("parseHeavyConfig", () => {
+  it("reads the fleet.heavy strings of a .dotbabel.json", () => {
+    expect(parseHeavyConfig(JSON.stringify({ fleet: { heavy: ["npm run ci", " ", 7, "make bench"] } }))).toEqual([
+      "npm run ci",
+      "make bench",
+    ]);
+  });
+
+  it("returns no entries for bad JSON, a missing list, or a list that is not an array", () => {
+    expect(parseHeavyConfig("{ not json")).toEqual([]);
+    expect(parseHeavyConfig(JSON.stringify({ fleet: {} }))).toEqual([]);
+    expect(parseHeavyConfig(JSON.stringify({ fleet: { heavy: "npm run ci" } }))).toEqual([]);
+    expect(parseHeavyConfig("null")).toEqual([]);
+  });
+
+  it("keeps at most 50 entries", () => {
+    const heavy = Array.from({ length: 80 }, (_, i) => `make job${i}`);
+    expect(parseHeavyConfig(JSON.stringify({ fleet: { heavy } }))).toHaveLength(50);
+  });
+});
+
 describe("the shell prefix prefilter", () => {
-  // fleet-shell-prefix.sh starts node only when a command matches both of its
-  // bash regexes. A heavy command that misses one of them would never reach a
-  // lane, so every heavy case above must match both.
+  // Without a fleet.heavy list, fleet-shell-prefix.sh starts node only when a
+  // command matches both of its bash regexes. A built-in heavy command that
+  // misses one of them would never reach a lane, so every built-in heavy case
+  // above must match both. Listed commands have their own check (bats).
   const here = path.dirname(fileURLToPath(import.meta.url));
   const script = fs.readFileSync(path.resolve(here, "../hooks/fleet-shell-prefix.sh"), "utf8");
   const regex = (name) => {
