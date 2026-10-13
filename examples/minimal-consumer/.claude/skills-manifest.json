@@ -131,7 +131,7 @@
     {
       "name": "git",
       "path": ".claude/skills/git/SKILL.md",
-      "checksum": "sha256:9f797b244ded960840f5014764edaa6509fa187a57a717e36785ae01a80051a6",
+      "checksum": "sha256:6f5189d36268ef393cca04e1096dbf0041babcefa948a63aa3c50673bc3f8475",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },
@@ -194,7 +194,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:435b305156635d306df9e8088e9de961cf999279e74f527a90448d77c2ccc362",
+      "checksum": "sha256:04f513e268494e380869b3172531d8c98b20617a82fc0ce645b6a13147d27741",
       "dependencies": [],
       "lastValidated": "2026-10-13"
     },
