@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { attestationGateInputs } from "../src/attestation-gate-inputs.mjs";
+import { attestationGateInputs, baseConfigAtRev } from "../src/attestation-gate-inputs.mjs";
 import { hashGovernanceFiles } from "../src/attestation.mjs";
 
 const HEAD = "a".repeat(40);
@@ -302,5 +302,35 @@ describe("attestationGateInputs", () => {
       const diff = calls.find((c) => c[1] === "diff");
       expect(diff.slice(diff.indexOf("--") + 1)).toEqual(["package.json"]);
     });
+  });
+});
+
+describe("baseConfigAtRev", () => {
+  it("reads the whole base config from the base commit, never the head", () => {
+    const { deps, calls } = makeDeps({ policy: { attestation: { spot_check: { rate: 0.2 } } } });
+    expect(baseConfigAtRev(deps, BASE)).toEqual({ attestation: { spot_check: { rate: 0.2 } } });
+    expect(calls).toContainEqual(["git", "show", `${BASE}:.dotbabel.json`]);
+    expect(calls.flat().join(" ")).not.toContain(HEAD);
+  });
+
+  it("returns undefined when the base commit has no .dotbabel.json", () => {
+    const { deps } = makeDeps({ policy: null });
+    expect(baseConfigAtRev(deps, BASE)).toBeUndefined();
+  });
+
+  it("throws when the base commit is not in this clone, so a missing fetch is not a missing policy", () => {
+    const { deps } = makeDeps({ catFile: 1 });
+    expect(() => baseConfigAtRev(deps, BASE)).toThrow(/not in this clone/);
+  });
+
+  it("throws when the base .dotbabel.json does not parse", () => {
+    const { deps } = makeDeps({ policy: "{ not json" });
+    expect(() => baseConfigAtRev(deps, BASE)).toThrow(/not readable JSON/);
+  });
+
+  it("refuses a revision that is not a full SHA", () => {
+    const { deps, calls } = makeDeps();
+    expect(() => baseConfigAtRev(deps, "main; rm -rf /")).toThrow(/full 40-character SHA/);
+    expect(calls).toEqual([]);
   });
 });

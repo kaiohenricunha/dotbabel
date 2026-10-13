@@ -318,11 +318,13 @@ const RE_NO_SPEC = h2("No-spec rationale");
  * Translate a `docs/repo-facts.json` protected-path glob into a RegExp.
  * Supports `**` (crosses separators), `*` and `?` (do not). Everything else is
  * matched literally — no dependency, per the repo's zero-runtime-deps promise.
+ * Exported so `attestation.spot_check.always_paths` (merge-verification.mjs)
+ * speaks the same dialect as the merge gate's protected paths.
  *
  * @param {string} glob
  * @returns {RegExp}
  */
-function globToRegExp(glob) {
+export function globToRegExp(glob) {
   let out = "^";
   for (let i = 0; i < glob.length; i += 1) {
     const ch = glob[i];

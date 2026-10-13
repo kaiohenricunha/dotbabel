@@ -7,6 +7,7 @@ import addFormats from "ajv-formats";
 import {
   RECEIPT_OUTCOMES,
   appendAttempt,
+  appendSpotCheck,
   createReceipt,
   frontmatterModel,
   receiptPath,
@@ -14,9 +15,11 @@ import {
   receiptVerdict,
   rollbackPoint,
   summarizePhases,
+  summarizeSpotChecks,
   USER_ALLOWED_RETRY,
 } from "../src/run-receipt.mjs";
 import { CONDUCTOR_PHASES } from "../src/pr-gates.mjs";
+import { SPOT_CHECK_REASONS } from "../src/merge-verification.mjs";
 
 const HEAD_A = "a".repeat(40);
 const HEAD_B = "b".repeat(40);
@@ -285,9 +288,15 @@ describe("receiptProblem agrees with the published schema", () => {
   addFormats(ajv);
   const validate = ajv.compile(schema);
   const good = () =>
-    receiptWith(
-      { phase: "pre-pr", outcome: "pass" },
-      { phase: "review-pr", outcome: "fail", reasonCode: "X_Y", evidence: ["https://x/1"], requestedModel: "sonnet", toolVersion: "4.0.0" },
+    appendSpotCheck(
+      appendSpotCheck(
+        receiptWith(
+          { phase: "pre-pr", outcome: "pass" },
+          { phase: "review-pr", outcome: "fail", reasonCode: "X_Y", evidence: ["https://x/1"], requestedModel: "sonnet", toolVersion: "4.0.0" },
+        ),
+        { kind: "spot-check", headSha: HEAD_A, selected: true, reason: "rate", rate: 0.2, roll: 0.1, ci: "available", toolVersion: "4.0.0", now: T1 },
+      ),
+      { kind: "explicit-run", headSha: HEAD_A, outcome: "pass", now: T2 },
     );
   const mutations = {
     "valid receipt": () => {},
@@ -313,6 +322,18 @@ describe("receiptProblem agrees with the published schema", () => {
     "numeric tool_version": (r) => (r.attempts[1].tool_version = 4),
     "missing outcome": (r) => delete r.attempts[0].outcome,
     "missing evidence": (r) => delete r.attempts[0].evidence,
+    "spot_checks not an array": (r) => (r.spot_checks = {}),
+    "unknown spot-check kind": (r) => (r.spot_checks[0].kind = "audit"),
+    "spot-check extra key": (r) => (r.spot_checks[0].note = "x"),
+    "spot-check missing reason": (r) => delete r.spot_checks[0].reason,
+    "spot-check unknown reason": (r) => (r.spot_checks[0].reason = "luck"),
+    "spot-check rate above 1": (r) => (r.spot_checks[0].rate = 2),
+    "spot-check roll of 1": (r) => (r.spot_checks[0].roll = 1),
+    "spot-check selected not boolean": (r) => (r.spot_checks[0].selected = "yes"),
+    "spot-check unknown ci": (r) => (r.spot_checks[0].ci = "maybe"),
+    "spot-check uppercase head": (r) => (r.spot_checks[0].head_sha = "A".repeat(40)),
+    "explicit-run unknown outcome": (r) => (r.spot_checks[1].outcome = "blocked"),
+    "explicit-run with a reason": (r) => (r.spot_checks[1].reason = "rate"),
   };
   for (const [name, mutate] of Object.entries(mutations)) {
     it(`agrees on: ${name}`, () => {
@@ -321,6 +342,96 @@ describe("receiptProblem agrees with the published schema", () => {
       expect(receiptProblem(r) === null, JSON.stringify(validate.errors)).toBe(validate(r));
     });
   }
+});
+
+describe("appendSpotCheck", () => {
+  const decision = { kind: "spot-check", headSha: HEAD_A, selected: true, reason: "rate", rate: 0.2, roll: 0.05, ci: "available" };
+
+  it("records a spot-check decision as its own append-only entry", () => {
+    const r = appendSpotCheck(createReceipt({ pr: 7, now: T0 }), { ...decision, toolVersion: "4.0.0", now: T1 });
+    expect(r.attempts).toEqual([]);
+    expect(r.updated_at).toBe(T1.toISOString());
+    expect(r.spot_checks).toEqual([
+      {
+        kind: "spot-check",
+        at: T1.toISOString(),
+        head_sha: HEAD_A,
+        selected: true,
+        reason: "rate",
+        rate: 0.2,
+        roll: 0.05,
+        ci: "available",
+        tool_version: "4.0.0",
+      },
+    ]);
+    expect(receiptProblem(r)).toBeNull();
+  });
+
+  it("records an explicit verification run for a head", () => {
+    const r = appendSpotCheck(createReceipt({ pr: 7, now: T0 }), { kind: "explicit-run", headSha: HEAD_A.toUpperCase(), outcome: "fail", now: T1 });
+    expect(r.spot_checks).toEqual([{ kind: "explicit-run", at: T1.toISOString(), head_sha: HEAD_A, outcome: "fail", tool_version: null }]);
+    expect(receiptProblem(r)).toBeNull();
+  });
+
+  it("never mutates the receipt it was given", () => {
+    const before = createReceipt({ pr: 7, now: T0 });
+    const snapshot = JSON.stringify(before);
+    appendSpotCheck(before, { ...decision, now: T1 });
+    expect(JSON.stringify(before)).toBe(snapshot);
+  });
+
+  it("refuses an entry of an unknown kind or with bad fields", () => {
+    const r = createReceipt({ pr: 7, now: T0 });
+    expect(() => appendSpotCheck(r, { ...decision, kind: "audit" })).toThrow(/kind/);
+    expect(() => appendSpotCheck(r, { ...decision, headSha: "abc" })).toThrow(/head/);
+    expect(() => appendSpotCheck(r, { ...decision, reason: "luck" })).toThrow(/reason/);
+    expect(() => appendSpotCheck(r, { ...decision, rate: 1.5 })).toThrow(/rate/);
+    expect(() => appendSpotCheck(r, { ...decision, roll: 1 })).toThrow(/roll/);
+    expect(() => appendSpotCheck(r, { ...decision, ci: "maybe" })).toThrow(/ci/);
+    expect(() => appendSpotCheck(r, { kind: "explicit-run", headSha: HEAD_A, outcome: "skipped" })).toThrow(/outcome/);
+  });
+
+  it("keeps spot-check entries out of the attempt count, the cap, and the ready verdict", () => {
+    let r = receiptWith(
+      { phase: "review-pr", outcome: "fail" },
+      { phase: "local-attest", outcome: "pass" },
+      { phase: "stop", outcome: "pass" },
+    );
+    const phasesBefore = summarizePhases(r);
+    expect(receiptVerdict(r)).toBe("blocked");
+    r = receiptWith(
+      { phase: "review-pr", outcome: "pass" },
+      { phase: "local-attest", outcome: "pass" },
+      { phase: "stop", outcome: "pass" },
+    );
+    expect(receiptVerdict(r)).toBe("ready");
+    const withSpot = appendSpotCheck(appendSpotCheck(r, { ...decision, now: T2 }), { kind: "explicit-run", headSha: HEAD_A, outcome: "fail", now: T2 });
+    expect(receiptVerdict(withSpot)).toBe("ready");
+    expect(summarizePhases(withSpot)).toEqual(summarizePhases(r));
+    expect(phasesBefore["review-pr"].consecutive_failures).toBe(1);
+    // A phase attempt appended after a spot check keeps the entries and numbers only attempts.
+    const next = appendAttempt(withSpot, { phase: "review-pr", outcome: "fail", headSha: HEAD_A, now: T2 });
+    expect(next.spot_checks).toHaveLength(2);
+    expect(next.attempts.at(-1).n).toBe(2);
+    expect(summarizePhases(next)["review-pr"].consecutive_failures).toBe(1);
+  });
+});
+
+describe("summarizeSpotChecks", () => {
+  it("reports, per head, the latest decision and whether an explicit run was recorded", () => {
+    let r = createReceipt({ pr: 7, now: T0 });
+    r = appendSpotCheck(r, { kind: "spot-check", headSha: HEAD_A, selected: false, reason: "not_selected", rate: 0.2, roll: 0.7, ci: "available", now: T0 });
+    r = appendSpotCheck(r, { kind: "spot-check", headSha: HEAD_B, selected: true, reason: "rate", rate: 0.2, roll: 0.1, ci: "available", now: T1 });
+    r = appendSpotCheck(r, { kind: "explicit-run", headSha: HEAD_B, outcome: "pass", now: T2 });
+    expect(summarizeSpotChecks(r)).toEqual([
+      { head_sha: HEAD_A, selected: false, reason: "not_selected", rate: 0.2, explicit: null },
+      { head_sha: HEAD_B, selected: true, reason: "rate", rate: 0.2, explicit: "pass" },
+    ]);
+  });
+
+  it("is empty for a receipt with no spot checks", () => {
+    expect(summarizeSpotChecks(createReceipt({ pr: 7, now: T0 }))).toEqual([]);
+  });
 });
 
 describe("receiptPath", () => {
@@ -353,6 +464,22 @@ describe("dotbabel.run-receipt.schema.json", () => {
   addFormats(ajv);
   const validate = ajv.compile(schema);
 
+  it("validates what appendSpotCheck emits", () => {
+    const r = appendSpotCheck(
+      appendSpotCheck(receiptWith({ phase: "pre-pr", outcome: "pass" }), {
+        kind: "spot-check",
+        headSha: HEAD_A,
+        selected: false,
+        reason: "off",
+        rate: 0,
+        roll: 0.5,
+        ci: "unknown",
+      }),
+      { kind: "explicit-run", headSha: HEAD_A, outcome: "pass", toolVersion: "4.0.0" },
+    );
+    expect(validate(r), JSON.stringify(validate.errors)).toBe(true);
+  });
+
   it("validates what appendAttempt emits, so the producer and the schema cannot drift", () => {
     const r = receiptWith(
       { phase: "pre-pr", outcome: "pass" },
@@ -364,6 +491,10 @@ describe("dotbabel.run-receipt.schema.json", () => {
   it("lists exactly the conductor phases, so a new phase cannot drift past the schema", () => {
     expect(schema.properties.attempts.items.properties.phase.enum).toEqual(CONDUCTOR_PHASES.map((p) => p.id));
     expect(schema.properties.attempts.items.properties.outcome.enum).toEqual([...RECEIPT_OUTCOMES]);
+  });
+
+  it("lists exactly the spot-check reasons the decision can return", () => {
+    expect(schema.properties.spot_checks.items.oneOf[0].properties.reason.enum).toEqual([...SPOT_CHECK_REASONS]);
   });
 
   it("rejects an unknown outcome", () => {

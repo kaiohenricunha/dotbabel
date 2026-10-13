@@ -104,6 +104,27 @@ describe("dotbabel.config.schema.json", () => {
     expect(validate({ conductor: { budget_usd: 5 } })).toBe(false);
   });
 
+  it("accepts an attestation spot-check policy", () => {
+    const validate = compile();
+    expect(validate({ attestation: { enforce: true, spot_check: {} } })).toBe(true);
+    expect(validate({ attestation: { spot_check: { rate: 0.2 } } })).toBe(true);
+    expect(validate({ attestation: { spot_check: { rate: 0, rate_when_ci_unavailable: 1, always_paths: ["src/auth/**"] } } })).toBe(true);
+    expect(validate({ attestation: { spot_check: { rate: 1, rate_when_ci_unavailable: 0 } } })).toBe(true);
+  });
+
+  it("rejects a spot-check rate outside 0 to 1, a bad path list, or an unknown key", () => {
+    const validate = compile();
+    expect(validate({ attestation: { spot_check: { rate: 1.5 } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { rate: -0.1 } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { rate: "0.2" } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { rate_when_ci_unavailable: 2 } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { always_paths: "src/**" } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { always_paths: [""] } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { always_paths: ["src/{a,b}/**"] } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: { sample: 0.2 } } })).toBe(false);
+    expect(validate({ attestation: { spot_check: 0.2 } })).toBe(false);
+  });
+
   it("is referenced by both the scaffolded default and this repo's config", () => {
     expect(DEFAULT_DOTBABEL_JSON.$schema).toBe(SCHEMA_ID);
     expect(readJson(path.join(REPO_ROOT, ".dotbabel.json")).$schema).toBe(SCHEMA_ID);
