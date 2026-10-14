@@ -336,8 +336,10 @@ function registeredClones(repos, problems) {
 /**
  * Ask `gh` about one pull request or issue. The issues endpoint answers for
  * both kinds: a pull request carries `pull_request.merged_at`. Merged, or a
- * closed issue, is satisfied; anything else GitHub knows is open; a number
- * GitHub does not have is missing; a `gh` that fails is unknown.
+ * closed issue, is satisfied; anything else GitHub knows is open. A `gh`
+ * that fails is unknown, with its first line as the problem: a 404 also
+ * answers for a private repository this account cannot see, so it is not
+ * reported as missing.
  *
  * @returns {{ state: import("../src/work-graph.mjs").DependencyState, problem?: string }}
  */
@@ -345,8 +347,7 @@ function askGitHub({ repo, number }) {
   const r = spawnSync("gh", ["api", `repos/${repo}/issues/${number}`], { encoding: "utf8", timeout: 15_000 });
   if (r.error !== undefined) return { state: "unknown", problem: `gh: ${r.error.message}` };
   if (r.status !== 0) {
-    const detail = (r.stderr ?? "").trim().split("\n")[0] || `gh exited ${r.status}`;
-    return /\b404\b/.test(detail) ? { state: "missing" } : { state: "unknown", problem: detail };
+    return { state: "unknown", problem: (r.stderr ?? "").trim().split("\n")[0] || `gh exited ${r.status}` };
   }
   try {
     const body = JSON.parse(r.stdout);

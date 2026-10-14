@@ -997,9 +997,8 @@ clone, including a task that names itself, and write nothing when they do.
 `graph` and `next` read the task files of every worktree of the clone on each
 call: no index. A dependency is `satisfied` when its task is closed, its pull
 request is merged, or its issue is closed; `open` while it is not; `missing`
-when no worktree holds the slug, or GitHub has no such number; `ambiguous`
-when two clones of one repository hold the slug; and `unknown` when it cannot
-be told. A task is ready when every dependency is satisfied; `ambiguous` and
+when no worktree holds the slug; `ambiguous` when two clones of one repository
+hold the slug; and `unknown` when it cannot be told. A task is ready when every dependency is satisfied; `ambiguous` and
 `unknown` count as blocked. The dependency order lists each task after the
 open tasks it depends on, ties by slug, so it is the same on every read; a
 cycle written on disk is reported and its tasks are left out of the order.
@@ -1021,7 +1020,9 @@ is not registered here is `unknown`.
 A pull request or issue (`owner/repo#123`) is `unknown` unless `--online` asks
 `gh` about it, one `gh api` call per reference, with a 15-second timeout. A
 `gh` that fails, is missing, or is not signed in leaves the reference
-`unknown`, names it as a warning, and still exits 0. Without `--online`,
+`unknown`, names it and the reason as a warning, and still exits 0. A 404 is
+`unknown` too, not `missing`: GitHub answers 404 both for a number that does
+not exist and for a private repository the signed-in account cannot see. Without `--online`,
 `graph`, `next`, and the session-start hook read local files and start no
 other process.
 

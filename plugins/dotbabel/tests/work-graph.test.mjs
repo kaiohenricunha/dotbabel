@@ -85,7 +85,9 @@ function cloneOf(url) {
 /**
  * A `gh` on PATH that answers `gh api repos/<owner>/<repo>/issues/<n>` from a
  * script and appends each call to $GH_LOG: #1 a merged pull request, #2 a
- * closed issue, #3 an open pull request, #4 not found, anything else a failure.
+ * closed issue, #3 an open pull request, #4 not found (which GitHub also
+ * answers for a private repository the account cannot see), anything else a
+ * failure.
  */
 function fakeGh() {
   const dir = makeTempDir("work-graph-gh-");
@@ -416,7 +418,7 @@ describe("cross-repo references through the task CLI", () => {
     expect(fs.existsSync(gh.log)).toBe(false);
   });
 
-  it("--online resolves a merged pull request and a closed issue through gh, and a gh failure is unknown", () => {
+  it("--online resolves a merged pull request and a closed issue through gh, and a gh failure or 404 is unknown", () => {
     const root = repo();
     put(root, "a", ["acme/widget#1", "acme/widget#2"]);
     put(root, "b", ["acme/widget#3"]);
@@ -428,10 +430,14 @@ describe("cross-repo references through the task CLI", () => {
     expect(out.ready.map((t) => t.slug)).toEqual(["a"]);
     expect(states(out, "b")).toEqual([{ ref: "acme/widget#3", kind: "github", state: "open" }]);
     expect(states(out, "c")).toEqual([
-      { ref: "acme/widget#4", kind: "github", state: "missing" },
+      { ref: "acme/widget#4", kind: "github", state: "unknown" },
       { ref: "acme/widget#5", kind: "github", state: "unknown" },
     ]);
-    expect(out.problems).toEqual([expect.stringMatching(/acme\/widget#5: .*could not connect/)]);
+    expect(out.problems).toEqual([
+      expect.stringMatching(/acme\/widget#4: .*HTTP 404/),
+      expect.stringMatching(/acme\/widget#5: .*could not connect/),
+    ]);
+    expect(r.stderr).toMatch(/warning: acme\/widget#4/);
     expect(r.stderr).toMatch(/warning: acme\/widget#5/);
     const calls = fs.readFileSync(gh.log, "utf8").trim().split("\n").sort();
     expect(calls).toEqual([1, 2, 3, 4, 5].map((n) => `api repos/acme/widget/issues/${n}`));

@@ -155,8 +155,8 @@ export function findSlugOwner(tasks, slug) {
  * @property {DependencyRef["kind"]} kind
  * @property {DependencyState} state  `satisfied` when the task is closed, the pull request
  *   is merged, or the issue is closed; `open` while it is not; `missing` when no worktree of
- *   the clone, or of any registered clone of the repository, holds the slug, or GitHub has no
- *   such number; `ambiguous` when two clones of one repository hold the slug (R-8);
+ *   the clone, or of any registered clone of the repository, holds the slug;
+ *   `ambiguous` when two clones of one repository hold the slug (R-8);
  *   `unknown` when the repository is not registered on this machine, or a pull request or
  *   issue was not asked of `gh` or `gh` failed. Only `satisfied` lets a task go ahead;
  *   `ambiguous` and `unknown` count as blocked (KD-2).
