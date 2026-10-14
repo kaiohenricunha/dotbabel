@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  EVIDENCE_TRUST_KEYS,
   POLICY_LAYERS,
   SHIPPED_POLICY,
   loadPolicyLayers,
@@ -377,5 +378,114 @@ describe("policy layer merge", () => {
 
     // A floor or pin may record why it exists (§5: rationale is permitted in every mode).
     expect(validate({ model_intelligence: { floor: { mode: "floor", requirement: "deep", rationale: "cross-cutting design work" } } })).toBe(true);
+  });
+});
+
+describe("monotonic evidence-trust preferences (ARCH-23 amendment, P-4b)", () => {
+  /** The shipped defaults of the four evidence-trust keys. */
+  const shipped = { preferences: { allow_stale_evidence: true, allow_expired_evidence: false, prefer_locally_verified: true, prefer_fresher_evidence: true } };
+
+  it("a project or artifact layer cannot relax an evidence-trust key that the user set, and mergePolicy records the attempt in shadowed with its layer", () => {
+    for (const layer of ["project", "artifact"]) {
+      const merged = mergePolicy({
+        shipped,
+        user: { preferences: { allow_stale_evidence: false, prefer_fresher_evidence: true } },
+        [layer]: { preferences: { allow_stale_evidence: true, prefer_fresher_evidence: false } },
+      });
+      // The user's stricter values stay in force, attributed to the user.
+      expect(merged.preferences.allow_stale_evidence, layer).toBe(false);
+      expect(merged.preferences.prefer_fresher_evidence, layer).toBe(true);
+      expect(merged.provenance["preferences.allow_stale_evidence"], layer).toBe("user");
+      expect(merged.provenance["preferences.prefer_fresher_evidence"], layer).toBe("user");
+      // Each attempt is recorded with the layer that made it, never dropped without a word.
+      expect(merged.shadowed, layer).toEqual([
+        { layer, declaration: { key: "allow_stale_evidence", value: true }, reason: `a ${layer} layer may only make allow_stale_evidence stricter; the user value stays in force` },
+        { layer, declaration: { key: "prefer_fresher_evidence", value: false }, reason: `a ${layer} layer may only make prefer_fresher_evidence stricter; the user value stays in force` },
+      ]);
+    }
+  });
+
+  it("a layer that gives an evidence-trust key a non-boolean value, such as the string \"true\", is a layer error", () => {
+    for (const layer of ["shipped", "user", "project", "artifact"]) {
+      for (const value of ["true", "false", 1, 0, null, undefined, {}]) {
+        expect(() => mergePolicy({ [layer]: { preferences: { allow_expired_evidence: value } } }), `${layer} ${String(value)}`).toThrow(
+          new RegExp(`^${layer} policy: preferences.allow_expired_evidence must be a boolean`),
+        );
+      }
+    }
+    // The shipped document itself passes the check it is held to.
+    expect(() => mergePolicy({ shipped: SHIPPED_POLICY })).not.toThrow();
+  });
+
+  it("a project or artifact layer cannot relax an evidence-trust key below the shipped default when the user set none", () => {
+    for (const layer of ["project", "artifact"]) {
+      const merged = mergePolicy({ shipped: SHIPPED_POLICY, [layer]: { preferences: { allow_expired_evidence: true, prefer_locally_verified: false, representation: "native-id" } } });
+      expect(merged.preferences.allow_expired_evidence, layer).toBe(false);
+      // Only the refused keys are left out: an ordinary preference in the same layer still applies.
+      expect(merged.preferences.representation, layer).toBe("native-id");
+      expect(merged.provenance["preferences.representation"], layer).toBe(layer);
+      expect(merged.preferences.prefer_locally_verified, layer).toBe(true);
+      expect(merged.provenance["preferences.allow_expired_evidence"], layer).toBe("shipped");
+      expect(merged.shadowed.map((entry) => [entry.layer, entry.declaration.key, entry.reason]), layer).toEqual([
+        [layer, "allow_expired_evidence", `a ${layer} layer may only make allow_expired_evidence stricter; the shipped value stays in force`],
+        [layer, "prefer_locally_verified", `a ${layer} layer may only make prefer_locally_verified stricter; the shipped value stays in force`],
+      ]);
+    }
+    // With no layer in force at all, the strict value is the bar, and the relaxing value is still refused.
+    const bare = mergePolicy({ project: { preferences: { allow_expired_evidence: true } } });
+    expect(bare.preferences.allow_expired_evidence).toBeUndefined();
+    expect(bare.shadowed).toEqual([
+      { layer: "project", declaration: { key: "allow_expired_evidence", value: true }, reason: "a project layer may only make allow_expired_evidence stricter; the strict value stays in force" },
+    ]);
+  });
+
+  it("the user layer may relax a shipped evidence-trust default", () => {
+    const merged = mergePolicy({ shipped: SHIPPED_POLICY, user: { preferences: { allow_expired_evidence: true, prefer_locally_verified: false } } });
+    expect(merged.preferences.allow_expired_evidence).toBe(true);
+    expect(merged.preferences.prefer_locally_verified).toBe(false);
+    expect(merged.provenance["preferences.allow_expired_evidence"]).toBe("user");
+    expect(merged.shadowed).toEqual([]);
+    // A later project or artifact layer that repeats the user's relaxed value relaxes nothing, so it is no attempt.
+    const repeated = mergePolicy({ shipped: SHIPPED_POLICY, user: { preferences: { allow_expired_evidence: true } }, project: { preferences: { allow_expired_evidence: true } } });
+    expect(repeated.preferences.allow_expired_evidence).toBe(true);
+    expect(repeated.shadowed).toEqual([]);
+  });
+
+  it("a project layer may make an evidence-trust key stricter, and an ordinary preference such as representation keeps the ARCH-23 order", () => {
+    const merged = mergePolicy({
+      shipped: SHIPPED_POLICY,
+      user: { preferences: { allow_stale_evidence: true, allow_expired_evidence: true, prefer_fresher_evidence: false, representation: "native-id" } },
+      project: { preferences: { allow_expired_evidence: false, prefer_fresher_evidence: true, representation: "opaque-selector" } },
+      artifact: { preferences: { allow_stale_evidence: false, representation: "stable-alias" } },
+    });
+    // Stricter values from later layers apply, with their own layer as provenance.
+    expect(merged.preferences.allow_expired_evidence).toBe(false);
+    expect(merged.provenance["preferences.allow_expired_evidence"]).toBe("project");
+    expect(merged.preferences.prefer_fresher_evidence).toBe(true);
+    expect(merged.provenance["preferences.prefer_fresher_evidence"]).toBe("project");
+    expect(merged.preferences.allow_stale_evidence).toBe(false);
+    expect(merged.provenance["preferences.allow_stale_evidence"]).toBe("artifact");
+    // An ordinary preference is not an evidence-trust key: the most specific layer wins (ARCH-23).
+    expect(merged.preferences.representation).toBe("stable-alias");
+    expect(merged.provenance["preferences.representation"]).toBe("artifact");
+    expect(merged.shadowed).toEqual([]);
+    // Repeating the strict value that is already in force is no relaxation: it applies and is not recorded.
+    const repeated = mergePolicy({ shipped: SHIPPED_POLICY, project: { preferences: { allow_expired_evidence: false, prefer_fresher_evidence: true } } });
+    expect(repeated.provenance["preferences.allow_expired_evidence"]).toBe("project");
+    expect(repeated.provenance["preferences.prefer_fresher_evidence"]).toBe("project");
+    expect(repeated.shadowed).toEqual([]);
+    // Once a later layer made a key stricter, an even later layer cannot relax it again.
+    const tightened = mergePolicy({ shipped: SHIPPED_POLICY, user: { preferences: { allow_expired_evidence: true } }, project: { preferences: { allow_expired_evidence: false } }, artifact: { preferences: { allow_expired_evidence: true } } });
+    expect(tightened.preferences.allow_expired_evidence).toBe(false);
+    expect(tightened.shadowed.map((e) => [e.layer, e.reason])).toEqual([["artifact", "a artifact layer may only make allow_expired_evidence stricter; the project value stays in force"]]);
+  });
+
+  it("exports the four evidence-trust keys with their strict values, frozen", () => {
+    expect(EVIDENCE_TRUST_KEYS).toEqual({ allow_stale_evidence: false, allow_expired_evidence: false, prefer_locally_verified: true, prefer_fresher_evidence: true });
+    expect(Object.isFrozen(EVIDENCE_TRUST_KEYS)).toBe(true);
+    // Every key the shipped policy carries is in the table, so none can escape the rule by omission.
+    for (const key of Object.keys(SHIPPED_POLICY.preferences).filter((k) => k.startsWith("allow_") || k.startsWith("prefer_"))) {
+      expect(Object.hasOwn(EVIDENCE_TRUST_KEYS, key), key).toBe(true);
+    }
   });
 });
