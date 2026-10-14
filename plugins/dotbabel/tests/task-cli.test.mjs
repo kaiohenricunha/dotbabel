@@ -14,10 +14,13 @@ const BIN = path.resolve(__dirname, "../bin/dotbabel-task.mjs");
 const UMBRELLA = path.resolve(__dirname, "../bin/dotbabel.mjs");
 const NODE = process.execPath;
 
+// Every bin spawn keeps its clone registry under this temp state directory.
+const STATE_HOME = makeTempDir("task-cli-state-");
+
 function cleanEnv() {
   const env = { ...process.env };
   for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
-  return env;
+  return { ...env, XDG_STATE_HOME: STATE_HOME };
 }
 
 function repo() {
@@ -323,6 +326,19 @@ describe("dotbabel task hook session-start", () => {
     expect(context).toMatch(/- b \(phase: started[\s\S]*?blocked by: a \(open\), acme\/web#1 \(unknown\)/);
     expect(context).not.toContain("- c (");
     expect(context).toContain("dotbabel task next");
+  });
+
+  it("the session-start context resolves a task of another registered clone offline", () => {
+    const widget = repo();
+    execFileSync("git", ["-C", widget, "remote", "add", "origin", "https://github.com/acme/widget.git"], { env: cleanEnv() });
+    expect(newTask(widget, "w").code).toBe(0);
+    const root = repo();
+    expect(newTask(root, "a", "--depends-on", "github.com/acme/widget:w", "--depends-on", "github.com/acme/none:w").code).toBe(0);
+    let context = json(task(root, ["hook", "session-start"], JSON.stringify({ cwd: root }))).hookSpecificOutput.additionalContext;
+    expect(context).toMatch(/blocked by: github\.com\/acme\/widget:w \(open\), github\.com\/acme\/none:w \(unknown\)/);
+    expect(task(widget, ["close", "w"]).code).toBe(0);
+    context = json(task(root, ["hook", "session-start"], JSON.stringify({ cwd: root }))).hookSpecificOutput.additionalContext;
+    expect(context).toMatch(/blocked by: github\.com\/acme\/widget:w \(satisfied\), github\.com\/acme\/none:w \(unknown\)/);
   });
 
   it("is silent when no task is open", () => {

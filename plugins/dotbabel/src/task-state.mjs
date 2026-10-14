@@ -61,6 +61,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { normalizeRemote } from "./fleet/policy.mjs";
 import { parseDependencyRef, parseWorktreeList } from "./work-graph.mjs";
 
 // The reference grammar lives with the graph that follows the references;
@@ -500,6 +501,20 @@ export function listWorktrees(worktreeRoot) {
     }
   }
   return roots;
+}
+
+/**
+ * The clone that contains `worktreeRoot`: its main checkout, as a real path,
+ * and its repository key, the normalized `origin` URL that the fleet ledger
+ * and the clone registry share. The key is null without a network `origin`,
+ * because no other repository can then name this one.
+ *
+ * @param {string} worktreeRoot
+ * @returns {{ key: string|null, path: string }}
+ */
+export function cloneIdentity(worktreeRoot) {
+  const [main] = listWorktrees(worktreeRoot);
+  return { key: normalizeRemote(git(["-C", worktreeRoot, "config", "--get", "remote.origin.url"])), path: main ?? worktreeRoot };
 }
 
 /**

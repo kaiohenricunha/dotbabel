@@ -16,6 +16,11 @@
  * followed here. A reference to a slug that no worktree holds yet is allowed:
  * the task may be created later, and `task next` reports it meanwhile.
  *
+ * A reference outside the clone is rated from what the bin hands in as a
+ * {@link Resolution}: the tasks of each registered clone of a repository
+ * (`clone-registry.mjs`, read offline), and the answers `gh` gave with
+ * `--online`. Without them, such a reference is `unknown`.
+ *
  * The graph keeps its own sort and cycle search (KD-7): `pr-stack.mjs` sorts
  * pull request numbers, and this module sorts task references.
  */
@@ -143,15 +148,28 @@ export function findSlugOwner(tasks, slug) {
 }
 
 /**
- * @typedef {"satisfied"|"open"|"missing"|"unknown"} DependencyState
+ * @typedef {"satisfied"|"open"|"missing"|"ambiguous"|"unknown"} DependencyState
  *
  * @typedef {object} DependencyStatus
  * @property {string} ref
  * @property {DependencyRef["kind"]} kind
- * @property {DependencyState} state  `satisfied` when the task is closed; `open` when it
- *   is open; `missing` when no worktree of the clone holds the slug; `unknown` for a task
- *   of another clone or a pull request or issue, which Phase 1b does not resolve. Only
- *   `satisfied` lets a task go ahead; `unknown` counts as blocked (KD-2).
+ * @property {DependencyState} state  `satisfied` when the task is closed, the pull request
+ *   is merged, or the issue is closed; `open` while it is not; `missing` when no worktree of
+ *   the clone, or of any registered clone of the repository, holds the slug;
+ *   `ambiguous` when two clones of one repository hold the slug (R-8);
+ *   `unknown` when the repository is not registered on this machine, or a pull request or
+ *   issue was not asked of `gh` or `gh` failed. Only `satisfied` lets a task go ahead;
+ *   `ambiguous` and `unknown` count as blocked (KD-2).
+ *
+ * @typedef {object} RegisteredClone
+ * @property {string} path   the clone's main checkout
+ * @property {import("./task-state.mjs").Task[]} tasks  every task of every worktree of that clone
+ *
+ * @typedef {object} Resolution
+ * @property {Map<string, RegisteredClone[]>} [clones]  the registered clones of each
+ *   repository key a `clone-task` reference names
+ * @property {Map<string, DependencyState>} [github]  the state `gh` reported for each
+ *   `owner/repo#123` reference, with `--online`
  */
 
 /**
@@ -159,16 +177,40 @@ export function findSlugOwner(tasks, slug) {
  *
  * @param {import("./task-state.mjs").Task} task
  * @param {import("./task-state.mjs").Task[]} tasks  every task of the clone
+ * @param {Resolution} [resolution]  what the bin resolved outside the clone
  * @returns {DependencyStatus[]}
  */
-export function dependencyStates(task, tasks) {
+export function dependencyStates(task, tasks, resolution = {}) {
   const bySlug = new Map(tasks.map((other) => [other.slug, other]));
   return task.depends_on.map((ref) => {
     const parsed = /** @type {DependencyRef} */ (parseDependencyRef(ref));
-    if (parsed.kind !== "task") return { ref, kind: parsed.kind, state: "unknown" };
-    const target = bySlug.get(parsed.slug);
-    return { ref, kind: "task", state: target === undefined ? "missing" : target.status === "closed" ? "satisfied" : "open" };
+    if (parsed.kind === "github") return { ref, kind: "github", state: resolution.github?.get(ref) ?? "unknown" };
+    if (parsed.kind === "clone-task") return { ref, kind: "clone-task", state: cloneTaskState(parsed, resolution.clones) };
+    return { ref, kind: "task", state: taskState(bySlug.get(parsed.slug)) };
   });
+}
+
+/** @param {import("./task-state.mjs").Task|undefined} target @returns {DependencyState} */
+function taskState(target) {
+  if (target === undefined) return "missing";
+  return target.status === "closed" ? "satisfied" : "open";
+}
+
+/**
+ * The state of a task of another clone: `unknown` until the repository is
+ * registered; then `missing`, `ambiguous` when more than one clone holds the
+ * slug, or the state of the one task that holds it.
+ *
+ * @param {{ repo: string, slug: string }} parsed
+ * @param {Map<string, RegisteredClone[]>} [clones]
+ * @returns {DependencyState}
+ */
+function cloneTaskState(parsed, clones) {
+  const registered = clones?.get(parsed.repo);
+  if (registered === undefined) return "unknown";
+  const owners = registered.map((clone) => clone.tasks.find((task) => task.slug === parsed.slug)).filter((task) => task !== undefined);
+  if (owners.length > 1) return "ambiguous";
+  return taskState(owners[0]);
 }
 
 /**
@@ -257,9 +299,10 @@ export function buildWorkGraph(tasks) {
  * slug, and is never ready because its dependency is open.
  *
  * @param {import("./task-state.mjs").Task[]} tasks
+ * @param {Resolution} [resolution]  what the bin resolved outside the clone
  * @returns {{ order: string[], ready: ReadyTask[], blocked: BlockedTask[] }}
  */
-export function nextTasks(tasks) {
+export function nextTasks(tasks, resolution = {}) {
   const open = tasks.filter((task) => task.status === "open");
   const { order } = topologicalOrder(open);
   const rank = new Map(order.map((slug, i) => [slug, i]));
@@ -267,7 +310,7 @@ export function nextTasks(tasks) {
   const ready = [];
   const blocked = [];
   for (const task of sorted) {
-    const waitsOn = dependencyStates(task, tasks);
+    const waitsOn = dependencyStates(task, tasks, resolution);
     const node = { slug: task.slug, worktree: task.worktree, phase: task.phase };
     if (waitsOn.every((status) => status.state === "satisfied")) ready.push(node);
     else blocked.push({ ...node, waits_on: waitsOn });
