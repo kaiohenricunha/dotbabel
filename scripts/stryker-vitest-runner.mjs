@@ -25,11 +25,16 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { INSTRUMENTER_CONSTANTS } from "@stryker-mutator/api/core";
-import { PluginKind, commonTokens, declareFactoryPlugin, tokens } from "@stryker-mutator/api/plugin";
 
-const require = createRequire(import.meta.url);
-const upstreamDir = path.dirname(require.resolve("@stryker-mutator/vitest-runner/package.json"));
+const upstreamPackage = createRequire(import.meta.url).resolve("@stryker-mutator/vitest-runner/package.json");
+const upstreamDir = path.dirname(upstreamPackage);
+// `@stryker-mutator/api` is the runner's dependency, not this repository's, so it is resolved from the
+// runner's own location: the same copy the upstream class was built against, wherever npm placed it.
+const fromUpstream = createRequire(upstreamPackage);
+/** @param {string} specifier @returns {Promise<any>} */
+const importFromUpstream = (specifier) => import(pathToFileURL(fromUpstream.resolve(specifier)).href);
+const { INSTRUMENTER_CONSTANTS } = await importFromUpstream("@stryker-mutator/api/core");
+const { PluginKind, commonTokens, declareFactoryPlugin, tokens } = await importFromUpstream("@stryker-mutator/api/plugin");
 const { VitestTestRunner } = await import(pathToFileURL(path.join(upstreamDir, "dist", "src", "vitest-test-runner.js")).href);
 
 /** The `testRunner` name that `stryker.config.mjs` selects. */
@@ -76,7 +81,7 @@ export class NamePatternVitestTestRunner extends VitestTestRunner {
 
 /**
  * Build the runner the way the upstream factory does, with the instrumenter's namespace.
- * @param {import("@stryker-mutator/api/plugin").Injector} injector
+ * @param {any} injector Stryker's dependency injector.
  * @returns {NamePatternVitestTestRunner}
  */
 function createRunner(injector) {
