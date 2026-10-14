@@ -93,7 +93,7 @@
     },
     {
       "id": "AC-4",
-      "status": "planned",
+      "status": "active",
       "given": "open task a, and open task b that depends on a",
       "when": "dotbabel task next --json runs",
       "then": "a is ready and b is blocked by a",
@@ -143,7 +143,7 @@
     },
     {
       "id": "AC-6",
-      "status": "planned",
+      "status": "active",
       "given": "a fixture clone with 20 worktrees and 200 tasks",
       "when": "dotbabel task graph and dotbabel task next run offline",
       "then": "each finishes in at most 1 second",

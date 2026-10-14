@@ -1,15 +1,67 @@
-// Unit tests for src/work-graph.mjs: the pure half of the work graph. The
-// worktree list comes in as text, the tasks come in as records, and nothing
-// here touches git or the disk.
+// Tests for src/work-graph.mjs, the pure half of the work graph, and for the
+// graph reads the task CLI builds on it. The pure tests feed records in and
+// touch nothing; the read tests build a temp clone with linked worktrees and
+// run the real bin, so nothing touches this checkout's own task state.
 
+import { execFileSync, spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { performance } from "node:perf_hooks";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createTask } from "../src/task-state.mjs";
-import { cloneEdges, findCycle, findSlugOwner, parseWorktreeList } from "../src/work-graph.mjs";
+import { makeTempDir } from "./fixtures/temp-dir.mjs";
+import { closeTask, createTask, listCloneTasks, tasksDir, writeTask } from "../src/task-state.mjs";
+import {
+  buildWorkGraph,
+  cloneEdges,
+  dependencyStates,
+  findCycle,
+  findSlugOwner,
+  nextTasks,
+  parseWorktreeList,
+  topologicalOrder,
+} from "../src/work-graph.mjs";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const BIN = path.resolve(__dirname, "../bin/dotbabel-task.mjs");
 const T0 = new Date("2026-10-12T10:00:00Z");
 
 function t(slug, dependsOn = [], worktree = "/w/main") {
   return createTask({ slug, goal: `goal ${slug}`, doneWhen: ["done"], dependsOn, worktree, now: T0 });
+}
+
+function closed(task) {
+  return closeTask(task, { now: T0 });
+}
+
+function cleanEnv() {
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
+  return { ...env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
+}
+
+function repo() {
+  const dir = makeTempDir("work-graph-");
+  execFileSync("git", ["init", "-q", "-b", "main", dir], { env: cleanEnv() });
+  execFileSync("git", ["-C", dir, "commit", "-q", "--allow-empty", "-m", "init"], { env: cleanEnv() });
+  return fs.realpathSync(dir);
+}
+
+function addWorktree(root, name) {
+  const linked = path.join(makeTempDir("work-graph-wt-"), name);
+  execFileSync("git", ["-C", root, "worktree", "add", "-q", "-b", name, linked], { env: cleanEnv() });
+  return fs.realpathSync(linked);
+}
+
+function put(root, slug, dependsOn = []) {
+  const task = createTask({ slug, goal: `goal ${slug}`, doneWhen: ["done"], dependsOn, worktree: root, now: T0 });
+  writeTask(root, task, { create: true });
+  return task;
+}
+
+function run(cwd, args) {
+  const r = spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: "utf8", env: cleanEnv() });
+  return { code: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
 describe("parseWorktreeList", () => {
@@ -69,4 +121,203 @@ describe("findSlugOwner", () => {
     expect(findSlugOwner(tasks, "b")).toBe("/w/side");
     expect(findSlugOwner(tasks, "c")).toBeNull();
   });
+});
+
+describe("dependencyStates", () => {
+  it("rates each reference: satisfied, open, missing, or unknown", () => {
+    const tasks = [t("a", ["b", "c", "d", "acme/web#1", "github.com/acme/web:z"]), t("b"), closed(t("c"))];
+    expect(dependencyStates(tasks[0], tasks)).toEqual([
+      { ref: "b", kind: "task", state: "open" },
+      { ref: "c", kind: "task", state: "satisfied" },
+      { ref: "d", kind: "task", state: "missing" },
+      { ref: "acme/web#1", kind: "github", state: "unknown" },
+      { ref: "github.com/acme/web:z", kind: "clone-task", state: "unknown" },
+    ]);
+    expect(dependencyStates(t("solo"), [t("solo")])).toEqual([]);
+  });
+});
+
+describe("topologicalOrder and buildWorkGraph", () => {
+  it("a topological order keeps every edge", () => {
+    const diamond = [t("d"), t("b", ["d"]), t("c", ["d"]), t("a", ["b", "c"])];
+    const chain = [t("z", ["y"]), t("y", ["x"]), t("x")];
+    for (const tasks of [diamond, chain]) {
+      const { order, cycle } = topologicalOrder(tasks);
+      expect(cycle).toBeNull();
+      expect([...order].sort()).toEqual(tasks.map((task) => task.slug).sort());
+      for (const [from, to] of cloneEdges(tasks)) expect(order.indexOf(to)).toBeLessThan(order.indexOf(from));
+    }
+    expect(topologicalOrder(diamond).order).toEqual(["d", "b", "c", "a"]);
+  });
+
+  it("orders ties by slug, skips closed and missing dependencies, and leaves a cycle out of the order", () => {
+    expect(topologicalOrder([t("b"), t("a"), t("c")]).order).toEqual(["a", "b", "c"]);
+    expect(topologicalOrder([t("a", ["gone", "done"]), closed(t("done"))]).order).toEqual(["a"]);
+    const { order, cycle } = topologicalOrder([t("a", ["b"]), t("b", ["a"]), t("c")]);
+    expect(order).toEqual(["c"]);
+    expect(cycle).toEqual(["a", "b", "a"]);
+    expect(topologicalOrder([])).toEqual({ order: [], cycle: null });
+  });
+
+  it("builds the graph of the open tasks with its edges, order, and cycle", () => {
+    const tasks = [t("a", ["b", "acme/web#1"], "/w/main"), t("b", [], "/w/side"), closed(t("c", ["a"]))];
+    expect(buildWorkGraph(tasks)).toEqual({
+      tasks: [
+        { slug: "a", worktree: "/w/main", phase: "started", depends_on: ["b", "acme/web#1"] },
+        { slug: "b", worktree: "/w/side", phase: "started", depends_on: [] },
+      ],
+      edges: [["a", "b"]],
+      order: ["b", "a"],
+      cycle: null,
+    });
+  });
+});
+
+describe("nextTasks", () => {
+  it("splits the open tasks into ready and blocked, each in dependency order", () => {
+    const tasks = [t("a", ["b", "acme/web#1"]), t("b", ["c"]), closed(t("c")), t("d"), t("e", ["gone"])];
+    expect(nextTasks(tasks)).toEqual({
+      order: ["b", "a", "d", "e"],
+      ready: [
+        { slug: "b", worktree: "/w/main", phase: "started" },
+        { slug: "d", worktree: "/w/main", phase: "started" },
+      ],
+      blocked: [
+        {
+          slug: "a",
+          worktree: "/w/main",
+          phase: "started",
+          waits_on: [
+            { ref: "b", kind: "task", state: "open" },
+            { ref: "acme/web#1", kind: "github", state: "unknown" },
+          ],
+        },
+        { slug: "e", worktree: "/w/main", phase: "started", waits_on: [{ ref: "gone", kind: "task", state: "missing" }] },
+      ],
+    });
+  });
+
+  it("never lists a task of a cycle as ready", () => {
+    const { ready, blocked } = nextTasks([t("a", ["b"]), t("b", ["a"])]);
+    expect(ready).toEqual([]);
+    expect(blocked.map((task) => task.slug).sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("graph reads through the task CLI", () => {
+  it("task next lists a as ready and b as blocked by a", () => {
+    const root = repo();
+    const side = addWorktree(root, "side");
+    put(root, "a");
+    put(side, "b", ["a"]);
+    const r = run(side, ["next", "--json"]);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ok).toBe(true);
+    expect(out.ready).toEqual([{ slug: "a", worktree: root, phase: "started" }]);
+    expect(out.blocked).toEqual([{ slug: "b", worktree: side, phase: "started", waits_on: [{ ref: "a", kind: "task", state: "open" }] }]);
+    expect(out.order).toEqual(["a", "b"]);
+    const text = run(root, ["next"]);
+    expect(text.code).toBe(0);
+    expect(text.stdout).toMatch(/ready:\n\s+a /);
+    expect(text.stdout).toMatch(/blocked:\n\s+b .*waits on a \(open\)/);
+  });
+
+  it("task graph prints every open task of the clone, its edges, the order, and any cycle", () => {
+    const root = repo();
+    const side = addWorktree(root, "side");
+    put(root, "a", ["b", "acme/web#1"]);
+    put(side, "b");
+    writeTask(side, closed(put(side, "old")));
+    const r = run(root, ["graph", "--json"]);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.tasks.map((task) => task.slug)).toEqual(["a", "b"]);
+    expect(out.edges).toEqual([["a", "b"]]);
+    expect(out.order).toEqual(["b", "a"]);
+    expect(out.cycle).toBeNull();
+    expect(out.problems).toEqual([]);
+    const text = run(root, ["graph"]);
+    expect(text.code).toBe(0);
+    expect(text.stdout).toContain("a [open]");
+    expect(text.stdout).toContain("depends on: b (open), acme/web#1 (unknown)");
+    expect(text.stdout).toContain("order: b, a");
+    expect(text.stdout).not.toContain("old");
+  });
+
+  it("reports a cycle written on disk and still exits 0", () => {
+    const root = repo();
+    const a = put(root, "a", ["b"]);
+    put(root, "b");
+    writeTask(root, { ...a, depends_on: ["b"] });
+    const bFile = path.join(tasksDir(root), "b.json");
+    fs.writeFileSync(bFile, JSON.stringify({ ...JSON.parse(fs.readFileSync(bFile, "utf8")), depends_on: ["a"] }));
+    const r = run(root, ["graph"]);
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("cycle: a -> b -> a");
+    expect(JSON.parse(run(root, ["graph", "--json"]).stdout).cycle).toEqual(["a", "b", "a"]);
+    expect(JSON.parse(run(root, ["next", "--json"]).stdout).ready).toEqual([]);
+  });
+
+  it("says so when the clone has no open task", () => {
+    const root = repo();
+    for (const sub of ["graph", "next"]) {
+      const r = run(root, [sub]);
+      expect(r.code).toBe(0);
+      expect(r.stdout).toContain("no open tasks in this clone");
+      const j = JSON.parse(run(root, [sub, "--json"]).stdout);
+      expect(j.ok).toBe(true);
+      expect(j.order).toEqual([]);
+    }
+  });
+
+  it("a graph read names an unreadable task file and goes on", () => {
+    const root = repo();
+    const side = addWorktree(root, "side");
+    put(root, "a");
+    put(side, "b", ["a"]);
+    fs.writeFileSync(path.join(tasksDir(side), "broken.json"), "{not json");
+    for (const sub of ["graph", "next"]) {
+      const r = run(root, [sub, "--json"]);
+      expect(r.code).toBe(0);
+      const out = JSON.parse(r.stdout);
+      expect(out.problems).toHaveLength(1);
+      expect(out.problems[0]).toContain("broken.json");
+      expect(out.problems[0]).toContain(side);
+      expect(out.order).toEqual(["a", "b"]);
+      const text = run(root, [sub]);
+      expect(text.code).toBe(0);
+      expect(text.stderr).toContain("warning");
+      expect(text.stderr).toContain("broken.json");
+    }
+  });
+
+  it("graph and next finish within 1 second for 20 worktrees and 200 tasks", () => {
+    const root = repo();
+    const roots = [root];
+    for (let i = 1; i < 20; i += 1) roots.push(addWorktree(root, `wt-${i}`));
+    let n = 0;
+    for (const dir of roots) {
+      for (let j = 0; j < 10; j += 1) {
+        const deps = n > 0 ? [`task-${n - 1}`] : [];
+        if (n % 7 === 0 && n > 10) deps.push(`task-${n - 10}`);
+        put(dir, `task-${n}`, deps);
+        n += 1;
+      }
+    }
+    expect(n).toBe(200);
+    const started = performance.now();
+    const clone = listCloneTasks(root);
+    const graph = buildWorkGraph(clone.tasks);
+    const next = nextTasks(clone.tasks);
+    const elapsed = performance.now() - started;
+    console.log(`graph + next over ${clone.tasks.length} tasks in ${roots.length} worktrees: ${elapsed.toFixed(0)} ms`);
+    expect(clone.problems).toEqual([]);
+    expect(graph.tasks).toHaveLength(200);
+    expect(graph.cycle).toBeNull();
+    expect(graph.order).toHaveLength(200);
+    expect(next.ready.map((task) => task.slug)).toEqual(["task-0"]);
+    expect(next.blocked).toHaveLength(199);
+    expect(elapsed).toBeLessThanOrEqual(1000);
+  }, 60_000);
 });

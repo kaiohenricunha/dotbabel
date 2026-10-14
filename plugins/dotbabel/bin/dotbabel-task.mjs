@@ -45,10 +45,10 @@ import {
   updateTask,
   writeTask,
 } from "../src/task-state.mjs";
-import { findCycle, findSlugOwner } from "../src/work-graph.mjs";
+import { buildWorkGraph, dependencyStates, findCycle, findSlugOwner, nextTasks } from "../src/work-graph.mjs";
 
 const TOOL = "dotbabel-task";
-const SUBCOMMANDS = new Set(["new", "update", "show", "list", "close", "hook"]);
+const SUBCOMMANDS = new Set(["new", "update", "show", "list", "close", "graph", "next", "hook"]);
 
 const USAGE = `Usage:
   dotbabel task new    <slug> --goal <text> --done-when <text>... [--constraint <text>]... [--phase <p>]
@@ -58,6 +58,8 @@ const USAGE = `Usage:
   dotbabel task show   <slug> [--json]
   dotbabel task list   [--all] [--json]
   dotbabel task close  <slug>
+  dotbabel task graph  [--json]                 every open task of the clone, its edges, the order, any cycle
+  dotbabel task next   [--json]                 the ready tasks, then the blocked ones with what they wait on
   dotbabel task hook   session-start            SessionStart hook entry (JSON on stdin)
 
 A task is the contract (goal, done_when) and the state (phase, decisions,
@@ -67,7 +69,10 @@ worktrees of the clone.
 
 A dependency <ref> is a task of this clone (<slug>), a task of another clone
 on this machine (github.com/owner/repo:<slug>), or a pull request or issue
-(owner/repo#123). An edge that closes a cycle is refused.
+(owner/repo#123). An edge that closes a cycle is refused. A task is ready when
+every dependency is satisfied: its task is closed. A reference to another
+clone or to GitHub is unknown, and unknown counts as blocked. graph and next
+read the task files of every worktree of the clone and call nothing else.
 
 Exit codes: 0 ok, 1 refused, 2 env error, 64 usage error.`;
 
@@ -171,8 +176,7 @@ function cmdNew(args) {
   // and the new edges close no cycle. A slug this worktree holds is left to
   // writeTask's exclusive create, which reports TASK_EXISTS and also catches
   // a same-worktree race.
-  const clone = listCloneTasks(root);
-  for (const p of clone.problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+  const clone = readClone(root);
   const owner = findSlugOwner(clone.tasks, slug);
   if (owner !== null && owner !== root) {
     throw new TaskError(TASK_ERROR_CODES.TASK_SLUG_TAKEN, `task "${slug}" already exists in worktree ${owner}`);
@@ -198,8 +202,7 @@ function cmdUpdate(args) {
     const next = updateTask(t, change);
     if (change.dependsOn.length > 0) {
       // Under the task's lock, so the edges checked are the edges written.
-      const clone = listCloneTasks(root);
-      for (const p of clone.problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+      const clone = readClone(root);
       assertNoCycle(next, clone.tasks.filter((other) => other.slug !== slug));
     }
     return next;
@@ -236,6 +239,88 @@ function cmdList(args) {
   return EXIT_CODES.OK;
 }
 
+/** Shorten a worktree root for a line of text: its last path segment. */
+function short(worktree) {
+  const parts = worktree.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? worktree;
+}
+
+function waits(statuses) {
+  return statuses.map((w) => `${w.ref} (${w.state})`).join(", ");
+}
+
+/** Read every worktree's tasks, print the problems as warnings, and return the tasks. */
+function readClone(root) {
+  const clone = listCloneTasks(root);
+  for (const p of clone.problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+  return clone;
+}
+
+function cmdGraph(args) {
+  if (args.positional.length > 0) throw new UsageError("graph takes no positional argument");
+  const { tasks, problems } = readClone(resolveWorktree(process.cwd()).root);
+  const graph = buildWorkGraph(tasks);
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify({ ok: true, ...graph, problems }, null, 2)}\n`);
+    return EXIT_CODES.OK;
+  }
+  if (graph.tasks.length === 0) {
+    process.stdout.write("no open tasks in this clone\n");
+    return EXIT_CODES.OK;
+  }
+  const open = tasks.filter((t) => t.status === "open");
+  const lines = [];
+  for (const node of graph.tasks) {
+    lines.push(`${node.slug} [open] phase: ${node.phase} — ${short(node.worktree)}`);
+    const task = /** @type {import("../src/task-state.mjs").Task} */ (open.find((t) => t.slug === node.slug));
+    if (node.depends_on.length > 0) lines.push(`  depends on: ${waits(dependencyStates(task, tasks))}`);
+  }
+  lines.push(`order: ${graph.order.join(", ")}`);
+  lines.push(`cycle: ${graph.cycle === null ? "none" : graph.cycle.join(" -> ")}`);
+  process.stdout.write(`${lines.join("\n")}\n`);
+  return EXIT_CODES.OK;
+}
+
+function cmdNext(args) {
+  if (args.positional.length > 0) throw new UsageError("next takes no positional argument");
+  const { tasks, problems } = readClone(resolveWorktree(process.cwd()).root);
+  const next = nextTasks(tasks);
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify({ ok: true, ...next, problems }, null, 2)}\n`);
+    return EXIT_CODES.OK;
+  }
+  if (next.ready.length === 0 && next.blocked.length === 0) {
+    process.stdout.write("no open tasks in this clone\n");
+    return EXIT_CODES.OK;
+  }
+  const lines = ["ready:"];
+  if (next.ready.length === 0) lines.push("  none");
+  for (const t of next.ready) lines.push(`  ${t.slug} — ${short(t.worktree)} (phase: ${t.phase})`);
+  if (next.blocked.length > 0) {
+    lines.push("blocked:");
+    for (const t of next.blocked) lines.push(`  ${t.slug} — ${short(t.worktree)} waits on ${waits(t.waits_on)}`);
+  }
+  process.stdout.write(`${lines.join("\n")}\n`);
+  return EXIT_CODES.OK;
+}
+
+/**
+ * The readiness of each open task of the worktree, from the work graph of the
+ * clone, or undefined when the clone cannot be read: the hook then prints the
+ * tasks without their state rather than nothing.
+ */
+function readiness(root) {
+  try {
+    const next = nextTasks(listCloneTasks(root).tasks);
+    const states = new Map();
+    for (const t of next.ready) states.set(t.slug, { ready: true, waits_on: [] });
+    for (const t of next.blocked) states.set(t.slug, { ready: false, waits_on: t.waits_on });
+    return states;
+  } catch {
+    return undefined;
+  }
+}
+
 /** SessionStart: the open tasks of the payload's worktree, as additionalContext. */
 function runHook(event) {
   if (event !== "session-start") return;
@@ -247,7 +332,8 @@ function runHook(event) {
   }
   if (!input || typeof input !== "object" || Array.isArray(input)) return;
   const cwd = typeof input.cwd === "string" && input.cwd !== "" ? input.cwd : process.cwd();
-  const context = formatSessionContext(listTasks(resolveWorktree(cwd).root).tasks);
+  const root = resolveWorktree(cwd).root;
+  const context = formatSessionContext(listTasks(root).tasks, readiness(root));
   if (context === "") return;
   process.stdout.write(
     `${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: context } })}\n`,
@@ -305,6 +391,8 @@ function main(argv) {
     if (sub === "update") return cmdUpdate(subArgs);
     if (sub === "show") return cmdShow(subArgs);
     if (sub === "close") return cmdClose(subArgs);
+    if (sub === "graph") return cmdGraph(subArgs);
+    if (sub === "next") return cmdNext(subArgs);
     return cmdList(subArgs);
   } catch (err) {
     if (err instanceof UsageError) {

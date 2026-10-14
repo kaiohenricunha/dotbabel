@@ -959,6 +959,8 @@ session start, so a new or resumed session reads that state.
 | `show <slug>`        | Print one task                                                                                    |
 | `list [--all]`       | Print the open tasks, or every task with `--all`, most recently updated first                     |
 | `close <slug>`       | Mark a task closed. The record stays and `show` still prints it                                   |
+| `graph [--json]`     | Every open task of the clone, its edges, the dependency order, and any cycle                      |
+| `next [--json]`      | The ready tasks, then the blocked ones with the references they wait on                           |
 | `hook session-start` | `SessionStart` entry: print the open tasks as context                                             |
 
 | Flag                      | Used by         | Meaning                                                               |
@@ -991,6 +993,20 @@ A dependency reference takes one of three forms: a task of this clone
 and `update` refuse a reference that closes a cycle through the tasks of the
 clone, including a task that names itself, and write nothing when they do.
 
+`graph` and `next` read the task files of every worktree of the clone on each
+call, and call nothing else: no index, no network, no `gh`. A dependency is
+`satisfied` when its task is closed, `open` while it is open, `missing` when no
+worktree holds the slug, and `unknown` for a task of another clone or a pull
+request or issue, which this version does not resolve. A task is ready when
+every dependency is satisfied; `unknown` counts as blocked. The dependency
+order lists each task after the open tasks it depends on, ties by slug, so it
+is the same on every read; a cycle written on disk is reported and its tasks
+are left out of the order. `--json` prints `{ok, tasks, edges, order, cycle,
+problems}` for `graph` and `{ok, order, ready, blocked, problems}` for `next`,
+where each blocked entry carries `waits_on: [{ref, kind, state}]`. A task file
+that does not read is named in `problems` and as a warning, and the read goes
+on.
+
 A task file's slug must be its file name; a copied or renamed file is reported
 as invalid rather than written to another task. `update` and `close` hold a
 per-task lock (`<slug>.json.lock`), so two writers cannot lose each other's
@@ -1005,7 +1021,8 @@ a reference the task does not have, or when a dependency closes a cycle.
 **Exits 2** outside a git repository, for a symbolic link on the task path, for
 a task file that does not parse or whose slug is not its file name, while
 another writer holds the task's lock, and for any filesystem error. `list`
-reports an unreadable file as a warning and still exits 0. **Exits 64** for a
+reports an unreadable file as a warning and still exits 0, as `graph` and
+`next` do. **Exits 64** for a
 bad slug, a missing or blank `--goal` or `--done-when`, any other blank text
 value, a malformed dependency reference, or an `update` with nothing to change. `hook` always exits 0: it fails
 open.
