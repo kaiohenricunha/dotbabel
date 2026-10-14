@@ -10,6 +10,101 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [4.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.4.0...v4.0.0) (2026-10-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **criteria:** derive merge-gate scope from the diff, not the body ([#376](https://github.com/kaiohenricunha/dotbabel/issues/376))
+
+### Added
+
+* **attestation:** merge verification — spot checks, main-CI contradiction alarm, billing-aware CI status ([#465](https://github.com/kaiohenricunha/dotbabel/issues/465)) ([94b2797](https://github.com/kaiohenricunha/dotbabel/commit/94b27973bfb10ac88c3ae61671f6b50f71ccbe24))
+* **ci:** adopt the criteria gate, critical_paths and the pre-push hook ([#394](https://github.com/kaiohenricunha/dotbabel/issues/394)) ([2fde317](https://github.com/kaiohenricunha/dotbabel/commit/2fde317c748f06bfdb9840c4766394b1ef973fa6))
+* **conductor:** narrow the preflight and derive the entry phase (P-G2) ([#401](https://github.com/kaiohenricunha/dotbabel/issues/401)) ([ab91b1d](https://github.com/kaiohenricunha/dotbabel/commit/ab91b1d96ba1b7fbfee70995500860a015d1e58a))
+* **conductor:** skip a finished review on re-entry and let a consumer adopt attestation (P-G5, P-G6) ([#403](https://github.com/kaiohenricunha/dotbabel/issues/403)) ([79c61d8](https://github.com/kaiohenricunha/dotbabel/commit/79c61d89535a5c04b6311763061e481be689033e))
+* **consumer:** ship CI templates, a pre-push hook, and related tests (P-D1..P-D3) ([#382](https://github.com/kaiohenricunha/dotbabel/issues/382)) ([89d42bf](https://github.com/kaiohenricunha/dotbabel/commit/89d42bfe9cd98f50c8abe928a217987e40ae6aa7))
+* **criteria:** verify criteria in review-pr and guard the evidence marker (P-B4) ([#379](https://github.com/kaiohenricunha/dotbabel/issues/379)) ([b84ba63](https://github.com/kaiohenricunha/dotbabel/commit/b84ba639d4e12448d2eba69e21858c59deb3e3cc))
+* **deploy:** add smoke checks to the deploy helper (P-E1) ([#383](https://github.com/kaiohenricunha/dotbabel/issues/383)) ([04cbd14](https://github.com/kaiohenricunha/dotbabel/commit/04cbd14991b23372587e62d4ff24883b2402ff22))
+* **doctor:** report which shipped hooks are registered ([#450](https://github.com/kaiohenricunha/dotbabel/issues/450)) ([a22b813](https://github.com/kaiohenricunha/dotbabel/commit/a22b813510fe4f536883832f44626799b9fdaa9c))
+* **fleet:** 2 lanes of about 7 CPUs by default, and session-aware lending ([#443](https://github.com/kaiohenricunha/dotbabel/issues/443)) ([04f496b](https://github.com/kaiohenricunha/dotbabel/commit/04f496b957b0a0278e21a42b3e5893f0e60c52c4))
+* **fleet:** CPU lanes for heavy test runs through CLAUDE_CODE_SHELL_PREFIX ([#426](https://github.com/kaiohenricunha/dotbabel/issues/426)) ([39b7127](https://github.com/kaiohenricunha/dotbabel/commit/39b71272b8b1458fc8a411ced57d1fc1efce09d8))
+* **fleet:** cross-session file claims with a deny-on-conflict edit guard ([#424](https://github.com/kaiohenricunha/dotbabel/issues/424)) ([3cc3408](https://github.com/kaiohenricunha/dotbabel/commit/3cc34080452f258b3f00edf293bd72ffd31a89a5))
+* **fleet:** fair CPU share, an equal CPU weight for each session's scope ([#445](https://github.com/kaiohenricunha/dotbabel/issues/445)) ([bea14a1](https://github.com/kaiohenricunha/dotbabel/commit/bea14a1ba1e7f3012ea0eefccdd09f91abf3fd98))
+* **fleet:** lane lending and a lane width setting, both off by default ([#441](https://github.com/kaiohenricunha/dotbabel/issues/441)) ([d7cb53d](https://github.com/kaiohenricunha/dotbabel/commit/d7cb53dea61c0a3e9ad5326e7910e5be8cb90e30))
+* **fleet:** merge event feed so peers learn when the base moved under their claims ([#427](https://github.com/kaiohenricunha/dotbabel/issues/427)) ([c37e803](https://github.com/kaiohenricunha/dotbabel/commit/c37e803fc02a7d5f92857938931fc2beb2049946))
+* **fleet:** merge token so one session at a time rebases, attests, and merges a repo ([#429](https://github.com/kaiohenricunha/dotbabel/issues/429)) ([2bc2de8](https://github.com/kaiohenricunha/dotbabel/commit/2bc2de8a8217da9135752991d0b65f723e721d90))
+* **fleet:** repositories name their own heavy commands in fleet.heavy ([#444](https://github.com/kaiohenricunha/dotbabel/issues/444)) ([36c8d92](https://github.com/kaiohenricunha/dotbabel/commit/36c8d92fd03f0ad1ad5f5d9996d33d1c921eb5a2))
+* **gates:** make CI the merge evidence and add /deliver; review and attest run on demand ([#469](https://github.com/kaiohenricunha/dotbabel/issues/469)) ([5ff38d2](https://github.com/kaiohenricunha/dotbabel/commit/5ff38d24480040916c6075ec65de09f332684ae8))
+* **gates:** reuse SHA-pinned attestation evidence at merge time (P-G1) ([#400](https://github.com/kaiohenricunha/dotbabel/issues/400)) ([9fab044](https://github.com/kaiohenricunha/dotbabel/commit/9fab0442d962b5e404d92e3ec1df6cab498e9c08))
+* harness follow-ups — doctor run receipts, task state in /git pr and pr-conductor, merge-verification done ([#478](https://github.com/kaiohenricunha/dotbabel/issues/478)) ([4115a0b](https://github.com/kaiohenricunha/dotbabel/commit/4115a0b3d4f6d07f134b1e6e2fd5122c3143721e))
+* **hooks:** ask before destructive git calls instead of hard-blocking ([#420](https://github.com/kaiohenricunha/dotbabel/issues/420)) ([d58baca](https://github.com/kaiohenricunha/dotbabel/commit/d58baca7987c1e515d83995917ad69a3dcd112d7))
+* **local-attest:** scope every attestation to the PR's changes; the full suite runs on demand ([#447](https://github.com/kaiohenricunha/dotbabel/issues/447)) ([6c24355](https://github.com/kaiohenricunha/dotbabel/commit/6c24355fbaa1b5ea9ffc02f7e60908f543e4fc9c))
+* **models:** add the Claude and Codex source adapters (P-6, P-7) ([#414](https://github.com/kaiohenricunha/dotbabel/issues/414)) ([1936712](https://github.com/kaiohenricunha/dotbabel/commit/1936712a76dc6f53cf1524f5f2b10eeabbf66729))
+* **models:** add the dotbabel.compute schema and requirement parser (P-2) ([#389](https://github.com/kaiohenricunha/dotbabel/issues/389)) ([79d8884](https://github.com/kaiohenricunha/dotbabel/commit/79d8884e0b6fa50bf0b73860ff1b3537df693a26))
+* **models:** add the Model Intelligence domain vocabulary (P-1) ([#387](https://github.com/kaiohenricunha/dotbabel/issues/387)) ([4ab850e](https://github.com/kaiohenricunha/dotbabel/commit/4ab850ed2ad9edd6c54a9ad7787f52b7d3065c64))
+* **models:** add the Model Intelligence policy layers (P-4) ([#396](https://github.com/kaiohenricunha/dotbabel/issues/396)) ([d73aac1](https://github.com/kaiohenricunha/dotbabel/commit/d73aac18d91382b8f3d783738e3f3712a7badbc6))
+* **models:** add the Models.dev knowledge-source adapter and close RQ-1 for its license (P-8a) ([#436](https://github.com/kaiohenricunha/dotbabel/issues/436)) ([d99883c](https://github.com/kaiohenricunha/dotbabel/commit/d99883c8fb8eb74f325d64c291c4b930de7fc846))
+* **models:** add the source adapter contract and its fixtures (P-5) ([#407](https://github.com/kaiohenricunha/dotbabel/issues/407)) ([7b0c379](https://github.com/kaiohenricunha/dotbabel/commit/7b0c3790e1dfabb5d46275b02feb3b2356632b42))
+* **models:** align the adapters with the §5 contract decisions (P-8c) ([#473](https://github.com/kaiohenricunha/dotbabel/issues/473)) ([f554af5](https://github.com/kaiohenricunha/dotbabel/commit/f554af5ad0e1c36fb789fe2e5fc91b972f8fe00d))
+* **models:** capability cache, refresh lock, catalog normalization, and the refresh and status verbs (P-9) ([#479](https://github.com/kaiohenricunha/dotbabel/issues/479)) ([108bd8e](https://github.com/kaiohenricunha/dotbabel/commit/108bd8ed9375af9c861497f000fafe98a621e162))
+* **models:** evidence-trust preferences are monotonic after the user layer (P-4b) ([#481](https://github.com/kaiohenricunha/dotbabel/issues/481)) ([5ef27cd](https://github.com/kaiohenricunha/dotbabel/commit/5ef27cd2381fc95f246eb3599a8d9efc9f94f495))
+* **models:** harden the source-adapter contract before P-9 persists evidence (PR-05b) ([#425](https://github.com/kaiohenricunha/dotbabel/issues/425)) ([78f3796](https://github.com/kaiohenricunha/dotbabel/commit/78f3796d040e78828348ce7c0c92bfa67727712c))
+* **models:** read legacy model/effort and report migration (P-3) ([#393](https://github.com/kaiohenricunha/dotbabel/issues/393)) ([10ab937](https://github.com/kaiohenricunha/dotbabel/commit/10ab93789ff8a0fdece3b70f03e347ba201cff37))
+* **pr-conductor:** let agents start the pipeline behind an ask prompt ([#418](https://github.com/kaiohenricunha/dotbabel/issues/418)) ([b5ace20](https://github.com/kaiohenricunha/dotbabel/commit/b5ace205d3d621bf16841d01096e6faca3488832))
+* **pr-stack:** attempt cap, the conductor stops after N failed attempts of one phase ([#455](https://github.com/kaiohenricunha/dotbabel/issues/455)) ([993d3b7](https://github.com/kaiohenricunha/dotbabel/commit/993d3b7612065e9abd2df5e4f49ce5bd1496da45))
+* **pr-stack:** run receipt, an append-only record of each conductor phase attempt ([#451](https://github.com/kaiohenricunha/dotbabel/issues/451)) ([4ee7665](https://github.com/kaiohenricunha/dotbabel/commit/4ee7665d58305d344ff481cdfc1dd71b7c618759))
+* **quality:** declare the Stryker mutation tool and repair its sandbox (P-F1) ([#391](https://github.com/kaiohenricunha/dotbabel/issues/391)) ([f42eb1b](https://github.com/kaiohenricunha/dotbabel/commit/f42eb1b974e8275356cf6549b114b74b401fa0a4))
+* **quality:** reuse matrix results and unblock governed-file PRs (P-G3, P-G4) ([#402](https://github.com/kaiohenricunha/dotbabel/issues/402)) ([a234ff3](https://github.com/kaiohenricunha/dotbabel/commit/a234ff3c7abab621738d905654e7d260826d488a))
+* **quality:** score mutation on changed lines only (P-C4) ([#380](https://github.com/kaiohenricunha/dotbabel/issues/380)) ([86efe05](https://github.com/kaiohenricunha/dotbabel/commit/86efe056e48ccfebfa2c40a9b9b8f9c0c8ef05a9))
+* **security-audit:** add the parent-side artifact promoter ([#422](https://github.com/kaiohenricunha/dotbabel/issues/422)) ([3566db5](https://github.com/kaiohenricunha/dotbabel/commit/3566db5e24f8554336970783a815a54059c37900))
+* **skills:** add security-audit skill from cloudflare/security-audit-skill ([#416](https://github.com/kaiohenricunha/dotbabel/issues/416)) ([7f576ba](https://github.com/kaiohenricunha/dotbabel/commit/7f576ba08a9d016c42e1d3896e5981e741c5a283))
+* **smoke:** add the smoke-test skill and extend release verification (P-E2) ([#386](https://github.com/kaiohenricunha/dotbabel/issues/386)) ([bab0e23](https://github.com/kaiohenricunha/dotbabel/commit/bab0e23096001dc27c1046f82bd6ca9a50e615fe))
+* **spec:** scaffold spec.json and wire criteria into the authoring skills (P-A2) ([#388](https://github.com/kaiohenricunha/dotbabel/issues/388)) ([9872f11](https://github.com/kaiohenricunha/dotbabel/commit/9872f118bd15b4790f54a342fbd7eb55e3aaf258))
+* **task:** a contract and durable state for work without a spec ([#454](https://github.com/kaiohenricunha/dotbabel/issues/454)) ([fda2c99](https://github.com/kaiohenricunha/dotbabel/commit/fda2c991d46ed187544523eafd675e0b2133d33d))
+* **task:** task graph and task next, and ready or blocked tasks at session start (graph-engineering 1b) ([#476](https://github.com/kaiohenricunha/dotbabel/issues/476)) ([5eb0244](https://github.com/kaiohenricunha/dotbabel/commit/5eb0244ada294689e5b71e719d48815f073f072a))
+* **task:** task schema version 2 with depends_on, clone-unique slugs, and cycle refusal (graph-engineering 1a) ([#475](https://github.com/kaiohenricunha/dotbabel/issues/475)) ([9daecb6](https://github.com/kaiohenricunha/dotbabel/commit/9daecb61e86283d7a4db2a50ae141f9c2c2cad87))
+* **task:** the clone registry, cross-repo task references, and --online pull request and issue references (graph-engineering 1c) ([#482](https://github.com/kaiohenricunha/dotbabel/issues/482)) ([a897557](https://github.com/kaiohenricunha/dotbabel/commit/a897557b05e5587b70ab1b79d6a2ce2a9e02355f))
+* **trust:** inherit repository trust in git worktrees ([#409](https://github.com/kaiohenricunha/dotbabel/issues/409)) ([45ca1d9](https://github.com/kaiohenricunha/dotbabel/commit/45ca1d921ee789b15bd64e18baddc5d23c5727ef))
+* **yolo:** a per-session autonomy grant that reverts by itself ([#464](https://github.com/kaiohenricunha/dotbabel/issues/464)) ([a4d15cc](https://github.com/kaiohenricunha/dotbabel/commit/a4d15ccca98292048b8c6c7c25e10663a5658993))
+
+
+### Fixed
+
+* **cli:** stop truncating --json output on a slow pipe reader ([#404](https://github.com/kaiohenricunha/dotbabel/issues/404)) ([2ef2186](https://github.com/kaiohenricunha/dotbabel/commit/2ef218678bb7e056679dd4fd2bcc28099226ae77))
+* **criteria:** compress the evidence payload line to fit the comment cap ([#468](https://github.com/kaiohenricunha/dotbabel/issues/468)) ([6cacf50](https://github.com/kaiohenricunha/dotbabel/commit/6cacf508e7f2832ae0183a75189c9e7a33ff8144))
+* **criteria:** derive merge-gate scope from the diff, not the body ([#376](https://github.com/kaiohenricunha/dotbabel/issues/376)) ([0db0221](https://github.com/kaiohenricunha/dotbabel/commit/0db0221b1e11a982a9ffe6a0382f3781d3846d1a))
+* **criteria:** verify --pr runs the specs the diff implicates, as the gate does ([#449](https://github.com/kaiohenricunha/dotbabel/issues/449)) ([73e297f](https://github.com/kaiohenricunha/dotbabel/commit/73e297f9bcf9a612ff04e7e40a7d3dd2ade84ac2))
+* **fleet:** deliver merges a session lived through on its first check ([#428](https://github.com/kaiohenricunha/dotbabel/issues/428)) ([114b73a](https://github.com/kaiohenricunha/dotbabel/commit/114b73a9bf909446a5178be21329ab59bdfb34a6))
+* **fleet:** write a waiting command's record, so lanes and lending see it ([#446](https://github.com/kaiohenricunha/dotbabel/issues/446)) ([d12a962](https://github.com/kaiohenricunha/dotbabel/commit/d12a962f0bd2213f1c16746498621fd758c9d440))
+* **mutation:** resolve the five orphan units against measurement ([#399](https://github.com/kaiohenricunha/dotbabel/issues/399)) ([a0158f0](https://github.com/kaiohenricunha/dotbabel/commit/a0158f00619f6e7e9a1e490d1d3cf6878bc18757))
+* **mutation:** scope Stryker to all of TEST-1, not just the criteria tree ([#398](https://github.com/kaiohenricunha/dotbabel/issues/398)) ([c6009e8](https://github.com/kaiohenricunha/dotbabel/commit/c6009e896349bd76ff227174ec4ef9e70ca9b8e9))
+* **quality:** keep a path-scoped coverage tool not_triggered on a diff outside its paths ([#471](https://github.com/kaiohenricunha/dotbabel/issues/471)) ([3bc9f36](https://github.com/kaiohenricunha/dotbabel/commit/3bc9f3656d531b4a8d064f066f19b89ace137ff8))
+* **tests:** make example-parity ignore scaffolder date stamps ([#417](https://github.com/kaiohenricunha/dotbabel/issues/417)) ([3c8ab42](https://github.com/kaiohenricunha/dotbabel/commit/3c8ab425bf8772ff24b79794f7f98ed154d9a959))
+* **yolo:** let a merge in the scope delete its own pull request branch ([#470](https://github.com/kaiohenricunha/dotbabel/issues/470)) ([fad7303](https://github.com/kaiohenricunha/dotbabel/commit/fad73032229780326e8c9f9f763639c565f95891))
+
+
+### Documentation
+
+* **changelog:** note the fan_out upgrade caveat for 3.4.0 ([#377](https://github.com/kaiohenricunha/dotbabel/issues/377)) ([c9a2182](https://github.com/kaiohenricunha/dotbabel/commit/c9a218284e09c328decae3380489d68f97a5d88c))
+* **experiments:** CPU lane size benchmark, 2026-09-27 ([#430](https://github.com/kaiohenricunha/dotbabel/issues/430)) ([3702e5e](https://github.com/kaiohenricunha/dotbabel/commit/3702e5e066117761622f29eb16b98f00ffacfd45))
+* **experiments:** CPU lane size test 1 (jobs arrive over time) and foreign-load check ([#440](https://github.com/kaiohenricunha/dotbabel/issues/440)) ([6e6e876](https://github.com/kaiohenricunha/dotbabel/commit/6e6e876852f80cd4557149f14046da64c91e0f0e))
+* **experiments:** offline harness for a Jev triage gate on review findings ([#453](https://github.com/kaiohenricunha/dotbabel/issues/453)) ([33f66a8](https://github.com/kaiohenricunha/dotbabel/commit/33f66a883128b05732cecc0cc3a837fbeb29b100))
+* **experiments:** record the Jev triage results — REJECT ([#477](https://github.com/kaiohenricunha/dotbabel/issues/477)) ([1a90179](https://github.com/kaiohenricunha/dotbabel/commit/1a9017983de08c9c10fc7a3507757f354a1ced3d))
+* **rule-floor:** require a completion status report at the end of each work unit ([#421](https://github.com/kaiohenricunha/dotbabel/issues/421)) ([74faeef](https://github.com/kaiohenricunha/dotbabel/commit/74faeefb8b7a08b417d654be2326094cef59e665))
+* **rules:** a /deliver task or task contract is the approval for readings and bug audits ([#474](https://github.com/kaiohenricunha/dotbabel/issues/474)) ([646bb60](https://github.com/kaiohenricunha/dotbabel/commit/646bb609fe1d2188d9388d612385d6366daba25a))
+* **rules:** correct the Disk hygiene facts for this host ([#480](https://github.com/kaiohenricunha/dotbabel/issues/480)) ([fabcb76](https://github.com/kaiohenricunha/dotbabel/commit/fabcb764a8a65d51836498b2559d80261f0cc4e5))
+* **spec:** draft graph-engineering — a work graph, host-neutral coordination, and an opt-in decider ([#467](https://github.com/kaiohenricunha/dotbabel/issues/467)) ([1304a5d](https://github.com/kaiohenricunha/dotbabel/commit/1304a5d80bfd1e763425a5edd96e389b76626ef9))
+* **spec:** draft unforgeable-evidence — gate on evidence an agent cannot sign alone ([#452](https://github.com/kaiohenricunha/dotbabel/issues/452)) ([797ae9d](https://github.com/kaiohenricunha/dotbabel/commit/797ae9d1cf990deb2058ab7615b6e689aabe2f8a))
+* **spec:** move qa-verification-harness to done ([#433](https://github.com/kaiohenricunha/dotbabel/issues/433)) ([5434d39](https://github.com/kaiohenricunha/dotbabel/commit/5434d39050890a4c2785eed3af0d20e8310dcfab))
+* **spec:** park unforgeable-evidence and record the E-1 and A-6 runs ([#463](https://github.com/kaiohenricunha/dotbabel/issues/463)) ([f392a78](https://github.com/kaiohenricunha/dotbabel/commit/f392a78b9a3ac653145ebad8a781498c0d2886dd))
+* **spec:** reconcile qa-verification-harness with what shipped, and fix the TEST-4 timeout test ([#406](https://github.com/kaiohenricunha/dotbabel/issues/406)) ([9357b52](https://github.com/kaiohenricunha/dotbabel/commit/9357b525382d26d6be7649c01ebe6f90a2f2a1eb))
+* **specs:** add the Model Intelligence Phase 0 findings ([#385](https://github.com/kaiohenricunha/dotbabel/issues/385)) ([b6c0ecb](https://github.com/kaiohenricunha/dotbabel/commit/b6c0ecb2a06a58562c90a3d47700f59a2eb2472e))
+* **specs:** add the Model Intelligence PR sequence and landing pipeline ([#392](https://github.com/kaiohenricunha/dotbabel/issues/392)) ([99db64b](https://github.com/kaiohenricunha/dotbabel/commit/99db64bbc7aa6228b80fbcdef4322122820cedf5))
+* **specs:** add the Model Intelligence spec ([#384](https://github.com/kaiohenricunha/dotbabel/issues/384)) ([ed91bcc](https://github.com/kaiohenricunha/dotbabel/commit/ed91bcc8cabdac68a90461cdd6d18448b944b68a))
+* **spec:** settle seven Model Intelligence contract decisions ([#466](https://github.com/kaiohenricunha/dotbabel/issues/466)) ([7426e8d](https://github.com/kaiohenricunha/dotbabel/commit/7426e8d1a7d4ddcba811057ac5c7f64f280f30d6))
+* **specs:** record the dual-spec-id landing obligation as IMPL-19 ([#397](https://github.com/kaiohenricunha/dotbabel/issues/397)) ([a842839](https://github.com/kaiohenricunha/dotbabel/commit/a842839aba6a58b0d3c9bdb16446626a25ab32ef))
+
 ## [3.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.3.0...v3.4.0) (2026-09-16)
 
 
