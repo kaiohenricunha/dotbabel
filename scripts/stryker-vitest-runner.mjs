@@ -15,8 +15,8 @@
  * before the runner starts Vitest. That holds in every Stryker worker without
  * state, matches the Vitest 4 names too, and still matches once upstream joins
  * with " > ". Delete this file and select `vitest` again when a published runner
- * builds names Vitest 5 can match (`tests/stryker-vitest-runner.test.mjs` says
- * how to tell).
+ * builds names Vitest 5 can match: its `collectTestName` in `dist/src/test-helpers.js`
+ * then joins with " > " instead of a space.
  *
  * The upstream runner exports only its plugin list, so the class is imported
  * from its file. A runner upgrade that moves that file fails the test above.
