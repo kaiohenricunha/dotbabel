@@ -5,12 +5,19 @@
  * for an unscoped run, not the per-unit invocation.
  *
  * The Vitest runner reuses the repository's own `vitest.config.mjs`.
+ *
+ * `testRunner` is `vitest-dotbabel`, the upstream Vitest runner with a repaired
+ * test-name filter (`scripts/stryker-vitest-runner.mjs`). With the upstream
+ * `vitest` runner 10.0.0 and Vitest 5, every mutant run executes zero tests and
+ * every covered mutant reports "survived". The upstream plugin stays listed,
+ * because it carries the schema and defaults of the `vitest` options.
  */
 import { skillDirRuntimes, projectSkillsDir } from "./plugins/dotbabel/src/agents.mjs";
 
 export default {
   packageManager: "npm",
-  testRunner: "vitest",
+  testRunner: "vitest-dotbabel",
+  plugins: ["@stryker-mutator/vitest-runner", "./scripts/stryker-vitest-runner.mjs"],
   coverageAnalysis: "perTest",
   // `json` is what `dotbabel quality` reads back: the declared mutation tool in
   // `.dotbabel.json` parses this file with the `stryker-json` format. The path
