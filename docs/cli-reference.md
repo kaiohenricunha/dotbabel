@@ -963,19 +963,20 @@ session start, so a new or resumed session reads that state.
 | `next [--json]`      | The ready tasks, then the blocked ones with the references they wait on                           |
 | `hook session-start` | `SessionStart` entry: print the open tasks as context                                             |
 
-| Flag                      | Used by         | Meaning                                                               |
-| ------------------------- | --------------- | --------------------------------------------------------------------- |
-| `--goal <text>`           | `new`           | What the work must achieve                                            |
-| `--done-when <text>`      | `new`           | A check that decides the work is done. Repeatable                     |
-| `--constraint <t>`        | `new`           | A limit on how the work is done. Repeatable                           |
-| `--phase <p>`             | `new`, `update` | The phase, in the vocabulary of the driving skill (default `started`) |
-| `--decision <text>`       | `update`        | Append a decision with its time. Repeatable                           |
-| `--pending <text>`        | `update`        | Append a pending item. Repeatable                                     |
-| `--done <text>`           | `update`        | Remove a pending item, matched exactly. Repeatable                    |
-| `--depends-on <ref>`      | `new`, `update` | A reference this task waits on (see below). Repeatable                |
-| `--drop-depends-on <ref>` | `update`        | Remove a dependency, matched exactly. Repeatable                      |
-| `--all`                   | `list`          | Include closed tasks                                                  |
-| `--json`                  | all             | Print `{ok, task}` or `{ok, tasks, problems}`                         |
+| Flag                      | Used by         | Meaning                                                                |
+| ------------------------- | --------------- | ---------------------------------------------------------------------- |
+| `--goal <text>`           | `new`           | What the work must achieve                                             |
+| `--done-when <text>`      | `new`           | A check that decides the work is done. Repeatable                      |
+| `--constraint <t>`        | `new`           | A limit on how the work is done. Repeatable                            |
+| `--phase <p>`             | `new`, `update` | The phase, in the vocabulary of the driving skill (default `started`)  |
+| `--decision <text>`       | `update`        | Append a decision with its time. Repeatable                            |
+| `--pending <text>`        | `update`        | Append a pending item. Repeatable                                      |
+| `--done <text>`           | `update`        | Remove a pending item, matched exactly. Repeatable                     |
+| `--depends-on <ref>`      | `new`, `update` | A reference this task waits on (see below). Repeatable                 |
+| `--drop-depends-on <ref>` | `update`        | Remove a dependency, matched exactly. Repeatable                       |
+| `--all`                   | `list`          | Include closed tasks                                                   |
+| `--online`                | `graph`, `next` | Ask `gh` about each pull request or issue reference. Ignored elsewhere |
+| `--json`                  | all             | Print `{ok, task}` or `{ok, tasks, problems}`                          |
 
 A slug is lowercase letters, digits, and dashes, up to 64 characters, and it is
 unique across the worktrees of the clone: `new` refuses a slug that another
@@ -994,18 +995,35 @@ and `update` refuse a reference that closes a cycle through the tasks of the
 clone, including a task that names itself, and write nothing when they do.
 
 `graph` and `next` read the task files of every worktree of the clone on each
-call, and call nothing else: no index, no network, no `gh`. A dependency is
-`satisfied` when its task is closed, `open` while it is open, `missing` when no
-worktree holds the slug, and `unknown` for a task of another clone or a pull
-request or issue, which this version does not resolve. A task is ready when
-every dependency is satisfied; `unknown` counts as blocked. The dependency
-order lists each task after the open tasks it depends on, ties by slug, so it
-is the same on every read; a cycle written on disk is reported and its tasks
-are left out of the order. `--json` prints `{ok, tasks, edges, order, cycle,
-problems}` for `graph` and `{ok, order, ready, blocked, problems}` for `next`,
-where each blocked entry carries `waits_on: [{ref, kind, state}]`. A task file
-that does not read is named in `problems` and as a warning, and the read goes
-on.
+call: no index. A dependency is `satisfied` when its task is closed, its pull
+request is merged, or its issue is closed; `open` while it is not; `missing`
+when no worktree holds the slug, or GitHub has no such number; `ambiguous`
+when two clones of one repository hold the slug; and `unknown` when it cannot
+be told. A task is ready when every dependency is satisfied; `ambiguous` and
+`unknown` count as blocked. The dependency order lists each task after the
+open tasks it depends on, ties by slug, so it is the same on every read; a
+cycle written on disk is reported and its tasks are left out of the order.
+`--json` prints `{ok, tasks, edges, order, cycle, problems}` for `graph` and
+`{ok, order, ready, blocked, problems}` for `next`, where each blocked entry
+carries `waits_on: [{ref, kind, state}]`. A task file that does not read is
+named in `problems` and as a warning, and the read goes on.
+
+A task of another clone (`github.com/owner/repo:<slug>`) resolves offline from
+that clone's task files. The clone registry,
+`$XDG_STATE_HOME/dotbabel/graph/clones.json` (default `~/.local/state`), maps
+a repository key, the normalized `origin` URL that `dotbabel fleet` also uses,
+to the main checkouts of its clones on this machine. Every `new`, `update`, and
+`close` records its own clone there, once for all its worktrees; a clone with
+no network `origin` is not recorded, and a registry that cannot be written is
+a warning. A path that no longer exists is dropped on read. A repository that
+is not registered here is `unknown`.
+
+A pull request or issue (`owner/repo#123`) is `unknown` unless `--online` asks
+`gh` about it, one `gh api` call per reference, with a 15-second timeout. A
+`gh` that fails, is missing, or is not signed in leaves the reference
+`unknown`, names it as a warning, and still exits 0. Without `--online`,
+`graph`, `next`, and the session-start hook read local files and start no
+other process.
 
 A task file's slug must be its file name; a copied or renamed file is reported
 as invalid rather than written to another task. `update` and `close` hold a

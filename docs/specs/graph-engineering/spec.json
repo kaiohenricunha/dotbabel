@@ -6,6 +6,7 @@
   "linked_paths": [
     "plugins/dotbabel/src/task-state.mjs",
     "plugins/dotbabel/src/work-graph.mjs",
+    "plugins/dotbabel/src/clone-registry.mjs",
     "plugins/dotbabel/bin/dotbabel-task.mjs",
     "schemas/dotbabel.task-state.schema.json"
   ],
@@ -118,7 +119,7 @@
     },
     {
       "id": "AC-5",
-      "status": "planned",
+      "status": "active",
       "given": "a task that depends on owner/repo#123",
       "when": "dotbabel task next runs without --online",
       "then": "the task is blocked on that reference with state unknown, and no gh process starts",

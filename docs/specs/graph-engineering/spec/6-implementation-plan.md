@@ -21,7 +21,7 @@
 
 - Phase 1, unit 2-0, and units 3a to 3c can run at the same time.
 - Each phase adds its code and schema files to `linked_paths` when it starts (R-1).
-- Before 3a edits `plugins/dotbabel/bin/dotbabel-pr-stack.mjs` or `schemas/dotbabel.config.schema.json`, it coordinates with the `feat/merge-verification` branch (§2).
+- 3a edits `plugins/dotbabel/bin/dotbabel-pr-stack.mjs` and `schemas/dotbabel.config.schema.json` on top of `main`: the merge-verification work that touched them shipped as #465 (§2).
 - 3a and 3d add new bins, so they also edit `package.json` and the dispatcher, `plugins/dotbabel/bin/dotbabel.mjs` (§2 Boundaries).
 
 ## 6.2 Workstream Breakdown
@@ -117,7 +117,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `decider-boundary.test.mjs`: "no merge gate module imports the decider module" (AC-12, SEC-2)
   - `runtime-deps.test.mjs`: "the package has four runtime dependencies" (AC-13, OPS-1)
   - `dotbabel-doctor.test.mjs`: "doctor reports the decider's adapter, consent, and key presence, never the key" (OPS-2)
-- **Files:** create the decider module and `plugins/dotbabel/bin/dotbabel-decide.mjs`. Modify `plugins/dotbabel/bin/dotbabel.mjs`, `package.json`, `run-receipt.mjs` and its schema, `dotbabel-pr-stack.mjs` (`record`), `dotbabel-doctor.mjs`, and `schemas/dotbabel.config.schema.json`. Message the session that owns `feat/merge-verification` before you edit `dotbabel-pr-stack.mjs` or the config schema.
+- **Files:** create the decider module and `plugins/dotbabel/bin/dotbabel-decide.mjs`. Modify `plugins/dotbabel/bin/dotbabel.mjs`, `package.json`, `run-receipt.mjs` and its schema, `dotbabel-pr-stack.mjs` (`record`), `dotbabel-doctor.mjs`, and `schemas/dotbabel.config.schema.json`. The merge-verification changes to `dotbabel-pr-stack.mjs` and the config schema are on `main` (#465).
 
 ### 3b — The skills call `dotbabel decide`
 

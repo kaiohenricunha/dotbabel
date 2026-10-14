@@ -8,9 +8,12 @@
  * new or resumed session reads the state of the work instead of a retelling.
  * Storage and its limits are documented in src/task-state.mjs.
  *
- * Every git shell-out and all task storage go through src/task-state.mjs, and
- * the cycle check through src/work-graph.mjs. The bin itself reads only the
- * hook payload on stdin. Usage: see USAGE below, or `dotbabel task --help`.
+ * Every git shell-out and all task storage go through src/task-state.mjs, the
+ * cycle check and the dependency states through src/work-graph.mjs, and the
+ * clone registry through src/clone-registry.mjs. The bin itself reads the
+ * hook payload on stdin and, only with `--online`, asks `gh` about pull
+ * request and issue references (KD-2). Usage: see USAGE below, or
+ * `dotbabel task --help`.
  *
  * A slug is unique per clone: `new` refuses one that any worktree of the clone
  * holds. `new` and `update` refuse a dependency that closes a cycle through the
@@ -26,14 +29,17 @@
  *   64  bad CLI invocation, including a blank text value
  */
 
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import { invokedDirectly, misfiredAs } from "../src/lib/invoked-direct.mjs";
 import { parse } from "../src/lib/argv.mjs";
 import { EXIT_CODES } from "../src/lib/exit-codes.mjs";
 import { version } from "../src/index.mjs";
+import { clonesOf, readRegistry, registerClone, registryFile } from "../src/clone-registry.mjs";
 import {
   TASK_ERROR_CODES,
   TaskError,
+  cloneIdentity,
   closeTask,
   createTask,
   formatSessionContext,
@@ -45,7 +51,7 @@ import {
   updateTask,
   writeTask,
 } from "../src/task-state.mjs";
-import { buildWorkGraph, dependencyStates, findCycle, findSlugOwner, nextTasks } from "../src/work-graph.mjs";
+import { buildWorkGraph, dependencyStates, findCycle, findSlugOwner, nextTasks, parseDependencyRef } from "../src/work-graph.mjs";
 
 const TOOL = "dotbabel-task";
 const SUBCOMMANDS = new Set(["new", "update", "show", "list", "close", "graph", "next", "hook"]);
@@ -58,8 +64,8 @@ const USAGE = `Usage:
   dotbabel task show   <slug> [--json]
   dotbabel task list   [--all] [--json]
   dotbabel task close  <slug>
-  dotbabel task graph  [--json]                 every open task of the clone, its edges, the order, any cycle
-  dotbabel task next   [--json]                 the ready tasks, then the blocked ones with what they wait on
+  dotbabel task graph  [--json] [--online]      every open task of the clone, its edges, the order, any cycle
+  dotbabel task next   [--json] [--online]      the ready tasks, then the blocked ones with what they wait on
   dotbabel task hook   session-start            SessionStart hook entry (JSON on stdin)
 
 A task is the contract (goal, done_when) and the state (phase, decisions,
@@ -70,9 +76,13 @@ worktrees of the clone.
 A dependency <ref> is a task of this clone (<slug>), a task of another clone
 on this machine (github.com/owner/repo:<slug>), or a pull request or issue
 (owner/repo#123). An edge that closes a cycle is refused. A task is ready when
-every dependency is satisfied: its task is closed. A reference to another
-clone or to GitHub is unknown, and unknown counts as blocked. graph and next
-read the task files of every worktree of the clone and call nothing else.
+every dependency is satisfied: its task is closed, its pull request is merged,
+or its issue is closed. A task of another clone resolves from that clone's
+files, through the clone registry ($XDG_STATE_HOME/dotbabel/graph/clones.json)
+that every task write updates; a repository not registered here is unknown,
+and a slug that two clones hold is ambiguous. A pull request or issue is
+unknown unless --online asks gh. Unknown and ambiguous count as blocked.
+Without --online, graph and next read local files and call nothing else.
 
 Exit codes: 0 ok, 1 refused, 2 env error, 64 usage error.`;
 
@@ -183,6 +193,7 @@ function cmdNew(args) {
   }
   assertNoCycle(task, clone.tasks);
   writeTask(root, task, { create: true });
+  recordClone(root);
   return emitTask(task, args, "created");
 }
 
@@ -207,6 +218,7 @@ function cmdUpdate(args) {
     }
     return next;
   });
+  recordClone(root);
   return emitTask(task, args, "updated");
 }
 
@@ -216,7 +228,9 @@ function cmdShow(args) {
 
 function cmdClose(args) {
   const slug = slugArg(args, "close");
-  const task = mutateTask(resolveWorktree(process.cwd()).root, slug, (t) => closeTask(t));
+  const root = resolveWorktree(process.cwd()).root;
+  const task = mutateTask(root, slug, (t) => closeTask(t));
+  recordClone(root);
   return emitTask(task, args, "closed");
 }
 
@@ -249,16 +263,127 @@ function waits(statuses) {
   return statuses.map((w) => `${w.ref} (${w.state})`).join(", ");
 }
 
+function warn(problems) {
+  for (const p of problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+}
+
 /** Read every worktree's tasks, print the problems as warnings, and return the tasks. */
 function readClone(root) {
   const clone = listCloneTasks(root);
-  for (const p of clone.problems) process.stderr.write(`${TOOL}: warning: ${p}\n`);
+  warn(clone.problems);
   return clone;
+}
+
+/**
+ * Record this clone in the registry after a task write, so another
+ * repository's task can name a task of this one. Best effort: the task is
+ * already written, and a registry that cannot be written is a warning.
+ */
+function recordClone(root) {
+  try {
+    const id = cloneIdentity(root);
+    if (id.key !== null) registerClone(registryFile(), id.key, id.path);
+  } catch (err) {
+    warn([`clone registry: ${/** @type {Error} */ (err).message}`]);
+  }
+}
+
+/**
+ * The references of the open tasks that point outside the clone, each once.
+ *
+ * @param {import("../src/task-state.mjs").Task[]} tasks
+ * @returns {{ repos: Set<string>, github: Map<string, { repo: string, number: number }> }}
+ */
+function outsideRefs(tasks) {
+  const repos = new Set();
+  const github = new Map();
+  for (const task of tasks) {
+    if (task.status !== "open") continue;
+    for (const ref of task.depends_on) {
+      const parsed = parseDependencyRef(ref);
+      if (parsed?.kind === "clone-task") repos.add(parsed.repo);
+      if (parsed?.kind === "github") github.set(ref, parsed);
+    }
+  }
+  return { repos, github };
+}
+
+/**
+ * The tasks of every registered clone of each repository in `repos`, read
+ * offline from their task files. A repository with no readable clone is left
+ * out, so its references stay unknown.
+ */
+function registeredClones(repos, problems) {
+  const clones = new Map();
+  if (repos.size === 0) return clones;
+  const registry = readRegistry(registryFile());
+  for (const repo of repos) {
+    const readable = [];
+    for (const clonePath of clonesOf(registry, repo)) {
+      try {
+        const listed = listCloneTasks(clonePath);
+        problems.push(...listed.problems);
+        readable.push({ path: clonePath, tasks: listed.tasks });
+      } catch (err) {
+        problems.push(`${clonePath}: ${/** @type {Error} */ (err).message}`);
+      }
+    }
+    if (readable.length > 0) clones.set(repo, readable);
+  }
+  return clones;
+}
+
+/**
+ * Ask `gh` about one pull request or issue. The issues endpoint answers for
+ * both kinds: a pull request carries `pull_request.merged_at`. Merged, or a
+ * closed issue, is satisfied; anything else GitHub knows is open; a number
+ * GitHub does not have is missing; a `gh` that fails is unknown.
+ *
+ * @returns {{ state: import("../src/work-graph.mjs").DependencyState, problem?: string }}
+ */
+function askGitHub({ repo, number }) {
+  const r = spawnSync("gh", ["api", `repos/${repo}/issues/${number}`], { encoding: "utf8", timeout: 15_000 });
+  if (r.error !== undefined) return { state: "unknown", problem: `gh: ${r.error.message}` };
+  if (r.status !== 0) {
+    const detail = (r.stderr ?? "").trim().split("\n")[0] || `gh exited ${r.status}`;
+    return /\b404\b/.test(detail) ? { state: "missing" } : { state: "unknown", problem: detail };
+  }
+  try {
+    const body = JSON.parse(r.stdout);
+    const pr = body.pull_request !== undefined && body.pull_request !== null;
+    const satisfied = pr ? body.pull_request.merged_at != null : body.state === "closed";
+    return { state: satisfied ? "satisfied" : "open" };
+  } catch {
+    return { state: "unknown", problem: "gh: unreadable answer" };
+  }
+}
+
+/**
+ * Everything a graph read needs: the tasks of the clone, what resolved outside
+ * it, and every problem met on the way, already printed as warnings. Other
+ * clones are read only when a task names one, and `gh` runs only with
+ * `--online` and only for the pull requests and issues named (ARCH-3).
+ */
+function readGraph(root, online) {
+  const clone = listCloneTasks(root);
+  const problems = [...clone.problems];
+  const refs = outsideRefs(clone.tasks);
+  const resolution = { clones: registeredClones(refs.repos, problems) };
+  if (online) {
+    resolution.github = new Map();
+    for (const [ref, parsed] of refs.github) {
+      const answer = askGitHub(parsed);
+      resolution.github.set(ref, answer.state);
+      if (answer.problem !== undefined) problems.push(`${ref}: ${answer.problem}`);
+    }
+  }
+  warn(problems);
+  return { tasks: clone.tasks, resolution, problems };
 }
 
 function cmdGraph(args) {
   if (args.positional.length > 0) throw new UsageError("graph takes no positional argument");
-  const { tasks, problems } = readClone(resolveWorktree(process.cwd()).root);
+  const { tasks, resolution, problems } = readGraph(resolveWorktree(process.cwd()).root, args.flags.online === true);
   const graph = buildWorkGraph(tasks);
   if (args.json) {
     process.stdout.write(`${JSON.stringify({ ok: true, ...graph, problems }, null, 2)}\n`);
@@ -273,7 +398,7 @@ function cmdGraph(args) {
   for (const node of graph.tasks) {
     lines.push(`${node.slug} [open] phase: ${node.phase} — ${short(node.worktree)}`);
     const task = /** @type {import("../src/task-state.mjs").Task} */ (open.find((t) => t.slug === node.slug));
-    if (node.depends_on.length > 0) lines.push(`  depends on: ${waits(dependencyStates(task, tasks))}`);
+    if (node.depends_on.length > 0) lines.push(`  depends on: ${waits(dependencyStates(task, tasks, resolution))}`);
   }
   lines.push(`order: ${graph.order.join(", ")}`);
   lines.push(`cycle: ${graph.cycle === null ? "none" : graph.cycle.join(" -> ")}`);
@@ -283,8 +408,8 @@ function cmdGraph(args) {
 
 function cmdNext(args) {
   if (args.positional.length > 0) throw new UsageError("next takes no positional argument");
-  const { tasks, problems } = readClone(resolveWorktree(process.cwd()).root);
-  const next = nextTasks(tasks);
+  const { tasks, resolution, problems } = readGraph(resolveWorktree(process.cwd()).root, args.flags.online === true);
+  const next = nextTasks(tasks, resolution);
   if (args.json) {
     process.stdout.write(`${JSON.stringify({ ok: true, ...next, problems }, null, 2)}\n`);
     return EXIT_CODES.OK;
@@ -306,12 +431,14 @@ function cmdNext(args) {
 
 /**
  * The readiness of each open task of the worktree, from the work graph of the
- * clone, or undefined when the clone cannot be read: the hook then prints the
- * tasks without their state rather than nothing.
+ * clone and the registered clones it names, offline, or undefined when the
+ * clone cannot be read: the hook then prints the tasks without their state
+ * rather than nothing.
  */
 function readiness(root) {
   try {
-    const next = nextTasks(listCloneTasks(root).tasks);
+    const clone = listCloneTasks(root);
+    const next = nextTasks(clone.tasks, { clones: registeredClones(outsideRefs(clone.tasks).repos, []) });
     const states = new Map();
     for (const t of next.ready) states.set(t.slug, { ready: true, waits_on: [] });
     for (const t of next.blocked) states.set(t.slug, { ready: false, waits_on: t.waits_on });
@@ -354,6 +481,7 @@ function main(argv) {
       "depends-on": { type: "string", multiple: true },
       "drop-depends-on": { type: "string", multiple: true },
       all: { type: "boolean" },
+      online: { type: "boolean" },
     });
   } catch (err) {
     process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n${USAGE}\n`);

@@ -25,6 +25,10 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BIN = path.resolve(__dirname, "../bin/dotbabel-task.mjs");
 const T0 = new Date("2026-10-12T10:00:00Z");
+// Every bin spawn writes its clone registry under this temp state directory,
+// never under the developer's own.
+const STATE_HOME = makeTempDir("work-graph-state-");
+const REGISTRY = path.join(STATE_HOME, "dotbabel", "graph", "clones.json");
 
 function t(slug, dependsOn = [], worktree = "/w/main") {
   return createTask({ slug, goal: `goal ${slug}`, doneWhen: ["done"], dependsOn, worktree, now: T0 });
@@ -37,7 +41,14 @@ function closed(task) {
 function cleanEnv() {
   const env = { ...process.env };
   for (const k of Object.keys(env)) if (k.startsWith("GIT_")) delete env[k];
-  return { ...env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" };
+  return {
+    ...env,
+    GIT_AUTHOR_NAME: "t",
+    GIT_AUTHOR_EMAIL: "t@t",
+    GIT_COMMITTER_NAME: "t",
+    GIT_COMMITTER_EMAIL: "t@t",
+    XDG_STATE_HOME: STATE_HOME,
+  };
 }
 
 function repo() {
@@ -59,9 +70,45 @@ function put(root, slug, dependsOn = []) {
   return task;
 }
 
-function run(cwd, args) {
-  const r = spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: "utf8", env: cleanEnv() });
+function run(cwd, args, env = {}) {
+  const r = spawnSync(process.execPath, [BIN, ...args], { cwd, encoding: "utf8", env: { ...cleanEnv(), ...env } });
   return { code: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+/** A clone with an `origin`, so it has a repository key and registers itself on a task write. */
+function cloneOf(url) {
+  const root = repo();
+  execFileSync("git", ["-C", root, "remote", "add", "origin", url], { env: cleanEnv() });
+  return root;
+}
+
+/**
+ * A `gh` on PATH that answers `gh api repos/<owner>/<repo>/issues/<n>` from a
+ * script and appends each call to $GH_LOG: #1 a merged pull request, #2 a
+ * closed issue, #3 an open pull request, #4 not found, anything else a failure.
+ */
+function fakeGh() {
+  const dir = makeTempDir("work-graph-gh-");
+  const script = [
+    "#!/usr/bin/env bash",
+    'printf "%s\\n" "$*" >> "$GH_LOG"',
+    'case "$2" in',
+    '  */issues/1) echo \'{"number":1,"state":"closed","pull_request":{"merged_at":"2026-01-01T00:00:00Z"}}\' ;;',
+    '  */issues/2) echo \'{"number":2,"state":"closed"}\' ;;',
+    '  */issues/3) echo \'{"number":3,"state":"open","pull_request":{"merged_at":null}}\' ;;',
+    '  */issues/4) echo "gh: Not Found (HTTP 404)" >&2; exit 1 ;;',
+    '  *) echo "gh: could not connect" >&2; exit 1 ;;',
+    "esac",
+    "",
+  ].join("\n");
+  fs.writeFileSync(path.join(dir, "gh"), script, { mode: 0o755 });
+  const log = path.join(dir, "calls.log");
+  return { env: { PATH: `${dir}${path.delimiter}${process.env.PATH}`, GH_LOG: log }, log };
+}
+
+function states(out, slug) {
+  const task = out.blocked.find((t) => t.slug === slug) ?? out.ready.find((t) => t.slug === slug);
+  return task?.waits_on ?? [];
 }
 
 describe("parseWorktreeList", () => {
@@ -124,6 +171,37 @@ describe("findSlugOwner", () => {
 });
 
 describe("dependencyStates", () => {
+  it("rates a task of another clone from its registered clones: satisfied, open, missing, ambiguous, or unknown", () => {
+    const ref = "github.com/acme/widget:a";
+    const task = t("x", [ref, "github.com/acme/other:a"]);
+    const one = [{ path: "/c1", tasks: [t("a", [], "/c1")] }];
+    expect(dependencyStates(task, [task])).toEqual([
+      { ref, kind: "clone-task", state: "unknown" },
+      { ref: "github.com/acme/other:a", kind: "clone-task", state: "unknown" },
+    ]);
+    const open = dependencyStates(task, [task], { clones: new Map([["github.com/acme/widget", one]]) });
+    expect(open[0]).toEqual({ ref, kind: "clone-task", state: "open" });
+    expect(open[1].state).toBe("unknown");
+    const done = [{ path: "/c1", tasks: [closed(t("a", [], "/c1"))] }];
+    expect(dependencyStates(task, [task], { clones: new Map([["github.com/acme/widget", done]]) })[0].state).toBe("satisfied");
+    const none = [{ path: "/c1", tasks: [t("b", [], "/c1")] }];
+    expect(dependencyStates(task, [task], { clones: new Map([["github.com/acme/widget", none]]) })[0].state).toBe("missing");
+    const two = [...one, { path: "/c2", tasks: [closed(t("a", [], "/c2"))] }];
+    expect(dependencyStates(task, [task], { clones: new Map([["github.com/acme/widget", two]]) })[0].state).toBe("ambiguous");
+  });
+
+  it("takes the online answer for a pull request or issue, and stays unknown without one", () => {
+    const task = t("x", ["acme/widget#1", "acme/widget#2"]);
+    const github = new Map([["acme/widget#1", "satisfied"]]);
+    expect(dependencyStates(task, [task], { github })).toEqual([
+      { ref: "acme/widget#1", kind: "github", state: "satisfied" },
+      { ref: "acme/widget#2", kind: "github", state: "unknown" },
+    ]);
+    expect(nextTasks([task], { github: new Map([["acme/widget#1", "satisfied"], ["acme/widget#2", "satisfied"]]) }).ready).toEqual([
+      { slug: "x", worktree: "/w/main", phase: "started" },
+    ]);
+  });
+
   it("rates each reference: satisfied, open, missing, or unknown", () => {
     const tasks = [t("a", ["b", "c", "d", "acme/web#1", "github.com/acme/web:z"]), t("b"), closed(t("c"))];
     expect(dependencyStates(tasks[0], tasks)).toEqual([
@@ -320,4 +398,101 @@ describe("graph reads through the task CLI", () => {
     expect(next.blocked).toHaveLength(199);
     expect(elapsed).toBeLessThanOrEqual(1000);
   }, 60_000);
+});
+
+describe("cross-repo references through the task CLI", () => {
+  it("an offline pull request reference is unknown and blocks without calling gh", () => {
+    const root = repo();
+    put(root, "a", ["acme/widget#1"]);
+    const gh = fakeGh();
+    const r = run(root, ["next", "--json"], gh.env);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ready).toEqual([]);
+    expect(states(out, "a")).toEqual([{ ref: "acme/widget#1", kind: "github", state: "unknown" }]);
+    expect(fs.existsSync(gh.log)).toBe(false);
+    const graph = run(root, ["graph"], gh.env);
+    expect(graph.stdout).toContain("depends on: acme/widget#1 (unknown)");
+    expect(fs.existsSync(gh.log)).toBe(false);
+  });
+
+  it("--online resolves a merged pull request and a closed issue through gh, and a gh failure is unknown", () => {
+    const root = repo();
+    put(root, "a", ["acme/widget#1", "acme/widget#2"]);
+    put(root, "b", ["acme/widget#3"]);
+    put(root, "c", ["acme/widget#4", "acme/widget#5"]);
+    const gh = fakeGh();
+    const r = run(root, ["next", "--json", "--online"], gh.env);
+    expect(r.code).toBe(0);
+    const out = JSON.parse(r.stdout);
+    expect(out.ready.map((t) => t.slug)).toEqual(["a"]);
+    expect(states(out, "b")).toEqual([{ ref: "acme/widget#3", kind: "github", state: "open" }]);
+    expect(states(out, "c")).toEqual([
+      { ref: "acme/widget#4", kind: "github", state: "missing" },
+      { ref: "acme/widget#5", kind: "github", state: "unknown" },
+    ]);
+    expect(out.problems).toEqual([expect.stringMatching(/acme\/widget#5: .*could not connect/)]);
+    expect(r.stderr).toMatch(/warning: acme\/widget#5/);
+    const calls = fs.readFileSync(gh.log, "utf8").trim().split("\n").sort();
+    expect(calls).toEqual([1, 2, 3, 4, 5].map((n) => `api repos/acme/widget/issues/${n}`));
+    const graph = run(root, ["graph", "--online"], gh.env);
+    expect(graph.code).toBe(0);
+    expect(graph.stdout).toContain("depends on: acme/widget#1 (satisfied), acme/widget#2 (satisfied)");
+  });
+
+  it("a task of another registered clone resolves offline, and two clones of one repository make it ambiguous", () => {
+    const url = "https://github.com/acme/widget.git";
+    const widget = cloneOf(url);
+    const here = cloneOf("git@github.com:acme/app.git");
+    put(here, "x", ["github.com/acme/widget:a", "github.com/acme/widget:nope", "github.com/acme/none:a"]);
+    // Not registered yet: the repository is unknown to this machine.
+    let out = JSON.parse(run(here, ["next", "--json"]).stdout);
+    expect(states(out, "x").map((w) => w.state)).toEqual(["unknown", "unknown", "unknown"]);
+    // A task write in widget registers that clone, and nothing calls gh.
+    const gh = fakeGh();
+    expect(run(widget, ["new", "a", "--goal", "g", "--done-when", "d"], gh.env).code).toBe(0);
+    out = JSON.parse(run(here, ["next", "--json"], gh.env).stdout);
+    expect(states(out, "x")).toEqual([
+      { ref: "github.com/acme/widget:a", kind: "clone-task", state: "open" },
+      { ref: "github.com/acme/widget:nope", kind: "clone-task", state: "missing" },
+      { ref: "github.com/acme/none:a", kind: "clone-task", state: "unknown" },
+    ]);
+    expect(fs.existsSync(gh.log)).toBe(false);
+    expect(run(widget, ["close", "a"]).code).toBe(0);
+    expect(states(JSON.parse(run(here, ["next", "--json"]).stdout), "x")[0].state).toBe("satisfied");
+    // A second clone of widget with the same slug: the graph does not choose (R-8).
+    const twin = cloneOf(url);
+    expect(run(twin, ["new", "a", "--goal", "g", "--done-when", "d"]).code).toBe(0);
+    out = JSON.parse(run(here, ["next", "--json"]).stdout);
+    expect(states(out, "x")[0]).toEqual({ ref: "github.com/acme/widget:a", kind: "clone-task", state: "ambiguous" });
+    expect(out.ready).toEqual([]);
+    expect(run(here, ["next"]).stdout).toContain("github.com/acme/widget:a (ambiguous)");
+  });
+
+  it("a task write registers the clone once for all its worktrees, and a clone without origin is not registered", () => {
+    const url = "ssh://git@github.com/acme/lib.git";
+    const lib = cloneOf(url);
+    const side = addWorktree(lib, "side");
+    expect(run(side, ["new", "s", "--goal", "g", "--done-when", "d"]).code).toBe(0);
+    expect(run(lib, ["new", "m", "--goal", "g", "--done-when", "d"]).code).toBe(0);
+    expect(run(lib, ["update", "m", "--phase", "p"]).code).toBe(0);
+    const registry = JSON.parse(fs.readFileSync(REGISTRY, "utf8"));
+    expect(registry.schema_version).toBe(1);
+    expect(registry.repos["github.com/acme/lib"]).toEqual([lib]);
+    const local = repo();
+    expect(run(local, ["new", "l", "--goal", "g", "--done-when", "d"]).code).toBe(0);
+    const after = JSON.parse(fs.readFileSync(REGISTRY, "utf8"));
+    expect(Object.keys(after.repos).some((k) => k.startsWith("local:"))).toBe(false);
+    expect(after.repos["github.com/acme/lib"]).toEqual([lib]);
+  });
+
+  it("a registry that cannot be written warns and still writes the task", () => {
+    const lib = cloneOf("https://github.com/acme/ro.git");
+    const blocked = path.join(makeTempDir("work-graph-ro-"), "state");
+    fs.mkdirSync(path.join(blocked, "dotbabel", "graph", "clones.json"), { recursive: true });
+    const r = run(lib, ["new", "r", "--goal", "g", "--done-when", "d"], { XDG_STATE_HOME: blocked });
+    expect(r.code).toBe(0);
+    expect(r.stderr).toMatch(/warning: clone registry/);
+    expect(run(lib, ["show", "r"]).code).toBe(0);
+  });
 });
