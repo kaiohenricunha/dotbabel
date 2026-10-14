@@ -50,6 +50,26 @@ export const SHIPPED_POLICY = /** @type {any} */ (deepFreeze(require("./shipped.
  */
 export const POLICY_LAYERS = Object.freeze(["shipped", "user", "project", "artifact"]);
 
+/**
+ * The evidence-trust keys, each with its strict value (ARCH-23, amended by the owner on
+ * 2026-10-12). The two `allow_*` keys decide what evidence the resolver may accept, and
+ * the two `prefer_*` keys decide which evidence wins a tie.
+ *
+ * `shipped` sets the defaults and `user` may set any value, but `project` and `artifact`
+ * may only move a key toward its strict value. A cloned repository is untrusted
+ * content: without this rule it could set `allow_expired_evidence: true` over the
+ * user's own `model-intelligence.json`.
+ */
+export const EVIDENCE_TRUST_KEYS = Object.freeze({
+  allow_stale_evidence: false,
+  allow_expired_evidence: false,
+  prefer_locally_verified: true,
+  prefer_fresher_evidence: true,
+});
+
+/** Layers that may only make an evidence-trust key stricter than the value in force. */
+const STRICTER_ONLY_LAYERS = Object.freeze(["project", "artifact"]);
+
 /** Basename of the user-scope policy file inside the dotbabel config directory. */
 const USER_POLICY_FILE = "model-intelligence.json";
 
@@ -281,13 +301,51 @@ function copyEntries(target, source, layer, where, onWrite) {
 }
 
 /**
+ * Hold one layer's evidence-trust preferences to the ARCH-23 rule, and return the
+ * preferences that may be applied.
+ *
+ * Every layer must give each key a boolean, so a string such as `"true"` can never
+ * pass for a relaxing value. A `project` or `artifact` value that relaxes the value in
+ * force is left out and recorded in `shadowed` instead. With no value in force, the
+ * strict value is the bar. The record holds a key and a checked boolean, so it carries
+ * no free text and no secret (OPS-4).
+ * @param {string} layer
+ * @param {unknown} source The layer's `preferences`, before `copyEntries` checks its shape.
+ * @param {Record<string, unknown>} preferences The values in force so far.
+ * @param {Record<string, string>} provenance
+ * @param {object[]} shadowed
+ * @returns {unknown} `source`, or a copy without the refused keys.
+ */
+function holdEvidenceTrust(layer, source, preferences, provenance, shadowed) {
+  if (!isPlainObject(source)) return source;
+  const declared = /** @type {Record<string, unknown>} */ (source);
+  /** @type {string[]} */
+  const refused = [];
+  for (const [key, strict] of Object.entries(EVIDENCE_TRUST_KEYS)) {
+    if (!Object.hasOwn(declared, key)) continue;
+    const value = declared[key];
+    if (typeof value !== "boolean") throw new TypeError(`${layer} policy: preferences.${key} must be a boolean, got ${typeOf(value)}`);
+    if (!STRICTER_ONLY_LAYERS.includes(layer) || value === strict) continue;
+    const inForce = preferences[key] ?? strict;
+    if (inForce !== strict) continue;
+    const inForceLayer = provenance[`preferences.${key}`] ?? "strict";
+    shadowed.push({ layer, declaration: { key, value }, reason: `a ${layer} layer may only make ${key} stricter; the ${inForceLayer} value stays in force` });
+    refused.push(key);
+  }
+  if (refused.length === 0) return source;
+  return Object.fromEntries(Object.entries(declared).filter(([key]) => !refused.includes(key)));
+}
+
+/**
  * Merge the policy layers into one effective policy.
  *
  * A floor composes monotonically: the strongest applicable minimum wins, whichever
  * layer declared it, so a broader layer may strengthen a floor and no layer may
  * weaken a more specific one (§5, `floor`). A pin does not compose: the most
  * specific one wins, and every shadowed pin is recorded rather than dropped, so
- * the resolver can explain why it did not apply (ARCH-66).
+ * the resolver can explain why it did not apply (ARCH-66). An evidence-trust key is
+ * monotonic after the user layer: `project` and `artifact` may only make it stricter,
+ * and a refused relaxation is recorded in `shadowed` too (ARCH-23).
  * @param {Partial<Record<string, object>>} layers Keyed by `POLICY_LAYERS` name.
  * @returns {{floor?: PolicyDeclaration, pin?: PolicyDeclaration, preferences: object, shadowed: object[], provenance: Record<string, string>}}
  */
@@ -355,7 +413,8 @@ export function mergePolicy(layers) {
       provenance.classes = layer;
     }
 
-    copyEntries(preferences, declarations.preferences, layer, "preferences", (key) => {
+    const applicable = holdEvidenceTrust(layer, declarations.preferences, preferences, provenance, shadowed);
+    copyEntries(preferences, applicable, layer, "preferences", (key) => {
       provenance[`preferences.${key}`] = layer;
     });
   }
