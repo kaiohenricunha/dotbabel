@@ -349,6 +349,27 @@ describe("dotbabel-doctor check-on-stop trust check", () => {
 // non-empty value"), so it is asserted here, against the bin, rather than
 // only against checkRemovedRepoFactsKeys in repo-facts-keys.test.mjs. Without
 // these, deleting doctor's call site would leave that file's tests green.
+describe("dotbabel-doctor host adapters", () => {
+  it("doctor lists each host adapter's capability states", () => {
+    const home = makeTmpDir("doctor-home-");
+    const { events } = runDoctorJson({ home, repoRoot: repoWithFacts({}) });
+    const hosts = events.filter((e) => /^host [a-z]+ \(/.test(e.message));
+    const ids = hosts.map((e) => /^host ([a-z]+) /.exec(e.message)[1]);
+    expect(ids).toEqual(["claude", "codex", "gemini", "antigravity", "opencode", "copilot"]);
+    const claude = hosts.find((e) => e.message.startsWith("host claude "));
+    expect(claude.kind).toBe("pass");
+    for (const cap of ["identity", "liveness", "preEdit", "preBash", "postTool", "sessionStart"]) {
+      expect(claude.message).toContain(`${cap} supported`);
+    }
+    for (const other of hosts.filter((e) => e !== claude)) {
+      expect(other.kind).toBe("info");
+      expect(other.message).toContain("every capability unsupported");
+      expect(other.message).toContain("the fleet is off for this host");
+    }
+    expect(hosts.filter((e) => e.kind === "fail")).toEqual([]);
+  });
+});
+
 describe("dotbabel-doctor removed repo-facts keys (OPS-6)", () => {
   it("doctor warns when repo-facts gives regression_paths a non-empty value", () => {
     const home = makeTmpDir("home-");

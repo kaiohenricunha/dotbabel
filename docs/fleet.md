@@ -157,6 +157,37 @@ Environment variables take precedence:
 | `DOTBABEL_FLEET_STATE_DIR`          | Ledger root (default `$XDG_STATE_HOME/dotbabel/fleet`)    |
 | `CLAUDE_CONFIG_DIR`                 | Where Claude Code keeps `sessions/` (default `~/.claude`) |
 
+## Host adapters
+
+The fleet needs six things from the CLI that hosts a session. A host adapter
+declares each one as `supported`, `unsupported`, or `unverified`, and
+`unverified` never counts as `supported`. The descriptor follows the
+operation-capability shape of the Model Intelligence spec
+(`docs/specs/model-intelligence/spec/5-interfaces-apis.md`): each capability
+carries its support state, whether it needs the network or existing
+credentials, whether its answer can be cached, and whether it may execute a
+model.
+
+| Capability     | What the fleet uses it for                              |
+| -------------- | ------------------------------------------------------- |
+| `identity`     | Which session runs this process                         |
+| `liveness`     | Whether a session that holds a claim is still alive     |
+| `preEdit`      | A hook before a file edit, where a claim is checked     |
+| `preBash`      | A hook before a shell command, where a lane is taken    |
+| `postTool`     | A hook after a tool call, where a hook result is read   |
+| `sessionStart` | A hook at session start, where the live claims are told |
+
+Claude Code is the host adapter today: its session registry gives identity
+and liveness (`plugins/dotbabel/src/fleet/registry.mjs`), and its
+`PreToolUse`, `PostToolUse`, and `SessionStart` hooks plus the shell prefix
+give the four hook points ([hooks.md](./hooks.md)). Every other CLI that
+dotbabel knows reports every capability as `unsupported` until its hooks and
+session identity are verified. A fleet feature that needs an unsupported
+capability is off for that host, and `dotbabel doctor` prints one line per
+CLI with the state of each capability, so the gap is visible rather than a
+silent failure. The table lives in
+`plugins/dotbabel/src/fleet/host-adapter.mjs`.
+
 ## Limits of the claims
 
 - **Only the edit tools are guarded.** `Edit`, `Write`, `MultiEdit`, and
