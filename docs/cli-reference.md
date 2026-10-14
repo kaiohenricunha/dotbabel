@@ -173,8 +173,8 @@ Reads context from the environment — designed for GitHub Actions:
 ## `dotbabel-doctor`
 
 Self-diagnostic. Walks env → repo → facts → manifest → specs → drift →
-hook → hook registration → run receipts → check-on-stop trust → attestation
-policy. Prints `✓/✗/⚠` per check.
+hook → hook registration → run receipts → check-on-stop trust → host
+adapters → attestation policy. Prints `✓/✗/⚠` per check.
 
 | Flag                 | Default          |          |
 | -------------------- | ---------------- | -------- |
@@ -222,6 +222,15 @@ A repository with no receipts prints no row.
 The trust row reports whether this repo may run turn-end project checks. It
 never fails the run — a repo deliberately left off the allowlist is a valid
 state. See [hooks.md](./hooks.md#check-on-stop-trust).
+
+The host rows list one line per supported CLI with the state of each fleet
+capability its host adapter declares: `identity`, `liveness`, `preEdit`,
+`preBash`, `postTool`, and `sessionStart`, each `supported`, `unsupported`, or
+`unverified`. Claude Code is a `✓` row with every capability supported. A CLI
+with no host adapter yet is an informational row that says every capability is
+unsupported and the fleet is off for that host. The rows read a static table
+and probe nothing; they never fail the run. See
+[fleet.md](./fleet.md#host-adapters).
 
 The attestation rows check `.dotbabel.json`'s `attestation` policy against the
 local-attest config, and fail when enforcement is on but cannot work (no config,
