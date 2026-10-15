@@ -20,7 +20,16 @@ describe("security-audit upstream validator suites", () => {
     const suites = readdirSync(UPSTREAM_DIR).filter((name) => name.endsWith(".test.cjs"));
     expect(suites.length).toBeGreaterThan(0);
 
-    const result = spawnSync(process.execPath, ["--test", ...suites.map((name) => join(UPSTREAM_DIR, name))], {
+    // Pin the reporter: from Node 24 `node --test` prints the spec format even
+    // when stdout is not a TTY, so the TAP summary line asserted below exists
+    // only when TAP is asked for. The release job runs on Node 24 (v4.0.0's
+    // publish failed here); the PR matrix runs 20 and 22.
+    const args = [
+      "--test",
+      "--test-reporter=tap",
+      ...suites.map((name) => join(UPSTREAM_DIR, name)),
+    ];
+    const result = spawnSync(process.execPath, args, {
       cwd: UPSTREAM_DIR,
       encoding: "utf8",
     });
