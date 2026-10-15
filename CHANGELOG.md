@@ -10,6 +10,13 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [4.0.1](https://github.com/kaiohenricunha/dotbabel/compare/v4.0.0...v4.0.1) (2026-10-15)
+
+
+### Fixed
+
+* **security-audit:** pin the node --test reporter in the upstream suite check ([#487](https://github.com/kaiohenricunha/dotbabel/issues/487)) ([bb74ad6](https://github.com/kaiohenricunha/dotbabel/commit/bb74ad6e2136b16bbe89e2c33f896fb5ad30b026))
+
 ## [4.0.0](https://github.com/kaiohenricunha/dotbabel/compare/v3.4.0...v4.0.0) (2026-10-14)
 
 
