@@ -1,5 +1,7 @@
 # Peer collaboration verification — 2026-10-16
 
+_Last updated: v4.0.1_
+
 ## Current result
 
 The implementation, skill distribution, architecture guide, and automated tests

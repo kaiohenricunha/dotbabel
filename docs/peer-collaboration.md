@@ -1,5 +1,7 @@
 # Persistent peer collaboration
 
+_Last updated: v4.0.1_
+
 Peer connects one implementation session (Main) and one read-only reasoning
 session (Advisor). Each can run in Claude Code or Codex CLI on Linux/WSL2.
 It keeps both conversations and contexts intact. Handoff still transfers context;
