@@ -46,12 +46,11 @@ describe("extractProtectedTokens: ICU", () => {
   it("reads select nested inside plural, and simple arguments inside options", () => {
     const text =
       "{n, plural, one {{gender, select, female {Ela tem # item} other {Ele tem # item}}} other {{name} tem # itens}}";
-    expect(values(text, "icu-selector")).toEqual([
-      "n.one",
-      "gender.female",
-      "gender.other",
-      "n.other",
-    ]);
+    expect(values(text, "icu-selector")).toEqual(["n.one", "n.other"]);
+    expect(values(text, "icu-select-key")).toEqual(["gender.female", "gender.other"]);
+    expect(extractProtectedTokens(text).tokens.filter((t) => t.kind === "icu-hash")).toHaveLength(
+      3,
+    );
     expect(values(text, "placeholder")).toEqual(["{name}"]);
   });
 
@@ -251,7 +250,10 @@ describe("compareProtectedTokens", () => {
       "{n, plural, one {um item} other {vários itens}}",
     );
     expect(result.ok).toBe(false);
-    expect(result.missing).toEqual([{ kind: "icu-hash", value: "#", count: 2 }]);
+    expect(result.missing).toEqual([
+      { kind: "icu-hash", value: "n.one#", count: 1 },
+      { kind: "icu-hash", value: "n.other#", count: 1 },
+    ]);
   });
 
   it("flags a changed href, but accepts a translated alt text", () => {
@@ -536,6 +538,103 @@ describe("validateReviewDocument", () => {
   });
 });
 
+describe("review findings: tokenizer edge cases", () => {
+  it("reads a placeholder that is the whole plural branch as ICU, not as Mustache", () => {
+    const text = "{n, plural, one {{n}} other {{n}}}";
+    const { tokens, errors } = extractProtectedTokens(text);
+    expect(errors).toEqual([]);
+    expect(tokens.filter((t) => t.kind === "template")).toEqual([]);
+    expect(values(text, "icu-selector")).toEqual(["n.one", "n.other"]);
+    expect(values(text, "placeholder")).toEqual(["{n}", "{n}"]);
+  });
+
+  it("still reads Mustache when the string has no ICU block", () => {
+    expect(values("Hello {{name}}", "template")).toEqual(["{{name}}"]);
+  });
+
+  it("does not take a footnote or bracketed prose for a link destination", () => {
+    expect(values("[^1]: Footnote text", "link-dest")).toEqual([]);
+    expect(values("[INFO]: starting up", "link-dest")).toEqual([]);
+    expect(values("[ref]: https://example.com/x", "link-dest")).toEqual(["https://example.com/x"]);
+    expect(values("[ref]: ./docs/a.md", "link-dest")).toEqual(["./docs/a.md"]);
+  });
+
+  it("checks placeholders and URLs inside a translatable attribute value", () => {
+    const original = '<img alt="Photo of {name}" src="a.png">';
+    expect(values(original, "placeholder")).toEqual(["{name}"]);
+    const result = compareProtectedTokens(original, '<img alt="Foto" src="a.png">');
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual([{ kind: "placeholder", value: "{name}", count: 1 }]);
+    expect(compareProtectedTokens(original, '<img alt="Foto de {name}" src="a.png">').ok).toBe(
+      true,
+    );
+  });
+
+  it("matches a fixed term on Latin-script boundaries, but still next to Arabic letters", () => {
+    expect(values("Signé et Signs et Sign.", "term", { preserve: ["Sign"] })).toEqual(["Sign"]);
+    expect(values("اضغط على Sign الآن", "term", { preserve: ["Sign"] })).toEqual(["Sign"]);
+    expect(compareProtectedTokens("Use Sign.", "Use Signé.", { preserve: ["Sign"] }).ok).toBe(
+      false,
+    );
+  });
+
+  it("finds every fixed term when many are given", () => {
+    const preserve = Array.from({ length: 300 }, (_, i) => `Term${i}x`);
+    const text = preserve.slice(0, 5).join(" e ");
+    expect(values(text, "term", { preserve })).toEqual(preserve.slice(0, 5));
+  });
+
+  it("does not shorten a URL that really ends in an underscore", () => {
+    expect(compareProtectedTokens("Veja https://x.com/a_b_", "Veja https://x.com/a_b").ok).toBe(
+      false,
+    );
+    expect(values("Veja *https://x.com/a*", "url")).toEqual(["https://x.com/a"]);
+  });
+
+  it("does not take prose such as 50%of for a printf specifier", () => {
+    expect(values("50%of users", "format")).toEqual([]);
+    expect(values("Item%d", "format")).toEqual(["%d"]);
+    expect(compareProtectedTokens("50%of users", "50% of users").ok).toBe(true);
+  });
+});
+
+describe("review findings: plural-category relaxation", () => {
+  const relaxed = { allowPluralCategories: true };
+
+  it("still fails when # is dropped from a branch that was kept", () => {
+    const a = "{n, plural, one {# item} other {# itens}}";
+    const b = "{n, plural, one {um item} few {# itens} other {# itens}}";
+    const result = compareProtectedTokens(a, b, relaxed);
+    expect(result.ok).toBe(false);
+    expect(result.missing).toEqual([{ kind: "icu-hash", value: "n.one#", count: 1 }]);
+  });
+
+  it("does not relax the keys of a select argument named one or other", () => {
+    const a = "{g, select, one {a} other {b}}";
+    const b = "{g, select, one {a} few {c} other {b}}";
+    expect(compareProtectedTokens(a, b, relaxed).ok).toBe(false);
+  });
+
+  it("relaxes # only in the categories that were added", () => {
+    const a = "{n, plural, one {# a} other {# b}}";
+    const b = "{n, plural, one {# a} few {# c} other {# b}}";
+    expect(compareProtectedTokens(a, b, relaxed).ok).toBe(true);
+  });
+});
+
+describe("review findings: validator", () => {
+  it("reports only the enum error for a bad severity, not a misleading verdict error", () => {
+    const bad = { ...GOOD_FINDING, severity: "bogus" };
+    expect(codes(review({ verdict: "needs-revision", findings: [bad] }))).toEqual(["invalid-enum"]);
+  });
+
+  it("skips verdict checks when a finding is not an object", () => {
+    expect(codes(review({ verdict: "needs-revision", findings: ["x"] }))).toEqual([
+      "invalid-finding",
+    ]);
+  });
+});
+
 describe("check-review CLI", () => {
   function run(args, input) {
     const result = spawnSync(process.execPath, [SCRIPT, ...args], {
@@ -615,9 +714,9 @@ describe("check-review CLI", () => {
     expect(JSON.parse(result.stdout).errors.map((e) => e.code)).toContain("verdict-mismatch");
   });
 
-  it("validate: exits 1, not a crash, on input that is not JSON", () => {
+  it("validate: exits 2, not a crash, on input that is not JSON", () => {
     const result = run(["validate", "-"], "not json");
-    expect(result.status).toBe(1);
+    expect(result.status).toBe(2);
     expect(result.stderr + result.stdout).toMatch(/JSON/);
   });
 

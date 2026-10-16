@@ -21,7 +21,7 @@
  *   node check-review.mjs validate <review.json|-> [options]
  *   node check-review.mjs extract <file|-> [options]
  *
- * Exit codes: 0 ok, 1 violation, 2 input could not be read, 64 usage.
+ * Exit codes: 0 ok, 1 violation, 2 input could not be read or parsed, 64 usage.
  */
 
 import { readFileSync, realpathSync } from "node:fs";
@@ -90,7 +90,7 @@ function skipQuote(s, i) {
   return i + 1;
 }
 
-function parseIcuMessage(s, j, ctx, inPlural) {
+function parseIcuMessage(s, j, ctx, branch) {
   while (j < s.length) {
     const c = s[j];
     if (c === "}") {
@@ -98,15 +98,15 @@ function parseIcuMessage(s, j, ctx, inPlural) {
       return j + 1;
     }
     if (c === "{") {
-      j = parseIcuArgument(s, j, ctx, inPlural);
+      j = parseIcuArgument(s, j, ctx, branch);
       continue;
     }
     if (c === "'") {
       j = skipQuote(s, j);
       continue;
     }
-    if (c === "#" && inPlural) {
-      ctx.tokens.push({ kind: "icu-hash", value: "#", pos: j });
+    if (c === "#" && branch) {
+      ctx.tokens.push({ kind: "icu-hash", value: `${branch}#`, pos: j });
       ctx.ranges.push([j, j + 1]);
     }
     j++;
@@ -120,7 +120,7 @@ function readUntil(s, j, stops) {
   return [out, j];
 }
 
-function parseIcuArgument(s, start, ctx, inPlural) {
+function parseIcuArgument(s, start, ctx, branch) {
   let [name, j] = readUntil(s, start + 1, [",", "}", "{"]);
   if (j >= s.length) throw new IcuError(`unterminated argument at offset ${start}`);
   if (s[j] === "{") throw new IcuError(`unexpected "{" inside an argument at offset ${j}`);
@@ -158,7 +158,6 @@ function parseIcuArgument(s, start, ctx, inPlural) {
   }
   ctx.tokens.push({ kind: "icu-arg", value: `{${name},${type}}`, pos: start });
   ctx.ranges.push([start, j]);
-  const nestedPlural = type === "select" ? inPlural : true;
   for (;;) {
     while (j < s.length && /\s/.test(s[j])) j++;
     if (j >= s.length) throw new IcuError(`unterminated ${type} argument at offset ${start}`);
@@ -179,9 +178,16 @@ function parseIcuArgument(s, start, ctx, inPlural) {
     if (s[j] !== "{") {
       throw new IcuError(`expected "{" after selector "${selector}" at offset ${j}`);
     }
-    ctx.tokens.push({ kind: "icu-selector", value: `${name}.${selector}`, pos: selectorStart });
+    // A # belongs to the nearest enclosing plural branch, also through a select.
+    const isSelect = type === "select";
+    const here = `${name}.${selector}`;
+    ctx.tokens.push({
+      kind: isSelect ? "icu-select-key" : "icu-selector",
+      value: here,
+      pos: selectorStart,
+    });
     ctx.ranges.push([selectorStart, j + 1]);
-    j = parseIcuMessage(s, j + 1, ctx, nestedPlural);
+    j = parseIcuMessage(s, j + 1, ctx, isSelect ? branch : here);
   }
 }
 
@@ -200,7 +206,7 @@ function parseIcu(s, ctx) {
     while (i < s.length) {
       const c = s[i];
       if (c === "'") i = skipQuote(s, i);
-      else if (c === "{") i = parseIcuArgument(s, i, ctx, false);
+      else if (c === "{") i = parseIcuArgument(s, i, ctx, null);
       else if (c === "}") throw new IcuError(`unexpected "}" at offset ${i}`);
       else i++;
     }
@@ -211,11 +217,11 @@ function parseIcu(s, ctx) {
   }
 }
 
-function trimUrl(url) {
+function trimUrl(url, wrapped) {
   let u = url;
   for (;;) {
     const last = u[u.length - 1];
-    if (last && /[.,;:!?»”’'"…،؛؟*_]/.test(last)) {
+    if (last && (/[.,;:!?»”’"…،؛؟]/.test(last) || (wrapped && last === "*"))) {
       u = u.slice(0, -1);
       continue;
     }
@@ -261,6 +267,8 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
   const push = (kind, value, pos) => {
     tokens.push({ kind, value, pos });
   };
+  /** Ranges of attribute prose to put back into the mask once its tag is blanked. */
+  const reveal = [];
 
   pass(/^ {0,3}(`{3,}|~{3,})[^\n]*(?:\n[\s\S]*?)?\n {0,3}\1[ \t]*$/gm, (m) => {
     push("code-fence", text.slice(m.index, m.index + m[0].length).trimEnd(), m.index);
@@ -286,11 +294,19 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
       const attr = a[1].toLowerCase();
       if (TRANSLATABLE_ATTRS.has(attr)) {
         push("attr", `${name}@${attr}`, m.index);
+        const value = a[2] ?? a[3];
+        if (value) {
+          // Keep the value in the mask: it is prose, but it may hold a placeholder or a URL.
+          const at = m.index + 1 + closing.length + name.length + a.index;
+          const start = at + a[0].indexOf(value, a[0].indexOf("="));
+          reveal.push([start, start + value.length]);
+        }
       } else {
         push("attr", `${name}@${attr}=${a[2] ?? a[3] ?? a[4] ?? ""}`, m.index);
       }
     }
   });
+  for (const [a, b] of reveal) for (let k = a; k < b; k++) mask[k] = text[k];
   pass(
     /\]\(\s*(<[^>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:\s+(?:"[^"\n]*"|'[^'\n]*'))?\s*\)/g,
     (m) => {
@@ -298,7 +314,7 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
       if (dest) push("link-dest", dest, m.index);
     },
   );
-  pass(/^ {0,3}\[[^\]\n]+\]:[ \t]*(\S+)/gm, (m) => {
+  pass(/^ {0,3}\[(?!\^)[^\]\n]+\]:[ \t]*(<[^>\n]+>|\S*[/.#:]\S*)/gm, (m) => {
     push("link-dest", m[1].replace(/^<|>$/g, ""), m.index);
   });
   pass(
@@ -307,7 +323,7 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
       "giu",
     ),
     (m) => {
-      const url = trimUrl(m[0]);
+      const url = trimUrl(m[0], text[m.index - 1] === "*");
       push("url", url, m.index);
       return m.index + url.length;
     },
@@ -315,7 +331,10 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
   pass(/[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, (m) => {
     push("email", m[0], m.index);
   });
-  pass(/\{\{[^{}]*\}\}/g, (m) => push("template", `{{${m[0].slice(2, -2).trim()}}}`, m.index));
+  // `one {{n}}` is ICU, not Mustache, so only read {{x}} when there is no ICU block.
+  if (!/\{\s*[^{},]+,\s*(?:plural|select|selectordinal)\s*,/.test(text)) {
+    pass(/\{\{[^{}]*\}\}/g, (m) => push("template", `{{${m[0].slice(2, -2).trim()}}}`, m.index));
+  }
   pass(/\$\{[^{}]*\}/g, (m) => push("template", m[0], m.index));
   pass(/%\{[^{}]*\}/g, (m) => push("template", m[0], m.index));
   pass(/%\([A-Za-z_]\w*\)[#0\- +]*\d*(?:\.\d+)?[sdifrxXeEgGc]/g, (m) =>
@@ -323,7 +342,7 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
   );
   pass(/\$t\([^()]*\)/g, (m) => push("template", m[0], m.index));
   pass(
-    /%(?:\d+\$)?[-+0#]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|z|j|t)?[diouxXeEfFgGaAcspn%]/g,
+    /%%|(?<![0-9])%(?:\d+\$)?[-+0#]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|z|j|t)?[diouxXeEfFgGaAcspn]/g,
     (m) => push("format", m[0], m.index),
   );
 
@@ -341,11 +360,19 @@ export function extractProtectedTokens(text, { preserve = [] } = {}) {
   const terms = [...new Set(preserve.filter((t) => typeof t === "string" && t !== ""))].sort(
     (a, b) => b.length - a.length,
   );
-  for (const term of terms) {
-    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const before = /^[A-Za-z0-9_]/.test(term) ? "(?<![A-Za-z0-9_])" : "";
-    const after = /[A-Za-z0-9_]$/.test(term) ? "(?![A-Za-z0-9_])" : "";
-    pass(new RegExp(`${before}${escaped}${after}`, "g"), (m) => push("term", term, m.index));
+  if (terms.length > 0) {
+    // Boundaries are Latin-script aware: "Sign" is not inside "Signé", but it can still sit
+    // next to Arabic letters, where a Latin term is often written without a space.
+    const word = "\\p{Script=Latin}\\p{N}_";
+    const alternation = terms
+      .map((term) => {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const before = new RegExp(`^[${word}]`, "u").test(term) ? `(?<![${word}])` : "";
+        const after = new RegExp(`[${word}]$`, "u").test(term) ? `(?![${word}])` : "";
+        return `${before}${escaped}${after}`;
+      })
+      .join("|");
+    pass(new RegExp(alternation, "gu"), (m) => push("term", m[0], m.index));
   }
 
   pass(/(?<![\p{L}\p{N}_/.~-])(?:~|\.{1,2})?\/[\w.-]+(?:\/[\w.-]+)*/gu, (m) => {
@@ -505,8 +532,10 @@ export function compareProtectedTokens(
   if (allowPluralCategories) {
     const isCategory = (t) =>
       t.kind === "icu-selector" && CLDR_PLURAL_CATEGORIES.has(t.value.split(".").pop());
-    if (missing.some(isCategory) || added.some(isCategory)) {
-      const relaxed = (t) => isCategory(t) || t.kind === "icu-hash";
+    const changed = new Set([...missing, ...added].filter(isCategory).map((t) => t.value));
+    if (changed.size > 0) {
+      const relaxed = (t) =>
+        isCategory(t) || (t.kind === "icu-hash" && changed.has(t.value.slice(0, -1)));
       const why = "; plural categories allowed";
       missing = relax(missing, "removed", relaxed, why);
       added = relax(added, "added", relaxed, why);
@@ -678,6 +707,10 @@ export function validateReviewDocument(doc, { preserve = [] } = {}) {
       l.severity === "minor" || ((l.severity === "critical" || l.severity === "major") && l.unsure),
   );
   const expected = blocking ? "needs-revision" : minor ? "minor-polish" : "natural";
+  const wellFormed = doc.findings.every(
+    (f) => isObject(f) && SEVERITIES.includes(f.severity) && CONFIDENCES.includes(f.confidence),
+  );
+  if (!wellFormed) return done();
   if (expected === "natural" && doc.findings.length > 0) {
     fail(
       "findings",
@@ -709,7 +742,7 @@ Options:
   --json                      Print JSON
   -h, --help                  Print this help
 
-Exit codes: 0 ok, 1 violation, 2 input could not be read, 64 usage.`;
+Exit codes: 0 ok, 1 violation, 2 input could not be read or parsed, 64 usage.`;
 
 class UsageError extends Error {}
 
@@ -818,7 +851,7 @@ export function main(argv = process.argv.slice(2)) {
       doc = JSON.parse(input);
     } catch (e) {
       err(`input is not valid JSON: ${e.message}`);
-      return EXIT.VIOLATION;
+      return EXIT.ENV;
     }
     const result = validateReviewDocument(doc, { preserve });
     if (opts.json) out(JSON.stringify(result, null, 2));

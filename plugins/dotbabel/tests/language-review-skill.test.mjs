@@ -337,22 +337,59 @@ describe("the documented reports follow the contract they document", () => {
   });
 });
 
+/** Source lines that are not comments, so a word in a comment cannot trip a guard. */
+function code(source) {
+  return source
+    .split("\n")
+    .filter((line) => !/^\s*(?:\/\/|\/\*|\*)/.test(line))
+    .join("\n");
+}
+
+/** What the zero-dependency, read-only contract forbids in a script's source. */
+function forbidden(source) {
+  const found = [];
+  const src = code(source);
+  for (const m of src.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)) {
+    if (!/^node:(?:fs|url|path)$/.test(m[1])) found.push(`import ${m[1]}`);
+  }
+  if (/\bimport\s*\(|\brequire\s*\(|process\.binding|process\.dlopen/.test(src)) {
+    found.push("dynamic load");
+  }
+  if (
+    /\bfetch\s*\(|XMLHttpRequest|WebSocket|child_process|node:(?:http|https|net|dgram|dns|tls|worker_threads)/.test(
+      src,
+    )
+  ) {
+    found.push("network or process");
+  }
+  if (
+    /\b(?:writeFile|appendFile|mkdir|mkdtemp|unlink|rm|rmdir|rename|copyFile|cp|truncate|symlink|link|chmod|createWriteStream|writeSync|writev)(?:Sync)?\s*\(/.test(
+      src,
+    )
+  ) {
+    found.push("file write");
+  }
+  return found;
+}
+
 describe("check-review.mjs stays inside the zero-dependency, read-only contract", () => {
   const source = read("scripts", "check-review.mjs");
 
-  it("imports only Node built-ins", () => {
-    const specifiers = [...source.matchAll(/^\s*import\s[^;]*?from\s+["']([^"']+)["']/gm)].map(
-      (m) => m[1],
-    );
-    expect(specifiers.length).toBeGreaterThan(0);
-    for (const specifier of specifiers) expect(specifier).toMatch(/^node:/);
+  it("uses only the built-ins it needs, loads nothing dynamically, and writes no file", () => {
+    expect(forbidden(source)).toEqual([]);
   });
 
-  it("makes no network call, spawns no process, and writes no file", () => {
-    expect(source).not.toMatch(
-      /\bfetch\s*\(|XMLHttpRequest|WebSocket|node:(?:http|https|net|dgram|child_process)/,
+  it("would notice a violation (the guard is not vacuous)", () => {
+    expect(forbidden('const m = await import("child_process");')).toContain("dynamic load");
+    expect(forbidden('import { execSync } from "child_process";')).toContain(
+      "import child_process",
     );
-    expect(source).not.toMatch(/writeFile|appendFile|mkdir|unlink|rmSync|renameSync|copyFile/);
+    expect(forbidden('import("node:fs").then((fs) => fs.cpSync(a, b));')).toContain("dynamic load");
+    expect(forbidden('import { writeFileSync } from "node:fs";\nwriteFileSync(p, d);')).toContain(
+      "file write",
+    );
+    expect(forbidden("const r = await fetch(url);")).toContain("network or process");
+    expect(forbidden("// mkdir and fetch( are only words in a comment\nconst a = 1;")).toEqual([]);
   });
 });
 
