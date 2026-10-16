@@ -6,7 +6,7 @@
  * For each skill in skills/<slug>/SKILL.md:
  *   → plugins/dotbabel/templates/claude/skills/<slug>/SKILL.md
  *     (frontmatter stripped of owner, created, updated)
- *   → supporting references/, examples/, and scripts/ files copied verbatim
+ *   → supporting references/, examples/, scripts/, and agents/ files copied verbatim
  *
  * For each command in commands/<slug>.md:
  *   → plugins/dotbabel/templates/claude/commands/<slug>.md
@@ -41,7 +41,7 @@ import { spawnSync } from "node:child_process";
 const TOOL_VERSION = "1.0.0";
 /** Fields stripped from consumer-facing frontmatter. */
 const AUTHORING_FIELDS = new Set(["owner", "created", "updated"]);
-const SKILL_SUPPORT_DIRS = ["references", "examples", "scripts"];
+const SKILL_SUPPORT_DIRS = ["references", "examples", "scripts", "agents"];
 
 const META = {
   name: "build-plugin",

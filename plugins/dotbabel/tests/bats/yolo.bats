@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 # Behavior tests for plugins/dotbabel/hooks/yolo.sh, the hook behind /yolo.
 #
-#   grant        UserPromptExpansion: `/yolo <scope>` writes the session's
+#   grant        UserPromptExpansion: `/yolo --for 2h [scope]` writes the session's
 #                grant, `/yolo off` removes it.
 #   permission   PermissionRequest: while the grant lives, and the session's
 #                transcript holds the typed /yolo that backs it, it approves
@@ -109,8 +109,8 @@ assert_declines() {
 
 # ---------------- grant ----------------
 
-@test "grant: /yolo <scope> writes the session's grant for 4 hours by default" {
-  expand "finish tifo milestone 1.5 phase 7, merge each PR when green"
+@test "grant: an explicit scope and lifetime write the session grant" {
+  expand "finish tifo milestone 1.5 phase 7, merge each PR when green --for 4h"
   [ "$status" -eq 0 ]
   [ -f "$GRANT" ]
   [ "$(jq -r .session_id "$GRANT")" = "$SID" ]
@@ -124,8 +124,40 @@ assert_declines() {
   [ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.hookEventName')" = "UserPromptExpansion" ]
 }
 
+@test "grant: only --for is required and omitted scope means the current task" {
+  expand "--for 5h"
+  [ "$status" -eq 0 ]
+  [ -f "$GRANT" ]
+  [ "$(jq -r .scope "$GRANT")" = "the current task in this session" ]
+  [ "$(jq -r .merge "$GRANT")" = "false" ]
+  [ "$(jq -r '.expires - .started' "$GRANT")" = "18000" ]
+}
+
+@test "grant: scope-free invocations accept optional merge flags in either order" {
+  expand "--for 5h --merge"
+  [ "$(jq -r .merge "$GRANT")" = "true" ]
+  expand "--no-merge --for 5h"
+  [ "$(jq -r .merge "$GRANT")" = "false" ]
+}
+
+@test "grant: --for accepts the minimum and maximum lifetimes without a scope" {
+  expand "--for 1m"
+  [ "$(jq -r '.expires - .started' "$GRANT")" = "60" ]
+  expand "--for 24h"
+  [ "$(jq -r '.expires - .started' "$GRANT")" = "86400" ]
+}
+
+@test "grant: --for is required even when a scope or merge flag is present" {
+  for args in "fix the flaky test" "--merge" "fix the flaky test --merge"; do
+    expand "$args"
+    [ "$(printf '%s' "$output" | jq -r .decision)" = "block" ]
+    [[ "$(printf '%s' "$output" | jq -r .reason)" == *"--for"* ]]
+    [ ! -e "$GRANT" ]
+  done
+}
+
 @test "grant: the state directory and the grant are private to the user" {
-  expand "fix the flaky test"
+  expand "fix the flaky test --for 4h"
   [ "$(stat -c %a "$WORK/state")" = "700" ]
   [ "$(stat -c %a "$GRANT")" = "600" ]
 }
@@ -148,23 +180,23 @@ assert_declines() {
 }
 
 @test "grant: merges are in scope only when the scope says so" {
-  expand "fix the flaky test and open a PR"
+  expand "fix the flaky test and open a PR --for 4h"
   [ "$(jq -r .merge "$GRANT")" = "false" ]
   [[ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.additionalContext')" == *"merge: no"* ]]
-  expand "open the PRs but do not merge them"
+  expand "open the PRs but do not merge them --for 4h"
   [ "$(jq -r .merge "$GRANT")" = "false" ]
-  expand "land phase 7, don't merge"
+  expand "land phase 7, don't merge --for 4h"
   [ "$(jq -r .merge "$GRANT")" = "false" ]
-  expand "land phase 7 and merge when green"
+  expand "land phase 7 and merge when green --for 4h"
   [ "$(jq -r .merge "$GRANT")" = "true" ]
-  expand "land phase 7 --merge"
+  expand "land phase 7 --merge --for 4h"
   [ "$(jq -r .merge "$GRANT")" = "true" ]
-  expand "land phase 7 and merge when green --no-merge"
+  expand "land phase 7 and merge when green --no-merge --for 4h"
   [ "$(jq -r .merge "$GRANT")" = "false" ]
 }
 
 @test "grant: /yolo off removes the grant" {
-  expand "fix the flaky test"
+  expand "fix the flaky test --for 4h"
   [ -f "$GRANT" ]
   expand "off"
   [ "$status" -eq 0 ]
@@ -172,28 +204,52 @@ assert_declines() {
   [[ "$(printf '%s' "$output" | jq -r '.hookSpecificOutput.additionalContext')" == *"YOLO GRANT REMOVED"* ]]
 }
 
-@test "grant: an empty scope is refused with the usage" {
+@test "grant: empty arguments are refused with the usage" {
   expand "   "
   [ "$(printf '%s' "$output" | jq -r .decision)" = "block" ]
-  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"/yolo <scope>"* ]]
+  [[ "$(printf '%s' "$output" | jq -r .reason)" == *"/yolo --for"* ]]
   [ ! -e "$GRANT" ]
 }
 
 @test "grant: a plugin-namespaced command name counts" {
-  expand "fix the flaky test" "dotbabel:yolo"
+  expand "fix the flaky test --for 4h" "dotbabel:yolo"
   [ -f "$GRANT" ]
 }
 
 @test "grant: another command expands untouched" {
-  expand "fix the flaky test" "pr-conductor"
+  expand "fix the flaky test --for 4h" "pr-conductor"
   assert_declines
   [ ! -e "$WORK/state" ]
 }
 
 @test "grant: an unsafe session id writes nothing" {
-  expand "fix the flaky test" yolo "../../escape"
+  expand "fix the flaky test --for 4h" yolo "../../escape"
   [ "$(printf '%s' "$output" | jq -r .decision)" = "block" ]
   [ -z "$(ls -A "$WORK/state" 2>/dev/null)" ]
+}
+
+@test "permission: a scope-free typed grant permits work but keeps the merge dialog" {
+  expand "--for 5h"
+  typed "--for 5h" 0
+  ask_bash "npm test"
+  assert_allows
+  ask_bash "gh pr merge 12 --squash"
+  assert_declines
+}
+
+@test "permission: a typed command without --for cannot back an existing grant" {
+  grant_file "$SID" 3600
+  : >"$TRANSCRIPT"
+  typed "test scope --merge" 0
+  ask_bash "npm test"
+  assert_declines
+}
+
+@test "permission: a scope-free typed merge grant permits merging" {
+  expand "--for 5h --merge"
+  typed "--for 5h --merge" 0
+  ask_bash "gh pr merge 12 --squash --delete-branch"
+  assert_allows
 }
 
 # ---------------- permission: no grant ----------------
@@ -457,7 +513,7 @@ assert_declines() {
 @test "permission: the typed lifetime bounds the grant, whatever the file says" {
   grant_file "$SID" 86400
   : >"$TRANSCRIPT"
-  typed "test scope" $((5 * 3600))
+  typed "test scope --for 4h" $((5 * 3600))
   ask_bash "npm test"
   assert_declines
   : >"$TRANSCRIPT"
@@ -469,7 +525,7 @@ assert_declines() {
 @test "permission: merge comes from the typed /yolo, not from the file" {
   grant_file "$SID" 3600 true
   : >"$TRANSCRIPT"
-  typed "test scope --no-merge" 0
+  typed "test scope --for 1h --no-merge" 0
   ask_bash "gh pr merge 12 --squash"
   assert_declines
 }

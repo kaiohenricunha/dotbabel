@@ -2,19 +2,19 @@
 id: yolo
 name: yolo
 type: skill
-version: 1.2.0
+version: 1.4.0
 domain: [devex]
 platform: [none]
 task: [runtime-ops]
 maturity: draft
 description: >
   Start a temporary autonomy mode for this session: one approval from the owner
-  covers a stated scope, and the session asks nothing else for work inside it
-  until the scope is done, `/yolo off`, the expiry (4 h by default), or the end
-  of the session. It still stops for force pushes, hard resets, deletions,
+  covers the current task or an explicit scope. The session asks nothing else
+  for work inside it until the scope is done, yolo off, the required --for expiry,
+  or the end of the session. It still stops for force pushes, hard resets, deletions,
   production deploys, destroys, spec-text edits, a check it cannot fix, and
   work outside the scope.
-argument-hint: "<scope> [--for 2h] [--merge|--no-merge] | off"
+argument-hint: "--for <duration> [--merge|--no-merge] [scope] | off"
 disable-model-invocation: true
 user-invocable: true
 ---
@@ -22,7 +22,26 @@ user-invocable: true
 # yolo
 
 `disable-model-invocation: true` is deliberate. Only the owner can start this
-mode, by typing `/yolo <scope>`. That command is the only approval.
+mode. In Claude Code, type `/yolo --for <duration> [scope]`. In Codex, type
+`$yolo --for <duration> [scope]`. Only `--for` is required; scope text and
+`--merge` or `--no-merge` are optional. `off` needs no duration.
+
+Without scope text, use only the current task already agreed in this session.
+State that task before work starts. If no task exists, ask the owner for one.
+An omitted scope never grants merge permission or includes unrelated work.
+Merges require `--merge` or an explicit merge instruction in the scope.
+The invocation is the approval for that task or scope, never for unrelated work.
+
+## Choose the runtime
+
+**Codex:** Read [references/codex.md](references/codex.md) and follow that path.
+It uses the owner's prompt and conversation context, not a Claude hook grant.
+Do not run the Claude grant steps below in Codex.
+
+**Claude Code:** Follow the hook-backed path below. A missing Claude grant never
+selects the Codex path. For any other runtime, report that it is unsupported and stop.
+
+## Claude Code
 
 The `yolo.sh` hook does the mechanical part (see
 [docs/hooks.md](../../docs/hooks.md#yolosh)). When the owner types the command,
@@ -39,10 +58,11 @@ one of these:
 - `YOLO GRANT REMOVED` — the owner typed `/yolo off`. Tell the owner, in one
   sentence, that every permission default is back. Stop.
 - `YOLO GRANT ACTIVE` — read the session, the expiry, the grant file path,
-  `merge: yes|no`, and the scope from it. Go to step 2.
-- Neither line — the hook is not registered, so no grant exists and every
-  dialog still prompts. Tell the owner that `/yolo` needs the four `yolo.sh`
-  entries from `docs/hooks.md#yolosh`, and stop. Do not start the scope as if
+  `merge: yes|no`, and the scope from it. Resolve "the current task in this
+  session" to the agreed task before step 2.
+- Neither line — no hook grant is available, so every permission default stays.
+  Tell the owner to check the four `yolo.sh` entries in `docs/hooks.md#yolosh`,
+  and stop. Do not start the scope as if
   it were autonomous.
 
 Do not edit any settings file to make the mode work. The mode must never

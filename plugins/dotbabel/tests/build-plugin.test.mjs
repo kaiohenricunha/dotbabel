@@ -245,6 +245,25 @@ describe("build-plugin", () => {
     );
   });
 
+  it.each([false, true])("preserves Codex invocation policy %s in packaged skills", (implicit) => {
+    const root = mkRepo();
+    writeSkill(root, "scoped-tool");
+    const metadata = `policy:\n  allow_implicit_invocation: ${implicit}\n`;
+    mkdirSync(join(root, "skills", "scoped-tool", "agents"), { recursive: true });
+    writeFileSync(join(root, "skills", "scoped-tool", "agents", "openai.yaml"), metadata);
+    buildIndex(root);
+
+    expect(runBuild(root).status).toBe(0);
+    const installed = join(root, "plugins/dotbabel/templates/claude/skills/scoped-tool/agents/openai.yaml");
+    expect(readFileSync(installed, "utf8")).toBe(metadata);
+    expect(runBuild(root, ["--check"]).status).toBe(0);
+
+    writeFileSync(installed, `policy:\n  allow_implicit_invocation: ${!implicit}\n`);
+    expect(runBuild(root, ["--check"]).status).toBe(1);
+    expect(runBuild(root).status).toBe(0);
+    expect(readFileSync(installed, "utf8")).toBe(metadata);
+  });
+
   it("copies command file to templates/claude/commands/<slug>.md", () => {
     const root = mkRepo();
     writeCommand(root, "my-cmd");
