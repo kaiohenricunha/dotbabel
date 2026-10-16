@@ -20,6 +20,7 @@ try {
     const context = deciderContext();
     exitCode = 64;
     let raw = "";
+    process.stdin.setEncoding("utf8");
     for await (const chunk of process.stdin) {
       raw += chunk;
       if (Buffer.byteLength(raw) > 65536) throw new Error("decision input exceeds 64 KiB");
