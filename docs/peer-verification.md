@@ -3,10 +3,10 @@
 ## Current result
 
 The implementation, skill distribution, architecture guide, and automated tests
-are present. Peer tests pass: 52 tests across 10 files. Peer-only coverage is 90.97% lines, 83.17% branches,
-93.65% functions, and 88.73% statements. The broader
-Fleet/Handoff/bootstrap/sync selection passes 964 tests. The shared lock/hook
-integration selection passes 139 tests, and the Bats selection passes 23 tests.
+are present. Peer tests pass: 62 tests across 10 files. Peer-only coverage is 91.48% lines, 83.90% branches,
+93.79% functions, and 89.20% statements. The broader
+Fleet/Handoff/bootstrap/sync selection passes 974 tests. The shared lock/hook
+integration selection passes 149 tests, and the Bats selection passes 23 tests.
 
 The resolved fast quality command exits 0 with warnings. Its configured test
 command runs the repository suite; correctness and lint checks pass. Complexity,
@@ -105,6 +105,41 @@ ledger instead of exceeding the shell argument limit. Regression tests cover
 registration, shell quoting, command injection, oversized output, and untrusted
 executable paths. Other implementation commands retain their permission checks.
 
+## PR review and hardening
+
+The delivery review reproduces two defects and fixes both before publication.
+
+| Candidate cause                                                      | Evidence for/against                                                                                                                               | Decision                                                                                                                                |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Native notification loss prevents a waiting request from resuming    | A direct domain-only probe stores Main's reply, then records the wait. It returns `waiting_for_peer` and `next: null` without involving transport. | Rejected as the cause of this reproduction.                                                                                             |
+| Wait recording overwrites an already available reply                 | Reply handling resumes requests only when they are already waiting; the later wait transaction previously did not inspect saved replies.           | Confirmed; inspect correlated durable replies before entering waiting state.                                                            |
+| Domain operations persist unknown lifecycle values                   | Existing domain transition validation accepts only known states; normal snapshots in tests remain valid.                                           | Rejected for the corruption reproduction.                                                                                               |
+| Snapshot validation checks string types without lifecycle membership | Replacing a saved request state with `corrupted-state` previously succeeds on read.                                                                | Confirmed; validate known request/delivery states, message kinds and text bounds, sequence type, active leases, and one active request. |
+
+The red test run fails nine tests for these causes. The fixed peer suite passes
+62 tests. A separate-process CLI regression sends Main's reply before `wait`,
+then verifies immediate requeue, a fresh lease, and successful completion.
+A negative case keeps waiting when a reply addresses another question. Seven
+malformed-snapshot cases verify both rejection and byte-for-byte preservation.
+
+The public-function run now prints:
+
+```json
+{ "state_after_wait": "queued", "resumed_same_request": true, "fresh_lease": true }
+```
+
+A fresh native CLI registration/status/unpair run inside the current Codex tool
+environment resolves harness `codex`, `main_alive: true`, the actual Dotbabel
+`peer-collaboration` worktree, and finally `closed: true`. This tests current
+registration and snapshot validation; it does not replace the pending two-model
+Claude/Codex scenario. The earlier interactive actor observations remain scoped
+to the behaviors and versions recorded above.
+
+The review finds no new dependency, public API removal, schema/spec change,
+Handoff change, Fleet claim change, or automatic production operation. The shared
+lock extraction preserves the original exports and is covered by catalog and
+Fleet regressions. Unsupported static measurements remain unavailable.
+
 ## Verification commands
 
 The excerpts below retain each command's last ten output lines, or all lines when
@@ -113,7 +148,7 @@ and intermediate failures are superseded by these successful runs. One concurren
 quality run observes the newly added large-output test before its fix and fails;
 the final quality run occurs after all source and test changes. A regression
 invocation with quoted filename globs selects only 153 tests; the recorded
-unquoted command is rerun and verifies all 964 tests.
+unquoted command is rerun and verifies all 974 tests.
 
 ### Peer behavior and coverage
 
@@ -122,15 +157,15 @@ npm test -- plugins/dotbabel/tests/peer --coverage --coverage.include='plugins/d
 ```
 
 ```text
- store.mjs     |   83.52 |    78.26 |     100 |   84.61 | ...65,101-103,112,118
+ store.mjs     |   88.17 |    84.61 |     100 |   89.53 | ...11,147-149,158,164
  transport.mjs |   83.87 |    65.38 |   81.25 |   90.74 | 21,41,48,63,119
 ---------------|---------|----------|---------|---------|-----------------------
 
 =============================== Coverage summary ===============================
-Statements   : 88.73% ( 772/870 )
-Branches     : 83.17% ( 717/862 )
-Functions    : 93.65% ( 118/126 )
-Lines        : 90.97% ( 675/742 )
+Statements   : 89.2% ( 785/880 )
+Branches     : 83.9% ( 740/882 )
+Functions    : 93.79% ( 121/129 )
+Lines        : 91.48% ( 688/752 )
 ================================================================================
 ```
 
@@ -147,9 +182,9 @@ dotbabel-handoff: meta extraction failed for claude
 dotbabel-handoff: description encode failed: encode failed
 
  Test Files  41 passed (41)
-      Tests  964 passed (964)
-   Start at  20:19:47
-   Duration  14.54s (tests 83%, transform 11%, import 4%, setup 2%, worker 1%)
+      Tests  974 passed (974)
+   Start at  20:40:20
+   Duration  8.32s (tests 83%, transform 10%, import 4%, setup 2%, worker 1%)
 
 ```
 
@@ -166,9 +201,9 @@ npm test -- plugins/dotbabel/tests/peer plugins/dotbabel/tests/model-intelligenc
 
 
  Test Files  13 passed (13)
-      Tests  139 passed (139)
-   Start at  20:17:26
-   Duration  10.13s (tests 91%, transform 7%, import 1%, setup 1%)
+      Tests  149 passed (149)
+   Start at  20:40:28
+   Duration  6.22s (tests 91%, transform 7%, import 1%, setup 1%)
 
 ```
 
@@ -206,7 +241,7 @@ npm run dogfood
   ✓ instruction files match repo facts
   ✓ generated instruction files are fresh
   ✓ generated instruction headings have parity
-  ✓ spec coverage ok (15 protected file(s) changed)
+  ✓ spec coverage ok (16 protected file(s) changed)
   ✓ schemas/dotbabel.compute.schema.json fresh
 ```
 
@@ -227,7 +262,7 @@ node scripts/build-plugin.mjs --check
 ```
 
 ```text
-  ✓ plugin templates fresh (210 files + manifest)
+  ✓ plugin templates fresh (212 files + manifest)
 ```
 
 ### Resolved fast quality profile
@@ -282,10 +317,38 @@ Checking formatting...
 All matched files use Prettier code style!
 markdownlint-cli2 v0.23.2 (markdownlint v0.41.1)
 Finding: **/*.md !node_modules !.claude/worktrees !node_modules/** !.claude/worktrees/** !plugins/dotbabel/tests/fixtures/** !commands/** !skills/** !.claude/commands/** !.claude/skills/** !**/security-audit/references/upstream/**
-Linting: 1356 files
+Linting: 1363 files
 Summary: 0 issues in 0 files
 check-jsdoc-coverage: ok — 133 file(s) scanned, every export documented.
 ```
+
+## PR quality profile
+
+The final delivery run executes the PR profile against `origin/main` and exits 0
+with warnings. Changed-line coverage, changed-branch coverage, and coverage
+regression checks pass. No test script, quality threshold, or workflow is changed.
+
+```bash
+node plugins/dotbabel/bin/dotbabel-quality.mjs check --profile pr --base origin/main
+```
+
+```text
+  pass correctness.compile [checked] — check passed
+  pass correctness.compile [checked] — check passed
+  pass correctness.compile [checked] — check passed
+  pass correctness.compile [checked] — check passed
+  pass correctness.compile [checked] — check passed
+  pass correctness.lint [checked] — check passed
+  pass correctness.tests [checked] — check passed
+
+.:javascript / regression
+  pass coverage.no_regression [checked]
+```
+
+A separate availability probe using Claude's `haiku` alias also returns
+`429 usage_limit_reached`, with the same October 19 reset notice. No account,
+credential, billing, permission, or persistent hook setting is changed to obtain
+model access. The cross-harness model smoke remains explicitly unavailable.
 
 ## Remaining validation
 

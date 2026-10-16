@@ -118,6 +118,9 @@ Useful operations:
 | Replace a terminated role                    | `dotbabel peer reconnect advisor --pair PAIR_ID`                                 |
 | Close the pair, retaining history            | `dotbabel peer unpair`                                                           |
 
+A reply that arrives before `wait` is recorded also resumes the investigation.
+The next claim uses a fresh lease; a reply to another question cannot resume it.
+
 All operations support `--json`. External shell queue operations use `--pair` and
 the same repository. Sending, receiving, acknowledgments, and task completion require
 a registered session. Use a stable `--dedupe KEY` when retrying enqueue or sends.

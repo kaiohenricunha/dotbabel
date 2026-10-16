@@ -4,7 +4,42 @@ import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { acquireLock } from "../lib/process-lock.mjs";
-import { createState } from "./state.mjs";
+import { createState, textBody } from "./state.mjs";
+
+const REQUEST_STATES = new Set([
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+  "waiting_for_peer",
+]);
+const DELIVERY_STATES = new Set([
+  "persisted",
+  "sending",
+  "uncertain",
+  "failed",
+  "transport_accepted",
+  "delivered",
+  "processed",
+  "acknowledged",
+]);
+const MESSAGE_KINDS = new Set([
+  "finding",
+  "question",
+  "reply",
+  "recommendation",
+  "acknowledgment",
+  "status",
+]);
+function validText(value) {
+  try {
+    textBody(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Refuse symlinked, foreign-owner, or public state paths. @param {string} file @param {boolean} [directory] @param {boolean} [requirePrivate] @returns {void} */
 export function privatePath(file, directory = false, requirePrivate = true) {
@@ -32,20 +67,31 @@ function validate(s, repo) {
       typeof p.id !== "string" ||
       !Array.isArray(p.messages) ||
       !Array.isArray(p.requests) ||
-      !p.main?.key
+      !p.main?.key ||
+      !Number.isInteger(p.sequence) ||
+      p.sequence < 0 ||
+      p.requests.filter((r) => r?.state === "running").length > 1
     )
       throw new Error("malformed peer pair");
     for (const m of p.messages)
       if (
+        !m ||
         m.version !== 1 ||
         m.pair_id !== p.id ||
-        typeof m.body !== "string" ||
-        !m.delivery ||
+        !validText(m.body) ||
+        !MESSAGE_KINDS.has(m.kind) ||
+        !DELIVERY_STATES.has(m.delivery?.state) ||
         typeof m.to !== "string"
       )
         throw new Error("malformed peer message");
     for (const r of p.requests)
-      if (typeof r.id !== "string" || typeof r.body !== "string" || typeof r.state !== "string")
+      if (
+        !r ||
+        typeof r.id !== "string" ||
+        !validText(r.body) ||
+        !REQUEST_STATES.has(r.state) ||
+        (r.state === "running" && (typeof r.lease !== "string" || !r.lease))
+      )
         throw new Error("malformed peer request");
   }
 }

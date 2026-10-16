@@ -115,6 +115,31 @@ it("routes correlated messages and requires recipient acknowledgments", () => {
   const reply = json(w.cli(["send", "advisor", "investigate", "--reply-to", m.id, "--json"]));
   expect(json(w.cli(["receive", "--json"], 1))[0].id).toBe(reply.id);
 });
+it("persists an early Main reply across processes and resumes Advisor after wait", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const a = json(w.cli(["ask", "discuss the race", "--json"]));
+  const running = json(w.cli(["next", "--json"], 1));
+  const q = json(
+    w.cli(["send", "main", "why?", "--kind", "question", "--request", a.id, "--json"], 1),
+  );
+  json(w.cli(["send", "advisor", "because", "--kind", "reply", "--reply-to", q.id, "--json"]));
+  const waited = json(
+    w.cli(
+      ["wait", a.id, "--lease", running.lease, "--result", "waiting", "--reply-to", q.id, "--json"],
+      1,
+    ),
+  );
+  expect(waited.state).toBe("queued");
+  const resumed = json(w.cli(["next", "--json"], 1));
+  expect(resumed.id).toBe(a.id);
+  expect(resumed.lease).not.toBe(running.lease);
+  expect(
+    json(w.cli(["complete", a.id, "--lease", resumed.lease, "--result", "resolved", "--json"], 1))
+      .state,
+  ).toBe("completed");
+});
 it("supports independent submissions and rejects unknown operations and missing input", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));

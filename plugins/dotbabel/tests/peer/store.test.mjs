@@ -4,6 +4,78 @@ import { spawn } from "node:child_process";
 import { describe, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 import { PeerStore } from "../../src/peer/store.mjs";
+import { registerMain, pairAdvisor, enqueue, sendMessage } from "../../src/peer/state.mjs";
+
+it.each([
+  [
+    "unknown investigation state",
+    (p) => {
+      p.requests[0].state = "corrupted-state";
+    },
+  ],
+  [
+    "unknown delivery state",
+    (p) => {
+      p.messages[0].delivery.state = "corrupted-state";
+    },
+  ],
+  [
+    "unknown message kind",
+    (p) => {
+      p.messages[0].kind = "execute";
+    },
+  ],
+  [
+    "oversized message",
+    (p) => {
+      p.messages[0].body = "x".repeat(16385);
+    },
+  ],
+  [
+    "invalid sequence",
+    (p) => {
+      p.sequence = null;
+    },
+  ],
+  [
+    "missing active lease",
+    (p) => {
+      p.requests[0].state = "running";
+      p.requests[0].lease = null;
+    },
+  ],
+  [
+    "multiple active investigations",
+    (p) => {
+      const b = enqueue(p, "second");
+      for (const r of [p.requests[0], b]) {
+        r.state = "running";
+        r.lease = "lease";
+      }
+    },
+  ],
+])("rejects %s without rewriting the malformed durable snapshot", async (_label, corrupt) => {
+  const store = new PeerStore(makeTempDir("peer-malformed-"), "repo");
+  await store.transaction((s) => {
+    const main = { key: "main", repo: "repo" },
+      advisor = { key: "advisor", repo: "repo" };
+    const p = registerMain(s, main, { alive: () => true });
+    pairAdvisor(s, advisor, p.code, { alive: () => true });
+    enqueue(p, "review");
+    sendMessage(p, main, "advisor", "question", { kind: "question" });
+  });
+  const s = JSON.parse(fs.readFileSync(store.file, "utf8"));
+  corrupt(s.pairs[0]);
+  const damaged = JSON.stringify(s);
+  fs.writeFileSync(store.file, damaged);
+  await expect(store.read()).rejects.toThrow(/malformed/);
+  await expect(
+    store.transaction((x) => {
+      x.marker = "must not commit";
+    }),
+  ).rejects.toThrow(/malformed/);
+  expect(fs.readFileSync(store.file, "utf8")).toBe(damaged);
+});
 
 it("persists atomically, rolls back errors, refuses malformed state and uses private permissions", async () => {
   const root = makeTempDir("peer-store-"),

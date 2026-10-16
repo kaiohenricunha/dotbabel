@@ -247,9 +247,20 @@ export function finishRequest(p, who, id, lease, state, result, waitingOn) {
     throw new Error("waiting requires a correlated question to Main");
   r.outcomes ??= [];
   r.outcomes.push({ state, result, at: new Date().toISOString(), attempt: r.attempts });
-  r.state = state;
+  // A fast Main can answer between the question and this separate transaction.
+  // Observe that durable reply here instead of waiting for another notification.
+  const answered =
+    state === "waiting_for_peer" &&
+    p.messages.some(
+      (m) =>
+        m.reply_to === waitingOn &&
+        m.request_id === id &&
+        m.to === who.key &&
+        (m.from === p.main.key || p.previous_members?.main?.includes(m.from)),
+    );
+  r.state = answered ? "queued" : state;
   r.result = result;
-  r.waiting_on = waitingOn ?? null;
+  r.waiting_on = answered ? null : (waitingOn ?? null);
   r.lease = null;
   r.finished_at = new Date().toISOString();
   return r;

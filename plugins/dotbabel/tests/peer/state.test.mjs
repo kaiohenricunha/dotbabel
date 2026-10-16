@@ -103,6 +103,37 @@ describe("durable investigations", () => {
     expect(a.state).toBe("queued");
     expect(b.state).toBe("running");
   });
+  it("resumes with a fresh lease when Main replies before Advisor records its wait", () => {
+    const { p, main, advisor } = world();
+    const a = enqueue(p, "one"),
+      b = enqueue(p, "two");
+    nextRequest(p, advisor);
+    const lease = a.lease;
+    const q = sendMessage(p, advisor, "main", "why?", { kind: "question", requestId: a.id });
+    sendMessage(p, main, "advisor", "because", { kind: "reply", replyTo: q.id });
+    finishRequest(p, advisor, a.id, lease, "waiting_for_peer", "waiting", q.id);
+    expect(a.state).toBe("queued");
+    expect(a.waiting_on).toBe(null);
+    expect(nextRequest(p, advisor).id).toBe(a.id);
+    expect(a.lease).not.toBe(lease);
+    expect(() => finishRequest(p, advisor, a.id, lease, "completed", "stale")).toThrow(/lease/);
+    finishRequest(p, advisor, a.id, a.lease, "completed", "Main answered");
+    expect(nextRequest(p, advisor).id).toBe(b.id);
+  });
+  it("keeps waiting when an early reply belongs to another question", () => {
+    const { p, main, advisor } = world();
+    const a = enqueue(p, "one");
+    nextRequest(p, advisor);
+    const q = sendMessage(p, advisor, "main", "why?", { kind: "question", requestId: a.id });
+    const other = sendMessage(p, advisor, "main", "another question", {
+      kind: "question",
+      requestId: a.id,
+    });
+    sendMessage(p, main, "advisor", "other answer", { kind: "reply", replyTo: other.id });
+    finishRequest(p, advisor, a.id, a.lease, "waiting_for_peer", "waiting", q.id);
+    expect(a.state).toBe("waiting_for_peer");
+    expect(nextRequest(p, advisor)).toBe(null);
+  });
   it("cancels, reprioritizes and rejects stale completion leases", () => {
     const { p, advisor } = world();
     const a = enqueue(p, "a"),
