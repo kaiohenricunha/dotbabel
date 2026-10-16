@@ -213,17 +213,28 @@ complements it and does not replace it.
 ## `yolo.sh`
 
 The hook behind the [`/yolo`](../skills/yolo/SKILL.md) skill: a temporary,
-per-session autonomy mode. The owner types `/yolo <scope>` once. Until the
-scope is done, the session asks nothing for the work in the scope. The mode
+per-session autonomy mode. The owner types `/yolo --for <duration> [scope]` once.
+Until the scope is done, the session asks nothing for the work in the scope. The mode
 reverts by itself at `/yolo off`, at the expiry, or at the end of the session.
 It never edits a settings file, and with no live grant the behavior is the same
 as without the hook.
 
 ```text
-/yolo finish milestone 1.5 phase 7, merge each PR when green
+/yolo --for 5h
+/yolo --for 5h --merge
+/yolo --for 4h finish milestone 1.5 phase 7, merge each PR when green
 /yolo --for 2h fix the flaky fleet test
 /yolo off
 ```
+
+These entries apply to Claude Code. The user's Claude settings may already
+register them globally; check those before adding project entries. Codex uses
+different events and transcript formats, so these four entries do not install
+a Codex permission hook. In Codex, the skill accepts a direct
+`$yolo --for <duration> [--merge|--no-merge] [scope]` as session instructions.
+It records an expiry in the conversation and preserves host permission checks;
+it does not create a hook grant or approve permission dialogs. See the
+[host selection rules](../skills/yolo/SKILL.md#choose-the-runtime).
 
 It has four entries:
 
@@ -237,9 +248,11 @@ It has four entries:
 **The grant.** `$XDG_STATE_HOME/dotbabel/yolo/<session_id>.json` (default
 `~/.local/state/dotbabel/yolo/`, override with `DOTBABEL_YOLO_STATE_DIR`), mode
 `0600` in a `0700` directory. It holds the scope, `merge` (true or false), and
-the start and expiry in epoch seconds. The lifetime is 4 hours by default;
-`--for 2h` or `--for 90m` changes it, up to 24 hours. Merges are in the scope
-when the scope text says "merge" and does not say "do not merge", "don't
+the start and expiry in epoch seconds. `--for` is required: `--for 2h` or
+`--for 90m` sets a positive lifetime up to 24 hours. Scope text is optional;
+without it the scope is "the current task in this session". The skill resolves
+that phrase to the agreed task before work starts. Merges are disabled by
+default. Merges are in the scope when the scope text says "merge" and does not say "do not merge", "don't
 merge", "no merge", or "without merging". `--merge` and `--no-merge` set it
 explicitly. A hook writes the grant because a skill cannot learn its own
 session id, and the `UserPromptExpansion` input carries `session_id`,
