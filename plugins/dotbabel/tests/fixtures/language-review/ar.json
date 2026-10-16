@@ -1,0 +1,247 @@
+{
+  "locale": "ar",
+  "cases": [
+    {
+      "id": "ar-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "نود أن نلفت انتباهكم إلى حقيقة أن اشتراككم سوف ينتهي في المستقبل القريب.",
+      "suggestion": "سينتهي اشتراككم قريبًا.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Correct, but a heavy lead-in and 'في المستقبل القريب' say what one adverb says. The plural-formal address (كم) is kept."
+    },
+    {
+      "id": "ar-calque",
+      "scenario": "calque",
+      "original": "قام النظام بتنفيذ العملية، وتم إرسال الإشعار إلى المستخدم.",
+      "suggestion": "نفّذ النظام العملية وأُرسل الإشعار إلى المستخدم.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "'قام بـ' and 'تم' plus a verbal noun replace plain verbs. Both are very common in modern MSA, so this is a style finding with medium confidence, not an error."
+    },
+    {
+      "id": "ar-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "معلش، التحويل ما نفعش. جرب تاني كده.",
+      "suggestion": "عذرًا، تعذّر إتمام التحويل. يُرجى المحاولة مرة أخرى.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Egyptian colloquial in banking UI copy that is otherwise Modern Standard Arabic. The fix moves to MSA and keeps the apology ('معلش'); it does not pick another dialect."
+    },
+    {
+      "id": "ar-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "original": "سيُعقد الاجتماع في 5 كانون الثاني وسيُرسل التقرير في فبراير.",
+      "suggestion": "سيُعقد الاجتماع في 5 يناير وسيُرسل التقرير في فبراير.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Levantine month name (كانون الثاني) beside the form used in Egypt and the Gulf (فبراير). Pick one set per audience."
+    },
+    {
+      "id": "ar-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "تمت الموافقة من قبل الإدارة على التقرير الذي كتبه المحلل الذي وظفه الفريق الذي شكلناه العام الماضي.",
+      "suggestion": "وافقت الإدارة على تقرير المحلل الذي وظّفه الفريق الذي شكّلناه العام الماضي.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "A passive with من قبل and three stacked relative clauses; an active verb-first clause with a construct (تقرير المحلل) keeps the noun definite and removes one level."
+    },
+    {
+      "id": "ar-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "تُحفَظ تغييراتك تلقائيًا. يمكنك إغلاق هذه النافذة في أي وقت.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural MSA with a morphological passive and a consistent second-person address. No findings expected."
+    },
+    {
+      "id": "ar-artificial-style",
+      "scenario": "artificial-style",
+      "original": "في عالم رقمي سريع التطور، تُمكّن منصتنا المبتكرة الفرق من إطلاق العنان لكامل إمكاناتها بسلاسة تامة.",
+      "suggestion": "تساعد منصتنا الفرق على بلوغ أقصى إمكاناتها بسهولة.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked abstractions that claim little."
+    },
+    {
+      "id": "ar-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "للتحقق من إعدادات DotBabel، يجب عليك القيام بتنفيذ الأمر `dotbabel doctor` بعد القيام بتثبيت `@dotbabel/dotbabel`.",
+      "suggestion": "للتحقق من إعدادات DotBabel، نفّذ الأمر `dotbabel doctor` بعد تثبيت `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The Latin product name and the commands stay exactly as written inside RTL prose."
+    },
+    {
+      "id": "ar-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "للتحقق من إعدادات DotBabel، يجب عليك القيام بتنفيذ الأمر `dotbabel doctor` بعد القيام بتثبيت `@dotbabel/dotbabel`.",
+      "suggestion": "للتحقق من إعدادات DotBabel، نفّذ الأمر `دوتبابل doctor` بعد تثبيت `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["code-span"]
+      },
+      "note": "A revision must never transliterate part of a command inside a code span."
+    },
+    {
+      "id": "ar-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, zero {لا توجد أي عناصر موجودة في سلتك حاليًا.} one {يوجد عنصر واحد موجود في سلتك حاليًا.} two {يوجد عنصران موجودان في سلتك حاليًا.} few {يوجد # عناصر موجودة في سلتك حاليًا.} many {يوجد # عنصرًا موجودًا في سلتك حاليًا.} other {يوجد # عنصر موجود في سلتك حاليًا.}}",
+      "suggestion": "{count, plural, zero {سلتك فارغة.} one {في سلتك عنصر واحد.} two {في سلتك عنصران.} few {في سلتك # عناصر.} many {في سلتك # عنصرًا.} other {في سلتك # عنصر.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "All six CLDR categories for Arabic kept; # kept in the three branches that carry a number."
+    },
+    {
+      "id": "ar-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, zero {لا توجد أي عناصر موجودة في سلتك حاليًا.} one {يوجد عنصر واحد موجود في سلتك حاليًا.} two {يوجد عنصران موجودان في سلتك حاليًا.} few {يوجد # عناصر موجودة في سلتك حاليًا.} many {يوجد # عنصرًا موجودًا في سلتك حاليًا.} other {يوجد # عنصر موجود في سلتك حاليًا.}}",
+      "suggestion": "{count, plural, zero {سلتك فارغة.} one {في سلتك عنصر واحد.} two {في سلتك عنصران.} few {في سلتك عدة عناصر.} many {في سلتك عناصر كثيرة.} other {في سلتك عناصر.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with words loses the number."
+    },
+    {
+      "id": "ar-plural-categories-added",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {يوجد عنصر واحد في سلتك.} other {يوجد # عناصر في سلتك.}}",
+      "suggestion": "{count, plural, zero {سلتك فارغة.} one {في سلتك عنصر واحد.} two {في سلتك عنصران.} few {في سلتك # عناصر.} many {في سلتك # عنصرًا.} other {في سلتك # عنصر.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-selector"],
+        "preservedWhenPluralCategoriesAllowed": true
+      },
+      "note": "A two-category message for a language with six. Adding the missing categories is a legitimate finding, so the check must be able to tolerate it when asked."
+    },
+    {
+      "id": "ar-localization-markup",
+      "scenario": "localization-string",
+      "original": "انقر على <b>حفظ</b> لكي تتمكن من حفظ تغييرات {name}. راجع <a href=\"https://example.com/help\">صفحة المساعدة</a>.",
+      "suggestion": "انقر على <b>حفظ</b> لحفظ تغييرات {name}. راجع <a href=\"https://example.com/help\">صفحة المساعدة</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href and the Latin placeholder are intact inside RTL text. The wordy 'لكي تتمكن من' is shortened; the verb stays 'save'."
+    },
+    {
+      "id": "ar-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "انقر على <b>حفظ</b> لكي تتمكن من حفظ تغييرات {name}. راجع <a href=\"https://example.com/help\">صفحة المساعدة</a>.",
+      "suggestion": "انقر على حفظ لتثبيت تغييرات {اسم}. راجع <a href=\"https://example.com/help\">صفحة المساعدة</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a placeholder name written in Arabic."
+    },
+    {
+      "id": "ar-rtl-mixed",
+      "scenario": "rtl-mixed",
+      "original": "قم بتثبيت Node.js ثم قم بتشغيل الأمر `npm install` داخل المجلد ./app .",
+      "suggestion": "ثبّت Node.js ثم شغّل الأمر `npm install` داخل المجلد ./app.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Latin identifiers, a code span and a relative path inside an RTL sentence. The stray space before the final full stop is removed; the path must not absorb the full stop."
+    },
+    {
+      "id": "ar-rtl-mixed-bidi-mark",
+      "scenario": "rtl-mixed",
+      "original": "قم بتثبيت Node.js ثم قم بتشغيل الأمر `npm install` داخل المجلد ./app .",
+      "suggestion": "ثبّت Node.js ثم شغّل الأمر `npm install` داخل المجلد ./app\u200F.",
+      "expect": {
+        "preserved": true,
+        "warnings": "U\\+200F"
+      },
+      "note": "A directional mark added next to a Latin token is reported as a warning to look at, never as a violation. Whether it helps depends on the renderer, which this check cannot see."
+    },
+    {
+      "id": "ar-rtl-mixed-bidi-inside-placeholder",
+      "scenario": "rtl-mixed",
+      "original": "عدد العناصر: {count}",
+      "suggestion": "عدد العناصر: {cou\u200Ent}",
+      "expect": {
+        "preserved": false,
+        "violations": ["placeholder"]
+      },
+      "note": "A directional mark inside a placeholder name breaks the placeholder."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "ar-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "ar",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "users of a banking app across the Arab world",
+          "register": "Modern Standard Arabic, formal-neutral",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "transfer.error",
+            "original": "معلش، التحويل ما نفعش. جرب تاني كده.",
+            "suggestion": "عذرًا، تعذّر إتمام التحويل. يُرجى المحاولة مرة أخرى.",
+            "category": "register",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "The line is Egyptian colloquial in an interface that is otherwise Modern Standard Arabic. For a pan-Arab audience, MSA is the safer register; the revision does not choose another dialect."
+          },
+          {
+            "id": "F2",
+            "location": "reports.date",
+            "original": "سيُعقد الاجتماع في 5 كانون الثاني وسيُرسل التقرير في فبراير.",
+            "suggestion": "سيُعقد الاجتماع في 5 يناير وسيُرسل التقرير في فبراير.",
+            "category": "regional-fit",
+            "severity": "minor",
+            "confidence": "medium",
+            "explanation": "Two month-name conventions in one sentence. The revision follows the Egypt and Gulf set already used for February.",
+            "uncertainty": "If the audience is the Levant, the other direction (كانون الثاني, شباط) is equally correct. Confirm the target region."
+          },
+          {
+            "id": "F3",
+            "location": "system.log",
+            "original": "قام النظام بتنفيذ العملية، وتم إرسال الإشعار إلى المستخدم.",
+            "suggestion": "نفّذ النظام العملية وأُرسل الإشعار إلى المستخدم.",
+            "category": "naturalness",
+            "severity": "preference",
+            "confidence": "medium",
+            "explanation": "Plain verbs read tighter than 'قام بـ' and 'تم' plus a verbal noun. The original is common and not wrong."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content. Rendering of mixed-direction text was not checked on screen."
+      }
+    },
+    {
+      "id": "ar-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "ar",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}

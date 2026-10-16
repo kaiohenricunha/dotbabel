@@ -157,6 +157,13 @@
       "lastValidated": "2026-10-13"
     },
     {
+      "name": "language-review",
+      "path": ".claude/skills/language-review/SKILL.md",
+      "checksum": "sha256:fc850d39d06e94c1d97edf807d15d17249e2aea7c71de71cf5e214f81908b970",
+      "dependencies": [],
+      "lastValidated": "2026-10-16"
+    },
+    {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
       "checksum": "sha256:f8285ffada80003ce380c1b98886ced49f6382cb6a28cb0db39182a3f61eea20",

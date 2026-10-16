@@ -258,6 +258,10 @@ After `./bootstrap.sh`, open any repo in Claude Code and try:
 /dependabot-sweep
 # → parallel subagents annotate each PR with risk level; safe bumps merged automatically
 
+# Review wording as a native-language editor would (read-only; en, pt-BR, es, fr, de, ar, id-ID)
+/language-review locales/pt-BR.json --source locales/en.json
+# → findings with original, suggestion, category, severity, confidence; placeholders and markup untouched; natural text left alone
+
 # Hand off mid-task context across CLIs or machines
 /handoff <query>                    # local cross-agent: emit <handoff> block
 /handoff push [<query>] [--tag]     # upload to transport (scrubs secrets)

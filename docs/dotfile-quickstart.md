@@ -81,7 +81,20 @@ Open any repo in Claude Code. The full library is now available:
 
 # Transfer your session to another machine or AI
 /handoff push
+
+# Review wording as a native-language editor would (read-only)
+/language-review docs/pt-BR/guia.md --lang pt-BR --audience developers
 ```
+
+`/language-review` covers English, Brazilian Portuguese, Spanish, French, German, Modern
+Standard Arabic, and Indonesian. It reviews original text or a translation against its source,
+keeps placeholders, ICU syntax, and markup untouched, and leaves natural text alone. It never
+edits a file. It works without any service or key. Codex, Gemini CLI, and OpenCode load the
+same skill from the project's `.agents/skills` or `.cli/skills`, and answer when you describe
+the task in plain words ("does this Spanish UI copy sound natural?"). GitHub Copilot receives it
+as an always-on instructions file, `.github/instructions/language-review.instructions.md`, not
+as a slash command, and does not get the per-language reference files; the skill says so in its
+report and lowers its confidence.
 
 Cloud/IaC specialists activate automatically — just mention the technology:
 

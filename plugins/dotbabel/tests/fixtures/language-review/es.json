@@ -1,0 +1,202 @@
+{
+  "locale": "es-MX",
+  "cases": [
+    {
+      "id": "es-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "Nosotros hemos recibido su solicitud y nosotros la procesaremos en un breve período de tiempo.",
+      "suggestion": "Hemos recibido su solicitud y la procesaremos en breve.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Correct, but the repeated subject pronoun 'nosotros' is emphatic in a pro-drop language, and 'un breve período de tiempo' is padding. The perfect tense is kept, so the revision is neutral across variants."
+    },
+    {
+      "id": "es-calque",
+      "scenario": "calque",
+      "original": "Por favor aplique para el puesto enviando su aplicación antes del viernes.",
+      "suggestion": "Para postularse al puesto, envíe su solicitud antes del viernes.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "'Aplicar para' and 'aplicación' for 'apply for' and 'application' follow English; 'postularse' and 'solicitud' are the conventional Latin American forms."
+    },
+    {
+      "id": "es-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "¡Ey, colega! Tu factura sigue sin pagar, ponte las pilas y paga ya, ¿vale?",
+      "suggestion": "Le recordamos que su factura sigue pendiente de pago. Le agradeceremos que la liquide a la brevedad.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "A B2B payment reminder in slang and an imperative; the fix moves to usted. It uses ordinary formal formulas, which suit a payment notice."
+    },
+    {
+      "id": "es-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "original": "Para guardar el archivo en tu ordenador, haz clic en el botón y ustedes podrán elegir la carpeta.",
+      "suggestion": "Para guardar el archivo en tu computadora, haz clic en el botón y podrás elegir la carpeta.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "es-MX text with Peninsular 'ordenador' and a switch from tú to ustedes inside one sentence."
+    },
+    {
+      "id": "es-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "El informe que fue redactado por el analista que fue contratado por el equipo que formamos el año pasado fue aprobado por la dirección.",
+      "suggestion": "La dirección aprobó el informe redactado por el analista contratado por el equipo que formamos el año pasado.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Stacked relative clauses with passives; the active main clause is clearer."
+    },
+    {
+      "id": "es-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "Tus cambios se guardan automáticamente. Puedes cerrar esta ventana en cualquier momento.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural, with the reflexive passive and a consistent tú. No findings expected."
+    },
+    {
+      "id": "es-artificial-style",
+      "scenario": "artificial-style",
+      "original": "En el vertiginoso panorama digital actual, nuestra innovadora plataforma permite a los equipos liberar todo su potencial sin fisuras.",
+      "suggestion": "Nuestra plataforma ayuda a los equipos a aprovechar todo su potencial.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked abstractions. 'Liberar todo su potencial' and 'sin fisuras' are themselves calques of 'unlock your full potential' and 'seamless'."
+    },
+    {
+      "id": "es-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "Para comprobar la configuración de DotBabel, es necesario que usted ejecute el comando `dotbabel doctor` después de realizar la instalación de `@dotbabel/dotbabel`.",
+      "suggestion": "Para comprobar la configuración de DotBabel, ejecute `dotbabel doctor` después de instalar `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The product name and the commands stay exactly as written."
+    },
+    {
+      "id": "es-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "Para comprobar la configuración de DotBabel, es necesario que usted ejecute el comando `dotbabel doctor` después de realizar la instalación de `@dotbabel/dotbabel`.",
+      "suggestion": "Para comprobar la configuración de DotBabel, ejecute `dotbabel médico` después de instalar `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["code-span"]
+      },
+      "note": "A revision must never translate a command inside a code span."
+    },
+    {
+      "id": "es-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Hay # artículo actualmente ubicado en su carrito.} other {Hay # artículos actualmente ubicados en su carrito.}}",
+      "suggestion": "{count, plural, one {Su carrito tiene # artículo.} other {Su carrito tiene # artículos.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "ICU skeleton, selectors and # markers are untouched."
+    },
+    {
+      "id": "es-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Hay # artículo actualmente ubicado en su carrito.} other {Hay # artículos actualmente ubicados en su carrito.}}",
+      "suggestion": "{count, plural, one {Su carrito tiene un artículo.} other {Su carrito tiene varios artículos.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with words loses the number."
+    },
+    {
+      "id": "es-localization-markup",
+      "scenario": "localization-string",
+      "original": "Haz clic en <b>Guardar</b> para poder guardar los cambios que has realizado en {name}. Consulta <a href=\"https://example.com/ayuda\">la página de ayuda</a>.",
+      "suggestion": "Haz clic en <b>Guardar</b> para guardar los cambios de {name}. Consulta <a href=\"https://example.com/ayuda\">la página de ayuda</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href and the placeholder are intact. 'Guardar para guardar' is idiomatic help text and is left as it is; only 'poder' and 'que has realizado' are dropped."
+    },
+    {
+      "id": "es-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "Haz clic en <b>Guardar</b> para poder guardar los cambios que has realizado en {name}. Consulta <a href=\"https://example.com/ayuda\">la página de ayuda</a>.",
+      "suggestion": "Haz clic en Guardar para guardar los cambios de {nombre}. Consulta <a href=\"https://example.com/ayuda\">la página de ayuda</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a translated placeholder name."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "es-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "es-MX",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "usuarios de una aplicación de facturación en México",
+          "register": "tú in the UI, usted in billing notices",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "careers.apply",
+            "original": "Por favor aplique para el puesto enviando su aplicación antes del viernes.",
+            "suggestion": "Para postularse al puesto, envíe su solicitud antes del viernes.",
+            "category": "idiom",
+            "severity": "major",
+            "confidence": "medium",
+            "explanation": "'Aplicar para' and 'aplicación' follow English 'apply for' and 'application'. 'Postularse' and 'solicitud' are the conventional Latin American forms. The English-shaped use is spreading, so the confidence is medium."
+          },
+          {
+            "id": "F2",
+            "location": "download.help",
+            "original": "Para guardar el archivo en tu ordenador, haz clic en el botón y ustedes podrán elegir la carpeta.",
+            "suggestion": "Para guardar el archivo en tu computadora, haz clic en el botón y podrás elegir la carpeta.",
+            "category": "regional-fit",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "'Ordenador' is Peninsular; 'computadora' is the Mexican norm. The sentence also moves from tú to ustedes, which breaks address consistency."
+          },
+          {
+            "id": "F3",
+            "location": "billing.reminder",
+            "original": "Nosotros hemos recibido su solicitud y nosotros la procesaremos en un breve período de tiempo.",
+            "suggestion": "Hemos recibido su solicitud y la procesaremos en breve.",
+            "category": "naturalness",
+            "severity": "minor",
+            "confidence": "high",
+            "explanation": "Spanish drops the subject pronoun unless it contrasts. Repeating 'nosotros' sounds like a translation from English."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    },
+    {
+      "id": "es-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "es-MX",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}

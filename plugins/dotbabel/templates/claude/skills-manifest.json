@@ -157,6 +157,13 @@
       "lastValidated": null
     },
     {
+      "name": "language-review",
+      "path": ".claude/skills/language-review/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "local-attest",
       "path": ".claude/skills/local-attest/SKILL.md",
       "checksum": "",
