@@ -74,11 +74,33 @@ Fast-path a comment only when **all three** hold:
 
 1. It carries a `post-pr-review:v1:` marker, **and**
 2. its author matches the authenticated login (`gh api user -q .login`) — the marker is public text anyone can paste, so the marker alone proves nothing, **and**
-3. its `category` is mechanical: `style`, `comment`, or `type`.
+3. its `category` is mechanical: `style`, `comment`, or `type`, and its severity is stated and is not `critical`.
 
 Everything else — `bug`, `design`, `security`, `test`, `simplify`, `error-handling`, any unmarked comment, any foreign author — gets the full validation below. Those are the categories where a confident agent is most often wrong, and under `--conductor` this is the only stage that can still reject a finding: step 4 replies to false positives, and after this the fixes are applied, pushed with `[skip ci]`, and the threads resolved. Never let a `critical` finding through on the fast path regardless of category.
 
-For each review comment:
+For each finding outside that authenticated fast path, write only
+`{finding: {file, title, body, diff_hunk, severity, category}}` to a private
+temporary JSON file outside the repository. Do not interpolate review text into
+shell code. Run:
+
+```bash
+dotbabel decide --step review-triage < "$DECISION_INPUT" > "$DECISION_OUTPUT"
+```
+
+Follow `answer`: `auto-valid` accepts the finding, `auto-false-positive` sends it
+to step 4, and `full-validation` runs the checks below. A missing or `critical`
+severity always requires full validation. On exit 2 or 64, report that the
+decider is unavailable and perform full validation. The built-in rule uses full
+validation for every finding sent here. A model's `shadow` answer is a log only;
+never follow it. No Jev step is adopted by the current implementation.
+
+Append each successful decision JSON object to the phase's private JSON array.
+At phase completion, include `--decisions "$DECISIONS_FILE"` in the existing
+`dotbabel pr-stack record --pr <N> --phase review-pr --outcome <observed>` call.
+Outside conductor mode, make that record once with the observed phase outcome.
+Do not record the input, an API key, or an invented phase pass.
+
+For each review comment requiring full validation:
 
 - Read the relevant file and surrounding code context
 - Determine: is this a **valid issue** (real bug, style violation, missing edge case, legit improvement) or a **false positive** (nitpick that's wrong, misunderstanding of intent, outdated concern)?
