@@ -1,6 +1,6 @@
 {
   "$schema": "https://dotbabel.dev/schemas/index.schema.json",
-  "generatedAt": "2026-10-16T01:48:01.328Z",
+  "generatedAt": "2026-10-16T22:38:00.017Z",
   "version": "4.0.1",
   "artifacts": [
     {
@@ -648,6 +648,21 @@
         "maturity": "validated"
       },
       "version": "2.1.0",
+      "owner": "@kaiohenricunha"
+    },
+    {
+      "id": "peer",
+      "type": "skill",
+      "path": "skills/peer/SKILL.md",
+      "name": "peer",
+      "description": "Pair persistent Main and Advisor sessions across Claude Code and Codex. Manage their durable investigations, queue, and bidirectional messages. Use for peer main, peer advisor, peer ask, or requests addressed to an already paired Advisor. Handoff remains the separate context-transfer tool.\n",
+      "facets": {
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "debugging"],
+        "maturity": "draft"
+      },
+      "version": "1.0.0",
       "owner": "@kaiohenricunha"
     },
     {

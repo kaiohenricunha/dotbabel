@@ -1,0 +1,253 @@
+# Persistent peer collaboration
+
+Peer connects one implementation session (Main) and one read-only reasoning
+session (Advisor). Each can run in Claude Code or Codex CLI on Linux/WSL2.
+It keeps both conversations and contexts intact. Handoff still transfers context;
+its commands, storage, and transcript extraction are unchanged.
+
+## Install and pair
+
+From this checkout, install the CLI and distribute the skill:
+
+```bash
+npm install -g /absolute/path/to/dotbabel
+dotbabel bootstrap --source /absolute/path/to/dotbabel
+dotbabel peer setup --harness both
+```
+
+Setup adds lifecycle hooks to Claude's user settings and Codex's `hooks.json`.
+It preserves existing hooks and permissions. Restart the harnesses. Review and
+trust the new definitions in Codex's `/hooks` interface. Dotbabel does not grant
+hook trust, change permission modes, or enable socket access through a sandbox.
+If Claude holds a native notification, approve it in that terminal. A deliberately
+configured per-session `crossSessionInbound: accept` also permits unattended native
+wakeups, but accepts native messages beyond this pair; Dotbabel never sets it.
+Use `receive`/`next` when inbound controls prevent a wakeup.
+The role instructions still work without hooks, but tool enforcement and lifecycle
+recovery then depend on the model following the skill. Bootstrap discovers the
+installed CLIs; `--all` includes CLIs not currently on PATH.
+
+In terminal A, inside Claude Code:
+
+```text
+/peer main
+```
+
+In terminal B, inside Codex:
+
+```text
+$peer advisor 12AB34CD
+```
+
+Use the actual code printed by Main. A code expires after ten minutes. Advisor
+can omit the code when this repository has exactly one eligible Main. Selection
+is required otherwise. Main can refresh an unused code with `peer main`.
+For reverse roles, use `$peer main` in Codex and `/peer advisor CODE` in Claude.
+Codex's supported skill syntax is `$peer`; an arbitrary `/peer` command is not
+registered. Plugin installations can namespace Claude skills; use the skill name
+shown in that installation's menu.
+
+The deterministic equivalents are `dotbabel peer main` and
+`dotbabel peer advisor CODE`, run through the session's shell tool. Claude resolves
+its identity through Fleet's registry and process ancestry. Codex uses its exported
+thread ID and verifies a live Codex process ancestor. No recent-transcript guessing
+or manual UUID copying is required. `status` prints the durable pair ID.
+
+## Working together
+
+Ask Advisor normally: “Investigate the account-linking race, then tell Main.”
+The skill persists an investigation, reads Main's current files, reports to you,
+and forwards actionable evidence. “Don't message Main yet” uses `--forward never`.
+Ordinary questions and discussion stay in your conversation. A direct request to
+message Main uses `send`; a question that needs Main's answer uses a correlated
+message and `wait`. Queue management does not send a message to Main.
+
+An occupied prompt does not provide an independent submission channel. Open a
+small third shell/pane in the repository while Advisor works:
+
+```bash
+dotbabel peer ask "Check JWT refresh" --pair PAIR_ID
+dotbabel peer ask "Review the migration" --pair PAIR_ID
+dotbabel peer input --pair PAIR_ID
+```
+
+The input pane stores one investigation per nonempty line. `.queue`, `.pause`,
+`.resume`, and `.quit` control it. It does not interpret conversation or start
+another model. Enqueue remains available while either model is busy.
+
+Useful operations:
+
+| Operation                                    | Command                                                                          |
+| -------------------------------------------- | -------------------------------------------------------------------------------- |
+| Inspect running work and FIFO history        | `dotbabel peer queue`                                                            |
+| Inspect pair, liveness and delivery failures | `dotbabel peer status`                                                           |
+| See messages and results                     | `dotbabel peer history`                                                          |
+| Read incoming messages                       | `dotbabel peer receive`                                                          |
+| Record processing                            | `dotbabel peer ack MESSAGE --processed`                                          |
+| Record handling/acknowledgment               | `dotbabel peer ack MESSAGE`                                                      |
+| Start/resume eligible Advisor work           | `dotbabel peer next`                                                             |
+| Complete work with the current fenced lease  | `dotbabel peer complete REQUEST --lease TOKEN --result "result"`                 |
+| Record a failure                             | `dotbabel peer fail REQUEST --lease TOKEN --result "reason"`                     |
+| Send a question about a request              | `dotbabel peer send main "why?" --kind question --request REQUEST`               |
+| Suspend that request for the answer          | `dotbabel peer wait REQUEST --lease TOKEN --result "waiting" --reply-to MESSAGE` |
+| Answer the question                          | `dotbabel peer send advisor "answer" --kind reply --reply-to MESSAGE`            |
+| Follow up on an investigation                | `dotbabel peer ask "follow-up" --parent REQUEST`                                 |
+| Suppress forwarding                          | `dotbabel peer ask "discuss privately" --forward never`                          |
+| Prioritize queued work                       | `dotbabel peer priority REQUEST --priority 10`                                   |
+| Cancel work                                  | `dotbabel peer cancel REQUEST`                                                   |
+| Retry eligible failed/waiting work           | `dotbabel peer retry REQUEST`                                                    |
+| Pause/resume automatic scheduling            | `dotbabel peer pause` / `dotbabel peer resume`                                   |
+| Replace a terminated role                    | `dotbabel peer reconnect advisor --pair PAIR_ID`                                 |
+| Close the pair, retaining history            | `dotbabel peer unpair`                                                           |
+
+All operations support `--json`. External shell queue operations use `--pair` and
+the same repository. Sending, receiving, acknowledgments, and task completion require
+a registered session. Use a stable `--dedupe KEY` when retrying enqueue or sends.
+A key reused with different content is rejected. Unknown flags are errors.
+
+## Delivery and execution semantics
+
+A small detached notification pump starts when Advisor pairs. There is one pump
+per pair, not one machine-wide daemon. It exits when the pair closes or both
+processes terminate. It calls native transport adapters and never invokes a model,
+creates a new reasoning session, changes code, or reads transcripts. Run
+`dotbabel peer relay --pair PAIR_ID` in a foreground shell for diagnostics/recovery.
+Ordinary operations restart a missing pump. `status` reports its process liveness.
+
+The pump claims the highest-priority eligible request, FIFO among equal priorities.
+Only one request is `running`. It notifies the existing Advisor session, which
+runs `next` to obtain the request and lease. The skill records an explicit result
+and loops to `next`; the pump also detects completion and wakes the next task.
+A Stop hook continues eligible work if the model tries to end early. One reminder
+is allowed for an unfinished running task; a repeated unsuccessful stop pauses
+scheduling instead of causing an infinite model loop.
+
+`waiting_for_peer` releases the active slot. A reply to the exact waiting message
+requeues the request. Other investigations can run meanwhile. Completion with an
+old lease is refused after cancellation or recovery. Reconnect requeues interrupted
+read-only work up to three attempts, preserving previous attempt results. Model
+errors/interruption hooks pause scheduling. After an API limit, inspect the request
+and resume when the harness can work again. Without the relevant hooks, use pause
+and resume explicitly; Dotbabel cannot infer an API error from silence.
+
+Messages distinguish these observations:
+
+1. `persisted`: Dotbabel fsyncs the message before native delivery.
+2. `sending`: a pump reserves one delivery attempt.
+3. `transport_accepted`: the socket write or Codex queue command succeeds.
+4. `delivered`: the recipient explicitly runs `receive`.
+5. `processed`: the recipient explicitly records processing.
+6. `acknowledged`: the recipient explicitly records handling.
+
+Acceptance does not prove model receipt, agreement, or completion. Claude can hold
+or refuse inbound text. Codex queue acceptance does not prove an active turn was
+interrupted. After five minutes without a recipient observation, status marks an
+accepted notification unresponsive. It does not resend it automatically.
+
+A failure before socket connection can retry with exponential backoff, at most
+three attempts. An interrupted send, timeout after submission, or nonzero Codex
+queue exit is `uncertain`; it never silently replays. First inspect `receive` and
+`next`, then use `retry-delivery ID` only when appropriate. A retry can repeat a
+native notification, but request IDs, deduplication, and fenced state transitions
+prevent a duplicate request or stale completion. Exactly-once native delivery is
+not claimed. Message ordering blocks a later notification in each direction until
+the recipient reads earlier messages. `receive` returns unread/unhandled messages
+in their persisted order, including repeated reads until processing is recorded.
+
+## Storage, repository awareness, and boundaries
+
+State lives at `$XDG_STATE_HOME/dotbabel/peer` (default `~/.local/state/dotbabel/peer`).
+`DOTBABEL_PEER_STATE_DIR` overrides it. SHA-256 filenames isolate Fleet-normalized
+repository origins; local repositories use their common Git directory. Worktrees
+share one ledger. State is a versioned JSON snapshot in a 0700 directory, with
+0600 state files, an atomic rename, file fsync, and directory fsync. Transactions
+reuse Dotbabel's process-incarnation lock. Concurrent writers cannot lose requests.
+Malformed state fails closed and is preserved. A killed transaction's lock is
+recoverable after the shared helper's ten-minute minimum age, only with proof that
+its owner died or its PID was reused. Do not delete a live lock.
+
+Linux process start time and boot identity protect against PID reuse and reboot.
+Claude identity is also checked against its current registry session ID. A `/clear`
+therefore invalidates the old endpoint; explicit reconnect confirms the replacement.
+Codes and pair IDs apply only inside the correct repository. State is same-user
+local coordination, not a security boundary against malicious processes under
+that same OS account. No credential, auth token, or full transcript is copied.
+Native Windows, cross-machine coordination, multiple Advisors, and cloud sessions
+are outside v1.
+
+Advisor gets Main's actual worktree path, not a stale patch export. It can read
+current uncommitted and untracked files without checking out branches or applying
+patches. Main can change a file during inspection; there is no atomic multi-file
+snapshot. Re-read evidence before reporting and report stale/unavailable worktrees.
+Fleet's claim behavior remains unchanged. Peer does not acquire claims for reads.
+
+Advisor's hook denies write tools and commands outside a conservative read-only
+list. Hooks depend on installation, trust, and harness coverage; they are not a
+sandbox. Git configuration and specialized harness tool paths remain additional
+reasons to preserve the session's own permission boundary. Peer content never
+grants human approval or authority to change settings. Message bodies are limited
+to 16 KiB; notifications contain no body text or full transcripts. Each sender is
+limited to thirty messages per minute and six correlated reply levels. Each history
+is capped at 10,000 items and each repository snapshot at 32 MiB; a full ledger
+requires an operator to archive state before starting a fresh repository ledger.
+
+## Compatibility and measured evidence
+
+Checked 2026-10-16 with Claude Code 2.1.302 and Codex CLI 0.163.0.
+
+| Capability                  | Claude Code                                           | Codex CLI                                        | Fallback/limit                                           |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| Skill entry point           | `/peer`                                               | `$peer`                                          | deterministic CLI from the tool shell                    |
+| Native transport            | Local inbox, `peerProtocol: 1`                        | stable `codex queue --thread --message`          | `receive` and `next`                                     |
+| Busy turn                   | Native peer text can arrive between tool calls        | Queue accepts text; no steering claim            | independent shell/pane accepts investigations            |
+| Idle turn                   | Native inbox can wake a turn                          | Queue interface targets an existing thread       | actual model processing needs recipient ACK              |
+| Identity/liveness           | Fleet registry, PID incarnation, session ID           | exported thread ID, Codex ancestor, SessionEnd   | shared daemon liveness alone cannot prove a thread lives |
+| Lifecycle                   | SessionStart, Stop, StopFailure, SessionEnd           | SessionStart, Stop, Interrupt, SessionEnd        | review/trust hooks; explicit recovery when absent        |
+| Read-only Advisor           | instructions plus optional hook guard                 | instructions plus optional hook guard            | permissions remain per-session                           |
+| Urgent active-turn steering | not exposed                                           | not exposed                                      | never described as interrupting a turn                   |
+| Delivery proof              | live peer-origin turn started; model hit weekly limit | live queue command accepted for an active thread | full reasoning round-trip remains pending                |
+
+Official evidence: [Claude messaging and inbound controls](https://code.claude.com/docs/en/cross-session-messaging),
+[Claude hooks](https://code.claude.com/docs/en/hooks),
+[Codex queue](https://developers.openai.com/codex/cli/reference),
+[Codex hooks and trust](https://developers.openai.com/codex/hooks),
+and [Codex skills](https://developers.openai.com/codex/skills).
+Claude's documentation describes the socket and optional own-child auth line,
+but not a stable cross-harness payload framing contract. The adapter isolates the
+single-line protocol, checks registry `peerProtocol === 1`, and uses no claimed
+permission class or own-child token. Its live probe starts a peer-origin turn.
+A changed protocol falls back to mailbox reads. The
+[App Server](https://developers.openai.com/codex/app-server) provides active-turn
+steering, but is unnecessary for stable queued notifications and is not attached
+to or resumed over an already-running interactive thread by this implementation.
+
+## Real two-terminal smoke test
+
+These steps require available model quotas. Automated tests use isolated adapters;
+they do not establish live cross-harness reasoning. The implementation environment's
+Claude account returns `429 usage_limit_reached`, so both full real pair directions
+remain pending manual validation. A successful socket write is not marked a pass
+for any model-processing step. Natural-language routing is supplied by the skill;
+its model-level behavioral validation also remains pending. Deterministic routing
+and state transitions are covered by automated tests.
+
+1. Install and trust hooks as above. Open both harnesses in a scratch Git repository.
+2. Register Claude Main with `/peer main`, then Codex Advisor with `$peer advisor CODE`.
+3. Ask Main to inspect a file and keep the implementation task active.
+4. Ask Advisor: “Investigate this file for a race. Give evidence, then tell Main.”
+5. While it works, submit two more investigations using `peer ask --pair PAIR_ID`.
+6. Check `peer queue --pair PAIR_ID` from the shell: one running, two queued.
+7. Verify Advisor gives its result, persists completion, and sends Main a finding.
+8. Verify Main runs `receive`, acknowledges the finding, and sends a correlated reply.
+9. Verify Advisor receives and acknowledges that reply and automatically runs the
+   remaining investigations. Check results and delivery states in `history`.
+10. Repeat a message while Main is idle. Verify a new turn starts and records an ACK.
+11. Suspend a request with `wait`, run an independent request, and answer from Main.
+    Verify the suspended investigation resumes with a fresh lease.
+12. Interrupt Advisor. Verify pause/recovery state. Restart/resume it, explicitly
+    reconnect if its endpoint changed, then resume the queue. Check retained results.
+13. Unpair. Repeat the scenario with Codex Main and Claude Advisor.
+
+For each step, record harness versions, request/message IDs, actual CLI output,
+recipient acknowledgments, and any inbound approval prompt. Keep findings scoped;
+do not include credentials or full session transcripts in a smoke-test report.

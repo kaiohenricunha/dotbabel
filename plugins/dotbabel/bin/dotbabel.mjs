@@ -48,6 +48,7 @@ const SUBCOMMANDS = [
   "criteria",
   "models",
   "fleet",
+  "peer",
   "task",
 ];
 

@@ -2,6 +2,10 @@
 
 _Last updated: v4.0.1_
 
+For concurrent sessions that exchange messages without transferring context, use
+[Peer collaboration](peer-collaboration.md). Handoff remains the context-transfer
+interface.
+
 > **Added in v0.5.0; later reworked** to drop the `init` ceremony —
 > `push` now auto-bootstraps the remote store on first run.
 > Full skill reference: [`skills/handoff/SKILL.md`](../skills/handoff/SKILL.md).

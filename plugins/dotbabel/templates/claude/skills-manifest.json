@@ -185,6 +185,13 @@
       "lastValidated": null
     },
     {
+      "name": "peer",
+      "path": ".claude/skills/peer/SKILL.md",
+      "checksum": "",
+      "dependencies": [],
+      "lastValidated": null
+    },
+    {
       "name": "plan-grader",
       "path": ".claude/skills/plan-grader/SKILL.md",
       "checksum": "",

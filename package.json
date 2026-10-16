@@ -38,7 +38,8 @@
     "dotbabel-criteria": "./plugins/dotbabel/bin/dotbabel-criteria.mjs",
     "dotbabel-models": "./plugins/dotbabel/bin/dotbabel-models.mjs",
     "dotbabel-fleet": "./plugins/dotbabel/bin/dotbabel-fleet.mjs",
-    "dotbabel-task": "./plugins/dotbabel/bin/dotbabel-task.mjs"
+    "dotbabel-task": "./plugins/dotbabel/bin/dotbabel-task.mjs",
+    "dotbabel-peer": "./plugins/dotbabel/bin/dotbabel-peer.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",
