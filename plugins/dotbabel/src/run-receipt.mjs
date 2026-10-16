@@ -30,9 +30,10 @@
  * @property {string[]} evidence Links to the evidence the phase produced.
  * @property {string|null} requested_model The phase artifact's frontmatter `model`.
  * @property {string|null} tool_version
+ * @property {import("./decision-value.mjs").DecisionRecord[]} decisions
  *
  * @typedef {object} RunReceipt
- * @property {1} schema_version
+ * @property {2} schema_version
  * @property {"dotbabel-pr-stack"} tool
  * @property {number} pr
  * @property {string} created_at
@@ -50,6 +51,7 @@
 import path from "node:path";
 
 import { CONDUCTOR_PHASES } from "./pr-gates.mjs";
+import { decisionProblem } from "./decision-value.mjs";
 
 /** The outcomes an attempt may record. */
 export const RECEIPT_OUTCOMES = Object.freeze(["pass", "fail", "blocked", "skipped"]);
@@ -91,6 +93,7 @@ const ATTEMPT_KEYS = new Set([
   "evidence",
   "requested_model",
   "tool_version",
+  "decisions",
 ]);
 
 /**
@@ -146,7 +149,7 @@ export function receiptPath(gitCommonDir, pr) {
  */
 export function createReceipt({ pr, now }) {
   const at = (now ?? new Date()).toISOString();
-  return { schema_version: 1, tool: "dotbabel-pr-stack", pr: assertPr(pr), created_at: at, updated_at: at, attempts: [] };
+  return { schema_version: 2, tool: "dotbabel-pr-stack", pr: assertPr(pr), created_at: at, updated_at: at, attempts: [] };
 }
 
 /**
@@ -158,10 +161,12 @@ export function createReceipt({ pr, now }) {
  * @param {RunReceipt} receipt
  * @param {{ phase: string, outcome: string, headSha: string, baseRef?: string|null,
  *           mergeBase?: string|null, reasonCode?: string|null, evidence?: string[],
- *           requestedModel?: string|null, toolVersion?: string|null, now?: Date }} attempt
+ *           requestedModel?: string|null, toolVersion?: string|null,
+ *           decisions?: import("./decision-value.mjs").DecisionRecord[], now?: Date }} attempt
  * @returns {RunReceipt}
  */
 export function appendAttempt(receipt, attempt) {
+  receipt = normalizeReceipt(receipt);
   const { phase, outcome, headSha, baseRef = null, mergeBase = null, reasonCode = null } = attempt;
   if (!PHASE_IDS.includes(phase)) throw new Error(`phase must be one of ${PHASE_IDS.join(", ")}, got ${JSON.stringify(phase)}`);
   if (!RECEIPT_OUTCOMES.includes(/** @type {any} */ (outcome))) {
@@ -182,6 +187,8 @@ export function appendAttempt(receipt, attempt) {
   const toolVersion = attempt.toolVersion ?? null;
   if (!nullOr(toolVersion, VERSION_RE)) throw new Error(`tool version is not a version: ${JSON.stringify(toolVersion)}`);
   const at = (attempt.now ?? new Date()).toISOString();
+  const decisions = attempt.decisions ?? [];
+  if (!Array.isArray(decisions) || decisions.some((d) => decisionProblem(d))) throw new Error("invalid decisions");
   const n = receipt.attempts.filter((a) => a.phase === phase).length + 1;
   return {
     ...receipt,
@@ -200,6 +207,7 @@ export function appendAttempt(receipt, attempt) {
         evidence: [...evidence],
         requested_model: requestedModel,
         tool_version: toolVersion,
+        decisions: structuredClone(decisions),
       },
     ],
   };
@@ -303,7 +311,7 @@ export function receiptProblem(value, expectedPr) {
   const r = /** @type {Record<string, unknown>} */ (value);
   const extra = Object.keys(r).find((k) => !RECEIPT_KEYS.has(k));
   if (extra !== undefined) return `unknown key ${JSON.stringify(extra)}`;
-  if (r.schema_version !== 1) return `unsupported schema_version ${JSON.stringify(r.schema_version)}`;
+  if (![1, 2].includes(r.schema_version)) return `unsupported schema_version ${JSON.stringify(r.schema_version)}`;
   if (r.tool !== "dotbabel-pr-stack") return "tool must be dotbabel-pr-stack";
   if (!Number.isInteger(r.pr) || /** @type {number} */ (r.pr) <= 0) return "pr must be a positive integer";
   if (expectedPr !== undefined && r.pr !== expectedPr) return `pr is ${r.pr}, but the file is for #${expectedPr}`;
@@ -312,7 +320,7 @@ export function receiptProblem(value, expectedPr) {
   for (const [i, a] of r.attempts.entries()) {
     const at = `attempts[${i}]`;
     if (a === null || typeof a !== "object" || Array.isArray(a)) return `${at} must be an object`;
-    const missing = [...ATTEMPT_KEYS].find((k) => !(k in a));
+    const missing = [...ATTEMPT_KEYS].find((k) => !(k in a) && !(k === "decisions" && r.schema_version === 1));
     if (missing !== undefined) return `${at}.${missing} is missing`;
     const unknown = Object.keys(a).find((k) => !ATTEMPT_KEYS.has(k));
     if (unknown !== undefined) return `${at} has unknown key ${JSON.stringify(unknown)}`;
@@ -329,6 +337,17 @@ export function receiptProblem(value, expectedPr) {
     }
     if (!nullOr(a.requested_model, MODEL_RE)) return `${at}.requested_model must be null or a model id`;
     if (!nullOr(a.tool_version, VERSION_RE)) return `${at}.tool_version must be null or a version`;
+    if ("decisions" in a && (!Array.isArray(a.decisions) || a.decisions.some((d) => decisionProblem(d)))) return `${at}.decisions is invalid`;
   }
   return null;
+}
+
+/** Validate and upgrade a receipt without mutating its earlier attempts.
+ * @param {unknown} value
+ * @returns {RunReceipt}
+ */
+export function normalizeReceipt(value) {
+  const problem = receiptProblem(value);
+  if (problem) throw new Error(problem);
+  return { ...value, schema_version: 2, attempts: value.attempts.map((a) => ({ ...a, decisions: structuredClone(a.decisions ?? []) })) };
 }

@@ -38,7 +38,9 @@
     "dotbabel-criteria": "./plugins/dotbabel/bin/dotbabel-criteria.mjs",
     "dotbabel-models": "./plugins/dotbabel/bin/dotbabel-models.mjs",
     "dotbabel-fleet": "./plugins/dotbabel/bin/dotbabel-fleet.mjs",
-    "dotbabel-task": "./plugins/dotbabel/bin/dotbabel-task.mjs"
+    "dotbabel-task": "./plugins/dotbabel/bin/dotbabel-task.mjs",
+    "dotbabel-decide": "./plugins/dotbabel/bin/dotbabel-decide.mjs",
+    "dotbabel-export": "./plugins/dotbabel/bin/dotbabel-export.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",

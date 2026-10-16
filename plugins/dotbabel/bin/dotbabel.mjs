@@ -49,6 +49,8 @@ const SUBCOMMANDS = [
   "models",
   "fleet",
   "task",
+  "decide",
+  "export",
 ];
 
 function printUsage() {

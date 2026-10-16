@@ -17,9 +17,9 @@
  * Claude Code is the one adapter today; its implementation is
  * `registry.mjs`, which this module imports and which never imports this one.
  * Every other CLI that `agents.mjs` knows reports every capability as
- * unsupported until the Phase 2 research verifies it. The fleet's callers
- * (`token.mjs`, `lanes.mjs`, the fleet bin) still call `registry.mjs`
- * directly; they move behind this seam when a second adapter exists.
+ * unsupported until the Phase 2 research verifies it. The fleet bin selects
+ * identity and liveness through this seam. Lower-level process readers keep
+ * the Claude registry backend until another identity store is verified.
  */
 
 import { RUNTIMES } from "../agents.mjs";

@@ -103,6 +103,18 @@ function repoWithFacts(contents) {
 }
 
 describe("dotbabel-doctor fan-out check", () => {
+  it("doctor reports the decider's adapter, consent, and key presence, never the key", () => {
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    spawnSync("git", ["init", "-q", repoRoot]);
+    fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ decider: { adapter: "jev", steps: ["review-triage"] } }));
+    spawnSync("git", ["-C", repoRoot, "add", ".dotbabel.json"]);
+    spawnSync("git", ["-C", repoRoot, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-qm", "config"]);
+    const key = "doctor-canary-123";
+    const out = spawnSync(process.execPath, [DOCTOR, "--repo-root", repoRoot, "--json"], { encoding: "utf8", env: { ...process.env, HOME: makeTmpDir("home-"), TYPESAFE_API_KEY: key } });
+    expect(out.stdout).toContain("decider: adapter jev, consent review-triage, key present");
+    expect(out.stdout + out.stderr).not.toContain(key);
+    expect(out.stdout).toContain("platform");
+  });
   it("warns when codex skill fan-out sentinel is missing (and codex is on PATH)", () => {
     const home = makeTmpDir("home-");
     // Codex on PATH, but no fan-out symlinks created.

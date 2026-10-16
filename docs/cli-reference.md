@@ -14,7 +14,8 @@ Every bin honors the **dotbabel-wide flag set** in addition to its own:
 | `NO_COLOR=` env        | env   | Same as `--no-color`, honors the cross-tool convention                             |
 | `DOTBABEL_DEBUG=1` env | env   | Route previously-silent catches through `stderr` tagged `[harness:*]`              |
 
-`dotbabel-quality` is the one exception to the `--json` shape: it emits a
+`dotbabel decide` always prints its decision JSON directly. `dotbabel export`
+writes JSON to the requested file. `dotbabel-quality` emits a
 `schema_version: 1` quality envelope rather than `{events, counts}`. See
 [`dotbabel-quality`](#dotbabel-quality).
 
@@ -56,6 +57,10 @@ dotbabel quality [check|detect|explain|baseline] [OPTIONS]
 
 # Task contract and state for work without a spec
 dotbabel task <new|update|show|list|close|hook> [OPTIONS]
+
+# Bounded judgment and offline exports
+dotbabel decide --step review-triage|retry|dispatch [--base-ref <ref>] < input.json
+dotbabel export --a2a <file> | --otlp <file>
 ```
 
 Each subcommand also exists standalone — `npx dotbabel-doctor` and
@@ -929,6 +934,7 @@ how the event feed reports merges, and [hooks.md](./hooks.md) for the hooks.
 | `cpu-share [--status]` | Give every live session's scope an equal CPU weight              |
 | `token take`           | Take the merge token for this session                            |
 | `token release`        | Give this session's merge token back                             |
+| `token leave`          | Remove this session's queue reservation                          |
 
 | Flag             | Default        |                                                            |
 | ---------------- | -------------- | ---------------------------------------------------------- |
@@ -1056,6 +1062,69 @@ value, a malformed dependency reference, or an `update` with nothing to change. 
 open.
 
 ---
+
+## `dotbabel-decide`
+
+Read one JSON object from stdin and print
+`{step, answer, confidence, decider, fallback, shadow}`. Inputs:
+
+| Step            | Input                                                           | Built-in answer                                                              |
+| --------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `review-triage` | `{finding: {file, title, body, diff_hunk, severity, category}}` | `full-validation`; the skill handles authenticated mechanical findings first |
+| `retry`         | `{phase, attempt, failure_tail}`                                | `fix` below the base's phase attempt cap; `ask-owner` at the cap             |
+| `dispatch`      | `{profile, changed_files, changed_lines, candidates}`           | reviewers to add; keeps `security-auditor`                                   |
+
+`profile` and `candidates` are arrays of reviewer IDs. The budget gate still
+runs before a retry. `--base-ref` selects its fetched remote base ref; without
+it, retry uses `origin/HEAD`, then `origin/main`, then the local `HEAD` for a
+repository without a fetched remote. Missing severity and `critical` findings
+always require full validation. Payloads are limited to 64 KiB.
+
+Without a `decider` key, the built-in rules make no network request. Opt in by
+committing this repository configuration and supplying `TYPESAFE_API_KEY` in
+the user's environment:
+
+```json
+{ "decider": { "adapter": "jev", "steps": ["review-triage"] } }
+```
+
+Both the working config and the committed config must enable the step. A user
+key alone, or an uncommitted config, gives no consent. A failed adapter,
+including a five-second timeout, returns the built-in answer with
+`fallback: true` and exit 0. Error messages never include vendor errors or keys.
+
+All Jev steps remain in shadow mode. The triage experiment returned REJECT;
+retry and dispatch have no locked ADOPT result. `shadow` records the bounded
+model answer, but skills follow `answer`. Configuration cannot promote a step.
+Doctor reports adapter support, committed consent, and key presence.
+
+Collect decision output in a private JSON array outside the repository. Pass
+that file to `dotbabel pr-stack record --decisions <file>` with the observed
+phase outcome. Receipt version 2 retains the decisions and shadow answers.
+Version 1 receipts read as version 2 with empty decision arrays. The receipt
+remains a self-reported log and supplies no merge evidence.
+
+Exit 0 means answered, 2 means repository/configuration unavailable, and 64
+means invalid input or arguments.
+
+## `dotbabel-export`
+
+`dotbabel export --a2a <file>` writes an array of A2A 1.0 Task objects from
+the clone's tasks. Open tasks without a phase map to `TASK_STATE_SUBMITTED`,
+phase-set tasks to `TASK_STATE_WORKING`, and closed tasks to
+`TASK_STATE_COMPLETED`. Unresolved dependency references go into metadata.
+
+`dotbabel export --otlp <file>` writes receipt attempts and decisions as OTLP
+JSON spans. The resource names the development convention snapshot in
+`dotbabel.otel.convention.version`. Spans represent recording instants; they
+do not invent durations or token counts. Model decisions include the provider
+and model, including when the answer is a shadow answer.
+
+Both formats write a new file with mode 0600, refuse an existing destination,
+and remove the configured adapter key from exported strings. They never
+contact a service or change task/receipt state. A malformed receipt stops the
+OTLP export; unreadable tasks are named and skipped. Exit 0 means written,
+2 means a state/file error, and 64 means invalid arguments.
 
 ## `dotbabel-handoff`
 

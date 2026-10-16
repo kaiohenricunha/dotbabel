@@ -37,7 +37,7 @@
  *   dotbabel fleet lanes   [--json]
  *   dotbabel fleet events  [--all] [--json]
  *   dotbabel fleet event   --pr <N> [--repo <owner/name>]
- *   dotbabel fleet token   [status | take | release] [--json]
+ *   dotbabel fleet token   [status | take | release | leave] [--json]
  *   dotbabel fleet cpu-share [--status] [--json]
  *
  * Environment:
@@ -95,7 +95,9 @@ import {
   releaseClaims,
 } from "../src/fleet/policy.mjs";
 import { cpuWeightSetting, sessionScope, setPropertyArgs } from "../src/fleet/cpushare.mjs";
-import { findSelf, isOwnerAlive, ownerFromEntry, readRegistry, sessionsDir } from "../src/fleet/registry.mjs";
+import { ownerFromEntry, readRegistry, sessionsDir } from "../src/fleet/registry.mjs";
+import { hostAdapter } from "../src/fleet/host-adapter.mjs";
+import { platformAdapter, describePlatformAdapter } from "../src/fleet/platform-adapter.mjs";
 import {
   DEFAULT_TOKEN_IDLE_MS,
   findTokenCommand,
@@ -106,13 +108,19 @@ import {
   takeToken,
   tokenHolder,
   touchToken,
+  tokenQueue,
+  leaveTokenQueue,
 } from "../src/fleet/token.mjs";
+import { listCloneTasks } from "../src/task-state.mjs";
 
 const TOOL = "dotbabel-fleet";
+const HOST = hostAdapter(process.env.DOTBABEL_FLEET_HOST || "claude");
+const findSelf = (args) => HOST.identity?.(args) ?? null;
+const isOwnerAlive = (owner, opts) => HOST.isAlive?.(owner, opts) ?? true;
 const SELF_PATH = fileURLToPath(import.meta.url);
 const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
 const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token", "cpu-share"]);
-const TOKEN_ACTIONS = new Set(["status", "take", "release"]);
+const TOKEN_ACTIONS = new Set(["status", "take", "release", "leave"]);
 const TOKEN_ACTION_TEXT = { rebase: "rebase onto the base", attest: "local-attest", merge: "gh pr merge" };
 const PR_FIELDS = "number,title,state,mergeCommit,baseRefName,headRefName,files,url";
 const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
@@ -129,7 +137,7 @@ const USAGE = `Usage:
   dotbabel fleet lanes   [--json]                       show the CPU lanes and who holds them
   dotbabel fleet events  [--all] [--json]               show recent merges in this repo (or all repos)
   dotbabel fleet event   --pr <N> [--repo <owner/name>] record a merge made outside Claude Code
-  dotbabel fleet token   [status | take | release]      show, take, or give back this repo's merge token
+  dotbabel fleet token   [status | take | release | leave] show the token and queue, take, release, or leave
   dotbabel fleet cpu-share [--status]                    give every live session's scope an equal CPU weight
 
 Patterns are relative to the repo root. A bare path also covers everything
@@ -259,7 +267,7 @@ function cliCommand() {
 
 /** True when the registry can vouch for liveness: readable, with a live entry. */
 function registryHealthy(registry) {
-  return registry.ok && registry.entries.some((e) => isOwnerAlive(e));
+  return HOST.capabilities.liveness.support === "supported" && registry.ok && registry.entries.some((e) => isOwnerAlive(e));
 }
 
 /**
@@ -394,8 +402,14 @@ function preEdit(input, now) {
 function tokenDeny(dir, repo, self, action, now) {
   const idleMs = tokenIdleMs(repo);
   const holder = tokenHolder(readToken(dir), { now, idleMs });
-  if (!holder || holder.owner.key === self.key) return null;
-  return denyOutput(formatTokenDeny({ repoKey: repo.key, holder, action, cli: cliCommand(), now, idleMs }));
+  const queue = tokenQueue(dir, { now, idleMs });
+  if ((!holder && (!queue.length || queue[0].owner.key === self.key)) || holder?.owner.key === self.key) return null;
+  return denyOutput(formatTokenDeny({ repoKey: repo.key, holder, action, cli: cliCommand(), now, idleMs, position: queue.findIndex((e) => e.owner.key === self.key) + 1 }));
+}
+
+function tokenTasks(repo) {
+  if (!repo.toplevel) return [];
+  return listCloneTasks(repo.toplevel).tasks;
 }
 
 function denyOutput(reason) {
@@ -432,10 +446,10 @@ function preBash(input, now) {
   if (!selfEntry) return null;
   const self = ownerFromEntry(selfEntry);
   const idleMs = tokenIdleMs(repo);
-  const result = takeToken(repoDir(stateRoot(), repo.key), { repoKey: repo.key, owner: self, branch: repo.branch, kind: found.kind, now, idleMs });
+  const result = takeToken(repoDir(stateRoot(), repo.key), { repoKey: repo.key, owner: self, branch: repo.branch, kind: found.kind, now, idleMs, tasks: tokenTasks(repo) });
   if (result.taken) return null;
   const action = TOKEN_ACTION_TEXT[found.kind];
-  return denyOutput(formatTokenDeny({ repoKey: repo.key, holder: result.holder, action, cli: cliCommand(), now, idleMs }));
+  return denyOutput(formatTokenDeny({ repoKey: repo.key, ...result, action, cli: cliCommand(), now, idleMs }));
 }
 
 /** SessionStart: the claims in the session's repo, as plain context text. */
@@ -453,6 +467,7 @@ function sessionStart(input) {
 }
 
 function runHook(event) {
+  if (!HOST.adapter) return;
   let input;
   try {
     input = JSON.parse(fs.readFileSync(0, "utf8"));
@@ -718,28 +733,34 @@ function cmdEvent(args) {
 /** `token [status | take | release] [--json]`: this repo's merge token. */
 function cmdToken(args) {
   const action = args.positional[0] ?? "status";
-  if (!TOKEN_ACTIONS.has(action)) throw new UsageError(`token takes status, take, or release, not "${action}"`);
+  if (!TOKEN_ACTIONS.has(action)) throw new UsageError(`token takes status, take, release, or leave, not "${action}"`);
   const repo = requireRepo();
   const dir = repoDir(stateRoot(), repo.key);
   const now = Date.now();
   const idleMs = tokenIdleMs(repo);
   if (action === "status") {
+    const queue = HOST.adapter ? tokenQueue(dir, { now, idleMs, tasks: tokenTasks(repo) }) : readToken(dir)?.queue ?? [];
     const holder = tokenHolder(readToken(dir), { now, idleMs });
     const out = args.json
-      ? JSON.stringify({ repo: repo.key, holder }, null, 2)
-      : formatTokenStatus({ repoKey: repo.key, holder, now, idleMs });
+      ? JSON.stringify({ repo: repo.key, holder, queue }, null, 2)
+      : [formatTokenStatus({ repoKey: repo.key, holder, now, idleMs }), ...queue.map((e, i) => `  ${i + 1}. ${e.owner.name ?? e.owner.key} — ${e.reservedUntil ? `reserved until ${e.reservedUntil}` : "waiting"}`)].join("\n");
     process.stdout.write(`${out}\n`);
     return EXIT_CODES.OK;
   }
   const self = requireSelf(readRegistry(sessionsDir()));
+  if (action === "leave") {
+    const removed = leaveTokenQueue(dir, self.key);
+    process.stdout.write(removed ? "Left the merge queue.\n" : "This session is not in the merge queue.\n");
+    return EXIT_CODES.OK;
+  }
   if (action === "release") {
     const released = releaseToken(dir, self.key);
     process.stdout.write(released ? `Released the merge token for ${repo.key}.\n` : `This session holds no merge token for ${repo.key}.\n`);
     return released ? EXIT_CODES.OK : EXIT_CODES.VALIDATION;
   }
-  const result = takeToken(dir, { repoKey: repo.key, owner: self, branch: repo.branch, kind: "manual", now, idleMs });
+  const result = takeToken(dir, { repoKey: repo.key, owner: self, branch: repo.branch, kind: "manual", now, idleMs, tasks: tokenTasks(repo) });
   if (!result.taken) {
-    process.stderr.write(`${formatTokenDeny({ repoKey: repo.key, holder: result.holder, action: "token take", cli: cliCommand(), now, idleMs })}\n`);
+    process.stderr.write(`${formatTokenDeny({ repoKey: repo.key, ...result, action: "token take", cli: cliCommand(), now, idleMs })}\n`);
     return EXIT_CODES.VALIDATION;
   }
   process.stdout.write(`This session holds the merge token for ${repo.key}.\n`);
@@ -769,6 +790,7 @@ function applyCpuShare(unit, weight) {
 
 /** SessionStart: the hook's own session scope gets the weight. */
 function ensureCpuShare() {
+  if (platformAdapter().capabilities.cpuShare.support !== "supported") return;
   const weight = cpuWeightSetting(process.env);
   const scope = weight === null ? null : scopeOf("self");
   if (scope) applyCpuShare(scope.unit, weight);
@@ -776,6 +798,14 @@ function ensureCpuShare() {
 
 /** `cpu-share [--status] [--json]`: the weight for every live session's scope. */
 function cmdCpuShare(args) {
+  if (!HOST.adapter) {
+    process.stdout.write(`CPU share is off: host ${HOST.host} is unsupported.\n`);
+    return EXIT_CODES.OK;
+  }
+  if (platformAdapter().capabilities.cpuShare.support !== "supported") {
+    process.stdout.write(`${describePlatformAdapter(platformAdapter())}\n`);
+    return EXIT_CODES.OK;
+  }
   const weight = cpuWeightSetting(process.env);
   if (weight === null) {
     process.stdout.write("The fair CPU share is off (DOTBABEL_FLEET_CPU_WEIGHT).\n");
@@ -834,9 +864,10 @@ function cmdLane(argv) {
     const self = findSelf({ entries: readRegistry(sessionsDir()).entries, startPid: process.ppid });
     if (self?.name) env.DOTBABEL_LANE_SESSION = self.name;
   }
-  const args = [LANE_SCRIPT, ...(name ? ["--name", name] : []), "--", ...command];
+  const pin = platformAdapter().lanes;
+  const args = pin ? [LANE_SCRIPT, ...(name ? ["--name", name] : []), "--", ...command] : command.slice(1);
   return new Promise((resolve) => {
-    const child = spawn("bash", args, { stdio: "inherit", env });
+    const child = spawn(pin ? "bash" : command[0], args, { stdio: "inherit", env });
     const ignoreInt = () => {};
     const forward = (sig) => child.kill(sig);
     process.on("SIGINT", ignoreInt);
@@ -857,6 +888,10 @@ function cmdLane(argv) {
 
 /** `lanes [--json]`: the layout from fleet-lane.sh, and who holds or waits for each lane. */
 function cmdLanes(args) {
+  if (!platformAdapter().lanes) {
+    process.stdout.write(args.json ? `${JSON.stringify({ off: true, platform: process.platform, lanes: [], waiters: [] })}\n` : `${describePlatformAdapter(platformAdapter())}\n`);
+    return EXIT_CODES.OK;
+  }
   const r = spawnSync("bash", [LANE_SCRIPT, "--layout"], { encoding: "utf8" });
   if (r.status !== 0) throw new EnvError(`cannot read the lane layout: ${(r.stderr || "bash failed").trim()}`);
   const layout = parseLayout(r.stdout);

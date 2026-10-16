@@ -71,6 +71,8 @@ import {
   resolveGlobalSkillsDir,
 } from "../src/agents.mjs";
 import { describeHostAdapter, listHostAdapters } from "../src/fleet/host-adapter.mjs";
+import { describePlatformAdapter, platformAdapter } from "../src/fleet/platform-adapter.mjs";
+import { deciderContext, describeDecider } from "../src/decider-config.mjs";
 
 const META = {
   name: "dotbabel-doctor",
@@ -325,6 +327,9 @@ for (const host of listHostAdapters()) {
   if (host.adapter) out.pass(describeHostAdapter(host));
   else out.info(describeHostAdapter(host));
 }
+out.info(describePlatformAdapter(platformAdapter()));
+try { out.info(describeDecider(deciderContext(ctx.repoRoot))); }
+catch { out.warn("decider: repository or configuration unavailable"); }
 
 if (argv.flags["install-hooks"]) {
   try {
