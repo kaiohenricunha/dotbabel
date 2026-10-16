@@ -57,6 +57,7 @@
     "./templates/claude/skills/ground-first",
     "./templates/claude/skills/handoff",
     "./templates/claude/skills/kubernetes-specialist",
+    "./templates/claude/skills/language-review",
     "./templates/claude/skills/local-attest",
     "./templates/claude/skills/plan-grader",
     "./templates/claude/skills/post-pr-review",

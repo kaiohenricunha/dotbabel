@@ -77,7 +77,14 @@
       "terragrunt-specialist"
     ],
     "backend": ["backend-developer", "test-engineer"],
-    "writing": ["changelog-assistant", "documentation-writer", "markdown", "pr-tldr", "tldr"],
+    "writing": [
+      "changelog-assistant",
+      "documentation-writer",
+      "language-review",
+      "markdown",
+      "pr-tldr",
+      "tldr"
+    ],
     "security": [
       "compliance-auditor",
       "dependabot-sweep",
@@ -113,6 +120,7 @@
       "git",
       "ground-first",
       "handoff",
+      "language-review",
       "markdown",
       "plan-grader",
       "platform-engineer",
@@ -219,6 +227,7 @@
       "git",
       "ground-first",
       "kubernetes-specialist",
+      "language-review",
       "merge-pr",
       "plan-grader",
       "post-pr-review",
@@ -363,6 +372,7 @@
       "handoff",
       "iac-engineer",
       "kubernetes-specialist",
+      "language-review",
       "local-attest",
       "plan-grader",
       "platform-engineer",

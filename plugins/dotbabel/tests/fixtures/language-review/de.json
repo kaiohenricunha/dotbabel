@@ -1,0 +1,194 @@
+{
+  "locale": "de-DE",
+  "cases": [
+    {
+      "id": "de-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "Wir möchten Sie darüber in Kenntnis setzen, dass Ihr Abonnement in naher Zukunft ablaufen wird.",
+      "suggestion": "Ihr Abonnement läuft bald ab.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Correct, but a bureaucratic fixed phrase and a periphrastic future for something the present tense states."
+    },
+    {
+      "id": "de-calque",
+      "scenario": "calque",
+      "original": "Wir haben das Meeting gecancelt und werden es nächste Woche neu schedulen.",
+      "suggestion": "Wir haben das Meeting abgesagt und werden es nächste Woche neu ansetzen.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "English verbs given German endings ('gecancelt', 'schedulen') where established German verbs exist. Common in speech; weak in published copy."
+    },
+    {
+      "id": "de-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "Hey! Deine Überweisung hat leider nicht geklappt. Probier's einfach nochmal, okay?",
+      "suggestion": "Ihre Überweisung konnte nicht ausgeführt werden. Bitte versuchen Sie es erneut.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Banking app that addresses users with Sie elsewhere; this string switches to du and spoken forms."
+    },
+    {
+      "id": "de-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "locale": "de-CH",
+      "original": "Bitte parkieren Sie Ihr Velo nicht auf der Straße.",
+      "suggestion": "Bitte parkieren Sie Ihr Velo nicht auf der Strasse.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Swiss vocabulary (parkieren, Velo) beside the German eszett; Swiss Standard German writes ss."
+    },
+    {
+      "id": "de-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "Der Bericht, der von dem Analysten, der von dem Team, das wir letztes Jahr zusammengestellt haben, eingestellt wurde, verfasst wurde, wurde von der Geschäftsführung genehmigt.",
+      "suggestion": "Die Geschäftsführung hat den Bericht genehmigt. Verfasst hat ihn der Analyst, den das von uns im letzten Jahr zusammengestellte Team eingestellt hat.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Grammatical, but the verb-final clauses pile up so the reader cannot find the main verb."
+    },
+    {
+      "id": "de-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "Ihre Änderungen werden automatisch gespeichert. Sie können dieses Fenster jederzeit schließen.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural, with a consistent Sie. No findings expected."
+    },
+    {
+      "id": "de-artificial-style",
+      "scenario": "artificial-style",
+      "original": "In der heutigen schnelllebigen digitalen Welt ermöglicht unsere innovative Plattform Teams, ihr volles Potenzial nahtlos zu entfalten.",
+      "suggestion": "Unsere Plattform hilft Teams, ihr Potenzial voll auszuschöpfen.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked abstractions that claim little."
+    },
+    {
+      "id": "de-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "Um die Konfiguration von DotBabel zu überprüfen, ist es erforderlich, dass Sie nach der Durchführung der Installation von `@dotbabel/dotbabel` den Befehl `dotbabel doctor` ausführen.",
+      "suggestion": "Führen Sie nach der Installation von `@dotbabel/dotbabel` den Befehl `dotbabel doctor` aus, um die Konfiguration von DotBabel zu prüfen.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The product name and the commands stay exactly as written, even though the word order of the sentence changed."
+    },
+    {
+      "id": "de-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "Um die Konfiguration von DotBabel zu überprüfen, ist es erforderlich, dass Sie nach der Durchführung der Installation von `@dotbabel/dotbabel` den Befehl `dotbabel doctor` ausführen.",
+      "suggestion": "Führen Sie nach der Installation von `@dotbabel/dotbabel` den Befehl `dotbabel Arzt` aus, um die Konfiguration von DotBabel zu prüfen.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["code-span"]
+      },
+      "note": "A revision must never translate a command inside a code span."
+    },
+    {
+      "id": "de-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Es befindet sich derzeit # Artikel in Ihrem Warenkorb.} other {Es befinden sich derzeit # Artikel in Ihrem Warenkorb.}}",
+      "suggestion": "{count, plural, one {Ihr Warenkorb enthält # Artikel.} other {Ihr Warenkorb enthält # Artikel.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "ICU skeleton, selectors and # markers are untouched. Both branches may legitimately read the same in German."
+    },
+    {
+      "id": "de-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Es befindet sich derzeit # Artikel in Ihrem Warenkorb.} other {Es befinden sich derzeit # Artikel in Ihrem Warenkorb.}}",
+      "suggestion": "{count, plural, one {Ihr Warenkorb enthält einen Artikel.} other {Ihr Warenkorb enthält mehrere Artikel.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with words loses the number."
+    },
+    {
+      "id": "de-localization-markup",
+      "scenario": "localization-string",
+      "original": "Klicken Sie auf <b>Speichern</b>, um die Änderungen von {name} zu speichern. Weitere Informationen finden Sie auf <a href=\"https://example.com/hilfe\">der Hilfeseite</a>.",
+      "suggestion": "Klicken Sie auf <b>Speichern</b>, um die Änderungen von {name} zu sichern. Weitere Informationen finden Sie auf <a href=\"https://example.com/hilfe\">der Hilfeseite</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href and the placeholder are intact."
+    },
+    {
+      "id": "de-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "Klicken Sie auf <b>Speichern</b>, um die Änderungen von {name} zu speichern. Weitere Informationen finden Sie auf <a href=\"https://example.com/hilfe\">der Hilfeseite</a>.",
+      "suggestion": "Klicken Sie auf Speichern, um die Änderungen von {Name} zu sichern. Weitere Informationen finden Sie auf <a href=\"https://example.com/hilfe\">der Hilfeseite</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a re-capitalised placeholder name (German nouns are capitalised, but placeholder names are identifiers)."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "de-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "de-DE",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "Kunden einer Banking-App",
+          "register": "Sie",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "transfer.error",
+            "original": "Hey! Deine Überweisung hat leider nicht geklappt. Probier's einfach nochmal, okay?",
+            "suggestion": "Ihre Überweisung konnte nicht ausgeführt werden. Bitte versuchen Sie es erneut.",
+            "category": "register",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "The rest of the app uses Sie. A single du string with spoken forms is jarring in an error about money."
+          },
+          {
+            "id": "F2",
+            "location": "meeting.notice",
+            "original": "Wir haben das Meeting gecancelt und werden es nächste Woche neu schedulen.",
+            "suggestion": "Wir haben das Meeting abgesagt und werden es nächste Woche neu ansetzen.",
+            "category": "lexical-choice",
+            "severity": "minor",
+            "confidence": "medium",
+            "explanation": "'Canceln' and 'schedulen' are common in workplace speech. Established German verbs exist, and they read better in published text.",
+            "uncertainty": "Some teams use the English verbs as house style; keep them if the glossary says so."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    },
+    {
+      "id": "de-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "de-DE",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}

@@ -46,6 +46,7 @@
     "ground-first",
     "handoff",
     "kubernetes-specialist",
+    "language-review",
     "local-attest",
     "plan-grader",
     "post-pr-review",

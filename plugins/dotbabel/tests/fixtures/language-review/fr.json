@@ -1,0 +1,193 @@
+{
+  "locale": "fr-FR",
+  "cases": [
+    {
+      "id": "fr-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "Nous voudrions porter à votre attention le fait que votre abonnement va arriver à expiration dans un futur proche.",
+      "suggestion": "Votre abonnement expire bientôt.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Correct, but a heavy fixed phrase and a periphrastic future say what one verb and one adverb say."
+    },
+    {
+      "id": "fr-calque",
+      "scenario": "calque",
+      "original": "Nous avons réalisé que le fichier était corrompu et nous allons adresser le problème dès que possible.",
+      "suggestion": "Nous nous sommes rendu compte que le fichier était corrompu et nous allons traiter le problème dès que possible.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "'Adresser un problème' is a calque of 'address'. 'Réaliser que' in the sense of 'realize' is widespread but still flagged by some editors, so confidence there is medium."
+    },
+    {
+      "id": "fr-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "Salut ! Ton compte a été bloqué, mais t'inquiète, on s'en occupe vite fait.",
+      "suggestion": "Votre compte a été bloqué. Nous nous en occupons rapidement.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "A bank notice in tu and spoken contractions; the fix moves to vous and keeps the reassurance."
+    },
+    {
+      "id": "fr-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "locale": "fr-CA",
+      "original": "Consultez votre courriel ce week-end pour découvrir nos offres, ou faites du shopping en ligne.",
+      "suggestion": "Consultez votre courriel cette fin de semaine pour découvrir nos offres, ou magasinez en ligne.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "fr-CA copy that uses 'courriel' (Québec) beside France-leaning 'faites du shopping'. 'Week-end' is also used in Québec, so confidence is medium."
+    },
+    {
+      "id": "fr-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "Le rapport qui a été rédigé par l'analyste qui a été recruté par l'équipe que nous avons formée l'an dernier a été approuvé par la direction.",
+      "suggestion": "La direction a approuvé le rapport rédigé par l'analyste recruté par l'équipe que nous avons formée l'an dernier.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Stacked relative clauses with passives; the active main clause is clearer."
+    },
+    {
+      "id": "fr-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "Vos modifications sont enregistrées automatiquement. Vous pouvez fermer cette fenêtre à tout moment.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural, with a consistent vous. No findings expected."
+    },
+    {
+      "id": "fr-artificial-style",
+      "scenario": "artificial-style",
+      "original": "Dans le paysage numérique en constante évolution d'aujourd'hui, notre plateforme innovante permet aux équipes de libérer tout leur potentiel en toute fluidité.",
+      "suggestion": "Notre plateforme aide les équipes à exploiter tout leur potentiel.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked abstractions that claim little."
+    },
+    {
+      "id": "fr-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "Afin de vérifier la configuration de DotBabel, il est nécessaire d'exécuter la commande `dotbabel doctor` après avoir procédé à l'installation de `@dotbabel/dotbabel`.",
+      "suggestion": "Pour vérifier la configuration de DotBabel, exécutez `dotbabel doctor` après avoir installé `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The product name and the commands stay exactly as written."
+    },
+    {
+      "id": "fr-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "Afin de vérifier la configuration de DotBabel, il est nécessaire d'exécuter la commande `dotbabel doctor` après avoir procédé à l'installation de `@dotbabel/dotbabel`.",
+      "suggestion": "Pour vérifier la configuration de Babel Point, exécutez `dotbabel doctor` après avoir installé `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["term"]
+      },
+      "note": "A revision must never translate a product name."
+    },
+    {
+      "id": "fr-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Il y a # article actuellement situé dans votre panier.} other {Il y a # articles actuellement situés dans votre panier.}}",
+      "suggestion": "{count, plural, one {Votre panier contient # article.} other {Votre panier contient # articles.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "ICU skeleton, selectors and # markers are untouched."
+    },
+    {
+      "id": "fr-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Il y a # article actuellement situé dans votre panier.} other {Il y a # articles actuellement situés dans votre panier.}}",
+      "suggestion": "{count, plural, one {Votre panier contient un article.} other {Votre panier contient plusieurs articles.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with words loses the number."
+    },
+    {
+      "id": "fr-localization-markup",
+      "scenario": "localization-string",
+      "original": "Cliquez sur <b>Enregistrer</b> afin de pouvoir enregistrer les modifications de {name}. Consultez <a href=\"https://example.com/aide\">la page d'aide</a>.",
+      "suggestion": "Cliquez sur <b>Enregistrer</b> pour conserver les modifications de {name}. Consultez <a href=\"https://example.com/aide\">la page d'aide</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href and the placeholder are intact. The apostrophe in \"d'aide\" is not followed by a brace, so it is not ICU quoting; \"d'{name}\" would be."
+    },
+    {
+      "id": "fr-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "Cliquez sur <b>Enregistrer</b> afin de pouvoir enregistrer les modifications de {name}. Consultez <a href=\"https://example.com/aide\">la page d'aide</a>.",
+      "suggestion": "Cliquez sur Enregistrer pour conserver les modifications de {nom}. Consultez <a href=\"https://example.com/aide\">la page d'aide</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a translated placeholder name."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "fr-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "fr-FR",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "clients d'une banque en ligne",
+          "register": "vous, neutre",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "account.blocked",
+            "original": "Salut ! Ton compte a été bloqué, mais t'inquiète, on s'en occupe vite fait.",
+            "suggestion": "Votre compte a été bloqué. Nous nous en occupons rapidement.",
+            "category": "register",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "Tu and spoken contractions in a notice about a blocked account are out of register for a bank. The revision uses vous and keeps the reassurance."
+          },
+          {
+            "id": "F2",
+            "location": "incident.update",
+            "original": "Nous avons réalisé que le fichier était corrompu et nous allons adresser le problème dès que possible.",
+            "suggestion": "Nous nous sommes rendu compte que le fichier était corrompu et nous allons traiter le problème dès que possible.",
+            "category": "lexical-choice",
+            "severity": "minor",
+            "confidence": "medium",
+            "explanation": "'Adresser un problème' follows English 'address a problem'; 'traiter' or 'régler' is idiomatic. 'Réaliser que' is common today, but some editors still prefer 'se rendre compte'."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    },
+    {
+      "id": "fr-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "fr-FR",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}

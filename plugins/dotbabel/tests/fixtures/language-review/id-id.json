@@ -1,0 +1,202 @@
+{
+  "locale": "id-ID",
+  "cases": [
+    {
+      "id": "id-id-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "Kami ingin menyampaikan kepada Anda bahwa langganan Anda akan segera berakhir dalam waktu dekat.",
+      "suggestion": "Langganan Anda akan segera berakhir.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Correct, but 'segera' and 'dalam waktu dekat' say the same thing twice, and the lead-in adds nothing."
+    },
+    {
+      "id": "id-id-calque",
+      "scenario": "calque",
+      "original": "Akun dari pengguna telah dibuat dengan sukses oleh sistem pada hari kemarin.",
+      "suggestion": "Akun pengguna berhasil dibuat oleh sistem kemarin.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "English 'of', 'with success', 'has been' and 'on the day yesterday' carried over: 'dari', 'dengan sukses', 'telah', 'pada hari kemarin'."
+    },
+    {
+      "id": "id-id-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "Waduh, transfer kamu gagal nih. Coba lagi ya, gaes!",
+      "suggestion": "Transfer Anda gagal. Silakan coba lagi.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Banking error in slang and with a friend-register address; the fix moves to Anda."
+    },
+    {
+      "id": "id-id-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "original": "Sila muat turun fail anda dan simpan dalam komputer riba.",
+      "suggestion": "Silakan unduh berkas Anda dan simpan di laptop.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Malaysian Malay (sila, muat turun, fail, komputer riba) in an Indonesian product."
+    },
+    {
+      "id": "id-id-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "Laporan yang dibuat oleh analis yang dipekerjakan oleh tim yang kami bentuk tahun lalu telah disetujui oleh direksi.",
+      "suggestion": "Direksi menyetujui laporan analis yang dipekerjakan oleh tim yang kami bentuk tahun lalu.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Three stacked yang-clauses with passives are hard to follow. Fronting the agent removes one level; the di- passive itself is natural."
+    },
+    {
+      "id": "id-id-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "Perubahan Anda tersimpan otomatis. Anda dapat menutup jendela ini kapan saja.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural, with a consistent Anda. No findings expected."
+    },
+    {
+      "id": "id-id-artificial-style",
+      "scenario": "artificial-style",
+      "original": "Di era digital yang serba cepat saat ini, platform inovatif kami memberdayakan tim untuk membuka seluruh potensi mereka secara mulus.",
+      "suggestion": "Platform kami membantu tim mengembangkan potensi penuhnya.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked abstractions that claim little."
+    },
+    {
+      "id": "id-id-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "Untuk melakukan pengecekan terhadap konfigurasi DotBabel, Anda perlu menjalankan perintah `dotbabel doctor` setelah melakukan instalasi `@dotbabel/dotbabel`.",
+      "suggestion": "Untuk memeriksa konfigurasi DotBabel, jalankan `dotbabel doctor` setelah menginstal `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The product name and the commands stay exactly as written."
+    },
+    {
+      "id": "id-id-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "Untuk melakukan pengecekan terhadap konfigurasi DotBabel, Anda perlu menjalankan perintah `dotbabel doctor` setelah melakukan instalasi `@dotbabel/dotbabel`.",
+      "suggestion": "Untuk memeriksa konfigurasi Babel Titik, jalankan `dotbabel doctor` setelah menginstal `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["term"]
+      },
+      "note": "A revision must never translate a product name."
+    },
+    {
+      "id": "id-id-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, other {Ada # barang yang saat ini berada di keranjang Anda.}}",
+      "suggestion": "{count, plural, other {Keranjang Anda berisi # barang.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Indonesian has the single plural category 'other' in CLDR; the skeleton and # are untouched."
+    },
+    {
+      "id": "id-id-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, other {Ada # barang yang saat ini berada di keranjang Anda.}}",
+      "suggestion": "{count, plural, other {Keranjang Anda berisi beberapa barang.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with a word loses the number."
+    },
+    {
+      "id": "id-id-localization-markup",
+      "scenario": "localization-string",
+      "original": "Klik <b>Simpan</b> agar supaya perubahan {name} dapat disimpan. Lihat <a href=\"https://example.com/bantuan\">halaman bantuan</a>.",
+      "suggestion": "Klik <b>Simpan</b> agar perubahan {name} tersimpan. Lihat <a href=\"https://example.com/bantuan\">halaman bantuan</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href and the placeholder are intact. 'Agar supaya' is a pleonasm: both words mean 'so that'."
+    },
+    {
+      "id": "id-id-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "Klik <b>Simpan</b> agar supaya perubahan {name} dapat disimpan. Lihat <a href=\"https://example.com/bantuan\">halaman bantuan</a>.",
+      "suggestion": "Klik Simpan agar perubahan {nama} tersimpan. Lihat <a href=\"https://example.com/bantuan\">halaman bantuan</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a translated placeholder name."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "id-id-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "id-ID",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "pengguna aplikasi perbankan",
+          "register": "baku, Anda",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "transfer.error",
+            "original": "Waduh, transfer kamu gagal nih. Coba lagi ya, gaes!",
+            "suggestion": "Transfer Anda gagal. Silakan coba lagi.",
+            "category": "register",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "Slang and the friend-register 'kamu' do not fit a banking error. The revision uses Anda and standard 'silakan'."
+          },
+          {
+            "id": "F2",
+            "location": "signup.done",
+            "original": "Akun dari pengguna telah dibuat dengan sukses oleh sistem pada hari kemarin.",
+            "suggestion": "Akun pengguna berhasil dibuat oleh sistem kemarin.",
+            "category": "idiom",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "'Dari' for possession, 'dengan sukses' and 'pada hari kemarin' follow English. Indonesian places the possessor directly after the head noun and uses 'berhasil'."
+          },
+          {
+            "id": "F3",
+            "location": "download.help",
+            "original": "Sila muat turun fail anda dan simpan dalam komputer riba.",
+            "suggestion": "Silakan unduh berkas Anda dan simpan di laptop.",
+            "category": "regional-fit",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "This is Malaysian Malay, not Indonesian. An Indonesian reader will notice 'sila', 'muat turun', 'fail' and 'komputer riba' at once."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    },
+    {
+      "id": "id-id-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "id-ID",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "locale": "en-US",
+  "cases": [
+    {
+      "id": "en-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "We would like to bring to your attention the fact that your subscription will be expiring in the near future.",
+      "suggestion": "Your subscription will expire soon.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Grammatical, but a nominal fact-clause and a stacked time phrase say what two words can."
+    },
+    {
+      "id": "en-calque",
+      "scenario": "calque",
+      "original": "I am agree with the proposal, and I will do a presentation next week for the team.",
+      "suggestion": "I agree with the proposal, and I will give a presentation to the team next week.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "'I am agree' is a clear error that follows the Romance 'estoy de acuerdo'. 'Do a presentation' is informal; 'give' or 'make' is the conventional wording in formal writing (a preference, medium confidence)."
+    },
+    {
+      "id": "en-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "Hey there! Oopsie, your payment didn't go through lol. Try again, k?",
+      "suggestion": "Your payment did not go through. Please try again.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Banking error copy: playful slang is out of register and reads as dismissive."
+    },
+    {
+      "id": "en-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "locale": "en-GB",
+      "original": "Please colour the centre panel and select a favorite theme before you customize your licence.",
+      "suggestion": "Please colour the centre panel and select a favourite theme before you customize your licence.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "en-GB text with the American spelling 'favorite' beside British 'colour', 'centre', 'licence'. Oxford '-ize' in 'customize' is acceptable British spelling and is left alone."
+    },
+    {
+      "id": "en-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "The report that the analyst who the team that we hired last year trained wrote was approved.",
+      "suggestion": "The report was approved. The analyst who wrote it was trained by the team we hired last year.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Grammatical centre-embedding that a reader cannot parse on one pass."
+    },
+    {
+      "id": "en-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "Your changes are saved automatically. You can close this window at any time.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural, clear, correct register. A reviewer should report no findings."
+    },
+    {
+      "id": "en-artificial-style",
+      "scenario": "artificial-style",
+      "original": "In today's fast-paced digital landscape, our innovative platform seamlessly empowers teams to unlock their full potential.",
+      "suggestion": "Our platform helps teams reach their full potential.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked adjectives. The revision drops them and keeps the one claim the author made. The concrete benefit is the author's to supply."
+    },
+    {
+      "id": "en-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "In order to check your DotBabel setup, you will need to run the command `dotbabel doctor` after installing `@dotbabel/dotbabel`.",
+      "suggestion": "To check your DotBabel setup, run `dotbabel doctor` after installing `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The product name and the commands stay exactly as written."
+    },
+    {
+      "id": "en-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "In order to check your DotBabel setup, you will need to run the command `dotbabel doctor` after installing `@dotbabel/dotbabel`.",
+      "suggestion": "To check your DotBabel setup, run `dotbabel diagnose` after installing `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["code-span"]
+      },
+      "note": "A revision must never reword a command inside a code span."
+    },
+    {
+      "id": "en-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {There is # item that is currently located in your cart.} other {There are # items that are currently located in your cart.}}",
+      "suggestion": "{count, plural, one {Your cart has # item.} other {Your cart has # items.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "ICU skeleton, selectors and # markers are untouched; only the prose changed."
+    },
+    {
+      "id": "en-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {There is # item that is currently located in your cart.} other {There are # items that are currently located in your cart.}}",
+      "suggestion": "{count, plural, one {Your cart has one item.} other {Your cart has several items.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with words loses the number."
+    },
+    {
+      "id": "en-localization-markup",
+      "scenario": "localization-string",
+      "original": "Click <b>Save</b> in order to save the changes for {name}. See <a href=\"https://example.com/help\">the help page</a>.",
+      "suggestion": "Click <b>Save</b> to save the changes for {name}. See <a href=\"https://example.com/help\">the help page</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href, and the placeholder are intact. Only 'in order' is dropped; the verb still matches the button label."
+    },
+    {
+      "id": "en-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "Click <b>Save</b> in order to save the changes for {name}. See <a href=\"https://example.com/help\">the help page</a>.",
+      "suggestion": "Click Save to save the changes for {username}. See <a href=\"https://example.com/help\">the help page</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a renamed placeholder."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "en-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "en-US",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "consumers of a payments app",
+          "register": "neutral, courteous",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "payment.error",
+            "original": "Hey there! Oopsie, your payment didn't go through lol. Try again, k?",
+            "suggestion": "Your payment did not go through. Please try again.",
+            "category": "register",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "Playful slang in an error about money reads as dismissive. A neutral sentence states the problem and the next step."
+          },
+          {
+            "id": "F2",
+            "location": "subscription.expiry",
+            "original": "We would like to bring to your attention the fact that your subscription will be expiring in the near future.",
+            "suggestion": "Your subscription will expire soon.",
+            "category": "naturalness",
+            "severity": "minor",
+            "confidence": "high",
+            "explanation": "The fact-clause and the stacked time phrase add length without adding meaning."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content.",
+        "left_alone": [
+          "\"Your invoice will be sent to you by email\" is a natural passive; no change needed."
+        ]
+      }
+    },
+    {
+      "id": "en-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "en-US",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}

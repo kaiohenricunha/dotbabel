@@ -1,0 +1,202 @@
+{
+  "locale": "pt-BR",
+  "cases": [
+    {
+      "id": "pt-br-unnatural-but-correct",
+      "scenario": "unnatural-but-correct",
+      "original": "Nós gostaríamos de informar que a sua solicitação foi recebida com sucesso por nossa equipe e será processada brevemente.",
+      "suggestion": "Recebemos sua solicitação e ela será processada em breve.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Correct but stiff: the formula 'gostaríamos de informar que' and two clauses for one fact. The subject pronoun is not the problem."
+    },
+    {
+      "id": "pt-br-calque-gerundismo",
+      "scenario": "calque",
+      "original": "Vou estar encaminhando o seu pedido para o setor responsável.",
+      "suggestion": "Vou encaminhar seu pedido ao setor responsável.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "'Vou estar + gerúndio' for a single action is widely discouraged in professional writing. It is a style judgement, so the confidence is medium."
+    },
+    {
+      "id": "pt-br-register-mismatch",
+      "scenario": "register-mismatch",
+      "original": "Opa, deu ruim na sua transferência! Tenta de novo aí, beleza?",
+      "suggestion": "Não foi possível concluir a transferência. Tente novamente.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Banking error copy in slang. The fix lowers informality; it does not add any."
+    },
+    {
+      "id": "pt-br-regional-inconsistency",
+      "scenario": "regional-inconsistency",
+      "original": "Para acessar seu arquivo, carregue em Baixar e guarde-o no celular.",
+      "suggestion": "Para acessar seu arquivo, clique em Baixar e salve-o no celular.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "European 'carregue em' mixed with Brazilian 'acessar', 'arquivo', and 'celular'. The enclitic 'salve-o' is ordinary Brazilian writing."
+    },
+    {
+      "id": "pt-br-awkward-valid-structure",
+      "scenario": "awkward-valid-structure",
+      "original": "O relatório que foi elaborado pelo analista que foi contratado pela equipe que nós formamos no ano passado foi aprovado pela diretoria.",
+      "suggestion": "A diretoria aprovou o relatório elaborado pelo analista contratado pela equipe que formamos no ano passado.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Three stacked relative clauses with passives; the active main clause reads at once."
+    },
+    {
+      "id": "pt-br-natural-as-is",
+      "scenario": "natural-as-is",
+      "original": "Suas alterações são salvas automaticamente. Você pode fechar esta janela a qualquer momento.",
+      "suggestion": null,
+      "expect": {
+        "preserved": true
+      },
+      "note": "Natural neutral register in Brazilian Portuguese. No findings expected."
+    },
+    {
+      "id": "pt-br-artificial-style",
+      "scenario": "artificial-style",
+      "original": "No mundo digital acelerado de hoje, nossa solução inovadora capacita equipes a liberar todo o seu potencial de forma perfeita.",
+      "suggestion": "Nossa solução ajuda equipes a aproveitar todo o seu potencial.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Formulaic opener and stacked adjectives. The revision drops them and keeps the one claim the author made."
+    },
+    {
+      "id": "pt-br-fixed-terminology",
+      "scenario": "fixed-terminology",
+      "original": "Para verificar a configuração do DotBabel, é necessário que você execute o comando `dotbabel doctor` após realizar a instalação do `@dotbabel/dotbabel`.",
+      "suggestion": "Para verificar a configuração do DotBabel, execute `dotbabel doctor` depois de instalar o `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": true
+      },
+      "note": "The product name and the commands stay exactly as written."
+    },
+    {
+      "id": "pt-br-fixed-terminology-broken",
+      "scenario": "fixed-terminology",
+      "original": "Para verificar a configuração do DotBabel, é necessário que você execute o comando `dotbabel doctor` após realizar a instalação do `@dotbabel/dotbabel`.",
+      "suggestion": "Para verificar a configuração do Babel Pontual, execute `dotbabel doctor` depois de instalar o `@dotbabel/dotbabel`.",
+      "preserve": ["DotBabel"],
+      "expect": {
+        "preserved": false,
+        "violations": ["term"]
+      },
+      "note": "A revision must never translate a product name."
+    },
+    {
+      "id": "pt-br-localization-icu",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Existe # item atualmente localizado no seu carrinho.} other {Existem # itens atualmente localizados no seu carrinho.}}",
+      "suggestion": "{count, plural, one {Seu carrinho tem # item.} other {Seu carrinho tem # itens.}}",
+      "expect": {
+        "preserved": true
+      },
+      "note": "ICU skeleton, selectors and # markers are untouched."
+    },
+    {
+      "id": "pt-br-localization-icu-broken",
+      "scenario": "localization-string",
+      "original": "{count, plural, one {Existe # item atualmente localizado no seu carrinho.} other {Existem # itens atualmente localizados no seu carrinho.}}",
+      "suggestion": "{count, plural, one {Seu carrinho tem um item.} other {Seu carrinho tem vários itens.}}",
+      "expect": {
+        "preserved": false,
+        "violations": ["icu-hash"]
+      },
+      "note": "Replacing # with words loses the number."
+    },
+    {
+      "id": "pt-br-localization-markup",
+      "scenario": "localization-string",
+      "original": "Clique em <b>Salvar</b> para guardar as alterações de {name}. Veja <a href=\"https://example.com/ajuda\">a página de ajuda</a>.",
+      "suggestion": "Para salvar as alterações de {name}, clique em <b>Salvar</b>. Veja <a href=\"https://example.com/ajuda\">a página de ajuda</a>.",
+      "expect": {
+        "preserved": true
+      },
+      "note": "Tags, the href and the placeholder are intact. The sentence is reordered so that the verb is not repeated next to the button."
+    },
+    {
+      "id": "pt-br-localization-markup-broken",
+      "scenario": "localization-string",
+      "original": "Clique em <b>Salvar</b> para guardar as alterações de {name}. Veja <a href=\"https://example.com/ajuda\">a página de ajuda</a>.",
+      "suggestion": "Para salvar as alterações de {nome}, clique em Salvar. Veja <a href=\"https://example.com/ajuda\">a página de ajuda</a>.",
+      "expect": {
+        "preserved": false,
+        "violations": ["tag", "placeholder"]
+      },
+      "note": "Dropped <b> tags and a translated placeholder name."
+    }
+  ],
+  "reviews": [
+    {
+      "id": "pt-br-review-valid",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "pt-BR",
+        "verdict": "needs-revision",
+        "assumptions": {
+          "audience": "clientes de um aplicativo bancário",
+          "register": "neutral, você",
+          "domain": "UI copy"
+        },
+        "findings": [
+          {
+            "id": "F1",
+            "location": "transfer.error",
+            "original": "Opa, deu ruim na sua transferência! Tenta de novo aí, beleza?",
+            "suggestion": "Não foi possível concluir a transferência. Tente novamente.",
+            "category": "register",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "Slang in a banking error undermines trust. The revision is neutral; it does not add contractions or regional words."
+          },
+          {
+            "id": "F2",
+            "location": "support.reply",
+            "original": "Vou estar encaminhando o seu pedido para o setor responsável.",
+            "suggestion": "Vou encaminhar seu pedido ao setor responsável.",
+            "category": "idiom",
+            "severity": "minor",
+            "confidence": "medium",
+            "explanation": "'Vou estar + gerúndio' for a single action is widely discouraged in professional Brazilian writing. The simple future with 'ir' says the same. It is a style judgement."
+          },
+          {
+            "id": "F3",
+            "location": "download.help",
+            "original": "Para acessar seu arquivo, carregue em Baixar e guarde-o no celular.",
+            "suggestion": "Para acessar seu arquivo, clique em Baixar e salve-o no celular.",
+            "category": "regional-fit",
+            "severity": "major",
+            "confidence": "high",
+            "explanation": "'Carregue em' is European Portuguese ('clique em' in Brazil). The rest of the sentence is Brazilian, so the mix is audible."
+          }
+        ],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    },
+    {
+      "id": "pt-br-review-natural",
+      "expect": {
+        "valid": true
+      },
+      "document": {
+        "language": "pt-BR",
+        "verdict": "natural",
+        "findings": [],
+        "disclaimer": "AI-assisted editorial review. It does not replace a native-speaking editor for high-stakes content."
+      }
+    }
+  ]
+}
