@@ -352,6 +352,33 @@ A separate availability probe using Claude's `haiku` alias also returns
 credential, billing, permission, or persistent hook setting is changed to obtain
 model access. The cross-harness model smoke remains explicitly unavailable.
 
+## CI distribution corrections
+
+The first PR run rejects missing version stamps in both new documents and
+missing peer exports in the example and project CLI fan-out. The local checks
+reproduce both distribution failures. Regenerating with the shipped scaffolder
+and project-sync command adds only the peer skill, manifest entry, and three
+exports; no check is weakened.
+
+```bash
+node scripts/stamp-doc-versions.mjs --check
+```
+
+```text
+✓ all 21 docs stamped with v4.0.1
+```
+
+```bash
+npm exec -- bats plugins/dotbabel/tests/bats/example-parity.bats plugins/dotbabel/tests/bats/project-sync-parity.bats
+```
+
+```text
+1..3
+ok 1 example-parity: minimal-consumer matches fresh scaffolder output
+ok 2 project-sync-parity: the committed fan-out matches what project-sync would write
+ok 3 project-sync-parity: the checker reports a stale generated file, so the gate is not vacuous
+```
+
 ## Remaining validation
 
 Run the [two-terminal smoke procedure](peer-collaboration.md#real-two-terminal-smoke-test)
