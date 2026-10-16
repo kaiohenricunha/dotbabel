@@ -8,9 +8,9 @@
 #   UserPromptSubmit:                     yolo.sh prompt
 #   SessionEnd:                           yolo.sh session-end
 #
-# grant        `/yolo <scope> [--for 2h] [--merge|--no-merge]` writes
+# grant        `/yolo --for 2h [--merge|--no-merge] [scope]` writes
 #              <state>/<session_id>.json: the scope, whether merges are in it,
-#              and the start and expiry (default 4 h, at most 24 h). It adds a
+#              and the start and expiry (required lifetime, at most 24 h). It adds a
 #              context line that tells the skill the grant exists, because a
 #              skill cannot learn its own session id. `/yolo off` removes it.
 # permission   While the session's grant lives, approves the permission
@@ -52,9 +52,8 @@ command -v jq >/dev/null 2>&1 || exit 0
 
 STATE="${DOTBABEL_YOLO_STATE_DIR:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/dotbabel/yolo}"
 SID_RX='^[A-Za-z0-9_-]{1,128}$'
-DEFAULT_SECONDS=14400
 MAX_SECONDS=86400
-USAGE='Usage: /yolo <scope> [--for 2h|90m] [--merge|--no-merge], or /yolo off'
+USAGE='Usage: /yolo --for 2h|90m [--merge|--no-merge] [scope], or /yolo off'
 
 # The prompt entry runs at every prompt: with no grant on disk, stop before
 # any work.
@@ -119,11 +118,11 @@ parse_args() {
     i=$((i + 1))
   done
 
-  if [ -z "$P_SCOPE" ]; then
-    P_ERR="Give the scope of the work. $USAGE"
+  if [ -z "$P_SECONDS" ]; then
+    P_ERR="--for is required. $USAGE"
     return 1
   fi
-  P_SECONDS=${P_SECONDS:-$DEFAULT_SECONDS}
+  P_SCOPE=${P_SCOPE:-the current task in this session}
   if [ "$P_SECONDS" -le 0 ] || [ "$P_SECONDS" -gt "$MAX_SECONDS" ]; then
     P_ERR="The lifetime must be more than 0 and at most 24h. $USAGE"
     return 1
