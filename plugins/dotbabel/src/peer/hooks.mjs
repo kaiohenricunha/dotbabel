@@ -1,31 +1,20 @@
 /** Read-only Advisor guard and recovery context for the two supported hook protocols. */
-import { simpleCommands } from "../fleet/heavy.mjs";
+import { literalWords } from "./shell.mjs";
 import { nextRequest, recoverRequests } from "./state.mjs";
+import { fileURLToPath } from "node:url";
+const PEER_BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
+const UMBRELLA_BIN = fileURLToPath(new URL("../../bin/dotbabel.mjs", import.meta.url));
 
 function readOnlyShell(command) {
-  if (typeof command !== "string") return false;
-  let quote = null;
-  for (const c of command) {
-    if (c === "\n" || c === "\r") return false;
-    if (quote === "'") {
-      if (c === "'") quote = null;
-      continue;
-    }
-    if (quote === '"') {
-      if (c === '"') quote = null;
-      else if (/[`$\\]/.test(c)) return false;
-      continue;
-    }
-    if (c === "'" || c === '"') quote = c;
-    else if (/[`$<>|&;(){}\\#]/.test(c)) return false;
-  }
-  if (quote) return false;
-  const commands = simpleCommands(command);
-  if (!commands || commands.length !== 1) return false;
-  const words = commands[0];
-  const first = /^\s*(?:'([^']+)'|"([^"]+)"|([^\s'"]+))/.exec(command);
-  if (!first || (first[1] ?? first[2] ?? first[3]) !== words[0]) return false;
+  const words = literalWords(command);
+  if (!words) return false;
   const bin = words[0]?.split("/").at(-1);
+  if (
+    ["cat", "head", "tail", "wc", "ls", "pwd", "rg", "git"].includes(bin) &&
+    words[0] !== bin &&
+    ![`/bin/${bin}`, `/usr/bin/${bin}`].includes(words[0])
+  )
+    return false;
   if (["cat", "head", "tail", "wc", "ls", "pwd", "rg"].includes(bin))
     return !words.some((w) => /^(?:--pre|--hostname-bin|--search-zip)(?:=|$)/.test(w));
   if (bin === "git") {
@@ -40,9 +29,11 @@ function readOnlyShell(command) {
   const cli =
     bin === "dotbabel"
       ? words.slice(1)
-      : bin === "node" && words[1]?.endsWith("/dotbabel-peer.mjs")
+      : bin === "node" && words[1] === PEER_BIN
         ? ["peer", ...words.slice(2)]
-        : [];
+        : bin === "node" && words[1] === UMBRELLA_BIN
+          ? words.slice(2)
+          : [];
   return (
     cli[0] === "peer" &&
     [

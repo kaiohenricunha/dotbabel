@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { beforeEach, afterEach, vi, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 const ctx = vi.hoisted(() => ({ who: null, live: true, input: [], spawned: 0 }));
@@ -194,4 +194,70 @@ it("restores Advisor context through hooks and blocks mutation tools", async () 
   expect((await run("status")).value.paused).toBe(true);
   await run("hook", "SessionEnd");
   expect((await store.read()).pairs[0].advisor.ended).toBe(true);
+});
+
+it("coordinates literal peer operations in a trusted host hook with scoped results and usage failures", async () => {
+  const original = fs.readFileSync;
+  let input;
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  async function hook(command, tool = "Bash") {
+    input = {
+      cwd: repo,
+      session_id: ctx.who.sessionId,
+      tool_name: tool,
+      tool_input: tool === "Bash" ? { command } : { cmd: command },
+    };
+    const result = await run("hook", "PreToolUse");
+    expect(result.code).toBe(0);
+    return result.value;
+  }
+  function printed(result, expectedCode = 0) {
+    expect(result.hookSpecificOutput.permissionDecision).toBe("allow");
+    const output = spawnSync("bash", ["-c", result.hookSpecificOutput.updatedInput.command], {
+      encoding: "utf8",
+    });
+    expect(output.status).toBe(expectedCode);
+    return JSON.parse(output.stdout);
+  }
+  const p = printed(await hook("dotbabel peer main --json"));
+  expect(p.main.key).toBe(main.key);
+  ctx.who = advisor;
+  expect(printed(await hook(`dotbabel peer advisor ${p.code} --json`)).advisor.key).toBe(
+    advisor.key,
+  );
+  const bin = new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname;
+  const umbrella = new URL("../../bin/dotbabel.mjs", import.meta.url).pathname;
+  expect(
+    printed(await hook(`node '${bin}' ask 'literal $(touch forbidden); text' --json`)).body,
+  ).toBe("literal $(touch forbidden); text");
+  expect(printed(await hook(`node '${umbrella}' peer queue --json`))).toHaveLength(1);
+  const legacy = await hook("dotbabel peer queue --json", "exec_command");
+  expect(legacy.hookSpecificOutput.updatedInput.cmd).toBe(
+    legacy.hookSpecificOutput.updatedInput.command,
+  );
+  expect(printed(legacy)).toHaveLength(1);
+  // A valid ledger can exceed the shell's per-argument limit. Keep the hook
+  // response bounded without discarding the durable result or re-running it.
+  for (let n = 0; n < 3; n++) await run("ask", "x".repeat(16384));
+  const large = await hook("dotbabel peer history --json");
+  expect(Buffer.byteLength(large.hookSpecificOutput.updatedInput.command)).toBeLessThan(32768);
+  expect(printed(large)).toMatchObject({ output: "read_ledger", ledger: store.file, exit_code: 0 });
+  expect((await store.read()).pairs[0].requests).toHaveLength(4);
+  expect((await hook("dotbabel peer main")).hookSpecificOutput.permissionDecision).toBe("deny");
+  for (const command of [
+    "dotbabel peer next --unknown",
+    "dotbabel peer ask",
+    "dotbabel peer status --repo-root /tmp",
+    "dotbabel peer status --help",
+  ]) {
+    const result = await hook(command);
+    expect(printed(result, 64).error.code, command).toBe("PEER_USAGE");
+  }
+  expect(printed(await hook("dotbabel peer unpair")).closed).toBe(true);
+  expect(printed(await hook("dotbabel peer status"), 1).error.code).toBe("PEER_OPERATION");
+  expect(await hook("pwd")).toBe(null);
+  expect(await hook("dotbabel peer setup --harness both")).toBe(null);
+  expect(await hook("node /unrelated/script.mjs peer main")).toBe(null);
 });

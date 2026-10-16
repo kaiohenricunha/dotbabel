@@ -16,15 +16,32 @@ dotbabel peer setup --harness both
 ```
 
 Setup adds lifecycle hooks to Claude's user settings and Codex's `hooks.json`.
-It preserves existing hooks and permissions. Restart the harnesses. Review and
-trust the new definitions in Codex's `/hooks` interface. Dotbabel does not grant
-hook trust, change permission modes, or enable socket access through a sandbox.
+It preserves existing hooks and permission settings. Review and trust the new
+definitions in Codex's `/hooks` interface, then restart or resume the session.
+The live Codex 0.163.0 probe requires resume before its newly trusted hook runs.
+Dotbabel does not grant hook trust or change permission modes. Installing and
+trusting the peer hook authorizes a narrow host-side coordination capability:
+for one literal `dotbabel peer` operation, the hook changes only private peer
+state and returns a shell command that prints the result. It never executes
+model-provided shell text on the host. Setup, interactive input, relay, hook
+invocation, shell wrappers, chains, expansions, and repository overrides are
+excluded. Other commands retain their normal permission checks. This capability
+is necessary when a Codex tool sandbox hides host process ancestry or blocks the
+private coordination directory. Peer content never grants this capability.
+Coordination persists during PreToolUse, before the result-printing shell runs.
+If another hook denies that tool call, the coordination result can already exist;
+inspect state and use deduplication keys before retrying. Results above 24 KiB
+after shell quoting return `output: read_ledger` with the exact pair/result IDs
+and private ledger path. Read only that pair's data through normal read tools;
+the operation is not repeated and the full durable result is retained.
 If Claude holds a native notification, approve it in that terminal. A deliberately
 configured per-session `crossSessionInbound: accept` also permits unattended native
 wakeups, but accepts native messages beyond this pair; Dotbabel never sets it.
 Use `receive`/`next` when inbound controls prevent a wakeup.
-The role instructions still work without hooks, but tool enforcement and lifecycle
-recovery then depend on the model following the skill. Bootstrap discovers the
+Without hooks, direct CLI commands require a shell that can verify the harness
+process ancestry and access private peer state. A namespaced Codex shell can
+refuse registration; it must not infer an identity from an unverified UUID.
+Advisor protection and lifecycle recovery also require the installed hooks. Bootstrap discovers the
 installed CLIs; `--all` includes CLIs not currently on PATH.
 
 In terminal A, inside Claude Code:
@@ -50,7 +67,8 @@ shown in that installation's menu.
 The deterministic equivalents are `dotbabel peer main` and
 `dotbabel peer advisor CODE`, run through the session's shell tool. Claude resolves
 its identity through Fleet's registry and process ancestry. Codex uses its exported
-thread ID and verifies a live Codex process ancestor. No recent-transcript guessing
+thread ID and verifies a live Codex process ancestor, in the trusted host hook
+when the shell has its own PID namespace. No recent-transcript guessing
 or manual UUID copying is required. `status` prints the durable pair ID.
 
 ## Working together
@@ -195,17 +213,17 @@ requires an operator to archive state before starting a fresh repository ledger.
 
 Checked 2026-10-16 with Claude Code 2.1.302 and Codex CLI 0.163.0.
 
-| Capability                  | Claude Code                                           | Codex CLI                                        | Fallback/limit                                           |
-| --------------------------- | ----------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
-| Skill entry point           | `/peer`                                               | `$peer`                                          | deterministic CLI from the tool shell                    |
-| Native transport            | Local inbox, `peerProtocol: 1`                        | stable `codex queue --thread --message`          | `receive` and `next`                                     |
-| Busy turn                   | Native peer text can arrive between tool calls        | Queue accepts text; no steering claim            | independent shell/pane accepts investigations            |
-| Idle turn                   | Native inbox can wake a turn                          | Queue interface targets an existing thread       | actual model processing needs recipient ACK              |
-| Identity/liveness           | Fleet registry, PID incarnation, session ID           | exported thread ID, Codex ancestor, SessionEnd   | shared daemon liveness alone cannot prove a thread lives |
-| Lifecycle                   | SessionStart, Stop, StopFailure, SessionEnd           | SessionStart, Stop, Interrupt, SessionEnd        | review/trust hooks; explicit recovery when absent        |
-| Read-only Advisor           | instructions plus optional hook guard                 | instructions plus optional hook guard            | permissions remain per-session                           |
-| Urgent active-turn steering | not exposed                                           | not exposed                                      | never described as interrupting a turn                   |
-| Delivery proof              | live peer-origin turn started; model hit weekly limit | live queue command accepted for an active thread | full reasoning round-trip remains pending                |
+| Capability                  | Claude Code                                           | Codex CLI                                              | Fallback/limit                                           |
+| --------------------------- | ----------------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| Skill entry point           | `/peer`                                               | `$peer`                                                | deterministic CLI from the tool shell                    |
+| Native transport            | Local inbox, `peerProtocol: 1`                        | stable `codex queue --thread --message`                | `receive` and `next`                                     |
+| Busy turn                   | Native peer text can arrive between tool calls        | Queue accepts text; no steering claim                  | independent shell/pane accepts investigations            |
+| Idle turn                   | Native inbox can wake a turn                          | Queue interface targets an existing thread             | actual model processing needs recipient ACK              |
+| Identity/liveness           | Fleet registry, PID incarnation, session ID           | exported thread ID, host hook/ancestor, SessionEnd     | shared daemon liveness alone cannot prove a thread lives |
+| Lifecycle                   | SessionStart, Stop, StopFailure, SessionEnd           | SessionStart, Stop, Interrupt, SessionEnd              | review/trust hooks; explicit recovery when absent        |
+| Read-only Advisor           | instructions plus optional hook guard                 | instructions plus optional hook guard                  | permissions remain per-session                           |
+| Urgent active-turn steering | not exposed                                           | not exposed                                            | never described as interrupting a turn                   |
+| Delivery proof              | live peer-origin turn started; model hit weekly limit | live Advisor queue and Main replies with isolated peer | full reasoning round-trip remains pending                |
 
 Official evidence: [Claude messaging and inbound controls](https://code.claude.com/docs/en/cross-session-messaging),
 [Claude hooks](https://code.claude.com/docs/en/hooks),
@@ -228,8 +246,9 @@ they do not establish live cross-harness reasoning. The implementation environme
 Claude account returns `429 usage_limit_reached`, so both full real pair directions
 remain pending manual validation. A successful socket write is not marked a pass
 for any model-processing step. Natural-language routing is supplied by the skill;
-its model-level behavioral validation also remains pending. Deterministic routing
-and state transitions are covered by automated tests.
+its Codex investigation, private discussion, and queue behavior is verified with
+an isolated opposite peer. Full Claude/Codex model round trips remain pending.
+Deterministic routing and state transitions are covered by automated tests.
 
 1. Install and trust hooks as above. Open both harnesses in a scratch Git repository.
 2. Register Claude Main with `/peer main`, then Codex Advisor with `$peer advisor CODE`.

@@ -129,3 +129,92 @@ it("supports independent submissions and rejects unknown operations and missing 
   expect(json(r).body).toBe("independent question");
   expect(w.cli(["send", "main", "oops", "--urgent"], 1).status).toBe(64);
 });
+
+it("executes peer coordination in the trusted host hook before a namespaced shell runs", () => {
+  const w = world();
+  const hook = (command, n = 0) =>
+    w.cli(
+      ["hook", "PreToolUse"],
+      n,
+      JSON.stringify({
+        cwd: w.repo,
+        session_id: w.ids[n].sessionId,
+        tool_name: "Bash",
+        tool_input: { command },
+      }),
+    );
+  const registered = json(hook("dotbabel peer main --json"));
+  expect(registered.hookSpecificOutput.permissionDecision).toBe("allow");
+  const output = spawnSync("bash", ["-c", registered.hookSpecificOutput.updatedInput.command], {
+    encoding: "utf8",
+  });
+  const main = JSON.parse(output.stdout);
+  expect(main.main.sessionId).toBe(w.ids[0].sessionId);
+  const joined = json(hook(`dotbabel peer advisor ${main.code} --json`, 1));
+  const advisor = JSON.parse(
+    spawnSync("bash", ["-c", joined.hookSpecificOutput.updatedInput.command], { encoding: "utf8" })
+      .stdout,
+  );
+  expect(advisor.advisor.sessionId).toBe(w.ids[1].sessionId);
+  const injection = hook("dotbabel peer ask 'literal $(touch forbidden); text' --json", 1);
+  expect(injection.status).toBe(0);
+  expect(JSON.parse(injection.stdout).hookSpecificOutput.permissionDecision).toBe("allow");
+  expect(fs.existsSync(path.join(w.repo, "forbidden"))).toBe(false);
+  const queued = json(w.cli(["queue", "--json"]));
+  expect(queued[0].body).toBe("literal $(touch forbidden); text");
+  const quoted = json(hook('dotbabel peer ask "a single apostrophe: \'" --json', 1));
+  const printed = spawnSync("bash", ["-c", quoted.hookSpecificOutput.updatedInput.command], {
+    encoding: "utf8",
+  });
+  expect(printed.status).toBe(0);
+  expect(JSON.parse(printed.stdout).body).toBe("a single apostrophe: '");
+});
+
+it("keeps chained commands, wrappers, setup, repository overrides, and Advisor role changes outside host coordination", () => {
+  const w = world(),
+    main = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", main.code, "--json"], 1));
+  for (const command of [
+    "dotbabel peer ask injected; touch forbidden",
+    'dotbabel peer ask "$(touch forbidden)"',
+    "env dotbabel peer ask injected",
+    "X=1 dotbabel peer ask injected",
+    "dotbabel peer ask *",
+    "dotbabel peer setup --harness both",
+    "dotbabel peer main",
+  ]) {
+    const result = json(
+      w.cli(
+        ["hook", "PreToolUse"],
+        1,
+        JSON.stringify({
+          cwd: w.repo,
+          session_id: w.ids[1].sessionId,
+          tool_name: "Bash",
+          tool_input: { command },
+        }),
+      ),
+    );
+    expect(result.hookSpecificOutput.permissionDecision, command).toBe("deny");
+    expect(result.hookSpecificOutput.updatedInput).toBeUndefined();
+  }
+  const result = json(
+    w.cli(
+      ["hook", "PreToolUse"],
+      1,
+      JSON.stringify({
+        cwd: w.repo,
+        session_id: w.ids[1].sessionId,
+        tool_name: "Bash",
+        tool_input: { command: "dotbabel peer ask overridden --repo-root /tmp --json" },
+      }),
+    ),
+  );
+  const printed = spawnSync("bash", ["-c", result.hookSpecificOutput.updatedInput.command], {
+    encoding: "utf8",
+  });
+  expect(printed.status).toBe(64);
+  expect(JSON.parse(printed.stdout).error.code).toBe("PEER_USAGE");
+  expect(json(w.cli(["queue", "--json"]))).toEqual([]);
+  expect(fs.existsSync(path.join(w.repo, "forbidden"))).toBe(false);
+});

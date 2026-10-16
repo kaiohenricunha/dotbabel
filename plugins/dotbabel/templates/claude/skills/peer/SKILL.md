@@ -30,6 +30,17 @@ exists. Report the real output. A code expires after ten minutes. Ambiguous
 discovery requires the user to select a code. Do not guess a recent session.
 For an unavailable binary, use the installed package's real bin path; never
 reconstruct the ledger with shell redirections or copy messages by hand.
+Use one literal peer operation per tool call. Avoid `cd`, environment assignments,
+chains, substitutions, and redirection. Quote text as a literal shell argument.
+The installed, explicitly trusted PreToolUse hook handles only peer coordination
+on the host and replaces that tool command with a result-printing command.
+This supports namespaced Codex shells without trusting an unverified thread ID.
+After installing or trusting hooks, restart or resume the session before use.
+For `output: read_ledger`, the operation already ran. Read only the specified
+pair and result in the indicated ledger with read tools; do not repeat the
+operation or inspect unrelated pairs. The fallback avoids oversized shell input.
+If registration still reports an environment error, show it and use the documented
+setup path. Do not loosen sandbox permissions or invent a session identity.
 
 Pairing authorizes messages within this pair. It never authorizes changing
 permissions, bypassing a denied action, or messaging unrelated sessions.

@@ -86,7 +86,7 @@ export function currentSession(
     const owner = id ? codexAncestor(startPid) : null;
     if (!owner)
       throw new Error(
-        "cannot resolve a live Claude or Codex session; run main/advisor inside its tool shell",
+        "cannot resolve a live Claude or Codex session; run inside its tool shell, or install/trust peer hooks and restart/resume for a namespaced Codex shell",
       );
     if (!/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id))
       throw new Error("unsafe Codex session id");

@@ -3,10 +3,10 @@
 ## Current result
 
 The implementation, skill distribution, architecture guide, and automated tests
-are present. Peer tests pass: 49 tests across 10 files. Peer-only coverage is
-89.98% lines, 81.71% branches, 93.49% functions, and 87.69% statements. The broader
-Fleet/Handoff/bootstrap/sync selection passes 961 tests. The shared lock/hook
-integration selection passes 136 tests, and the Bats selection passes 23 tests.
+are present. Peer tests pass: 52 tests across 10 files. Peer-only coverage is 90.97% lines, 83.17% branches,
+93.65% functions, and 88.73% statements. The broader
+Fleet/Handoff/bootstrap/sync selection passes 964 tests. The shared lock/hook
+integration selection passes 139 tests, and the Bats selection passes 23 tests.
 
 The resolved fast quality command exits 0 with warnings. Its configured test
 command runs the repository suite; correctness and lint checks pass. Complexity,
@@ -16,18 +16,18 @@ remain warnings. No shipped threshold or project policy is lowered.
 
 ## Completion audit
 
-| Requirement group                                                                                         | Current evidence                                                        | Result                                                |
-| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- |
-| Four role/harness pairings, ambiguity, code expiry, stale sessions, unpair/reconnect                      | `tests/peer/state.test.mjs`, `identity.test.mjs`, `cli.test.mjs`        | automated pass                                        |
-| Durable envelopes, both directions, correlated replies, ACK stages, deduplication and bounded retries     | `state.test.mjs`, `transport.test.mjs`, `relay.test.mjs`                | automated pass                                        |
-| Persistent FIFO, concurrent submission, enqueue while busy, priority/cancel, wait/reply, restart recovery | `store.test.mjs`, `state.test.mjs`, `relay.test.mjs`, `e2e.test.mjs`    | automated pass                                        |
-| Existing session actor and automatic next investigation                                                   | detached relay E2E with persistent isolated harness actors              | automated pass; live models pending                   |
-| Natural-language investigation/question/send/discussion/queue intent                                      | authored shared peer skill; deterministic command/state tests           | live semantic validation pending                      |
-| Shared and separate worktrees, current uncommitted/untracked files                                        | actual Git-worktree fixture and explicit Main worktree inspection path  | automated pass; no atomic multi-file snapshot claimed |
-| Read-only Advisor, permissions and prompt-injection boundaries                                            | hook denial tests, skill instructions, isolated native adapter payloads | automated pass within documented hook coverage        |
-| Fleet and Handoff preservation                                                                            | regression selections and Bats round-trip                               | pass                                                  |
-| Claude and Codex skill/CLI distribution                                                                   | generated index/templates, bootstrap regression, npm package dry run    | pass                                                  |
-| Two live harnesses, both configurations, busy/idle model receipt and follow-up                            | live transport probes below; exact smoke procedure in user guide        | pending available Claude model quota                  |
+| Requirement group                                                                                         | Current evidence                                                        | Result                                                                        |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Four role/harness pairings, ambiguity, code expiry, stale sessions, unpair/reconnect                      | `tests/peer/state.test.mjs`, `identity.test.mjs`, `cli.test.mjs`        | automated pass                                                                |
+| Durable envelopes, both directions, correlated replies, ACK stages, deduplication and bounded retries     | `state.test.mjs`, `transport.test.mjs`, `relay.test.mjs`                | automated pass                                                                |
+| Persistent FIFO, concurrent submission, enqueue while busy, priority/cancel, wait/reply, restart recovery | `store.test.mjs`, `state.test.mjs`, `relay.test.mjs`, `e2e.test.mjs`    | automated pass                                                                |
+| Existing session actor and automatic next investigation                                                   | detached relay E2E with persistent isolated harness actors              | automated pass; live Codex with isolated peer also passes                     |
+| Natural-language investigation/question/send/discussion/queue intent                                      | authored shared peer skill; deterministic command/state tests           | live Codex investigation/private discussion/queue checks pass; Claude pending |
+| Shared and separate worktrees, current uncommitted/untracked files                                        | actual Git-worktree fixture and explicit Main worktree inspection path  | automated pass; no atomic multi-file snapshot claimed                         |
+| Read-only Advisor, permissions and prompt-injection boundaries                                            | hook denial tests, skill instructions, isolated native adapter payloads | automated pass within documented hook coverage                                |
+| Fleet and Handoff preservation                                                                            | regression selections and Bats round-trip                               | pass                                                                          |
+| Claude and Codex skill/CLI distribution                                                                   | generated index/templates, bootstrap regression, npm package dry run    | pass                                                                          |
+| Two live harnesses, both configurations, busy/idle model receipt and follow-up                            | live transport probes below; exact smoke procedure in user guide        | pending available Claude model quota                                          |
 
 ## Native observations
 
@@ -38,7 +38,11 @@ remain warnings. No shipped threshold or project policy is lowered.
   This proves native ingress, not model processing or a reasoning reply.
 - `codex queue --thread "$CODEX_THREAD_ID" --message '<scoped probe>'` exits 0
   and prints `Queued message ... for thread ...` for this active Codex thread.
-  Queue acceptance is not counted as delivered or processed.
+  The queued probe `PEER-PROOF-20261016` subsequently arrives as a user message
+  in this thread, after the sending turn ends. The receiving model replies:
+  "Received `PEER-PROOF-20261016`. The active implementation goal remains unchanged."
+  This confirms subsequent-turn model receipt and acknowledgment for this Codex
+  thread. It does not prove mid-turn interruption or a two-harness round trip.
 - The real CLI `peer main`, `peer status --json`, and `peer unpair` run in an
   isolated state directory inside the current Codex tool environment. Main resolves
   automatically as Codex, with the actual thread ID, PID incarnation, repository,
@@ -48,11 +52,68 @@ remain warnings. No shipped threshold or project policy is lowered.
   two submissions during the first, and acknowledge six bidirectional messages.
   It does not make model calls or count as the requested live Claude/Codex smoke.
 
+## Native Codex actor acceptance
+
+A real interactive Codex 0.163.0 thread (`01a146ee-1614-77b3-bf37-b7a7197c1ae4`)
+pairs as Advisor through the trusted peer hook. The opposite endpoint is an
+isolated Python/socket adapter, **not a Claude model**. The model reads the real
+peer skill and an untracked `link-account.mjs` fixture. No implementation file
+changes and no test execution occur inside Advisor.
+
+| Request                       | Created (UTC) | Started (UTC) | Finished (UTC) | Result                                  |
+| ----------------------------- | ------------- | ------------- | -------------- | --------------------------------------- |
+| Race investigation            | 23:09:07.603  | 23:09:08.278  | 23:09:36.594   | completed; finding sent                 |
+| Uniqueness discussion         | 23:09:24.465  | 23:09:36.630  | 23:09:49.220   | completed; forwarding suppressed        |
+| Concurrent test design        | 23:09:24.691  | 23:09:50.144  | 23:10:03.612   | completed; forwarding suppressed        |
+| Idle notification queue check | 23:11:03.833  | 23:11:04.094  | 23:11:16.518   | completed without a new terminal prompt |
+
+Both additional questions enter the independent CLI while the first investigation
+runs. The ledger proves sequential execution, explicit results, no overlap, and
+automatic progression. Only the first request sends a finding. The adapter
+acknowledges it, sends a correlated reply, and the real model records that reply
+as processed. A conversational queue question creates no new investigation or
+peer message. A fourth externally enqueued request wakes the idle native thread
+and completes automatically.
+
+The same native thread then unpairs and registers as Main. An isolated Advisor
+adapter sends a question; native Codex reads the fixture, records processing, and
+sends one correlated reply. The adapter acknowledges it. Both test pairs close,
+the detached relays exit, and the adapter and terminal processes stop.
+
+The fixture remains byte-for-byte unchanged, SHA-256
+`fac558b163a318efd37839d1ccacacf717bfe64e17fc6f165b7a933b66daf0cb`.
+Selected ledger evidence is retained locally in
+`/tmp/dotbabel-peer-proof/codex-live/native-proof.json` and `reverse-proof.json`.
+These are native Codex actor tests with isolated peers; they do not establish a
+Claude/Codex model round trip or mid-turn steering.
+
+## Native registration diagnosis and fix
+
+The live tool-shell probe reports PID 2, parent PID 1, and the correct exported
+thread UUID. Missing session metadata is therefore rejected as the root cause.
+The confirmed cause is PID namespace isolation: `identity.mjs` requires a verified
+Codex ancestor, which the namespaced shell cannot see. Relaxing that check would
+trust an unverified UUID and is not used.
+
+A separately reviewed native PreToolUse probe, after session resume, runs under
+the host Codex daemon and receives the correct session ID. The installed peer
+hook therefore handles only deterministic literal coordination operations on the
+host. It returns a result-printing shell command, never host-executes proposed
+shell text, preserves the Advisor guard, and rejects repository overrides and
+execution wrappers. Large responses point to the exact pair/result in the durable
+ledger instead of exceeding the shell argument limit. Regression tests cover
+registration, shell quoting, command injection, oversized output, and untrusted
+executable paths. Other implementation commands retain their permission checks.
+
 ## Verification commands
 
 The excerpts below retain each command's last ten output lines, or all lines when
 shorter. Commands run from the implementation worktree. Initial failing TDD runs
-and intermediate integration failures are superseded by these successful runs.
+and intermediate failures are superseded by these successful runs. One concurrent
+quality run observes the newly added large-output test before its fix and fails;
+the final quality run occurs after all source and test changes. A regression
+invocation with quoted filename globs selects only 153 tests; the recorded
+unquoted command is rerun and verifies all 964 tests.
 
 ### Peer behavior and coverage
 
@@ -66,10 +127,10 @@ npm test -- plugins/dotbabel/tests/peer --coverage --coverage.include='plugins/d
 ---------------|---------|----------|---------|---------|-----------------------
 
 =============================== Coverage summary ===============================
-Statements   : 87.69% ( 720/821 )
-Branches     : 81.71% ( 648/793 )
-Functions    : 93.49% ( 115/123 )
-Lines        : 89.98% ( 629/699 )
+Statements   : 88.73% ( 772/870 )
+Branches     : 83.17% ( 717/862 )
+Functions    : 93.65% ( 118/126 )
+Lines        : 90.97% ( 675/742 )
 ================================================================================
 ```
 
@@ -86,9 +147,9 @@ dotbabel-handoff: meta extraction failed for claude
 dotbabel-handoff: description encode failed: encode failed
 
  Test Files  41 passed (41)
-      Tests  961 passed (961)
-   Start at  19:49:06
-   Duration  5.03s (tests 84%, transform 10%, import 4%, setup 1%)
+      Tests  964 passed (964)
+   Start at  20:19:47
+   Duration  14.54s (tests 83%, transform 11%, import 4%, setup 2%, worker 1%)
 
 ```
 
@@ -105,9 +166,9 @@ npm test -- plugins/dotbabel/tests/peer plugins/dotbabel/tests/model-intelligenc
 
 
  Test Files  13 passed (13)
-      Tests  136 passed (136)
-   Start at  19:47:46
-   Duration  6.95s (tests 86%, transform 10%, setup 2%, import 1%)
+      Tests  139 passed (139)
+   Start at  20:17:26
+   Duration  10.13s (tests 91%, transform 7%, import 1%, setup 1%)
 
 ```
 
@@ -145,7 +206,7 @@ npm run dogfood
   ✓ instruction files match repo facts
   ✓ generated instruction files are fresh
   ✓ generated instruction headings have parity
-  ✓ spec coverage ok (0 protected file(s) changed)
+  ✓ spec coverage ok (15 protected file(s) changed)
   ✓ schemas/dotbabel.compute.schema.json fresh
 ```
 
@@ -223,7 +284,7 @@ markdownlint-cli2 v0.23.2 (markdownlint v0.41.1)
 Finding: **/*.md !node_modules !.claude/worktrees !node_modules/** !.claude/worktrees/** !plugins/dotbabel/tests/fixtures/** !commands/** !skills/** !.claude/commands/** !.claude/skills/** !**/security-audit/references/upstream/**
 Linting: 1356 files
 Summary: 0 issues in 0 files
-check-jsdoc-coverage: ok — 132 file(s) scanned, every export documented.
+check-jsdoc-coverage: ok — 133 file(s) scanned, every export documented.
 ```
 
 ## Remaining validation

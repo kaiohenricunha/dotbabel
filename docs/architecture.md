@@ -138,7 +138,11 @@ mailbox receipt, processing, acknowledgment, and investigation completion are
 separate observations. Waiting for a correlated reply releases the active slot.
 
 The `peer` skill handles semantic intent. Hooks guard Advisor tools and restore
-role context; they do not replace per-session permissions. The independent CLI
+role context. An explicitly installed and trusted PreToolUse hook also handles
+literal peer coordination on the host, where Codex process ancestry and private
+state remain visible. It never executes proposed shell text: it calls only the
+internal peer operations and replaces the shell input with result printing.
+Other tools retain per-session permissions. The independent CLI
 input channel accepts durable work while the model is busy. See
 [the user guide, compatibility matrix, and smoke test](peer-collaboration.md) for
 state layout, failure semantics, installed-version evidence, and limitations.

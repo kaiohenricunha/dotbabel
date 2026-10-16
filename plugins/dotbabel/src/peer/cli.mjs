@@ -13,6 +13,7 @@ import * as domain from "./state.mjs";
 import { tick } from "./relay.mjs";
 import { setupHooks } from "./setup.mjs";
 import { peerHook } from "./hooks.mjs";
+import { literalWords } from "./shell.mjs";
 
 const BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
 const USAGE = `dotbabel peer — persistent local Main/Advisor collaboration
@@ -350,6 +351,77 @@ function print(value, json, command) {
   );
 }
 
+// This reviewed hook capability executes only internal peer state operations. It
+// never runs model-supplied shell text on the host. The replacement only prints
+// the result; unrelated commands retain their normal permission checks.
+async function coordinate(store, who, input, env) {
+  if (input.hook_event_name !== "PreToolUse" || !["Bash", "exec_command"].includes(input.tool_name))
+    return null;
+  const words = literalWords(input.tool_input?.command ?? input.tool_input?.cmd);
+  if (!words) return null;
+  const bin = path.basename(words[0]);
+  let argv;
+  if (bin === "dotbabel" && words[1] === "peer") argv = words.slice(2);
+  else if (bin === "node" && words[1] === BIN) argv = words.slice(2);
+  else if (
+    bin === "node" &&
+    words[1] === path.join(path.dirname(BIN), "dotbabel.mjs") &&
+    words[2] === "peer"
+  )
+    argv = words.slice(3);
+  else return null;
+  if (!COMMANDS.has(argv[0]) || ["setup", "input", "relay", "hook"].includes(argv[0])) return null;
+  const existing = (await store.read()).pairs.find(
+    (p) => !p.closed && [p.main?.key, p.advisor?.key].includes(who.key),
+  );
+  const guard = existing && peerHook(existing, who, input);
+  if (guard) return guard;
+  let value,
+    code = 0;
+  try {
+    const parsed = parse(argv, FLAGS),
+      [op, ...args] = parsed.positional;
+    validateArgs(op, args, parsed.flags);
+    if (parsed.help || parsed.version || parsed.flags["repo-root"])
+      usage("trusted peer coordination requires a literal operation in the current repository");
+    value = await execute(store, op, args, parsed.flags, who);
+    const pair = ["main", "advisor", "reconnect"].includes(op)
+      ? value
+      : pairFor(await store.read(), parsed.flags.pair, who, ["history", "unpair"].includes(op));
+    launchRelay(store, pair, env);
+  } catch (err) {
+    code = err.exitCode === 64 || err.code === "USAGE_UNKNOWN_FLAG" ? 64 : 1;
+    value = {
+      error: { code: code === 64 ? "PEER_USAGE" : "PEER_OPERATION", message: err.message },
+    };
+  }
+  let quoted = `'${JSON.stringify(value).replaceAll("'", "'\\''")}'`;
+  if (Buffer.byteLength(quoted) > 24576)
+    quoted = `'${JSON.stringify({
+      output: "read_ledger",
+      ledger: store.file,
+      command: argv[0],
+      exit_code: code,
+      pair_id: value?.main ? value.id : (existing?.id ?? null),
+      result_id: value?.id ?? null,
+      lease: value?.lease ?? null,
+    }).replaceAll("'", "'\\''")}'`;
+  const resultCommand = `printf '%s\\n' ${quoted}; exit ${code}`;
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "allow",
+      permissionDecisionReason:
+        "The installed peer hook handles this scoped coordination operation; the shell prints its result only.",
+      updatedInput: {
+        ...input.tool_input,
+        command: resultCommand,
+        ...(typeof input.tool_input.cmd === "string" ? { cmd: resultCommand } : {}),
+      },
+    },
+  };
+}
+
 /** Run the peer CLI with common Dotbabel flags and stable exit categories. @param {string[]} argv @param {NodeJS.ProcessEnv} [env] @returns {Promise<number>} */
 export async function runPeer(argv, env = process.env) {
   let parsed;
@@ -408,6 +480,11 @@ export async function runPeer(argv, env = process.env) {
       }
     }
     if (command === "hook") {
+      const coordination = await coordinate(store, who, input, env);
+      if (coordination) {
+        process.stdout.write(JSON.stringify(coordination) + "\n");
+        return 0;
+      }
       const p = (await store.read()).pairs.find(
         (p) => !p.closed && [p.main?.key, p.advisor?.key].includes(who.key),
       );

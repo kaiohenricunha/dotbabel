@@ -29,7 +29,7 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     "git show HEAD:a",
     "dotbabel peer next",
     "dotbabel peer send main 'finding; x && y'",
-    "node '/tools/dotbabel-peer.mjs' queue",
+    `node '${new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname}' queue`,
     "dotbabel peer unpair",
   ]) {
     expect(
@@ -57,6 +57,10 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     'dotbabel peer send main "$(rm x)"',
     "git\nstatus",
     "cat a | tee b",
+    "node /untrusted/dotbabel-peer.mjs queue",
+    "node /untrusted/dotbabel.mjs peer queue",
+    "/untrusted/cat src/main.mjs",
+    "/untrusted/git status",
   ]) {
     expect(
       peerHook(p, advisor, {

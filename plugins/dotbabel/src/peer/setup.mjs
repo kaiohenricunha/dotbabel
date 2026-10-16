@@ -68,6 +68,6 @@ export function setupHooks(harness, env = process.env) {
     );
   return {
     files,
-    next: "Restart the harnesses. In Codex, review and trust these definitions with /hooks. Existing sandbox and permission settings remain authoritative.",
+    next: "In Codex, review and trust these definitions with /hooks, then restart or resume. The trusted PreToolUse hook handles literal peer coordination on the host and prints its result. Other tool commands retain existing sandbox and permission checks.",
   };
 }
