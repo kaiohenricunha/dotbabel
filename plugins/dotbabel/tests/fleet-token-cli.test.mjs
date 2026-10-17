@@ -123,6 +123,24 @@ function world({ viaGuard = false } = {}) {
 }
 
 describe.skipIf(!HAS_PROC)("merge token: pre-bash hook", () => {
+  it("an unsupported host cannot take the token or prune a supported host's owner", () => {
+    const w = world();
+    w.bash("sess-peer", "git rebase origin/main");
+    w.env.DOTBABEL_FLEET_HOST = "codex";
+    expect(w.bash("sess-self", "git rebase origin/main")).toBeNull();
+    expect(w.cli(["token", "take"]).status).toBe(2);
+    expect(w.token().owner.name).toBe("peer-pane");
+  });
+  it("fleet token leave removes this session from the queue", () => {
+    const w = world();
+    w.bash("sess-peer", "git rebase origin/main");
+    const denied = w.bash("sess-self", "git rebase origin/main");
+    expect(denied.permissionDecisionReason).toContain("1st in the queue");
+    const before = JSON.parse(w.cli(["token", "--json"]).stdout);
+    expect(before.queue).toHaveLength(1);
+    expect(w.cli(["token", "leave"]).status).toBe(0);
+    expect(JSON.parse(w.cli(["token", "--json"]).stdout).queue).toEqual([]);
+  });
   it("takes the token for a rebase onto main and denies a peer's local-attest, naming the holder", () => {
     const w = world();
     expect(w.bash("sess-self", "git fetch origin && git rebase origin/main")).toBeNull();

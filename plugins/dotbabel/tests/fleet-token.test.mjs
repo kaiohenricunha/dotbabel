@@ -17,6 +17,8 @@ import {
   takeToken,
   tokenHolder,
   touchToken,
+  leaveTokenQueue,
+  tokenQueue,
 } from "../src/fleet/token.mjs";
 
 const T0 = Date.parse("2026-09-26T12:00:00.000Z");
@@ -29,6 +31,67 @@ const isAlive = (owner) => owner.pid !== DEAD_PID;
 function take(dir, owner, overrides = {}) {
   return takeToken(dir, { repoKey: REPO, owner, branch: "feat/x", kind: "rebase", now: T0, isAlive, ...overrides });
 }
+
+describe("merge queue", () => {
+  const C = { ...B, key: "300-3", pid: 300, name: "pane-c" };
+  it("a blocked session sees its queue position, and only the head takes a freed token", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A);
+    const denied = take(dir, B);
+    expect(denied.position).toBe(1);
+    expect(formatTokenDeny({ repoKey: REPO, ...denied, action: "merge", cli: "dotbabel fleet", now: T0, idleMs: DEFAULT_TOKEN_IDLE_MS })).toContain("1st in the queue");
+    releaseToken(dir, A.key, { now: T0, isAlive });
+    expect(take(dir, C).taken).toBe(false);
+    expect(take(dir, B).taken).toBe(true);
+    expect(readToken(dir).queue.map((q) => q.owner.key)).toEqual([C.key]);
+  });
+  it("a head that does not retry loses its reservation after 10 minutes", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A); take(dir, B); take(dir, C);
+    releaseToken(dir, A.key, { now: T0, isAlive });
+    expect(take(dir, C, { now: T0 + 599999 }).taken).toBe(false);
+    expect(take(dir, C, { now: T0 + 600000 }).taken).toBe(true);
+  });
+  it("the queue orders sessions by the work graph, then by arrival", () => {
+    const dir = makeTempDir("fleet-queue-");
+    const tasks = [{ slug: "b", branch: "feat/b", status: "open", depends_on: ["a"] }, { slug: "a", branch: "feat/a", status: "open", depends_on: [] }];
+    take(dir, A);
+    take(dir, B, { branch: "feat/b", tasks });
+    take(dir, C, { branch: "feat/a", tasks });
+    expect(tokenQueue(dir, { now: T0, isAlive, tasks }).map((q) => q.owner.key)).toEqual([C.key, B.key]);
+    releaseToken(dir, A.key, { now: T0, isAlive });
+    expect(take(dir, B, { now: T0 }).taken).toBe(false);
+    expect(take(dir, C, { now: T0 }).taken).toBe(true);
+  });
+  it("queue.off turns the queue off without a restart", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A); take(dir, B);
+    fs.writeFileSync(path.join(dir, "queue.off"), "");
+    releaseToken(dir, A.key, { now: T0, isAlive });
+    expect(take(dir, C).taken).toBe(true);
+  });
+  it("leaving and dead owners do not retain a reservation", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A); take(dir, B); take(dir, C);
+    expect(leaveTokenQueue(dir, B.key, { now: T0, isAlive })).toBe(true);
+    expect(tokenQueue(dir, { now: T0, isAlive: (o) => o.key !== C.key })).toEqual([]);
+  });
+  it("the queue check adds at most 50 ms to a token hook call", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A);
+    const start = performance.now();
+    take(dir, B);
+    expect(performance.now() - start).toBeLessThanOrEqual(50);
+  });
+  it("reads a version-1 token without a queue", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A);
+    const old = readToken(dir); old.schema = 1; delete old.queue;
+    fs.writeFileSync(path.join(dir, "merge-token.json"), JSON.stringify(old));
+    expect(readToken(dir).queue).toEqual([]);
+    expect(take(dir, B).position).toBe(1);
+  });
+});
 
 describe("takeToken", () => {
   it("gives a free token to the first session and records who took it", () => {

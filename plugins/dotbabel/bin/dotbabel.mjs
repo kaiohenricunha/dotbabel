@@ -50,6 +50,8 @@ const SUBCOMMANDS = [
   "fleet",
   "peer",
   "task",
+  "decide",
+  "export",
 ];
 
 function printUsage() {

@@ -128,6 +128,25 @@ The full set (chosen for high signal-to-noise on dotbabel PRs):
 - `compliance-auditor` — gate coverage, declared-vs-enforced invariants
 - `documentation-writer` — comment accuracy, missing docstrings, drift
 
+After selecting the profile (or honoring explicit `--agents`), write the input
+`{profile, changed_files, changed_lines, candidates}` to a private temporary JSON
+file. `profile` and `candidates` are arrays of reviewer IDs. The profile contains
+the selected reviewers; candidates contain only installed reviewers not already
+selected. Run:
+
+```bash
+dotbabel decide --step dispatch < "$DECISION_INPUT" > "$DECISION_OUTPUT"
+```
+
+Union the returned `answer` with the selected profile; never remove reviewers.
+Always retain `security-auditor`. On exit 2 or 64, keep the selected profile and
+report that the decider is unavailable. The built-in rule adds no reviewer when
+security is already present. Do not follow `shadow`: no model step is adopted.
+Append the decision to the phase's private JSON array and include
+`--decisions "$DECISIONS_FILE"` in the phase's `pr-stack record` call. Outside
+conductor mode, record `post-pr-review` once with the observed outcome. A dry
+run records no attempt and makes no decision call.
+
 Report which profile fired in step 9 — a wrong profile is otherwise invisible,
 and the failure mode (a logic-heavy diff reviewed by the docs agent alone) is
 silent. Pass `--agents` to override whenever the heuristic misjudges a diff.

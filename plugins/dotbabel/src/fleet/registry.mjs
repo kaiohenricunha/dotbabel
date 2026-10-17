@@ -1,6 +1,9 @@
 /**
  * Find Claude Code sessions for `dotbabel fleet`: the session registry,
- * process liveness, and which session is running the current process.
+ * process liveness, and which session is running the current process. This
+ * is the Claude Code host adapter's implementation of `identity` and
+ * `liveness`; `host-adapter.mjs` declares the adapter and imports this
+ * module, never the other way round.
  *
  * Claude Code keeps one file per running session in `~/.claude/sessions/`
  * (`<pid>.json`: pid, sessionId, procStart, name, status, ...). That format is

@@ -1,18 +1,36 @@
 {
   "id": "graph-engineering",
-  "title": "Graph engineering \u2014 a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
+  "title": "Graph engineering — a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
   "status": "implementing",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/task-state.mjs",
     "plugins/dotbabel/src/work-graph.mjs",
     "plugins/dotbabel/src/clone-registry.mjs",
+    "plugins/dotbabel/src/fleet/host-adapter.mjs",
     "plugins/dotbabel/bin/dotbabel-task.mjs",
-    "schemas/dotbabel.task-state.schema.json"
+    "schemas/dotbabel.task-state.schema.json",
+    "plugins/dotbabel/src/fleet/token.mjs",
+    "plugins/dotbabel/src/fleet/merge-queue.mjs",
+    "plugins/dotbabel/src/fleet/platform-adapter.mjs",
+    "plugins/dotbabel/src/decider.mjs",
+    "plugins/dotbabel/src/decider-config.mjs",
+    "plugins/dotbabel/src/decision-value.mjs",
+    "plugins/dotbabel/src/jev-adapter.mjs",
+    "plugins/dotbabel/src/export.mjs",
+    "plugins/dotbabel/src/run-receipt.mjs",
+    "plugins/dotbabel/bin/dotbabel-decide.mjs",
+    "plugins/dotbabel/bin/dotbabel-export.mjs",
+    "plugins/dotbabel/bin/dotbabel-fleet.mjs",
+    "schemas/dotbabel.run-receipt.schema.json",
+    "schemas/dotbabel.config.schema.json"
   ],
   "acceptance_commands": [
     "npx vitest run plugins/dotbabel/tests/task-state.test.mjs",
-    "npx vitest run plugins/dotbabel/tests/work-graph.test.mjs"
+    "npx vitest run plugins/dotbabel/tests/work-graph.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/task-cli.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/fleet-token.test.mjs plugins/dotbabel/tests/fleet-token-cli.test.mjs plugins/dotbabel/tests/fleet-platform.test.mjs plugins/dotbabel/tests/fleet-merge-queue.test.mjs plugins/dotbabel/tests/fleet-registry.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/decider.test.mjs plugins/dotbabel/tests/decider-cli.test.mjs plugins/dotbabel/tests/decider-config.test.mjs plugins/dotbabel/tests/decision-value.test.mjs plugins/dotbabel/tests/decider-boundary.test.mjs plugins/dotbabel/tests/jev-adapter.test.mjs plugins/dotbabel/tests/jev-transport.test.mjs plugins/dotbabel/tests/run-receipt.test.mjs plugins/dotbabel/tests/export.test.mjs plugins/dotbabel/tests/skills-decide.test.mjs plugins/dotbabel/tests/runtime-deps.test.mjs"
   ],
   "depends_on_specs": [],
   "active_prs": [],
@@ -169,7 +187,7 @@
     },
     {
       "id": "AC-7",
-      "status": "planned",
+      "status": "active",
       "given": "session A holds the merge token, and session B runs a token command",
       "when": "the hook denies B and A's merge is then recorded",
       "then": "B sees its queue position in the deny reason and is the only session that can take the freed token",
@@ -194,7 +212,7 @@
     },
     {
       "id": "AC-8",
-      "status": "planned",
+      "status": "active",
       "given": "session B heads the queue with a reservation",
       "when": "10 minutes pass and B does not retry",
       "then": "B loses the reservation and the next entry heads the queue",
@@ -219,7 +237,7 @@
     },
     {
       "id": "AC-9",
-      "status": "planned",
+      "status": "active",
       "given": "a review finding with critical severity or no severity",
       "when": "dotbabel decide --step review-triage runs with any adapter answer",
       "then": "the answer is full-validation",
@@ -244,7 +262,7 @@
     },
     {
       "id": "AC-10",
-      "status": "planned",
+      "status": "active",
       "given": "a model adapter that does not answer within 5 seconds",
       "when": "dotbabel decide runs",
       "then": "it prints the built-in answer with fallback true and exits 0",
@@ -269,7 +287,7 @@
     },
     {
       "id": "AC-11",
-      "status": "planned",
+      "status": "active",
       "given": "a canary adapter key",
       "when": "dotbabel decide, pr-stack record, and both exports run",
       "then": "the key appears in no receipt, export file, or log line",
@@ -294,7 +312,7 @@
     },
     {
       "id": "AC-12",
-      "status": "planned",
+      "status": "active",
       "given": "the merge gate modules",
       "when": "their imports are read",
       "then": "none of them imports the decider module",
@@ -319,7 +337,7 @@
     },
     {
       "id": "AC-13",
-      "status": "planned",
+      "status": "active",
       "given": "package.json",
       "when": "its runtime dependencies are counted",
       "then": "there are four",
@@ -344,7 +362,7 @@
     },
     {
       "id": "AC-14",
-      "status": "planned",
+      "status": "active",
       "given": "an open task without a phase, an open task with a phase, and a closed task",
       "when": "dotbabel export --a2a runs",
       "then": "they map to TASK_STATE_SUBMITTED, TASK_STATE_WORKING, and TASK_STATE_COMPLETED",
