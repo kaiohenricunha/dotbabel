@@ -15,6 +15,7 @@ import {
   rollbackPoint,
   summarizePhases,
   USER_ALLOWED_RETRY,
+  normalizeReceipt,
 } from "../src/run-receipt.mjs";
 import { CONDUCTOR_PHASES } from "../src/pr-gates.mjs";
 
@@ -35,10 +36,26 @@ function receiptWith(...attempts) {
 }
 
 describe("createReceipt", () => {
+  it("reads a version-1 receipt as version 2", () => {
+    const old = receiptWith({ phase: "review-pr", outcome: "pass" });
+    old.schema_version = 1;
+    delete old.attempts[0].decisions;
+    const upgraded = normalizeReceipt(old);
+    expect(upgraded.schema_version).toBe(2);
+    expect(upgraded.attempts[0].decisions).toEqual([]);
+    expect(old.schema_version).toBe(1);
+  });
+  it("records each decision with its shadow answer", () => {
+    const decision = { step: "retry", answer: "fix", confidence: 1, decider: "builtin", fallback: false, shadow: { decider: "jev", answer: "retry", confidence: 0.7 } };
+    const receipt = appendAttempt(createReceipt({ pr: 7 }), { phase: "review-pr", outcome: "fail", headSha: HEAD_A, decisions: [decision] });
+    expect(receipt.attempts[0].decisions).toEqual([decision]);
+    expect(receiptProblem(receipt)).toBeNull();
+    expect(() => appendAttempt(receipt, { phase: "review-pr", outcome: "fail", headSha: HEAD_A, decisions: [{ ...decision, key: "secret" }] })).toThrow(/decision/);
+  });
   it("starts an empty, valid receipt for one pull request", () => {
     const r = createReceipt({ pr: 7, now: T0 });
     expect(r).toEqual({
-      schema_version: 1,
+      schema_version: 2,
       tool: "dotbabel-pr-stack",
       pr: 7,
       created_at: T0.toISOString(),
@@ -269,7 +286,7 @@ describe("receiptProblem", () => {
 
   it("names what is wrong with a hand-edited or foreign file", () => {
     expect(receiptProblem(null)).toMatch(/object/);
-    expect(receiptProblem({ ...createReceipt({ pr: 7 }), schema_version: 2 })).toMatch(/schema_version/);
+    expect(receiptProblem({ ...createReceipt({ pr: 7 }), schema_version: 3 })).toMatch(/schema_version/);
     expect(receiptProblem({ ...createReceipt({ pr: 7 }), attempts: "x" })).toMatch(/attempts/);
     const bad = receiptWith({ phase: "pre-pr", outcome: "pass" });
     bad.attempts[0].outcome = "maybe";

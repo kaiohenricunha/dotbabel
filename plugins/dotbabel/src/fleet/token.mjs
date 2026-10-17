@@ -6,7 +6,7 @@
  *
  * Layout, next to the repo's claims ledger:
  *
- *   <root>/<repo-slug>/merge-token.json   the lease, absent while the token is free
+ *   <root>/<repo-slug>/merge-token.json   the lease and its reservation queue
  *   <root>/<repo-slug>/merge-token.lock/  held for the few milliseconds of a change
  *
  * A token is held while its owner's process runs and the owner used it inside
@@ -20,9 +20,10 @@ import { parseMergeCommand } from "./events.mjs";
 import { formatAge } from "./format.mjs";
 import { simpleCommands } from "./heavy.mjs";
 import { isOwnerAlive } from "./registry.mjs";
+import { reserveQueue } from "./merge-queue.mjs";
 
-/** Version of the token format. A reader ignores a token of another version. */
-export const TOKEN_SCHEMA = 1;
+/** Version written now. Readers also accept version 1 without a queue. */
+export const TOKEN_SCHEMA = 2;
 
 /**
  * A holder that ran no token command for this long loses the token. It is
@@ -100,8 +101,10 @@ function writeAtomic(file, value) {
 export function readToken(dir) {
   try {
     const token = JSON.parse(fs.readFileSync(tokenPath(dir), "utf8"));
-    if (token?.schema !== TOKEN_SCHEMA || typeof token.owner?.key !== "string") return null;
-    return token;
+    if (![1, TOKEN_SCHEMA].includes(token?.schema)) return null;
+    if (token.owner !== null && typeof token.owner?.key !== "string") return null;
+    if (token.owner === null && !Array.isArray(token.queue)) return null;
+    return { ...token, schema: TOKEN_SCHEMA, queue: Array.isArray(token.queue) ? token.queue : [] };
   } catch {
     return null;
   }
@@ -116,7 +119,7 @@ export function readToken(dir) {
  * @returns {object|null}
  */
 export function tokenHolder(token, { now, idleMs = DEFAULT_TOKEN_IDLE_MS, isAlive = isOwnerAlive }) {
-  if (!token) return null;
+  if (!token?.owner) return null;
   const touched = Date.parse(token.touchedAt);
   if (!Number.isFinite(touched) || now - touched >= idleMs) return null;
   return isAlive(token.owner) ? token : null;
@@ -137,12 +140,21 @@ export function tokenHolder(token, { now, idleMs = DEFAULT_TOKEN_IDLE_MS, isAliv
  * @param {number} [args.lockWaitMs]
  * @returns {{taken: true, token: object}|{taken: false, holder: object}}
  */
-export function takeToken(dir, { repoKey, owner, branch, kind, now = Date.now(), idleMs, isAlive, lockWaitMs }) {
+export function takeToken(dir, { repoKey, owner, branch, kind, now = Date.now(), idleMs, isAlive = isOwnerAlive, lockWaitMs, tasks = [] }) {
   return withLock(
     dir,
     () => {
-      const holder = tokenHolder(readToken(dir), { now, idleMs, isAlive });
-      if (holder && holder.owner.key !== owner.key) return { taken: false, holder };
+      const previous = readToken(dir);
+      const holder = tokenHolder(previous, { now, idleMs, isAlive });
+      let queue = queueEnabled(dir) ? reserveQueue(previous?.queue ?? [], { now, held: !!holder, isAlive, tasks }) : [];
+      if ((holder && holder.owner.key !== owner.key) || (!holder && queue.length && queue[0].owner.key !== owner.key)) {
+        if (queueEnabled(dir) && !queue.some((e) => e.owner.key === owner.key)) {
+          queue.push({ owner, branch: branch ?? null, joinedAt: new Date(now).toISOString(), reservedUntil: null });
+          queue = reserveQueue(queue, { now, held: !!holder, isAlive, tasks });
+        }
+        writeAtomic(tokenPath(dir), { ...previous, schema: TOKEN_SCHEMA, owner: holder?.owner ?? null, queue });
+        return { taken: false, holder, queue, position: queue.findIndex((e) => e.owner.key === owner.key) + 1 };
+      }
       const at = new Date(now).toISOString();
       const token = {
         schema: TOKEN_SCHEMA,
@@ -152,6 +164,7 @@ export function takeToken(dir, { repoKey, owner, branch, kind, now = Date.now(),
         kind,
         takenAt: holder?.takenAt ?? at,
         touchedAt: at,
+        queue: queue.filter((e) => e.owner.key !== owner.key).map((e) => ({ ...e, reservedUntil: null })),
       };
       writeAtomic(tokenPath(dir), token);
       return { taken: true, token };
@@ -169,10 +182,10 @@ export function takeToken(dir, { repoKey, owner, branch, kind, now = Date.now(),
  * @returns {boolean} true when the owner holds the token
  */
 export function touchToken(dir, ownerKey, { now = Date.now() } = {}) {
-  if (readToken(dir)?.owner.key !== ownerKey) return false;
+  if (readToken(dir)?.owner?.key !== ownerKey) return false;
   return withLock(dir, () => {
     const token = readToken(dir);
-    if (token?.owner.key !== ownerKey) return false;
+    if (token?.owner?.key !== ownerKey) return false;
     writeAtomic(tokenPath(dir), { ...token, touchedAt: new Date(now).toISOString() });
     return true;
   });
@@ -185,11 +198,53 @@ export function touchToken(dir, ownerKey, { now = Date.now() } = {}) {
  * @param {string} ownerKey
  * @returns {boolean} true when a token was released
  */
-export function releaseToken(dir, ownerKey) {
-  if (readToken(dir)?.owner.key !== ownerKey) return false;
+export function releaseToken(dir, ownerKey, { now = Date.now(), isAlive = isOwnerAlive } = {}) {
+  if (readToken(dir)?.owner?.key !== ownerKey) return false;
   return withLock(dir, () => {
-    if (readToken(dir)?.owner.key !== ownerKey) return false;
-    fs.rmSync(tokenPath(dir), { force: true });
+    const token = readToken(dir);
+    if (token?.owner?.key !== ownerKey) return false;
+    const queue = queueEnabled(dir) ? reserveQueue(token.queue, { now, held: false, isAlive }) : [];
+    if (queue.length) writeAtomic(tokenPath(dir), { ...token, owner: null, queue });
+    else fs.rmSync(tokenPath(dir), { force: true });
+    return true;
+  });
+}
+
+function queueEnabled(dir) {
+  return !fs.existsSync(path.join(dir, "queue.off")) && !fs.existsSync(path.join(dir, "..", "queue.off"));
+}
+
+/** Refresh the queue under its token lock, including expiry and dead owners.
+ * @param {string} dir
+ * @param {object} [opts]
+ * @returns {object[]}
+ */
+export function tokenQueue(dir, opts = {}) {
+  return withLock(dir, () => {
+    const token = readToken(dir);
+    if (!token) return [];
+    const options = { now: Date.now(), isAlive: isOwnerAlive, ...opts };
+    const queue = queueEnabled(dir) ? reserveQueue(token.queue, { ...options, held: !!tokenHolder(token, options) }) : [];
+    writeAtomic(tokenPath(dir), { ...token, queue });
+    return queue;
+  });
+}
+
+/** Remove a session's reservation without releasing another session's token.
+ * @param {string} dir
+ * @param {string} ownerKey
+ * @param {object} [opts]
+ * @returns {boolean}
+ */
+export function leaveTokenQueue(dir, ownerKey, opts = {}) {
+  return withLock(dir, () => {
+    const token = readToken(dir);
+    if (!token) return false;
+    const kept = token.queue.filter((e) => e.owner.key !== ownerKey);
+    if (kept.length === token.queue.length) return false;
+    const options = { now: Date.now(), isAlive: isOwnerAlive, ...opts };
+    const queue = reserveQueue(kept, { ...options, held: !!tokenHolder(token, options) });
+    writeAtomic(tokenPath(dir), { ...token, queue });
     return true;
   });
 }
@@ -299,11 +354,15 @@ function describeHolder(holder, now) {
  * @param {number} args.idleMs
  * @returns {string}
  */
-export function formatTokenDeny({ repoKey, holder, action, cli, now, idleMs }) {
+export function formatTokenDeny({ repoKey, holder, action, cli, now, idleMs, position = 0 }) {
+  const ordinal = position % 100 >= 11 && position % 100 <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[position % 10] ?? "th");
+  const queued = position ? `You are ${position}${ordinal} in the queue. Retry after its merge is recorded, or run ${cli} token leave.` : "";
+  if (!holder) return `The merge token for ${repoKey} is reserved for the queue head. ${queued}`;
   const owner = `"${holder.owner.name ?? `pid ${holder.owner.pid}`}"`;
   return [
     `dotbabel fleet: the live Claude Code session ${owner} holds the merge token for ${repoKey} (${describeHolder(holder, now)}).`,
     `This ${action} is blocked. Only one session at a time rebases onto the base, attests, and merges in a repo, so that two pull requests do not both pass against an old base.`,
+    ...(queued ? [queued] : []),
     "Do this:",
     `1. SendMessage ${owner}. Ask when it merges, or ask it to give the token back with: ${cli} token release`,
     "2. Continue with other work, then try again.",

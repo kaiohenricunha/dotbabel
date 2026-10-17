@@ -252,6 +252,24 @@
           }
         }
       }
+    },
+    "decider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter", "steps"],
+      "description": "Opt-in model decisions need this committed repository consent and a user TYPESAFE_API_KEY. Unadopted steps run only in shadow mode.",
+      "properties": {
+        "adapter": {
+          "enum": ["builtin", "jev"]
+        },
+        "steps": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": ["review-triage", "retry", "dispatch"]
+          }
+        }
+      }
     }
   },
   "$defs": {

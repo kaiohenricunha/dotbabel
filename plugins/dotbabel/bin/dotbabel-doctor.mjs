@@ -16,6 +16,7 @@
  *                (user, project, local) or the shell prefix (warn only)
  *   receipts     /pr-conductor run receipts and spot-check logs under the git
  *                common directory read with their writers' validators (warn only)
+ *   hosts        each CLI's host adapter and the state of its fleet capabilities (static table)
  *   attestation  .dotbabel.json attestation policy coherent with the local-attest config
  *   bootstrap    ~/.claude/CLAUDE.md and supported CLI symlinks present
  *                (informational — warn only)
@@ -69,11 +70,14 @@ import {
   resolveGlobalInstructionPath,
   resolveGlobalSkillsDir,
 } from "../src/agents.mjs";
+import { describeHostAdapter, listHostAdapters } from "../src/fleet/host-adapter.mjs";
+import { describePlatformAdapter, platformAdapter } from "../src/fleet/platform-adapter.mjs";
+import { deciderContext, describeDecider } from "../src/decider-config.mjs";
 
 const META = {
   name: "dotbabel-doctor",
   synopsis: "dotbabel-doctor [OPTIONS]",
-  description: "Run the harness self-diagnostic across env, repo, facts, manifest, specs, drift, and hooks.",
+  description: "Run the harness self-diagnostic across env, repo, facts, manifest, specs, drift, hooks, and host adapters.",
   flags: {
     "repo-root": { type: "string" },
     "install-hooks": { type: "boolean" },
@@ -315,6 +319,17 @@ let stopHookRegistered = false;
     );
   }
 }
+
+// host adapters. One line per CLI with the state of each fleet capability,
+// from the static table in host-adapter.mjs: nothing is probed. A CLI with
+// no adapter is informational, never a failure: the fleet is off there.
+for (const host of listHostAdapters()) {
+  if (host.adapter) out.pass(describeHostAdapter(host));
+  else out.info(describeHostAdapter(host));
+}
+out.info(describePlatformAdapter(platformAdapter()));
+try { out.info(describeDecider(deciderContext(ctx.repoRoot))); }
+catch { out.warn("decider: repository or configuration unavailable"); }
 
 if (argv.flags["install-hooks"]) {
   try {

@@ -1,6 +1,6 @@
 # Fleet: file claims, CPU lanes, merge events, and the merge token across Claude Code sessions
 
-_Last updated: v4.0.1_
+_Last updated: v4.1.0_
 
 When several Claude Code sessions work on one machine, they get in each
 other's way in three places:
@@ -156,6 +156,48 @@ Environment variables take precedence:
 | `DOTBABEL_FLEET_TOKEN_IDLE_MINUTES` | Overrides `token_idle_minutes`                            |
 | `DOTBABEL_FLEET_STATE_DIR`          | Ledger root (default `$XDG_STATE_HOME/dotbabel/fleet`)    |
 | `CLAUDE_CONFIG_DIR`                 | Where Claude Code keeps `sessions/` (default `~/.claude`) |
+
+## Host adapters
+
+The fleet needs six things from the CLI that hosts a session. A host adapter
+declares each one as `supported`, `unsupported`, or `unverified`, and
+`unverified` never counts as `supported`. The descriptor follows the
+operation-capability shape of the Model Intelligence spec
+(`docs/specs/model-intelligence/spec/5-interfaces-apis.md`): each capability
+carries its support state, whether it needs the network or existing
+credentials, whether its answer can be cached, and whether it may execute a
+model.
+
+| Capability     | What the fleet uses it for                              |
+| -------------- | ------------------------------------------------------- |
+| `identity`     | Which session runs this process                         |
+| `liveness`     | Whether a session that holds a claim is still alive     |
+| `preEdit`      | A hook before a file edit, where a claim is checked     |
+| `preBash`      | A hook before a shell command, where a lane is taken    |
+| `postTool`     | A hook after a tool call, where a hook result is read   |
+| `sessionStart` | A hook at session start, where the live claims are told |
+
+Claude Code is the host adapter today: its session registry gives identity
+and liveness (`plugins/dotbabel/src/fleet/registry.mjs`), and its
+`PreToolUse`, `PostToolUse`, and `SessionStart` hooks plus the shell prefix
+give the four hook points ([hooks.md](./hooks.md)). Every other CLI that
+dotbabel knows reports every capability as `unsupported` until its hooks and
+session identity are verified. A fleet feature that needs an unsupported
+capability is off for that host, and `dotbabel doctor` prints one line per
+CLI with the state of each capability, so the gap is visible rather than a
+silent failure. The table lives in
+`plugins/dotbabel/src/fleet/host-adapter.mjs`.
+
+`DOTBABEL_FLEET_HOST` selects the host adapter; it defaults to `claude` for
+existing hook installations. Selecting an unsupported host disables identity
+and resource claims. It does not delete another host's state. The
+[Phase 2 research](specs/graph-engineering/research/phase-2-0-hosts.md) records
+the upstream hook evidence and the missing identity bridges.
+
+The platform adapter enables the Linux `taskset`/`flock` backend and the
+systemd CPU share where their tools are available. macOS, Windows, and unknown
+platforms report `unsupported` and run commands directly. Doctor prints those
+capability states. No unverified platform backend is enabled.
 
 ## Limits of the claims
 
@@ -501,17 +543,43 @@ so that a recorded merge frees the token.
 | `dotbabel fleet token [--json]` | Show who holds the token of this repository              |
 | `dotbabel fleet token take`     | Take the token before a manual rebase, attest, and merge |
 | `dotbabel fleet token release`  | Give the token back                                      |
+| `dotbabel fleet token leave`    | Remove this session from the merge queue                 |
 
 `take` exits 1 and names the holder when a live peer holds the token.
 `release` exits 1 when this session holds no token. `board` also shows the
 holder.
+
+### Merge queue
+
+A denied token command joins a reservation queue. The deny reason gives the
+session's position. `dotbabel fleet token --json` returns `holder` and `queue`;
+each entry contains its owner, branch, arrival time, and reservation expiry.
+The text command prints the same order below the holder.
+
+Task dependencies order the queue before arrival time. Unrelated sessions keep
+their arrival order. A transitive dependency also orders sessions, through each
+task's recorded branch. A session with no matching task uses arrival order.
+The current holder keeps its token. When it releases or exits, only the queue
+head can take the free token. A head that does not retry loses its reservation
+after ten minutes. It rejoins at the end on its next retry. Dead owners leave
+the queue, and `token leave` removes a session without releasing another
+session's token. Nothing waits inside a hook.
+
+Create `<fleet-state>/queue.off` to turn queue enforcement off immediately.
+The directory is `DOTBABEL_FLEET_STATE_DIR`, or
+`${XDG_STATE_HOME:-$HOME/.local/state}/dotbabel/fleet`. The existing token still
+excludes concurrent holders. Remove the file to enable the queue again.
+
+The token reader accepts version 1 records. Writers use version 2. A free
+token can retain its queue with `owner: null`; old token commands must not run
+beside the version 2 writer because they do not understand reservations.
 
 ### Limits of the merge token
 
 - **Only the command text is read.** A script that rebases or merges, a merge
   in the GitHub web interface, and a rebase that names no base branch take no
   token.
-- **The token does not wait.** A blocked session tries again later; nothing
-  queues it.
+- **The token does not wait.** A blocked session joins the reservation queue
+  and tries again later. The queue never starts its command for it.
 - **An idle hour frees the token** even when its holder still means to merge.
   The next token command takes it again if it is free.

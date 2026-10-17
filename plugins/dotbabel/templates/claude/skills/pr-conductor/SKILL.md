@@ -68,7 +68,7 @@ The canonical order lives in code, not here: `CONDUCTOR_PHASES` in `plugins/dotb
 Record every phase attempt, so the history of this pull request lives outside the conversation. When a phase ends — pass, fail, a hard stop, or a self-skip — run:
 
 ```bash
-dotbabel pr-stack record --pr <N> --phase <id> --outcome pass|fail|blocked|skipped [--reason <CODE>] [--evidence <url>]
+dotbabel pr-stack record --pr <N> --phase <id> --outcome pass|fail|blocked|skipped [--reason <CODE>] [--evidence <url>] [--decisions <file>]
 ```
 
 Pass `--reason` with the blocking code a phase stopped on, and `--evidence` with the link to each evidence comment it posted. Record the outcome you observed, never the one you hope for: the receipt is self-reported, nothing checks it against the evidence comments, and it is never evidence itself — the merge gate does not read it. Under `NO_PR`, phase 1 has no number yet: record it right after phase 2 opens the pull request. Exit `2` means the receipt is unavailable (no `gh`, a damaged file): say so in the summary and continue the current attempt. A missing receipt never blocks a phase's first attempt, but it does block a retry: the attempt cap counts only what was recorded (see Attempt cap). `dotbabel doctor` lists a damaged receipt under `run receipts`, with the pull request it blocks.
@@ -104,6 +104,29 @@ dotbabel pr-stack record --pr <N> --phase <id> --outcome skipped --reason USER_A
 ```
 
 That resets the phase's count and never reads as a pass. Record it only on the user's explicit go-ahead in this session. Never record a `pass`, edit or delete the receipt, or change `conductor` in `.dotbabel.json` to free the budget.
+
+After a passing budget gate, write only `{phase, attempt, failure_tail}` to a
+private temporary JSON file outside the repository. `attempt` is the phase's
+recorded consecutive failure count. Run:
+
+```bash
+dotbabel decide --step retry --base-ref "$PR_BASE_REF" < "$DECISION_INPUT" > "$DECISION_OUTPUT"
+```
+
+Follow `answer`: `fix` repairs the cause before another attempt, `retry` repeats
+the permitted attempt, and `ask-owner` stops. Set `PR_BASE_REF` to the fetched
+remote base ref used by the budget gate. The built-in rule selects `fix` below
+that base's phase cap, and `ask-owner` at the cap. The base-ref budget gate still
+applies first, including lower per-phase limits.
+A decider answer never resets or overrides that gate. After explicit owner
+permission, the skipped `USER_ALLOWED_RETRY` record resets the failure count;
+do not call the retry decider with an attempt of zero.
+
+On exit 2 or 64, keep the passing budget gate and use the existing repair
+process. Never follow a `shadow` answer: no model step is adopted. Collect the
+decision with the next phase attempt's other decisions in a private JSON array,
+then pass `--decisions "$DECISIONS_FILE"` to that attempt's `pr-stack record`.
+Never include the failure input or a key in the receipt.
 
 ## Steps
 
