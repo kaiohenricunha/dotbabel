@@ -1,6 +1,6 @@
 # Template catalog
 
-_Last updated: v4.1.0_
+_Last updated: v4.2.0_
 
 Every file under `plugins/dotbabel/templates/` is written verbatim into a
 consumer repo by `dotbabel-init`, with `{{placeholder}}` tokens substituted
