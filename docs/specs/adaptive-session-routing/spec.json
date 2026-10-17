@@ -1,0 +1,369 @@
+{
+  "id": "adaptive-session-routing",
+  "title": "Project opt-in adaptive main-session model and reasoning routing",
+  "status": "approved",
+  "owners": ["@kaiohenricunha"],
+  "linked_paths": [
+    "plugins/dotbabel/src/adaptive-session-routing/**",
+    "plugins/dotbabel/tests/adaptive-session-routing-*.test.mjs",
+    "plugins/dotbabel/tests/integration/adaptive-session-routing-*.integration.test.mjs"
+  ],
+  "acceptance_commands": [
+    "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
+    "node plugins/dotbabel/bin/dotbabel-criteria.mjs verify --spec adaptive-session-routing --allow-project-commands"
+  ],
+  "depends_on_specs": ["model-intelligence"],
+  "active_prs": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "status": "active",
+      "given": "project isolation",
+      "when": "runs enabled and disabled projects concurrently without policy or activation leakage",
+      "then": "simultaneous enabled/disabled projects retain distinct activation and policy",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-activation.test.mjs",
+          "name": "runs enabled and disabled projects concurrently without policy or activation leakage"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-activation.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/adaptive-session-routing-AC-1.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/adaptive-session-routing-AC-1.junit.xml"
+      }
+    },
+    {
+      "id": "AC-2",
+      "status": "active",
+      "given": "independent activation",
+      "when": "requires independent explicit boolean opt-ins for intelligence and routing",
+      "then": "engine and routing require independent explicit boolean opt-ins",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-activation.test.mjs",
+          "name": "requires independent explicit boolean opt-ins for intelligence and routing"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/model-intelligence-activation.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/adaptive-session-routing-AC-2.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/adaptive-session-routing-AC-2.junit.xml"
+      }
+    },
+    {
+      "id": "AC-3",
+      "status": "planned",
+      "given": "disabled path",
+      "when": "disabled routing performs no discovery classification application or writes",
+      "then": "disabled automatic routing invokes no discovery classifier runtime or mutation",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "disabled routing performs no discovery classification application or writes"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-3.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-3.junit.xml"
+      }
+    },
+    {
+      "id": "AC-4",
+      "status": "planned",
+      "given": "normal prompt",
+      "when": "routes an ordinary main-session prompt before execution",
+      "then": "selected model and effort apply before the original main prompt executes",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "routes an ordinary main-session prompt before execution"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-4.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-4.junit.xml"
+      }
+    },
+    {
+      "id": "AC-5",
+      "status": "planned",
+      "given": "conversation continuity",
+      "when": "two configurations retain the same thread and original input exactly once",
+      "then": "different consecutive routes retain the thread and submit each original input once",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing-codex.test.mjs",
+          "name": "two configurations retain the same thread and original input exactly once"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing-codex.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-5.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-5.junit.xml"
+      }
+    },
+    {
+      "id": "AC-6",
+      "status": "planned",
+      "given": "manual overrides",
+      "when": "preserves manual model and effort independently",
+      "then": "an explicit manual model or effort remains authoritative per axis",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "preserves manual model and effort independently"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-6.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-6.junit.xml"
+      }
+    },
+    {
+      "id": "AC-7",
+      "status": "planned",
+      "given": "agent independence",
+      "when": "never changes a subagent configuration",
+      "then": "main-session routing leaves subagent compute configuration unchanged",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing-claude.test.mjs",
+          "name": "never changes a subagent configuration"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing-claude.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-7.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-7.junit.xml"
+      }
+    },
+    {
+      "id": "AC-8",
+      "status": "planned",
+      "given": "floors and pins",
+      "when": "never reports a below-floor manual pin as satisfied",
+      "then": "pins and mandatory floors are honored and a violation is never reported satisfied",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "never reports a below-floor manual pin as satisfied"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-8.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-8.junit.xml"
+      }
+    },
+    {
+      "id": "AC-9",
+      "status": "planned",
+      "given": "safe fallback",
+      "when": "uncertain classification and failed application preserve current configuration",
+      "then": "failures preserve safe configuration and expose stable diagnostic codes",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "uncertain classification and failed application preserve current configuration"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-9.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-9.junit.xml"
+      }
+    },
+    {
+      "id": "AC-10",
+      "status": "planned",
+      "given": "fixture evaluation",
+      "when": "evaluates representative engineering scenarios with explicit uncertainty",
+      "then": "representative task fixture results report confidence and known limitations",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing-classifier.test.mjs",
+          "name": "evaluates representative engineering scenarios with explicit uncertainty"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing-classifier.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-10.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-10.junit.xml"
+      }
+    },
+    {
+      "id": "AC-11",
+      "status": "planned",
+      "given": "Claude real runtime",
+      "when": "observes selected model and effort in a real Claude main-session turn",
+      "then": "real Claude evidence identifies the effective model and effort on a main turn",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/integration/adaptive-session-routing-claude.integration.test.mjs",
+          "name": "observes selected model and effort in a real Claude main-session turn"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/integration/adaptive-session-routing-claude.integration.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-11.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-11.junit.xml"
+      }
+    },
+    {
+      "id": "AC-12",
+      "status": "planned",
+      "given": "Codex real runtime",
+      "when": "observes two effective configurations in one real Codex thread",
+      "then": "real Codex evidence identifies two effective routes on one retained thread",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/integration/adaptive-session-routing-codex.integration.test.mjs",
+          "name": "observes two effective configurations in one real Codex thread"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/integration/adaptive-session-routing-codex.integration.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-12.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-12.junit.xml"
+      }
+    },
+    {
+      "id": "AC-13",
+      "status": "planned",
+      "given": "runtime limitations",
+      "when": "unsupported or unverified routing never appears active",
+      "then": "status does not report an unsupported or unverified mechanism as active",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "unsupported or unverified routing never appears active"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-13.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-13.junit.xml"
+      }
+    },
+    {
+      "id": "AC-14",
+      "status": "planned",
+      "given": "performance",
+      "when": "warm local classification and routing p95 is at most 25 ms",
+      "then": "warmed local decision p95 is at most 25 milliseconds over 1000 calls",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "name": "warm local classification and routing p95 is at most 25 ms"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-14.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-14.junit.xml"
+      }
+    }
+  ]
+}
