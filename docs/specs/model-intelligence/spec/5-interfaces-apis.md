@@ -185,6 +185,12 @@ Generation: `ai-review.source.yml` + `ai-review.compute.yml` + shipped policy + 
 
 Decided by the owner on 2026-09-18. `model_intelligence` is the project-level namespace for Model Intelligence configuration in `.dotbabel.json`. It follows the snake_case convention of the existing multiword keys (`fan_out`, `fan_out_layout`, `rule_floor_source`, `cli_substitutions`; `.dotbabel.json:6-7`). A top-level `models` key is not used, because it could be read as a literal model catalog or model-definition map. The object contains policy/configuration overrides only. It is never a persistent store for discovered models, resolved recommendations, cache evidence, generated projections, or release snapshot data; those remain in the stores of §3 (ARCH-20, ARCH-22). A command that mutates this object follows the read-modify-write lock of ARCH-63.
 
+### Activation flags — 2026-10-16 amendment
+
+`model_intelligence.enabled` and `model_intelligence.adaptive_routing.enabled` are optional strict booleans defaulting to false. The latter is effective only when both are true; it is permission for a verified integration, not proof that one is active. `models enable|disable [--routing] [--repo-root <path>] [--json]` changes only project flags under ARCH-63. Disabling retains policy and user-owned artifacts. No global runtime settings change. The linked routing spec documents runtime reload/restart requirements.
+
+Status adds `activation: {enabled, routingRequested, routingEnabled}`. `routingEnabled` means effective project permission; observed runtime activity must be reported separately. Diagnostic refresh/resolve/recommend remain explicitly requested operations when disabled.
+
 ## Source Adapter Contract
 
 Decided by the owner on 2026-09-18. Every runtime and external knowledge source implements the same descriptor envelope (ARCH-12, ARCH-25, ARCH-50). The quality layer's adapter registry is the in-repo precedent for a descriptor with explicit availability and source fields.
@@ -290,6 +296,10 @@ invocation:
 ```
 
 This is different from artifact binding. A runtime can support selecting a model on its CLI while having no verified way to bind that model to a skill (ARCH-50).
+
+### Main-session capability extension — 2026-10-16 amendment
+
+Runtime capability data additionally distinguishes the main-session mechanism, model and effort override support, manual-selection provenance and effective-axis observation. Each uses the existing `supported | unsupported | unverified` vocabulary with versioned evidence. An absent extension is unverified, never supported. The linked routing spec defines its application contract; the resolver continues to consume plain supplied data and performs no runtime call.
 
 ### Adapter calls
 

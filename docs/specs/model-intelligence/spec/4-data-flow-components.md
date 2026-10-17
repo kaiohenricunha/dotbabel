@@ -212,6 +212,11 @@ Runtime projection is capability-gated per runtime, artifact kind, and configura
 
 KD-1 through KD-6 define the artifact declaration, Claude materialization, plugin baseline, cross-runtime fan-out, runtime-specific skill projection, and deterministic workflow projection contracts that implement this architecture.
 
+### Project activation boundary — 2026-10-16
+
+- **ARCH-73:** Project activation is read exclusively from `.dotbabel.json`. Both engine and adaptive routing default to disabled. Automatic consumers check activation before discovery, classification, resolution or mutation. Shared caches never store project flags, policy or prompt content. Explicit diagnostics do not implicitly opt a project in.
+- **ARCH-74:** Runtime capability evidence separates artifact binding, invocation, main-session turn overrides and observation of effective axes. Supported discovery or invocation does not prove main-session routing. Adaptive application lives in the linked spec and uses this subsystem's shared resolver. Disabled projects preserve existing behavior and native agent configuration.
+
 ### Key Decisions
 
 #### KD-1: Artifacts declare Model Intelligence intent in new Dotbabel-namespaced frontmatter
