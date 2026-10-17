@@ -235,7 +235,13 @@ if (cLayoutRuns.length) {
   );
 }
 for (const a of trials.filter((t) => t.phase === "C-abort")) {
-  out.push(`Stopped without data before ${a.label}: foreign load ${fmt(a.foreign_permille / 10)}% did not go down.`, "");
+  const why =
+    a.reason === "cutoff"
+      ? "the cutoff time came, so no new run started"
+      : a.reason === "deadline"
+        ? "the latest start time came before the host was quiet"
+        : `foreign load ${fmt(a.foreign_permille / 10)}% did not go down`;
+  out.push(`Stopped before ${a.label}: ${why}.`, "");
 }
 const arrivals = trials.filter((t) => {
   if (t.phase !== "C") return false;
