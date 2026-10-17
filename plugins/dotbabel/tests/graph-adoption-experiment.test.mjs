@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 it("the locked adoption protocol and its real CLI contracts pass offline", () => {
   const root = fileURLToPath(new URL("../../../", import.meta.url));
-  const result = spawnSync(process.execPath, ["--test",
+  const result = spawnSync(process.execPath, ["--test", "--test-reporter=tap",
     "docs/experiments/graph-step-adoption/protocol.test.mjs",
     "docs/experiments/graph-step-adoption/run.test.mjs"],
   { cwd: root, encoding: "utf8", timeout: 25000 });
