@@ -2,6 +2,10 @@
 
 _Last updated: v4.1.0_
 
+For persistent Main/Advisor messages and investigation queues across Claude and
+Codex, see [Peer collaboration](peer-collaboration.md). Fleet continues to own
+file claims, CPU lanes, and merge coordination.
+
 When several Claude Code sessions work on one machine, they get in each
 other's way in three places:
 
