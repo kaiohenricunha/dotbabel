@@ -185,6 +185,13 @@
       "lastValidated": "2026-10-16"
     },
     {
+      "name": "peer",
+      "path": ".claude/skills/peer/SKILL.md",
+      "checksum": "sha256:a31f68110adf5b18f669abfbcfb17042b9fffe9ced4e6f0545e3324cd2e98e19",
+      "dependencies": [],
+      "lastValidated": "2026-10-16"
+    },
+    {
       "name": "plan-grader",
       "path": ".claude/skills/plan-grader/SKILL.md",
       "checksum": "sha256:ddc99e19327ee84c65a7bfb9adb5ffc7d67550201f5f3e2c56d935d95bb9957f",

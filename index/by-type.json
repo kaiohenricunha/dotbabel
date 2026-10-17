@@ -48,6 +48,7 @@
     "kubernetes-specialist",
     "language-review",
     "local-attest",
+    "peer",
     "plan-grader",
     "post-pr-review",
     "pr-conductor",

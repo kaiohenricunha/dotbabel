@@ -1,6 +1,10 @@
 # Fleet: file claims, CPU lanes, merge events, and the merge token across Claude Code sessions
 
-_Last updated: v4.1.0_
+_Last updated: v4.2.0_
+
+For persistent Main/Advisor messages and investigation queues across Claude and
+Codex, see [Peer collaboration](peer-collaboration.md). Fleet continues to own
+file claims, CPU lanes, and merge coordination.
 
 When several Claude Code sessions work on one machine, they get in each
 other's way in three places:

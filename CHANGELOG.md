@@ -10,6 +10,18 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [4.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.1.0...v4.2.0) (2026-10-17)
+
+
+### Added
+
+* **peer:** add persistent Claude and Codex collaboration ([#493](https://github.com/kaiohenricunha/dotbabel/issues/493)) ([ecf8293](https://github.com/kaiohenricunha/dotbabel/commit/ecf82931cb50e741a6b796a027c5388abffb9814))
+
+
+### Fixed
+
+* **tests:** pin TAP reporter for Node 24 adoption checks ([#494](https://github.com/kaiohenricunha/dotbabel/issues/494)) ([4f95a97](https://github.com/kaiohenricunha/dotbabel/commit/4f95a976d0208f03efb9e04205ecb7fa930125b4))
+
 ## [4.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.0.1...v4.1.0) (2026-10-17)
 
 
