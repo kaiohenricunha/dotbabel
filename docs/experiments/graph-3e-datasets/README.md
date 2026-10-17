@@ -115,3 +115,51 @@ node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experime
 ```
 
 Synthetic data appears only in isolated tool tests. It never enters an experimental dataset.
+
+## Local failure recovery and wider review collection
+
+Use `recovery.mjs` to read explicit Claude transcript directories and preserve relevant tool outputs.
+Resolve those directories through `dotbabel handoff`; do not search the home directory.
+The recovery configuration contains `repositories`, each with a GitHub `repo` name and explicit
+`session_roots`. The scanner reads top-level UUID transcripts in those directories.
+It never executes a recovered command. It excludes conflicting tool results and request blobs.
+The scanner retains source hashes, line references, sanitized tool events, literal roster requests,
+and attestation logs from scratch directories explicitly referenced by source commands.
+A roster request alone does not confirm a historical dispatch.
+
+```bash
+node docs/experiments/graph-3e-datasets/recovery.mjs scan /private/recovery-config.json /private/recovery-run
+node docs/experiments/graph-3e-datasets/recovery.mjs link /private/recovery-run /private/sealed-parent /private/retry-links.json
+node docs/experiments/graph-3e-datasets/recovery.mjs expand-dispatch /private/recovery-run /private/sealed-parent
+node docs/experiments/graph-3e-datasets/recovery.mjs pin-dispatch /private/recovery-run
+node docs/experiments/graph-3e-datasets/recovery.mjs seal /private/recovery-run /private/sealed-parent
+node docs/experiments/graph-3e-datasets/recovery.mjs validate /private/recovery-run /private/sealed-parent
+```
+
+The explicit retry link map supplies a parent case `id` and an `invocation_tool_id`.
+Use `log_ref` for a retained original log. Alternatively, supply `failure_tool_id`,
+`original_log_path`, and an optional `header_tool_id` for original tool-output excerpts.
+The collector checks the invocation, PR, commit prefix, original log path, receipt timestamp,
+operational phase, and consecutive attempt. Diagnostic runs and capped attempts remain excluded.
+An independently recovered header stays outside the failure excerpt supplied to a model.
+
+Review expansion reads every PR in the parent metadata pool, including final-head exclusions.
+It considers each distinct review head with an explicit same-head specialist roster.
+It retrieves pinned comparisons and historical facts before creating an annotation input.
+Missing patches, incomplete review pagination, unsupported rosters, and failed reads stay unknown.
+The comparison uses the retained PR base and the original review head; it does not establish a
+different historical target branch that the source records do not preserve.
+
+The outputs `retry-annotation-input.jsonl` and `dispatch-annotation-input.jsonl` contain **unlabeled
+inputs**, not new verified primary rows. `recovery-manifest.json` hashes the private bundle and binds
+the unchanged parent manifest and protocol. Keep failed intermediate runs separate from the sealed run.
+The parent dataset remains unchanged. Independent annotations, separate verification, sufficient
+samples, and protocol provenance compatibility are still required before replay.
+
+Run the recovery tests with the existing preparation and protocol tests:
+
+```bash
+node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experiments/graph-step-adoption/run.test.mjs docs/experiments/graph-3e-datasets/prepare.test.mjs docs/experiments/graph-3e-datasets/recovery.test.mjs
+```
+
+See [the recovery report](recovery-report.md) for the actual source coverage and remaining gaps.
