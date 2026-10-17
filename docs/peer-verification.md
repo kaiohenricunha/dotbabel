@@ -1,6 +1,6 @@
 # Peer collaboration verification — 2026-10-16
 
-_Last updated: v4.0.1_
+_Last updated: v4.1.0_
 
 ## Current result
 

@@ -10,6 +10,15 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+## [4.1.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.0.1...v4.1.0) (2026-10-17)
+
+
+### Added
+
+* **graph:** add coordination, bounded decisions, and offline exports ([#492](https://github.com/kaiohenricunha/dotbabel/issues/492)) ([7ef7831](https://github.com/kaiohenricunha/dotbabel/commit/7ef78317f0a45aefa3e2f33e2715cfb19ecb70e7))
+* **skills:** add language-review, a read-only multilingual editorial review skill ([#489](https://github.com/kaiohenricunha/dotbabel/issues/489)) ([c55d4f9](https://github.com/kaiohenricunha/dotbabel/commit/c55d4f91a95681d858ca651c8483c3dd4ebef7b9))
+* **yolo:** require duration and make scope optional ([#491](https://github.com/kaiohenricunha/dotbabel/issues/491)) ([0e766b5](https://github.com/kaiohenricunha/dotbabel/commit/0e766b5445f3d14708018b24932045cd452dcf15))
+
 ## [4.0.1](https://github.com/kaiohenricunha/dotbabel/compare/v4.0.0...v4.0.1) (2026-10-15)
 
 
