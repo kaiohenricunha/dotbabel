@@ -2,7 +2,7 @@
  * Project-local activation boundary (ARCH-73). No user/global activation exists.
  * Read operations never discover models, invoke a runtime, or write configuration.
  */
-import * as fs from "node:fs";
+import fs from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
@@ -48,8 +48,9 @@ function readDocument(file) {
     fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
     const stat = fs.fstatSync(fd);
     if (!stat.isFile() || stat.size > MAX_CONFIG_BYTES) throw failure("project_config_unavailable");
+    const text = fs.readFileSync(fd, "utf8");
     let document;
-    try { document = JSON.parse(fs.readFileSync(fd, "utf8")); }
+    try { document = JSON.parse(text); }
     catch { throw failure("invalid_project_config"); }
     projectActivation(document);
     return { document, mode: stat.mode & 0o777 };

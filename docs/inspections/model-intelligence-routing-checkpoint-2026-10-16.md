@@ -45,3 +45,17 @@ PR #486 isolated verification worktree `.claude/worktrees/mi-runner-verification
 Validate and finish activation/spec unit; integrate latest main including the runner repair; commit and open its scoped PR. Then write P-10/P-11 resolver composition/enforcement tests before implementation, following the supplied catalog and policy shapes. Add routing classification after the spec boundary is stable; do not wait for every artifact migration to start independent classifier work.
 
 The abandoned peer task's worktree `.claude/worktrees/peer-collaboration-complete` is preserved and is outside this scope. No peer changes are imported here. Original model-intelligence and other sessions' worktrees are untouched.
+
+## Activation unit evidence update — 2026-10-17
+
+Activation implementation commit `0b0b981`; main integration commit `cca5ef7`. Main includes the verified runner repair through #492 and release #490. Renewed authorization starts 2026-10-17 04:23:33 UTC and expires 2026-10-17 16:23:33 UTC; merge yes, same scope and stops.
+
+The first PR quality run is invalid: dependency reinstallation overlapped execution and caused missing package files. Dependencies are fully installed before subsequent runs. The second completed PR quality run exits 0 with warning verdict and no environment error. A final run after failure-boundary changes is pending; no failing gate is waived.
+
+Activation now has 26 passing tests, including malformed input, maximum size, I/O failures, live-lock refusal and concurrent project isolation. The repaired Stryker runner scores 87.66%, 129 killed, 6 timeout, 16 survived, 3 uncovered, zero zero-test survivors. The threshold remains 85. Last successful scoped coverage before expanded fault tests: 96.49% lines, 86.95% branches, 100% functions, 91.78% statements. All 12 existing models Bats tests pass. Both original-spec AC-26/AC-27 and linked-spec AC-1/AC-2 pass; all remaining criteria remain planned.
+
+The documented CLI feature run on an isolated project proves enable, routing opt-in, status, routing disable and engine disable. It changes no global runtime settings. `npm run lint` passes; 10 specs validate. No initiative PR has been opened yet.
+
+Resolver worktree `.claude/worktrees/model-intelligence-resolver`, branch `feat/model-intelligence-resolver`, starts at `f368fe6`. P-10's missing-module baseline is recorded; 15 composition tests now pass. P-11 initially fails six enforcement/explanation cases as expected; implementation is in progress. Current resolver fixtures use supplied capability facts. Existing adapter evidence still lacks the reasoning/tool-call fields the shipped class rules require, so that pipeline gap must close before claiming useful end-to-end resolution.
+
+Final activation PR-quality run: exit 0, warning verdict, environment_error=false. The configured lint, test and coverage executions each exit 0; unavailable semantic/complexity tools and large existing spec files remain reported, not called passes. The source review fixes configuration-size overflow and distinguishes unavailable reads from malformed JSON. No policy threshold is weakened. The source/tests and checkpoint receive a follow-up commit before the first push.

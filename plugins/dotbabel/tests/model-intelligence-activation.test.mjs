@@ -1,5 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync, writeFileSync, symlinkSync, readdirSync, mkdirSync, chmodSync, statSync } from "node:fs";
+import fs from "node:fs";
+import { acquireLock } from "../src/model-intelligence/catalog/lock.mjs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -22,7 +24,78 @@ function command(repo, ...args) {
   });
 }
 
+afterEach(() => vi.restoreAllMocks());
 describe("project Model Intelligence activation", () => {
+  it("rejects a non-object project document without accepting inherited activation", () => {
+    for (const document of [null, [], "text", 3, false]) expect(() => projectActivation(document)).toThrow(/invalid_project_config/);
+  });
+  it("reports malformed content through both the read and write interfaces", () => {
+    const repo = makeTempDir("mi-activation-");
+    writeFileSync(join(repo, ".dotbabel.json"), '{"private":');
+    expect(() => readProjectActivation(repo)).toThrow(/invalid_project_config/);
+    expect(readFileSync(join(repo, ".dotbabel.json"), "utf8")).toBe('{"private":');
+  });
+  it("never repairs invalid activation implicitly while enabling it", () => {
+    const repo = makeTempDir("mi-activation-");
+    const file = join(repo, ".dotbabel.json");
+    const text = JSON.stringify({ model_intelligence: { enabled: "true" } });
+    writeFileSync(file, text);
+    expect(() => setProjectActivation(repo, { enabled: true })).toThrow(/invalid_project_config/);
+    expect(readFileSync(file, "utf8")).toBe(text);
+  });
+  it("refuses a mixed valid and unknown mutation without creating configuration", () => {
+    const repo = makeTempDir("mi-activation-");
+    expect(() => setProjectActivation(repo, { enabled: true, other: false })).toThrow(/invalid_activation_change/);
+    expect(readdirSync(repo)).toEqual([]);
+  });
+  it("keeps a live configuration lock and refuses a contending writer within its deadline", () => {
+    const repo = makeTempDir("mi-activation-");
+    const file = join(repo, ".dotbabel.json");
+    writeFileSync(file, "{}");
+    const lock = acquireLock(`${file}.model-intelligence.lock`, { resource: file });
+    expect(lock.acquired).toBe(true);
+    const before = readFileSync(`${file}.model-intelligence.lock`, "utf8");
+    let now = Date.now();
+    vi.spyOn(Date, "now").mockImplementation(() => { now += 2500; return now; });
+    try {
+      expect(() => setProjectActivation(repo, { enabled: true })).toThrow(/project_config_locked/);
+      expect(readFileSync(file, "utf8")).toBe("{}");
+      expect(readFileSync(`${file}.model-intelligence.lock`, "utf8")).toBe(before);
+    } finally { lock.release(); }
+  });
+  it.each(["writeFileSync", "fsyncSync", "closeSync", "renameSync"])("a %s failure preserves the old document and removes temporary files", operation => {
+    const repo = makeTempDir("mi-activation-");
+    const file = join(repo, ".dotbabel.json");
+    writeFileSync(file, "{}");
+    const original = fs[operation].bind(fs);
+    let calls = 0;
+    vi.spyOn(fs, operation).mockImplementation((...args) => {
+      calls++;
+      if (calls === (operation === "closeSync" ? 2 : 1)) throw Object.assign(new Error("injected_io_failure"), { code: "EIO" });
+      return original(...args);
+    });
+    expect(() => setProjectActivation(repo, { enabled: true })).toThrow(/injected_io_failure/);
+    expect(readFileSync(file, "utf8")).toBe("{}");
+    expect(readdirSync(repo)).toEqual([".dotbabel.json"]);
+  });
+  it("reports an unavailable read without treating it as malformed JSON", () => {
+    const repo = makeTempDir("mi-activation-");
+    writeFileSync(join(repo, ".dotbabel.json"), "{}");
+    vi.spyOn(fs, "readFileSync").mockImplementationOnce(() => { throw Object.assign(new Error("private failure text"), { code: "EIO" }); });
+    expect(() => readProjectActivation(repo)).toThrow(/project_config_unavailable/);
+  });
+  it("accepts the maximum readable document size and maximum rendered document size", () => {
+    const repo = makeTempDir("mi-activation-");
+    const file = join(repo, ".dotbabel.json");
+    const base = JSON.stringify({ padding: "" });
+    writeFileSync(file, JSON.stringify({ padding: "x".repeat(1024 * 1024 - base.length) }));
+    expect(readProjectActivation(repo).enabled).toBe(false);
+    const document = { padding: "", model_intelligence: { enabled: true } };
+    document.padding = "x".repeat(1024 * 1024 - JSON.stringify(document, null, 2).length - 1);
+    writeFileSync(file, JSON.stringify(document));
+    expect(setProjectActivation(repo, { enabled: true }).enabled).toBe(true);
+    expect(statSync(file).size).toBe(1024 * 1024);
+  });
   it("defaults both capabilities to disabled and never uses a global activation", () => {
     expect(projectActivation({})).toMatchObject({ enabled: false, routingRequested: false, routingEnabled: false });
     expect(readProjectActivation(makeTempDir("mi-activation-"))).toMatchObject({ enabled: false, routingEnabled: false });
