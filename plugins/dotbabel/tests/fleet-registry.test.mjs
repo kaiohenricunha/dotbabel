@@ -15,6 +15,15 @@ import {
   readRegistry,
   sessionsDir,
 } from "../src/fleet/registry.mjs";
+import {
+  HOST_CAPABILITIES,
+  SUPPORT_STATES,
+  describeHostAdapter,
+  hostAdapter,
+  isSupported,
+  listHostAdapters,
+} from "../src/fleet/host-adapter.mjs";
+import { RUNTIMES } from "../src/agents.mjs";
 
 // /proc/<pid>/stat: "pid (comm) state ppid ... starttime(field 22) ...".
 function statLine(pid, comm, ppid, startTime) {
@@ -169,5 +178,76 @@ describe("ownerFromEntry", () => {
   it("falls back to startedAt, then to 0, when procStart is missing", () => {
     expect(ownerFromEntry({ pid: 5, startedAt: 1790362641466 }).key).toBe("5-1790362641466");
     expect(ownerFromEntry({ pid: 5 }).key).toBe("5-0");
+  });
+});
+
+
+describe("host adapters", () => {
+  it("the Claude Code host adapter reports identity and liveness as supported", () => {
+    const claude = hostAdapter("claude");
+    expect(claude.host).toBe("claude");
+    expect(claude.adapter).toBe(true);
+    expect(claude.capabilities.identity.support).toBe("supported");
+    expect(claude.capabilities.liveness.support).toBe("supported");
+    for (const name of HOST_CAPABILITIES) expect(isSupported(claude.capabilities[name].support)).toBe(true);
+    // The adapter binds the session registry and the liveness check this module already has.
+    const procRoot = fakeProc([{ pid: 100, ppid: 1, startTime: 5 }]);
+    const dir = writeRegistry([{ pid: 100, procStart: "5", sessionId: "s-1", name: "one" }]);
+    const env = { CLAUDE_CONFIG_DIR: path.dirname(dir) };
+    fs.renameSync(dir, path.join(path.dirname(dir), "sessions"));
+    expect(claude.identity({ sessionId: "s-1", env, procRoot })?.pid).toBe(100);
+    expect(claude.identity({ sessionId: "s-2", env, procRoot })).toBe(null);
+    expect(claude.isAlive({ pid: 100, procStart: "5" }, { procRoot })).toBe(true);
+    expect(claude.isAlive({ pid: 100, procStart: "6" }, { procRoot })).toBe(false);
+  });
+
+  it("a host without an adapter reports every capability as unsupported", () => {
+    for (const id of ["codex", "gemini", "antigravity", "opencode", "copilot", "not-a-cli", ""]) {
+      const host = hostAdapter(id);
+      expect(host.adapter).toBe(false);
+      expect(Object.keys(host.capabilities).sort()).toEqual([...HOST_CAPABILITIES].sort());
+      for (const name of HOST_CAPABILITIES) {
+        expect(host.capabilities[name].support).toBe("unsupported");
+        expect(isSupported(host.capabilities[name].support)).toBe(false);
+      }
+      expect(host.identity).toBe(null);
+      expect(host.isAlive).toBe(null);
+    }
+    expect(hostAdapter("codex").label).toBe("Codex");
+    expect(hostAdapter("not-a-cli").label).toBe("not-a-cli");
+  });
+
+  it("unverified never counts as supported (ARCH-4)", () => {
+    expect(SUPPORT_STATES).toEqual(["supported", "unsupported", "unverified"]);
+    expect(isSupported("supported")).toBe(true);
+    expect(isSupported("unverified")).toBe(false);
+    expect(isSupported("unsupported")).toBe(false);
+    expect(isSupported("yes")).toBe(false);
+  });
+
+  it("every descriptor names the six capabilities in the operation-capability shape", () => {
+    const hosts = listHostAdapters();
+    expect(hosts.map((h) => h.host)).toEqual(Object.keys(RUNTIMES));
+    expect(HOST_CAPABILITIES).toEqual(["identity", "liveness", "preEdit", "preBash", "postTool", "sessionStart"]);
+    for (const host of hosts) {
+      expect(Object.keys(host.capabilities)).toEqual([...HOST_CAPABILITIES]);
+      for (const cap of Object.values(host.capabilities)) {
+        expect(SUPPORT_STATES).toContain(cap.support);
+        expect(["never", "optional", "required"]).toContain(cap.network);
+        expect(["none", "optional-existing", "required-existing"]).toContain(cap.auth);
+        expect(typeof cap.cacheable).toBe("boolean");
+        expect(["read-only", "may-execute-model"]).toContain(cap.execution);
+        expect(cap.evidence).toMatch(/\S/);
+      }
+    }
+  });
+
+  it("describes an adapter in one line for the doctor", () => {
+    expect(describeHostAdapter(hostAdapter("claude"))).toBe(
+      "host claude (Claude): identity supported, liveness supported, preEdit supported, preBash supported, postTool supported, sessionStart supported",
+    );
+    expect(describeHostAdapter(hostAdapter("codex"))).toBe(
+      "host codex (Codex): every capability unsupported — no host adapter yet, so the fleet is off for this host",
+    );
   });
 });

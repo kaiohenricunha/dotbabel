@@ -110,6 +110,7 @@ import {
   frontmatterModel,
   receiptPath,
   receiptProblem,
+  normalizeReceipt,
   receiptVerdict,
   rollbackPoint,
   summarizePhases,
@@ -159,6 +160,7 @@ const FLAGS = {
   outcome: { type: "string" },
   reason: { type: "string" },
   evidence: { type: "string", multiple: true },
+  decisions: { type: "string" },
   workflow: { type: "string", default: "test.yml" },
   show: { type: "boolean" },
   "record-explicit": { type: "string" },
@@ -208,6 +210,7 @@ Options:
   --outcome <o>      record: ${RECEIPT_OUTCOMES.join(" | ")}
   --reason <CODE>    record: the blocking reason code, UPPER_SNAKE
   --evidence <url>   record: a link to evidence the phase produced (repeatable)
+  --decisions <file> record: a JSON array of bounded decisions, including shadow answers
   --workflow <file>  spot-check, main-status, contradiction: the test workflow
                      file on the default branch (default: test.yml)
   --show             spot-check: print the recorded decisions; decide nothing
@@ -238,7 +241,7 @@ failed main-status --local run, 2 env error, 64 usage error.`;
  * @returns {void}
  */
 function fail(code, msg) {
-  if (msg) process.stderr.write(`${TOOL}: ${msg}\n`);
+  if (msg) process.stderr.write(`${TOOL}: ${String(msg).split(process.env.TYPESAFE_API_KEY || "\0").join("<redacted>")}\n`);
   process.exit(code);
 }
 
@@ -551,7 +554,7 @@ function readReceipt(file, prNumber) {
   }
   const problem = receiptProblem(parsed, prNumber);
   if (problem) return fail(EXIT_CODES.ENV, `${file} is not a run receipt (${problem}); left unchanged`);
-  return parsed;
+  return normalizeReceipt(parsed);
 }
 
 const RECEIPT_LOCK_WAIT_MS = 2_000;
@@ -1640,6 +1643,10 @@ async function main() {
       requestedModel: requestedModel(repoRoot(), phase.artifact),
       toolVersion: version,
     };
+    if (flags.decisions !== undefined) {
+      try { attemptInput.decisions = JSON.parse(readFileSync(String(flags.decisions), "utf8")); }
+      catch { return fail(EXIT_CODES.USAGE, "--decisions must name a readable JSON array of decisions"); }
+    }
     // Validate before taking the lock, so a usage error never waits on it.
     try {
       appendAttempt(createReceipt({ pr: prNumber }), attemptInput);
@@ -1648,6 +1655,9 @@ async function main() {
     }
     const receipt = withFileLock(file, () => {
       const next = appendAttempt(readReceipt(file, prNumber) ?? createReceipt({ pr: prNumber }), attemptInput);
+      if (process.env.TYPESAFE_API_KEY && JSON.stringify(next).includes(process.env.TYPESAFE_API_KEY)) {
+        return fail(EXIT_CODES.USAGE, "receipt contains an adapter key; left unchanged");
+      }
       writeJsonAtomic(file, next);
       return next;
     });

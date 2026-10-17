@@ -103,6 +103,18 @@ function repoWithFacts(contents) {
 }
 
 describe("dotbabel-doctor fan-out check", () => {
+  it("doctor reports the decider's adapter, consent, and key presence, never the key", () => {
+    const repoRoot = repoWithFacts({ protected_paths: [] });
+    spawnSync("git", ["init", "-q", repoRoot]);
+    fs.writeFileSync(path.join(repoRoot, ".dotbabel.json"), JSON.stringify({ decider: { adapter: "jev", steps: ["review-triage"] } }));
+    spawnSync("git", ["-C", repoRoot, "add", ".dotbabel.json"]);
+    spawnSync("git", ["-C", repoRoot, "-c", "user.name=t", "-c", "user.email=t@example.org", "commit", "-qm", "config"]);
+    const key = "doctor-canary-123";
+    const out = spawnSync(process.execPath, [DOCTOR, "--repo-root", repoRoot, "--json"], { encoding: "utf8", env: { ...process.env, HOME: makeTmpDir("home-"), TYPESAFE_API_KEY: key } });
+    expect(out.stdout).toContain("decider: adapter jev, consent review-triage, key present");
+    expect(out.stdout + out.stderr).not.toContain(key);
+    expect(out.stdout).toContain("platform");
+  });
   it("warns when codex skill fan-out sentinel is missing (and codex is on PATH)", () => {
     const home = makeTmpDir("home-");
     // Codex on PATH, but no fan-out symlinks created.
@@ -349,6 +361,27 @@ describe("dotbabel-doctor check-on-stop trust check", () => {
 // non-empty value"), so it is asserted here, against the bin, rather than
 // only against checkRemovedRepoFactsKeys in repo-facts-keys.test.mjs. Without
 // these, deleting doctor's call site would leave that file's tests green.
+describe("dotbabel-doctor host adapters", () => {
+  it("doctor lists each host adapter's capability states", () => {
+    const home = makeTmpDir("doctor-home-");
+    const { events } = runDoctorJson({ home, repoRoot: repoWithFacts({}) });
+    const hosts = events.filter((e) => /^host [a-z]+ \(/.test(e.message));
+    const ids = hosts.map((e) => /^host ([a-z]+) /.exec(e.message)[1]);
+    expect(ids).toEqual(["claude", "codex", "gemini", "antigravity", "opencode", "copilot"]);
+    const claude = hosts.find((e) => e.message.startsWith("host claude "));
+    expect(claude.kind).toBe("pass");
+    for (const cap of ["identity", "liveness", "preEdit", "preBash", "postTool", "sessionStart"]) {
+      expect(claude.message).toContain(`${cap} supported`);
+    }
+    for (const other of hosts.filter((e) => e !== claude)) {
+      expect(other.kind).toBe("info");
+      expect(other.message).toContain("every capability unsupported");
+      expect(other.message).toContain("the fleet is off for this host");
+    }
+    expect(hosts.filter((e) => e.kind === "fail")).toEqual([]);
+  });
+});
+
 describe("dotbabel-doctor removed repo-facts keys (OPS-6)", () => {
   it("doctor warns when repo-facts gives regression_paths a non-empty value", () => {
     const home = makeTmpDir("home-");

@@ -46,6 +46,9 @@ case "${SHELL:-}" in
 esac
 run() { exec "$shell" -c -l "$script"; }
 
+# Only the Linux lane backend has verified CPU affinity and locking support.
+case "$(uname -s)" in Linux) ;; *) run ;; esac
+
 [ "${DOTBABEL_FLEET_LANES:-}" = off ] && run
 [ -n "${DOTBABEL_LANE:-}" ] && run
 state="${DOTBABEL_FLEET_STATE_DIR:-${XDG_STATE_HOME:-${HOME:-}/.local/state}/dotbabel/fleet}"
