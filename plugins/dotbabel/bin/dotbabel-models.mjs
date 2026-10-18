@@ -30,7 +30,7 @@ import {
   canCarryComputeDeclaration,
 } from "../src/model-intelligence/compat/index.mjs";
 import { readProjectActivation, setProjectActivation } from "../src/model-intelligence/activation/index.mjs";
-import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS } from "../src/model-intelligence/domain/index.mjs";
+import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS, checkOpaqueValue } from "../src/model-intelligence/domain/index.mjs";
 import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
 import { resolve as resolveCompute } from "../src/model-intelligence/resolver/index.mjs";
 import { makeObservedConfiguration } from "../src/model-intelligence/sources/evidence.mjs";
@@ -53,8 +53,10 @@ const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
   description:
-    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; recommend [artifact | --requirement <class>] --runtime <id> — read-only advice and native invocation recipe; migrate [--check | --write] [--decisions <path>] [--batch <A-F>] — report or apply reviewed canonical migrations; class-F decisions remain untouched.",
+    "Model Intelligence. session [--runtime codex] [--model auto|<native-id>] [--effort auto|<native-value>] — run an explicitly enabled project's managed App Server terminal with ordinary prompts; enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; recommend [artifact | --requirement <class>] --runtime <id> — read-only advice and native invocation recipe; migrate [--check | --write] [--decisions <path>] [--batch <A-F>] — report or apply reviewed canonical migrations; class-F decisions remain untouched.",
   flags: {
+    model: { type: "string" },
+    effort: { type: "string" },
     write: { type: "boolean" },
     batch: { type: "string" },
     decisions: { type: "string" },
@@ -72,10 +74,11 @@ const META = {
   },
 };
 
-const VERBS = Object.freeze(["refresh", "status", "snapshot", "migrate", "resolve", "recommend", "enable", "disable"]);
+const VERBS = Object.freeze(["refresh", "status", "snapshot", "migrate", "resolve", "recommend", "enable", "disable", "session"]);
 
 /** The flags each verb accepts, beyond the harness-wide set. Any other is a usage error. */
 const VERB_FLAGS = Object.freeze({
+  session: ["repo-root", "runtime", "model", "effort"],
   refresh: ["source", "runtime"],
   status: ["check", "repo-root", "snapshot-file"],
   snapshot: ["check", "write", "snapshot-file", "evidence-file"],
@@ -115,15 +118,20 @@ if (argv.version) {
 const verb = argv.positional?.[0];
 if (verb === undefined) usage(`a verb is required (one of: ${VERBS.join(", ")})`);
 if (!VERBS.includes(verb)) usage(`unknown verb "${verb}" (expected one of: ${VERBS.join(", ")})`);
-for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file", "batch", "decisions", "observation-file"]) {
+for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file", "model", "effort", "batch", "decisions", "observation-file"]) {
   if (argv.flags[flag] !== undefined && !VERB_FLAGS[verb].includes(flag)) usage(`--${flag} does not apply to ${verb}`);
 }
 if (verb === "migrate" && argv.flags.check && argv.flags.write) usage("migrate --check and --write cannot be combined");
 if (verb === "migrate" && argv.flags.batch !== undefined && !["A", "B", "C", "D", "E", "F"].includes(argv.flags.batch)) usage("migrate --batch requires A, B, C, D, E or F");
 if (verb === "snapshot" && argv.flags.check && (argv.flags.write || argv.flags["evidence-file"])) usage("snapshot --check cannot be combined with --write or --evidence-file");
 if (!["migrate", "resolve", "recommend"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
+if (verb === "session") {
+  if (argv.flags.runtime !== undefined && argv.flags.runtime !== "codex") usage("session currently requires --runtime codex");
+  for (const [flag, axis] of [["model", "model"], ["effort", "reasoning"]]) if (argv.flags[flag] !== undefined && !checkOpaqueValue(axis, argv.flags[flag])) usage(`invalid --${flag}`);
+}
 
-// Under `--json`, stdout carries exactly one JSON document, so every human line
+// Diagnostic `--json` stdout carries exactly one JSON document; session explicitly streams NDJSON.
+// Every human diagnostic line
 // goes to stderr. A caller piping the report into `jq` gets the report, not the
 // report plus a summary sentence (§5, "JSON contract").
 const out = createOutput({ noColor: argv.noColor, stream: argv.flags.json ? process.stderr : process.stdout });
@@ -133,11 +141,15 @@ try {
   else if (verb === "status") runStatus();
   else if (verb === "snapshot") await runSnapshot();
   else if (["resolve", "recommend"].includes(verb)) runResolve();
+  else if (verb === "session") {
+    const { runManagedTerminal } = await import("../src/adaptive-session-routing/terminal.mjs");
+    await runManagedTerminal({ repoRoot: resolveRepoRoot(), model: argv.flags.model, effort: argv.flags.effort, json: argv.flags.json });
+  }
   else if (["enable", "disable"].includes(verb)) runActivation();
   else await runMigrate();
 } catch (error) {
   const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_|migration_|projection_|recommendation_)/.test(error.code) ? error.code : undefined;
-  const code = snapshotCode ?? (["invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
+  const code = snapshotCode ?? (["routing_disabled", "session_initialization_failed", "session_closed", "session_busy", "session_input_invalid", "native_completion_unknown", "invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
   if (argv.flags.json) process.stdout.write(`${JSON.stringify({ diagnostics: [{ code }] })}\n`);
   out.fail(code);
   process.exit(["invalid_project_config", "invalid_activation_change", "release_evidence_stale", "release_evidence_time_invalid", "release_requirement_unsatisfied", "migration_input_invalid", "migration_decision_invalid", "migration_decision_conflict", "migration_source_invalid", "projection_output_drift", "recommendation_observation_invalid"].includes(code) || code.startsWith("snapshot_") && !["snapshot_unavailable", "snapshot_locked"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);

@@ -97,13 +97,13 @@
     },
     {
       "id": "AC-4",
-      "status": "planned",
-      "given": "normal prompt",
+      "status": "active",
+      "given": "ordinary prompts in the managed Codex App Server terminal",
       "when": "routes an ordinary main-session prompt before execution",
       "then": "selected model and effort apply before the original main prompt executes",
       "tests": [
         {
-          "file": "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+          "file": "plugins/dotbabel/tests/adaptive-session-routing-session-cli.test.mjs",
           "name": "routes an ordinary main-session prompt before execution"
         }
       ],
@@ -111,7 +111,7 @@
         "npx",
         "vitest",
         "run",
-        "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+        "plugins/dotbabel/tests/adaptive-session-routing-session-cli.test.mjs",
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AR-AC-4.junit.xml"
       ],
