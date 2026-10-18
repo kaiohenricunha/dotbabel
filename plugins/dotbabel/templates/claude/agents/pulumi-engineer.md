@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:77bb53de5cc0795a34b2334f96fd48b7161820fcc7239b0efe9b3c4d5afafd04 source=agents/pulumi-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:b30ed55318030524063dae028a15d32e51b058ed3dfb907e313e9852ca9c59ef source=agents/pulumi-engineer.md — do not edit directly
 description: |
   Use when working with Pulumi stacks, component resources, or the Automation API. Triggers on: "Pulumi", "pulumi up", "pulumi stack", "ComponentResource", "Pulumi ESC", "Automation API", "pulumi.Config", "pulumi new", "stack reference", "StackReference". Uses sonnet — Pulumi stack work is code-first and structured; sonnet matches the task depth.
 model: sonnet

@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1f484e8c08eea9d6c9aa5d3e681094a098c7deaed98698204a1b58f2b221322a source=agents/backend-developer.md — do not edit directly
+# dotbabel:generated projection=sha256:885010ed1c5859411923d7ea87af223df82a0e2985b76d23b950d389ba971966 source=agents/backend-developer.md — do not edit directly
 description: |
   Use when building or modifying server-side code: APIs, services, data models, background jobs, or infrastructure logic. Triggers on: "build API", "add endpoint", "database schema", "backend service", "server-side", "REST", "GraphQL", "background job", "migration". Uses sonnet — everyday backend implementation benefits from balanced capability and throughput.
 model: sonnet

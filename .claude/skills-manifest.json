@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T14:05:02.118Z",
+  "generatedAt": "2026-10-18T14:34:27.767Z",
   "skills": [
     {
       "name": "agents-search",
@@ -96,7 +96,7 @@
     {
       "name": "deploy-status",
       "path": ".claude/skills/deploy-status/SKILL.md",
-      "checksum": "sha256:b38adf13e60b90b9ee4df6c3ba29e7f1e32185ff86ee8566023821f29bdc356a",
+      "checksum": "sha256:b3df282e732739883eb1582191f31e76de9faa4d2966114514c348a71c0880df",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -117,7 +117,7 @@
     {
       "name": "flyctl",
       "path": ".claude/skills/flyctl/SKILL.md",
-      "checksum": "sha256:1bbe6a5feb5484ce78b56b588845ccc2a8d7de30552af32ba78e090d6c7b18cd",
+      "checksum": "sha256:d0050ef2a0ded335ece7d26ad9135d17c360766d26beac19ccd2518719bab3ac",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -131,7 +131,7 @@
     {
       "name": "git",
       "path": ".claude/skills/git/SKILL.md",
-      "checksum": "sha256:815cbb14a427766c5a77b3352bee21cd7bcd7e8e9663878748ce16ff51072233",
+      "checksum": "sha256:3d51251614db7d29153bfdcd788f580278705980d2a042710056858b19ff2e82",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -210,7 +210,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:f2a13a026745ad4c4797f7561508ef3af0fab015df093e24fd098d839f1e6d0b",
+      "checksum": "sha256:d4a1ca150d5e4d7b25af20077110e164affa84a07ef22f70dffba557ad5d7d19",
       "dependencies": [
         "pre-pr",
         "git",
@@ -238,7 +238,7 @@
     {
       "name": "project-sync",
       "path": ".claude/skills/project-sync/SKILL.md",
-      "checksum": "sha256:561c1a9c203e04b72e3d1d99cbf6e0a1f0ebb6288b4dda7b6106d0e39172bfa5",
+      "checksum": "sha256:ac00afc564cbd1a8131d487b7728a9835ab190162dcb5cb8462b8d38c7eb91ca",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -259,7 +259,7 @@
     {
       "name": "release-conductor",
       "path": ".claude/skills/release-conductor/SKILL.md",
-      "checksum": "sha256:b14739d256ca5123f3208a02e4349939a845fb658c46b17bcc46b0c8723a81f6",
+      "checksum": "sha256:3dcc70c4eecf3a4a4db1eef3aeb47ce15a9e7c8c6452776d209169e12cd5b97e",
       "dependencies": [
         "deploy-status"
       ],

@@ -11,12 +11,12 @@ task:
   - review
   - testing
 maturity: draft
-owner: '@kaiohenricunha'
+owner: "@kaiohenricunha"
 created: 2026-08-08T00:00:00.000Z
 updated: 2026-10-13T00:00:00.000Z
 description: |
   Land one pull request end to end: pre-PR quality gate, open the PR, AI review, apply review fixes, local CI attestation — then STOP with a go/no-go summary. Never merges; merging stays an explicit human call handed to /merge-pr. Understands stacked PRs, where a child must retarget and rebase --onto after its parent squash-merges. Delegates every phase to an existing artifact rather than reimplementing it. On demand only: the default path from a task to a pull request is /deliver. Triggers on: "land this PR", "run the PR pipeline", "run the review pipeline", "ship this branch", "what's blocking my PR".
-argument-hint: '[PR#] [--stack] [--from <phase>] [--dry-run]'
+argument-hint: "[PR#] [--stack] [--from <phase>] [--dry-run]"
 model: sonnet
 user-invocable: true
 disable-model-invocation: false

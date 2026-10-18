@@ -10,12 +10,12 @@ platform:
 task:
   - scaffolding
 maturity: draft
-owner: '@kaiohenricunha'
+owner: "@kaiohenricunha"
 created: 2026-05-09T00:00:00.000Z
 updated: 2026-05-09T00:00:00.000Z
 description: |
   Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex, Gemini, and Copilot project-scope analogues (.codex/skills, .gemini/skills, .github/prompts, .github/instructions) plus refresh AGENTS.md, GEMINI.md, and .github/copilot-instructions.md from the project's rule floor. Wraps `dotbabel project-sync`. Use when adopting cross-CLI workflows in a repo for the first time, or when adding a new command/skill that needs to be visible to Codex/Gemini/Copilot. Triggers on: "sync this repo", "project sync", "fan out commands", "wire up gemini for this project", "add this command to codex", "make this skill available in copilot", "regenerate AGENTS.md for this project".
-argument-hint: '[--dry-run] [--all] [--repo <path>]'
+argument-hint: "[--dry-run] [--all] [--repo <path>]"
 tools: Bash, Read, Glob
 effort: low
 model: sonnet

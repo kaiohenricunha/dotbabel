@@ -10,7 +10,7 @@ platform:
 task:
   - documentation
 maturity: draft
-owner: '@kaiohenricunha'
+owner: "@kaiohenricunha"
 created: 2026-04-28T00:00:00.000Z
 updated: 2026-04-28T00:00:00.000Z
 name: changelog-assistant

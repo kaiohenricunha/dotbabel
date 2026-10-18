@@ -11,12 +11,12 @@ task:
   - review
   - runtime-ops
 maturity: draft
-owner: '@kaiohenricunha'
+owner: "@kaiohenricunha"
 created: 2026-05-26T00:00:00.000Z
 updated: 2026-08-07T00:00:00.000Z
 description: |
   Gate the open release-please PR before merging: verify CI green, feature PRs landed, no release blockers, changelog reflects intent. One-word approval, then merge. Reports the resulting release.yml run URL. release-please owns the changelog/bump/tag; release.yml owns OIDC npm publish — this skill only gates the merge in between. Triggers on: "ship a release", "cut a release", "merge the release PR", "is the release ready", "verify the release".
-argument-hint: '[verify <tag>]'
+argument-hint: "[verify <tag>]"
 model: sonnet
 user-invocable: true
 disable-model-invocation: true

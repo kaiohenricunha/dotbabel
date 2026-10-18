@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:6efb255b72ba8efb5fc015aa6b4f6835315deb1f314a4c0c3e63af82259ad2e3 source=agents/changelog-assistant.md — do not edit directly
+# dotbabel:generated projection=sha256:55bb26260ddd033d87e1d8d647f2296bf4da45163e4c834646bab9d84c78cfd2 source=agents/changelog-assistant.md — do not edit directly
 description: |
   Use when generating changelog entries, drafting release notes, or summarizing git history for a release. Triggers on: "generate changelog", "release notes", "what changed", "CHANGELOG", "summarize commits", "release summary", "version bump notes". Uses haiku — changelog generation from git history is formulaic and lightweight; fast output benefits release flow.
 model: haiku

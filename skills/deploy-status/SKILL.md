@@ -14,12 +14,12 @@ task:
   - diagnostics
   - runtime-ops
 maturity: draft
-owner: '@kaiohenricunha'
+owner: "@kaiohenricunha"
 created: 2026-05-05T00:00:00.000Z
 updated: 2026-05-05T00:00:00.000Z
 description: |
   Show deployed git SHAs across configured production targets and compare them against origin/main. Use during deploy verification, incident response, and release drift checks. Triggers on: "what is deployed", "deploy status", "production drift", "is prod on main", "compare prod to main".
-argument-hint: '[--dry-run] [--no-fetch]'
+argument-hint: "[--dry-run] [--no-fetch]"
 tools: Bash, Read, Grep, Glob
 allowed-tools: Read Grep Glob Bash
 model: sonnet
