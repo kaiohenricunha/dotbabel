@@ -1,0 +1,96 @@
+{
+  "turns": [
+    {
+      "index": 0,
+      "turnId": "01a14d57-b50e-7511-8b7a-42928610dcc0",
+      "promptSha256": "264fe1ef389f41489d1df35c6ea423010add76d33ba8053e99cce21c213f98c5",
+      "status": "completed",
+      "decision": "proposed",
+      "requested": {
+        "model": "gpt-5.6-luna",
+        "reasoning": "low"
+      },
+      "selected": {
+        "model": "gpt-5.6-luna",
+        "reasoning": "low"
+      },
+      "nativeObserved": {
+        "model": "gpt-5.6-luna",
+        "reasoning": "low"
+      },
+      "observationSource": "thread/read after turn/completed",
+      "inputUnchanged": true,
+      "effectiveAtAcknowledgement": "unknown"
+    },
+    {
+      "index": 1,
+      "turnId": "01a14d57-c44e-7ba3-8f66-2890010c66c3",
+      "promptSha256": "c99c3e87e8c234906809f0e2eabf16361023789bb878695bbe901cf1aea51a3b",
+      "status": "completed",
+      "decision": "proposed",
+      "requested": {
+        "reasoning": "high"
+      },
+      "selected": {
+        "model": "gpt-5.6-luna",
+        "reasoning": "high"
+      },
+      "nativeObserved": {
+        "model": "gpt-5.6-luna",
+        "reasoning": "high"
+      },
+      "observationSource": "thread/read after turn/completed",
+      "inputUnchanged": true,
+      "effectiveAtAcknowledgement": "unknown"
+    }
+  ],
+  "reroutes": [],
+  "extraClassifierInferenceCalls": 0,
+  "approvalHandler": "no automatic tool approval",
+  "transcriptReplayed": false,
+  "runtime": "dotbabel-routing-real-proof/0.163.0 (Ubuntu 24.4.0; x86_64) WindowsTerminal (dotbabel-routing-real-proof; 0.1.0)",
+  "threadId": "01a14d57-b4a3-7730-ab4e-e3b17a585395",
+  "initial": {
+    "model": "gpt-6.1-sol",
+    "reasoning": "high"
+  },
+  "observedUserMessages": [
+    {
+      "turnId": "01a14d57-b50e-7511-8b7a-42928610dcc0",
+      "textSha256": ["264fe1ef389f41489d1df35c6ea423010add76d33ba8053e99cce21c213f98c5"]
+    },
+    {
+      "turnId": "01a14d57-c44e-7ba3-8f66-2890010c66c3",
+      "textSha256": ["c99c3e87e8c234906809f0e2eabf16361023789bb878695bbe901cf1aea51a3b"]
+    }
+  ],
+  "configurationsDiffer": true,
+  "exactOriginalMessages": true,
+  "notificationCounts": {
+    "remoteControl/status/changed": 1,
+    "thread/started": 1,
+    "mcpServer/startupStatus/updated": 4,
+    "thread/settings/updated": 2,
+    "thread/status/changed": 4,
+    "turn/started": 2,
+    "account/updated": 1,
+    "hook/started": 6,
+    "hook/completed": 6,
+    "item/started": 5,
+    "item/completed": 5,
+    "item/agentMessage/delta": 35,
+    "turn/moderationMetadata": 2,
+    "thread/tokenUsage/updated": 2,
+    "account/rateLimits/updated": 2,
+    "turn/completed": 2
+  },
+  "transportDiagnostics": [],
+  "implementationSourceHashes": {
+    "plugins/dotbabel/src/adaptive-session-routing/codex.mjs": "06d291e7e22a9842e31c477f658818e1e116dae66133e4fa929b152470cd5585",
+    "plugins/dotbabel/src/adaptive-session-routing/codex-rpc.mjs": "d750863421d8fa4e4a788da3ee6102ac3d87bb4d1ac8edbb22bf7808d0a77e44",
+    "plugins/dotbabel/src/adaptive-session-routing/route.mjs": "d87e5946edfadf32a536c0e52a5d4047b93cb73b2039c79b3b1e921d901cfb46",
+    "plugins/dotbabel/src/adaptive-session-routing/prepare.mjs": "380b004ca5696c2416f84d28634fcc357b75bcded5716d861496ae408b611cd4"
+  },
+  "completedAt": "2026-10-18T04:49:21.425066+00:00",
+  "evidenceKind": "controlled native App Server execution; not a mocked acknowledgement"
+}

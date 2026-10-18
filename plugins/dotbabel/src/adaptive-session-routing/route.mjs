@@ -57,7 +57,7 @@ export function route(input) {
     // A retention probe uses the same resolver and cannot shadow any actual model pin.
     const pinnedModel = overrides.model ?? invocation.pin?.config.model ?? declaration?.pin?.config.model ?? resolverInput.policy.pin?.config.model;
     const currentModel = current?.axes?.model;
-    if (pinnedModel === undefined && typeof currentModel === "string" && currentModel !== resolution.configuration.axes.model) {
+    if (current?.turnExecuted !== false && pinnedModel === undefined && typeof currentModel === "string" && currentModel !== resolution.configuration.axes.model) {
       const retained = resolve({ ...request, invocation: { ...invocation, modelSelection: "automatic", pin: { runtime: request.target.runtimeId, config: { ...invocation.pin?.config, model: currentModel } } } });
       if (retained.status === "resolved" && retained.confidence !== "low" && fresh(retained)) {
         resolution = retained;
