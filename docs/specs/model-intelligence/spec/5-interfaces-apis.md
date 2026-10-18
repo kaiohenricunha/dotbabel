@@ -218,6 +218,16 @@ interface SourceAdapterDescriptor {
     };
 
     validation: OperationCapability;
+
+    mainSession?: Record<
+      string, // runtime mechanism identifier, not a model id
+      {
+        support: SupportState;
+        axes: Record<string, SupportState>;
+        observation: { support: SupportState; axes: Record<string, SupportState> };
+        manualSelection?: { support: SupportState; axes: Record<string, SupportState> };
+      }
+    >;
   };
 }
 ```
@@ -300,6 +310,14 @@ This is different from artifact binding. A runtime can support selecting a model
 ### Main-session capability extension — 2026-10-16 amendment
 
 Runtime capability data additionally distinguishes the main-session mechanism, model and effort override support, manual-selection provenance and effective-axis observation. Each uses the existing `supported | unsupported | unverified` vocabulary with versioned evidence. An absent extension is unverified, never supported. The linked routing spec defines its application contract; the resolver continues to consume plain supplied data and performs no runtime call.
+
+`mainSession` is optional for existing descriptors and runtime-only. It holds at most 16 named
+mechanisms, each with independent control axes and effective-axis observation. `manualSelection`
+describes whether a mechanism exposes selection provenance for each axis. Missing fields remain
+unverified. Registry getters require supported enclosing blocks before returning a supported axis.
+An App Server declaration cannot establish stock CLI support; native discovery, invocation and
+artifact binding remain separate capabilities. No production adapter gains verified routing solely
+from adding this contract.
 
 ### Adapter calls
 
