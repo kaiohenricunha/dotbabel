@@ -221,3 +221,23 @@ dotbabel handoff doctor
 It prints a one-line status for `git`, the transport URL, the persisted
 config file, and `gh` fallback availability. A failure is always
 accompanied by an exact remediation command.
+
+## Model observation metadata
+
+`handoff-extract.sh meta` uses the shared runtime adapters for Claude and Codex model metadata.
+The file-only bridge starts no native runtime, discovery, network request or inference. It returns
+only typed configuration fields and provenance; transcript prompts and credentials are not output.
+The observation read accepts at most 8 MiB of stable regular UTF-8 data. Symlinks, changed files,
+invalid encoding and unavailable no-follow protection produce an unknown observation with a code.
+The existing session identity, prompts, turns, todos and mirror extraction keep their contracts.
+
+Claude reports `system/init.model` when present, including sessions with no inference. Codex reports
+the latest explicit `turn_context.model` and `turn_context.effort` as **reconstructed configuration**;
+those fields alone do not prove the model used for inference. Its provider comes independently from
+`session_meta.model_provider`. A missing model remains null rather than becoming the provider.
+The full `observation` field records the basis and sources. Recommendation consumers use the same
+observation schema. This explicit metadata read is available without enabling automatic routing.
+
+Copilot and Gemini retain their existing metadata readers until their separate adapters arrive.
+`meta antigravity` and `meta opencode` return unsupported observation without failing; this does not
+add prompt/turn extraction for those runtimes. Other operations for those names remain unsupported.

@@ -41,7 +41,7 @@ import { MAX_OUTPUT_BYTES, firstLine, probeVersion, resolveContext, runIsolated 
 export const RUNTIME_ID = "claude";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "2";
+export const ADAPTER_VERSION = "3";
 
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CLAUDE_CONFIG_DIR", rootDirName: ".claude" });
@@ -240,6 +240,17 @@ export async function discover(context) {
 }
 
 /**
+ * Observe supplied stream JSON without starting a runtime or reading native configuration.
+ * @param {unknown} stream Bounded caller-supplied stream JSON.
+ * @param {{now?:Function}} [options] Caller-owned observation clock.
+ * @returns {object} The same typed observation used by observe({stream}).
+ */
+export function observeStream(stream, { now = () => new Date().toISOString() } = {}) {
+  if (typeof stream !== "string" || Buffer.byteLength(stream, "utf8") > MAX_OUTPUT_BYTES) return makeAdapterResult({ status: "unknown", provenance: baseProvenance(), observedAt: now(), diagnostic: { code: "malformed_output", message: "The supplied stream is not bounded UTF-8 observation text." } });
+  return classifyStream(parseStreamJson(stream), { now }, { basis: { configurationBasis: "as-run" } });
+}
+
+/**
  * Observe the model Claude Code resolves.
  *
  * With `context.stream` (stream-json text from a run the caller already made) nothing is executed and the
@@ -258,20 +269,7 @@ export async function discover(context) {
 export async function observe(context = {}) {
   const ctx = resolveContext(context, ROOT);
   const options = /** @type {any} */ (context);
-  if (typeof options.stream === "string") {
-    // A probed stream is already bounded by `runProcess`'s own output cap; `context.stream` is
-    // caller-supplied text with no such bound, so it is checked here before `parseStreamJson` runs
-    // `split` and one `JSON.parse` per line over it with no upper limit on either.
-    if (Buffer.byteLength(options.stream, "utf8") > MAX_OUTPUT_BYTES) {
-      return makeAdapterResult({
-        status: "unknown",
-        provenance: baseProvenance(),
-        observedAt: ctx.now(),
-        diagnostic: { code: "malformed_output", message: `the supplied stream exceeded the ${MAX_OUTPUT_BYTES}-byte limit` },
-      });
-    }
-    return classifyStream(parseStreamJson(options.stream), ctx, { basis: { configurationBasis: "as-run" } });
-  }
+  if (context !== null && Object.hasOwn(context ?? {}, "stream")) return observeStream(options.stream, { now: ctx.now });
 
   const values = axisValues("observe", options);
   const args = ["-p", PROBE_PROMPT];
