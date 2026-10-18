@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ValidationError, ERROR_CODES } from "./lib/errors.mjs";
-import { fanOutRuntimes, projectArtifactTargets } from "./agents.mjs";
+import { defaultFanOutRuntimes, projectArtifactTargets } from "./agents.mjs";
 
 /** Default `.dotbabel.json` body written when none exists. */
 export const DEFAULT_DOTBABEL_JSON = Object.freeze({
@@ -16,7 +16,7 @@ export const DEFAULT_DOTBABEL_JSON = Object.freeze({
   rule_floor_source: "CLAUDE.md",
   commands_dir: ".claude/commands",
   skills_dir: ".claude/skills",
-  fan_out: fanOutRuntimes(),
+  fan_out: Object.freeze(defaultFanOutRuntimes()),
   fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
   quality: Object.freeze({ enabled: true }),

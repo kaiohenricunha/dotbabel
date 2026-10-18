@@ -34,6 +34,7 @@ describe("scaffoldProjectInit", () => {
     expect(r.filesWritten).toContain("CLAUDE.md");
 
     const cfg = JSON.parse(fs.readFileSync(path.join(repo, ".dotbabel.json"), "utf8"));
+    expect(cfg.fan_out).toEqual(["codex", "antigravity", "opencode", "copilot"]);
     expect(cfg.fan_out).toEqual(DEFAULT_DOTBABEL_JSON.fan_out);
     expect(cfg.targets).toEqual(DEFAULT_DOTBABEL_JSON.targets);
     expect(cfg.quality).toEqual({ enabled: true });

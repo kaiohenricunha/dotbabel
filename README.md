@@ -377,7 +377,7 @@ support.
 `dotbabel bootstrap` covers your **user scope** (`~/.claude/`, `~/.codex/`,
 `~/.gemini/`, `~/.config/opencode/`). For **per-repo** artifacts — a project's own `CLAUDE.md`,
 `.claude/commands/*.md`, and `.claude/skills/*` — use `project-sync` to fan
-them out to Codex (`.codex/skills/`), Gemini (`.gemini/skills/`), Antigravity
+them out to Codex (`.codex/skills/`), optional Gemini CLI (`.gemini/skills/`), Antigravity
 (`.agents/skills/`), OpenCode (`.opencode/skills/`), and Copilot (`.github/prompts/*.prompt.md` +
 `.github/instructions/*.instructions.md`):
 
@@ -392,18 +392,24 @@ dotbabel check-project-sync --all     # ...including CLIs you have not installed
 
 The fan-out uses symlinks — your `.claude/` tree stays the single source of
 truth. A `.dotbabel.json` is optional; without one, project-sync uses
-sensible defaults and treats the entire `CLAUDE.md` as the project rule
+the default fan-out `codex`, `antigravity`, `opencode`, and `copilot`, and treats the entire `CLAUDE.md` as the project rule
 floor (or the slice between `<!-- dotbabel:rule-floor:begin -->` /
 `<!-- dotbabel:rule-floor:end -->` markers when present).
 
 `gate_on_cli_presence` (default `true`) skips a CLI's symlink fan-out when its
 binary is absent from `PATH`. `check-project-sync` honors the same setting, so
-a machine without `gemini` installed does not report the un-synced Gemini tree
+a machine without `agy` installed does not report the un-synced Antigravity tree
 as drift; pass `--all` to either command to ignore the gate for one run.
 Instruction files (`AGENTS.md`, `GEMINI.md`, `.github/copilot-instructions.md`)
 are always written, never gated.
 
-`fan_out_layout` (default `per-cli`) controls whether Codex and Gemini get
+Antigravity CLI (`agy`) is the preferred Google runtime. Gemini CLI (`gemini`) remains
+a supported, optional legacy/enterprise integration. Gemini models remain supported.
+Claude Code remains the canonical authoring runtime. Add `gemini` to `fan_out`
+to enable both Google runtimes; existing explicit lists remain authoritative.
+See the [migration guidance](docs/quickstart.md#google-runtime-migration) before changing an existing installation.
+
+`fan_out_layout` (default `per-cli`) controls whether enabled Codex and Gemini get
 their own trees. Both read `<dir>/SKILL.md`, so `shared` writes one canonical
 tree and points both at it, halving the entries git has to track:
 
@@ -432,10 +438,10 @@ Point your editor at the config schema for autocomplete and validation:
 ```json
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
-  "fan_out": ["codex", "gemini", "antigravity", "opencode", "copilot"],
+  "fan_out": ["codex", "antigravity", "opencode", "copilot"],
   "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true,
-  "cli_excluded": { "codex": ["review-prs-parallel"], "gemini": ["review-prs-parallel"] }
+  "cli_excluded": { "codex": ["review-prs-parallel"], "opencode": ["review-prs-parallel"] }
 }
 ```
 
