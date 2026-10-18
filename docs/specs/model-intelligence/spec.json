@@ -477,7 +477,7 @@
     },
     {
       "id": "AC-18",
-      "status": "planned",
+      "status": "active",
       "given": "two snapshot generations with the same facts and different observedAt",
       "when": "snapshotId is computed",
       "then": "both ids are identical",

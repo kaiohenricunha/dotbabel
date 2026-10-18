@@ -25,6 +25,12 @@ function request(changes = {}) {
 const codes = decision => decision.diagnostics.map(item => item.code);
 
 describe("adaptive session routing decisions", () => {
+  it("never uses release snapshot acceptance as live account availability", () => {
+    const value = request(); value.resolverInput.catalog.scope = "release";
+    const result = route(value);
+    expect(result.status).toBe("preserved"); expect(codes(result)).toContain("release_snapshot_not_live_evidence");
+    expect(result.configuration).toBeUndefined(); expect(result.changes).toBeUndefined();
+  });
   it("proposes model and effort without claiming a running configuration", () => {
     const decision = route(request());
     expect(decision).toMatchObject({ status: "proposed", configuration: { axes: { model: "a-deep", reasoning: "calm" } } });

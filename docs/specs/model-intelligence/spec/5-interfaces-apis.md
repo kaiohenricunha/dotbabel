@@ -1084,6 +1084,16 @@ The snapshot may contain the runtime-specific facts needed for deterministic mat
 
 The release snapshot does not contain Dotbabel's permanent semantic policy (ARCH-15). "Security review requires >= frontier" belongs to shipped policy. The snapshot may contain evidence such as "Claude selector X satisfies frontier", with provenance. Release resolution combines shipped semantic policy plus the release capability snapshot through the resolver into the release projection.
 
+### Accepted release support is not live entitlement
+
+The P-15 snapshot records accepted selector compatibility and capability support for deterministic release generation. It contains no account availability or quota assertion. `snapshotCatalog` marks its resolver envelopes with `scope: release`; its fixed fresh/available values mean accepted release support, not a current account's ability to invoke a model. Reviewed inclusion produces a separate `releaseEligibility: eligible` field. Only the release scope consumes that field; live resolution continues to require native `selectionVisibility: listed`. Adaptive MAIN routing refuses that scope before model selection. A package build does not discover models or renew acceptance dates.
+
+The first Claude snapshot combines measured credential-free selector mappings, a sanitized official-provider response recording, and explicitly reviewed first-party documentation facts. Field provenance names each exact accepted source version. The documented native model/effort contract and provider capability facts remain distinct; neither replaces a live runtime observation. The recorded inputs and their scope are documented in `docs/experiments/model-intelligence-release-snapshot-2026-10-18.md`.
+
+`snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>]` has two explicit input paths. By default, generation invokes the isolated Claude observation adapter to recheck every exact accepted selector against the committed runtime version and canonical mapping. It preserves the original dates of retained provider/documentation facts. A changed runtime version, changed mapping, unavailable required source or unacceptable evidence fails without replacement. `--evidence-file` supplies a separately reviewed, schema-valid and identity-valid accepted candidate; it does not read a generated projection or grant repository-command trust. `--check` is offline and cannot be combined with that input or `--write`.
+
+The shared snapshot lock covers collection, complete validation and atomic replacement. The operational default check clock is read after source collection finishes; an explicit injected check clock remains authoritative. `snapshot --check` and `status --check` enforce the seven-day backing-evidence gate, and plain status reports the age without failing for age. The library also checks caller-supplied required floor/pin requests through the existing resolver before a write. P-16 and P-17 supply their actual release projection requests and reproduce generated baselines from this input.
+
 ### Snapshot generation
 
 `dotbabel models snapshot --write` is the only normal operation that updates the committed snapshot. Under the ARCH-64/ARCH-65 lock:

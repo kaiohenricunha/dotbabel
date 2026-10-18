@@ -1,0 +1,37 @@
+{
+  "nativeVersion": "2.1.302",
+  "inferenceCalls": 0,
+  "credentialBoundary": "isolated credential-free source adapter with a dead-port proxy",
+  "selectors": [
+    {
+      "selector": "haiku",
+      "canonicalModel": "claude-haiku-5-5",
+      "observedAt": "2026-10-18T08:18:51.205Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "sonnet",
+      "canonicalModel": "claude-sonnet-5-5",
+      "observedAt": "2026-10-18T08:18:51.606Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "opus",
+      "canonicalModel": "claude-opus-5-5",
+      "observedAt": "2026-10-18T08:18:52.055Z",
+      "turnExecuted": false
+    }
+  ],
+  "acceptedDocumentationFacts": {
+    "models": ["claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5"],
+    "reasoning": true,
+    "tool_call": true,
+    "supportedReasoningLevels": ["low", "medium", "high", "xhigh", "max"],
+    "defaultReasoningLevel": "medium",
+    "sources": [
+      "https://code.claude.com/docs/en/model-config",
+      "https://platform.claude.com/docs/en/models/overview"
+    ]
+  },
+  "providerRecording": "anthropic-models-api/models.json"
+}
