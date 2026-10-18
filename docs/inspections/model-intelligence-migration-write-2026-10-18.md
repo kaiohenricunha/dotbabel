@@ -192,3 +192,17 @@ remain byte-identical to the completed 86.96% report, verified by SHA-256. Only
 correction. Measure those three complete modules with the same 393 semantic tests and unchanged
 85% gate. Preserve the earlier full report and the stopped-run log; do not combine them into a
 fabricated single-run report or count an interrupted measurement as a pass.
+
+## RPC deadline fixture audit
+
+The client PR quality run passes the normal suite but coverage fails the RPC test
+`bounds waiting and does not retry a timed-out write`; 5,634 coverage tests pass and one fails.
+Candidate one is the client acceptance-state fix. The failing test imports only the unchanged
+transport and its subprocess fixture, so that client module does not participate. Candidate two is
+coupled startup timing: `adaptive-session-routing-codex-rpc.test.mjs:58` gives a cold child 100 ms,
+expects its first held request to time out, then gives its immediate echo only another 100 ms.
+A child taking over 200 ms to start makes the echo fail. Add an explicit 250 ms fixture startup
+before correcting the test. Keep the 100 ms production request deadline, warm the real child,
+and advance the host timer deterministically at 99/100 ms. Count held requests in the real fixture
+to prove no retry. This changes no production timeout or acceptance threshold. It strengthens a
+shared verification case that already failed during P18's earlier contended validation.
