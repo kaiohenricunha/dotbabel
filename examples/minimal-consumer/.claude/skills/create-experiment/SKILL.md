@@ -1,19 +1,10 @@
 ---
-id: create-experiment
-name: create-experiment
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
-maturity: validated
-description: >
-  Run a scoped, local-only experiment and save the report to docs/experiments/.
-  Triggers on: "let's try", "compare A vs B", "prototype", "explore".
-argument-hint: "[topic or hypothesis]"
-tools: Read, Grep, Glob, Bash, Write
+# dotbabel:generated projection=sha256:6cdc1ed239546403a79e240699aeb5d19e4aea701ec988a27b841b1473aec13b source=skills/create-experiment/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash Write
-model: sonnet
+argument-hint: "[topic or hypothesis]"
+description: |
+  Run a scoped, local-only experiment and save the report to docs/experiments/. Triggers on: "let's try", "compare A vs B", "prototype", "explore".
+name: create-experiment
 ---
 
 Run a scoped, local-only experiment and produce a structured report saved to the project's `docs/experiments/` directory.

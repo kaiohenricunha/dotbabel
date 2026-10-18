@@ -1,26 +1,10 @@
 ---
-id: flyctl
-name: flyctl
-type: skill
-version: 1.0.0
-domain: [infra, devex, observability]
-platform: [flyio]
-task: [runtime-ops, diagnostics, incident-response]
-maturity: draft
-description: >
-  Explicit-invocation Fly.io operations wrapper. Run `/flyctl <subcommand>` to
-  deploy (with --image), tail logs, manage secrets, inspect machines, scale,
-  SSH, proxy, check health, list releases, and show status. Auto-discovers
-  the app from fly.toml in the current directory. Side-effectful ops on
-  prod-flavored apps require typed confirmation matching the app name.
-  Rollback is delegated to /rollback-prod; cross-provider SHA reporting is
-  delegated to /deploy-status. Unlisted subcommands require
-  `flyctl <subcommand> --help` first.
-argument-hint: "<subcommand> [-a <app>] [--no-confirm] [...]"
-tools: Bash, Read, Grep, Glob
-model: sonnet
-effort: medium
+# dotbabel:generated projection=sha256:1151e049861f03f7f2b2cf798fa8bc66a8bea1168a740058c6c817f426dab367 source=skills/flyctl/SKILL.md — do not edit directly
+argument-hint: <subcommand> [-a <app>] [--no-confirm] [...]
+description: |
+  Explicit-invocation Fly.io operations wrapper. Run `/flyctl <subcommand>` to deploy (with --image), tail logs, manage secrets, inspect machines, scale, SSH, proxy, check health, list releases, and show status. Auto-discovers the app from fly.toml in the current directory. Side-effectful ops on prod-flavored apps require typed confirmation matching the app name. Rollback is delegated to /rollback-prod; cross-provider SHA reporting is delegated to /deploy-status. Unlisted subcommands require `flyctl <subcommand> --help` first.
 disable-model-invocation: true
+name: flyctl
 user-invocable: true
 ---
 

@@ -71,6 +71,19 @@ describe("offline Claude release baseline", () => {
     const accepted = createSnapshot(seed);
     expect(() => buildClaudeBaseline({ toolVersion: "4.2.0", snapshot: accepted, artifacts: [artifact("agent", compute("floor"))] })).toThrow();
   });
+  it("rejects low-confidence evidence for mandatory floors and exact legacy pins", () => {
+    const seed = structuredClone(snapshot);
+    for (const model of seed.runtimes.claude.models) for (const entries of Object.values(model.fields)) for (const entry of entries) entry.confidence = "low";
+    const accepted = createSnapshot(seed);
+    for (const source of [artifact("agent", compute("floor")), artifact("agent", { model: "opus" })]) {
+      expect(() => buildClaudeBaseline({ toolVersion: "4.2.0", snapshot: accepted, artifacts: [source] })).toThrow("release_requirement_unsatisfied");
+    }
+  });
+  it("rejects ambiguous independent legacy effort instead of silently removing it", () => {
+    for (const fields of [{ effort: "max" }, { model: "inherit", effort: "high" }, { effort: "unverified" }, { effort: null }]) {
+      expect(() => build([artifact("agent", fields)])).toThrow("claude_baseline_effort_model_unverified");
+    }
+  });
   it("keeps baseline identity independent of observation times", () => {
     const sources = [artifact("agent", { model: "opus" })];
     const first = build(sources);

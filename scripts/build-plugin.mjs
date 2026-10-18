@@ -33,6 +33,7 @@
 
 import { version as dotbabelVersion } from "../plugins/dotbabel/src/index.mjs";
 import { buildClaudeReviewWorkflow } from "../plugins/dotbabel/src/model-intelligence/materialize/runtime/claude-workflow.mjs";
+import { readSnapshot } from "../plugins/dotbabel/src/model-intelligence/snapshot/index.mjs";
 import { buildClaudeBaseline } from "../plugins/dotbabel/src/model-intelligence/materialize/runtime/claude-build.mjs";
 import { parse, helpText } from "../plugins/dotbabel/src/lib/argv.mjs";
 import { EXIT_CODES } from "../plugins/dotbabel/src/lib/exit-codes.mjs";
@@ -194,7 +195,7 @@ function buildExpected() {
     }
   }
 
-  const snapshot = JSON.parse(readFileSync(join(repoRoot, "plugins/dotbabel/src/model-intelligence/snapshot/release-capabilities.json"), "utf8"));
+  const snapshot = readSnapshot(join(repoRoot, "plugins/dotbabel/src/model-intelligence/snapshot/release-capabilities.json"));
   const baseline = buildClaudeBaseline({ toolVersion: dotbabelVersion, snapshot, artifacts: projections });
   for (const file of baseline.files) files.set(join(templateRoot, file.path), file.content);
   files.set(join(templateRoot, ".dotbabel-projection.json"), JSON.stringify(baseline.manifest, null, 2) + "\n");

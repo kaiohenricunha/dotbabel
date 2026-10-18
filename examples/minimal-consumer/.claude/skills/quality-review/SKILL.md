@@ -1,18 +1,10 @@
 ---
-id: quality-review
-name: quality-review
-type: skill
-version: 0.1.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
-maturity: draft
-description: >
-  Check changed code against the resolved dotbabel quality policy, then review semantic risks that tools cannot judge. Triggers on: "quality review", "quality check", "review code quality".
-argument-hint: "[fast|pr|deep] [base-ref]"
-tools: Bash, Read, Grep
+# dotbabel:generated projection=sha256:336f3e5ff24590b4d2fc29a1c5d22e5ef5ada3374e8a01c69aaa26103c0680d8 source=skills/quality-review/SKILL.md — do not edit directly
 allowed-tools: Read Grep Bash
-model: sonnet
+argument-hint: "[fast|pr|deep] [base-ref]"
+description: |
+  Check changed code against the resolved dotbabel quality policy, then review semantic risks that tools cannot judge. Triggers on: "quality review", "quality check", "review code quality".
+name: quality-review
 ---
 
 # Quality review
