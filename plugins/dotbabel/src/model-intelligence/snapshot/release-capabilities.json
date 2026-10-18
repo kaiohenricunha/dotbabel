@@ -1,0 +1,652 @@
+{
+  "runtimes": {
+    "claude": {
+      "models": [
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-haiku-5-5"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": {
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "contextWindow": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "1",
+                  "sourceId": "anthropic-models-api",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8"
+                },
+                "value": 1000000
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": "medium"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-haiku-5-5"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "claude-haiku-5-5"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-opus-5-5"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": {
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "contextWindow": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "1",
+                  "sourceId": "anthropic-models-api",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8"
+                },
+                "value": 1000000
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": "medium"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-opus-5-5"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "claude-opus-5-5"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-sonnet-5-5"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": {
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "contextWindow": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "1",
+                  "sourceId": "anthropic-models-api",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8"
+                },
+                "value": 1000000
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": "medium"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-sonnet-5-5"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "claude-sonnet-5-5"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-haiku-5-5"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": {
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "contextWindow": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "1",
+                  "sourceId": "anthropic-models-api",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8"
+                },
+                "value": 1000000
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": "medium"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "haiku"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "haiku"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-opus-5-5"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": {
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "contextWindow": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "1",
+                  "sourceId": "anthropic-models-api",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8"
+                },
+                "value": 1000000
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": "medium"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "opus"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "opus"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "claude-sonnet-5-5"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": {
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "contextWindow": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "1",
+                  "sourceId": "anthropic-models-api",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8"
+                },
+                "value": 1000000
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": "medium"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "2",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.302"
+                },
+                "value": "sonnet"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "sonnet"
+        }
+      ],
+      "provenance": {
+        "adapterVersion": "2",
+        "sourceId": "claude",
+        "sourceKind": "runtime",
+        "sourceVersion": "2.1.302"
+      },
+      "runtimeContract": {
+        "capabilities": {
+          "binding": {
+            "agent": {
+              "axes": {
+                "model": "supported",
+                "reasoning": "supported"
+              },
+              "support": "supported"
+            },
+            "command": {
+              "axes": {
+                "model": "supported",
+                "reasoning": "unverified"
+              },
+              "support": "supported"
+            },
+            "skill": {
+              "axes": {
+                "model": "unsupported",
+                "reasoning": "unsupported"
+              },
+              "support": "unsupported"
+            }
+          },
+          "discovery": {
+            "support": "unsupported"
+          },
+          "invocation": {
+            "axes": {
+              "model": "supported",
+              "reasoning": "supported"
+            },
+            "support": "supported"
+          },
+          "observation": {
+            "auth": "optional-existing",
+            "cacheable": false,
+            "execution": "may-execute-model",
+            "network": "optional",
+            "support": "supported"
+          },
+          "validation": {
+            "auth": "none",
+            "cacheable": false,
+            "execution": "read-only",
+            "network": "never",
+            "support": "supported"
+          }
+        },
+        "id": "claude",
+        "kind": "runtime"
+      }
+    }
+  },
+  "schemaVersion": 1,
+  "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
+  "sources": [
+    {
+      "adapterVersion": "1",
+      "observedAt": "2026-10-18T05:18:08.353389+00:00",
+      "sourceId": "anthropic-models-api",
+      "sourceKind": "knowledge-source",
+      "sourceVersion": "sha256:6a05e955d6317af645a89ce55af2bdc8",
+      "url": "https://api.anthropic.com/v1/models"
+    },
+    {
+      "adapterVersion": "2",
+      "observedAt": "2026-10-18T08:18:51.205Z",
+      "sourceId": "claude",
+      "sourceKind": "runtime",
+      "sourceVersion": "2.1.302"
+    },
+    {
+      "observedAt": "2026-10-18T08:22:25.895Z",
+      "sourceId": "claude-release-docs",
+      "sourceKind": "knowledge-source",
+      "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9",
+      "url": "https://code.claude.com/docs/en/model-config"
+    }
+  ],
+  "toolVersion": "4.2.0"
+}

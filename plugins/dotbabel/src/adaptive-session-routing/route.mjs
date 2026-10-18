@@ -18,6 +18,7 @@ export function isClassificationUsable(task) {
 function eligibility(input) {
   if (input.activation?.enabled !== true) return "intelligence_disabled";
   if (input.activation.routingEnabled !== true) return "routing_disabled";
+  if (input.resolverInput?.catalog?.scope === "release") return "release_snapshot_not_live_evidence";
   if (input.runtimeCapability?.support !== "supported") return input.runtimeCapability?.support === "unsupported" ? "routing_unsupported" : "routing_unverified";
   const task = input.classification;
   if (!isClassificationUsable(task)) return "classification_uncertain";

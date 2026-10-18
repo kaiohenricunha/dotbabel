@@ -34,6 +34,7 @@ import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS } from "../src
 import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
 import { resolveRequest } from "../src/model-intelligence/cli/resolve.mjs";
 import { catalogStatus, refreshSources } from "../src/model-intelligence/catalog/index.mjs";
+import { readSnapshot, updateSnapshot, collectReleaseEvidence, releaseSnapshotStatus, DEFAULT_SNAPSHOT_PATH } from "../src/model-intelligence/snapshot/index.mjs";
 import { cacheRoot } from "../src/model-intelligence/catalog/cache.mjs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
@@ -42,8 +43,11 @@ const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
   description:
-    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and refresh state, never refreshing; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
+    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
   flags: {
+    write: { type: "boolean" },
+    "snapshot-file": { type: "string" },
+    "evidence-file": { type: "string" },
     routing: { type: "boolean" },
     "repo-root": { type: "string" },
     source: { type: "string" },
@@ -55,12 +59,13 @@ const META = {
   },
 };
 
-const VERBS = Object.freeze(["refresh", "status", "migrate", "resolve", "enable", "disable"]);
+const VERBS = Object.freeze(["refresh", "status", "snapshot", "migrate", "resolve", "enable", "disable"]);
 
 /** The flags each verb accepts, beyond the harness-wide set. Any other is a usage error. */
 const VERB_FLAGS = Object.freeze({
   refresh: ["source", "runtime"],
-  status: ["check", "repo-root"],
+  status: ["check", "repo-root", "snapshot-file"],
+  snapshot: ["check", "write", "snapshot-file", "evidence-file"],
   enable: ["routing", "repo-root"],
   disable: ["routing", "repo-root"],
   migrate: ["repo-root"],
@@ -96,9 +101,10 @@ if (argv.version) {
 const verb = argv.positional?.[0];
 if (verb === undefined) usage(`a verb is required (one of: ${VERBS.join(", ")})`);
 if (!VERBS.includes(verb)) usage(`unknown verb "${verb}" (expected one of: ${VERBS.join(", ")})`);
-for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing"]) {
+for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file"]) {
   if (argv.flags[flag] !== undefined && !VERB_FLAGS[verb].includes(flag)) usage(`--${flag} does not apply to ${verb}`);
 }
+if (verb === "snapshot" && argv.flags.check && (argv.flags.write || argv.flags["evidence-file"])) usage("snapshot --check cannot be combined with --write or --evidence-file");
 if (!["migrate", "resolve"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
 
 // Under `--json`, stdout carries exactly one JSON document, so every human line
@@ -109,14 +115,16 @@ const out = createOutput({ noColor: argv.noColor, stream: argv.flags.json ? proc
 try {
   if (verb === "refresh") await runRefresh();
   else if (verb === "status") runStatus();
+  else if (verb === "snapshot") await runSnapshot();
   else if (verb === "resolve") runResolve();
   else if (["enable", "disable"].includes(verb)) runActivation();
   else runMigrate();
 } catch (error) {
-  const code = ["invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed";
+  const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_)/.test(error.code) ? error.code : undefined;
+  const code = snapshotCode ?? (["invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
   if (argv.flags.json) process.stdout.write(`${JSON.stringify({ diagnostics: [{ code }] })}\n`);
   out.fail(code);
-  process.exit(["invalid_project_config", "invalid_activation_change"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);
+  process.exit(["invalid_project_config", "invalid_activation_change", "release_evidence_stale", "release_evidence_time_invalid", "release_requirement_unsatisfied"].includes(code) || code.startsWith("snapshot_") && !["snapshot_unavailable", "snapshot_locked"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);
 }
 
 /** Explicit project-local enable/disable operation. @returns {void} */
@@ -219,7 +227,10 @@ function renderRefresh(r) {
 function runStatus() {
   const activation = readProjectActivation(resolveRepoRoot(true));
   out.info(`project intelligence: ${activation.enabled}; routing opt-in effective: ${activation.routingEnabled}`);
-  const report = { activation, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };
+  let releaseSnapshot;
+  try { releaseSnapshot = releaseSnapshotStatus(readSnapshot(argv.flags["snapshot-file"] ?? DEFAULT_SNAPSHOT_PATH), { now: new Date().toISOString() }); }
+  catch (error) { releaseSnapshot = { valid: false, reason: error.code ?? "snapshot_invalid", releaseSnapshotAgeMs: null }; }
+  const report = { activation, releaseSnapshot, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };
   if (argv.flags.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   for (const s of report.sources) {
     const cache = s.cache === null ? "no cache" : `cache ${s.cache.freshness}, observed ${s.cache.observedAt}, ${s.cache.models} model(s)`;
@@ -228,6 +239,10 @@ function runStatus() {
     const lock = s.lock ? `; lock ${s.lock.state} (${s.lock.reason})` : "";
     out.info(`${s.id} (${s.kind}): discovery ${s.discovery}; ${cache}; refresh ${s.refresh}${failure}${invalid}${lock}`);
   }
+  out.info(`release snapshot: ${releaseSnapshot.snapshotId ?? "unavailable"}; ${releaseSnapshot.reason}; age ${releaseSnapshot.releaseSnapshotAgeMs ?? "unknown"} ms`);
+  if (argv.flags.check && !releaseSnapshot.valid) {
+    out.fail(releaseSnapshot.reason); process.exit(releaseSnapshot.reason === "snapshot_unavailable" ? EXIT_CODES.ENV : EXIT_CODES.VALIDATION);
+  }
   const { totalBytes, maxBytes, withinLimit } = report.cache;
   if (argv.flags.check && !withinLimit) {
     out.fail(`the capability cache holds ${totalBytes} bytes, above the ${maxBytes}-byte limit (OPS-2)`);
@@ -235,6 +250,26 @@ function runStatus() {
   }
   out.info(`cache: ${totalBytes} of ${maxBytes} bytes`);
   process.exit(EXIT_CODES.OK);
+}
+
+/** Explicit release-only snapshot command. @returns {Promise<void>} */
+async function runSnapshot() {
+  const file = resolve(argv.flags["snapshot-file"] ?? DEFAULT_SNAPSHOT_PATH);
+  if (argv.flags.check) {
+    const status = releaseSnapshotStatus(readSnapshot(file), { now: new Date().toISOString() });
+    if (argv.flags.json) process.stdout.write(`${JSON.stringify({ envelope: "ModelsSnapshotCheck", version: 1, ...status }, null, 2)}\n`);
+    (status.valid ? out.pass : out.fail)(status.reason);
+    process.exit(status.valid ? EXIT_CODES.OK : EXIT_CODES.VALIDATION);
+  }
+  const candidate = argv.flags["evidence-file"];
+  const report = await updateSnapshot({ file, write: argv.flags.write === true,
+    collect: () => candidate === undefined ? collectReleaseEvidence(readSnapshot(file)) : readSnapshot(resolve(candidate)),
+  });
+  if (argv.flags.json) process.stdout.write(`${JSON.stringify({ envelope: "ModelsSnapshot", version: 1, ...report }, null, 2)}\n`);
+  else {
+    out.info(`snapshot ${report.snapshot.snapshotId}; changed: ${report.changed}; written: ${report.written}`);
+    if (report.changed) process.stdout.write(`--- committed snapshot\n+++ candidate snapshot\n${report.after}`);
+  }
 }
 
 /**
