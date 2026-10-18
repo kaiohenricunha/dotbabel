@@ -331,6 +331,7 @@ The generated Claude command copy therefore:
 **Transitional release compatibility.** IMPL-2 and the migration rule in §6.6 prohibit removing an existing working native declaration before its replacement is proven. The release baseline therefore retains an already-authored command `model:` while a `dynamic` or `floor` declaration is introduced. The shared resolver checks that exact legacy selector as an invocation pin against the semantic minimum and accepted release evidence. Missing evidence, an insufficient selector or an unverified native model binding fails the release build. This bridge never invents a selector, emits effort or changes the canonical requirement into a semantic pin. Its resolver enforcement remains unknown for the dynamic session requirement. Ordinary non-release materialization still omits a dynamic/floor command model. Remove the retained authored field only in a separate migration that proves the replacement preserves behavior.
 
 ```text
+ordinary non-release command materialization
 canonical command
     ↓
 generated Claude projection

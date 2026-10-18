@@ -34,6 +34,7 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     // selector, checked as an invocation pin above, never a dynamically selected session model.
     const compatibilityCommand = artifact.releaseBaseline === true && kind === "command" && ["dynamic", "floor"].includes(requirement?.mode) && legacyAxes?.model !== undefined && legacyAxes.model === source.frontmatter.model;
     if (compatibilityCommand && (binding?.support !== "supported" || binding.axes?.model !== "supported")) throw fail("claude_projection_pin_binding_unverified");
+    if (compatibilityCommand && resolverResult.configuration?.axes?.model !== source.frontmatter.model) throw fail("release_requirement_unsatisfied");
     if (requirement?.mode === "pin") {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
       if (kind !== "skill" && Object.keys(requirement.pin.config).some(axis => binding?.support !== "supported" || binding.axes?.[axis] !== "supported" || kind === "command" && axis !== "model")) throw fail("claude_projection_pin_binding_unverified");

@@ -56,4 +56,13 @@ describe("Claude release command migration compatibility", () => {
     input.runtimeContract.capabilities.binding.command.axes.model = "unverified";
     expect(() => materializeClaude({ toolVersion: "4.2.0", context: input, artifacts: [{ ...source, releaseBaseline: true, legacyAxes: { model: "sonnet" } }] })).toThrow(/binding_unverified/);
   });
+
+  it("does not emit a below-floor authored selector after an invocation override validates another model", () => {
+    const source = declared(artifact("pre-pr"), "frontier", "floor"), input = context();
+    for (const model of input.catalog.runtimes[0].models.filter(model => model.model === "sonnet" || model.model === "claude-sonnet-5-5")) for (const fact of model.fields.capabilities) fact.value = { reasoning: false, tool_call: true };
+    input.invocation = { overrides: { model: "opus" } };
+    const resolution = resolve({ ...input, requirement: parseProjectionSource(source).requirement, target: { runtimeId: "claude", artifactKind: "command", sourcePath: source.sourcePath }, invocation: { ...input.invocation, pin: { runtime: "claude", config: { model: "sonnet" } }, omitDefaultReasoning: true } });
+    expect(resolution.status).toBe("resolved"); expect(resolution.configuration.axes.model).toBe("opus");
+    expect(() => materializeClaude({ toolVersion: "4.2.0", context: input, artifacts: [{ ...source, releaseBaseline: true, legacyAxes: { model: "sonnet" } }] })).toThrow(/release_requirement_unsatisfied/);
+  });
 });
