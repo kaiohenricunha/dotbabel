@@ -421,9 +421,18 @@ ls -la ~/.claude/skills/aws-specialist/SKILL.md
 If missing: re-run `./bootstrap.sh`. If present: restart the Claude Code session
 (`/clear` or quit and reopen) — the session may have cached the pre-bootstrap state.
 
-### A skill isn't available in Codex / Gemini CLI
+### A skill isn't available in Codex, Antigravity, or Gemini CLI
 
-Skills are fanned out to `~/.codex/skills/<id>/SKILL.md` and `~/.gemini/skills/<id>/SKILL.md` during `dotbabel bootstrap`. Two reasons a skill might be missing there:
+Antigravity CLI (`agy`) is the preferred Google runtime. Its verified global skills path is
+`~/.gemini/config/skills/<id>/SKILL.md`, overridden by `ANTIGRAVITY_CONFIG_HOME`.
+Codex uses `~/.codex/skills/<id>/SKILL.md`; optional Gemini CLI (`gemini`) uses
+`~/.gemini/skills/<id>/SKILL.md`. Bootstrap checks the executable names independently.
+
+For project skills, new defaults enable Antigravity at `.agents/skills/`. Add `gemini`
+to `fan_out` to enable `.gemini/skills/`. Both use project `GEMINI.md`; neither requires
+a rename. See [migration guidance](quickstart.md#google-runtime-migration).
+
+Two reasons a global skill might be missing:
 
 - **Fan-out was skipped because the host CLI wasn't on `$PATH`.** Bootstrap only fans out to a CLI it can find. Re-run with `dotbabel bootstrap --all` (or `./bootstrap.sh --all`) to force fan-out even when the CLI isn't installed yet.
 - **Custom config dir.** Both `$CODEX_HOME` and `$GEMINI_HOME` override the default `~/.codex` and `~/.gemini` parents. Check the active values:

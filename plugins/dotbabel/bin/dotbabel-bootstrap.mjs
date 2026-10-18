@@ -28,7 +28,7 @@ import { bootstrapGlobal } from "../src/bootstrap-global.mjs";
 const META = {
   name: "dotbabel-bootstrap",
   synopsis: "dotbabel-bootstrap [OPTIONS]",
-  description: "Set up (or refresh) ~/.claude/ by symlinking commands/, skills/, CLAUDE.md, and copying agent templates into place. Idempotent — safe to re-run.",
+  description: "Set up (or refresh) ~/.claude/ by symlinking commands/, skills/, CLAUDE.md, and copying agent templates into place. Idempotent — safe to re-run. Antigravity CLI (agy) is the recommended Google runtime; installed Gemini CLI remains supported.",
   flags: {
     source: { type: "string" },
     target: { type: "string" },

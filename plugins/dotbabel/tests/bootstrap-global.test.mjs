@@ -36,6 +36,34 @@ afterEach(() => {
   tmpDirs = [];
 });
 
+describe("Google bootstrap compatibility", () => {
+  it.each(["agy", "gemini"])("configures the installed %s runtime independently and preserves user files", async (binary) => {
+    const source = makeTmpDir();
+    const target = makeTmpDir();
+    buildFakeSource(source);
+    buildCliInstructionSources(source);
+    hideAllClisFromPath();
+    fs.writeFileSync(path.join(process.env.PATH, binary), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    const googleRoot = path.join(target, ".gemini");
+    const skillsRoot = binary === "agy" ? path.join(googleRoot, "config", "skills") : path.join(googleRoot, "skills");
+    fs.mkdirSync(path.join(skillsRoot, "custom"), { recursive: true });
+    fs.writeFileSync(path.join(skillsRoot, "custom", "SKILL.md"), "user skill\n");
+    fs.writeFileSync(path.join(googleRoot, "settings.json"), '{"user":true}\n');
+    await withEnv({ GEMINI_HOME: undefined, ANTIGRAVITY_CONFIG_HOME: undefined }, async () => {
+      for (let run = 0; run < 2; run++) {
+        const result = await bootstrapGlobal({ source, target, quiet: true });
+        expect(result.ok).toBe(true);
+        expect(result.backed_up).toBe(0);
+      }
+    });
+    expect(fs.readFileSync(path.join(skillsRoot, "foo", "SKILL.md"), "utf8")).toBe("# foo\n");
+    expect(fs.readFileSync(path.join(skillsRoot, "custom", "SKILL.md"), "utf8")).toBe("user skill\n");
+    expect(fs.readFileSync(path.join(googleRoot, "settings.json"), "utf8")).toBe('{"user":true}\n');
+    const absentRoot = binary === "agy" ? path.join(googleRoot, "skills") : path.join(googleRoot, "config", "skills");
+    expect(fs.existsSync(absentRoot)).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Helpers — build a minimal fake source tree that mirrors the bootstrap.sh
 // expectations.

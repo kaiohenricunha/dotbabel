@@ -6,6 +6,7 @@ import {
   RUNTIMES,
   INSTRUCTION_ARTIFACTS,
   fanOutRuntimes,
+  defaultFanOutRuntimes,
   skillDirRuntimes,
   shareableSkillRuntimes,
   projectSkillsDir,
@@ -59,6 +60,15 @@ afterEach(() => {
 // The derived half is kept because it documents the wiring; the literal half is
 // what catches a registry edit that changes the public contract.
 describe("agents registry — equivalence with existing declarations", () => {
+  it("derives default project destinations without dropping optional support", () => {
+    const defaults = defaultFanOutRuntimes();
+    expect(defaults).toEqual(["codex", "antigravity", "opencode", "copilot"]);
+    expect(DEFAULT_PROJECT_CONFIG.fan_out).toEqual(defaults);
+    expect(fanOutRuntimes()).toContain("gemini");
+    defaults.push("gemini");
+    expect(defaultFanOutRuntimes()).not.toContain("gemini");
+  });
+
   it("fanOutRuntimes() reproduces the documented fan-out list, order included", () => {
     expect(fanOutRuntimes()).toEqual(["codex", "gemini", "antigravity", "opencode", "copilot"]);
     expect([...KNOWN_FAN_OUT_CLIS]).toEqual(fanOutRuntimes());
