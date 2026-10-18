@@ -343,7 +343,7 @@ Added by the owner on 2026-10-12. It implements the ARCH-23 amendment, so that a
 
 ### P-8 — Knowledge-source adapters from RQ-1 — `/plan`, one prompt per source
 
-Blocked until RQ-1 closes (IMPL-1). Split into `P-8a` Models.dev and `P-8b` official provider APIs if their behavior differs materially. **Split on 2026-09-27:** RQ-1 closed for Models.dev, including its license, so P-8a proceeds. P-8b stays blocked on the OpenAI response shape. The conditional GET (`If-None-Match`, `304`) needs the stored `etag`, so it lands with the capability cache in P-9, not in P-8a.
+Blocked until RQ-1 closes (IMPL-1). Split into `P-8a` Models.dev and `P-8b` official provider APIs if their behavior differs materially. **Split on 2026-09-27:** RQ-1 closed for Models.dev, including its license, so P-8a proceeds. **Applicable Anthropic slice, 2026-10-18:** its documented API and recorded native-authorized capability response permit a source-specific P-8b implementation. A caller-owned native fetch retains authorization outside the adapter; no credential handling or runtime availability assertion is introduced. The OpenAI slice remains blocked on its response research. The conditional GET (`If-None-Match`, `304`) needs the stored `etag`, so it lands with the capability cache in P-9, not in P-8a.
 
 1. **Tests first** — `plugins/dotbabel/tests/model-intelligence-adapter-<source>.test.mjs`
    - `descriptor: kind knowledge-source, discovery network required, observation unsupported, binding {}`

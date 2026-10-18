@@ -18,6 +18,7 @@
 
 import { createHash } from "node:crypto";
 import { MAX_CACHE_ENTRY_BYTES, assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult, runBounded } from "../contract.mjs";
+import { readBoundedResponse } from "../network.mjs";
 import { makeDiscoveryEvidence, makeModelFact, makeProviderCatalogEvidence, optionalCount, optionalIdentifier, toSourceKey } from "../evidence.mjs";
 
 /** The source's id, as the descriptor and every provenance name it. */
@@ -149,46 +150,6 @@ function requestEtag(value) {
   const etag = optionalIdentifier(value);
   if (etag === undefined) throw new TypeError("models-dev discover: etag must be a non-empty printable string of at most 200 characters");
   return etag;
-}
-
-/**
- * Read a response body, stopping once it exceeds `MAX_RESPONSE_BYTES`. The declared length is checked
- * first, but the stream is counted too, because a declared length can be absent or wrong. An abort of
- * the operation cancels the read, so a stalled body cannot hold the connection open.
- * @param {Response} response
- * @param {AbortSignal} signal
- * @returns {Promise<{tooLarge: true} | {tooLarge: false, bytes: Buffer}>}
- */
-async function readBounded(response, signal) {
-  const declared = Number(response.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
-    await response.body?.cancel().catch(() => {});
-    return { tooLarge: true };
-  }
-  if (response.body === null) return { tooLarge: false, bytes: Buffer.alloc(0) };
-  const reader = response.body.getReader();
-  const cancel = () => {
-    reader.cancel().catch(() => {});
-  };
-  signal.addEventListener("abort", cancel, { once: true });
-  /** @type {Uint8Array[]} */
-  const chunks = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > MAX_RESPONSE_BYTES) {
-        cancel();
-        return { tooLarge: true };
-      }
-      chunks.push(value);
-    }
-  } finally {
-    signal.removeEventListener("abort", cancel);
-  }
-  return { tooLarge: false, bytes: Buffer.concat(chunks) };
 }
 
 /** An effort value as Models.dev spells one: a short lower-case token such as `low` or `xhigh`. */
@@ -335,7 +296,7 @@ export async function discover(context) {
           await response.body?.cancel().catch(() => {});
           return { httpStatus: response.status };
         }
-        return { httpStatus: response.status, etag: optionalIdentifier(response.headers.get("etag")), read: await readBounded(response, signal) };
+        return { httpStatus: response.status, etag: optionalIdentifier(response.headers.get("etag")), read: await readBoundedResponse(response, signal, MAX_RESPONSE_BYTES) };
       },
       { channel: "network", timeoutMs: ctx.timeoutMs, provenance, now },
     )
