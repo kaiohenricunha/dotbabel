@@ -1,3 +1,5 @@
+# Generated runtime configuration.
+# dotbabel:generated projection=sha256:8b0a42f0db86522ca9e4f47280e05d2f42dec0a88673b95903bd5b72f10af612 source=plugins/dotbabel/src/model-intelligence/workflows/ai-review.source.yml — do not edit directly
 # Always-on AI PR review via Claude-headless.
 #
 # Phase 5 of the SDD & Harness Hardening plan chose this path over Vercel Agent
@@ -27,5 +29,5 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          npx @anthropic-ai/claude-code -p "Run /review-prs for PR #${{ github.event.pull_request.number }}" \
+          npx @anthropic-ai/claude-code --model 'claude-haiku-5-5' --effort 'medium' -p "Run /review-prs for PR #${{ github.event.pull_request.number }}" \
             --settings .claude/settings.headless.json --max-turns 40

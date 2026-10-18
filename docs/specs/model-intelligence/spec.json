@@ -527,7 +527,7 @@
     },
     {
       "id": "AC-20",
-      "status": "planned",
+      "status": "active",
       "given": "an ai-review session requirement that the snapshot cannot satisfy",
       "when": "the workflow is generated",
       "then": "the build fails and never omits --model",

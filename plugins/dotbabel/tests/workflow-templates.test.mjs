@@ -265,3 +265,11 @@ describe("workflow templates", () => {
     } finally { fs.rmSync(target, { recursive: true, force: true }); }
   });
 });
+
+it("review coordinator has explicit native model and effort while keeping worker configuration separate", () => {
+  const doc = loadTemplate("ai-review.yml");
+  const scripts = runScripts(doc).filter(script => script.includes("npx @anthropic-ai/claude-code"));
+  expect(scripts).toHaveLength(1); expect(scripts[0]).toMatch(/--model '[^']+'/); expect(scripts[0]).toMatch(/--effort '[^']+'/);
+  expect(scripts[0]).toContain("--settings .claude/settings.headless.json --max-turns 40");
+  expect(scripts[0]).not.toMatch(/--agents|--agent/);
+});

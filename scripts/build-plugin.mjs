@@ -32,6 +32,7 @@
  */
 
 import { version as dotbabelVersion } from "../plugins/dotbabel/src/index.mjs";
+import { buildClaudeReviewWorkflow } from "../plugins/dotbabel/src/model-intelligence/materialize/runtime/claude-workflow.mjs";
 import { readSnapshot } from "../plugins/dotbabel/src/model-intelligence/snapshot/index.mjs";
 import { buildClaudeBaseline } from "../plugins/dotbabel/src/model-intelligence/materialize/runtime/claude-build.mjs";
 import { parse, helpText } from "../plugins/dotbabel/src/lib/argv.mjs";
@@ -198,6 +199,15 @@ function buildExpected() {
   const baseline = buildClaudeBaseline({ toolVersion: dotbabelVersion, snapshot, artifacts: projections });
   for (const file of baseline.files) files.set(join(templateRoot, file.path), file.content);
   files.set(join(templateRoot, ".dotbabel-projection.json"), JSON.stringify(baseline.manifest, null, 2) + "\n");
+  const workflowRoot = join(repoRoot, "plugins/dotbabel/src/model-intelligence/workflows");
+  const workflow = buildClaudeReviewWorkflow({ toolVersion: dotbabelVersion, snapshot, sourceContent: readFileSync(join(workflowRoot, "ai-review.source.yml"), "utf8"), computeContent: readFileSync(join(workflowRoot, "ai-review.compute.yml"), "utf8") });
+  for (const file of workflow.files) {
+    files.set(join(repoRoot, "plugins/dotbabel/templates/workflows", file.path), file.content);
+    files.set(join(repoRoot, "examples/minimal-consumer/.github/workflows", file.path), file.content);
+  }
+  const workflowManifest = JSON.stringify(workflow.manifest, null, 2) + "\n";
+  files.set(join(repoRoot, "plugins/dotbabel/templates/workflows/.dotbabel-projection.json"), workflowManifest);
+  files.set(join(repoRoot, "examples/minimal-consumer/.github/workflows/.dotbabel-projection.json"), workflowManifest);
   const manifest = { version: 1, generatedAt: "{{today}}", skills: manifestEntries };
   const manifestText = JSON.stringify(manifest, null, 2) + "\n";
   return { files, manifestText };
