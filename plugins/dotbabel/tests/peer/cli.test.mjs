@@ -4,6 +4,7 @@ import { spawn, spawnSync, execFileSync } from "node:child_process";
 import { afterEach, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 import { processState } from "../../src/fleet/registry.mjs";
+import { setupHooks } from "../../src/peer/setup.mjs";
 const bin = new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname;
 const children = [];
 afterEach(() => {
@@ -51,6 +52,92 @@ function json(r) {
   expect(r.status, r.stderr || r.stdout).toBe(0);
   return JSON.parse(r.stdout);
 }
+it("launches an owned Antigravity stream from the public CLI without changing native defaults", () => {
+  const w = world(),
+    dir = path.join(w.root, "bin");
+  fs.mkdirSync(dir);
+  setupHooks("antigravity", {}, w.repo);
+  fs.writeFileSync(
+    path.join(dir, "agy"),
+    `#!/usr/bin/env node\nconsole.log(JSON.stringify({event:'init',conversation_id:'00000000-0000-4000-8000-000000000031',init:{permission_mode:'request-review'}}));require('node:readline').createInterface({input:process.stdin}).on('line',line=>console.log(JSON.stringify({event:'result',result:{conversation_id:'00000000-0000-4000-8000-000000000031',status:'SUCCESS',response:JSON.parse(line).message.content}})));\n`,
+    { mode: 0o700 },
+  );
+  const result = spawnSync(process.execPath, [bin, "launch", "main", "--harness", "antigravity"], {
+    cwd: w.repo,
+    env: { ...w.env, PATH: `${dir}:${process.env.PATH}` },
+    input: "owned prompt\n",
+    encoding: "utf8",
+    timeout: 10000,
+  });
+  expect(result.status, result.stderr).toBe(0);
+  const events = result.stdout
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  expect(events.find((e) => e.event === "dotbabel_peer").pair.main.harness).toBe("antigravity");
+  expect(events.some((e) => e.result?.response === "owned prompt")).toBe(true);
+  const pair = events.find((e) => e.event === "dotbabel_peer").pair;
+  const resumed = spawnSync(
+    process.execPath,
+    [
+      bin,
+      "launch",
+      "main",
+      "--harness",
+      "antigravity",
+      "--pair",
+      pair.id,
+      "--conversation",
+      pair.main.sessionId,
+    ],
+    {
+      cwd: w.repo,
+      env: { ...w.env, PATH: `${dir}:${process.env.PATH}` },
+      input: "resume owned prompt\n",
+      encoding: "utf8",
+      timeout: 10000,
+    },
+  );
+  expect(resumed.status, resumed.stderr).toBe(0);
+  expect(
+    resumed.stdout
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+      .find((e) => e.event === "dotbabel_peer").pair.id,
+  ).toBe(pair.id);
+  expect(w.cli(["launch", "main", "--harness", "copilot"]).status).toBe(64);
+  expect(w.cli(["launch", "advisor", "--harness", "antigravity"]).status).toBe(64);
+});
+it("routes native camelCase hook input without applying legacy session identity", () => {
+  const w = world();
+  const result = w.cli(
+    ["hook", "PreToolUse", "--harness", "antigravity"],
+    0,
+    JSON.stringify({
+      conversationId: "00000000-0000-4000-8000-000000000041",
+      workspacePaths: [w.repo],
+      toolCall: { name: "write_to_file", args: {} },
+    }),
+  );
+  expect(result.status, result.stderr).toBe(0);
+  expect(JSON.parse(result.stdout)).toEqual({});
+});
+it("returns a native deny decision when a managed hook cannot authenticate its actor", () => {
+  const w = world();
+  const r = spawnSync(process.execPath, [bin, "hook", "PreToolUse", "--harness", "antigravity"], {
+    cwd: w.repo,
+    env: { ...w.env, DOTBABEL_PEER_MANAGED: "antigravity" },
+    input: JSON.stringify({
+      conversationId: "00000000-0000-4000-8000-000000000041",
+      workspacePaths: [w.repo],
+      toolCall: { name: "write_to_file", args: {} },
+    }),
+    encoding: "utf8",
+  });
+  expect(r.status, r.stderr).toBe(0);
+  expect(JSON.parse(r.stdout)).toMatchObject({ decision: "deny" });
+});
 it("pairs in two commands and exposes the complete queue lifecycle through separate CLI processes", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));
@@ -153,6 +240,7 @@ it("supports independent submissions and rejects unknown operations and missing 
   );
   expect(json(r).body).toBe("independent question");
   expect(w.cli(["send", "main", "oops", "--urgent"], 1).status).toBe(64);
+  expect(w.cli(["main", "--harness", "opencode"]).status).toBe(64);
 });
 
 it("executes peer coordination in the trusted host hook before a namespaced shell runs", () => {
@@ -242,4 +330,27 @@ it("keeps chained commands, wrappers, setup, repository overrides, and Advisor r
   expect(JSON.parse(printed.stdout).error.code).toBe("PEER_USAGE");
   expect(json(w.cli(["queue", "--json"]))).toEqual([]);
   expect(fs.existsSync(path.join(w.repo, "forbidden"))).toBe(false);
+});
+it("returns scoped CLI help through the trusted Advisor hook instead of requiring package-source access", () => {
+  const w = world(),
+    pair = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", pair.code, "--json"], 1));
+  const result = json(
+    w.cli(
+      ["hook", "PreToolUse"],
+      1,
+      JSON.stringify({
+        cwd: w.repo,
+        session_id: w.ids[1].sessionId,
+        tool_name: "Bash",
+        tool_input: { command: "dotbabel peer --help" },
+      }),
+    ),
+  );
+  expect(result.hookSpecificOutput.permissionDecision).toBe("allow");
+  const printed = spawnSync("bash", ["-c", result.hookSpecificOutput.updatedInput.command], {
+    encoding: "utf8",
+  });
+  expect(JSON.parse(printed.stdout).usage).toContain("--lease TOKEN --result TEXT");
+  expect(json(w.cli(["queue", "--json"]))).toEqual([]);
 });

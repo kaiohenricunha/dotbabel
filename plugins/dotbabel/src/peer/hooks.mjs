@@ -37,6 +37,8 @@ function readOnlyShell(command) {
   return (
     cli[0] === "peer" &&
     [
+      "--help",
+      "-h",
       "next",
       "receive",
       "ack",

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { it, expect } from "vitest";
+import { it, expect, vi } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 import { repository, currentSession, endpointAlive } from "../../src/peer/identity.mjs";
 import { processState } from "../../src/fleet/registry.mjs";
@@ -49,6 +49,32 @@ it("requires a real Codex process ancestor, never a supplied UUID alone", () => 
   expect(() => currentSession(r, { env: { CODEX_THREAD_ID: "fake" }, startPid: 1 })).toThrow(
     /Codex|session/,
   );
+});
+it("refuses an inherited Codex identity across a foreign native runtime boundary", () => {
+  const r = repository(repo()),
+    original = fs.readFileSync;
+  const spy = vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) => {
+    if (String(file) === "/proc/9100/stat")
+      return "9100 (opencode) S 9200 " + Array(18).fill("0").join(" ") + " 123";
+    if (String(file) === "/proc/9200/stat")
+      return "9200 (codex) S 1 " + Array(18).fill("0").join(" ") + " 456";
+    if (String(file) === "/proc/9100/cmdline") return "/usr/bin/opencode.exe\0serve\0";
+    if (String(file) === "/proc/9200/cmdline") return "/usr/bin/codex\0";
+    return original.call(fs, file, ...args);
+  });
+  try {
+    expect(() =>
+      currentSession(r, {
+        env: {
+          CLAUDE_CONFIG_DIR: makeTempDir("peer-no-registry-"),
+          CODEX_THREAD_ID: "00000000-0000-4000-8000-000000000001",
+        },
+        startPid: 9100,
+      }),
+    ).toThrow(/native|integration/);
+  } finally {
+    spy.mockRestore();
+  }
 });
 
 it("identifies separate worktrees as one repository while exposing live uncommitted files", () => {

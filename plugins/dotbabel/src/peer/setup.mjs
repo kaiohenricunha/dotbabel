@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
+import { setupNative } from "./native-setup.mjs";
 const BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 function install(file, events) {
@@ -44,8 +45,10 @@ function install(file, events) {
   return file;
 }
 
-/** Install peer hooks after explicit setup invocation; Codex trust remains the user's decision. @param {string} harness @param {NodeJS.ProcessEnv} [env] @returns {object} */
-export function setupHooks(harness, env = process.env) {
+/** Install peer hooks after explicit setup invocation; native trust remains the user's decision. @param {string} harness @param {NodeJS.ProcessEnv} [env] @param {string} [directory] @returns {object} */
+export function setupHooks(harness, env = process.env, directory = process.cwd()) {
+  if (["opencode", "copilot", "antigravity"].includes(harness))
+    return setupNative(harness, directory);
   if (!["claude", "codex", "both"].includes(harness))
     throw new Error("harness must be claude, codex, or both");
   const files = [];

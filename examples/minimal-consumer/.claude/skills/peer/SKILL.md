@@ -1,9 +1,9 @@
 ---
-# dotbabel:generated projection=sha256:3c4952d9433f0009a34ff4b81d87fcf21c6a417da53aaec346db2478cb0f0947 source=skills/peer/SKILL.md — do not edit directly
-allowed-tools: Bash Read Grep Glob
+# dotbabel:generated projection=sha256:f4a93c80d0268fb26563fd71e447c1a1c7568e4f9cf188447f35ea3f9afebff6 source=skills/peer/SKILL.md — do not edit directly
+allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status
 description: |
-  Pair persistent Main and Advisor sessions across Claude Code and Codex. Manage their durable investigations, queue, and bidirectional messages. Use for peer main, peer advisor, peer ask, or requests addressed to an already paired Advisor. Handoff remains the separate context-transfer tool.
+  Pair persistent Main and Advisor sessions across Claude Code, Codex, OpenCode v2, Copilot CLI, and managed Antigravity CLI streams. Manage their durable investigations, queue, and bidirectional messages. Use for peer main, peer advisor, peer ask, or requests addressed to an already paired Advisor. Handoff remains the separate context-transfer tool.
 name: peer
 ---
 
@@ -13,6 +13,41 @@ Claude Code invocation: `/peer main` or `/peer advisor CODE`.
 Codex invocation: `$peer main` or `$peer advisor CODE`. Do not invent a custom
 Codex `/peer` command. Both invoke `dotbabel peer` in the current session's
 shell. Run `dotbabel peer --help` for the exact deterministic interface.
+
+OpenCode v2 and Copilot CLI use the native `dotbabel_peer` tool. Pass the
+arguments after `dotbabel peer` as an `argv` array. Use `{"argv":["--help"]}`
+for the full interface. For example, claim work with `{"argv":["next"]}`.
+Complete it with `{"argv":["complete","REQUEST_ID","--lease","TOKEN","--result","Evidence and result"]}`.
+Never provide an actor ID or change a native model or permission policy.
+OpenCode Advisor calls through `execute` must contain one literal native tool call:
+`return await tools["dotbabel_peer"]({"argv":["status"]});`.
+Use JSON literal arguments. Arbitrary JavaScript and multiple calls are refused.
+
+Install one native integration in the project with
+`dotbabel peer setup --harness opencode|copilot|antigravity --repo-root PATH`,
+using one harness name. Restart OpenCode v2 after setup. Start Copilot with
+`copilot --experimental`; approve its native extension hooks when prompted.
+The extension joins the real foreground conversation. Normal tool approvals remain.
+
+Antigravity CLI requires the managed persistent stream launcher after setup:
+`dotbabel peer launch main --harness antigravity` or
+`dotbabel peer launch advisor CODE --harness antigravity`.
+The native `init` event supplies the real conversation ID. Each input line is a
+prompt; `.quit` ends input after accepted turns. Output is native NDJSON plus one
+`dotbabel_peer` registration event. This does not attach to an existing Antigravity
+terminal. Native hooks enforce Advisor restrictions and handle literal peer commands.
+They approve only the replacement command that prints a scoped operation's result.
+All other tools retain native permission checks. Stream mode cannot show permission
+prompts; a denied tool remains denied. Do not bypass this with permission flags.
+Use native file tools for Antigravity stream inspection. Run ordinary shell
+commands only when native policy already permits them. If Git evidence needs a
+permission grant, ask Main through a correlated peer question and record `wait`.
+After the owned process ends, preserve its pair and conversation with
+`dotbabel peer launch advisor --pair PAIR_ID --conversation CONVERSATION_ID --harness antigravity`.
+Use `main` for the Main role. Omit `--conversation` to reconnect a new native
+conversation instead. The native init ID must match a requested resume ID.
+Read status after reconnection, then resume scheduling explicitly. Use the current
+lease; a lease from the interrupted attempt is invalid.
 
 Register Main with `dotbabel peer main`. Pair Advisor with
 `dotbabel peer advisor CODE`, or omit CODE when exactly one eligible Main
@@ -99,7 +134,7 @@ after checking the active request. Never mark a failed model turn completed.
 
 Keep implementation authority. Read `receive` when notified and at safe points.
 Consider findings against current code and reply through `send advisor` with
-`--reply-to MESSAGE_ID`. Acknowledge only what you have handled. Continue your own
+`--kind reply --reply-to MESSAGE_ID`. Acknowledge only what you have handled. Continue your own
 implementation; Advisor is independent and cannot grant approvals.
 
 ## Input while busy
