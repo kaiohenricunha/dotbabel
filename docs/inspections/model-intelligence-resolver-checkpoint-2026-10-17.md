@@ -19,3 +19,11 @@ An isolated real Codex 0.163.0 discovery and subsequent resolution both exit 0. 
 ## Remaining scope
 
 Integrate the activation branch and latest main while preserving both CLI surfaces. Verify active acceptance commands, relevant regressions, lint, coverage and PR quality. Review and land through IMPL-12 after authorization returns. P-12 through P-23 and independent classifier/Claude mod/Codex App Server routing remain open, including real effective-state proof, manual axes, floors, exactly-once input, hysteresis, projections, snapshots, migrations, recommendations, remaining adapters and final requirement audit.
+
+## Integrated verification — 2026-10-18
+
+Resolver implementation commit: a3d8ae0. Local integration of activation and current main: 396ede5. Both CLI surfaces are retained; the only merge conflict belongs to these two units from this session. Combined feature/adapter/catalog tests pass 171 cases; all 15 models Bats cases pass. Direct read-boundary cases then directly verify the CLI orchestration, including malformed policies/frontmatter, missing/non-file/oversized artifacts, exact size, inheritance, legacy conflicts and absence of network calls.
+
+The first final PR quality run fails changed-line coverage at 81.39%. Direct file-boundary tests raise it to 98.70%; changed-branch coverage is 95.54%. The next quality run exits 0 with warning verdict, environment_error=false, and all configured executions exit 0. Its test and coverage legs each report 4,991 passed and 14 skipped across 198 files. Final core mutation verification again scores 85.44%, with 616 killed, 98 surviving, 7 uncovered and no timeouts. All six active original-spec criteria (AC-8/9/10/11/26/27) pass. No other criterion is claimed complete.
+
+The new default classifier starts independently in `.claude/worktrees/adaptive-session-routing-classifier`, branch `feat/adaptive-session-routing-classifier`, based on 396ede5. Its missing-module baseline is recorded; nineteen contextual/uncertainty/bounded-input tests now pass. Ten authored fixtures compare lexical and contextual rules without model calls; this is not held-out accuracy or model-ranking evidence. Classifier mutation/quality, routing core, runtime adapters and full initiative acceptance remain open.
