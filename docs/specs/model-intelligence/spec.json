@@ -1,6 +1,6 @@
 {
   "id": "model-intelligence",
-  "title": "Model Intelligence — provider-neutral compute requirements resolved to runtime-native configurations",
+  "title": "Model Intelligence \u2014 provider-neutral compute requirements resolved to runtime-native configurations",
   "status": "approved",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
@@ -77,7 +77,7 @@
     },
     {
       "id": "AC-2",
-      "status": "planned",
+      "status": "active",
       "given": "an artifact whose dotbabel.compute and legacy model disagree in known meaning",
       "when": "compat compares the two declarations",
       "then": "it reports a conflict and chooses neither silently",
@@ -102,7 +102,7 @@
     },
     {
       "id": "AC-3",
-      "status": "planned",
+      "status": "active",
       "given": "a shipped policy file that contains a provider model name",
       "when": "policy loads",
       "then": "the policy is rejected",
@@ -152,7 +152,7 @@
     },
     {
       "id": "AC-5",
-      "status": "planned",
+      "status": "active",
       "given": "an adapter operation with no declared timeout",
       "when": "the operation exceeds its limit",
       "then": "it returns unavailable with code timeout after 10 seconds for a subprocess or 20 seconds for a network call",
@@ -177,7 +177,7 @@
     },
     {
       "id": "AC-6",
-      "status": "planned",
+      "status": "active",
       "given": "a valid cache entry",
       "when": "a refresh fails or returns empty output",
       "then": "the previous entry stays usable and is marked stale",
@@ -202,7 +202,7 @@
     },
     {
       "id": "AC-7",
-      "status": "planned",
+      "status": "active",
       "given": "a refresh in progress for one cache key",
       "when": "a second process requests a refresh of that key",
       "then": "no second discovery starts and the caller sees refresh in_progress",
