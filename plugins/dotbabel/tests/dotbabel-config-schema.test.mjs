@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 import { DEFAULT_DOTBABEL_JSON } from "../src/project-init-scaffold.mjs";
-import { KNOWN_FAN_OUT_CLIS, KNOWN_FAN_OUT_LAYOUTS } from "../src/project-sync.mjs";
+import { KNOWN_FAN_OUT_CLIS, KNOWN_FAN_OUT_LAYOUTS, DEFAULT_PROJECT_CONFIG } from "../src/project-sync.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -59,7 +59,8 @@ describe("dotbabel.config.schema.json", () => {
   it("enumerates exactly the CLIs the code knows about", () => {
     const schema = readJson(SCHEMA_PATH);
     expect(schema.properties.fan_out.items.enum).toEqual([...KNOWN_FAN_OUT_CLIS]);
-    expect(schema.properties.fan_out.default).toEqual([...KNOWN_FAN_OUT_CLIS]);
+    expect(schema.properties.fan_out.default).toEqual([...DEFAULT_PROJECT_CONFIG.fan_out]);
+    expect(schema.properties.fan_out.default).toEqual(DEFAULT_DOTBABEL_JSON.fan_out);
     expect(schema.properties.cli_excluded.propertyNames.enum).toEqual([...KNOWN_FAN_OUT_CLIS]);
   });
 

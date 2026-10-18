@@ -72,6 +72,19 @@ Artifacts must be regular files of at most 1 MiB. Missing, non-file or oversized
 diagnostics. Use explicit refresh when older cached evidence lacks the capabilities needed by a
 requirement; resolution never performs that refresh on its own.
 
+## Google runtime policy
+
+Antigravity is the preferred Google project fan-out target. Gemini CLI remains an optional
+legacy/enterprise runtime. The `antigravity` and `gemini` runtime identifiers stay distinct;
+Gemini model identifiers do not imply Gemini CLI. Existing explicit fan-out lists remain authoritative.
+
+The default change does not activate Model Intelligence or adaptive routing and does not alter
+models or reasoning settings. The runtime registry recognizes both Google runtimes independently.
+The shipped live discovery adapters currently cover Claude and Codex; this policy adds no adapter.
+The [capability investigation](audits/model-runtime-capability-investigation.md) records Antigravity’s
+`agy models` discovery separately from Gemini CLI’s lack of an equivalent verified command.
+Those differences remain intact. See the [migration guidance](quickstart.md#google-runtime-migration).
+
 ## Runtime availability
 
 The [adaptive routing spec](specs/adaptive-session-routing/README.md) defines the runtime integrations.

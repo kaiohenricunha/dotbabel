@@ -95,6 +95,8 @@ describe("model-intelligence domain vocabulary", () => {
   it("runtime ids come from the RUNTIMES registry and are not redeclared", () => {
     expect(domain.RUNTIME_IDS).toEqual(Object.keys(RUNTIMES));
     expect(domain.isRuntimeId("opencode")).toBe(true);
+    expect(domain.isRuntimeId("gemini")).toBe(true);
+    expect(domain.isRuntimeId("antigravity")).toBe(true);
     expect(domain.isRuntimeId("anthropic")).toBe(false);
     expect(() => domain.makeResolvedRuntimeConfiguration({
       runtimeId: "anthropic",

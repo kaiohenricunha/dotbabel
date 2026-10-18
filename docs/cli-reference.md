@@ -345,6 +345,11 @@ Pre-existing real files (not symlinks) are backed up to `<name>.bak-<timestamp>`
 
 [^1]: Skills fan out to `~/.codex/skills/`, `~/.gemini/skills/`, `~/.gemini/config/skills/` (Antigravity), and `~/.config/opencode/skills/`. Copilot has no skill auto-discovery directory, so only its instruction file is linked.
 
+Antigravity CLI (`agy`) is the recommended Google runtime for new individual installations.
+Bootstrap still configures any installed supported runtime, including optional Gemini CLI
+(`gemini`); `--all` still configures both even when absent. Project defaults exclude Gemini,
+and an explicit project `fan_out` can enable it. See [migration guidance](quickstart.md#google-runtime-migration).
+
 **Typical invocations:**
 
 ```bash

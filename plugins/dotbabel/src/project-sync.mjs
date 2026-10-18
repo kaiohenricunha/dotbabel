@@ -27,6 +27,7 @@ import {
 import {
   RUNTIMES,
   anyRuntimePresent,
+  defaultFanOutRuntimes,
   fanOutRuntimes,
   projectArtifactTargets,
   resolveProjectSkillsDir,
@@ -88,7 +89,7 @@ export const DEFAULT_PROJECT_CONFIG = Object.freeze({
   rule_floor_source: "CLAUDE.md",
   commands_dir: ".claude/commands",
   skills_dir: ".claude/skills",
-  fan_out: KNOWN_FAN_OUT_CLIS,
+  fan_out: Object.freeze(defaultFanOutRuntimes()),
   fan_out_layout: "per-cli",
   gate_on_cli_presence: true,
   cli_excluded: Object.freeze({}),
