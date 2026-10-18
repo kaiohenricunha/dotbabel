@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T14:34:27.767Z",
+  "generatedAt": "2026-10-18T17:42:56.629Z",
   "skills": [
     {
       "name": "agents-search",
@@ -347,7 +347,7 @@
     {
       "name": "validate-spec",
       "path": ".claude/skills/validate-spec/SKILL.md",
-      "checksum": "sha256:74004709a48027b2ad3355752b7eb099069e6a66b32fca6f17f66ce78d9a9088",
+      "checksum": "sha256:0ccf486090a349a9a682be7458b1e5cbc9301fc62d31d370d36f31cf8ba88750",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
