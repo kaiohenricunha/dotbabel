@@ -45,7 +45,7 @@ import { ValidationError } from "./lib/errors.mjs";
  * @property {boolean} [quiet]
  * @property {import('./lib/output.mjs').Output} [out]
  *
- * @typedef {{ kind: 'instruction'|'symlink'|'generated', path: string, expected?: string, actual?: string }} DriftEntry
+ * @typedef {{ kind: 'instruction'|'symlink'|'generated'|'projection', path: string, expected?: string, actual?: string }} DriftEntry
  *
  * @typedef {object} CheckProjectSyncResult
  * @property {boolean} ok                 true iff missing.length === 0 && stale.length === 0

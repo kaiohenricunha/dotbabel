@@ -14,8 +14,11 @@ function parseManifest(text) {
   if (text === null) return null;
   let value; try { value = JSON.parse(text); } catch { throw fail("projection_manifest_invalid"); }
   if (value?.schemaVersion !== 1 || typeof value.toolVersion !== "string" || !value.entries || typeof value.entries !== "object" || Array.isArray(value.entries) || Object.keys(value.entries).length > 1024) throw fail("projection_manifest_invalid");
-  for (const [path, entry] of Object.entries(value.entries)) {
-    if (!isProjectionPath(path) || [MANIFEST, PENDING, ".dotbabel-projection.lock"].includes(path) || !isProjectionPath(entry?.sourcePath) || !["projectionId", "sourceHash", "inputsHash", "outputHash", "resolverResultHash", "runtimeContractHash"].every(key => digest(entry[key]))) throw fail("projection_manifest_invalid");
+  for (const records of [value.entries, ...(value.retainedEntries === undefined ? [] : [value.retainedEntries])]) {
+    if (!records || typeof records !== "object" || Array.isArray(records) || Object.keys(records).length > 1024) throw fail("projection_manifest_invalid");
+    for (const [path, entry] of Object.entries(records)) {
+      if (!isProjectionPath(path) || [MANIFEST, PENDING, ".dotbabel-projection.lock"].includes(path) || !isProjectionPath(entry?.sourcePath) || !["projectionId", "sourceHash", "inputsHash", "outputHash", "resolverResultHash", "runtimeContractHash"].every(key => digest(entry[key]))) throw fail("projection_manifest_invalid");
+    }
   }
   return value;
 }
@@ -23,7 +26,7 @@ function owned(content, entry) {
   return content !== null && entry !== undefined && content.split("\n", 3)[1] === `# dotbabel:generated projection=${entry.projectionId} source=${entry.sourcePath} — do not edit directly`;
 }
 function state(tree, expected, previous, pending) {
-  const paths = [...new Set([...Object.keys(previous?.entries ?? {}), ...Object.keys(pending?.entries ?? {}), ...Object.keys(expected.entries)])].sort();
+  const paths = [...new Set([...Object.keys(previous?.entries ?? {}), ...Object.keys(pending?.entries ?? {}), ...Object.keys(pending?.retainedEntries ?? {}), ...Object.keys(expected.entries)])].sort();
   return paths.map(path => {
     const content = tree.read(path); const before = previous?.entries[path]; const next = expected.entries[path];
     return { path, state: classifyDrift({ previous: before, expected: next, ...(content === null ? {} : { outputHash: hashContent(content) }) }), content, before, next };
@@ -31,9 +34,11 @@ function state(tree, expected, previous, pending) {
 }
 function assertOwned(entry, pending) {
   if (entry.content === null) return;
-  const recorded = owned(entry.content, entry.before) ? entry.before : pending?.entries[entry.path];
-  if (!owned(entry.content, recorded)) throw fail("projection_not_owned");
-  if (hashContent(entry.content) !== recorded.outputHash) throw fail("projection_output_drift");
+  const candidates = [entry.before, pending?.entries[entry.path], pending?.retainedEntries?.[entry.path]].filter(record => owned(entry.content, record));
+  if (!candidates.length) throw fail("projection_not_owned");
+  const recorded = candidates.find(record => hashContent(entry.content) === record.outputHash);
+  if (!recorded) throw fail("projection_output_drift");
+  return recorded;
 }
 
 /**
@@ -47,26 +52,33 @@ export async function syncProjectionTree({ root, loadInputs, onStep }) {
   try {
     lock = acquireLock(tree.lockPath, { resource: "projection-tree" });
     if (!lock.acquired) return { status: "busy", reason: lock.reason };
-    const previous = parseManifest(tree.read(MANIFEST)); const pending = parseManifest(tree.read(PENDING));
+    const previousText = tree.read(MANIFEST); const pendingText = tree.read(PENDING);
+    const previous = parseManifest(previousText); const pending = parseManifest(pendingText);
     const batch = materialize(await loadInputs()); parseManifest(JSON.stringify(batch.manifest));
     const entries = state(tree, batch.manifest, previous, pending);
-    entries.forEach(entry => assertOwned(entry, pending));
-    tree.write(PENDING, canonicalJson(batch.manifest) + "\n");
-    for (const entry of entries) {
+    const retainedEntries = Object.fromEntries(entries.filter(entry => entry.content !== null).map(entry => [entry.path, assertOwned(entry, pending)]));
+    if (Object.keys(retainedEntries).length > 1024) throw fail("projection_manifest_invalid");
+    const result = { status: "synced", manifest: batch.manifest, entries: entries.map(({ path, state }) => ({ path, state })) };
+    if (pending === null && canonicalJson(previous) === canonicalJson(batch.manifest) && entries.every(entry => entry.state === "clean")) return result;
+    const journal = canonicalJson({ ...batch.manifest, retainedEntries }) + "\n";
+    tree.write(PENDING, journal, { expected: pendingText, exclusive: pendingText === null });
+    // Retire old targets before adding new ones, bounding live recovery ownership.
+    for (const entry of [...entries.filter(entry => entry.next === undefined), ...entries.filter(entry => entry.next !== undefined)]) {
       const current = tree.read(entry.path);
       if (current !== entry.content) throw fail("projection_output_drift");
-      if (entry.next === undefined) tree.remove(entry.path);
+      if (entry.next === undefined) tree.remove(entry.path, { expected: current });
       else {
         const file = batch.files.find(file => file.path === entry.path);
-        if (current !== file.content) tree.write(entry.path, file.content, { exclusive: current === null });
+        if (current !== file.content) tree.write(entry.path, file.content, { expected: current, exclusive: current === null });
       }
       await onStep?.({ kind: "file", path: entry.path });
     }
     for (const file of batch.files) if (hashContent(tree.read(file.path) ?? "") !== batch.manifest.entries[file.path].outputHash) throw fail("projection_output_drift");
-    tree.write(MANIFEST, canonicalJson(batch.manifest) + "\n");
+    for (const entry of entries) if (entry.next === undefined && tree.read(entry.path) !== null) throw fail("projection_output_drift");
+    tree.write(MANIFEST, canonicalJson(batch.manifest) + "\n", { expected: previousText, exclusive: previousText === null });
     await onStep?.({ kind: "manifest" });
-    tree.remove(PENDING);
-    return { status: "synced", manifest: batch.manifest, entries: entries.map(({ path, state }) => ({ path, state })) };
+    tree.remove(PENDING, { expected: journal });
+    return result;
   } finally { if (lock?.acquired) lock.release(); tree.close(); }
 }
 
@@ -82,9 +94,9 @@ export async function inspectProjectionTree({ root, loadInputs }) {
     if (readLockOwner(tree.lockPath) !== undefined) return { status: "busy", entries: [] };
     const original = tree.read(MANIFEST); const previous = parseManifest(original);
     const batch = materialize(await loadInputs()); parseManifest(JSON.stringify(batch.manifest));
-    const pending = parseManifest(tree.read(PENDING));
+    const pendingText = tree.read(PENDING); const pending = parseManifest(pendingText);
     const entries = state(tree, batch.manifest, previous, pending).map(({ path, state }) => ({ path, state }));
-    if (readLockOwner(tree.lockPath) !== undefined || original !== tree.read(MANIFEST)) return { status: "busy", entries: [] };
+    if (readLockOwner(tree.lockPath) !== undefined || original !== tree.read(MANIFEST) || pendingText !== tree.read(PENDING)) return { status: "busy", entries: [] };
     return { status: pending !== null ? "incomplete" : entries.every(entry => entry.state === "clean") ? "clean" : "drift", manifest: batch.manifest, entries };
   } finally { tree.close(); }
 }
