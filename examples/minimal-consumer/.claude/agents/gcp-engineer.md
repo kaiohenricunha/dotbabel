@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:a40b3e39e59957c94bc5da293262f35650570f24bd509bb5c8cd8b62fa04d13f source=agents/gcp-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:48599ed93f8ff48aeca288b7348ac1dbe23ce5e8796c43f806da495ea4987457 source=agents/gcp-engineer.md — do not edit directly
 description: |
   Use when designing, debugging, or reviewing Google Cloud workloads and service integrations. Triggers on: "GCP", "Google Cloud", "GKE", "Cloud Run", "GCE", "Cloud Functions", "Pub/Sub", "GCS", "BigQuery", "Cloud Build", "Workload Identity", "Service Account", "VPC", "Cloud Armor", "Cloud CDN", "Deployment Manager", "Config Connector". Uses opus — GCP architecture across Workload Identity, VPC networks, and IAM hierarchies requires deep reasoning to avoid security gaps.
 model: opus

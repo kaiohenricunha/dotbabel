@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:66674ea8b26c9bcac5a7e4868bdb3ac0a1c7e2d7143c56b980df852a8f8d407c source=agents/frontend-developer.md — do not edit directly
+# dotbabel:generated projection=sha256:00ed994c934c254be2a494b06cb26e80d8a3e32bc976f6c7d73eb4093bdb366c source=agents/frontend-developer.md — do not edit directly
 description: |
   Use when building or modifying client-side code: UI components, pages, forms, state management, or client-side data fetching. Triggers on: "build UI", "React component", "frontend", "CSS", "accessibility", "form validation", "client-side", "Next.js page", "Tailwind". Uses sonnet — everyday frontend implementation benefits from balanced capability and response speed.
 model: sonnet
