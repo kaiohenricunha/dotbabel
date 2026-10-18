@@ -357,3 +357,28 @@ teardown() {
   [ "$status" -eq 2 ]
   [[ "$output" == *"file not found"* ]]
 }
+
+@test "handoff-extract: claude reports the observed model from init.model instead of null" {
+  printf '%s\n' '{"type":"system","subtype":"init","model":"claude-fixture","claude_code_version":"2.1.302"}' >> "$CLAUDE_FILE"
+  run bash "$EX" meta claude "$CLAUDE_FILE"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .model)" = claude-fixture ]
+}
+
+@test "handoff-extract: codex reports the model and the provider in separate fields" {
+  printf '%s\n' '{"type":"turn_context","payload":{"model":"codex-fixture","effort":"high"}}' >> "$CODEX_FILE"
+  run bash "$EX" meta codex "$CODEX_FILE"
+  [ "$status" -eq 0 ]
+  [ "$(printf '%s' "$output" | jq -r .model)" = codex-fixture ]
+  [ "$(printf '%s' "$output" | jq -r .provider)" = openai ]
+  [ "$(printf '%s' "$output" | jq -r .observation.evidence.configurationBasis)" = reconstructed ]
+}
+
+@test "handoff-extract: antigravity and opencode report observation unsupported rather than failing" {
+  for runtime in antigravity opencode; do
+    run bash "$EX" meta "$runtime" "$CLAUDE_FILE"
+    [ "$status" -eq 0 ]
+    [ "$(printf '%s' "$output" | jq -r .observation.status)" = unsupported ]
+    [ "$(printf '%s' "$output" | jq -r .model)" = null ]
+  done
+}

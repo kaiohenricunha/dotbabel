@@ -1164,3 +1164,18 @@ The internal surface is the shared library contract of ARCH-58 and the contracts
 ## Database Schema
 
 N/A — there is no database (ARCH-22). The five file stores and their access patterns are in §3 `Data Stores`; the projection manifest and the release snapshot formats are above.
+
+### File-only observation entry point
+
+A runtime adapter may export `observeStream(stream, { now? })` as a data-only entry point over its
+existing parser and observation constructors. It starts no runtime and reads no native configuration.
+`observe({ stream, ...context })` delegates to that same entry point, including rejection of an
+explicit stream with the wrong type. This does not introduce another resolver, provider registry,
+capability table or model-selection policy.
+
+The handoff bridge selects only runtime handles from `SOURCE_ADAPTERS`. It requires supported
+observation and an explicit `observeStream` function before reading a transcript. An unverified
+operation stays unknown; an absent/unsupported adapter reports unsupported; a supported adapter
+without a data-only method reports `observation_stream_unavailable`. It never falls back to a native
+probe on this path. Typed observations are identical to the adapter's `observe({stream})` output.
+Codex turn-context configuration remains reconstructed rather than proof of effective inference.

@@ -6,7 +6,7 @@
 #   handoff-extract.sh prompts <cli> <file>
 #   handoff-extract.sh turns   <cli> <file> [N]
 #
-# cli:   claude | copilot | codex | gemini
+# cli:   claude | copilot | codex | gemini; meta also accepts antigravity | opencode
 # file:  absolute path to the session JSONL (from handoff-resolve.sh)
 # N:     optional limit for `turns` (default: 20)
 #
@@ -33,6 +33,7 @@ die_runtime() { printf 'handoff-extract: %s\n' "$1" >&2; exit 2; }
 usage() {
   cat <<'EOF' >&2
 usage: handoff-extract.sh <meta|prompts|turns> <claude|copilot|codex|gemini> <file> [N]
+meta also accepts antigravity and opencode, reporting unsupported observation.
 EOF
   exit 64
 }
@@ -272,7 +273,7 @@ meta_codex() {
         session_id: nn($sid),
         short_id: nn($sid[:8]),
         cwd: nn(.cwd),
-        model: nn(.model_provider),
+        model: null,
         started_at: nn(.timestamp)
       }
   '
@@ -407,6 +408,7 @@ main() {
   local cli="$2"
   case "$cli" in
     claude|copilot|codex|gemini) ;;
+    antigravity|opencode) [[ "$sub" == meta ]] || die_usage "only metadata observation is supported for this runtime" ;;
     *) die_usage "cli must be one of: claude, copilot, codex, gemini (got: $cli)" ;;
   esac
 
@@ -417,11 +419,21 @@ main() {
 
   case "$sub" in
     meta)
-      case "$cli" in
+      local metadata observation script_dir
+      metadata=$(case "$cli" in
         claude)  meta_claude "$file" ;;
         copilot) meta_copilot "$file" ;;
         codex)   meta_codex "$file" ;;
         gemini)  meta_gemini "$file" ;;
+        antigravity|opencode) jq -nc --arg cli "$cli" '{cli:$cli,session_id:null,short_id:null,cwd:null,model:null,started_at:null}' ;;
+      esac)
+      case "$cli" in
+        claude|codex|antigravity|opencode)
+          script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+          observation=$(node "$script_dir/handoff-observe.mjs" "$cli" "$file")
+          jq -nc --argjson metadata "$metadata" --argjson observation "$observation" '$metadata + {model:($observation.evidence.axes.model // null),provider:($observation.evidence.provider // null),observation:$observation}'
+          ;;
+        *) printf '%s\n' "$metadata" ;;
       esac
       ;;
     prompts)

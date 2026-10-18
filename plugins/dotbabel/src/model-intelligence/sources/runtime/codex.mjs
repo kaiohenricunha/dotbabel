@@ -25,6 +25,7 @@
  */
 
 import { join } from "node:path";
+import { observeCodexSession } from "./codex-session.mjs";
 import { writeFile } from "node:fs/promises";
 import { assertOpaqueValue, checkOpaqueValue } from "../../domain/index.mjs";
 import { assertDescriptor, deepFreeze, isPlainObject, makeAdapterResult } from "../contract.mjs";
@@ -36,7 +37,7 @@ import { firstLine, parseVersion, probeVersion, resolveContext, runIsolated } fr
 export const RUNTIME_ID = "codex";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "4";
+export const ADAPTER_VERSION = "5";
 
 // Semantics of recognized Codex controls, applied only when THIS model advertises the value.
 // The order compares native effort controls, never model quality. Future values stay unannotated.
@@ -294,6 +295,16 @@ export async function discover(context) {
 }
 
 /**
+ * Observe supplied transcript metadata without starting a runtime or reading configuration.
+ * @param {unknown} stream Bounded caller-supplied JSONL.
+ * @param {{now?:Function}} [options] Caller-owned observation clock.
+ * @returns {object} The same typed observation used by observe({stream}).
+ */
+export function observeStream(stream, { now = () => new Date().toISOString() } = {}) {
+  return observeCodexSession(stream, { observedAt: now(), provenance: baseProvenance() });
+}
+
+/**
  * Observe the model, provider and effort Codex resolves, from its `exec` banner.
  *
  * The run happens in a scratch home holding only the user's model keys, with no credential and no route
@@ -304,6 +315,7 @@ export async function discover(context) {
 export async function observe(context) {
   const ctx = resolveContext(context, ROOT);
   const provenance = baseProvenance();
+  if (context !== null && Object.hasOwn(context ?? {}, "stream")) return observeStream(context.stream, { now: ctx.now });
   /** @type {string[]} */
   let carried = [];
   const ran = /** @type {any} */ (
