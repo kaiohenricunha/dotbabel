@@ -2,6 +2,7 @@
 import { prepareRoute } from "./prepare.mjs";
 import { checkOpaqueValue } from "../model-intelligence/domain/index.mjs";
 
+const validAxisValue = (axis, value) => typeof value === "string" && checkOpaqueValue(axis, value);
 const validId = value => typeof value === "string" && value.length > 0 && value.length <= 256;
 const result = (status, code, extra = {}) => ({ status, effective: { state: "unknown" }, diagnostics: [{ code }], ...extra });
 
@@ -61,10 +62,10 @@ export function createCodexTurnRouter(options) {
       if (revision !== preparedRevision) return result("blocked", "session_state_changed");
       if (decision?.status === "blocked") return result("blocked", "routing_blocked", { decision });
       const params = { ...original };
-      const requested = Object.fromEntries([["model", original.model], ["reasoning", original.effort]].filter(([axis, value]) => value !== undefined && checkOpaqueValue(axis, value)));
+      const requested = Object.fromEntries([["model", original.model], ["reasoning", original.effort]].filter(([axis, value]) => validAxisValue(axis, value)));
       if (decision?.status === "proposed") {
         const changes = decision.changes;
-        const valid = changes !== null && typeof changes === "object" && !Array.isArray(changes) && Object.entries(changes).every(([axis, value]) => ["model", "reasoning"].includes(axis) && options.runtimeCapability?.support === "supported" && options.runtimeCapability.axes?.[axis] === "supported" && checkOpaqueValue(axis, value));
+        const valid = changes !== null && typeof changes === "object" && !Array.isArray(changes) && Object.entries(changes).every(([axis, value]) => ["model", "reasoning"].includes(axis) && options.runtimeCapability?.support === "supported" && options.runtimeCapability.axes?.[axis] === "supported" && validAxisValue(axis, value));
         if (valid) {
           for (const [axis, native] of [["model", "model"], ["reasoning", "effort"]]) {
             const value = manual[axis]?.source === "manual" ? manual[axis].value ?? current?.axes?.[axis] : changes[axis];

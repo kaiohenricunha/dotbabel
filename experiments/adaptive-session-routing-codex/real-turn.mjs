@@ -52,7 +52,7 @@ try{
  let seenAxes=proof.initial;
  const prompts=["Format the sample JSON as two-space indented text. Do not use tools. Return only JSON: {a:1}","Investigate this authentication race and give one sentence of verification guidance without using tools. Two requests read a missing token before either writes it."];
  for(let i=0;i<prompts.length;i++){
-  const params={threadId,input:[{type:"text",text:prompts[i],text_elements:[]}]};
+  const params={threadId,input:[{type:"text",text:prompts[i],text_elements:[]}],model:null,effort:null};
   const dry=await prepareRoute({repoRoot:cwd,prompt:prompts[i],current:{axes:seenAxes,turnExecuted:i===0?false:true},manual,runtimeCapability:capability},dependencies);
   if(dry.status!=="proposed")throw new Error("preflight did not propose: "+dry.diagnostics?.map(x=>x.code).join(","));
   console.error(JSON.stringify({stage:"preflight",index:i,status:dry.status,changes:dry.changes}));

@@ -37,6 +37,20 @@ describe("Codex main-session submission routing", () => {
     expect(request.mock.calls.every(([, params]) => params.threadId === "thread-1")).toBe(true);
     expect(request.mock.calls[0][1].input).toEqual(first.input);
   });
+  it.each([{ model: null }, { effort: null }, { model: null, effort: null }])("preserves nullable native override parameters during a conservative fallback", async overrides => {
+    const { router, request } = setup({ prepare: async () => ({ status: "preserved", diagnostics: [{ code: "routing_disabled" }] }) });
+    const original = { ...submission(), ...overrides }; const before = structuredClone(original);
+    const outcome = await router.submit("native-null", original);
+    expect(outcome).toMatchObject({ status: "accepted", requested: {}, effective: { state: "unknown" } });
+    expect(request).toHaveBeenCalledExactlyOnceWith("turn/start", before);
+    expect(original).toEqual(before);
+  });
+  it("keeps a manual effort while a nullable model inherits automatic selection", async () => {
+    const { router, request } = setup();
+    const outcome = await router.submit("independent-null", { ...submission(), model: null, effort: "low" });
+    expect(outcome).toMatchObject({ status: "accepted", requested: { model: "native-b", reasoning: "low" } });
+    expect(request.mock.calls[0][1]).toMatchObject({ model: "native-b", effort: "low" });
+  });
   it("deduplicates concurrent and completed submissions without replay", async () => {
     const { router, request } = setup();
     const one = router.submit("same", submission());
@@ -204,7 +218,7 @@ describe("Codex main-session submission routing", () => {
     expect(outcome).toMatchObject({ requested: { model: "my-model", reasoning: "low" }, decision: { status: "preserved", diagnostics: [{ code: "routing_preparation_failed" }] } });
     expect(JSON.stringify(outcome)).not.toContain("private classifier exception");
   });
-  it.each([null, [], "invalid", { model: "native-b", unsafeAxis: "write" }, { model: "native-b", reasoning: "bad\nvalue" }])("rejects malformed proposed changes without native overrides", async changes => {
+  it.each([null, [], "invalid", { model: 42 }, { reasoning: null }, { model: "native-b", unsafeAxis: "write" }, { model: "native-b", reasoning: "bad\nvalue" }])("rejects malformed proposed changes without native overrides", async changes => {
     const { router, request } = setup({ prepare: async () => ({ status: "proposed", changes }) });
     const original = submission();
     const outcome = await router.submit("invalid-proposal", original);

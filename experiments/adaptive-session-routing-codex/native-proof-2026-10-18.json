@@ -2,7 +2,7 @@
   "turns": [
     {
       "index": 0,
-      "turnId": "01a14d7b-a5ed-7540-93df-a32185f03d2f",
+      "turnId": "01a14d84-3ed6-7211-8785-cc2635bdc0f1",
       "promptSha256": "264fe1ef389f41489d1df35c6ea423010add76d33ba8053e99cce21c213f98c5",
       "status": "completed",
       "decision": "proposed",
@@ -24,7 +24,7 @@
     },
     {
       "index": 1,
-      "turnId": "01a14d7b-b63d-7a92-b6f9-c18a73db1af7",
+      "turnId": "01a14d84-5425-7ba1-a47d-4ab1aa499c3e",
       "promptSha256": "c99c3e87e8c234906809f0e2eabf16361023789bb878695bbe901cf1aea51a3b",
       "status": "completed",
       "decision": "proposed",
@@ -49,18 +49,18 @@
   "approvalHandler": "no automatic tool approval",
   "transcriptReplayed": false,
   "runtime": "dotbabel-routing-real-proof/0.163.0 (Ubuntu 24.4.0; x86_64) WindowsTerminal (dotbabel-routing-real-proof; 0.1.0)",
-  "threadId": "01a14d7b-a56b-78d1-b9bc-f32928676707",
+  "threadId": "01a14d84-3e64-72b2-8d94-c352cc1f75de",
   "initial": {
     "model": "gpt-6.1-sol",
     "reasoning": "high"
   },
   "observedUserMessages": [
     {
-      "turnId": "01a14d7b-a5ed-7540-93df-a32185f03d2f",
+      "turnId": "01a14d84-3ed6-7211-8785-cc2635bdc0f1",
       "textSha256": ["264fe1ef389f41489d1df35c6ea423010add76d33ba8053e99cce21c213f98c5"]
     },
     {
-      "turnId": "01a14d7b-b63d-7a92-b6f9-c18a73db1af7",
+      "turnId": "01a14d84-5425-7ba1-a47d-4ab1aa499c3e",
       "textSha256": ["c99c3e87e8c234906809f0e2eabf16361023789bb878695bbe901cf1aea51a3b"]
     }
   ],
@@ -76,18 +76,18 @@
     "account/updated": 1,
     "hook/started": 6,
     "hook/completed": 6,
-    "item/started": 6,
-    "item/completed": 6,
-    "item/agentMessage/delta": 24,
+    "item/started": 5,
+    "item/completed": 5,
+    "item/agentMessage/delta": 29,
     "turn/moderationMetadata": 2,
     "thread/tokenUsage/updated": 2,
     "account/rateLimits/updated": 2,
     "turn/completed": 2
   },
   "transportDiagnostics": [],
-  "completedAt": "2026-10-18T05:28:37.252132+00:00",
+  "completedAt": "2026-10-18T05:38:01.943204+00:00",
   "sourceHashes": {
-    "codex": "b88f502b374b5e55b8df688992b8346ac5a9c5574379ab9667c473a33b0e2e43",
+    "codex": "4fffa3321ad60f5393471be57e206a201bea8f7706463255a9630ef5b0fb187c",
     "codex-rpc": "d750863421d8fa4e4a788da3ee6102ac3d87bb4d1ac8edbb22bf7808d0a77e44",
     "route": "b808b68e2fd8cab3114431944d1c3e252c08a1395607c4890022b935c8b8b934",
     "prepare": "380b004ca5696c2416f84d28634fcc357b75bcded5716d861496ae408b611cd4"
