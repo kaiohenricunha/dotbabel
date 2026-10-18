@@ -8,7 +8,7 @@ Candidate one is replacing legacy selectors through alias ranking. That is unsaf
 
 ## Exact inventory and unchanged behavior
 
-Six category-E skills receive `mode: inherit`, `enforcement: consumer`: pr-conductor, release-conductor, deploy-status, flyctl, git and project-sync. Their existing invocation controls remain. Local-attest has no requirement and no projection; its model, effort and invocation behavior remain unchanged.
+Six category-E skills receive `mode: inherit`, `binding: consumer`: pr-conductor, release-conductor, deploy-status, flyctl, git and project-sync. Their existing invocation controls remain. Local-attest has no requirement and no projection; its model, effort and invocation behavior remain unchanged.
 
 Twenty category-C agents receive reviewed self-enforced floors. Architect-reviewer and platform-engineer use Frontier; AWS, Azure, GCP and Kubernetes use Deep; workflow-orchestrator uses Exceptional; the remaining implementation specialists use Routine, except changelog-assistant and documentation-writer, which use Mechanical. This adds no worker topology or fleet guarantees. Security-auditor, security-engineer, compliance-auditor and data-scientist remain excluded from this batch.
 
