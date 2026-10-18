@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:3ebbfade5ce9667c94afc87eed5e6c279b0112d17767abb00f051a1884d7b15e source=skills/validate-spec/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:29f0f212c6f8e1d048196d278a8d5ace88324ff3e12f510ab67b256c26102914 source=skills/validate-spec/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: "[spec-id] [--no-run]"
 description: |
