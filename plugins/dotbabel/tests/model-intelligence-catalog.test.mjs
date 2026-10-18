@@ -832,6 +832,56 @@ describe("model-intelligence catalog boundaries (P-9)", () => {
     if (process.platform === "linux") expect(processStartIdentity(process.pid)).toMatch(/^\d+$/);
   });
 
+  it("treats symlinked and oversized lock metadata as unknown without changing it", () => {
+    const root = tempRoot();
+    const outside = join(root, "outside.json");
+    const path = join(root, "untrusted.lock");
+    const text = JSON.stringify({ token: "test-owner", pid: process.pid, host: hostname(), acquiredAt: new Date().toISOString() });
+    writeFileSync(outside, text);
+    fs.symlinkSync(outside, path);
+    expect(readLockOwner(path)).toBeNull();
+    expect(acquireLock(path)).toMatchObject({ acquired: false, state: "manual_recovery" });
+    expect(fs.lstatSync(path).isSymbolicLink()).toBe(true);
+    expect(readFileSync(outside, "utf8")).toBe(text);
+    fs.unlinkSync(path);
+    const oversized = JSON.stringify({ ...JSON.parse(text), padding: "x".repeat(65536) });
+    writeFileSync(path, oversized);
+    expect(readLockOwner(path)).toBeNull();
+    expect(acquireLock(path)).toMatchObject({ acquired: false, state: "manual_recovery" });
+    expect(readFileSync(path, "utf8")).toBe(oversized);
+  });
+  it("reads maximum-sized metadata and restores an unsafe replacement during stale recovery", () => {
+    const root = tempRoot();
+    const path = join(root, "boundary.lock");
+    const old = { token: "stale", pid: process.pid, host: hostname(), acquiredAt: T0, resource: "test" };
+    const metadata = { ...old, padding: "" };
+    metadata.padding = "x".repeat(65536 - Buffer.byteLength(JSON.stringify(metadata)));
+    writeFileSync(path, JSON.stringify(metadata));
+    expect(readLockOwner(path).token).toBe("stale");
+    const outside = join(root, "replacement.json");
+    writeFileSync(outside, JSON.stringify(old));
+    const attempt = acquireLock(path, { now: () => Date.parse(T0) + 24 * HOUR, isAlive: () => {
+      fs.unlinkSync(path);
+      fs.symlinkSync(outside, path);
+      return false;
+    } });
+    expect(attempt).toMatchObject({ acquired: false, reason: "contended" });
+    expect(fs.lstatSync(path).isSymbolicLink()).toBe(true);
+    expect(readFileSync(outside, "utf8")).toBe(JSON.stringify(old));
+    expect(readdirSync(root).sort()).toEqual(["boundary.lock", "replacement.json"]);
+  });
+  it.skipIf(process.platform === "win32")("does not block when lock metadata is a FIFO", () => {
+    const root = tempRoot();
+    const path = join(root, "fifo.lock");
+    const fifo = spawnSync("mkfifo", [path], { encoding: "utf8" });
+    expect(fifo.status, fifo.stderr).toBe(0);
+    const moduleUrl = new URL("../src/model-intelligence/catalog/lock.mjs", import.meta.url).href;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e",
+      `import { readLockOwner } from ${JSON.stringify(moduleUrl)}; process.stdout.write(JSON.stringify(readLockOwner(${JSON.stringify(path)})));`], { encoding: "utf8", timeout: 2000 });
+    expect(child.error).toBeUndefined();
+    expect(child.status, child.stderr).toBe(0);
+    expect(child.stdout).toBe("null");
+  });
   it("reads a lock or attempt file that is not a JSON object as unknown, never as a valid owner or failure", async () => {
     const root = tempRoot();
     const path = lockPathFor(root, "fake-catalog");

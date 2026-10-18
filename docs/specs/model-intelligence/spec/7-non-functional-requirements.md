@@ -115,3 +115,8 @@ Decided by the owner on 2026-09-18. Model Intelligence may inspect runtimes, rea
   - Model Intelligence never automatically adds a repository to the trust allowlist (`plugins/dotbabel/src/trust-allowlist.mjs`), weakens an existing trust decision, infers trust from the presence of `.dotbabel.json`, `.claude/**`, or a projection manifest, treats generated status/provenance as proof of repository trust, or executes a project-controlled command merely because an adapter declares `requiresTrust`.
   - If required trust is absent, an operation requiring project execution returns a structured trust-required/unavailable result and executes no command. Operations that do not require project execution remain usable. A fresh repository with no trust allowlist therefore behaves as today: automatic project-command execution is disabled, and read-only/non-project-executing Dotbabel functionality remains available.
   - For hook-driven paths such as `check-on-stop`, Model Intelligence inherits the same trust decision rather than creating a second trust database or allowlist.
+
+## Project activation amendment — 2026-10-16
+
+- **REL-8:** With project activation absent or false, automatic consumers perform zero new discovery/classification/provider operations and zero runtime configuration writes. Concurrent enabled/disabled project tests fail on any leakage. Explicit diagnostic commands remain available.
+- **SEC-7:** Configuration mutations hold the project lock through read-modify-write, preserve unrelated keys/files, reject symlink configuration and never write global harness settings. A violation fails the activation integration check.

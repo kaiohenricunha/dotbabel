@@ -36,3 +36,7 @@ Before implementation starts: `feat/qa-harness-p-c4-mutation` lands (§2 `Urgenc
 ## Research Sources
 
 See [research/sources.md](research/sources.md) for indexed source documents.
+
+## Linked adaptive routing initiative — 2026-10-16
+
+The owner adds explicit per-project activation and separate routing opt-in. [Adaptive Session Routing](../adaptive-session-routing/README.md) owns automatic main-session classification and application. This spec retains its advisory runtime boundary and supplies the one shared pure resolver. Implementation completion is separate from the completed design-section dashboard above.

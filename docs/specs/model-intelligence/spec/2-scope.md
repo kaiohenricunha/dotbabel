@@ -16,6 +16,12 @@ All seven capabilities belong to the target architecture. §6 can phase their im
 6. **Runtime advisory recommendations.** Recommendations when the current model/configuration is materially mismatched with the work, including escalation and de-escalation guidance. This remains advisory; the system must not silently change the user's active model.
 7. **Migration.** Backward-compatible migration of Dotbabel's existing hardcoded model/effort metadata, schemas, generated artifacts, and runtime fan-out.
 
+## Project opt-in amendment — 2026-10-16
+
+The owner assignment requires explicit per-project activation. Absent `model_intelligence.enabled: true` disables automatic Model Intelligence behavior. A separate `adaptive_routing.enabled: true` enables the linked [Adaptive Session Routing spec](../../adaptive-session-routing/README.md) only when the engine is enabled and the runtime integration is verified. Installing dotbabel never activates either capability globally.
+
+This spec remains advisory at runtime. Explicit diagnostic commands remain available when disabled. The linked spec owns classification and active main-session application; it reuses this spec's pure resolver rather than changing `resolve` or `recommend` into mutating operations. Agent-specific compute remains independent.
+
 ## Out of Scope
 
 These are boundaries of responsibility, not exclusions from observation. Dotbabel may inspect runtime/provider metadata needed to make and explain a recommendation without taking ownership of execution, billing, authentication, or provider policy. The owner decided the first eight exclusions on 2026-09-17 and the ninth on 2026-09-18.
