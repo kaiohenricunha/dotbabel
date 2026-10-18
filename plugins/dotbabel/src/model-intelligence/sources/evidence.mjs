@@ -249,7 +249,7 @@ export function makeObservedConfiguration(input) {
 }
 
 const LEVEL_FIELDS = Object.freeze(["effort", "description"]);
-const MODEL_FACT_FIELDS = Object.freeze(["id", "displayName", "visibility", "defaultReasoningLevel", "supportedReasoningLevels", "contextWindow", "maxContextWindow", "supportVerbosity", "defaultVerbosity"]);
+const MODEL_FACT_FIELDS = Object.freeze(["id", "capabilities", "displayName", "visibility", "defaultReasoningLevel", "supportedReasoningLevels", "contextWindow", "maxContextWindow", "supportVerbosity", "defaultVerbosity"]);
 
 /**
  * @param {string} name
@@ -283,6 +283,7 @@ function reasoningLevel(level) {
 /**
  * @typedef {object} ModelFact
  * @property {string} id Opaque model identifier, verbatim.
+ * @property {{reasoning?: boolean, tool_call?: boolean}} [capabilities] Explicit source facts, never inferred model strength.
  * @property {string} [displayName]
  * @property {string} [visibility]
  * @property {string} [defaultReasoningLevel]
@@ -312,6 +313,10 @@ export function makeModelFact(input) {
     supportVerbosity: flag,
     defaultVerbosity: identifier,
   });
+  if (fields.capabilities !== undefined) {
+    const capabilities = knownFields("ModelFact.capabilities", fields.capabilities, ["reasoning", "tool_call"]);
+    out.capabilities = Object.freeze(Object.fromEntries(Object.entries(capabilities).map(([key, value]) => [key, flag(`ModelFact.capabilities.${key}`, value)])));
+  }
   if (!Array.isArray(fields.supportedReasoningLevels)) throw new TypeError("ModelFact.supportedReasoningLevels must be an array");
   out.supportedReasoningLevels = Object.freeze(fields.supportedReasoningLevels.map(reasoningLevel));
   const fact = /** @type {any} */ (Object.freeze(out));

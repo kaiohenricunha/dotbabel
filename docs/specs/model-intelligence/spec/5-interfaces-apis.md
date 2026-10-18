@@ -444,6 +444,14 @@ interface CatalogEvidence<T> {
 
 Field-level facts retain their individual provenance as required by ARCH-28. A merged catalog record does not assign one global winning source to the entire model.
 
+### Capability facts for resolution — 2026-10-17 implementation amendment
+
+`ModelFact` may carry `capabilities: {reasoning?: boolean, tool_call?: boolean}`. These are explicit source facts, not task classes or model rankings. Unknown capabilities stay absent. The catalog preserves them and the model identity as field-level evidence envelopes. This closes the missing link between the shipped `classes.*.satisfied_by` rules and actual source evidence; consumers do not maintain separate capability tables.
+
+Models.dev supplies its declared boolean fields. Codex supplies reasoning support from its native reasoning-level list, and tool-call support only for recognized native shell interfaces. Unknown interfaces remain unknown. The adapter never derives these facts from model names. Semantic classes remain the policy's judgment; accepted effort values remain per-model evidence. Neither these coarse rules nor passing fixture tests establish model-ranking accuracy.
+
+The pure resolver accepts an optional `invocation.pin` with the existing runtime/config shape for the most-specific explicit pin. It composes this after policy and artifact pins while preserving every mandatory floor. Catalogs lacking sufficient identity or capability evidence produce structured unresolved results.
+
 ### Authority
 
 The adapter descriptor does not declare itself globally authoritative. Authority is field-specific and is applied by `catalog/` according to the source rules in §3 (ARCH-28): local Codex invokability comes from Codex runtime discovery, provider API model existence comes from the provider API for that fact, and Dotbabel workload classification comes from Dotbabel policy. A source adapter supplies evidence and provenance. It does not decide how its evidence ranks for unrelated fields.

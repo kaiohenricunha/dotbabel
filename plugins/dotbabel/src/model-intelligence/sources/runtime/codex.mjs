@@ -36,7 +36,7 @@ import { firstLine, parseVersion, probeVersion, resolveContext, runIsolated } fr
 export const RUNTIME_ID = "codex";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "2";
+export const ADAPTER_VERSION = "3";
 
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CODEX_HOME", rootDirName: ".codex" });
@@ -92,6 +92,12 @@ function factFromEntry(entry) {
     : [];
   /** @type {Record<string, unknown>} */
   const fields = { id, supportedReasoningLevels: levels };
+  // Native catalog controls, not a model-name heuristic: reported reasoning levels and a known
+  // shell tool interface are explicit evidence. Future unknown tool modes remain unknown.
+  const capabilities = {};
+  if (levels.length) capabilities.reasoning = levels.some(level => level.effort !== "none");
+  if (["unified_exec", "local", "shell_command"].includes(e.shell_type)) capabilities.tool_call = true;
+  if (Object.keys(capabilities).length) fields.capabilities = capabilities;
   for (const [target, read, source] of [
     ["displayName", optionalIdentifier, e.display_name],
     ["visibility", optionalIdentifier, e.visibility],
