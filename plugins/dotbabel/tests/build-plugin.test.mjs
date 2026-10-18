@@ -24,6 +24,9 @@ function mkRepo() {
   const snapshotFile = join(root, SNAPSHOT_REL);
   mkdirSync(dirname(snapshotFile), { recursive: true });
   writeFileSync(snapshotFile, JSON.stringify(RELEASE_SNAPSHOT));
+  const workflowRoot = "plugins/dotbabel/src/model-intelligence/workflows";
+  mkdirSync(join(root, workflowRoot), { recursive: true });
+  for (const name of ["ai-review.source.yml", "ai-review.compute.yml"]) writeFileSync(join(root, workflowRoot, name), readFileSync(join(REPO_ROOT, workflowRoot, name), "utf8"));
   mkdirSync(join(root, "commands"), { recursive: true });
   mkdirSync(join(root, "skills"), { recursive: true });
   mkdirSync(join(root, "agents"), { recursive: true });
@@ -549,4 +552,28 @@ it("records the generator version separately from a target repository version", 
   expect(runBuild(root).status).toBe(0);
   const manifest = JSON.parse(readFileSync(join(root, "plugins/dotbabel/templates/claude/.dotbabel-projection.json"), "utf8"));
   expect(manifest.toolVersion).toBe(JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).version);
+});
+
+describe("build-plugin review workflow projection", () => {
+  it("generates identical template and example workflow copies with release provenance", () => {
+    const root = mkRepo(); writeAgent(root, "workflow-build-agent"); buildIndex(root);
+    expect(runBuild(root).status).toBe(0);
+    const native = readFileSync(join(root, "plugins/dotbabel/templates/workflows/ai-review.yml"), "utf8");
+    expect(readFileSync(join(root, "examples/minimal-consumer/.github/workflows/ai-review.yml"), "utf8")).toBe(native);
+    const manifest = JSON.parse(readFileSync(join(root, "plugins/dotbabel/templates/workflows/.dotbabel-projection.json"), "utf8"));
+    expect(manifest.entries["ai-review.yml"].snapshotId).toBe(RELEASE_SNAPSHOT.snapshotId);
+    expect(runBuild(root, ["--check"]).status).toBe(0);
+    expect(runBuild(root, ["--check"]).status).toBe(0);
+    writeFileSync(join(root, "examples/minimal-consumer/.github/workflows/ai-review.yml"), "changed");
+    expect(runBuild(root, ["--check"]).status).toBe(1);
+  });
+  it("does not replace either copy when required workflow compute is unsatisfied", () => {
+    const root = mkRepo(); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = join(root, "plugins/dotbabel/templates/workflows/ai-review.yml"); const previous = readFileSync(generated, "utf8");
+    const seed = structuredClone(RELEASE_SNAPSHOT);
+    for (const model of seed.runtimes.claude.models) model.fields.capabilities[0].value.reasoning = false;
+    writeFileSync(join(root, SNAPSHOT_REL), JSON.stringify(createSnapshot(seed)));
+    expect(runBuild(root).status).toBe(2); expect(readFileSync(generated, "utf8")).toBe(previous);
+    expect(readFileSync(join(root, "examples/minimal-consumer/.github/workflows/ai-review.yml"), "utf8")).toBe(previous);
+  });
 });

@@ -29,6 +29,10 @@ export function renderProjection(artifact, projectionId, source) {
   const contract = artifact.projectionContract;
   if (!contract || !Array.isArray(contract.frontmatterKeys) || contract.frontmatterKeys.some(key => typeof key !== "string" || !/^[A-Za-z][A-Za-z0-9_.-]*$/.test(key) || ["constructor", "prototype"].includes(key))) throw new TypeError("invalid projection metadata contract");
   if (contract.permitsCompute === true && (typeof contract.computeConsumer !== "string" || contract.computeConsumer.trim() === "")) throw new TypeError("private compute metadata needs an explicit consumer");
+  if (contract.outputFormat === "yaml") {
+    if (artifact.target.artifactKind !== "workflow" || typeof contract.outputBody !== "string") throw new TypeError("invalid YAML projection contract");
+    return `# Generated runtime configuration.\n# dotbabel:generated projection=${projectionId} source=${artifact.sourcePath} — do not edit directly\n${contract.outputBody}`;
+  }
   const mappings = Object.entries(contract.axisKeys ?? {});
   if (mappings.some(([axis, key]) => !["model", "reasoning"].includes(axis) || typeof key !== "string") || new Set(mappings.map(([, key]) => key)).size !== mappings.length) throw new TypeError("invalid projection axis mapping");
   const metadata = Object.fromEntries(contract.frontmatterKeys.filter(key => Object.hasOwn(frontmatter, key) && (key !== "dotbabel" || contract.permitsCompute === true)).map(key => [key, structuredClone(key === "dotbabel" ? { compute: frontmatter.dotbabel.compute } : frontmatter[key])]));
