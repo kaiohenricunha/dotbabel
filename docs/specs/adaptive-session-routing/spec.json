@@ -6,6 +6,7 @@
   "linked_paths": [
     "experiments/adaptive-session-routing-codex/**",
     "plugins/dotbabel/src/adaptive-session-routing/**",
+    "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
     "plugins/dotbabel/tests/adaptive-session-routing-*.test.mjs",
     "plugins/dotbabel/tests/adaptive-session-routing-codex*.test.mjs",
     "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
