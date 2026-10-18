@@ -1,18 +1,15 @@
 import { describe, expect, it } from "vitest";
-import yaml from "js-yaml";
+import { readFileSync } from "node:fs";
 import { materializeClaude } from "../src/model-intelligence/materialize/runtime/claude.mjs";
 import { parseFrontmatter } from "../src/build-index.mjs";
-import { input } from "./fixtures/model-intelligence/resolver.mjs";
-
-function fixture(kind = "agent", compute = { requirement: "deep", mode: "dynamic", binding: "self" }) {
-  const context = JSON.parse(JSON.stringify(input()).replaceAll('"codex"', '"claude"'));
-  context.runtimeContract.binding.command = { support: "supported", axes: { model: "supported", reasoning: "unverified" } };
-  const sourceContent = "---\n" + yaml.dump({ name: "projection-example", description: "A projection fixture.", tools: ["Read"], model: "legacy-shadow", effort: "low", owner: "private-owner", dotbabel: { compute } }) + "---\n\nPreserve this exact body.\n";
-  return { toolVersion: "4.2.0", artifacts: [{ sourcePath: `${kind}s/example.md`, sourceContent, target: { path: `${kind}s/example.md`, artifactKind: kind } }], context };
-}
+import { claudeProjectionFixture as fixture, claudeProjectionCases } from "./fixtures/model-intelligence/claude-projection.mjs";
 const metadata = batch => parseFrontmatter(batch.files[0].content).frontmatter;
 
 describe("Claude projection rules", () => {
+  it("matches the reviewed native bytes for every Claude projection rule", () => {
+    const golden = JSON.parse(readFileSync(new URL("./fixtures/model-intelligence/claude-projection.expected.json", import.meta.url), "utf8"));
+    for (const [name, inputs] of Object.entries(claudeProjectionCases())) expect(materializeClaude(inputs).files[0].content).toBe(golden[name]);
+  });
   it("an agent with a dynamic requirement gets model and effort projected into the generated copy", () => {
     const options = fixture(); const before = structuredClone(options);
     const result = materializeClaude(options);
@@ -57,9 +54,19 @@ describe("Claude projection rules", () => {
     const options = fixture(); options.context.catalog.runtimes = [];
     expect(() => materializeClaude(options)).toThrow(/resolution|evidence/);
   });
-  it("does not bind an unverified agent axis", () => {
+  it("refuses an agent projection with any unverified native axis", () => {
     const options = fixture(); options.context.runtimeContract.binding.agent.axes.reasoning = "unverified";
-    const result = materializeClaude(options);
-    expect(metadata(result)).not.toHaveProperty("effort");
+    expect(() => materializeClaude(options)).toThrow(/binding_unverified/);
+  });
+  it("refuses an unverified binding for a mandatory agent floor", () => {
+    const options = fixture("agent", { requirement: "frontier", mode: "floor", binding: "self" });
+    options.context.runtimeContract.binding.agent.axes.reasoning = "unverified";
+    expect(() => materializeClaude(options)).toThrow(/binding_unverified/);
+  });
+  it("refuses a pin for another runtime and an unsupported artifact kind", () => {
+    const other = fixture("command", { requirement: "deep", mode: "pin", binding: "session", pin: { runtime: "codex", config: { model: "deep-model" } } });
+    expect(() => materializeClaude(other)).toThrow(/pin_runtime/);
+    const unsupported = fixture(); unsupported.artifacts[0].target.artifactKind = "workflow";
+    expect(() => materializeClaude(unsupported)).toThrow(/kind_invalid/);
   });
 });

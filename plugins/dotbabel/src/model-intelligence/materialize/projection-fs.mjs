@@ -132,5 +132,13 @@ export function openProjectionTree(root) {
       try { if (!retain) unlinkTemporary(temporary); } finally { location.close(); }
     }
   };
-  return { read, write, remove, ensureDirectory: relative => parent(relative + "/.unused", true).close(), close: () => fs.closeSync(rootFd), lockPath: `/proc/self/fd/${rootFd}/.dotbabel-projection.lock` };
+  const linkCompanion = (relative, source) => {
+    if (typeof source !== "string" || !path.isAbsolute(source)) throw fail("projection_path_unsafe");
+    const location = parent(relative, true);
+    try {
+      try { fs.symlinkSync(source, location.path); } catch (error) { if (error.code === "EEXIST") return false; throw error; }
+      fs.fsyncSync(location.fd); return true;
+    } finally { location.close(); }
+  };
+  return { read, write, remove, linkCompanion, ensureDirectory: relative => parent(relative + "/.unused", true).close(), close: () => fs.closeSync(rootFd), lockPath: `/proc/self/fd/${rootFd}/.dotbabel-projection.lock` };
 }

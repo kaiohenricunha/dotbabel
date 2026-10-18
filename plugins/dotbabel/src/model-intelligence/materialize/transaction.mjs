@@ -48,13 +48,40 @@ function assertOwned(entry, pending) {
  * @returns {Promise<object>} synced or busy, with deterministic manifest and pre-write drift entries.
  */
 export async function syncProjectionTree({ root, loadInputs, onStep }) {
+  return syncProjectionBatch({ root, loadBatch: async () => materialize(await loadInputs()), onStep });
+}
+
+/**
+ * Validate an already-derived release batch without treating its metadata as canonical policy.
+ * @param {object} batch Files and deterministic provenance produced by the pure materializer.
+ * @returns {object} The validated batch, unchanged.
+ */
+export function validateProjectionBatch(batch) {
+  if (!batch || !Array.isArray(batch.files) || batch.files.length > 1024) throw fail("projection_batch_invalid");
+  const manifest = parseManifest(JSON.stringify(batch.manifest));
+  if (!manifest || manifest.retainedEntries !== undefined || Object.keys(manifest.entries).length !== batch.files.length) throw fail("projection_batch_invalid");
+  const paths = new Set();
+  for (const file of batch.files) {
+    if (!isProjectionPath(file?.path) || paths.has(file.path) || !Object.hasOwn(manifest.entries, file.path) || typeof file.content !== "string" || Buffer.byteLength(file.content) > 4 * 1024 * 1024 || !owned(file.content, manifest.entries[file.path]) || hashContent(file.content) !== manifest.entries[file.path].outputHash) throw fail("projection_batch_invalid");
+    paths.add(file.path);
+  }
+  return batch;
+}
+
+/**
+ * Install an already-materialized release batch through the same ownership transaction.
+ * Copying verified derived bytes performs no model resolution or policy adoption.
+ * @param {{root:string, loadBatch:Function, onStep?:Function}} options Trusted immutable-release loader, called inside the lock.
+ * @returns {Promise<object>} Synced or busy with the installed provenance manifest.
+ */
+export async function syncProjectionBatch({ root, loadBatch, onStep }) {
   const tree = openProjectionTree(root); let lock;
   try {
     lock = acquireLock(tree.lockPath, { resource: "projection-tree" });
     if (!lock.acquired) return { status: "busy", reason: lock.reason };
     const previousText = tree.read(MANIFEST); const pendingText = tree.read(PENDING);
     const previous = parseManifest(previousText); const pending = parseManifest(pendingText);
-    const batch = materialize(await loadInputs()); parseManifest(JSON.stringify(batch.manifest));
+    const batch = validateProjectionBatch(await loadBatch());
     const entries = state(tree, batch.manifest, previous, pending);
     const retainedEntries = Object.fromEntries(entries.filter(entry => entry.content !== null).map(entry => [entry.path, assertOwned(entry, pending)]));
     if (Object.keys(retainedEntries).length > 1024) throw fail("projection_manifest_invalid");

@@ -31,7 +31,7 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
       if (kind !== "skill" && Object.keys(requirement.pin.config).some(axis => binding?.support !== "supported" || binding.axes?.[axis] !== "supported" || kind === "command" && axis !== "model")) throw fail("claude_projection_pin_binding_unverified");
     }
-    if (kind === "agent" && ["floor", "pin"].includes(requirement?.mode) && resolverResult.status === "resolved" && resolverResult.enforcement?.state !== "enforced") throw fail("claude_projection_floor_binding_unverified");
+    if (kind === "agent" && resolverResult.status === "resolved" && resolverResult.enforcement?.state !== "enforced") throw fail("claude_projection_agent_binding_unverified");
     const pinnedCommand = kind === "command" && requirement?.mode === "pin";
     const frontmatterKeys = kind === "agent" ? AGENT_KEYS : kind === "skill" ? SKILL_KEYS : [...COMMAND_KEYS, ...(pinnedCommand ? ["model"] : [])];
     const axisKeys = kind === "agent" ? { model: "model", reasoning: "effort" } : pinnedCommand ? { model: "model" } : {};

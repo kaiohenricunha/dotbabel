@@ -9,28 +9,92 @@
 #             one-line summary are printed.
 #   --all     link all supported CLI instruction targets even when the
 #             corresponding CLI binary is not currently on PATH.
+#   --source <path>  use an explicit local source tree.
+#   --projections    install verified release projections through the Node CLI;
+#                    requires Node and the installed CLI dependencies.
 
 set -euo pipefail
 
 QUIET=0
 ALL=0
-for arg in "$@"; do
-  case "$arg" in
-    --quiet) QUIET=1 ;;
-    --all) ALL=1 ;;
+PROJECTIONS=0
+SOURCE_OVERRIDE=""
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --quiet) QUIET=1; shift ;;
+    --all) ALL=1; shift ;;
+    --projections) PROJECTIONS=1; shift ;;
+    --source)
+      if [[ "$#" -lt 2 || -z "$2" || "$2" == --* ]]; then
+        echo "bootstrap.sh: --source requires a path" >&2
+        exit 64
+      fi
+      SOURCE_OVERRIDE="$2"; shift 2
+      ;;
     --help|-h)
       grep -E '^# ' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
-      echo "bootstrap.sh: unknown argument '$arg' (try --help)" >&2
+      echo "bootstrap.sh: unknown argument '$1' (try --help)" >&2
       exit 64
       ;;
   esac
 done
 
-DOTBABEL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTBABEL="${SOURCE_OVERRIDE:-$SCRIPT_ROOT}"
 TARGET="$HOME/.claude"
+if [[ ! -d "$DOTBABEL" ]]; then
+  echo "bootstrap.sh: source directory does not exist" >&2
+  exit 2
+fi
+DOTBABEL="$(cd "$DOTBABEL" && pwd)"
+
+# The plain quickstart remains shell-only. Explicit projections and existing
+# projection ownership require the shared Node transaction instead of legacy links.
+projection_state_exists() {
+  [[ -e "$TARGET/.dotbabel-projection.json" || -L "$TARGET/.dotbabel-projection.json" || -e "$TARGET/.dotbabel-projection.pending.json" || -L "$TARGET/.dotbabel-projection.pending.json" ]]
+}
+
+bootstrap_node() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "bootstrap.sh: projection ownership requires Node and the installed dotbabel CLI" >&2
+    exit 2
+  fi
+  BOOTSTRAP_ARGS=(--source "$DOTBABEL")
+  [[ "$PROJECTIONS" = "1" ]] && BOOTSTRAP_ARGS+=(--projections)
+  [[ "$QUIET" = "1" ]] && BOOTSTRAP_ARGS+=(--quiet)
+  [[ "$ALL" = "1" ]] && BOOTSTRAP_ARGS+=(--all)
+  exec node "$SCRIPT_ROOT/plugins/dotbabel/bin/dotbabel-bootstrap.mjs" "${BOOTSTRAP_ARGS[@]}"
+}
+
+if [[ "$PROJECTIONS" = "1" ]] || projection_state_exists || [[ -e "$TARGET/.dotbabel-projection.lock" || -L "$TARGET/.dotbabel-projection.lock" ]]; then
+  bootstrap_node
+fi
+
+mkdir -p "$TARGET"
+LEGACY_LOCK="$TARGET/.dotbabel-projection.lock"
+if ! mkdir "$LEGACY_LOCK" 2>/dev/null; then
+  echo "bootstrap.sh: projection tree is busy; no files were installed" >&2
+  exit 2
+fi
+LEGACY_LOCK_OWNER="owner-$$-$RANDOM-$RANDOM"
+printf '%s\n' "$$" > "$LEGACY_LOCK/$LEGACY_LOCK_OWNER"
+release_legacy_lock() {
+  if [[ -f "$LEGACY_LOCK/$LEGACY_LOCK_OWNER" && ! -L "$LEGACY_LOCK/$LEGACY_LOCK_OWNER" ]]; then
+    if ! rm -- "$LEGACY_LOCK/$LEGACY_LOCK_OWNER" || ! rm -d -- "$LEGACY_LOCK"; then
+      echo "bootstrap.sh: could not release its projection reservation" >&2
+    fi
+  fi
+}
+trap release_legacy_lock EXIT
+# A projection may have committed between the first check and our reservation.
+if projection_state_exists; then
+  release_legacy_lock
+  trap - EXIT
+  bootstrap_node
+fi
 TS=$(date +%Y%m%d-%H%M%S)
 
 mkdir -p "$TARGET"
