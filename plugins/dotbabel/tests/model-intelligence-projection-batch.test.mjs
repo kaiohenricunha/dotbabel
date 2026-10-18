@@ -22,7 +22,10 @@ describe("verified release batch transaction", () => {
   it.each(["missing-file", "duplicate-file", "unrecorded-target", "bad-marker", "oversized-file", "recovery-metadata"])("refuses %s before writing any projection", async fault => {
     const root = makeTempDir("mi-invalid-release-"); const batch = materialize(materializationFixture());
     if (fault === "missing-file") batch.files = [];
-    if (fault === "duplicate-file") batch.files.push(structuredClone(batch.files[0]));
+    if (fault === "duplicate-file") {
+      batch.files.push(structuredClone(batch.files[0]));
+      batch.manifest.entries["unused.md"] = structuredClone(Object.values(batch.manifest.entries)[0]);
+    }
     if (fault === "unrecorded-target") batch.files[0].path = "other.md";
     if (fault === "bad-marker") {
       batch.files[0].content = "---\nname: handwritten\n---\nmy content\n";

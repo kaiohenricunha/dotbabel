@@ -14,6 +14,34 @@ function setup() {
 }
 
 describe("projection review safety regressions", () => {
+  it("updates only a companion whose current link matches proven ownership", () => {
+    const root = makeTempDir("mi-companion-cas-"); const tree = openProjectionTree(root);
+    try {
+      expect(tree.readLink("missing/asset")).toBe(null);
+      expect(tree.linkCompanion("assets/reference", "/release/A")).toBe(true);
+      expect(tree.linkCompanion("assets/reference", "/release/B")).toBe(false);
+      expect(tree.linkCompanion("assets/reference", "/release/B", { expected: "/user" })).toBe(false);
+      expect(tree.linkCompanion("assets/reference", "/release/B", { expected: "/release/A" })).toBe(true);
+      expect(tree.readLink("assets/reference")).toBe("/release/B");
+      expect(tree.linkCompanion("assets/reference", "/release/B", { expected: "/release/B" })).toBe(true);
+      fs.writeFileSync(join(root, "personal"), "user bytes");
+      expect(tree.linkCompanion("personal", "/release/B", { expected: "/release/A" })).toBe(false);
+      expect(fs.readFileSync(join(root, "personal"), "utf8")).toBe("user bytes");
+      expect(() => tree.linkCompanion("assets/other", "relative")).toThrow(/unsafe/);
+    } finally { tree.close(); }
+  });
+  it("restores a companion changed by the user at the atomic exchange boundary", () => {
+    const root = makeTempDir("mi-companion-race-"); const tree = openProjectionTree(root);
+    const file = join(root, "reference"); fs.symlinkSync("/release/A", file);
+    const originalSpawn = childProcess.spawnSync; let changed = false;
+    vi.spyOn(childProcess, "spawnSync").mockImplementation((...args) => {
+      if (!changed) { changed = true; fs.unlinkSync(file); fs.symlinkSync("/user/reference", file); }
+      return originalSpawn(...args);
+    });
+    try { expect(() => tree.linkCompanion("reference", "/release/B", { expected: "/release/A" })).toThrow(/drift/); }
+    finally { tree.close(); }
+    expect(changed).toBe(true); expect(fs.readlinkSync(file)).toBe("/user/reference");
+  });
   it("refuses malformed UTF-8 instead of treating replacement decoding as unchanged content", () => {
     const root = makeTempDir("mi-invalid-projection-");
     fs.writeFileSync(join(root, "edited.md"), Buffer.from([0xff]));

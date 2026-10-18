@@ -27,6 +27,101 @@ function setup() {
 }
 
 describe("Claude release baseline installation", () => {
+  it("recovers an interrupted owned companion transition into a third release", async () => {
+    const first = setup(); first.write(); fs.writeFileSync(join(first.source, "skills/example-skill/reference.md"), "A");
+    await installClaudeBaseline(first);
+    const second = setup(); second.write(); fs.writeFileSync(join(second.source, "skills/example-skill/reference.md"), "B");
+    await expect(installClaudeBaseline({ ...second, target: first.target, onStep: step => {
+      if (step.kind === "companion") throw new Error("companion interruption");
+    } })).rejects.toThrow(/companion interruption/);
+    const third = setup(); third.write(); fs.writeFileSync(join(third.source, "skills/example-skill/reference.md"), "C");
+    await installClaudeBaseline({ ...third, target: first.target });
+    expect(fs.readFileSync(join(first.target, "skills/example-skill/reference.md"), "utf8")).toBe("C");
+  });
+  it("holds the shared lock through companion installation and identical-batch refresh", async () => {
+    const options = setup(); options.write(); fs.writeFileSync(join(options.source, "skills/example-skill/reference.md"), "A");
+    let observed = 0;
+    const onStep = step => {
+      if (step.kind !== "companion") return;
+      const lock = acquireLock(join(options.target, ".dotbabel-projection.lock"), { resource: "test" });
+      if (lock.acquired) lock.release();
+      expect(lock.acquired).toBe(false); observed++;
+    };
+    await installClaudeBaseline({ ...options, onStep }); await installClaudeBaseline({ ...options, onStep });
+    expect(observed).toBe(2);
+  });
+  it("does not adopt an unowned link that resembles an earlier release", async () => {
+    const first = setup(); first.write(); fs.writeFileSync(join(first.source, "skills/example-skill/reference.md"), "A");
+    const reference = join(first.target, "skills/example-skill/reference.md"); fs.mkdirSync(join(reference, ".."), { recursive: true });
+    fs.symlinkSync(join(first.source, "skills/example-skill/reference.md"), reference);
+    await installClaudeBaseline(first);
+    const second = setup(); second.write(); fs.writeFileSync(join(second.source, "skills/example-skill/reference.md"), "B");
+    await installClaudeBaseline({ ...second, target: first.target });
+    expect(fs.readlinkSync(reference)).toBe(join(first.source, "skills/example-skill/reference.md"));
+  });
+  it.each(["malformed", "version", "array", "path", "projection", "target", "extra-key", "pending"])("refuses %s companion ownership without changing a user asset", async fault => {
+    const options = setup(); options.write(); fs.writeFileSync(join(options.source, "skills/example-skill/reference.md"), "A");
+    const reference = join(options.target, "skills/example-skill/reference.md"); fs.mkdirSync(join(reference, ".."), { recursive: true }); fs.writeFileSync(reference, "user bytes");
+    const ledger = { schemaVersion: 1, links: { "skills/example-skill/reference.md": { current: "/old/reference.md" } } };
+    if (fault === "version") ledger.schemaVersion = 2;
+    if (fault === "array") ledger.links = [];
+    if (fault === "path") ledger.links = { "../outside": { current: "/old" } };
+    if (fault === "projection") ledger.links = { "skills/example-skill/SKILL.md": { current: "/old" } };
+    if (fault === "target") ledger.links["skills/example-skill/reference.md"].current = "relative";
+    if (fault === "extra-key") ledger.links["skills/example-skill/reference.md"].other = true;
+    if (fault === "pending") ledger.links["skills/example-skill/reference.md"].pending = "relative";
+    fs.writeFileSync(join(options.target, ".dotbabel-claude-companions.json"), fault === "malformed" ? "{" : JSON.stringify(ledger));
+    await expect(installClaudeBaseline(options)).rejects.toMatchObject({ code: "claude_companion_ownership_invalid" });
+    expect(fs.readFileSync(reference, "utf8")).toBe("user bytes");
+  });
+  it("refuses a sibling destination through a symlink alias before initial installation", async () => {
+    const options = setup(); options.write(); const alias = join(makeTempDir("mi-runtime-alias-"), "alias"); fs.symlinkSync(options.target, alias);
+    const previous = process.env.CODEX_HOME; process.env.CODEX_HOME = alias;
+    try {
+      await expect(bootstrapGlobal({ ...options, projections: true, allCli: true, quiet: true })).rejects.toThrow(/overlap/);
+      expect(fs.readdirSync(options.target)).toEqual([]);
+    } finally { if (previous === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previous; }
+  });
+  it("updates owned companion links across source roots even with an identical generated batch", async () => {
+    const first = setup(); first.write();
+    fs.writeFileSync(join(first.source, "skills/example-skill/reference.md"), "release A\n");
+    await installClaudeBaseline(first);
+    const second = setup(); second.write();
+    fs.writeFileSync(join(second.source, "skills/example-skill/reference.md"), "release B\n");
+    await installClaudeBaseline({ ...second, target: first.target });
+    const reference = join(first.target, "skills/example-skill/reference.md");
+    expect(fs.readlinkSync(reference)).toBe(join(second.source, "skills/example-skill/reference.md"));
+    expect(fs.readFileSync(reference, "utf8")).toBe("release B\n");
+  });
+  it("preserves a changed user link during a source-root upgrade", async () => {
+    const first = setup(); first.write();
+    fs.writeFileSync(join(first.source, "skills/example-skill/reference.md"), "release A\n");
+    await installClaudeBaseline(first);
+    const reference = join(first.target, "skills/example-skill/reference.md");
+    const user = join(makeTempDir("mi-user-reference-"), "reference.md"); fs.writeFileSync(user, "user bytes\n");
+    fs.unlinkSync(reference); fs.symlinkSync(user, reference);
+    const second = setup(); second.write(); fs.writeFileSync(join(second.source, "skills/example-skill/reference.md"), "release B\n");
+    await installClaudeBaseline({ ...second, target: first.target });
+    expect(fs.readlinkSync(reference)).toBe(user);
+    expect(fs.readFileSync(reference, "utf8")).toBe("user bytes\n");
+  });
+  it.each(["skills", "commands"])("refuses a sibling runtime alias into protected %s before any writes", async kind => {
+    const options = setup(); options.write();
+    await installClaudeBaseline(options);
+    // The command wrapper shares the generated skill slug to expose that collision too.
+    if (kind === "commands") {
+      fs.copyFileSync(join(options.source, "commands/example-command.md"), join(options.source, "commands/example-skill.md"));
+      fs.rmSync(join(options.source, "skills"), { recursive: true });
+    }
+    const previous = process.env.CODEX_HOME;
+    process.env.CODEX_HOME = options.target;
+    try {
+      const before = fs.readFileSync(join(options.target, "skills/example-skill/SKILL.md"), "utf8");
+      await expect(bootstrapGlobal({ ...options, allCli: true, quiet: true })).rejects.toThrow(/overlap/);
+      expect(fs.readFileSync(join(options.target, "skills/example-skill/SKILL.md"), "utf8")).toBe(before);
+      expect(fs.lstatSync(join(options.target, "skills/example-skill")).isDirectory()).toBe(true);
+    } finally { if (previous === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = previous; }
+  });
   it("copies a verified generated release batch and replaces only manifest-owned outputs", async () => {
     const options = setup(); const first = options.write();
     expect((await installClaudeBaseline(options)).status).toBe("synced");

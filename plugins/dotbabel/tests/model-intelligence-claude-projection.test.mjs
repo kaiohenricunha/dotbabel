@@ -6,6 +6,16 @@ import { claudeProjectionFixture as fixture, claudeProjectionCases } from "./fix
 const metadata = batch => parseFrontmatter(batch.files[0].content).frontmatter;
 
 describe("Claude projection rules", () => {
+  it("preserves runtime inheritance for static artifacts without compute metadata", () => {
+    for (const kind of ["agent", "command", "skill"]) {
+      const options = fixture(kind);
+      options.artifacts[0].sourceContent = "---\nname: static-example\ndescription: A static artifact.\n---\n\nOriginal body.\n";
+      const result = materializeClaude(options);
+      expect(metadata(result)).not.toHaveProperty("model");
+      expect(metadata(result)).not.toHaveProperty("effort");
+      expect(result.files[0].content.endsWith("\nOriginal body.\n")).toBe(true);
+    }
+  });
   it("matches the reviewed native bytes for every Claude projection rule", () => {
     const golden = JSON.parse(readFileSync(new URL("./fixtures/model-intelligence/claude-projection.expected.json", import.meta.url), "utf8"));
     for (const [name, inputs] of Object.entries(claudeProjectionCases())) expect(materializeClaude(inputs).files[0].content).toBe(golden[name]);

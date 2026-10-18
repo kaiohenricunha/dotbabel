@@ -71,10 +71,10 @@ export function validateProjectionBatch(batch) {
 /**
  * Install an already-materialized release batch through the same ownership transaction.
  * Copying verified derived bytes performs no model resolution or policy adoption.
- * @param {{root:string, loadBatch:Function, onStep?:Function}} options Trusted immutable-release loader, called inside the lock.
+ * @param {{root:string, loadBatch:Function, onStep?:Function, beforeCommit?:Function}} options Trusted release loader and optional companion installer, both called inside the lock.
  * @returns {Promise<object>} Synced or busy with the installed provenance manifest.
  */
-export async function syncProjectionBatch({ root, loadBatch, onStep }) {
+export async function syncProjectionBatch({ root, loadBatch, onStep, beforeCommit }) {
   const tree = openProjectionTree(root); let lock;
   try {
     lock = acquireLock(tree.lockPath, { resource: "projection-tree" });
@@ -86,7 +86,10 @@ export async function syncProjectionBatch({ root, loadBatch, onStep }) {
     const retainedEntries = Object.fromEntries(entries.filter(entry => entry.content !== null).map(entry => [entry.path, assertOwned(entry, pending)]));
     if (Object.keys(retainedEntries).length > 1024) throw fail("projection_manifest_invalid");
     const result = { status: "synced", manifest: batch.manifest, entries: entries.map(({ path, state }) => ({ path, state })) };
-    if (pending === null && canonicalJson(previous) === canonicalJson(batch.manifest) && entries.every(entry => entry.state === "clean")) return result;
+    if (pending === null && canonicalJson(previous) === canonicalJson(batch.manifest) && entries.every(entry => entry.state === "clean")) {
+      await beforeCommit?.({ tree, manifest: batch.manifest });
+      return result;
+    }
     const journal = canonicalJson({ ...batch.manifest, retainedEntries }) + "\n";
     tree.write(PENDING, journal, { expected: pendingText, exclusive: pendingText === null });
     // Retire old targets before adding new ones, bounding live recovery ownership.
@@ -102,6 +105,7 @@ export async function syncProjectionBatch({ root, loadBatch, onStep }) {
     }
     for (const file of batch.files) if (hashContent(tree.read(file.path) ?? "") !== batch.manifest.entries[file.path].outputHash) throw fail("projection_output_drift");
     for (const entry of entries) if (entry.next === undefined && tree.read(entry.path) !== null) throw fail("projection_output_drift");
+    await beforeCommit?.({ tree, manifest: batch.manifest });
     tree.write(MANIFEST, canonicalJson(batch.manifest) + "\n", { expected: previousText, exclusive: previousText === null });
     await onStep?.({ kind: "manifest" });
     tree.remove(PENDING, { expected: journal });

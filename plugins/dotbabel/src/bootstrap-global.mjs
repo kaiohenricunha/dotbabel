@@ -81,6 +81,25 @@ export function resolveSource(sourceOpt, env) {
   return pkgRoot();
 }
 
+function resolvedDestination(destination) {
+  try { return fs.realpathSync(destination); }
+  catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return path.join(resolvedDestination(path.dirname(destination)), path.basename(destination));
+  }
+}
+
+function assertNoProjectionOverlap(target, homeRoot, allCli) {
+  const protectedRoots = ["agents", "commands", "skills"].map(name => resolvedDestination(path.resolve(target, name)));
+  for (const runtime of Object.values(RUNTIMES)) {
+    if (!allCli && !anyRuntimePresent([runtime.id])) continue;
+    for (const destination of [resolveGlobalInstructionPath(runtime.id, homeRoot, process.env), resolveGlobalSkillsDir(runtime.id, homeRoot, process.env)].filter(Boolean)) {
+      const resolved = resolvedDestination(path.resolve(destination));
+      if (protectedRoots.some(root => resolved === root || resolved.startsWith(root + path.sep) || root.startsWith(resolved + path.sep))) throw new Error("claude_baseline_runtime_overlap");
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // bootstrapGlobal — main entry point
 // ---------------------------------------------------------------------------
@@ -128,6 +147,8 @@ export async function bootstrapGlobal(opts = {}) {
   }
 
   const timestamp = buildTimestamp();
+
+  if (opts.projections || [".dotbabel-projection.json", ".dotbabel-projection.pending.json"].some(name => fs.existsSync(path.join(target, name)))) assertNoProjectionOverlap(target, homeRoot, opts.allCli);
 
   fs.mkdirSync(target, { recursive: true });
 

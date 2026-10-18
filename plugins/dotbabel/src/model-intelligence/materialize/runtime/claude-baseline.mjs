@@ -4,6 +4,7 @@ import path from "node:path";
 import { openProjectionTree } from "../projection-fs.mjs";
 import { syncProjectionBatch, validateProjectionBatch } from "../transaction.mjs";
 import { acquireLock } from "../../../lib/process-lock.mjs";
+import { syncClaudeCompanions } from "./claude-companions.mjs";
 
 const MANIFEST = ".dotbabel-projection.json";
 const PENDING = ".dotbabel-projection.pending.json";
@@ -65,19 +66,10 @@ export async function installClaudeBaseline({ source, target, onStep }) {
   const sourceTree = openProjectionTree(baseline);
   try {
     fs.mkdirSync(target, { recursive: true });
-    const result = await syncProjectionBatch({ root: target, loadBatch: () => readBatch(sourceTree), onStep });
+    const result = await syncProjectionBatch({ root: target, loadBatch: () => readBatch(sourceTree), onStep,
+      beforeCommit: ({ tree, manifest }) => syncClaudeCompanions({ tree, manifest, source, onStep }),
+    });
     if (result.status !== "synced") throw fail("claude_baseline_busy");
-    const tree = openProjectionTree(target);
-    try {
-      for (const [file, entry] of Object.entries(result.manifest.entries)) {
-        if (entry.artifactKind !== "skill") continue;
-        const sourceDirectory = path.resolve(source, path.dirname(entry.sourcePath));
-        for (const companion of fs.readdirSync(sourceDirectory)) {
-          if (companion === "SKILL.md") continue;
-          tree.linkCompanion(path.posix.join(path.posix.dirname(file), companion), path.join(sourceDirectory, companion));
-        }
-      }
-    } finally { tree.close(); }
     return { status: "synced", paths: Object.keys(result.manifest.entries).sort() };
   } finally { sourceTree.close(); }
 }

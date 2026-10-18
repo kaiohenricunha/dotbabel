@@ -55,6 +55,14 @@ function exchange(fd, first, second) {
 function unlinkTemporary(file) {
   try { fs.unlinkSync(file); } catch (error) { if (error.code !== "ENOENT") throw error; }
 }
+function readLinkAt(file) {
+  try { return fs.readlinkSync(file); }
+  catch (error) {
+    if (error.code === "ENOENT") return null;
+    if (error.code === "EINVAL") return undefined;
+    throw error;
+  }
+}
 
 /**
  * Open an existing real owning root through a no-follow descriptor walk.
@@ -132,13 +140,32 @@ export function openProjectionTree(root) {
       try { if (!retain) unlinkTemporary(temporary); } finally { location.close(); }
     }
   };
-  const linkCompanion = (relative, source) => {
+  const readLink = relative => {
+    const location = parent(relative); if (location === null) return null;
+    try { return readLinkAt(location.path); } finally { location.close(); }
+  };
+  const linkCompanion = (relative, source, options = {}) => {
     if (typeof source !== "string" || !path.isAbsolute(source)) throw fail("projection_path_unsafe");
     const location = parent(relative, true);
+    const temporaryName = location.name + "." + randomUUID() + ".tmp";
+    const temporary = `/proc/self/fd/${location.fd}/${temporaryName}`; let retain = false;
     try {
-      try { fs.symlinkSync(source, location.path); } catch (error) { if (error.code === "EEXIST") return false; throw error; }
+      const observed = readLinkAt(location.path);
+      if (observed === source && options.expected === observed) return true;
+      if (observed !== null && (options.expected === undefined || observed !== options.expected)) return false;
+      fs.symlinkSync(source, temporary);
+      if (observed === null) {
+        try { fs.linkSync(temporary, location.path); } catch (error) { if (error.code === "EEXIST") return false; throw error; }
+      } else {
+        retain = true; exchange(location.fd, temporaryName, location.name);
+        if (readLinkAt(temporary) !== observed) {
+          try { exchange(location.fd, temporaryName, location.name); } catch { /* Preserve both objects on ambiguity. */ }
+          throw fail("projection_output_drift");
+        }
+        retain = false;
+      }
       fs.fsyncSync(location.fd); return true;
-    } finally { location.close(); }
+    } finally { try { if (!retain) unlinkTemporary(temporary); } finally { location.close(); } }
   };
-  return { read, write, remove, linkCompanion, ensureDirectory: relative => parent(relative + "/.unused", true).close(), close: () => fs.closeSync(rootFd), lockPath: `/proc/self/fd/${rootFd}/.dotbabel-projection.lock` };
+  return { read, write, remove, readLink, linkCompanion, ensureDirectory: relative => parent(relative + "/.unused", true).close(), close: () => fs.closeSync(rootFd), lockPath: `/proc/self/fd/${rootFd}/.dotbabel-projection.lock` };
 }

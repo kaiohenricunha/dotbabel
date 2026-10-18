@@ -25,7 +25,7 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     const source = parseProjectionSource(artifact);
     const requirement = source.requirement;
     const target = { ...artifact.target, runtimeId: "claude" };
-    const resolverResult = resolve({ ...context, requirement, target, runtimeContract });
+    const resolverResult = resolve({ ...context, requirement: requirement ?? undefined, target, runtimeContract });
     const binding = (runtimeContract.capabilities ?? runtimeContract).binding?.[kind];
     if (requirement?.mode === "pin") {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
