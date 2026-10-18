@@ -47,6 +47,10 @@ loading. Dependency failures return coded fallback without copying rejected inpu
 A proposal remains distinct from an applied or observed configuration. Hysteresis uses a second
 shared-resolver probe and cannot shadow an existing model pin.
 
+`current.turnExecuted: false` identifies a verified cold thread with no completed turn. It skips
+current-model retention because no conversation cache exists yet. A true, absent or unverified
+value keeps conservative retention. Explicit manual axes and all floors still apply on a cold turn.
+
 `apply(decision, originalSubmission)` is runtime-specific and called once before execution. Requested, accepted and observed effective configurations are separate states. A successful submission acknowledgement alone does not prove the actual model.
 
 ## Runtime contracts

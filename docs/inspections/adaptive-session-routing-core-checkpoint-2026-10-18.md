@@ -43,3 +43,9 @@ The final routing/prepare mutation run passes at 91.04%: 254 killed, 25 survivin
 ## Final local commands
 
 `npx vitest run plugins/dotbabel/tests/adaptive-session-routing.test.mjs` exits 0 with 40 passing tests. `npx stryker run --mutate 'plugins/dotbabel/src/adaptive-session-routing/route.mjs,plugins/dotbabel/src/adaptive-session-routing/prepare.mjs' --concurrency 2` exits 0 at 91.04%, without uncovered mutants or timeouts. Logs: `/tmp/ar-core-classification-boundary-green.log`, `/tmp/ar-core-route-mutation-final.log`. Full final quality and post-integration acceptance remain required.
+
+## Delivery checkpoint after classifier merge
+
+Classifier #501 merges at f5f9b93 after its full review and exact-head CI. This branch preserves that main state by normal merges. The final pre-cold-turn PR profile exits 0 with warning verdict, no environment error and all configured executions exiting 0: 5,125 tests pass, 14 skip, changed lines 100%, changed branches 97.08%. The unchanged 500-model wall-clock benchmark measures p95 5.99 ms, below 25 ms. The fast profile also exits 0. All nine active adaptive criteria and six original criteria pass. A real isolated public prepareRoute dry run proposes a configuration only for enabled A, never reads disabled B's prompt, loads only A and preserves both project files. Native application remains outside this unit.
+
+A new regression distinguishes a verified cold thread from a warm conversation. Initial inherited defaults have no prompt cache before any turn executes; retaining them provides no continuity benefit. current.turnExecuted=false skips only that retention probe, while manual pins, unknown provenance and all floors remain binding. True, absent and unverified values retain the prior conservative behavior. All 41 routing tests pass. Final mutation and PR-quality verification follow this small boundary amendment before publication.

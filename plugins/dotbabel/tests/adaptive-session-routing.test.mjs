@@ -119,6 +119,17 @@ describe("adaptive session routing decisions", () => {
     value.resolverInput.catalog.runtimes[0].models[1].fields.selectionVisibility = [evidence("hidden")];
     expect(route(value).configuration.axes.model).toBe("a-deep");
   });
+  it("does not retain an inherited default before any turn executes", () => {
+    const value = request({ current: { axes: { model: "z-frontier", reasoning: "calm" }, turnExecuted: false } });
+    expect(route(value).configuration.axes.model).toBe("a-deep");
+    for (const turnExecuted of [undefined, true, "false"]) {
+      value.current.turnExecuted = turnExecuted;
+      expect(route(value).configuration.axes.model).toBe("z-frontier");
+    }
+    value.current.turnExecuted = false;
+    value.manual = { ...value.manual, model: { source: "manual", value: "z-frontier" } };
+    expect(route(value).configuration.axes.model).toBe("z-frontier");
+  });
   it("does not let hysteresis shadow a policy pin", () => {
     const value = request({ current: { axes: { model: "a-deep", reasoning: "calm" } } });
     value.resolverInput.policy = { ...value.resolverInput.policy, pin: { runtime: "codex", config: { model: "z-frontier" } } };
