@@ -3,19 +3,27 @@ id: audit-and-fix
 name: audit-and-fix
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, debugging]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - debugging
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.
-  Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
 argument-hint: "[domain]"
 tools: Read, Grep, Glob, Bash
 model: opus
+dotbabel:
+  compute:
+    mode: floor
+    requirement: frontier
+    binding: consumer
 ---
 
 Run a long-horizon audit-then-implement pipeline: produce a structured audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.
@@ -79,3 +87,12 @@ Arguments: `$ARGUMENTS` — the audit domain (e.g. "hardcoded business logic", "
 - Every draft PR must include the audit file path in its Summary section so reviewers can trace the finding.
 - Keep the status file updated even on failures — silence is worse than partial information.
 - If clustering produces more than 8 PRs, STOP and ask the user to narrow the audit scope.
+
+## Compute scope
+
+The Frontier floor describes the coordinator's consumer requirement. Native skill
+frontmatter does not enforce that floor. Keep the existing general-purpose worker
+dispatch, inheritance, tools, worktrees and draft-only merge prohibition. This
+declaration adds no enforced worker-floor guarantee and does not set a worker's
+model or effort. Report coordinator and worker observations separately when they
+are available; an unavailable observation remains unknown.

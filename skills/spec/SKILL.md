@@ -292,7 +292,8 @@ Use these templates when creating each section file in Phase 1.
 <!--
 Each prompt should include:
 - <read-first> block listing 4-6 specific source files
-- Command recommendation (/think, /ultraplan, /plan)
+- The existing /plan workflow; recommend an explicit reasoning effort only when
+  the active runtime supports that control. Do not invent a slash command.
 - TDD test names (the test is the first deliverable)
 - Exact file paths to create/modify
 - A <proof> block: the tests, the command that runs the new behavior, what the
