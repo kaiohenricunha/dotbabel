@@ -11,6 +11,7 @@ import {
   processState,
   isOwnerAlive,
 } from "../fleet/registry.mjs";
+import { currentNativeSession, nativeAlive, NATIVE_HARNESSES } from "./native-registry.mjs";
 
 function git(cwd, args) {
   const env = { ...process.env };
@@ -70,11 +71,49 @@ function codexAncestor(startPid) {
   return null;
 }
 
+function foreignNativeAncestor(startPid) {
+  let pid = startPid;
+  for (let n = 0; n < 64 && pid > 1; n++) {
+    const proc = processState(pid);
+    let argv = [];
+    try {
+      argv = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
+    } catch {}
+    const binary = path.basename(argv[0] || ""),
+      script = argv[1] || "";
+    if (
+      ["codex", "claude"].includes(binary) ||
+      (binary === "node" && /(?:^|\/)(?:codex|claude)(?:\.js)?$/.test(script))
+    )
+      return false;
+    if (
+      /^(?:opencode(?:\.exe)?|copilot|agy|antigravity)$/.test(binary) ||
+      (["node", "bun"].includes(binary) &&
+        /(?:\/@github\/copilot\/(?:index|copilot)\.(?:m?js)|\/(?:copilot|opencode)(?:\.(?:m?js))?)$/.test(
+          script,
+        ))
+    )
+      return true;
+    pid = proc.ppid ?? 0;
+  }
+  return false;
+}
+
 /** Resolve the invoking session without guessing a recent transcript. @param {object} repo @param {object} [opts] @returns {object} */
 export function currentSession(
   repo,
   { env = process.env, startPid = process.ppid, sessionId } = {},
 ) {
+  const native = currentNativeSession(repo, {
+    root: peerRoot(env),
+    key: env.DOTBABEL_PEER_NATIVE_SESSION,
+    startPid,
+  });
+  if (native) return native;
+  if (foreignNativeAncestor(startPid))
+    throw new Error(
+      "native runtime requires its installed peer integration; inherited Claude/Codex identity is refused",
+    );
   const entries = readRegistry(sessionsDir(env)).entries;
   const claude = findSelf({ entries, startPid, sessionId });
   let who;
@@ -120,6 +159,7 @@ export function endpointAlive(who, { env = process.env } = {}) {
   } catch {
     return false;
   }
+  if (NATIVE_HARNESSES.includes(who.harness)) return nativeAlive(who, peerRoot(env));
   if (who.harness === "claude") {
     return readRegistry(sessionsDir(env)).entries.some(
       (e) =>

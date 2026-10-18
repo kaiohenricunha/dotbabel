@@ -3,6 +3,8 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { deliverNative } from "./native.mjs";
+import { NATIVE_HARNESSES } from "./native-registry.mjs";
 
 function claude(who, text, timeout) {
   if (who.peerProtocol !== 1)
@@ -116,5 +118,7 @@ export async function deliver(who, text, { timeout = 5000, codexBin = "codex" } 
     throw new Error("notification must be one bounded UTF-8 line");
   if (who.harness === "claude") return claude(who, text, timeout);
   if (who.harness === "codex") return codex(who, text, codexBin, timeout);
+  if (NATIVE_HARNESSES.includes(who.harness) && who.nativeProtocol === 1)
+    return deliverNative(who, text, { timeout });
   return { state: "failed", retryable: false, error: "unsupported harness" };
 }

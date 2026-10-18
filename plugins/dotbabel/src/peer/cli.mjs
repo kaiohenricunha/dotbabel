@@ -20,6 +20,9 @@ const USAGE = `dotbabel peer — persistent local Main/Advisor collaboration
 
 Usage:
   dotbabel peer setup --harness both         one-time hook installation; restart/review trust
+  dotbabel peer setup --harness opencode|copilot|antigravity [--repo-root PATH]
+  dotbabel peer launch main|advisor CODE --harness antigravity
+  dotbabel peer launch main|advisor --pair ID [--conversation UUID] --harness antigravity
   dotbabel peer main                         register current session; show pairing code
   dotbabel peer advisor [CODE]               pair with a Main in this repository
   dotbabel peer ask TEXT [--pair ID]          durably enqueue while Advisor is busy
@@ -53,6 +56,7 @@ Exit codes: 0 ok, 1 operation refused, 2 environment error, 64 usage error.
 const FLAGS = Object.fromEntries(
   [
     "harness",
+    "conversation",
     "pair",
     "dedupe",
     "parent",
@@ -69,6 +73,7 @@ const FLAGS = Object.fromEntries(
 FLAGS.processed = { type: "boolean" };
 const COMMANDS = new Set([
   "setup",
+  "launch",
   "main",
   "advisor",
   "ask",
@@ -137,7 +142,7 @@ function launchRelay(store, p, env) {
   if (env.DOTBABEL_PEER_NO_RELAY === "1" || p.closed || !p.advisor) return;
   if (p.relay && isOwnerAlive(p.relay)) return;
   const child = spawn(
-    process.execPath,
+    process.versions.bun ? "node" : process.execPath,
     [BIN, "relay", "--pair", p.id, "--repo-root", p.main.worktree],
     { env, detached: true, stdio: "ignore" },
   );
@@ -177,25 +182,24 @@ async function pump(store, pairId) {
     });
   }
 }
-function context(p, who) {
+function context(p, who, env = process.env) {
   if (!p.main || repository(p.main.worktree).key !== p.main.repo)
     throw new Error("Main worktree is unavailable or changed repository");
   return {
     main_worktree: p.main.worktree,
-    main_alive: endpointAlive(p.main),
+    main_alive: endpointAlive(p.main, { env }),
     advisor_worktree: p.advisor?.worktree ?? null,
     shared_worktree: p.main.worktree === who?.worktree,
     instructions:
       "Read files directly in main_worktree, including uncommitted and untracked changes. Use git -C MAIN diff/status. Re-read evidence before sending findings. Do not write or apply patches there.",
   };
 }
-async function execute(store, command, args, flags, who) {
+async function execute(store, command, args, flags, who, env = process.env) {
+  const alive = (endpoint) => endpointAlive(endpoint, { env });
   return store.transaction((s) => {
-    if (command === "main") return domain.registerMain(s, who, { alive: endpointAlive });
-    if (command === "advisor")
-      return domain.pairAdvisor(s, who, args[0] ?? null, { alive: endpointAlive });
-    if (command === "reconnect")
-      return domain.reconnect(s, flags.pair, args[0], who, { alive: endpointAlive });
+    if (command === "main") return domain.registerMain(s, who, { alive });
+    if (command === "advisor") return domain.pairAdvisor(s, who, args[0] ?? null, { alive });
+    if (command === "reconnect") return domain.reconnect(s, flags.pair, args[0], who, { alive });
     const p = pairFor(s, flags.pair, who, command === "history");
     switch (command) {
       case "ask":
@@ -223,7 +227,7 @@ async function execute(store, command, args, flags, who) {
       case "next": {
         const r = domain.nextRequest(p, who);
         if (r) r.dispatch = { ...r.dispatch, state: "processed" };
-        return r ? { ...r, ...context(p, who) } : null;
+        return r ? { ...r, ...context(p, who, env) } : null;
       }
       case "complete":
       case "fail":
@@ -264,7 +268,7 @@ async function execute(store, command, args, flags, who) {
         domain.unpair(s, p.id, who);
         return { id: p.id, closed: true };
       case "inspect":
-        return context(p, who);
+        return context(p, who, env);
       case "status":
         return {
           id: p.id,
@@ -283,8 +287,8 @@ async function execute(store, command, args, flags, who) {
           deliveries: p.messages
             .slice(-50)
             .map((m) => ({ id: m.id, from: m.from, to: m.to, delivery: m.delivery })),
-          main_alive: endpointAlive(p.main),
-          advisor_alive: endpointAlive(p.advisor),
+          main_alive: alive(p.main),
+          advisor_alive: alive(p.advisor),
           relay_alive: Boolean(p.relay && isOwnerAlive(p.relay)),
           protection:
             "Advisor skill is read-only; PreToolUse enforcement requires installed peer hooks",
@@ -296,25 +300,65 @@ async function execute(store, command, args, flags, who) {
     }
   });
 }
+
+/** Execute a scoped operation for a verified native integration, without process-global output capture. @param {object} who @param {string[]} argv @param {NodeJS.ProcessEnv} [env] @returns {Promise<object|null>} */
+export async function invokePeer(who, argv, env = process.env) {
+  if (
+    !Array.isArray(argv) ||
+    argv.length > 128 ||
+    argv.some((a) => typeof a !== "string" || Buffer.byteLength(a) > 16384)
+  )
+    throw new Error("peer integration arguments must be a bounded string array");
+  if (!endpointAlive(who, { env }))
+    throw new Error("peer integration identity is not registered or live");
+  const parsed = parse(argv, FLAGS),
+    [command, ...args] = parsed.positional;
+  if (parsed.help && argv.length === 1) return { usage: USAGE };
+  if (
+    parsed.help ||
+    parsed.version ||
+    parsed.flags["repo-root"] ||
+    parsed.flags.harness ||
+    parsed.flags.conversation ||
+    ["setup", "launch", "hook", "relay", "input"].includes(command)
+  )
+    throw new Error("operation is unavailable through a scoped peer integration");
+  validateArgs(command, args, parsed.flags);
+  const store = new PeerStore(peerRoot(env), who.repo);
+  const result = await execute(store, command, args, parsed.flags, who, env);
+  const pair = ["main", "advisor", "reconnect"].includes(command)
+    ? result
+    : pairFor(await store.read(), parsed.flags.pair, who, ["history", "unpair"].includes(command));
+  launchRelay(store, pair, env);
+  return result;
+}
 function validateArgs(command, args, flags) {
   if (!COMMANDS.has(command)) usage("unknown peer operation; run dotbabel peer --help");
+  if (flags.harness && !["setup", "launch", "hook"].includes(command))
+    usage(
+      "--harness selects setup, launch, or a native hook protocol; it cannot replace session identity",
+    );
+  if (flags.conversation && command !== "launch")
+    usage("--conversation is available only for managed native launch");
   const maximum = ["ask", "send"].includes(command)
     ? Infinity
-    : [
-          "advisor",
-          "ack",
-          "complete",
-          "fail",
-          "wait",
-          "cancel",
-          "retry",
-          "priority",
-          "retry-delivery",
-          "reconnect",
-          "hook",
-        ].includes(command)
-      ? 1
-      : 0;
+    : command === "launch"
+      ? 2
+      : [
+            "advisor",
+            "ack",
+            "complete",
+            "fail",
+            "wait",
+            "cancel",
+            "retry",
+            "priority",
+            "retry-delivery",
+            "reconnect",
+            "hook",
+          ].includes(command)
+        ? 1
+        : 0;
   if (args.length > maximum) usage(`too many arguments for ${command}`);
   if (
     [
@@ -354,7 +398,8 @@ function print(value, json, command) {
 // This reviewed hook capability executes only internal peer state operations. It
 // never runs model-supplied shell text on the host. The replacement only prints
 // the result; unrelated commands retain their normal permission checks.
-async function coordinate(store, who, input, env) {
+/** Parse only a literal, scoped peer operation from a trusted native tool hook. @param {object} input @returns {string[]|null} */
+export function peerCommand(input) {
   if (input.hook_event_name !== "PreToolUse" || !["Bash", "exec_command"].includes(input.tool_name))
     return null;
   const words = literalWords(input.tool_input?.command ?? input.tool_input?.cmd);
@@ -370,7 +415,16 @@ async function coordinate(store, who, input, env) {
   )
     argv = words.slice(3);
   else return null;
-  if (!COMMANDS.has(argv[0]) || ["setup", "input", "relay", "hook"].includes(argv[0])) return null;
+  if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) return argv;
+  if (!COMMANDS.has(argv[0]) || ["setup", "launch", "input", "relay", "hook"].includes(argv[0]))
+    return null;
+  return argv;
+}
+
+/** Coordinate on behalf of an identity supplied by the native hook, replacing only harmless result printing. @param {object} store @param {object} who @param {object} input @param {NodeJS.ProcessEnv} env @returns {Promise<object|null>} */
+export async function coordinatePeer(store, who, input, env) {
+  const argv = peerCommand(input);
+  if (!argv) return null;
   const existing = (await store.read()).pairs.find(
     (p) => !p.closed && [p.main?.key, p.advisor?.key].includes(who.key),
   );
@@ -381,14 +435,17 @@ async function coordinate(store, who, input, env) {
   try {
     const parsed = parse(argv, FLAGS),
       [op, ...args] = parsed.positional;
-    validateArgs(op, args, parsed.flags);
-    if (parsed.help || parsed.version || parsed.flags["repo-root"])
-      usage("trusted peer coordination requires a literal operation in the current repository");
-    value = await execute(store, op, args, parsed.flags, who);
-    const pair = ["main", "advisor", "reconnect"].includes(op)
-      ? value
-      : pairFor(await store.read(), parsed.flags.pair, who, ["history", "unpair"].includes(op));
-    launchRelay(store, pair, env);
+    if (parsed.help && argv.length === 1) value = { usage: USAGE };
+    else {
+      validateArgs(op, args, parsed.flags);
+      if (parsed.help || parsed.version || parsed.flags["repo-root"])
+        usage("trusted peer coordination requires a literal operation in the current repository");
+      value = await execute(store, op, args, parsed.flags, who, env);
+      const pair = ["main", "advisor", "reconnect"].includes(op)
+        ? value
+        : pairFor(await store.read(), parsed.flags.pair, who, ["history", "unpair"].includes(op));
+      launchRelay(store, pair, env);
+    }
   } catch (err) {
     code = err.exitCode === 64 || err.code === "USAGE_UNKNOWN_FLAG" ? 64 : 1;
     value = {
@@ -444,13 +501,65 @@ export async function runPeer(argv, env = process.env) {
   try {
     validateArgs(command, args, flags);
     if (command === "setup") {
-      if (!flags.harness) usage("setup requires --harness claude|codex|both");
-      if (!["claude", "codex", "both"].includes(flags.harness)) usage("unknown setup harness");
+      if (!flags.harness)
+        usage("setup requires --harness claude|codex|both|opencode|copilot|antigravity");
+      if (
+        !["claude", "codex", "both", "opencode", "copilot", "antigravity"].includes(flags.harness)
+      )
+        usage("unknown setup harness");
       print(
-        environment(() => setupHooks(flags.harness, env)),
+        environment(() => setupHooks(flags.harness, env, flags["repo-root"] || process.cwd())),
         parsed.json,
         command,
       );
+      return 0;
+    }
+    if (command === "launch") {
+      if (
+        flags.harness !== "antigravity" ||
+        !["main", "advisor"].includes(args[0]) ||
+        (flags.pair
+          ? args.length !== 1
+          : args[0] === "advisor"
+            ? args.length !== 2
+            : args.length !== 1) ||
+        (flags.conversation && !flags.pair)
+      )
+        usage("launch requires main|advisor CODE --harness antigravity");
+      const { startAntigravityPeer } = await import("./integrations/antigravity.mjs");
+      const repo = environment(() => repository(flags["repo-root"] || process.cwd()));
+      const bridge = startAntigravityPeer({
+        worktree: repo.worktree,
+        role: args[0],
+        code: args[1],
+        pair: flags.pair,
+        conversation: flags.conversation,
+        env,
+        onEvent: (event) => process.stdout.write(JSON.stringify(event) + "\n"),
+      });
+      const stop = () => {
+        void bridge.close();
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+      let lines;
+      try {
+        await bridge.ready;
+        lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
+        const submit = (async () => {
+          for await (const line of lines) {
+            if (line.trim() === ".quit") break;
+            if (line.trim()) await bridge.send(line);
+          }
+          bridge.end();
+        })();
+        await Promise.race([bridge.done, submit.then(() => bridge.done)]);
+      } finally {
+        lines?.close();
+        await bridge.close();
+        process.removeListener("SIGINT", stop);
+        process.removeListener("SIGTERM", stop);
+      }
       return 0;
     }
     let input;
@@ -459,6 +568,11 @@ export async function runPeer(argv, env = process.env) {
       if (Buffer.byteLength(text) > 65536) throw new Error("hook input too large");
       input = JSON.parse(text);
       input.hook_event_name = args[0];
+      if (flags.harness === "antigravity") {
+        const { antigravityHook } = await import("./integrations/antigravity.mjs");
+        process.stdout.write(JSON.stringify(await antigravityHook(args[0], input, { env })) + "\n");
+        return 0;
+      }
     }
     const repo = environment(() => repository(flags["repo-root"] || input?.cwd || process.cwd())),
       store = environment(() => new PeerStore(peerRoot(env), repo.key));
@@ -480,7 +594,7 @@ export async function runPeer(argv, env = process.env) {
       }
     }
     if (command === "hook") {
-      const coordination = await coordinate(store, who, input, env);
+      const coordination = await coordinatePeer(store, who, input, env);
       if (coordination) {
         process.stdout.write(JSON.stringify(coordination) + "\n");
         return 0;
@@ -507,14 +621,14 @@ export async function runPeer(argv, env = process.env) {
         const op =
           { ".queue": "queue", ".pause": "pause", ".resume": "resume" }[line.trim()] ?? "ask";
         try {
-          print(await execute(store, op, op === "ask" ? [line] : [], flags, who), true, op);
+          print(await execute(store, op, op === "ask" ? [line] : [], flags, who, env), true, op);
         } catch (err) {
           process.stderr.write(err.message + "\n");
         }
       }
       return 0;
     }
-    const result = await execute(store, command, args, flags, who);
+    const result = await execute(store, command, args, flags, who, env);
     print(result, parsed.json, command);
     const p =
       command === "main" || command === "advisor" || command === "reconnect"
@@ -528,6 +642,16 @@ export async function runPeer(argv, env = process.env) {
     launchRelay(store, p, env);
     return 0;
   } catch (err) {
+    if (command === "hook" && flags.harness === "antigravity" && args[0] === "PreToolUse") {
+      process.stdout.write(
+        JSON.stringify({
+          decision: "deny",
+          reason:
+            "Dotbabel cannot verify the peer role. Inspect peer setup and status before retrying.",
+        }) + "\n",
+      );
+      return 0;
+    }
     if (parsed.json)
       process.stdout.write(
         JSON.stringify({

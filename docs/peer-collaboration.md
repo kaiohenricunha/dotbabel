@@ -3,7 +3,8 @@
 _Last updated: v4.2.0_
 
 Peer connects one implementation session (Main) and one read-only reasoning
-session (Advisor). Each can run in Claude Code or Codex CLI on Linux/WSL2.
+session (Advisor). Each can run in Claude Code, Codex CLI, OpenCode v2, Copilot CLI,
+or a managed Antigravity CLI stream on Linux/WSL2.
 It keeps both conversations and contexts intact. Handoff still transfers context;
 its commands, storage, and transcript extraction are unchanged.
 
@@ -72,6 +73,76 @@ its identity through Fleet's registry and process ancestry. Codex uses its expor
 thread ID and verifies a live Codex process ancestor, in the trusted host hook
 when the shell has its own PID namespace. No recent-transcript guessing
 or manual UUID copying is required. `status` prints the durable pair ID.
+
+## Native OpenCode, Copilot, and Antigravity setup
+
+Run setup once in the target project with one harness name:
+
+```bash
+dotbabel peer setup --harness opencode --repo-root /absolute/project
+dotbabel peer setup --harness copilot --repo-root /absolute/project
+dotbabel peer setup --harness antigravity --repo-root /absolute/project
+```
+
+Setup installs managed project files and `.agents/skills/peer/SKILL.md`. It refuses
+foreign files at its integration paths and symlinked paths. It preserves unrelated
+configuration, models, and permissions. The installed wrappers reference this
+package's location; rerun setup if you move the package.
+
+| Runtime                                     | Integration                                      | Start and coordinate                                                                                               |
+| ------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| OpenCode 2.x                                | `.opencode/plugins/dotbabel-peer/`               | Restart OpenCode; use native `dotbabel_peer` with `argv`                                                           |
+| Copilot CLI with extension API              | `.github/extensions/dotbabel-peer/extension.mjs` | Start `copilot --experimental`; approve native extension hooks; use `dotbabel_peer`                                |
+| Antigravity CLI with stream input and hooks | `.agents/hooks.json`                             | Use `dotbabel peer launch main --harness antigravity` or `dotbabel peer launch advisor CODE --harness antigravity` |
+
+The native tool takes arguments after `dotbabel peer`, for example
+`{"argv":["main"]}`, `{"argv":["advisor","CODE"]}`, or `{"argv":["--help"]}`.
+The SDK supplies the actor ID and project location. The tool cannot substitute
+either, install hooks, or launch another session. A shell cannot inherit its
+parent Codex identity across a recognized native runtime boundary.
+
+OpenCode Advisor uses one literal native tool call per `execute`:
+`return await tools["dotbabel_peer"]({"argv":["status"]});`.
+JSON literal arguments are required. The guard refuses arbitrary JavaScript,
+multiple calls, writes, subagents, and unknown tools. OpenCode queue delivery uses
+the existing native session. Plugin reload restores live paired SDK sessions.
+
+Copilot's extension joins the foreground conversation through `joinSession`.
+Queued messages use `mode: enqueue`. Native manual approvals remain in effect;
+approve each requested action according to your policy. Dotbabel does not enable
+experimental mode globally, change the model, or install an approval handler.
+
+Antigravity support starts an owned persistent `agy --input-format stream-json
+--output-format stream-json` process. The native `init.conversation_id` supplies
+its identity. Each input line is a prompt; `.quit` closes input after accepted
+turns. Output is native NDJSON plus a `dotbabel_peer` registration event. This
+path does not attach to an ordinary running Antigravity terminal.
+Native hooks map camelCase payloads, inject role context, guard Advisor tools,
+and continue unfinished work once per request lease. Only the replacement command
+that prints a scoped peer result receives `auto_approve`; explicit native deny
+rules still apply. Other tools retain their native permission decisions. Stream
+mode cannot display permission prompts, so those requests remain denied.
+Never add permission-bypass or model flags to make a peer test pass.
+Use native file tools for stream inspection. Ask Main for Git evidence that
+requires a separate native permission grant, then record `wait`.
+
+After an owned Antigravity process ends, reconnect its durable role:
+
+```bash
+dotbabel peer launch advisor --pair PAIR_ID --conversation CONVERSATION_ID --harness antigravity
+```
+
+Use `main` to reconnect Main. Omit `--conversation` for a new native conversation.
+The launcher verifies the real emitted init ID against a requested resume ID.
+It preserves the pair, queue, and history. Read status, then resume scheduling
+explicitly; use a new lease after interruption. Native stream summaries contain
+cumulative denial history. An old denial does not pause a recovered investigation
+again, while a new denial pauses unfinished work without marking it completed.
+
+Native integrations keep private process-fenced sockets. Queue admission is only
+`transport_accepted`. A timeout or failed callback is uncertain and is not replayed
+automatically. Native actors must still run `receive`, ACK processing, and record
+the investigation result. Ending a model turn does none of these.
 
 ## Working together
 
