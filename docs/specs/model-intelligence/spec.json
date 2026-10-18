@@ -1,6 +1,6 @@
 {
   "id": "model-intelligence",
-  "title": "Model Intelligence \u2014 provider-neutral compute requirements resolved to runtime-native configurations",
+  "title": "Model Intelligence — provider-neutral compute requirements resolved to runtime-native configurations",
   "status": "approved",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
@@ -102,7 +102,7 @@
     },
     {
       "id": "AC-3",
-      "status": "active",
+      "status": "planned",
       "given": "a shipped policy file that contains a provider model name",
       "when": "policy loads",
       "then": "the policy is rejected",
