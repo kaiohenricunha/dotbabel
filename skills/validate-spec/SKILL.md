@@ -3,26 +3,28 @@ id: validate-spec
 name: validate-spec
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - testing
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Audit an already-implemented spec against the codebase. Walks each constraint
-  (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in
-  file:line evidence, runs the spec.json acceptance_commands, and writes a
-  single audit doc to docs/audits/. Use whenever the user asks to "validate a
-  spec", "audit a spec", "check if spec is implemented", "verify the spec is
-  done", "is this spec really done", or otherwise wants closure on spec-driven
-  work. Read-only against the spec — produces an audit, never modifies the
-  spec itself.
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to "validate a spec", "audit a spec", "check if spec is implemented", "verify the spec is done", "is this spec really done", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.
 argument-hint: "[spec-id] [--no-run]"
 effort: max
 model: sonnet
 allowed-tools: Read Grep Glob Bash
+dotbabel:
+  compute:
+    mode: floor
+    requirement: frontier
+    binding: consumer
 ---
 
 # Validate Spec — Implementation Audit

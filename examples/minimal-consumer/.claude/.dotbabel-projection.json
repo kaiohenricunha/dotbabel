@@ -63,15 +63,15 @@
       "runtimeContractHash": "sha256:4e094f32a1e4d70c114a47c3cc3c0579ce222a86536a804f3430cc136c80be18"
     },
     "agents/compliance-auditor.md": {
-      "projectionId": "sha256:73eef375d8b38135ab1551915e52d3a530ec46ca5c963724390f31c26995d179",
+      "projectionId": "sha256:7ec477905f4289ec1d366f7d31ee3def6ff11d0c2bb9a2004ef26e2b67f18b64",
       "sourcePath": "agents/compliance-auditor.md",
-      "sourceHash": "sha256:005d85e43197ba4d0ddbe14d0a95c66bd1cda1d31631f131365aad52429785ed",
-      "inputsHash": "sha256:dcf6f6d3bc0dbe0924be90ce222c6180439fff38058de7230001dbf11184a4a4",
-      "outputHash": "sha256:7ee20aa5b73819188840f1a149cea88777c0ecde982cabe38c73a76adf179f2f",
+      "sourceHash": "sha256:32470dc78f33b6f0fb95467d04c0a80bdc2b5b24daa4a3c1d5ff480951ea19b5",
+      "inputsHash": "sha256:fcf5577f06513c692b8824b0d81c02f283240b5e9fc97319ef38dd692e1c0a39",
+      "outputHash": "sha256:719e6cfdace25e617a69dafa3ef7e61b5af72d0b9c8c9c63e12b63fb7679f308",
       "runtimeId": "claude",
       "artifactKind": "agent",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
-      "resolverResultHash": "sha256:5944ff04ded4a342fad2a6ac9efa08b6c7ff32c8cf840d9c221861dd6d69e423",
+      "resolverResultHash": "sha256:3b3324f833575d22b2c51c729338b18f52a399d316780e9615fb8fb8fde9c34b",
       "runtimeContractHash": "sha256:4e094f32a1e4d70c114a47c3cc3c0579ce222a86536a804f3430cc136c80be18"
     },
     "agents/container-engineer.md": {
@@ -99,15 +99,15 @@
       "runtimeContractHash": "sha256:4e094f32a1e4d70c114a47c3cc3c0579ce222a86536a804f3430cc136c80be18"
     },
     "agents/data-scientist.md": {
-      "projectionId": "sha256:c01d9bf006259ec53ea31784226b6d9b93627fe90545ced210e95478c955b2f9",
+      "projectionId": "sha256:9bfcc549ef9f70d27f8265439ecb08ba3fe1b5fcf7ea76fa333e72d1b21cc503",
       "sourcePath": "agents/data-scientist.md",
-      "sourceHash": "sha256:d16663bc8f0ab627eb3af08fa1bbe14b4e457f9a24b14d621a803366b323c1a2",
-      "inputsHash": "sha256:45f447d17ecaa99c34bdf8427fd67d28da7f6837a9849f85c73b61880c659c5b",
-      "outputHash": "sha256:a7886a495ac86e4e19e167920cf3f4a0fddc00d26ad956e50f57ba91f60bc3c6",
+      "sourceHash": "sha256:e4200a31a90e2e8691166fef0c090b7830aeb29ba1238eca150cb1a9801f5718",
+      "inputsHash": "sha256:4148843cbd7d9fc966e68310c26f4cec21ec3f01586e63e71127fee524e1f25e",
+      "outputHash": "sha256:a5bd7dfe5bf9e4e8caa6e984caad711462f07687404f29342abfe2547fb6226b",
       "runtimeId": "claude",
       "artifactKind": "agent",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
-      "resolverResultHash": "sha256:296ad0143f16553d8f0cb656a5de1685c1b92f14ea7125e2ee29f99f249fd59a",
+      "resolverResultHash": "sha256:8d0acfe6e1f028b3287d5a42a55c5e0b9f1ec6d6d5a02616b7088c8113d69982",
       "runtimeContractHash": "sha256:4e094f32a1e4d70c114a47c3cc3c0579ce222a86536a804f3430cc136c80be18"
     },
     "agents/deployment-engineer.md": {
@@ -855,15 +855,15 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/validate-spec/SKILL.md": {
-      "projectionId": "sha256:3ebbfade5ce9667c94afc87eed5e6c279b0112d17767abb00f051a1884d7b15e",
+      "projectionId": "sha256:29f0f212c6f8e1d048196d278a8d5ace88324ff3e12f510ab67b256c26102914",
       "sourcePath": "skills/validate-spec/SKILL.md",
-      "sourceHash": "sha256:74004709a48027b2ad3355752b7eb099069e6a66b32fca6f17f66ce78d9a9088",
-      "inputsHash": "sha256:6c3ae5bc6bc419cf34265f29e99d13bf5843c661ff59698cfa35d38228320ae9",
-      "outputHash": "sha256:c500529aa0ac0dc31e7fdf4d7d9e5a5e4618ace8e7e7493503c6ca34a23b45c4",
+      "sourceHash": "sha256:0ccf486090a349a9a682be7458b1e5cbc9301fc62d31d370d36f31cf8ba88750",
+      "inputsHash": "sha256:f95d0a6cbfa8efa034df08c40768d6acf3af6a77617748cbdc078551e72ca210",
+      "outputHash": "sha256:fd1765142c391e27d2e61516863c0cf0c8333763b99cb6746fe0886ae43d2c2a",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
-      "resolverResultHash": "sha256:6afeed774bfa2334e9074f1767eda45c50bcf8f0a7d0971dce4e2f6078cb0511",
+      "resolverResultHash": "sha256:76eaf724fde74ac0eac8aad56bbcb6f84e36b1d72cd495244e40882676a7fb48",
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/veracity-audit/SKILL.md": {

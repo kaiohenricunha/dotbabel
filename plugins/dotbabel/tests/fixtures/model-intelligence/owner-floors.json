@@ -1,0 +1,96 @@
+{
+  "originalCommit": "5d388d23c02dc5debae5c5c1d851e6ab653341d0",
+  "approval": "docs/inspections/model-intelligence-class-f-owner-decisions-2026-10-18.md",
+  "entries": [
+    {
+      "ownerDecision": "F1",
+      "sourcePath": "agents/compliance-auditor.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "compliance-auditor",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["security"],
+        "platform": ["none"],
+        "task": ["review", "diagnostics"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "compliance-auditor",
+        "description": "Use when auditing data quality gates, config-driven checks, or invariant enforcement. Cross-references declaration files against runtime enforcement code to find declared-not-enforced and enforced-not-declared gaps. Read-only — produces a coverage matrix, never modifies code or config. Triggers on: \"gate coverage\", \"quality check audit\", \"data invariants\", \"declared vs enforced\", \"config vs code gaps\", \"quality gate completeness\".\n",
+        "tools": "Read, Grep, Glob",
+        "model": "opus",
+        "skills": ["veracity-audit"],
+        "source": "https://github.com/VoltAgent/awesome-claude-code-subagents (MIT)"
+      },
+      "bodyHash": "929b2e10423a479036179d33c6915e5f0ff121b4a86865889df02b5ceb39b0bf"
+    },
+    {
+      "ownerDecision": "F2",
+      "sourcePath": "agents/data-scientist.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "deep",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "data-scientist",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["data"],
+        "platform": ["none"],
+        "task": ["review", "diagnostics"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "data-scientist",
+        "description": "Use when validating statistical models, scoring formulas, or config-driven math. Audits formula correctness, boundary conditions, config-vs-code drift, and output scale changes. Read-only — surfaces findings, never modifies code. Triggers on: \"validate scoring math\", \"check formula\", \"config drift\", \"boundary conditions\", \"statistical model audit\", \"rating algorithm review\".\n",
+        "tools": "Read, Grep, Glob",
+        "model": "sonnet",
+        "skills": ["veracity-audit"],
+        "source": "https://github.com/VoltAgent/awesome-claude-code-subagents (MIT)"
+      },
+      "bodyHash": "fa33eefe96083fbcd4d28c6d65647479817bf878d0f8332166ec1db373f2bde0"
+    },
+    {
+      "ownerDecision": "F6",
+      "sourcePath": "skills/validate-spec/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "validate-spec",
+        "name": "validate-spec",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to \"validate a spec\", \"audit a spec\", \"check if spec is implemented\", \"verify the spec is done\", \"is this spec really done\", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.\n",
+        "argument-hint": "[spec-id] [--no-run]",
+        "effort": "max",
+        "model": "sonnet",
+        "allowed-tools": "Read Grep Glob Bash"
+      },
+      "bodyHash": "dc17fdaa7de34a4fd7f1335a6e2c77aa1b6cbf4ba239fdc722f97e56935a7de2"
+    }
+  ]
+}

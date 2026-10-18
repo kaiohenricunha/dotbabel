@@ -334,7 +334,7 @@
     {
       "name": "validate-spec",
       "path": ".claude/skills/validate-spec/SKILL.md",
-      "checksum": "sha256:c500529aa0ac0dc31e7fdf4d7d9e5a5e4618ace8e7e7493503c6ca34a23b45c4",
+      "checksum": "sha256:fd1765142c391e27d2e61516863c0cf0c8333763b99cb6746fe0886ae43d2c2a",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
