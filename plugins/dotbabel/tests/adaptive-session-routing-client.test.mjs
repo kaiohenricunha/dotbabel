@@ -292,3 +292,23 @@ describe("managed native protocol and lifetime boundaries", () => {
     expect(result.decision.status).toBe("proposed"); expect(f.calls.find(([m]) => m === "turn/start")[1]).toMatchObject({ model: "a-deep", effort: "calm" }); session.close();
   });
 });
+it("keeps a thread warm after a timed-out first turn later completes",async()=>{
+ const options={noCompletion:true},seen=[],f=fixture({...options,prepared:request=>seen.push(request.current)});
+ const original=f.rpc.request.getMockImplementation();let turns=0;
+ f.rpc.request.mockImplementation(async(method,params)=>{const result=await original(method,params);if(method==="turn/start"&&++turns>1)queueMicrotask(()=>f.notify({method:"turn/completed",params:{threadId:"retained-thread",turn:{id:result.turn.id,status:"completed"}}}));return result;});
+ const session=await openCodexSession({repoRoot:"/project",completionTimeoutMs:10},f.deps);
+ try{await expect(session.submit([{type:"text",text:"First"}])).rejects.toMatchObject({code:"native_completion_unknown"});
+ f.notify({method:"turn/completed",params:{threadId:"retained-thread",turn:{id:"turn-1",status:"completed"}}});
+ expect((await session.submit([{type:"text",text:"Second"}])).status).toBe("completed");expect(seen[1]).toEqual({axes:{},turnExecuted:true});}finally{session.close();}
+});
+it("does not reuse an earlier observation after a later accepted turn times out",async()=>{
+ const loaded=[],f=fixture({load:true,loaded});f.deps.loadResolverInput=async()=>({});const original=f.rpc.request.getMockImplementation();let turns=0;
+ f.rpc.request.mockImplementation(async(method,params)=>{
+ if(method==="turn/start"&&++turns===2)return{turn:{id:"timed-out-turn",status:"inProgress"}};
+ return original(method,params);
+ });
+ const session=await openCodexSession({repoRoot:"/project",completionTimeoutMs:10},f.deps);
+ try{await session.submit([{type:"text",text:"First"}]);await expect(session.submit([{type:"text",text:"Second"}])).rejects.toMatchObject({code:"native_completion_unknown"});
+ f.notify({method:"turn/completed",params:{threadId:"retained-thread",turn:{id:"timed-out-turn",status:"completed"}}});
+ expect((await session.submit([{type:"text",text:"Third"}])).status).toBe("completed");expect(loaded[1].observed.configurationBasis).toBe("as-run");expect(loaded[2].observed).toBeUndefined();}finally{session.close();}
+});

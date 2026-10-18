@@ -86,14 +86,14 @@ export async function openCodexSession(options, dependencies = {}) {
           for (const [axis, key] of [["model", "model"], ["reasoning", "effort"]]) if (manual[axis].source === "manual") params[key] = manual[axis].value;
           const accepted = await router.submit(`submission-${++sequence}`, params);
           if (accepted.status !== "accepted") return accepted;
+          latestObservation = undefined;
+          router.updateState({ current: { axes: {}, turnExecuted: true } });
           const id = accepted.accepted.turnId;
           const turn = completions.get(id) ?? await new Promise((resolve, reject) => {
             const timer = setTimeout(() => reject(fail("native_completion_unknown")), timeoutMs);
             waiting = { id, resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } };
           });
           let effective = { state: "unknown" };
-          latestObservation = undefined;
-          router.updateState({ current: { axes: {}, turnExecuted: true } });
           try {
             const read = await rpc.request("thread/read", { threadId, includeTurns: false });
             const native = read.thread;

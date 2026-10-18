@@ -109,3 +109,18 @@ The existing real public-CLI proof remains applicable to unchanged production by
 prompts share one native thread, each original input appears once, and selected/effective axes match.
 Native read-only sandbox and on-request approval remain effective. This is the dotbabel-managed
 terminal, not interception in the stock Codex CLI. Final quality, review and CI remain required.
+
+## Late-completion recovery audit
+
+Two new regressions fail against `client.mjs:87-96`. A timed-out first turn later completes;
+the next preparation still sees `turnExecuted: false`. After an earlier successful turn, a later
+accepted turn times out and completes late; the third preparation still consumes the first turn's
+observation. Candidate one is incorrect completion correlation. Both notifications carry the correct
+retained thread and native turn identifiers, and the existing router releases the barrier only
+for those identifiers, so correlation does not explain the stale data. Candidate two is the state
+update position: observation invalidation and the executed-thread marker occur only after the
+awaited completion. The timeout skips both. Move those two operations to the successful native
+acceptance boundary, before waiting. Preserve unknown state until an actual completed observation
+arrives. This neither replays a prompt nor permits routing during an active turn. The autonomous
+contract authorizes the correction. The earlier mutation report covers the earlier bytes; rerun
+the same three-module measurement for this source correction.
