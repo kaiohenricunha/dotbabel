@@ -10,7 +10,8 @@ it("the locked adoption protocol, dataset tools and real CLI contracts pass offl
     "docs/experiments/graph-3e-datasets/prepare.test.mjs",
     "docs/experiments/graph-3e-datasets/recovery.test.mjs",
     "docs/experiments/graph-3e-datasets/labels.test.mjs",
-    "docs/experiments/graph-3e-datasets/baseline.test.mjs"],
+    "docs/experiments/graph-3e-datasets/baseline.test.mjs",
+    "docs/experiments/graph-3e-datasets/historical.test.mjs"],
   { cwd: root, encoding: "utf8", timeout: 25000 });
   expect(result.error).toBeUndefined();
   expect(result.status, result.stdout + result.stderr).toBe(0);

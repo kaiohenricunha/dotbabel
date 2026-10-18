@@ -227,9 +227,56 @@ model calls and changes no adoption state.
 
 See [the blind-label report](labeling-report.md) for the sealed runs, counts, and remaining gaps.
 
-Run all six research test files through the repository's
+Run all seven research test files through the repository's
 `plugins/dotbabel/tests/graph-adoption-experiment.test.mjs` wrapper, or use:
 
 ```bash
-node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experiments/graph-step-adoption/run.test.mjs docs/experiments/graph-3e-datasets/prepare.test.mjs docs/experiments/graph-3e-datasets/recovery.test.mjs docs/experiments/graph-3e-datasets/labels.test.mjs docs/experiments/graph-3e-datasets/baseline.test.mjs
+node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experiments/graph-step-adoption/run.test.mjs docs/experiments/graph-3e-datasets/prepare.test.mjs docs/experiments/graph-3e-datasets/recovery.test.mjs docs/experiments/graph-3e-datasets/labels.test.mjs docs/experiments/graph-3e-datasets/baseline.test.mjs docs/experiments/graph-3e-datasets/historical.test.mjs
 ```
+
+## Public historical review heads
+
+`historical.mjs` prepares a separate supplement from real intermediate heads attached to archived
+GitHub reviews. It keeps the actual current PR head in the evidence. It never rewrites that head,
+invents a historical reviewer assignment, or changes the locked profile function.
+
+The configuration has `repo`, `facts`, `metadata`, `prior_inputs`, and `reviews`. These name the
+public repository, the same frozen facts used by the final-head cohort, the all-state PR metadata,
+the earlier complete input ledger, and the directory of archived review batches. The collector
+checks GitHub repository visibility. It accepts only merged PRs with a complete archived review
+page. A source review must identify the full historical commit and a timestamp.
+
+Before labels, the policy freezes all candidate heads and their SHA-256 order. It excludes every
+previously sampled state regardless of its annotation outcome, plus final heads and full profiles.
+It targets 60 complete eligible inputs, with at most one added state per PR. Incomplete diffs and
+failed reads remain unknown. Source exhaustion is reported; it never lowers the target or a gate.
+These are additional real snapshots, not repetitions manufactured to reach a class count.
+
+Run the CLI with `node docs/experiments/graph-3e-datasets/historical.mjs`:
+
+```text
+collect CONFIG NEW_INPUT_RUN
+validate INPUT_RUN
+finalize INPUT_RUN LABELING NEW_GOLD_RUN [CUTOFF]
+validate-gold GOLD_RUN
+combine-public FINAL_HEAD_GOLD HISTORICAL_GOLD NEW_PUBLIC_RUN
+validate-public PUBLIC_RUN
+```
+
+Build the two blind packets with complete `pinned_files` and frozen `protected_paths`, as above.
+Keep separate actors, timestamps, rationales, and prediction blindness. Exact agreement admits a
+checked AI label; unresolved labels remain unknown. The validators reconstruct the source review,
+commit comparison, baseline, blind packet context, canonical sidecars, and all retained hashes.
+
+`combine-public` explicitly records both source cohorts. Its `public-dispatch.jsonl` request ledger
+contains only the repository verified as public by the historical collector. It retains canonical
+sidecars and source proofs with resolvable references. The local parent archives can include private
+evidence from the earlier mixed cohort. Keep the evidence bundle local; the public request ledger
+is the distinct input surface. No command here sends a model request.
+
+The public-only floor and protocol compatibility remain separate checks. Protocol v1 still rejects
+checked AI labels. Any later protocol revision must bind both source policies and the actual label
+provenance, preserve every numeric threshold, and retain the public-repository consent boundary.
+
+See [the public sample report](public-history-report.md) for the frozen inputs, verified counts,
+artifact identities, test proof, and remaining retry and protocol work.
