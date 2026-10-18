@@ -38,10 +38,10 @@ function readArtifact(file) {
 
 /**
  * Resolve an explicit diagnostic request without discovery, observation, or mutation.
- * @param {{repoRoot: string, runtimeId: string, artifactKind: string, workloadClass?: string, artifactPath?: string}} options
- * @returns {{result: object, exitCode: number, context?: object}}
+ * @param {{repoRoot: string, runtimeId: string, artifactKind: string, workloadClass?: string, artifactPath?: string,observed?:object,includeInputs?:boolean}} options
+ * @returns {{result: object, exitCode: number, context?: object,inputs?:object}}
  */
-export function resolveRequest({ repoRoot, runtimeId, artifactKind, workloadClass, artifactPath }) {
+export function resolveRequest({ repoRoot, runtimeId, artifactKind, workloadClass, artifactPath, observed, includeInputs = false }) {
   let requirement;
   if (artifactPath !== undefined) {
     const sourcePath = resolvePath(repoRoot, artifactPath);
@@ -68,8 +68,9 @@ export function resolveRequest({ repoRoot, runtimeId, artifactKind, workloadClas
   if (!adapter) return { result: failed("unresolved", "runtime_adapter_unavailable"), exitCode: 2 };
   const catalog = loadCatalog({ sources: SOURCE_ADAPTERS.map(module => ({ module })), now: new Date().toISOString() });
   const target = { runtimeId, artifactKind };
-  const result = resolve({ requirement, policy, catalog, target, runtimeContract: adapter.descriptor });
+  const inputs = { requirement, policy, catalog, target, runtimeContract: adapter.descriptor, ...(observed ? { observed } : {}) };
+  const result = resolve(inputs);
   const localEvidence = catalog.runtimes.find(runtime => runtime.runtimeId === runtimeId)?.models.length > 0;
   const exitCode = result.status === "resolved" ? 0 : result.status === "unresolved" && !localEvidence ? 2 : 1;
-  return { result, exitCode, context: { requirement, floor: policy.floor, pin: policy.pin, target } };
+  return { result, exitCode, context: { requirement, floor: policy.floor, pin: policy.pin, target }, ...(includeInputs ? { inputs } : {}) };
 }

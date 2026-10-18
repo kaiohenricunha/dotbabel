@@ -137,3 +137,26 @@ carry `diagnostics[].code`.
 To roll back, disable routing and then disable the engine with the commands above. No global files
 or unrelated artifacts need removal. Keep explicit pins and mandatory safety floors in their existing
 configuration; activation does not weaken them.
+
+## Recommendations
+
+`dotbabel models recommend <artifact> --runtime <id> --json` produces advice from the shared
+resolver and cached evidence. Use `--requirement deep` instead of an artifact for an explicit
+semantic request. Human output includes a native invocation recipe; JSON keeps its command,
+arguments and unsupported axes separate. A differing recommendation returns 0. No command runs
+that recipe, changes runtime settings, refreshes capability data or submits the user's task.
+
+An optional `--observation-file <path>` supplies a validated runtime observation record. This is
+an explicit saved record, not a new live session probe. The command preserves its basis and
+reported provider/model/effort fields. A reconstructed probe is not treated as the user's session.
+The saved-observation reader currently requires Linux and `/proc/self/fd`. Recommendations
+without this flag do not use that filesystem backend.
+Without an as-run observation, advice reports unknown comparison. Missing capability evidence
+never becomes a model ranking. Escalation and de-escalation compare semantic capability classes
+established by exact configuration queries to the same public resolver, with mandatory floors
+retained. Names, prices and provider families do not establish a ranking.
+
+The recommendation always has `configurationBasis: advice`. Its executable flag means that the
+native renderer can express the complete recipe; it is not evidence that a runtime used it.
+Unsupported native axes remain visible and make that flag false. Activation and MAIN routing
+remain independent of this explicit diagnostic command.
