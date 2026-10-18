@@ -227,7 +227,7 @@
     },
     {
       "id": "AC-8",
-      "status": "planned",
+      "status": "active",
       "given": "a user pin and an artifact pin",
       "when": "the resolver composes them",
       "then": "the artifact pin is effective and the shadowed pin is recorded",
@@ -252,7 +252,7 @@
     },
     {
       "id": "AC-9",
-      "status": "planned",
+      "status": "active",
       "given": "an artifact floor and a pin below that floor",
       "when": "the resolver composes them",
       "then": "the result is conflict with enforcement unsatisfied",
@@ -277,7 +277,7 @@
     },
     {
       "id": "AC-10",
-      "status": "planned",
+      "status": "active",
       "given": "an artifact with no native binding on a runtime with no observation",
       "when": "the resolver computes enforcement",
       "then": "the state is unknown and is never upgraded",
@@ -302,7 +302,7 @@
     },
     {
       "id": "AC-11",
-      "status": "planned",
+      "status": "active",
       "given": "a 500-record catalog across six runtime ids",
       "when": "resolve() runs 1,000 warmed calls",
       "then": "p95 is at most 10 ms",

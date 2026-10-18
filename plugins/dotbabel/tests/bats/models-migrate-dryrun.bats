@@ -53,7 +53,7 @@ teardown() {
 @test "models migrate: unknown verb and missing verb are usage errors" {
   run $MODELS
   [ "$status" -eq 64 ]
-  run $MODELS resolve
+  run $MODELS not-a-model-verb
   [ "$status" -eq 64 ]
   [[ "$output" == *"unknown verb"* ]]
 }

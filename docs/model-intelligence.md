@@ -3,8 +3,8 @@
 _Last updated: v4.2.0_
 
 Model Intelligence is an optional project capability. Installation does not enable it. The current
-activation interface stores project flags; resolver and adaptive runtime integrations are separate
-implementation work. An enabled routing preference alone does not prove a runtime is routing prompts.
+activation interface stores project flags. Explicit resolution uses cached capability evidence;
+adaptive runtime integrations remain separate implementation work. An enabled routing preference alone does not prove a runtime is routing prompts.
 
 ## Project activation
 
@@ -38,10 +38,39 @@ Disabling the engine preserves the routing preference and makes it ineffective. 
 preserves the engine's enabled flag. Both operations retain policy, agent configurations and unrelated files.
 They do not alter global Claude Code or Codex settings. Parallel projects read their own flags.
 
-Explicit `models refresh`, `status` and migration analysis remain available when disabled. Status
+Explicit `models refresh`, `status`, `resolve` and migration analysis remain available when disabled. Status
 never refreshes. Refresh can access runtime/provider metadata only when explicitly requested; it does
 not enable the project. Existing dotbabel operations and native per-agent model configuration retain
 their behavior while the feature is disabled.
+
+## Read-only resolution
+
+Resolve an explicit requirement or an artifact with the shared resolver:
+
+```bash
+dotbabel models refresh --runtime codex
+dotbabel models resolve --requirement deep --runtime codex --json
+dotbabel models resolve skills/example/SKILL.md --artifact-kind skill --runtime codex --json
+```
+
+Refresh is an explicit cache update. Resolution reads the existing cache and policy; it does not
+refresh, start an inference turn, or change a session. These diagnostic commands remain available
+without project activation. A missing runtime adapter or usable local cache produces exit 2.
+Insufficient capability evidence produces an unresolved result; a known pin/floor conflict produces
+exit 1. Invalid CLI arguments produce exit 64. Malformed artifact declarations produce data errors,
+not an implicit fallback to legacy metadata.
+
+`--artifact-kind` selects the target binding contract; it defaults to `command`. Pass the actual kind
+when resolving an artifact. JSON returns the shared `ResolverResult`, including selected axes,
+representation/provenance, enforcement, confidence, reason codes and diagnostics. Human output also
+shows the requirement, floor and target. A resolved recommendation with `enforcement: unknown` does
+not prove that a running session uses it. Reasoning and tool facts evaluate the configured semantic
+policy; they are not measured model-quality rankings.
+
+Artifacts must be regular files of at most 1 MiB. Missing, non-file or oversized inputs report
+`artifact_unavailable`. Opaque pin values rejected by the runtime contract are not printed in human
+diagnostics. Use explicit refresh when older cached evidence lacks the capabilities needed by a
+requirement; resolution never performs that refresh on its own.
 
 ## Runtime availability
 

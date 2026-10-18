@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * dotbabel-models — Model Intelligence refresh, status, and migration analysis
+ * dotbabel-models — Model Intelligence refresh, status, resolution, and migration analysis
  * (docs/specs/model-intelligence, §5 "CLI Surface").
  *
  * Verbs arrive with the library capability they expose (IMPL-4):
@@ -9,6 +9,8 @@
  *   per-key lock of ARCH-61. It writes only that reconstructible cache.
  * - `status` (P-9) reports each source's support, cached evidence, freshness, and refresh state, and
  *   the cache size. It never refreshes (ARCH-33) and writes nothing.
+ * - `resolve` (P-11) explains artifact or ad hoc requirements using cached evidence only.
+ *   It does not discover models, observe a session, or apply runtime configuration.
  * - `migrate` reports what migrating each artifact's legacy `model:` / `effort:` frontmatter would mean
  *   and writes nothing. `--write` and `--check` arrive with P-18, behind the batching and
  *   preserved-behaviour gates of IMPL-2.
@@ -28,8 +30,9 @@ import {
   canCarryComputeDeclaration,
 } from "../src/model-intelligence/compat/index.mjs";
 import { readProjectActivation, setProjectActivation } from "../src/model-intelligence/activation/index.mjs";
-import { PROVIDERS, RUNTIME_IDS } from "../src/model-intelligence/domain/index.mjs";
+import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS } from "../src/model-intelligence/domain/index.mjs";
 import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
+import { resolveRequest } from "../src/model-intelligence/cli/resolve.mjs";
 import { catalogStatus, refreshSources } from "../src/model-intelligence/catalog/index.mjs";
 import { cacheRoot } from "../src/model-intelligence/catalog/cache.mjs";
 import { spawnSync } from "node:child_process";
@@ -39,18 +42,20 @@ const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
   description:
-    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and refresh state, never refreshing; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
+    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and refresh state, never refreshing; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
   flags: {
     routing: { type: "boolean" },
     "repo-root": { type: "string" },
     source: { type: "string" },
     runtime: { type: "string" },
     check: { type: "boolean" },
+    requirement: { type: "string" },
+    "artifact-kind": { type: "string" },
     json: { type: "boolean" },
   },
 };
 
-const VERBS = Object.freeze(["refresh", "status", "migrate", "enable", "disable"]);
+const VERBS = Object.freeze(["refresh", "status", "migrate", "resolve", "enable", "disable"]);
 
 /** The flags each verb accepts, beyond the harness-wide set. Any other is a usage error. */
 const VERB_FLAGS = Object.freeze({
@@ -59,6 +64,7 @@ const VERB_FLAGS = Object.freeze({
   enable: ["routing", "repo-root"],
   disable: ["routing", "repo-root"],
   migrate: ["repo-root"],
+  resolve: ["repo-root", "runtime", "requirement", "artifact-kind"],
 });
 
 /**
@@ -90,10 +96,10 @@ if (argv.version) {
 const verb = argv.positional?.[0];
 if (verb === undefined) usage(`a verb is required (one of: ${VERBS.join(", ")})`);
 if (!VERBS.includes(verb)) usage(`unknown verb "${verb}" (expected one of: ${VERBS.join(", ")})`);
-for (const flag of ["repo-root", "source", "runtime", "check", "routing"]) {
+for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing"]) {
   if (argv.flags[flag] !== undefined && !VERB_FLAGS[verb].includes(flag)) usage(`--${flag} does not apply to ${verb}`);
 }
-if (verb !== "migrate" && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
+if (!["migrate", "resolve"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
 
 // Under `--json`, stdout carries exactly one JSON document, so every human line
 // goes to stderr. A caller piping the report into `jq` gets the report, not the
@@ -103,6 +109,7 @@ const out = createOutput({ noColor: argv.noColor, stream: argv.flags.json ? proc
 try {
   if (verb === "refresh") await runRefresh();
   else if (verb === "status") runStatus();
+  else if (verb === "resolve") runResolve();
   else if (["enable", "disable"].includes(verb)) runActivation();
   else runMigrate();
 } catch (error) {
@@ -307,4 +314,35 @@ function runMigrate() {
     process.exit(EXIT_CODES.VALIDATION);
   }
   out.pass(`analysed ${report.artifacts.length} artifact(s)`);
+}
+
+
+/** Resolve one artifact or ad hoc requirement through the shared library.
+ * @returns {void}
+ */
+function runResolve() {
+  const runtimeId = argv.flags.runtime;
+  const workloadClass = argv.flags.requirement;
+  const artifactPath = argv.positional[1];
+  const artifactKind = argv.flags["artifact-kind"] ?? "command";
+  if (!RUNTIME_IDS.includes(runtimeId)) usage("resolve requires a known --runtime");
+  if (argv.positional.length > 2 || (artifactPath === undefined) === (workloadClass === undefined)) usage("resolve requires exactly one artifact or --requirement");
+  if (workloadClass !== undefined && !WORKLOAD_CLASSES.includes(workloadClass)) usage("unknown workload class");
+  if (!ARTIFACT_KINDS.includes(artifactKind)) usage("unknown artifact kind");
+  const { result, exitCode, context } = resolveRequest({ repoRoot: resolveRepoRoot(), runtimeId, artifactKind, workloadClass, artifactPath });
+  if (argv.flags.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  else {
+    out.info(`target: ${runtimeId} / ${artifactKind}`);
+    out.info(`requirement: ${context?.requirement?.requirement ?? context?.requirement?.mode ?? "none"}`);
+    if (context?.floor) out.info(`floor: ${context.floor.requirement}`);
+    if (context?.pin) out.info(`pin: explicit ${context.pin.runtime} configuration`);
+    out.info(`resolution: ${result.status}; enforcement: ${result.enforcement.state} (${result.enforcement.basis}); confidence: ${result.confidence}`);
+    if (result.configuration) {
+      out.info(`configuration: ${JSON.stringify(result.configuration.axes)}`);
+      out.info(`representation: ${result.configuration.representation.kind}; source: ${result.configuration.representation.provenance.sourceId}`);
+    }
+    for (const reason of result.explanation) out.info(`${reason.code}: ${reason.message}`);
+    for (const diagnostic of result.diagnostics) out.warn(`${diagnostic.code}: ${diagnostic.message}`);
+  }
+  process.exit(exitCode);
 }
