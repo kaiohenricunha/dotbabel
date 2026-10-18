@@ -66,6 +66,22 @@ Claude: investigate documented mods `prompt.submit` and `turn.step`, field mutab
 
 Codex: verify installed `turn/start` `model` and `effort`, persistent defaults on subsequent turns, `thread/resume`, model/effort observation, approval requests and exact input preservation. `turn/steer` is not the routing boundary. A client must not silently supply permissive sandbox or approval overrides.
 
+### Managed Codex terminal
+
+`models session --runtime codex [--model auto|<native-id>] [--effort auto|<native-value>]`
+starts an explicitly enabled project's managed App Server terminal. Each ordinary input line becomes
+one MAIN prompt on one retained thread. EOF closes it. Without an axis option, native user/project
+settings remain manual and unknown provenance remains conservative. An explicit `auto` releases
+only that axis for this managed session; a concrete value pins it. Native permission settings remain
+unchanged. Missing approval handlers and noninteractive input cannot approve native tool execution.
+
+`session --json` is an explicit streaming interface: newline-delimited session, assistant-text and
+turn-result records. Existing diagnostic verbs still emit one JSON document. Requested, accepted
+and observed axes remain separate. A native reroute or missing post-completion observation leaves
+effective state unknown. Policy blocks exit 1; failed/uncertain native turns exit 2 without replay.
+This text-line terminal does not claim transparent stock-CLI interception, full interaction parity,
+thread resume or attachment entry. The public client preserves supplied native input arrays.
+
 ## Diagnostics
 
 JSON fields are additive and reason codes retain meaning. Codes include `intelligence_disabled`, `routing_disabled`, `classification_uncertain`, `manual_selection_preserved`, `routing_unsupported`, `routing_unverified`, `routing_apply_failed`, `effective_configuration_unknown`, `pin_floor_conflict` and `stale_capability_evidence`. Follow existing CLI exits: 0 completed, 1 policy conflict, 2 required environment unavailable, 64 invalid usage.

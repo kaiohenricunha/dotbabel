@@ -4,7 +4,7 @@ _Last updated: v4.2.0_
 
 Model Intelligence is an optional project capability. Installation does not enable it. The current
 activation interface stores project flags. Explicit resolution uses cached capability evidence;
-adaptive runtime integrations remain separate implementation work. An enabled routing preference alone does not prove a runtime is routing prompts.
+adaptive runtime integrations use separate execution modes. An enabled routing preference alone does not prove a runtime is routing prompts.
 
 ## Project activation
 
@@ -74,14 +74,53 @@ requirement; resolution never performs that refresh on its own.
 
 ## Runtime availability
 
-The [adaptive routing spec](specs/adaptive-session-routing/README.md) defines the planned runtime
-integrations. Candidate mechanisms are Claude mods and Codex App Server `turn/start`. The stock Codex
-interactive CLI has no verified transparent interception mechanism in this work. A future managed
-App Server client must be identified as a separate execution mode.
+The [adaptive routing spec](specs/adaptive-session-routing/README.md) defines the runtime integrations.
+The managed Codex terminal uses App Server `turn/start`. Claude mods remain a separate integration.
+The stock Codex interactive CLI has no verified transparent interception mechanism in this work.
 
 The activation commands currently change only the project flags. They do not install or reload a
 runtime integration. Any later adapter must document its startup/reload requirements. Do not expect
 an existing session to route prompts merely because the flags changed.
+
+### Managed Codex terminal
+
+After enabling both project flags, start this separate execution mode:
+
+```bash
+dotbabel models session --runtime codex --model auto --effort auto
+```
+
+Enter an ordinary prompt at each `You>` prompt. No slash command is required. Each input line is
+one prompt; EOF closes the session. The client retains one native thread and forwards each input
+once. It uses the shared local classifier and resolver. Native discovery runs locally, and the
+native model list supplies eligibility. The client starts no additional classifier inference.
+
+The launch options control model and effort independently. `auto` explicitly releases that axis
+for this managed session. A concrete native value pins that axis. Without an option, native user
+and project selections remain authoritative. Unknown selection provenance stays conservative.
+The client writes no native configuration file. It inherits the native approval and sandbox policy;
+the session report shows those policies. Command and file approvals require an explicit terminal
+answer. Piped input never approves tools. Other native interaction requests remain unsupported.
+
+`--json` emits newline-delimited session, assistant-text and turn-result records. Diagnostic verbs
+retain their existing single-document JSON contract. Each turn separates requested axes, native
+acceptance and the post-completion observation. A native reroute or unavailable observation leaves
+the effective configuration unknown. Failed or uncertain submissions are never replayed. Policy
+blocks exit 1; an uncertain or failed native turn exits 2. Acknowledgement alone proves no effective
+configuration.
+
+The terminal currently accepts text lines. The public client API also preserves structured native
+input arrays, including attachments. It does not provide the stock CLI's full editor and interaction
+surface. The real managed-terminal proof runs on Codex 0.163.0 under Linux/WSL; it completes two
+ordinary prompts at Low and High effort in one thread. Native thread inspection confirms exactly
+one original user message per prompt. Other native versions report routing as unverified and preserve
+automatic axes until their interface is measured. Run the controlled proof explicitly with
+`node experiments/adaptive-session-routing-codex/real-client.mjs --live`; it executes two primary
+model turns using the native account, with a temporary read-only native invocation wrapper.
+
+Disable routing with `dotbabel models disable --routing`. Each later prompt rechecks the project
+flags before classification and discovery. Close the managed terminal to end its native session.
+Starting a new terminal creates a new thread; this interface does not resume a previous thread.
 
 ## Troubleshooting and rollback
 
