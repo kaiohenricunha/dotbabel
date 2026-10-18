@@ -1,9 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { performance } from "node:perf_hooks";
+import { spawnSync } from "node:child_process";
 import { classify, MAX_PROMPT_BYTES } from "../src/adaptive-session-routing/classifier/index.mjs";
 import { tasks } from "./fixtures/adaptive-session-routing/tasks.mjs";
 
 describe("local contextual task classification", () => {
+  it("evaluates representative engineering scenarios with explicit uncertainty", () => {
+    const run = spawnSync(process.execPath, ["experiments/adaptive-session-routing-classifier/compare.mjs"], { encoding: "utf8" });
+    expect(run.status, run.stderr).toBe(0);
+    const report = JSON.parse(run.stdout);
+    expect(report.fixtureKind).toContain("not held-out accuracy");
+    expect(report.modelAssisted).toMatchObject({ evaluated: false, calls: 0 });
+    expect(report.approaches.contextual.count).toBe(tasks.length);
+    expect(report.approaches.contextual.agreement).toBe(tasks.length);
+    expect(report.approaches.lexical.agreement).toBeLessThan(tasks.length);
+    const cases = report.approaches.contextual.cases;
+    expect(cases.map(item => item.id)).toEqual(tasks.map(task => task.id));
+    for (const item of cases) {
+      expect(item.confidence).toMatch(/^(low|medium|high)$/);
+      expect(item.status).toMatch(/^(classified|uncertain)$/);
+      expect(item.reasonCodes.length).toBeGreaterThan(0);
+      expect(item).not.toHaveProperty("prompt");
+      expect(item).not.toHaveProperty("context");
+    }
+    expect(cases.filter(item => item.status === "uncertain")).not.toHaveLength(0);
+    expect(cases.filter(item => item.status === "uncertain").every(item => item.confidence === "low")).toBe(true);
+    expect(JSON.stringify(report)).not.toContain(tasks[0].prompt);
+  });
   it.each(tasks)("classifies $id without native model identifiers", fixture => {
     const result = classify({ prompt: fixture.prompt, context: fixture.context });
     if (fixture.expected.status === "uncertain") {

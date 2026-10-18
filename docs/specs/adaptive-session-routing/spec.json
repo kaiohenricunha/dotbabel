@@ -242,7 +242,7 @@
     },
     {
       "id": "AC-10",
-      "status": "planned",
+      "status": "active",
       "given": "fixture evaluation",
       "when": "evaluates representative engineering scenarios with explicit uncertainty",
       "then": "representative task fixture results report confidence and known limitations",
