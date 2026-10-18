@@ -69,3 +69,12 @@ Arguments: `$ARGUMENTS` — the audit domain (e.g. "hardcoded business logic", "
 - Every draft PR must include the audit file path in its Summary section so reviewers can trace the finding.
 - Keep the status file updated even on failures — silence is worse than partial information.
 - If clustering produces more than 8 PRs, STOP and ask the user to narrow the audit scope.
+
+## Compute scope
+
+The Frontier floor describes the coordinator's consumer requirement. Native skill
+frontmatter does not enforce that floor. Keep the existing general-purpose worker
+dispatch, inheritance, tools, worktrees and draft-only merge prohibition. This
+declaration adds no enforced worker-floor guarantee and does not set a worker's
+model or effort. Report coordinator and worker observations separately when they
+are available; an unavailable observation remains unknown.
