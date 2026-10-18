@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:f0b2d05eb994c6bdcc597ced1324d1e113d3b41067f522e8ab12014c803a231c source=skills/audit-and-fix/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:e3587d04f360c04ddeccf6368254bbbae0c69f587eb7f50060cd5dfc7708469e source=skills/audit-and-fix/SKILL.md — do not edit directly
 argument-hint: "[domain]"
 description: |
   Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
@@ -67,3 +67,12 @@ Arguments: `$ARGUMENTS` — the audit domain (e.g. "hardcoded business logic", "
 - Every draft PR must include the audit file path in its Summary section so reviewers can trace the finding.
 - Keep the status file updated even on failures — silence is worse than partial information.
 - If clustering produces more than 8 PRs, STOP and ask the user to narrow the audit scope.
+
+## Compute scope
+
+The Frontier floor describes the coordinator's consumer requirement. Native skill
+frontmatter does not enforce that floor. Keep the existing general-purpose worker
+dispatch, inheritance, tools, worktrees and draft-only merge prohibition. This
+declaration adds no enforced worker-floor guarantee and does not set a worker's
+model or effort. Report coordinator and worker observations separately when they
+are available; an unavailable observation remains unknown.

@@ -34,6 +34,30 @@ Supports four sub-commands: `search`, `list`, `fetch`, and `invalidate`.
 
 ## Sub-Commands
 
+### Read-only compute labels for `search` and `list`
+
+Read agent definitions as data. These two sub-commands never install, fetch, synchronize,
+or change an agent, a catalog, or a runtime setting.
+
+Use a valid, explicitly authored `dotbabel.compute` declaration when it is available.
+An installed native projection can omit that private metadata. In that case, read the
+matching canonical source only through an existing, verified Dotbabel projection manifest
+and an explicitly known source root. Verify the source identity and hash before using it.
+Never guess a source root or follow an unverified generated comment. If the canonical
+declaration cannot be verified, report **undeclared/legacy**.
+
+Keep the authored mode, requirement and binding separate from the installed native `model`
+and `effort` fields. `mode: inherit` belongs to the **inherit** group. Otherwise, group only
+by an explicitly declared valid `requirement`. A dynamic or pinned declaration without an
+explicit class belongs to **undeclared/legacy**, with its mode shown in the demand cell.
+An absent or invalid declaration also belongs there; identify invalid metadata instead of
+silently treating it as inheritance. Do not infer a demand class from a model name, a tool
+list, a missing native model, or a normalized default. These labels describe declared demand,
+not measured model quality or native enforcement.
+
+Show native selectors and effort exactly as written, or `unset` when absent. A native
+`model: inherit` remains a native control; it does not establish canonical inheritance.
+
 ### `search <query>`
 
 Find installed agents whose name or description matches a query string.
@@ -44,7 +68,8 @@ Find installed agents whose name or description matches a query string.
 2. For each file, use `Read` to load its content (frontmatter + body). Parse YAML frontmatter
    (the block between the first `---` and the second `---`) to extract:
    - `name` (string)
-   - `model` (string, may be absent — default to `inherit`)
+   - `model` and `effort` (native values, may be absent — display `unset`)
+   - Canonical compute mode, explicit requirement and binding, using the read-only rules above
    - `tools` (array or comma-separated string, may be absent — default to `""`)
    - `description` (string — use only the first line if multi-line)
 3. Perform a **case-insensitive substring match** of `<query>` against both `name` and the first
@@ -52,9 +77,9 @@ Find installed agents whose name or description matches a query string.
 4. If one or more agents match, render a markdown table:
 
    ```
-   | Name | Model | Tools | Description |
-   | ---- | ----- | ----- | ----------- |
-   | ...  | ...   | ...   | ...         |
+   | Name | Compute demand | Native model | Native effort | Tools | Description |
+   | ---- | -------------- | ------------ | ------------- | ----- | ----------- |
+   | ...  | ...            | ...          | ...           | ...   | ...         |
    ```
 
    - `Tools` column: join array entries with `", "` or display the raw string; truncate to 40 chars
@@ -73,25 +98,30 @@ Find installed agents whose name or description matches a query string.
 
 ### `list`
 
-List all installed agents grouped by model tier.
+List all installed agents grouped by explicitly declared canonical compute demand.
 
 **Steps:**
 
 1. Use `Glob` to enumerate all files at `~/.claude/agents/*.md`.
-2. For each file, `Read` its frontmatter and extract `name`, `model`, `tools`, `description`
-   (same parsing rules as `search`).
-3. Group agents by model tier in this order:
-   - **opus** — entries where `model` contains `opus`
-   - **sonnet** — entries where `model` contains `sonnet`
-   - **haiku** — entries where `model` contains `haiku`
-   - **inherit** — entries with no `model` field, `model: inherit`, or any other value
-4. For each non-empty tier, render a section header and a table:
+2. For each file, `Read` its frontmatter and extract the same fields as `search`.
+   Resolve canonical metadata only through the read-only rules above.
+3. Group agents in this fixed order:
+   - **mechanical** — explicit canonical requirement `mechanical`
+   - **routine** — explicit canonical requirement `routine`
+   - **deep** — explicit canonical requirement `deep`
+   - **frontier** — explicit canonical requirement `frontier`
+   - **exceptional** — explicit canonical requirement `exceptional`
+   - **inherit** — explicit canonical `mode: inherit`
+   - **undeclared/legacy** — no verified explicit class or inheritance declaration
+4. For each non-empty group, render a section header and a table. Sort names within
+   the group alphabetically. Show the canonical mode/class/binding in `Compute demand`;
+   keep native controls in their own columns:
 
    ```markdown
-   ### Opus
+   ### Frontier
 
-   | Name | Model | Tools | Description |
-   | ---- | ----- | ----- | ----------- |
+   | Name | Compute demand | Native model | Native effort | Tools | Description |
+   | ---- | -------------- | ------------ | ------------- | ----- | ----------- |
    ```
 
 5. If `~/.claude/agents/` does not exist or contains no `.md` files, output:
@@ -222,6 +252,6 @@ All file I/O uses Claude Code built-in tools — this is a skill, not a shell sc
    overwrites without user confirmation.
 5. **User drives installs.** Never silently write to `~/.claude/agents/` without presenting
    options and getting implicit or explicit user consent.
-6. **Tier order is fixed.** `list` always outputs opus → sonnet → haiku → inherit. Never
-   reorder based on agent count or alphabetical sort within tiers (alphabetical within a tier
-   is acceptable).
+6. **Canonical group order is fixed.** `list` uses mechanical → routine → deep → frontier →
+   exceptional → inherit → undeclared/legacy. Native selectors remain separate metadata;
+   never turn their spelling into a demand class, quality ranking, or enforcement claim.

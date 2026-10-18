@@ -1,0 +1,111 @@
+{
+  "originalCommit": "5d388d23c02dc5debae5c5c1d851e6ab653341d0",
+  "approval": "docs/inspections/model-intelligence-class-f-owner-decisions-2026-10-18.md",
+  "entries": [
+    {
+      "ownerDecision": "F3",
+      "sourcePath": "skills/agents-search/SKILL.md",
+      "artifactKind": "skill",
+      "frontmatter": {
+        "id": "agents-search",
+        "name": "agents-search",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: \"search agents\", \"list agents\", \"find agent\", \"what agents\", \"agent catalog\".\n",
+        "argument-hint": "search <query> | list | fetch <name> | invalidate [--fetch]",
+        "tools": "Glob, Read, Grep, Write, Bash, WebFetch",
+        "effort": "medium",
+        "model": "sonnet"
+      },
+      "bodyHash": "9cda02ebced62a39108b9a6d03374200287ed46a2746c52ff52f60934ec511bb"
+    },
+    {
+      "ownerDecision": "F4",
+      "sourcePath": "skills/audit-and-fix/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "audit-and-fix",
+        "name": "audit-and-fix",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "debugging"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: \"audit and fix\", \"clean up domain\", \"overnight cleanup\".\n",
+        "argument-hint": "[domain]",
+        "tools": "Read, Grep, Glob, Bash",
+        "model": "opus"
+      },
+      "bodyHash": "a7d4df65d5bba5d1f1d25fdaca25d28aab5f3ef16151b88c8ec26326f36582c2"
+    },
+    {
+      "ownerDecision": "F5",
+      "sourcePath": "skills/review-prs/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "review-prs",
+        "name": "review-prs",
+        "type": "skill",
+        "version": "1.0.1",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-18",
+        "updated": "2026-04-18",
+        "description": "Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table. Triggers on: \"review all PRs\", \"check my PRs\", \"PR status\".\n",
+        "argument-hint": "<N1> [N2 N3 ...] — space-separated PR numbers",
+        "tools": "Bash, Read, Grep",
+        "model": "opus",
+        "headless_safe": false
+      },
+      "bodyHash": "7e8f5e737218c95b1b56b8eeaea25d9b2893e4292335ee954ff18835b9d445c5"
+    },
+    {
+      "ownerDecision": "F7",
+      "sourcePath": "skills/spec/SKILL.md",
+      "artifactKind": "skill",
+      "frontmatter": {
+        "id": "spec",
+        "name": "spec",
+        "type": "skill",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-13",
+        "description": "Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on \"let's spec this out\", \"create a spec\", \"design doc\", \"write a technical plan\", \"plan the architecture\". Works for greenfield and brownfield projects. Outputs to docs/specs/.\n",
+        "argument-hint": "[spec-name] [description] [--brownfield]",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "2ba813b12ab18f6bef69eec8e24280da8c7e8aa2753c2dd63a3fe6a619fa9e37"
+    }
+  ]
+}
