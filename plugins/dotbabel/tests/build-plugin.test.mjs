@@ -584,6 +584,7 @@ describe("build-plugin review workflow projection", () => {
     expect(readFileSync(join(root, "examples/minimal-consumer/.github/workflows/ai-review.yml"), "utf8")).toBe(native);
     const manifest = JSON.parse(readFileSync(join(root, "plugins/dotbabel/templates/workflows/.dotbabel-projection.json"), "utf8"));
     expect(manifest.entries["ai-review.yml"].snapshotId).toBe(RELEASE_SNAPSHOT.snapshotId);
+    expect(JSON.parse(readFileSync(join(root, "examples/minimal-consumer/.github/workflows/.dotbabel-projection.json"), "utf8"))).toEqual(manifest);
     expect(runBuild(root, ["--check"]).status).toBe(0);
     expect(runBuild(root, ["--check"]).status).toBe(0);
     writeFileSync(join(root, "examples/minimal-consumer/.github/workflows/ai-review.yml"), "changed");

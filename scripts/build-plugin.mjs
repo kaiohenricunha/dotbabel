@@ -205,7 +205,9 @@ function buildExpected() {
     files.set(join(repoRoot, "plugins/dotbabel/templates/workflows", file.path), file.content);
     files.set(join(repoRoot, "examples/minimal-consumer/.github/workflows", file.path), file.content);
   }
-  files.set(join(repoRoot, "plugins/dotbabel/templates/workflows/.dotbabel-projection.json"), JSON.stringify(workflow.manifest, null, 2) + "\n");
+  const workflowManifest = JSON.stringify(workflow.manifest, null, 2) + "\n";
+  files.set(join(repoRoot, "plugins/dotbabel/templates/workflows/.dotbabel-projection.json"), workflowManifest);
+  files.set(join(repoRoot, "examples/minimal-consumer/.github/workflows/.dotbabel-projection.json"), workflowManifest);
   const manifest = { version: 1, generatedAt: "{{today}}", skills: manifestEntries };
   const manifestText = JSON.stringify(manifest, null, 2) + "\n";
   return { files, manifestText };
