@@ -3,24 +3,31 @@ id: terragrunt-specialist
 name: terragrunt-specialist
 type: skill
 version: 1.0.0
-domain: [infra]
-platform: [terraform, terragrunt]
-task: [debugging, review]
+domain:
+  - infra
+platform:
+  - terraform
+  - terragrunt
+task:
+  - debugging
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all
-  orchestration analysis. Use for structured investigations of multi-environment
-  Terragrunt layouts, dependency graphs, remote state config, and hook correctness.
-  Triggers on: "Terragrunt audit", "run-all review", "dependency block", "DRY pattern
-  review", "env hierarchy audit", "mock_outputs", "terragrunt hooks".
-argument-hint: "<repo root or terragrunt.hcl path>"
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all orchestration analysis. Use for structured investigations of multi-environment Terragrunt layouts, dependency graphs, remote state config, and hook correctness. Triggers on: "Terragrunt audit", "run-all review", "dependency block", "DRY pattern review", "env hierarchy audit", "mock_outputs", "terragrunt hooks".
+argument-hint: <repo root or terragrunt.hcl path>
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 # Terragrunt Specialist

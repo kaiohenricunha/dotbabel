@@ -887,6 +887,690 @@
         "user-invocable": true
       },
       "bodyHash": "8c3f02328b751db6c41b27614a51f683178b0c252fb4516e3624961a624cf3e3"
+    },
+    {
+      "sourcePath": "skills/spec/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "spec",
+        "name": "spec",
+        "type": "skill",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-13",
+        "description": "Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on \"let's spec this out\", \"create a spec\", \"design doc\", \"write a technical plan\", \"plan the architecture\". Works for greenfield and brownfield projects. Outputs to docs/specs/.\n",
+        "argument-hint": "[spec-name] [description] [--brownfield]",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "b6edec279e4516a9cff371a70122a15d61c965d430caef4f409c837d326941ef",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "frontier",
+        "binding": "consumer",
+        "rationale": "Engineering specification design composes architectural constraints and cross-component trade-offs."
+      }
+    },
+    {
+      "sourcePath": "skills/plan-grader/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "plan-grader",
+        "name": "plan-grader",
+        "type": "skill",
+        "version": "2.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-07",
+        "updated": "2026-05-07",
+        "description": "Grade implementation plans on a 0-10 scale without mutating the workspace. Accepts plan files, quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.\n",
+        "argument-hint": "[--json] [--blind] <plan-path | file:<path> | text:\"plan\" | \"plan\" | latest <agent> plan>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "model": "opus"
+      },
+      "bodyHash": "db2b6d15746d5ea8763d4033f1f5f50b007bd3033cdd6d30f03084f39768a2ac",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Rubric-based plan evaluation must compare interacting constraints without mutating the target."
+      }
+    },
+    {
+      "sourcePath": "skills/create-audit/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "create-audit",
+        "name": "create-audit",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Create an evidence-based audit document and save it to docs/audits/. Triggers on: \"audit\", \"review\", \"assessment\".\n",
+        "argument-hint": "[subject]",
+        "tools": "Read, Grep, Glob, Bash, Write",
+        "allowed-tools": "Read Grep Glob Bash Write",
+        "model": "opus"
+      },
+      "bodyHash": "a442d1286004050b02951e9d251c1b7f02adc7abae5de59431abe72b3931f406",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/create-assessment/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "create-assessment",
+        "name": "create-assessment",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Triggers on: \"grade\", \"rate\", \"score\", \"evaluate\", \"assess\".\n",
+        "argument-hint": "[target]",
+        "tools": "Read, Grep, Glob, Bash, Write",
+        "allowed-tools": "Read Grep Glob Bash Write",
+        "model": "opus"
+      },
+      "bodyHash": "710df1cdba15a7b88425424475e146f886a5e3347ee6185ce206e2b736608239",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/create-inspection/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "create-inspection",
+        "name": "create-inspection",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Triggers on: \"how should I fix\", \"what are my options\", \"investigate before I touch\".\n",
+        "argument-hint": "[problem]",
+        "tools": "Read, Grep, Glob, Bash, Write",
+        "allowed-tools": "Read Grep Glob Bash Write",
+        "model": "opus"
+      },
+      "bodyHash": "8425ae4fd7c82309bcb2d5a597c70d164c7795f1094ef42d3181c9e966bb07fe",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/ground-first/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "ground-first",
+        "name": "ground-first",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Produce a code-grounded analysis before any edit is proposed. Triggers on: \"analyze\", \"understand behavior\", \"how does this work\".\n",
+        "argument-hint": "[subject]",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "model": "opus"
+      },
+      "bodyHash": "765f2135f7945b6e4a414100df247bd3e51d30eb360b447ae325ff66554f98b8",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/aws-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "aws-specialist",
+        "name": "aws-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["aws"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive AWS architecture review, debugging, and service design. Use for structured investigations of AWS-specific issues, cost or IAM audits, and multi-service design reviews. Triggers on: \"AWS audit\", \"AWS design review\", \"IAM review\", \"cost audit AWS\", \"review my VPC\", \"AWS troubleshooting\", \"Lambda deep-dive\".\n",
+        "argument-hint": "<account context, service, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "e8ad48330fd37503f9acd764bb79b713832f63c47fd1f7435cddf0fc8a1525f2",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/azure-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "azure-specialist",
+        "name": "azure-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["azure"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Azure architecture review, debugging, and service design. Use for structured investigations of Azure-specific issues, identity or cost audits, and multi-service design reviews. Triggers on: \"Azure audit\", \"Azure design review\", \"EntraID review\", \"Managed Identity debug\", \"review my Azure\", \"Azure troubleshooting\", \"AKS deep-dive\".\n",
+        "argument-hint": "<subscription context, service, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "d1740d42a98b02158de59656cb275656ca97d14aed3c7214530b24640c0acf57",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/gcp-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "gcp-specialist",
+        "name": "gcp-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["gcp"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Google Cloud architecture review, debugging, and service design. Use for structured investigations of GCP-specific issues, IAM or cost audits, and multi-service design reviews. Triggers on: \"GCP audit\", \"GCP design review\", \"Workload Identity debug\", \"IAM review GCP\", \"review my GKE\", \"GCP troubleshooting\", \"Cloud Run deep-dive\".\n",
+        "argument-hint": "<project context, service, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "e0717e5648de99db825205079dd495baf934e7c771901e71eaade6bba94176d9",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/crossplane-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "crossplane-specialist",
+        "name": "crossplane-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["crossplane", "kubernetes"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Crossplane platform review: XRD design, Composition correctness, provider config audit, managed resource health, and GitOps integration. Use for structured investigations of stuck Claims, composition pipeline bugs, and credential injection patterns. Triggers on: \"Crossplane audit\", \"XRD review\", \"Composition debug\", \"stuck Claim\", \"managed resource stuck\", \"provider config review\", \"Crossplane GitOps\".\n",
+        "argument-hint": "<XRD name, Claim name, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "63cf71edc1065510e3ebea43e5bb3881c149b9758269ddd143a58ed9f77506c4",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/kubernetes-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "kubernetes-specialist",
+        "name": "kubernetes-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["kubernetes"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Kubernetes troubleshooting, workload design, and cluster health review. Use when you need a structured investigation of a cluster issue, a design review of Kubernetes manifests, or a health audit of a namespace or workload. Triggers on: \"debug kubernetes\", \"why is my pod\", \"review my manifests\", \"cluster health\", \"kubernetes design review\", \"k8s audit\".\n",
+        "argument-hint": "<cluster context, namespace, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "9826e2db6adcb837e2c1d2b1f1523a227137a6e5f86a26c8bbd4c32b988ca0dd",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/terraform-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "terraform-specialist",
+        "name": "terraform-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["terraform"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Terraform architecture review, module design, state management, and migration. Use for structured investigations of Terraform workspaces, provider configuration, module coupling, import workflows, and test coverage. Triggers on: \"Terraform audit\", \"module review\", \"state management\", \"Terraform import\", \"workspace design\", \"provider config review\", \"Terraform testing\".\n",
+        "argument-hint": "<module path, workspace, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "9f646552352aec4e6790f67b6ff5821e0ff445bd5633b59ffa9aee5a371e2d2e",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/terragrunt-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "terragrunt-specialist",
+        "name": "terragrunt-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["terraform", "terragrunt"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all orchestration analysis. Use for structured investigations of multi-environment Terragrunt layouts, dependency graphs, remote state config, and hook correctness. Triggers on: \"Terragrunt audit\", \"run-all review\", \"dependency block\", \"DRY pattern review\", \"env hierarchy audit\", \"mock_outputs\", \"terragrunt hooks\".\n",
+        "argument-hint": "<repo root or terragrunt.hcl path>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "2e718172d936ebb306c1477a2e761e6abe8f8d10aa2804983b3513d17348c623",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/pulumi-specialist/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "pulumi-specialist",
+        "name": "pulumi-specialist",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["pulumi"],
+        "task": ["debugging", "review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Deep-dive Pulumi stack review, component design, Automation API audit, and secrets management. Use for structured investigations of Pulumi stack drift, ComponentResource coupling, ESC configuration, and Automation API workflows. Triggers on: \"Pulumi audit\", \"stack review\", \"Automation API review\", \"ComponentResource design\", \"ESC audit\", \"Pulumi secrets\", \"Pulumi testing\".\n",
+        "argument-hint": "<stack name, project path, or problem description>",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash",
+        "effort": "max",
+        "model": "opus"
+      },
+      "bodyHash": "5513a1fe8d4b833c68e043a7891f649175063166a19ccad871be50157cbe7adb",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Evidence-based investigation or evaluation must hold several technical constraints at once."
+      }
+    },
+    {
+      "sourcePath": "skills/detect-flaky/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "detect-flaky",
+        "name": "detect-flaky",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["testing", "debugging"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis. Triggers on: \"detect flaky tests\", \"find flaky tests\", \"diagnose flaky tests\".\n",
+        "argument-hint": "[test-command]",
+        "tools": "Grep, Glob, Read, Bash",
+        "model": "sonnet"
+      },
+      "bodyHash": "3df4dbe7586bdd131b00c300c8784d15a9f70127b36222bd13a35c32542f5861",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Repeated experiments distinguish nondeterministic failures and their root causes."
+      }
+    },
+    {
+      "sourcePath": "skills/quality-review/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "quality-review",
+        "name": "quality-review",
+        "type": "skill",
+        "version": "0.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-04",
+        "updated": "2026-09-04",
+        "description": "Check changed code against the resolved dotbabel quality policy, then review semantic risks that tools cannot judge. Triggers on: \"quality review\", \"quality check\", \"review code quality\".\n",
+        "argument-hint": "[fast|pr|deep] [base-ref]",
+        "tools": "Bash, Read, Grep",
+        "allowed-tools": "Read Grep Bash",
+        "model": "sonnet"
+      },
+      "bodyHash": "992bd5adde447dfc6f399ac926646d09cc927194dfe5e59738e576b0f0bbfcc9",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Semantic review evaluates risks that deterministic quality measurements cannot judge."
+      }
+    },
+    {
+      "sourcePath": "skills/reproduce-bug/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "reproduce-bug",
+        "name": "reproduce-bug",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "testing"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2026-06-14",
+        "updated": "2026-06-14",
+        "description": "Reproduce a bug in an isolated, production-mirroring sandbox and capture a failing regression test as the objective baseline to fix against. Saves a report to docs/reproductions/. Triggers on: \"reproduce this bug\", \"can't reproduce\", \"make it fail reliably\", \"repro\".\n",
+        "argument-hint": "[bug or symptom]",
+        "tools": "Read, Grep, Glob, Bash, Write, Edit",
+        "model": "sonnet"
+      },
+      "bodyHash": "ff0ef41df5fb5da751d0d9cfea7d82beb475d052ceac7a4a81c8f4a38fecb264",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer",
+        "rationale": "Isolation and regression capture must reproduce the actual triggering conditions."
+      }
+    },
+    {
+      "sourcePath": "skills/code-simplifier/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "code-simplifier",
+        "name": "code-simplifier",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-11",
+        "updated": "2026-05-11",
+        "description": "Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default. Accepts an optional PR number, file glob, or base branch to narrow scope. Triggers on: \"simplify code\", \"code simplifier\", \"clean up the code\", \"simplify the PR\".\n",
+        "argument-hint": "[PR# | file-glob | base-branch]",
+        "tools": "Read, Grep, Glob, Bash, Edit",
+        "model": "sonnet"
+      },
+      "bodyHash": "2ee5c583e89fabeda0e50e5ea4172d971c1c122e47ef8ba1521ce0e6f13c4a5e",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer",
+        "rationale": "Scoped engineering follows an existing implementation or review workflow with checkable results."
+      }
+    },
+    {
+      "sourcePath": "skills/create-experiment/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "create-experiment",
+        "name": "create-experiment",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-29",
+        "updated": "2026-04-30",
+        "description": "Run a scoped, local-only experiment and save the report to docs/experiments/. Triggers on: \"let's try\", \"compare A vs B\", \"prototype\", \"explore\".\n",
+        "argument-hint": "[topic or hypothesis]",
+        "tools": "Read, Grep, Glob, Bash, Write",
+        "allowed-tools": "Read Grep Glob Bash Write",
+        "model": "sonnet"
+      },
+      "bodyHash": "2e96d3e2c47c5655f8aea5299ebb2f24b1cbf13a1a20ee99de2184a4588d78b7",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer",
+        "rationale": "Scoped engineering follows an existing implementation or review workflow with checkable results."
+      }
+    },
+    {
+      "sourcePath": "skills/fix-with-evidence/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "fix-with-evidence",
+        "name": "fix-with-evidence",
+        "type": "skill",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging", "testing"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-12",
+        "description": "Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on: \"fix this\", \"apply fix\", \"solve issue\".\n",
+        "argument-hint": "[issue]",
+        "tools": "Read, Grep, Glob, Bash",
+        "model": "sonnet"
+      },
+      "bodyHash": "8d1a1bbf462ad44a8f447b4342ca96bf8db287d53c2f3c042d9b44526652048a",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer",
+        "rationale": "Scoped engineering follows an existing implementation or review workflow with checkable results."
+      }
+    },
+    {
+      "sourcePath": "skills/review-pr/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "review-pr",
+        "name": "review-pr",
+        "type": "skill",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-08-12",
+        "description": "Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads. Triggers on: \"review PR\", \"review pull request\", \"check PR\".\n",
+        "argument-hint": "[PR#] [--conductor]",
+        "tools": "Bash, Read, Grep, Glob",
+        "model": "sonnet"
+      },
+      "bodyHash": "0b00ea4c865a25dd972cb720e6183dce95ba6a3ccc945216c789865e53748774",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer",
+        "rationale": "Scoped engineering follows an existing implementation or review workflow with checkable results."
+      }
+    },
+    {
+      "sourcePath": "skills/handoff/SKILL.md",
+      "artifactKind": "skill",
+      "category": "D",
+      "batch": "P-19c-skills",
+      "frontmatter": {
+        "id": "handoff",
+        "name": "handoff",
+        "type": "skill",
+        "version": "1.3.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-17",
+        "updated": "2026-05-04",
+        "description": "Transfer conversation context between agentic CLIs (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a source session transcript by UUID and produces either an inline summary, a paste-ready handoff digest, a written markdown file, or a branch in a user-owned private git repo that another machine can fetch. Use when switching agents mid-task, recovering context, or moving between Windows/Linux/macOS setups. Triggers on: \"handoff\", \"transfer context\", \"continue in codex\", \"continue in claude\", \"continue in copilot\", \"switch to codex\", \"switch to claude\", \"what was that session about\", \"claude --resume\", \"copilot --resume\", \"codex resume\", \"find the session where\", \"search sessions\", \"which session did I\", \"push handoff\", \"fetch handoff\", \"handoff to other machine\", \"resume on my other laptop\".\n",
+        "argument-hint": "[pull|push|fetch|list|search|prune|doctor] [args...]",
+        "tools": "Glob, Read, Grep, Bash, Write",
+        "effort": "medium",
+        "model": "sonnet"
+      },
+      "bodyHash": "f490e8ff7dfd5725c7ab750d5cc36eb578585ae2bc063243a82af21e0453e594",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer",
+        "rationale": "The coordinator maps user intent to a bounded context-transfer CLI and verifies its output."
+      }
     }
   ],
   "neutral": {
@@ -911,5 +1595,6 @@
     },
     "bodyHash": "2e619036b2c245fc211aafb1315be95b12d793806ca286824581d6d1ac94a1b3"
   },
-  "securityOriginalCommit": "8827df12b990a3aa7cd9e61232a8003f3dcab037"
+  "securityOriginalCommit": "8827df12b990a3aa7cd9e61232a8003f3dcab037",
+  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be"
 }

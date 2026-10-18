@@ -3,24 +3,30 @@ id: pulumi-specialist
 name: pulumi-specialist
 type: skill
 version: 1.0.0
-domain: [infra]
-platform: [pulumi]
-task: [debugging, review]
+domain:
+  - infra
+platform:
+  - pulumi
+task:
+  - debugging
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Deep-dive Pulumi stack review, component design, Automation API audit, and
-  secrets management. Use for structured investigations of Pulumi stack drift,
-  ComponentResource coupling, ESC configuration, and Automation API workflows.
-  Triggers on: "Pulumi audit", "stack review", "Automation API review",
-  "ComponentResource design", "ESC audit", "Pulumi secrets", "Pulumi testing".
-argument-hint: "<stack name, project path, or problem description>"
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Deep-dive Pulumi stack review, component design, Automation API audit, and secrets management. Use for structured investigations of Pulumi stack drift, ComponentResource coupling, ESC configuration, and Automation API workflows. Triggers on: "Pulumi audit", "stack review", "Automation API review", "ComponentResource design", "ESC audit", "Pulumi secrets", "Pulumi testing".
+argument-hint: <stack name, project path, or problem description>
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 # Pulumi Specialist

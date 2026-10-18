@@ -3,24 +3,30 @@ id: azure-specialist
 name: azure-specialist
 type: skill
 version: 1.0.0
-domain: [infra]
-platform: [azure]
-task: [debugging, review]
+domain:
+  - infra
+platform:
+  - azure
+task:
+  - debugging
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Deep-dive Azure architecture review, debugging, and service design. Use for
-  structured investigations of Azure-specific issues, identity or cost audits,
-  and multi-service design reviews. Triggers on: "Azure audit", "Azure design
-  review", "EntraID review", "Managed Identity debug", "review my Azure",
-  "Azure troubleshooting", "AKS deep-dive".
-argument-hint: "<subscription context, service, or problem description>"
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Deep-dive Azure architecture review, debugging, and service design. Use for structured investigations of Azure-specific issues, identity or cost audits, and multi-service design reviews. Triggers on: "Azure audit", "Azure design review", "EntraID review", "Managed Identity debug", "review my Azure", "Azure troubleshooting", "AKS deep-dive".
+argument-hint: <subscription context, service, or problem description>
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 # Azure Specialist
