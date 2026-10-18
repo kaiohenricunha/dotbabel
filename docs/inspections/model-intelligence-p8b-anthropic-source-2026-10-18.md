@@ -1,5 +1,9 @@
 # P-8b Anthropic source boundary — 2026-10-18
 
+## Protected review freshness diagnosis
+
+The four-role review on 908b3ac finds one missing policy declaration. Candidate one is a wrong shared provider API window. Against it: catalog/index.mjs:55 defines the required six-hour/24-hour class, and REL-4 specifies those windows. Candidate two is the new adapter falling back to the broad-catalog class. Confirmed at catalog/index.mjs:90 and the adapter's absent evidenceClass export: a 12-hour-old result is fresh and a 48-hour-old result is stale. The correction declares the existing provider-api class and tests both exact boundaries plus the review's counterexamples. It changes no shared threshold, resolver preference or freshness calculation.
+
 ## Scope and evidence
 
 The Anthropic slice proceeds independently of the still-open OpenAI response research. The existing adapter contract permits required-existing authorization at sources/contract.mjs:56. The measured Claude 2.1.302 mod supplies an opaque authorization handle only to native HTTP; the source adapter receives a caller-owned fetch function and never a credential. The sanitized fixture keeps three public identifiers and capability/limit fields from that read-only probe. No default network transport, automatic activation, model execution or runtime availability claim is added.

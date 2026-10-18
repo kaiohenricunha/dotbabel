@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { createHash } from "node:crypto";
 import * as source from "../src/model-intelligence/sources/knowledge/anthropic.mjs";
 import { MAX_CACHE_ENTRY_BYTES, validateDescriptor } from "../src/model-intelligence/sources/contract.mjs";
-import { refreshSource, buildCatalog } from "../src/model-intelligence/catalog/index.mjs";
+import { refreshSource, buildCatalog, freshnessPolicyFor, deriveFreshness } from "../src/model-intelligence/catalog/index.mjs";
 import { readEntry } from "../src/model-intelligence/catalog/cache.mjs";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
@@ -15,6 +15,12 @@ const discover = (fetch, extra = {}) => source.discover({ providers: ["anthropic
 afterEach(() => vi.restoreAllMocks());
 
 describe("Anthropic Models API knowledge source", () => {
+  it("uses the official provider API freshness class rather than broad catalog defaults", () => {
+    expect(freshnessPolicyFor(source)).toEqual({ evidenceClass: "provider-api", staleAfterMs: 6 * 60 * 60 * 1000, expireAfterMs: 24 * 60 * 60 * 1000 });
+  });
+  it.each([[6 * 3600000, "fresh"], [6 * 3600000 + 1, "stale"], [12 * 3600000, "stale"], [24 * 3600000, "stale"], [24 * 3600000 + 1, "expired"], [48 * 3600000, "expired"]])("classifies official evidence aged %d ms as %s", (age, expected) => {
+    expect(deriveFreshness({ observedAt: now(), policy: freshnessPolicyFor(source), now: new Date(Date.parse(now()) + age).toISOString() })).toBe(expected);
+  });
   it("preserves valid cache state when later native authorization or source data fails", async () => {
     const root = makeTempDir("mi-anthropic-cache-");
     const handle = { module: source, context: { providers: ["anthropic"], fetch: () => response(bytes), now } };

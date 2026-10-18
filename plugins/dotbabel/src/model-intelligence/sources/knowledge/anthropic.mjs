@@ -12,6 +12,8 @@ export const ADAPTER_VERSION = "1";
 export const SOURCE_URL = "https://api.anthropic.com/v1/models?limit=100";
 /** Model capability facts carry no copied document/license notice. */
 export const notice = null;
+/** Official provider API facts use REL-4's six-hour/24-hour windows. */
+export const evidenceClass = "provider-api";
 /** Discovery consumes existing native authorization but never receives or stores a credential. */
 export const descriptor = deepFreeze(assertDescriptor({ id: SOURCE_ID, kind: "knowledge-source", capabilities: {
   discovery: { support: "supported", network: "required", auth: "required-existing", cacheable: true, execution: "read-only" },
