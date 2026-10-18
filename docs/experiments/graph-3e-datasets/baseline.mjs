@@ -164,6 +164,15 @@ function baselineGoldResult(inputRoot, labelingRoot, cutoff) {
   const lines = file => fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map(JSON.parse);
   const cases = lines(path.join(inputRoot, "annotation-input.jsonl"));
   validateBlindPackets(cases, labelingRoot);
+  for (const name of ["annotator-input.jsonl", "verifier-input.jsonl"]) {
+    const packets = new Map(lines(path.join(labelingRoot, name)).map(r => [r.id, r]));
+    for (const row of cases) {
+      const proof = read(path.join(inputRoot, row.provenance_ref)), packet = packets.get(row.id);
+      if (!equivalentInput(packet.pinned_files, read(path.join(inputRoot, proof.comparison_ref)).files) ||
+          !equivalentInput(packet.protected_paths, read(path.join(inputRoot, proof.facts_ref)).protected_paths))
+        throw new Error("blind patch evidence mismatch");
+    }
+  }
   const annotations = lines(path.join(labelingRoot, "annotations.jsonl"));
   const independent = lines(path.join(labelingRoot, "independent-verification.jsonl"));
   const routingFile = path.join(labelingRoot, "verification-routing.json");

@@ -67,7 +67,8 @@ test("collects through a real offline gh subprocess and seals only complete orig
   const cases = fs.readFileSync(path.join(out, "annotation-input.jsonl"), "utf8").trim().split("\n").map(JSON.parse);
   const labeled = cases[0], labeling = path.join(root, "labeling"); fs.mkdirSync(labeling, { mode: 0o700 });
   for (const name of ["annotator-input.jsonl", "verifier-input.jsonl"])
-    fs.writeFileSync(path.join(labeling, name), JSON.stringify(labeled) + "\n", { mode: 0o600 });
+    fs.writeFileSync(path.join(labeling, name), JSON.stringify({ ...labeled, pinned_files: comparison.files,
+      protected_paths: facts.protected_paths }) + "\n", { mode: 0o600 });
   const common = { id: labeled.id, head_sha: head, label: [], rationale: "The complete documentation patch needs no additional specialist.",
     evidence: [labeled.provenance_ref], blind_to_predictions: true, inspection_complete: true };
   fs.writeFileSync(path.join(labeling, "annotations.jsonl"), JSON.stringify({ ...common, annotator: "agent:a", status: "labeled", labeled_at: "2026-10-18T03:10:00Z" }) + "\n", { mode: 0o600 });
@@ -79,6 +80,10 @@ test("collects through a real offline gh subprocess and seals only complete orig
   assert.throws(() => finalizeBaseline(out, labeling, path.join(root, "wrong-verifier"), "2026-10-18T03:12:00Z"), /verification routing/);
   routing.routing[0].actor = "agent:b";
   fs.writeFileSync(routingPath, JSON.stringify(routing));
+  const packetPath = path.join(labeling, "verifier-input.jsonl"), originalPacket = fs.readFileSync(packetPath, "utf8");
+  fs.writeFileSync(packetPath, JSON.stringify({ ...JSON.parse(originalPacket), pinned_files: [{ ...comparison.files[0], patch: "+unrelated patch" }] }) + "\n");
+  assert.throws(() => finalizeBaseline(out, labeling, path.join(root, "wrong-patch"), "2026-10-18T03:12:00Z"), /blind patch evidence/);
+  fs.writeFileSync(packetPath, originalPacket);
   const goldRoot = path.join(root, "gold"), gold = finalizeBaseline(out, labeling, goldRoot, "2026-10-18T03:12:00Z");
   assert.equal(gold.datasets.dispatch.rows, 1);
   assert.equal(gold.datasets.dispatch.classes.none, 1);

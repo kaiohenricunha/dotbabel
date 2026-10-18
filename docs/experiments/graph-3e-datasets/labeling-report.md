@@ -203,7 +203,10 @@ $ node docs/experiments/graph-3e-datasets/baseline.mjs validate-gold "$DATA_ROOT
 The semantic review checks actor separation, cancellation and bounded work, source error handling,
 private output ownership, frozen sampling, and unknown propagation. No runtime API or adoption
 state changes. Source-read failures remain explicit unknowns; no recovered command executes.
-Canonical proof references resolve inside each exported run. The routing check rejects a selected
+Canonical proof references resolve inside each exported run. The final review adds a guard that
+rejects blind packets with a different patch array or protected paths from the retained source.
+Its regression fails before the guard and passes afterward; all 360 actual packet patch arrays
+match their original comparisons. The strengthened validator accepts the unchanged sealed gold run. The routing check rejects a selected
 verifier that differs from the predeclared assignment. No new dependency or suppression is added.
 
 The PR quality profile exits zero. Syntax, configured lint, and file-size checks pass. Coverage
@@ -225,6 +228,37 @@ $ node plugins/dotbabel/bin/dotbabel.mjs quality check --profile pr --base origi
 
 .:javascript / regression
   info coverage.no_regression [not_triggered] — changed files did not match: plugins/dotbabel/src/**
+```
+
+The final packet-evidence guard is verified with the same 54-test command and the actual gold
+validator. Both exit zero; their last ten output lines follow.
+
+```text
+$ node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experiments/graph-step-adoption/run.test.mjs docs/experiments/graph-3e-datasets/prepare.test.mjs docs/experiments/graph-3e-datasets/recovery.test.mjs docs/experiments/graph-3e-datasets/labels.test.mjs docs/experiments/graph-3e-datasets/baseline.test.mjs
+  ...
+1..54
+# tests 54
+# suites 0
+# pass 54
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 586.584804
+```
+
+```text
+$ node docs/experiments/graph-3e-datasets/baseline.mjs validate-gold "$DATA_ROOT/2026-10-18-baseline-verified-01"
+          "additions": 0,
+          "none": 0
+        }
+      },
+      "ready": false
+    }
+  },
+  "unknown": 34,
+  "hashed_files": 770
+}
 ```
 
 ## Next work

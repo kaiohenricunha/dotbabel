@@ -206,9 +206,13 @@ baseline.mjs validate-gold GOLD_RUN
 ```
 
 Run the file with `node docs/experiments/graph-3e-datasets/baseline.mjs`. Input validation reconstructs
-each baseline from the retained PR, comparison, metadata, and facts. Gold validation reconstructs
-the accepted labels from the retained independent sidecars. Manifests bind all evidence hashes,
+each baseline from the retained PR, comparison, metadata, and facts. Gold validation checks both complete blind patch arrays and protected paths against retained
+evidence. It reconstructs the accepted labels from the retained independent sidecars. Manifests bind all evidence hashes,
 private permissions, class counts, PR counts, and unchanged numeric thresholds.
+
+Before annotation, build both blind packets from the input ledger. Attach `pinned_files` from each
+retained comparison's complete `files` array and `protected_paths` from its retained facts. Freeze
+the packets before either actor labels them. Do not substitute a current checkout or a later diff.
 
 A `packet-manifest.json` binds the two complete blind packets and any packet shards. An optional
 `verification-routing.json` records actor assignments before labels are compared. The latter has
