@@ -96,7 +96,7 @@
     {
       "name": "deploy-status",
       "path": ".claude/skills/deploy-status/SKILL.md",
-      "checksum": "sha256:9480932afeb6b62bff5e61ffc6c2305940dc1e6353278f66b0cf3889bd4ddcdf",
+      "checksum": "sha256:6f93270096e07b12e47b06edad6fd0570734bc6476b390e12977f92c3eff0acf",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -117,7 +117,7 @@
     {
       "name": "flyctl",
       "path": ".claude/skills/flyctl/SKILL.md",
-      "checksum": "sha256:65d3bf08096b9d3a1a78379eba5b9d1d65e3c8fea006387e347ea63a12077ce9",
+      "checksum": "sha256:85971fca70ad4d75bd38025f497af4ce26fae68dd29230ed4aed8249021bdf84",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -131,7 +131,7 @@
     {
       "name": "git",
       "path": ".claude/skills/git/SKILL.md",
-      "checksum": "sha256:e9ed1a2d398ddc3c581f173c4d932ebaab59c3c910d7015f953dfa935e81f259",
+      "checksum": "sha256:243659e2a2ded98c5b5029eebf871f5c36f91268da54d1e7d9fc22c1c6fe5f9e",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -208,7 +208,7 @@
     {
       "name": "pr-conductor",
       "path": ".claude/skills/pr-conductor/SKILL.md",
-      "checksum": "sha256:532d272446a76dbffa17c79ef8c29ec5313c749ec51b5bc19ecb46cf05514e8f",
+      "checksum": "sha256:e7ec439046f0dedcdb241711be2e38e06c0dc842c8a537b400ea5368812d0f3d",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -229,7 +229,7 @@
     {
       "name": "project-sync",
       "path": ".claude/skills/project-sync/SKILL.md",
-      "checksum": "sha256:365821b18fc0411addc42a6f5d86b5feca020d65123ae2a2f04711b3e5fab3c8",
+      "checksum": "sha256:fb575a61df8998649a4d9bb895f9f82bc75ee3466d5dbab098feffda95394521",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -250,7 +250,7 @@
     {
       "name": "release-conductor",
       "path": ".claude/skills/release-conductor/SKILL.md",
-      "checksum": "sha256:4c1bb3e15253dd2afbb5774bb798c8e128fa22bb54188b9e1c5f2aca2b2ac1a9",
+      "checksum": "sha256:a21b2f9ff9fd2cdd0ec2bab2833fb7da165a1bd6ee6292b951eba138bb1768f7",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },

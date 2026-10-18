@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:653a842965161fb3b5be601177cb51f3502d0f6b191b7c44407478cd4666b8cf source=skills/deploy-status/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:57924bffc4235823879ebee1dbf3f1e6c249b86c99c238524517568573b6eb83 source=skills/deploy-status/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: "[--dry-run] [--no-fetch]"
 description: |

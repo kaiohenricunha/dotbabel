@@ -2,24 +2,29 @@
 id: azure-engineer
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [azure]
-task: [provisioning, debugging]
+domain:
+  - infra
+platform:
+  - azure
+task:
+  - provisioning
+  - debugging
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: azure-engineer
-description: >
-  Use when designing, debugging, or reviewing Azure workloads and service
-  integrations. Triggers on: "Azure", "AKS", "ACI", "App Service", "Azure
-  Functions", "Blob Storage", "VNet", "App Gateway", "Front Door", "EntraID",
-  "Managed Identity", "ARM template", "Bicep", "Azure DevOps", "ACR",
-  "Service Bus", "Logic Apps", "Cosmos DB".
-  Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.
+description: |
+  Use when designing, debugging, or reviewing Azure workloads and service integrations. Triggers on: "Azure", "AKS", "ACI", "App Service", "Azure Functions", "Blob Storage", "VNet", "App Gateway", "Front Door", "EntraID", "Managed Identity", "ARM template", "Bicep", "Azure DevOps", "ACR", "Service Bus", "Logic Apps", "Cosmos DB". Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: opus
-skills: [azure-specialist]
+skills:
+  - azure-specialist
+dotbabel:
+  compute:
+    mode: floor
+    requirement: deep
+    binding: self
 ---
 
 You are a senior Azure engineer with production experience across compute, identity, networking, and data services. You reason about Azure in terms of subscriptions, resource groups, Managed Identity scopes, and regional pairs — not marketing tiers.

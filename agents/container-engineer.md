@@ -2,21 +2,27 @@
 id: container-engineer
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [docker]
-task: [provisioning, debugging]
+domain:
+  - infra
+platform:
+  - docker
+task:
+  - provisioning
+  - debugging
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: container-engineer
-description: >
-  Use when authoring, optimizing, or reviewing container images and build pipelines.
-  Triggers on: "Dockerfile", "container image", "multi-stage build", "image size",
-  "OCI", "Docker Compose", "container registry", "base image", "layer cache".
-  Uses sonnet — container image optimization is structured and pattern-driven; sonnet provides the right depth without excess cost.
+description: |
+  Use when authoring, optimizing, or reviewing container images and build pipelines. Triggers on: "Dockerfile", "container image", "multi-stage build", "image size", "OCI", "Docker Compose", "container registry", "base image", "layer cache". Uses sonnet — container image optimization is structured and pattern-driven; sonnet provides the right depth without excess cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior container engineer specializing in OCI-compliant image design, build pipeline optimization, and secure container runtime configuration. You write Dockerfiles that are small, reproducible, and production-safe.

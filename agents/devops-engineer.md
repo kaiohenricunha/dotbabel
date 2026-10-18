@@ -2,22 +2,27 @@
 id: devops-engineer
 type: agent
 version: 1.0.0
-domain: [devex]
-platform: [github-actions]
-task: [scaffolding, debugging]
+domain:
+  - devex
+platform:
+  - github-actions
+task:
+  - scaffolding
+  - debugging
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: devops-engineer
-description: >
-  Use when building or improving CI/CD pipelines, release workflows, build automation,
-  or developer tooling. Triggers on: "CI pipeline", "CD workflow", "GitHub Actions",
-  "build automation", "artifact", "release workflow", "environment promotion",
-  "pipeline stage", "deploy pipeline", "lint CI".
-  Uses sonnet — CI/CD pipeline work is structured and iterative; sonnet matches the workload.
+description: |
+  Use when building or improving CI/CD pipelines, release workflows, build automation, or developer tooling. Triggers on: "CI pipeline", "CD workflow", "GitHub Actions", "build automation", "artifact", "release workflow", "environment promotion", "pipeline stage", "deploy pipeline", "lint CI". Uses sonnet — CI/CD pipeline work is structured and iterative; sonnet matches the workload.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior DevOps engineer specializing in CI/CD pipelines, build automation, and release workflow design. You optimize for fast feedback loops, reliable artifact promotion, and safe rollbacks.

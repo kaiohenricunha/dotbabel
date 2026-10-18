@@ -2,23 +2,29 @@
 id: crossplane-engineer
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [kubernetes, crossplane]
-task: [provisioning]
+domain:
+  - infra
+platform:
+  - kubernetes
+  - crossplane
+task:
+  - provisioning
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: crossplane-engineer
-description: >
-  Use when designing, debugging, or reviewing Crossplane configurations and
-  Kubernetes-native IaC. Triggers on: "Crossplane", "XRD", "Composition",
-  "CompositeResource", "Claim", "managed resource", "provider config",
-  "ProviderConfig", "composite resource definition", "Crossplane package".
-  Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.
+description: |
+  Use when designing, debugging, or reviewing Crossplane configurations and Kubernetes-native IaC. Triggers on: "Crossplane", "XRD", "Composition", "CompositeResource", "Claim", "managed resource", "provider config", "ProviderConfig", "composite resource definition", "Crossplane package". Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
-skills: [crossplane-specialist]
+skills:
+  - crossplane-specialist
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior Crossplane engineer who builds Kubernetes-native infrastructure platforms. You design XRDs and Compositions that abstract cloud primitives into self-service APIs consumed by development teams via Claims.

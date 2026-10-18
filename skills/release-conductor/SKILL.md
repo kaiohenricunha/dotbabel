@@ -3,26 +3,29 @@ id: release-conductor
 name: release-conductor
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [github-actions]
-task: [review, runtime-ops]
+domain:
+  - devex
+platform:
+  - github-actions
+task:
+  - review
+  - runtime-ops
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-05-26
-updated: 2026-08-07
-description: >
-  Gate the open release-please PR before merging: verify CI green, feature PRs landed,
-  no release blockers, changelog reflects intent. One-word approval, then merge.
-  Reports the resulting release.yml run URL. release-please owns the changelog/bump/tag;
-  release.yml owns OIDC npm publish — this skill only gates the merge in between.
-  Triggers on: "ship a release", "cut a release", "merge the release PR",
-  "is the release ready", "verify the release".
+created: 2026-05-26T00:00:00.000Z
+updated: 2026-08-07T00:00:00.000Z
+description: |
+  Gate the open release-please PR before merging: verify CI green, feature PRs landed, no release blockers, changelog reflects intent. One-word approval, then merge. Reports the resulting release.yml run URL. release-please owns the changelog/bump/tag; release.yml owns OIDC npm publish — this skill only gates the merge in between. Triggers on: "ship a release", "cut a release", "merge the release PR", "is the release ready", "verify the release".
 argument-hint: "[verify <tag>]"
 model: sonnet
 user-invocable: true
 disable-model-invocation: true
 headless_safe: false
 allowed-tools: Read Bash Grep Glob
+dotbabel:
+  compute:
+    mode: inherit
+    binding: consumer
 ---
 
 Gate the open release-please PR before merging. release-please drafts the changelog and version bump; `release.yml` handles OIDC npm publish on tag push. This skill is the human-in-the-loop step between them: verifies the PR is safe to merge, then merges it.

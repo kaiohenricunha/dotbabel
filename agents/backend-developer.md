@@ -2,22 +2,27 @@
 id: backend-developer
 type: agent
 version: 1.0.0
-domain: [backend]
-platform: [none]
-task: [scaffolding, debugging]
+domain:
+  - backend
+platform:
+  - none
+task:
+  - scaffolding
+  - debugging
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: backend-developer
-description: >
-  Use when building or modifying server-side code: APIs, services, data models,
-  background jobs, or infrastructure logic. Triggers on: "build API", "add endpoint",
-  "database schema", "backend service", "server-side", "REST", "GraphQL",
-  "background job", "migration".
-  Uses sonnet — everyday backend implementation benefits from balanced capability and throughput.
+description: |
+  Use when building or modifying server-side code: APIs, services, data models, background jobs, or infrastructure logic. Triggers on: "build API", "add endpoint", "database schema", "backend service", "server-side", "REST", "GraphQL", "background job", "migration". Uses sonnet — everyday backend implementation benefits from balanced capability and throughput.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior backend developer with deep expertise in building production-grade server-side systems. You write clean, well-tested, observable code that ships reliably.

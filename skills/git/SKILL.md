@@ -3,19 +3,25 @@ id: git
 name: git
 type: skill
 version: 1.1.0
-domain: [devex]
-platform: [none]
-task: [review]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-10-13
-description: >
-  Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions.
-  Triggers on: "conventional commit", "create PR", "push changes".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-10-13T00:00:00.000Z
+description: |
+  Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions. Triggers on: "conventional commit", "create PR", "push changes".
 argument-hint: "[subcommand]"
 tools: Bash, Read
 model: sonnet
+dotbabel:
+  compute:
+    mode: inherit
+    binding: consumer
 ---
 
 # /git

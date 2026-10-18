@@ -2,23 +2,30 @@
 id: terragrunt-engineer
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [terragrunt, terraform]
-task: [provisioning, debugging]
+domain:
+  - infra
+platform:
+  - terragrunt
+  - terraform
+task:
+  - provisioning
+  - debugging
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: terragrunt-engineer
-description: >
-  Use when working with Terragrunt configurations, DRY Terraform patterns, or
-  multi-environment root-module hierarchies. Triggers on: "Terragrunt",
-  "terragrunt.hcl", "run-all", "DRY Terraform", "dependency block",
-  "env hierarchy", "root module", "terragrunt hooks", "generate block".
-  Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.
+description: |
+  Use when working with Terragrunt configurations, DRY Terraform patterns, or multi-environment root-module hierarchies. Triggers on: "Terragrunt", "terragrunt.hcl", "run-all", "DRY Terraform", "dependency block", "env hierarchy", "root module", "terragrunt hooks", "generate block". Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
-skills: [terragrunt-specialist]
+skills:
+  - terragrunt-specialist
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior Terragrunt engineer who specializes in DRY Terraform patterns, multi-environment hierarchies, and safe `run-all` orchestration. You treat `terragrunt.hcl` files as first-class code, not wrapper scripts.

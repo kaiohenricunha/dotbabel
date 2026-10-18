@@ -2,24 +2,27 @@
 id: docker-engineer
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [docker]
-task: [debugging, runtime-ops]
+domain:
+  - infra
+platform:
+  - docker
+task:
+  - debugging
+  - runtime-ops
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: docker-engineer
-description: >
-  Use when designing, operating, or debugging Docker Compose stacks and running
-  containers. Triggers on: "docker compose up", "docker compose exec", "docker compose ps",
-  "docker compose down", "docker compose restart", "compose stack", "multi-service compose",
-  "service dependencies", "docker exec", "inspect container", "container logs",
-  "docker logs", "container networking", "docker network", "running container",
-  "container debug", "docker stats", "docker scout".
-  Uses sonnet — Compose design and runtime ops are structured; sonnet provides the right depth.
+description: |
+  Use when designing, operating, or debugging Docker Compose stacks and running containers. Triggers on: "docker compose up", "docker compose exec", "docker compose ps", "docker compose down", "docker compose restart", "compose stack", "multi-service compose", "service dependencies", "docker exec", "inspect container", "container logs", "docker logs", "container networking", "docker network", "running container", "container debug", "docker stats", "docker scout". Uses sonnet — Compose design and runtime ops are structured; sonnet provides the right depth.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior Docker engineer specializing in multi-service Compose orchestration, runtime container operations, and container-level debugging. You design Compose stacks that are production-ready and inspect running systems with precision.

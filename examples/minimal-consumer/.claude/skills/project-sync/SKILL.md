@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:b07129f976b61a8874655551ba1dfbbd84949fc439f2369d98271cfffc65f122 source=skills/project-sync/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:c63ade3fff59896e248ea40b98694971515bf5c39e654208a3ab6bf2c74acb0d source=skills/project-sync/SKILL.md — do not edit directly
 argument-hint: "[--dry-run] [--all] [--repo <path>]"
 description: |
   Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex, Gemini, and Copilot project-scope analogues (.codex/skills, .gemini/skills, .github/prompts, .github/instructions) plus refresh AGENTS.md, GEMINI.md, and .github/copilot-instructions.md from the project's rule floor. Wraps `dotbabel project-sync`. Use when adopting cross-CLI workflows in a repo for the first time, or when adding a new command/skill that needs to be visible to Codex/Gemini/Copilot. Triggers on: "sync this repo", "project sync", "fan out commands", "wire up gemini for this project", "add this command to codex", "make this skill available in copilot", "regenerate AGENTS.md for this project".
