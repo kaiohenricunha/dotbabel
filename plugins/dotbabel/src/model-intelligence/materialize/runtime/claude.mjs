@@ -25,10 +25,10 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     const source = parseProjectionSource(artifact);
     const requirement = source.requirement;
     const target = { ...artifact.target, runtimeId: "claude" };
-    const legacyAxes = requirement === null ? artifact.legacyAxes : undefined;
+    const legacyAxes = artifact.legacyAxes;
     const invocation = legacyAxes ? { ...context.invocation, pin: { runtime: "claude", config: legacyAxes }, omitDefaultReasoning: true } : context.invocation;
-    const resolverResult = resolve({ ...context, ...(invocation ? { invocation } : {}), requirement: requirement ?? undefined, target, runtimeContract });
-    if (artifact.releaseBaseline === true && (legacyAxes || ["floor", "pin"].includes(requirement?.mode)) && resolverResult.confidence === "low") throw fail("release_requirement_unsatisfied");
+    const resolverResult = resolve({ ...context, ...(invocation ? { invocation } : {}), requirement: requirement ?? undefined, target: { ...target, sourcePath: artifact.sourcePath }, runtimeContract });
+    if (artifact.releaseBaseline === true && (legacyAxes || ["floor", "pin"].includes(requirement?.mode) || context.policy.floor !== undefined || resolverResult.explanation.some(entry => entry.code === "scoped_floor_applied")) && resolverResult.confidence === "low") throw fail("release_requirement_unsatisfied");
     const binding = (runtimeContract.capabilities ?? runtimeContract).binding?.[kind];
     if (requirement?.mode === "pin") {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
@@ -36,7 +36,7 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     }
     if (kind === "agent" && resolverResult.status === "resolved" && resolverResult.enforcement?.state !== "enforced") throw fail("claude_projection_agent_binding_unverified");
     const pinnedCommand = kind === "command" && (requirement?.mode === "pin" || legacyAxes?.model !== undefined);
-    const dynamicBaseline = artifact.releaseBaseline === true && kind === "agent" && requirement?.mode === "dynamic" && context.policy.floor === undefined;
+    const dynamicBaseline = !legacyAxes && artifact.releaseBaseline === true && kind === "agent" && requirement?.mode === "dynamic" && context.policy.floor === undefined && !resolverResult.explanation.some(entry => entry.code === "scoped_floor_applied");
     const frontmatterKeys = kind === "agent" ? AGENT_KEYS : kind === "skill" ? SKILL_KEYS : [...COMMAND_KEYS, ...(pinnedCommand ? ["model"] : [])];
     const axisKeys = kind === "agent" ? { model: "model", reasoning: "effort" } : pinnedCommand ? { model: "model" } : {};
     return { ...artifact, target, requirement, policy: context.policy, resolverResult, runtimeContract,

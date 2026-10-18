@@ -59,9 +59,20 @@ describe("Codex App Server subprocess protocol", () => {
     try { await rpc.request("reject", {}); } catch (error) { expect(error.message).not.toContain("private native error"); }
   });
   it("bounds waiting and does not retry a timed-out write", async () => {
-    const rpc = connect({ timeoutMs: 100 });
-    await expect(rpc.request("hold", {})).rejects.toMatchObject({ code: "native_rpc_timeout" });
-    expect(await rpc.request("echo", { next: true })).toEqual({ next: true });
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const entry = new URL("./fixtures/adaptive-session-routing/rpc-server.mjs", import.meta.url).href;
+      const rpc = connect({ timeoutMs: 100, args: ["--input-type=module", "--eval", `await new Promise(resolve => setTimeout(resolve, 250)); await import(${JSON.stringify(entry)});`] });
+      expect(await rpc.request("echo", { ready: true })).toEqual({ ready: true });
+      let settled = false;
+      const held = rpc.request("hold", {}).finally(() => { settled = true; });
+      const rejected = expect(held).rejects.toMatchObject({ code: "native_rpc_timeout" });
+      await vi.advanceTimersByTimeAsync(99); expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1); await rejected;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await rpc.request("requestCount", { method: "hold" })).toBe(1);
+      expect(await rpc.request("echo", { next: true })).toEqual({ next: true });
+    } finally { vi.useRealTimers(); }
   });
   it.each(["exit", "malformed", "oversized"])("fails pending requests when the native stream is %s", async method => {
     const rpc = connect({ maxLineBytes: 1024 });

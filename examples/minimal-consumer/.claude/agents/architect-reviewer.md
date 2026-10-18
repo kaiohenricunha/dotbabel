@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:f68ae881c72130a075861fe1012c04b9009d3cbc06cda3bef74e6f237b92c1b5 source=agents/architect-reviewer.md — do not edit directly
+# dotbabel:generated projection=sha256:cd26573fc1303c8aba0a5c1c5e97f46051c0e9910667ba7917c2f869cc33d850 source=agents/architect-reviewer.md — do not edit directly
 description: |
   Use when evaluating system design, reviewing architectural decisions, assessing technology choices, or identifying structural anti-patterns. Triggers on: "review architecture", "design review", "architecture concerns", "tech stack", "coupling", "scalability review", "ADR review". Uses opus — cross-cutting architectural analysis requires deep reasoning across large codebases.
 model: opus

@@ -13,6 +13,7 @@
  * (ARCH-57 rule 6).
  */
 
+import { normalizeScopedFloors } from "./scopes.mjs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -358,6 +359,7 @@ export function mergePolicy(layers) {
   let pin;
   /** @type {object[]} */
   const shadowed = [];
+  const scopedFloors = [];
   // Prototype-less containers. `copyEntries` already refuses the unsafe keys, so
   // this is defence in depth: with no prototype to reach, a future caller that
   // writes a key by name cannot reach a setter either.
@@ -375,6 +377,10 @@ export function mergePolicy(layers) {
     if (declarations === undefined || declarations === null) continue;
     if (!isPlainObject(declarations)) throw new TypeError(`${layer} policy: expected an object, got ${typeOf(declarations)}`);
     assertLayer(layer, declarations);
+    for (const floor of normalizeScopedFloors(declarations.scoped_floors)) {
+      provenance[`scoped_floors.${scopedFloors.length}`] = layer;
+      scopedFloors.push(floor);
+    }
 
     if (declarations.floor !== undefined) {
       const winner = strongerFloor(floor, declarations.floor);
@@ -423,6 +429,7 @@ export function mergePolicy(layers) {
   /** @type {Record<string, unknown>} */
   const merged = { preferences, shadowed, provenance };
   if (classes !== undefined) merged.classes = classes;
+  if (scopedFloors.length) merged.scoped_floors = scopedFloors;
   if (floor !== undefined) merged.floor = floor;
   if (pin !== undefined) merged.pin = pin;
   // ARCH-67 — "a pin is usable only if it satisfies every effective floor" — is
