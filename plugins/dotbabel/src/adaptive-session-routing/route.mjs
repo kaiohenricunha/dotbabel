@@ -52,8 +52,9 @@ export function route(input) {
     const request = { ...resolverInput, requirement, invocation };
     let resolution = resolve(request);
     if (resolution.status !== "resolved") return decision(resolution.status === "conflict" || resolution.enforcement.state === "unsatisfied" ? "blocked" : "preserved", "resolution_unavailable", { resolution, diagnostics: [...diagnostics, ...resolution.diagnostics] });
-    if (!fresh(resolution)) return decision("preserved", "stale_capability_evidence");
-    if (resolution.confidence === "low") return decision("preserved", "capability_confidence_low");
+    const rejectReplacement = code => decision(resolution.enforcement.state === "unsatisfied" ? "blocked" : "preserved", code, { resolution, diagnostics: [...diagnostics, ...resolution.diagnostics, { code, message: code }] });
+    if (!fresh(resolution)) return rejectReplacement("stale_capability_evidence");
+    if (resolution.confidence === "low") return rejectReplacement("capability_confidence_low");
     // A retention probe uses the same resolver and cannot shadow any actual model pin.
     const pinnedModel = overrides.model ?? invocation.pin?.config.model ?? declaration?.pin?.config.model ?? resolverInput.policy.pin?.config.model;
     const currentModel = current?.axes?.model;
@@ -67,7 +68,7 @@ export function route(input) {
     const axes = resolution.configuration.axes;
     const changed = Object.keys(axes).filter(axis => axes[axis] !== current?.axes?.[axis]);
     const unsupported = changed.find(axis => runtimeCapability.axes?.[axis] !== "supported");
-    if (unsupported) return decision("preserved", runtimeCapability.axes?.[unsupported] === "unsupported" ? "routing_unsupported" : "routing_unverified");
+    if (unsupported) return rejectReplacement(runtimeCapability.axes?.[unsupported] === "unsupported" ? "routing_unsupported" : "routing_unverified");
     const status = changed.length ? "proposed" : "preserved";
     diagnostics.push({ code: changed.length ? "configuration_proposed" : "configuration_already_current" });
     return { status, changes: Object.fromEntries(changed.map(axis => [axis, axes[axis]])), confidence: classification.confidence === "medium" || resolution.confidence === "medium" ? "medium" : "high", configuration: resolution.configuration, resolution, diagnostics };

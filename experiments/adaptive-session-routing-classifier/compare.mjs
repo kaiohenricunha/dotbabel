@@ -16,7 +16,12 @@ function agrees(result, expected) {
 }
 const approaches = {};
 for (const [name, classifyTask] of [["lexical", lexical], ["contextual", classify]]) {
-  const cases = tasks.map(task => ({ id: task.id, agreement: agrees(classifyTask(task), task.expected) }));
+  const cases = tasks.map(task => {
+    const result = classifyTask(task);
+    return { id: task.id, agreement: agrees(result, task.expected), status: result.status,
+      confidence: result.confidence ?? "unavailable", requirement: result.requirement?.requirement,
+      effortIntent: result.effortIntent, reasonCodes: (result.reasons ?? []).map(reason => reason.code) };
+  });
   for (const task of tasks) classifyTask(task);
   const samples = Array.from({ length: 1000 }, (_, index) => { const start = performance.now(); classifyTask(tasks[index % tasks.length]); return performance.now() - start; }).sort((a, b) => a - b);
   approaches[name] = { agreement: cases.filter(item => item.agreement).length, count: tasks.length, p95ms: samples[949], cases };

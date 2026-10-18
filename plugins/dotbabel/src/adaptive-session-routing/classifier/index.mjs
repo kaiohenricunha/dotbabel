@@ -28,7 +28,7 @@ function instructions(prompt) {
     .replace(/^\s*>.*$/gm, " ")
     .replace(/\b(?:do not|don't|must not|avoid|without|no changes to)\b[^.;\n]*/gi, " ")
     .replace(/`[^`\n]*`/g, " ")
-    .replace(/"[^"\n]*"|'[^'\n]*'/g, " ").toLowerCase();
+    .replace(/"[^"\n]*"|(?<![\p{L}\p{N}_])'[^'\n]*'(?![\p{L}\p{N}_])/gu, " ").toLowerCase();
 }
 
 /**
