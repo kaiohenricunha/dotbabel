@@ -55,6 +55,34 @@ describe("adaptive session routing decisions", () => {
     expect(result.status).toBe("blocked"); expect(result.resolution.enforcement.state).toBe("unsatisfied");
     expect(result.configuration).toBeUndefined();
   });
+  it.each(["stale", "low-confidence", "unsupported", "unverified"])("blocks a known observed floor violation when a %s replacement cannot be applied", failure => {
+    const value = request({ current: { axes: { model: "routine-only", reasoning: "calm" } } });
+    value.resolverInput.catalog.runtimes[0].models = [native("routine-only", "routine"), native("z-frontier", "frontier")];
+    value.resolverInput.policy = { ...value.resolverInput.policy, floor: { mode: "floor", requirement: "frontier" } };
+    value.resolverInput.observed = { runtimeId: "codex", configurationBasis: "as-run", freshness: "fresh", axes: { model: "routine-only" } };
+    const replacement = value.resolverInput.catalog.runtimes[0].models[1];
+    const expectedCode = failure === "stale" ? "stale_capability_evidence" : failure === "low-confidence" ? "capability_confidence_low" : failure === "unsupported" ? "routing_unsupported" : "routing_unverified";
+    if (failure === "stale") replacement.fields.id[0].freshness = "stale";
+    else if (failure === "low-confidence") replacement.fields.id[0].confidence = "low";
+    else value.runtimeCapability = { support: "supported", axes: { model: failure, reasoning: "supported" } };
+    const result = route(value);
+    expect(result.status).toBe("blocked");
+    expect(result.resolution.enforcement.state).toBe("unsatisfied");
+    expect(result.resolution.explanation.map(item => item.code)).toContain("observed_session_below_requirement");
+    expect(codes(result)).toContain(expectedCode);
+    expect(result.configuration).toBeUndefined();
+    expect(result.changes).toBeUndefined();
+  });
+  it("can propose a verified replacement that corrects a known observed floor violation", () => {
+    const value = request({ current: { axes: { model: "routine-only", reasoning: "calm" } } });
+    value.resolverInput.catalog.runtimes[0].models = [native("routine-only", "routine"), native("z-frontier", "frontier")];
+    value.resolverInput.policy = { ...value.resolverInput.policy, floor: { mode: "floor", requirement: "frontier" } };
+    value.resolverInput.observed = { runtimeId: "codex", configurationBasis: "as-run", freshness: "fresh", axes: { model: "routine-only" } };
+    const result = route(value);
+    expect(result.status).toBe("proposed");
+    expect(result.changes).toEqual({ model: "z-frontier" });
+    expect(result.resolution.enforcement.state).toBe("unsatisfied");
+  });
   it("composes classified demand with an artifact floor and keeps the stronger minimum", () => {
     const value = request(); value.resolverInput.requirement = requirement("frontier", "floor", { binding: "session" });
     expect(route(value).configuration.axes.model).toBe("z-frontier");
