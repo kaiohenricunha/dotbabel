@@ -195,7 +195,7 @@ describe("Codex main-session submission routing", () => {
     expect(await router.submit("next", submission())).toMatchObject({ status: "accepted" });
     expect(request).toHaveBeenCalledTimes(2);
   });
-  it("an uncertain write stays blocked until a native completion is observed", async () => {
+  it("an uncertain write stays blocked after uncorrelated completion events", async () => {
     const { router, request } = setup(); request.mockRejectedValueOnce(new Error("disconnected"));
     const first = await router.submit("first", submission());
     expect(first).toMatchObject({ status: "uncertain", requested: { model: "native-b", reasoning: "high" }, decision: { status: "proposed" } });
@@ -203,7 +203,16 @@ describe("Codex main-session submission routing", () => {
     for (const event of [null, {}, { method: "turn/started" }, { method: "turn/completed", params: { threadId: "thread-1", turn: { id: "native-turn", status: "inProgress" } } }]) expect(router.notify(event)).toBe(false);
     expect(await router.submit("next", submission())).toMatchObject({ status: "blocked" });
     expect(router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "native-turn", status: "completed" } } })).toBe(true);
-    expect(await router.submit("next", submission())).toMatchObject({ status: "accepted" });
+    expect(await router.submit("next", submission())).toMatchObject({ status: "blocked", diagnostics: [{ code: "submission_in_progress" }] });
+    expect(request).toHaveBeenCalledOnce();
+  });
+  it("a stale completion cannot release an uncertain submission", async () => {
+    const { router, request } = setup();
+    await router.submit("finished", submission());
+    request.mockRejectedValueOnce(new Error("acknowledgement lost"));
+    expect(await router.submit("uncertain-new", submission())).toMatchObject({ status: "uncertain" });
+    router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "turn-1", status: "completed" } } });
+    expect(await router.submit("third", submission())).toMatchObject({ status: "blocked", diagnostics: [{ code: "submission_in_progress" }] });
     expect(request).toHaveBeenCalledTimes(2);
   });
   it("a different completed turn cannot release a known active turn", async () => {

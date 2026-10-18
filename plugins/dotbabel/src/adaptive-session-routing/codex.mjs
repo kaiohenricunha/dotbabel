@@ -8,7 +8,9 @@ const result = (status, code, extra = {}) => ({ status, effective: { state: "unk
 /**
  * Create a bounded, exactly-once submission boundary for one managed native thread.
  * The caller owns transport, native approvals, observation and session UI. No retry occurs after
- * an uncertain write. The deduplication ledger lasts for this router instance; it is never evicted.
+ * an uncertain write; uncorrelated completion events cannot release that barrier.
+ * The caller must inspect native state before creating another boundary, without replaying it.
+ * The deduplication ledger lasts for this router instance; it is never evicted.
  * Current axes and manual provenance come from that caller, never from an acknowledgement.
  * @param {object} options Thread id, project root, runtime capability, current/manual state,
  * native request function, optional preparation strategy/dependencies and bounded ledger limit.
@@ -102,7 +104,7 @@ export function createCodexTurnRouter(options) {
       const params = notification?.params;
       if (notification?.method !== "turn/completed" || params?.threadId !== options.threadId || !validId(params.turn?.id) || !["completed", "interrupted", "failed"].includes(params.turn.status)) return false;
       if (busy) earlyCompletion = params.turn.id;
-      if (activeTurn === params.turn.id || activeTurn === uncertainTurn) activeTurn = undefined;
+      if (activeTurn === params.turn.id) activeTurn = undefined;
       return true;
     },
   };
