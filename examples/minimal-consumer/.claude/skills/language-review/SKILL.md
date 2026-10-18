@@ -1,30 +1,11 @@
 ---
-id: language-review
-name: language-review
-type: skill
-version: 1.0.0
-domain: [writing]
-platform: [none]
-task: [review]
-maturity: draft
-description: >
-  Read-only editorial review of text as an experienced native-language editor
-  would read it: naturalness, idiom, word choice, syntax, register, cohesion,
-  regional fit, and meaning preservation. Covers English (en-US, en-GB),
-  Brazilian Portuguese, Spanish, French, German, Modern Standard Arabic, and
-  Indonesian. Reviews original writing, or a translation against its source,
-  in sentences, documents, Markdown, UI copy, and JSON or YAML localization
-  strings. Never rewrites files. Triggers on: "does this sound natural",
-  "sounds translated", "review this translation", "would a native speaker say
-  this", "language review", "check the tone of this Portuguese text", "is this
-  idiomatic French", "natural German wording", "review my Spanish copy",
-  "Arabic copy review", "Indonesian wording".
-argument-hint: "[text | path ...] [--lang <tag>] [--region <variant>] [--source <path|tag>] [--audience <who>] [--register <level>] [--preserve <term>] [--format md|json] [--revised]"
-tools: Read, Grep, Glob
+# dotbabel:generated projection=sha256:717ac12c977683fd5f027715ba6d0a7f8316011ca4b82c162c70de77ce0694e3 source=skills/language-review/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob
-model: opus
-effort: medium
+argument-hint: "[text | path ...] [--lang <tag>] [--region <variant>] [--source <path|tag>] [--audience <who>] [--register <level>] [--preserve <term>] [--format md|json] [--revised]"
+description: |
+  Read-only editorial review of text as an experienced native-language editor would read it: naturalness, idiom, word choice, syntax, register, cohesion, regional fit, and meaning preservation. Covers English (en-US, en-GB), Brazilian Portuguese, Spanish, French, German, Modern Standard Arabic, and Indonesian. Reviews original writing, or a translation against its source, in sentences, documents, Markdown, UI copy, and JSON or YAML localization strings. Never rewrites files. Triggers on: "does this sound natural", "sounds translated", "review this translation", "would a native speaker say this", "language review", "check the tone of this Portuguese text", "is this idiomatic French", "natural German wording", "review my Spanish copy", "Arabic copy review", "Indonesian wording".
 disable-model-invocation: false
+name: language-review
 user-invocable: true
 ---
 

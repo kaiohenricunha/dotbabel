@@ -1,20 +1,10 @@
 ---
-id: peer
-name: peer
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, debugging]
-maturity: draft
-description: >
-  Pair persistent Main and Advisor sessions across Claude Code and Codex.
-  Manage their durable investigations, queue, and bidirectional messages.
-  Use for peer main, peer advisor, peer ask, or requests addressed to an
-  already paired Advisor. Handoff remains the separate context-transfer tool.
-argument-hint: "main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status"
+# dotbabel:generated projection=sha256:ff5b7649105f8ccaa6d5396e660ed7e01931539c02b9804d16f03c523e480402 source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob
-tools: Bash, Read, Grep, Glob
+argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status
+description: |
+  Pair persistent Main and Advisor sessions across Claude Code and Codex. Manage their durable investigations, queue, and bidirectional messages. Use for peer main, peer advisor, peer ask, or requests addressed to an already paired Advisor. Handoff remains the separate context-transfer tool.
+name: peer
 ---
 
 # Peer collaboration

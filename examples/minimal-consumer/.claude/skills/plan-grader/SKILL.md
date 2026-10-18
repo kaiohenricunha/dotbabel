@@ -1,19 +1,10 @@
 ---
-id: plan-grader
-name: plan-grader
-type: skill
-version: 2.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
-maturity: draft
-description: >
-  Grade implementation plans on a 0-10 scale without mutating the workspace. Accepts plan files,
-  quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.
-argument-hint: '[--json] [--blind] <plan-path | file:<path> | text:"plan" | "plan" | latest <agent> plan>'
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:dd4c842bf731ff2b4c723979d80c94a1f9461e44444d4fcfebc8df1c36074788 source=skills/plan-grader/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-model: opus
+argument-hint: '[--json] [--blind] <plan-path | file:<path> | text:"plan" | "plan" | latest <agent> plan>'
+description: |
+  Grade implementation plans on a 0-10 scale without mutating the workspace. Accepts plan files, quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.
+name: plan-grader
 ---
 
 Grade an implementation plan on a 0-10 scale using the plan-grader rubric. This skill is

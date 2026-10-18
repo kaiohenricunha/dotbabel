@@ -1,19 +1,10 @@
 ---
-id: create-audit
-name: create-audit
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
-maturity: validated
-description: >
-  Create an evidence-based audit document and save it to docs/audits/.
-  Triggers on: "audit", "review", "assessment".
-argument-hint: "[subject]"
-tools: Read, Grep, Glob, Bash, Write
+# dotbabel:generated projection=sha256:5c80649c5e6db57b71910a9102c250aad1451a9aa717c048c46023c86629348d source=skills/create-audit/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash Write
-model: opus
+argument-hint: "[subject]"
+description: |
+  Create an evidence-based audit document and save it to docs/audits/. Triggers on: "audit", "review", "assessment".
+name: create-audit
 ---
 
 Create a structured audit document and save it to the project's `docs/audits/` directory.

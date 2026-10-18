@@ -1,15 +1,8 @@
 ---
-id: changelog
-name: changelog
-type: command
-description: >
-  Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [documentation]
-maturity: validated
+# dotbabel:generated projection=sha256:1e8bd52084bda0b2dbf685d5b982e9ca43a502b698be7f5001401159ede9413a source=commands/changelog.md — do not edit directly
 argument-hint: "[ref-range|count|since-deploy]"
+description: |
+  Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.
 model: haiku
 ---
 

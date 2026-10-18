@@ -1,23 +1,10 @@
 ---
-id: azure-specialist
-name: azure-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [azure]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Azure architecture review, debugging, and service design. Use for
-  structured investigations of Azure-specific issues, identity or cost audits,
-  and multi-service design reviews. Triggers on: "Azure audit", "Azure design
-  review", "EntraID review", "Managed Identity debug", "review my Azure",
-  "Azure troubleshooting", "AKS deep-dive".
-argument-hint: "<subscription context, service, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:b786e0f4a8aafe5da889d8b0740c9af7d009d5de219b510b392d0fe7862870a3 source=skills/azure-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <subscription context, service, or problem description>
+description: |
+  Deep-dive Azure architecture review, debugging, and service design. Use for structured investigations of Azure-specific issues, identity or cost audits, and multi-service design reviews. Triggers on: "Azure audit", "Azure design review", "EntraID review", "Managed Identity debug", "review my Azure", "Azure troubleshooting", "AKS deep-dive".
+name: azure-specialist
 ---
 
 # Azure Specialist

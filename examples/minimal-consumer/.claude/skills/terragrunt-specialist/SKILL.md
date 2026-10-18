@@ -1,23 +1,10 @@
 ---
-id: terragrunt-specialist
-name: terragrunt-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [terraform, terragrunt]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all
-  orchestration analysis. Use for structured investigations of multi-environment
-  Terragrunt layouts, dependency graphs, remote state config, and hook correctness.
-  Triggers on: "Terragrunt audit", "run-all review", "dependency block", "DRY pattern
-  review", "env hierarchy audit", "mock_outputs", "terragrunt hooks".
-argument-hint: "<repo root or terragrunt.hcl path>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:5e869dc9c9876ffe8f3934a2ef2ff4c8113fd58cc9f31525a6215e21500e0e11 source=skills/terragrunt-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <repo root or terragrunt.hcl path>
+description: |
+  Deep-dive Terragrunt hierarchy review, DRY pattern audits, and run-all orchestration analysis. Use for structured investigations of multi-environment Terragrunt layouts, dependency graphs, remote state config, and hook correctness. Triggers on: "Terragrunt audit", "run-all review", "dependency block", "DRY pattern review", "env hierarchy audit", "mock_outputs", "terragrunt hooks".
+name: terragrunt-specialist
 ---
 
 # Terragrunt Specialist

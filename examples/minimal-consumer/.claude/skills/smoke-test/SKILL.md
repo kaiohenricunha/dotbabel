@@ -1,24 +1,11 @@
 ---
-id: smoke-test
-name: smoke-test
-type: skill
-version: 1.0.0
-domain: [infra, devex]
-platform: [vercel, flyio, aws]
-task: [diagnostics, runtime-ops]
-maturity: draft
-description: >
-  Run the smoke checks a repository declares for its deploy targets and report
-  whether production actually answers after a release. Use after a deploy, during
-  release verification, and when confirming a rollback landed. Triggers on:
-  "smoke test", "run smoke checks", "is production healthy", "did the deploy work",
-  "verify the release is live".
-argument-hint: "[--dry-run] [--json]"
-tools: Bash, Read, Grep, Glob
+# dotbabel:generated projection=sha256:cd7acd487fe2710972c8be32b20594cea07eaedef404170bdf0ddf47a7c0084b source=skills/smoke-test/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-model: sonnet
-effort: medium
+argument-hint: "[--dry-run] [--json]"
+description: |
+  Run the smoke checks a repository declares for its deploy targets and report whether production actually answers after a release. Use after a deploy, during release verification, and when confirming a rollback landed. Triggers on: "smoke test", "run smoke checks", "is production healthy", "did the deploy work", "verify the release is live".
 disable-model-invocation: true
+name: smoke-test
 user-invocable: true
 ---
 

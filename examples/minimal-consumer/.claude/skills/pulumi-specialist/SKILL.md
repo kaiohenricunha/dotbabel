@@ -1,23 +1,10 @@
 ---
-id: pulumi-specialist
-name: pulumi-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [pulumi]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Pulumi stack review, component design, Automation API audit, and
-  secrets management. Use for structured investigations of Pulumi stack drift,
-  ComponentResource coupling, ESC configuration, and Automation API workflows.
-  Triggers on: "Pulumi audit", "stack review", "Automation API review",
-  "ComponentResource design", "ESC audit", "Pulumi secrets", "Pulumi testing".
-argument-hint: "<stack name, project path, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:a6ac37eb78a36a215ae964ea90a97ba32d1df60764ea2965e89e64d846cc56e6 source=skills/pulumi-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <stack name, project path, or problem description>
+description: |
+  Deep-dive Pulumi stack review, component design, Automation API audit, and secrets management. Use for structured investigations of Pulumi stack drift, ComponentResource coupling, ESC configuration, and Automation API workflows. Triggers on: "Pulumi audit", "stack review", "Automation API review", "ComponentResource design", "ESC audit", "Pulumi secrets", "Pulumi testing".
+name: pulumi-specialist
 ---
 
 # Pulumi Specialist

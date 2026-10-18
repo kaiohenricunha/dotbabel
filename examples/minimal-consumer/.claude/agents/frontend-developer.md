@@ -1,20 +1,10 @@
 ---
-id: frontend-developer
-type: agent
-version: 1.0.0
-domain: [frontend]
-platform: [none]
-task: [scaffolding, debugging]
-maturity: draft
-name: frontend-developer
-description: >
-  Use when building or modifying client-side code: UI components, pages, forms,
-  state management, or client-side data fetching. Triggers on: "build UI",
-  "React component", "frontend", "CSS", "accessibility", "form validation",
-  "client-side", "Next.js page", "Tailwind".
-  Uses sonnet — everyday frontend implementation benefits from balanced capability and response speed.
-tools: Read, Write, Edit, Bash, Glob, Grep
+# dotbabel:generated projection=sha256:e821984b560a45afd284bdf4b6136ce5854976432d539aa086952e069243aeab source=agents/frontend-developer.md — do not edit directly
+description: |
+  Use when building or modifying client-side code: UI components, pages, forms, state management, or client-side data fetching. Triggers on: "build UI", "React component", "frontend", "CSS", "accessibility", "form validation", "client-side", "Next.js page", "Tailwind". Uses sonnet — everyday frontend implementation benefits from balanced capability and response speed.
 model: sonnet
+name: frontend-developer
+tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
 You are a senior frontend developer specializing in building accessible, performant, and maintainable user interfaces. You write code users can rely on across devices and assistive technologies.

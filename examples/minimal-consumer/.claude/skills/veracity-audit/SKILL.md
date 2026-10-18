@@ -1,26 +1,10 @@
 ---
-id: veracity-audit
-name: veracity-audit
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
-maturity: draft
-description: >
-  Audit a data pipeline for Veracity and Value. Dispatches data-scientist,
-  compliance-auditor, and data-engineer agents with project context injected
-  at dispatch time. All source paths are supplied via flags — no defaults,
-  no project assumptions.
-  Subcommands: audit (full pipeline walk), score-check (scoring math only),
-  gate-check (gate coverage only), source-trace <label> (single source end-to-end).
-  Invoke when: "audit pipeline", "veracity check", "scoring math correct?",
-  "check gates", "trace source", "verify quality gates", "formula correct?".
-argument-hint: "audit | score-check | gate-check | source-trace <label> --config <path> --quality-config <path> --pipeline-dir <path> --scoring-dir <path>"
-effort: max
-model: opus
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:565448e094e88610dec1693240ca4df7cf043013fde1f009e5ebff4f27888a8f source=skills/veracity-audit/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash Agent
+argument-hint: audit | score-check | gate-check | source-trace <label> --config <path> --quality-config <path> --pipeline-dir <path> --scoring-dir <path>
+description: |
+  Audit a data pipeline for Veracity and Value. Dispatches data-scientist, compliance-auditor, and data-engineer agents with project context injected at dispatch time. All source paths are supplied via flags — no defaults, no project assumptions. Subcommands: audit (full pipeline walk), score-check (scoring math only), gate-check (gate coverage only), source-trace <label> (single source end-to-end). Invoke when: "audit pipeline", "veracity check", "scoring math correct?", "check gates", "trace source", "verify quality gates", "formula correct?".
+name: veracity-audit
 ---
 
 # Veracity Audit
