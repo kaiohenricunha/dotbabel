@@ -57,6 +57,17 @@ describe("local contextual task classification", () => {
     expect(result.reasons.length).toBeGreaterThan(0);
     for (const reason of result.reasons) expect(reason.code).toMatch(/^[a-z][a-z_]+$/);
   });
+  it("preserves authentication instructions between possessive apostrophes", () => {
+    const plain = classify({ prompt: "Fix the user authentication code and add the user regression tests." });
+    for (const prompt of ["Fix the user's authentication code and add the user's regression tests.", "Fix the users' authentication code and add the users' regression tests."]) {
+      const result = classify({ prompt });
+      expect(result.requirement.requirement).toBe(plain.requirement.requirement);
+      expect(result.effortIntent).toBe(plain.effortIntent);
+      expect(result.characteristics.risk).toBe("high");
+    }
+    const quoted = classify({ prompt: "Fix the button spacing. Example: 'authentication security production'." });
+    expect(quoted.requirement.requirement).toBe("routine");
+  });
   it("uses task characteristics when no structured context is available", () => {
     const architecture = classify({ prompt: "Design a new distributed ingestion architecture." });
     expect(architecture.requirement.requirement).toBe("frontier");
