@@ -5,6 +5,7 @@
   "owners": ["@kaiohenricunha"],
   "linked_paths": [
     "plugins/dotbabel/src/adaptive-session-routing/**",
+    "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
     "plugins/dotbabel/tests/adaptive-session-routing-*.test.mjs",
     "plugins/dotbabel/tests/integration/adaptive-session-routing-*.integration.test.mjs"
   ],
@@ -67,7 +68,7 @@
     },
     {
       "id": "AC-3",
-      "status": "planned",
+      "status": "active",
       "given": "disabled path",
       "when": "disabled routing performs no discovery classification application or writes",
       "then": "disabled automatic routing invokes no discovery classifier runtime or mutation",
@@ -142,7 +143,7 @@
     },
     {
       "id": "AC-6",
-      "status": "planned",
+      "status": "active",
       "given": "manual overrides",
       "when": "preserves manual model and effort independently",
       "then": "an explicit manual model or effort remains authoritative per axis",
@@ -192,7 +193,7 @@
     },
     {
       "id": "AC-8",
-      "status": "planned",
+      "status": "active",
       "given": "floors and pins",
       "when": "never reports a below-floor manual pin as satisfied",
       "then": "pins and mandatory floors are honored and a violation is never reported satisfied",
@@ -317,7 +318,7 @@
     },
     {
       "id": "AC-13",
-      "status": "planned",
+      "status": "active",
       "given": "runtime limitations",
       "when": "unsupported or unverified routing never appears active",
       "then": "status does not report an unsupported or unverified mechanism as active",
@@ -342,7 +343,7 @@
     },
     {
       "id": "AC-14",
-      "status": "planned",
+      "status": "active",
       "given": "performance",
       "when": "warm local classification and routing p95 is at most 25 ms",
       "then": "warmed local decision p95 is at most 25 milliseconds over 1000 calls",
@@ -363,6 +364,31 @@
       "report": {
         "format": "junit-xml",
         "path": ".dotbabel/criteria/AR-AC-14.junit.xml"
+      }
+    },
+    {
+      "id": "AC-15",
+      "status": "active",
+      "given": "bounded local task context",
+      "when": "the classifier evaluates tasks with distinct risk and verification characteristics",
+      "then": "capability demand and effort intent remain independent without selecting a native model",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing-classifier.test.mjs",
+          "name": "changes model capability and effort intent independently"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing-classifier.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-15.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-15.junit.xml"
       }
     }
   ]
