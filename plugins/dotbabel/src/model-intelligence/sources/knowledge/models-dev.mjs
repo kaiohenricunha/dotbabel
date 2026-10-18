@@ -24,7 +24,7 @@ import { makeDiscoveryEvidence, makeModelFact, makeProviderCatalogEvidence, opti
 export const SOURCE_ID = "models-dev";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "2";
+export const ADAPTER_VERSION = "3";
 
 /** The one endpoint Models.dev serves (DOC-3). */
 export const SOURCE_URL = "https://models.dev/api.json";
@@ -223,6 +223,8 @@ function factFromRecord(record) {
   if (id === undefined) return undefined;
   /** @type {Record<string, unknown>} */
   const fields = { id, supportedReasoningLevels: effortValues(r.reasoning_options).map((effort) => ({ effort })) };
+  const capabilities = Object.fromEntries(["reasoning", "tool_call"].filter(key => typeof r[key] === "boolean").map(key => [key, r[key]]));
+  if (Object.keys(capabilities).length) fields.capabilities = capabilities;
   const displayName = optionalIdentifier(r.name);
   if (displayName !== undefined) fields.displayName = displayName;
   const contextWindow = isPlainObject(r.limit) ? optionalCount(/** @type {any} */ (r.limit).context) : undefined;

@@ -246,7 +246,7 @@ describe("codex parsing boundaries", () => {
     expect(skipped).toBe(0);
     expect(models[0]).toMatchObject({ id: "m", displayName: "M", visibility: "list", defaultReasoningLevel: "low", contextWindow: 10, defaultVerbosity: "low", supportVerbosity: true });
     expect(Object.hasOwn(models[0], "maxContextWindow")).toBe(false);
-    expect(models[0].supportedReasoningLevels).toEqual([{ effort: "low", description: "d" }, { effort: "high" }]);
+    expect(models[0].supportedReasoningLevels).toEqual([{ effort: "low", description: "d", intent: "low", order: 2 }, { effort: "high", intent: "high", order: 4 }]);
     expect(Object.hasOwn(models[1], "supportVerbosity")).toBe(false);
     expect(Object.hasOwn(models[1], "contextWindow")).toBe(false);
   });

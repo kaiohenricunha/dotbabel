@@ -454,6 +454,42 @@ interface CatalogEvidence<T> {
 
 Field-level facts retain their individual provenance as required by ARCH-28. A merged catalog record does not assign one global winning source to the entire model.
 
+### Capability facts for resolution — 2026-10-17 implementation amendment
+
+`ModelFact` may carry `capabilities: {reasoning?: boolean, tool_call?: boolean}`. These are explicit source facts, not task classes or model rankings. Unknown capabilities stay absent. The catalog preserves them and the model identity as field-level evidence envelopes. This closes the missing link between the shipped `classes.*.satisfied_by` rules and actual source evidence; consumers do not maintain separate capability tables.
+
+Models.dev supplies its declared boolean fields. Codex supplies reasoning support from its native reasoning-level list, and tool-call support only for recognized native shell interfaces. Unknown interfaces remain unknown. The adapter never derives these facts from model names. Semantic classes remain the policy's judgment; accepted effort values remain per-model evidence. Neither these coarse rules nor passing fixture tests establish model-ranking accuracy.
+
+The pure resolver accepts an optional `invocation.pin` with the existing runtime/config shape for the most-specific explicit pin. It composes this after policy and artifact pins while preserving every mandatory floor. Catalogs lacking sufficient identity or capability evidence produce structured unresolved results.
+
+### Routing constraint evidence — 2026-10-18 implementation amendment
+
+Model facts may include `selectionVisibility: listed|hidden|unknown` and explicit `inputModalities`.
+The native adapter normalizes picker visibility without claiming account entitlement. Automatic model
+selection requires known listed eligibility; an explicit model pin may preserve a hidden selection.
+Older caches without this fact remain readable but cannot prove automatic eligibility. An explicit
+refresh supplies the newer evidence; read-only resolution never refreshes implicitly.
+
+Each supported native effort may carry paired `intent: low|medium|high` and `order: 0..100`
+annotations from its runtime adapter. The ordinal compares recognized native effort controls, not
+model quality. An unfamiliar control stays opaque and unannotated. Values remain per-model: support
+on one model never implies support on another. Raw native values and descriptions remain preserved.
+
+The resolver accepts optional invocation constraints `requiredModalities`, `requiredCapabilities`,
+`effortIntent`, `overrides` and `modelSelection`. Required modalities need explicit per-model evidence.
+Required operation capabilities form a bounded boolean map, independent of task class. A coding
+harness can require tool calls even for mechanical work. Missing facts remain unknown; an exact
+manual model with a contradictory required capability produces a conflict. These are operation
+constraints, not another policy or model registry. Semantic effort intent
+selects a supported annotated native control; absent semantics produce an unresolved result.
+`overrides` preserves explicit axes independently, retaining untouched lower-scope pins and every
+mandatory floor. Native manual effort is exact and wins over automatic effort intent.
+`modelSelection: automatic` keeps ordinary eligibility binding even when a retention probe constrains
+the current model; `explicit` requires a specified model. A dynamic command or an inherit declaration
+does not gain artifact enforcement merely because invocation controls exist. Observed compliance
+checks required modalities, operation capabilities and effort as well as model capability. Missing observed axes remain
+unknown; they are not proof of compliance or a known violation.
+
 ### Authority
 
 The adapter descriptor does not declare itself globally authoritative. Authority is field-specific and is applied by `catalog/` according to the source rules in §3 (ARCH-28): local Codex invokability comes from Codex runtime discovery, provider API model existence comes from the provider API for that fact, and Dotbabel workload classification comes from Dotbabel policy. A source adapter supplies evidence and provenance. It does not decide how its evidence ranks for unrelated fields.

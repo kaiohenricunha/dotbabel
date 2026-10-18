@@ -81,6 +81,7 @@ describe("models-dev knowledge-source adapter", () => {
     expect(anthropic.discovery.models.map((m) => m.id)).toEqual(["claude-haiku-4-5", "claude-opus-4-5", "claude-opus-5"]);
     const opus45 = anthropic.discovery.models[1];
     expect(opus45).toEqual({
+      capabilities: { reasoning: true, tool_call: true },
       id: "claude-opus-4-5",
       displayName: "Claude Opus 4.5 (latest)",
       contextWindow: 200000,
@@ -335,7 +336,7 @@ describe("models-dev knowledge-source adapter", () => {
     const result = await run;
     expect(new Headers(double.calls[0].init.headers).get("if-none-match")).toBe('"v1"');
     // No evidence, so a 304 can never read as an empty catalog (ARCH-30); provenance and the time stay.
-    expect(result).toEqual({ status: "not_modified", provenance: { sourceId: "models-dev", sourceKind: "knowledge-source", adapterVersion: "2" }, observedAt: fixedNow() });
+    expect(result).toEqual({ status: "not_modified", provenance: { sourceId: "models-dev", sourceKind: "knowledge-source", adapterVersion: modelsDev.ADAPTER_VERSION }, observedAt: fixedNow() });
     // Without an etag, no validator is sent.
     const plain = discoverWith(() => reply(RECORDED));
     await plain.run;
