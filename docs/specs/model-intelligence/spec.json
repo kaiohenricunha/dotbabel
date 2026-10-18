@@ -552,7 +552,7 @@
     },
     {
       "id": "AC-21",
-      "status": "planned",
+      "status": "active",
       "given": "an artifact with an omitted model or inherit",
       "when": "migrate --write runs",
       "then": "no concrete requirement is introduced",

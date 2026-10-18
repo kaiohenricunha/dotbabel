@@ -1179,3 +1179,37 @@ operation stays unknown; an absent/unsupported adapter reports unsupported; a su
 without a data-only method reports `observation_stream_unavailable`. It never falls back to a native
 probe on this path. Typed observations are identical to the adapter's `observe({stream})` output.
 Codex turn-context configuration remains reconstructed rather than proof of effective inference.
+
+### P-18 migration and exact scoped-floor contract
+
+Each of the four policy layers accepts at most 128 exact scoped floors. The merged resolver
+input accepts all 512 declarations and preserves every applicable minimum.
+
+`model_intelligence.scoped_floors` is a bounded array of declarations with `mode: floor`, a
+canonical workload `requirement`, and an exact `scope` containing `artifact_kind` and
+`source_path`. Optional `rationale` is nonempty and bounded. Portable canonical source paths
+contain no globs, traversal, absolute roots, drive spellings or control characters. Each policy
+layer adds minima; a later layer cannot delete or weaken a previous scoped floor. The resolver
+receives `target.sourcePath` independently from its generated destination. Unknown source paths
+never acquire a global minimum from an exact selector.
+
+`models migrate` retains its write-free legacy report. Explicit `--write`, `--check`, `--batch`
+or `--decisions` selects the guarded migration interface. The optional decision JSON array names
+`sourcePath`, `artifactKind`, DOC-1 `category`, and canonical `compute`. The writer validates each
+decision with the existing requirement parser. Alias-derived proposals alone never authorize a
+semantic declaration. Class-F entries remain unchanged. Explicit inheritance can be represented
+without introducing a workload class; absent model metadata remains neutral.
+
+`--batch A|B|C|D|E|F` filters the approved inventory. A selected batch is compliant when no selected
+reviewed declaration remains unwritten. Other undecided legacy paths are reported separately.
+`--check` writes nothing and returns 1 for pending changes, 0 for a compliant selected batch.
+`--write` and `--check` together return 64. Conflicting canonical/legacy decisions fail before
+replacement. The no-flag analysis envelope remains compatible.
+
+The complete batch is read and prevalidated before replacement. The existing descriptor-anchored
+filesystem, root lock and compare-before-replace operation guard writes. Every intermediate
+canonical file keeps its native compatibility controls and exact body. For mandatory floor intent, the release adapter keeps
+those controls as shared-resolver pins while their legacy declaration remains. Explicit dynamic
+and inherit declarations keep their existing canonical precedence. A separate verified
+migration removes the bridge. Explicit canonical pins and retained native pins cannot disagree.
+Interrupted batches retain completed usable files and preserve conflicting user edits.
