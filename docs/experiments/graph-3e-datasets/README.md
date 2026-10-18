@@ -156,6 +156,13 @@ the unchanged parent manifest and protocol. Keep failed intermediate runs separa
 The parent dataset remains unchanged. Independent annotations, separate verification, sufficient
 samples, and protocol provenance compatibility are still required before replay.
 
+`recovery.mjs retry-sources HISTORY_ROOT NEW_OUT` reads PR bodies and up to 100 comments per PR
+from an explicit metadata pool. It records unavailable sources and incomplete comment pagination.
+The hashed private source index identifies phase/failure markers for manual inspection. These
+markers do not establish an original failure, a commit, or a consecutive failure count. They never
+produce a label or a primary row. A contemporaneous numbered run still needs the actual phase
+counter and reset history; a run ordinal alone is insufficient.
+
 Run the recovery tests with the existing preparation and protocol tests:
 
 ```bash
@@ -163,3 +170,62 @@ node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experime
 ```
 
 See [the recovery report](recovery-report.md) for the actual source coverage and remaining gaps.
+
+## Blind-label integration
+
+`labels.mjs integrate PARENT RECOVERY LABELING NEW_OUT [CUTOFF]` validates both sealed source runs,
+then compares separately completed blind labels. The labeling directory supplies identical
+`annotator-input.jsonl` and `verifier-input.jsonl` packets, `annotations.jsonl`, and
+`independent-verification.jsonl`. Each verifier record uses `status: "independent-label"` and
+`verified_at`; each annotation uses `status: "labeled"` and `labeled_at`. Both actors must provide
+rationales, evidence, prediction blindness, and valid timestamps before the reconciliation cutoff.
+An unknown or a disagreement remains unknown. The tool never selects a label by majority vote.
+The accepted source remains `ai-annotation-verified`, and the parent run stays unchanged.
+
+## Separate offline baseline cohort
+
+The original experiment computes its baseline from PR paths, size, and supplied repository facts.
+`baseline.mjs` prepares that separate cohort without claiming a historical reviewer assignment.
+Do not pool its rows with the observed-roster cohort. Frozen facts are collection inputs; they do
+not establish the facts that a historical reviewer saw.
+
+The baseline configuration contains `repositories`, each with `repo`, `visibility` (`public` or
+`private`), `facts`, and `prs`. The latter two fields name explicit JSON files. PR metadata also
+includes `state`. Selection excludes unmerged PRs, incomplete metadata, and profiles with no
+additional candidate. It follows repository configuration order, then a fixed SHA-256 rank within
+each repository. It selects the first 180 complete pinned inputs before any labels are read.
+Failed source reads stay unknown. The policy records the full candidate order and exclusions.
+
+The CLI accepts these commands:
+
+```text
+baseline.mjs collect CONFIG NEW_INPUT_RUN
+baseline.mjs validate INPUT_RUN
+baseline.mjs finalize INPUT_RUN LABELING NEW_GOLD_RUN [CUTOFF]
+baseline.mjs validate-gold GOLD_RUN
+```
+
+Run the file with `node docs/experiments/graph-3e-datasets/baseline.mjs`. Input validation reconstructs
+each baseline from the retained PR, comparison, metadata, and facts. Gold validation reconstructs
+the accepted labels from the retained independent sidecars. Manifests bind all evidence hashes,
+private permissions, class counts, PR counts, and unchanged numeric thresholds.
+
+A `packet-manifest.json` binds the two complete blind packets and any packet shards. An optional
+`verification-routing.json` records actor assignments before labels are compared. The latter has
+`created_at`, `labels_consulted: false`, `reason`, and `routing: [{ id, actor }]`. Finalization checks
+the selected verifier and retains this record. Earlier checks remain evidence when prior source
+exposure requires a fresh verifier; agreement must not determine which verifier is selected.
+
+Sample floors and protocol compatibility are separate results. Even a large checked AI cohort has
+`protocol_compatible: false` under the unchanged human-only protocol v1. A later reviewed protocol
+version must bind the distinct cohort and actual AI provenance before replay. This tool makes no
+model calls and changes no adoption state.
+
+See [the blind-label report](labeling-report.md) for the sealed runs, counts, and remaining gaps.
+
+Run all six research test files through the repository's
+`plugins/dotbabel/tests/graph-adoption-experiment.test.mjs` wrapper, or use:
+
+```bash
+node --test docs/experiments/graph-step-adoption/protocol.test.mjs docs/experiments/graph-step-adoption/run.test.mjs docs/experiments/graph-3e-datasets/prepare.test.mjs docs/experiments/graph-3e-datasets/recovery.test.mjs docs/experiments/graph-3e-datasets/labels.test.mjs docs/experiments/graph-3e-datasets/baseline.test.mjs
+```

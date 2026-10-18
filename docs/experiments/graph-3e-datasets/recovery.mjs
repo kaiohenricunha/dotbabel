@@ -249,6 +249,61 @@ export async function expandDispatch(root, parent) {
     verified_labels_added: 0, replay_performed: false };
 }
 
+export function retrySourceCandidates(repo, node, ref) {
+  const sources = [{ kind: "body", url: node.url, body: node.body ?? "" },
+    ...(node.comments?.nodes ?? []).map(c => ({ kind: "comment", url: c.url, body: c.body ?? "", comment_id: c.databaseId }))];
+  return sources.filter(s => /local-attest|npm run attest|pre-pr|open-pr|post-pr-review|review-pr/i.test(s.body) &&
+    /hard leg\(s\) failed|\bFAIL(?:ED)?\b|Error:|exit(?:ed)?[ =:]+[1-9]/i.test(s.body)).map(s => ({
+      repo, pr: node.number, kind: s.kind, url: s.url, comment_id: s.comment_id,
+      body_sha256: digest(s.body), evidence: [ref], eligible: false,
+      reason: "requires_original_log_head_phase_and_consecutive_counter_audit" }));
+}
+
+export async function collectRetrySources(parent, root) {
+  if (fs.existsSync(root)) throw new Error("output must be new");
+  const read = file => JSON.parse(fs.readFileSync(file, "utf8"));
+  const config = read(path.join(parent, "collection-config.json"));
+  fs.mkdirSync(root, { recursive: true, mode: 0o700 });
+  const coverage = [], unknown = [], candidates = [];
+  for (const repository of config.repositories) {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repository.name)) throw new Error("invalid repository");
+    const [owner, name] = repository.name.split("/"), slug = repository.name.replace("/", "--");
+    const bytes = fs.readFileSync(path.join(parent, `sources/${slug}-prs.json`)), prs = JSON.parse(bytes);
+    if (prs.some(p => !Number.isInteger(p.number) || p.number < 1) || new Set(prs.map(p => p.number)).size !== prs.length) throw new Error("invalid PR source");
+    save(path.join(root, `sources/${slug}-prs.json`), bytes);
+    for (let offset = 0; offset < prs.length; offset += 20) {
+      const batch = prs.slice(offset, offset + 20), ref = `batches/${slug}-${offset}.json`;
+      const fields = batch.map(p => `pr${p.number}:pullRequest(number:${p.number}){number url body comments(first:100){pageInfo{hasNextPage} nodes{databaseId url body createdAt updatedAt}}}`).join(" ");
+      const query = `query{repository(owner:${JSON.stringify(owner)},name:${JSON.stringify(name)}){${fields}}}`;
+      let response;
+      try {
+        const { stdout } = await execute("gh", ["api", "graphql", "-f", `query=${query}`], { maxBuffer: 40 * 1024 * 1024 });
+        response = sanitizeJSON(JSON.parse(stdout));
+      } catch { response = { reason: "github_retry_source_read_failed" }; }
+      save(path.join(root, ref), JSON.stringify(response) + "\n");
+      for (const pr of batch) {
+        const node = response.data?.repository?.[`pr${pr.number}`];
+        const complete = Boolean(node?.comments?.pageInfo && !node.comments.pageInfo.hasNextPage);
+        coverage.push({ repo: repository.name, pr: pr.number, evidence: [ref], complete,
+          comments: node?.comments?.nodes?.length ?? 0, metadata_sha256: digest(bytes) });
+        if (!complete) unknown.push({ repo: repository.name, pr: pr.number, evidence: [ref],
+          reason: node ? "retry_comments_pagination_incomplete" : "retry_source_unavailable" });
+        if (node) candidates.push(...retrySourceCandidates(repository.name, node, ref));
+      }
+      process.stderr.write(`retry sources: ${slug} ${Math.min(offset + 20, prs.length)}/${prs.length}; possible sources ${candidates.length}\n`);
+    }
+  }
+  save(path.join(root, "coverage.jsonl"), jsonl(coverage));
+  save(path.join(root, "possible-sources.jsonl"), jsonl(candidates));
+  save(path.join(root, "unknown.jsonl"), jsonl(unknown));
+  const result = { inspected_prs: coverage.length, complete_prs: coverage.filter(r => r.complete).length,
+    comments: coverage.reduce((n, r) => n + r.comments, 0), possible_sources: candidates.length,
+    unknown: unknown.length, verified_labels_added: 0, replay_performed: false };
+  save(path.join(root, "source-manifest.json"), JSON.stringify({ version: 1, collected_at: new Date().toISOString(),
+    ...result, eligibility: "source index only; no inferred attempts or labels", files: inventory(root) }, null, 2) + "\n");
+  return result;
+}
+
 export function pinnedDispatch(opportunity, pr, comparison, facts) {
   if (!comparison.files?.length || comparison.files.length >= 300 || comparison.files.some(f => !f.patch) ||
       comparison.total_commits !== comparison.commits.length || !comparison.commits.some(c => c.sha === opportunity.head_sha))
@@ -384,8 +439,8 @@ export function validateRecovery(root, parent) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const [command, ...args] = process.argv.slice(2);
-    const result = command === "scan" ? scan(...args) : command === "link" ? linkMapped(...args) : command === "expand-dispatch" ? await expandDispatch(...args) : command === "pin-dispatch" ? await pinExpanded(...args) : command === "seal" ? sealRecovery(...args) : command === "validate" ? validateRecovery(...args) : null;
-    if (!result) throw new Error("expected scan CONFIG NEW_OUT, link SCAN_ROOT PARENT_RUN LINKS, expand-dispatch SCAN_ROOT PARENT_RUN, pin-dispatch SCAN_ROOT, seal SCAN_ROOT PARENT_RUN, or validate SCAN_ROOT PARENT_RUN");
+    const result = command === "scan" ? scan(...args) : command === "link" ? linkMapped(...args) : command === "expand-dispatch" ? await expandDispatch(...args) : command === "retry-sources" ? await collectRetrySources(...args) : command === "pin-dispatch" ? await pinExpanded(...args) : command === "seal" ? sealRecovery(...args) : command === "validate" ? validateRecovery(...args) : null;
+    if (!result) throw new Error("expected scan CONFIG NEW_OUT, link SCAN_ROOT PARENT_RUN LINKS, expand-dispatch SCAN_ROOT PARENT_RUN, retry-sources HISTORY_ROOT NEW_OUT, pin-dispatch SCAN_ROOT, seal SCAN_ROOT PARENT_RUN, or validate SCAN_ROOT PARENT_RUN");
     process.stdout.write(JSON.stringify(result, null, 2) + "\n");
   } catch (error) { process.stderr.write(scrub(error.message) + "\n"); process.exitCode = 2; }
 }

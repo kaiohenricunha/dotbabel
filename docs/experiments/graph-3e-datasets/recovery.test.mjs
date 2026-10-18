@@ -3,8 +3,8 @@ import { test } from "node:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { toolEvents, rosterCalls, linkFailure, scan, reviewOpportunities, pinnedDispatch, sanitizeJSON, sealRecovery, validateRecovery } from "./recovery.mjs";
-import { collect, stage, finalize, seal } from "./prepare.mjs";
+import { toolEvents, rosterCalls, linkFailure, scan, reviewOpportunities, pinnedDispatch, sanitizeJSON, sealRecovery, validateRecovery, retrySourceCandidates, collectRetrySources } from "./recovery.mjs";
+import { collect, stage, finalize, seal, save } from "./prepare.mjs";
 
 const sha = "a".repeat(40);
 const record = (type, content, extra = {}) => ({ type, timestamp: "2026-10-13T10:00:00Z",
@@ -14,6 +14,39 @@ const call = { type: "tool_use", name: "Bash", id: "call-1", input: {
 const result = { type: "tool_result", tool_use_id: "call-1", content: "1 hard leg(s) failed: lint.\nexit=1" };
 const receipt = { repo: "owner/repo", pr: 1, head_sha: sha, phase: "local-attest", attempt: 1,
   receipt_n: 1, at: "2026-10-13T10:05:00Z" };
+
+test("indexes possible original retry sources without manufacturing attempts or labels", () => {
+  const node = { number: 1, url: "https://github.com/owner/repo/pull/1", body: "npm run attest: 1 hard leg(s) failed: lint.",
+    comments: { nodes: [{ databaseId: 2, url: "comment-url", body: "CI failed, fixed later." },
+      { databaseId: 3, url: "log-url", body: "local-attest: FAIL original output" }] } };
+  const rows = retrySourceCandidates("owner/repo", node, "batch.json");
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map(r => r.kind), ["body", "comment"]);
+  assert.ok(rows.every(r => r.eligible === false && r.reason === "requires_original_log_head_phase_and_consecutive_counter_audit"));
+  assert.ok(rows.every(r => !("label" in r) && !("attempt" in r)));
+});
+
+test("collects complete retry source pages privately and retains pagination gaps", async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "graph-retry-source-test-"));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const parent = path.join(root, "parent"), bin = path.join(root, "bin"); fs.mkdirSync(bin);
+  save(path.join(parent, "collection-config.json"), JSON.stringify({ repositories: [{ name: "owner/repo" }] }));
+  save(path.join(parent, "sources/owner--repo-prs.json"), JSON.stringify([{ number: 1 }, { number: 2 }]));
+  const node = n => ({ number: n, url: `https://github.com/owner/repo/pull/${n}`, body: "local-attest FAIL\nTOKEN=canary-secret",
+    comments: { pageInfo: { hasNextPage: n === 2 }, nodes: [] } });
+  const response = { data: { repository: { pr1: node(1), pr2: node(2) } } };
+  fs.writeFileSync(path.join(bin, "gh"), `#!${process.execPath}\nprocess.stdout.write(${JSON.stringify(JSON.stringify(response))});`, { mode: 0o700 });
+  const oldPath = process.env.PATH; process.env.PATH = `${bin}${path.delimiter}${oldPath}`;
+  t.after(() => { process.env.PATH = oldPath; });
+  const out = path.join(root, "out"), result = await collectRetrySources(parent, out);
+  assert.equal(result.inspected_prs, 2); assert.equal(result.unknown, 1);
+  assert.equal(result.possible_sources, 2); assert.equal(result.verified_labels_added, 0);
+  const manifest = JSON.parse(fs.readFileSync(path.join(out, "source-manifest.json"), "utf8"));
+  assert.ok(manifest.files.length >= 3);
+  assert.ok(!fs.readFileSync(path.join(out, "batches/owner--repo-0.json"), "utf8").includes("canary-secret"));
+  assert.equal(fs.statSync(out).mode & 0o777, 0o700);
+  await assert.rejects(() => collectRetrySources(parent, out), /output must be new/);
+});
 
 test("scrubs parsed string values without breaking escaped JSON syntax", () => {
   const input = { body: 'API_KEY="canary-secret"\nTail', nested: ['TOKEN="another-canary"'], count: 1 };
