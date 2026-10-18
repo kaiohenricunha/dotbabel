@@ -1,0 +1,13 @@
+# Adaptive session routing classifier checkpoint
+
+The full implementation goal remains open. Local work continues under the direct goal continuation; the previous push/merge grant expires 2026-10-18 00:31:31 UTC and is inactive. No new remote write, push or merge is authorized by this checkpoint.
+
+Worktree `.claude/worktrees/adaptive-session-routing-classifier`, branch `feat/adaptive-session-routing-classifier`, starts from origin/main ec60c11 and incorporates local resolver/activation dependency 396ede5. Node dependencies are reused through a symlink; no installation runs concurrently with verification. Resolver follow-up dfbd8c5 still needs integration before PR quality so its read-boundary coverage is present.
+
+AR-2 now has a local deterministic classifier with bounded supplied context, semantic capability and separate effort intent, explicit uncertainty and no provider/model names. TDD starts with a missing-module failure, then reproduces inline/truncated example handling, null-context acceptance and underclassification of a context-free design request. All are corrected. Thirty-four tests pass, including ordinary prompts without structured metadata, risk/consequence independence, recent failures, repeated quoted and negated examples, invalid values and byte boundaries.
+
+The lexical/contextual comparison uses ten authored fixtures: 5/10 versus 10/10 agreement, respectively. It is not held-out accuracy, calibrated confidence or measured model quality. No model-assisted provider call runs. The report and reproducible script are under docs/experiments and experiments/adaptive-session-routing-classifier. Source text is not scanned from a repository or sent to another provider.
+
+Mutation progresses from 60.00% to 78.26%, 83.70%, 83.97%, then 87.23% after meaningful boundary tests. Final evidence: 321 killed, 47 surviving, zero uncovered, zero timeout, 8.54 tests per mutant, zero surviving mutants with zero completed tests. Threshold remains 85. AR-AC-15 activates only the independent semantic-axis criterion. AR-AC-1/2/15 pass; real routing criteria remain planned.
+
+Next: integrate dfbd8c5, run lint/PR quality, review the local unit and commit proof. Then implement AR-3 through the existing shared resolver: independent manual axes and native effort evidence, model/input compatibility, uncertainty/stale/unsupported fallback, binding floors and hysteresis. Preserve original input/attachments, turn decisions, subagents, approvals and sandbox settings. P-12 through P-23 and both real runtime integrations remain part of the full goal. PR #496 still needs review closeout, deferred-plan disposition, fresh review-complete evidence and an authorized merge despite its passing head CI.

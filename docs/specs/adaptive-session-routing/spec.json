@@ -364,6 +364,31 @@
         "format": "junit-xml",
         "path": ".dotbabel/criteria/AR-AC-14.junit.xml"
       }
+    },
+    {
+      "id": "AC-15",
+      "status": "active",
+      "given": "bounded local task context",
+      "when": "the classifier evaluates tasks with distinct risk and verification characteristics",
+      "then": "capability demand and effort intent remain independent without selecting a native model",
+      "tests": [
+        {
+          "file": "plugins/dotbabel/tests/adaptive-session-routing-classifier.test.mjs",
+          "name": "changes model capability and effort intent independently"
+        }
+      ],
+      "argv": [
+        "npx",
+        "vitest",
+        "run",
+        "plugins/dotbabel/tests/adaptive-session-routing-classifier.test.mjs",
+        "--reporter=junit",
+        "--outputFile=.dotbabel/criteria/AR-AC-15.junit.xml"
+      ],
+      "report": {
+        "format": "junit-xml",
+        "path": ".dotbabel/criteria/AR-AC-15.junit.xml"
+      }
     }
   ]
 }

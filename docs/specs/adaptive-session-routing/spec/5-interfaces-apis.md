@@ -21,6 +21,19 @@ Both default to false. A routing preference alone does not enable the engine. Di
 
 `classify({prompt, context})` returns semantic requirement, separate effort intent, confidence, characteristics and stable reason codes. No native model name appears in classification output.
 
+The initial local classifier accepts at most 16,384 prompt bytes and a strict supplied context object
+bounded to 4,096 serialized bytes. Context fields are `componentCount` (0–64), `priorFailures` (0–20),
+`specification` (`present|absent|unknown`), `risk` and `consequence` (`low|medium|high|unknown`),
+`ambiguity` (`low|medium|high|unknown`), and `verification` (`simple|integration|adversarial|unknown`).
+It does not load that context from a repository or infer missing fields as verified facts.
+
+`status` is `classified`, `uncertain` or `invalid`. A classified result carries a normalized dynamic
+session requirement and a separate semantic `effortIntent` (`low|medium|high`). These effort labels
+are not assumed to be native runtime values. Adapters must map them against verified support.
+Confidence describes rule/input certainty; it is not calibrated task-success or model-quality
+probability. Structured diagnostics never echo rejected prompt/context contents. Quoted examples and
+negated clauses do not automatically raise demand; relevant failure facts belong in supplied context.
+
 `route({activation, classification, resolverInput, current, manual, runtimeCapability})` returns a decision, selected configuration, observed configuration, confidence, reasons and diagnostics. `current` is not automatically manual: `manual` tracks explicit selections per axis where the harness exposes provenance. Unknown provenance preserves the affected axis.
 
 `apply(decision, originalSubmission)` is runtime-specific and called once before execution. Requested, accepted and observed effective configurations are separate states. A successful submission acknowledgement alone does not prove the actual model.
