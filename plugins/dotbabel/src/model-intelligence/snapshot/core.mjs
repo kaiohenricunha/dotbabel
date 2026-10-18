@@ -72,7 +72,14 @@ export function validateSnapshot(snapshot) {
  */
 export function snapshotCatalog(snapshot) {
   validateSnapshot(snapshot);
-  return { scope: "release", sources: snapshot.sources.map(source => ({ ...source })), models: [], runtimes: Object.entries(snapshot.runtimes).map(([runtimeId, runtime]) => ({ runtimeId, models: runtime.models.map(model => ({ model: model.model, fields: Object.fromEntries(Object.entries(model.fields).map(([key, entries]) => [key, entries.map(entry => ({ ...structuredClone(entry), freshness: "fresh", availability: "available", refresh: "idle" }))])) })) })) };
+  const accepted = entry => ({ ...structuredClone(entry), freshness: "fresh", availability: "available", refresh: "idle" });
+  const runtimes = Object.entries(snapshot.runtimes).map(([runtimeId, runtime]) => ({ runtimeId, models: runtime.models.map(model => {
+    const fields = Object.fromEntries(Object.entries(model.fields).map(([key, entries]) => [key, entries.map(accepted)]));
+    // Inclusion in reviewed release inputs is separate from a native picker's live listed state.
+    fields.releaseEligibility = model.fields.id.map(entry => ({ ...accepted(entry), value: "eligible" }));
+    return { model: model.model, fields };
+  }) }));
+  return { scope: "release", sources: snapshot.sources.map(source => ({ ...source })), models: [], runtimes };
 }
 
 /**

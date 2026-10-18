@@ -6,6 +6,8 @@ import { createSnapshot, validateSnapshot, snapshotCatalog, releaseSnapshotStatu
 import { acquireLock } from "../src/lib/process-lock.mjs";
 import { canonicalJson, hashContent } from "../src/model-intelligence/materialize/manifest.mjs";
 import * as anthropic from "../src/model-intelligence/sources/knowledge/anthropic.mjs";
+import { resolve as resolveCompute } from "../src/model-intelligence/resolver/index.mjs";
+import { mergePolicy, SHIPPED_POLICY } from "../src/model-intelligence/policy/index.mjs";
 import { EFFORT_INTENTS } from "../src/model-intelligence/domain/index.mjs";
 import { descriptor } from "../src/model-intelligence/sources/runtime/claude.mjs";
 
@@ -237,4 +239,34 @@ it("refuses a required release configuration supported only by low-confidence ev
   const data = inputs(); for (const entries of Object.values(data.runtimes.claude.models[0].fields)) for (const entry of entries) entry.confidence = "low";
   const result = checkReleaseRequirements(createSnapshot(data), [{ runtimeId: "claude", artifactKind: "agent", requirement: { requirement: "deep", mode: "floor", binding: "self" } }]);
   expect(result.valid).toBe(false); expect(result.diagnostics).toEqual([{ code: "release_requirement_unsatisfied" }]);
+});
+
+
+describe("protected review regressions", () => {
+  it.each(["adapterVersion", "sourceVersion"])("does not renew accepted provenance from a changed %s", async axis => {
+    const seed = readSnapshot(); const target = file(); const previous = serializeSnapshot(seed); fs.writeFileSync(target, previous);
+    const observe = async ({ model }) => ({ status: "ok", provenance: { ...seed.runtimes.claude.provenance, [axis]: "UNREVIEWED-NEXT" }, observedAt: "2026-10-18T12:00:00.000Z", evidence: { axes: { model: seed.runtimes.claude.models.find(row => row.model === model).fields.canonicalModel[0].value }, turnExecuted: false, runtimeVersion: seed.runtimes.claude.provenance.sourceVersion } });
+    await expect(updateSnapshot({ file: target, collect: () => collectReleaseEvidence(seed, { observe }), write: true, now: "2026-10-18T12:00:01.000Z" })).rejects.toThrow("release_source_unavailable");
+    expect(fs.readFileSync(target, "utf8")).toBe(previous);
+  });
+  it("resolves an unpinned floor from the committed accepted release selectors", () => {
+    const saved = readSnapshot(); const request = { runtimeId: "claude", artifactKind: "agent", requirement: { requirement: "deep", mode: "floor", binding: "self" } };
+    const result = checkReleaseRequirements(saved, [request]); expect(result.valid).toBe(true);
+    expect(result.results[0].configuration.axes.model).toEqual(expect.any(String));
+    const catalog = snapshotCatalog(saved);
+    expect(catalog.runtimes[0].models.every(model => model.fields.releaseEligibility[0].value === "eligible")).toBe(true);
+    expect(catalog.runtimes[0].models.every(model => model.fields.selectionVisibility === undefined)).toBe(true);
+    const live = resolveCompute({ requirement: request.requirement, target: { runtimeId: "claude", artifactKind: "agent" }, policy: mergePolicy({ shipped: SHIPPED_POLICY }), runtimeContract: descriptor, catalog: { ...catalog, scope: "live" } });
+    expect(live.status).toBe("unresolved"); expect(live.diagnostics[0].code).toBe("ordinary_selection_unverified");
+  });
+  it.each([".dotbabel-projection.lock", ".dotbabel-projection.json", ".dotbabel-projection.pending.json", ".dotbabel-claude-companions.json"])("refuses coordination destination %s before collecting or acquiring a lock", async name => {
+    const root = makeTempDir("mi-snapshot-reserved-"); const target = path.join(root, name); const isLock = name.endsWith(".lock");
+    if (!isLock) fs.writeFileSync(target, "coordination metadata");
+    const collect = vi.fn(async () => inputs());
+    await expect(updateSnapshot({ file: target, collect, write: true })).rejects.toThrow("snapshot_destination_reserved");
+    expect(collect).not.toHaveBeenCalled();
+    if (!isLock) expect(fs.readFileSync(target, "utf8")).toBe("coordination metadata");
+    expect(fs.existsSync(path.join(root, ".dotbabel-projection.lock"))).toBe(false);
+    expect((await updateSnapshot({ file: path.join(root, "normal.json"), collect, write: true })).written).toBe(true);
+  });
 });

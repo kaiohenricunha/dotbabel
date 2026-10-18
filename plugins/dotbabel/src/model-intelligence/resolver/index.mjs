@@ -41,7 +41,7 @@ export function resolve(input) {
     let available = modelPinned ? allCandidates.filter(c => c.model === pinnedAxes.model) : allCandidates;
     if (!available.length) return unresolved("pin_unavailable");
     if (constraints.ordinarySelection) {
-      available = available.filter(c => c.selectionEvidence?.value === "listed");
+      available = available.filter(c => c.selectionEligible === true);
       if (!available.length) return unresolved("ordinary_selection_unverified");
     }
     if (modelPinned && !available.some(c => constraints.requirement === undefined || c.classes.includes(constraints.requirement))) {

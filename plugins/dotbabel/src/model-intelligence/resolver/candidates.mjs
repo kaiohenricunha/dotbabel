@@ -73,8 +73,10 @@ export function candidates(input, relevantModels) {
     const defaultLevel = field(fields.defaultReasoningLevel, preferences);
     const reasoning = levels.some(e => e.effort === defaultLevel?.value) ? defaultLevel.value : undefined;
     const axes = { model: record.model, ...(reasoning === undefined ? {} : { reasoning }) };
-    const selectionEvidence = field(fields.selectionVisibility, preferences);
+    const releaseSelection = input.catalog.scope === "release";
+    const selectionEvidence = field(releaseSelection ? fields.releaseEligibility : fields.selectionVisibility, preferences);
+    const selectionEligible = selectionEvidence?.value === (releaseSelection ? "eligible" : "listed");
     const modalityEvidence = field(fields.inputModalities, preferences);
-    return [configureCandidate({ model: record.model, classes, classStates, capabilities: caps, levels, baseEvidence: [identity, capability, supported].filter(Boolean), defaultEvidence: defaultLevel, selectionEvidence, modalityEvidence, provenance: identity.provenance, representation: "native-id" }, axes)];
+    return [configureCandidate({ model: record.model, classes, classStates, capabilities: caps, levels, baseEvidence: [identity, capability, supported].filter(Boolean), defaultEvidence: defaultLevel, selectionEvidence, selectionEligible, modalityEvidence, provenance: identity.provenance, representation: "native-id" }, axes)];
   });
 }

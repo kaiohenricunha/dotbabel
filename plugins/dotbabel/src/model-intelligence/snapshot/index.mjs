@@ -11,11 +11,17 @@ export { createSnapshot, validateSnapshot, snapshotCatalog, releaseSnapshotStatu
 /** One published, source-controlled release input. */
 export const DEFAULT_SNAPSHOT_PATH = fileURLToPath(new URL("./release-capabilities.json", import.meta.url));
 const fail = code => Object.assign(new Error(code), { code });
+const RESERVED_DESTINATIONS = new Set([".dotbabel-projection.lock", ".dotbabel-projection.json", ".dotbabel-projection.pending.json", ".dotbabel-claude-companions.json"]);
+function snapshotLocation(file) {
+  const target = path.resolve(file); const name = path.basename(target);
+  if (RESERVED_DESTINATIONS.has(name)) throw fail("snapshot_destination_reserved");
+  return { root: path.dirname(target), name };
+}
 
 /** @param {string} [file] Snapshot location. @returns {object} Validated offline release data. */
 export function readSnapshot(file = DEFAULT_SNAPSHOT_PATH) {
-  const tree = openProjectionTree(path.dirname(path.resolve(file)));
-  try { const text = tree.read(path.basename(file)); if (text === null) throw fail("snapshot_unavailable"); let data; try { data = JSON.parse(text); } catch { throw fail("snapshot_invalid"); } return validateSnapshot(data); }
+  const { root, name } = snapshotLocation(file); const tree = openProjectionTree(root);
+  try { const text = tree.read(name); if (text === null) throw fail("snapshot_unavailable"); let data; try { data = JSON.parse(text); } catch { throw fail("snapshot_invalid"); } return validateSnapshot(data); }
   finally { tree.close(); }
 }
 
@@ -26,10 +32,10 @@ export function readSnapshot(file = DEFAULT_SNAPSHOT_PATH) {
  * @returns {Promise<object>} Candidate and previous identities, changed/written state and serialized diff.
  */
 export async function updateSnapshot({ file = DEFAULT_SNAPSHOT_PATH, collect, write = false, now, requirements = [], policy } = {}) {
-  const tree = openProjectionTree(path.dirname(path.resolve(file))); let lock;
+  const { root, name } = snapshotLocation(file); const tree = openProjectionTree(root); let lock;
   try {
     lock = acquireLock(tree.lockPath, { resource: "release-snapshot" }); if (!lock.acquired) throw fail("snapshot_locked");
-    const name = path.basename(file); const previous = tree.read(name);
+    const previous = tree.read(name);
     const snapshot = createSnapshot(await collect());
     if (!checkReleaseRequirements(snapshot, requirements, policy).valid) throw fail("release_requirement_unsatisfied");
     const status = releaseSnapshotStatus(snapshot, { now: now ?? new Date().toISOString() }); if (!status.valid) throw fail(status.reason);
@@ -60,7 +66,7 @@ export async function collectReleaseEvidence(seed, { observe = observeClaude, ti
     if (remaining <= 0) throw fail("release_source_timeout");
     const observed = await observe({ model: model.model, timeoutMs: remaining });
     const canonical = model.fields.canonicalModel?.[0]?.value ?? model.model;
-    if (observed?.status !== "ok" || observed.evidence?.turnExecuted !== false || observed.evidence.axes?.model !== canonical || observed.evidence.runtimeVersion !== runtime.provenance.sourceVersion || observed.provenance?.sourceId !== "claude" || observed.provenance.sourceKind !== "runtime" || !Number.isFinite(Date.parse(observed.observedAt))) throw fail("release_source_unavailable");
+    if (observed?.status !== "ok" || observed.evidence?.turnExecuted !== false || observed.evidence.axes?.model !== canonical || observed.evidence.runtimeVersion !== runtime.provenance.sourceVersion || ["sourceId", "sourceKind", "sourceVersion", "adapterVersion"].some(key => observed.provenance?.[key] !== runtime.provenance[key]) || !Number.isFinite(Date.parse(observed.observedAt))) throw fail("release_source_unavailable");
     observations.push(observed.observedAt);
   }
   // The oldest observation bounds a batch that does not occur at one instant.
