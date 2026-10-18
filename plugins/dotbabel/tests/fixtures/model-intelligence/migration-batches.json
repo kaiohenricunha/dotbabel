@@ -725,6 +725,168 @@
         "model": "sonnet"
       },
       "bodyHash": "c4222e1de2cc1931c9bfdc747a35e9a8d6734f3511f226b9b3351a7c74d3b6f5"
+    },
+    {
+      "sourcePath": "agents/security-auditor.md",
+      "artifactKind": "agent",
+      "category": "A",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "security-auditor",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["security"],
+        "platform": ["none"],
+        "task": ["review", "diagnostics"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "security-auditor",
+        "description": "Use when conducting security audits, reviewing code for vulnerabilities, assessing secrets exposure, or evaluating compliance posture. Triggers on: \"audit security\", \"find vulnerabilities\", \"check secrets\", \"OWASP review\", \"security scan\", \"CVE\", \"threat model\". Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.\n",
+        "tools": "Read, Grep, Glob",
+        "model": "opus",
+        "skills": ["security-review"]
+      },
+      "bodyHash": "0f44ce839c3fac6543b53e7555f1a49cfa9d874ef1df802dcfd9a865d6fc8c6d"
+    },
+    {
+      "sourcePath": "agents/security-engineer.md",
+      "artifactKind": "agent",
+      "category": "A",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "security-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["security", "infra"],
+        "platform": ["kubernetes"],
+        "task": ["review", "provisioning"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "security-engineer",
+        "description": "Use when hardening infrastructure security posture, reviewing network policies, managing secrets, or assessing supply-chain risks. Triggers on: \"infrastructure hardening\", \"network policy\", \"secrets management\", \"RBAC\", \"admission controller\", \"mTLS\", \"supply chain\", \"image signing\", \"privilege escalation\", \"security posture\". Uses opus — infrastructure hardening and privilege analysis require deep reasoning; a missed vector has high downstream cost.\n",
+        "tools": "Read, Grep, Glob, Bash",
+        "model": "opus",
+        "skills": ["security-review"]
+      },
+      "bodyHash": "daa764c9f57bbc56e1bae38dca7d1550310683032419f26ffb71b0353f6613b8"
+    },
+    {
+      "sourcePath": "skills/security-review/SKILL.md",
+      "artifactKind": "skill",
+      "category": "A",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "security-review",
+        "name": "security-review",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex", "security"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes. Triggers on: \"security review\", \"check for secrets\", \"vulnerability scan\".\n",
+        "argument-hint": "[PR# | path | staged]",
+        "tools": "Bash, Read, Grep",
+        "allowed-tools": "Read Grep Bash",
+        "model": "opus"
+      },
+      "bodyHash": "f3884f8d9fe58ad7beb23616dd2638801a3f171b25d1de7ddf42750f12d4228b"
+    },
+    {
+      "sourcePath": "skills/veracity-audit/SKILL.md",
+      "artifactKind": "skill",
+      "category": "A",
+      "compute": {
+        "mode": "pin",
+        "requirement": "frontier",
+        "pin": {
+          "runtime": "claude",
+          "config": {
+            "model": "opus",
+            "reasoning": "max"
+          }
+        },
+        "binding": "consumer",
+        "rationale": "Preserve the high-compute integrity-audit pin while worker topology remains unresolved (PB-2)."
+      },
+      "frontmatter": {
+        "id": "veracity-audit",
+        "name": "veracity-audit",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-17",
+        "updated": "2026-04-17",
+        "description": "Audit a data pipeline for Veracity and Value. Dispatches data-scientist, compliance-auditor, and data-engineer agents with project context injected at dispatch time. All source paths are supplied via flags — no defaults, no project assumptions. Subcommands: audit (full pipeline walk), score-check (scoring math only), gate-check (gate coverage only), source-trace <label> (single source end-to-end). Invoke when: \"audit pipeline\", \"veracity check\", \"scoring math correct?\", \"check gates\", \"trace source\", \"verify quality gates\", \"formula correct?\".\n",
+        "argument-hint": "audit | score-check | gate-check | source-trace <label> --config <path> --quality-config <path> --pipeline-dir <path> --scoring-dir <path>",
+        "effort": "max",
+        "model": "opus",
+        "tools": "Read, Grep, Glob, Bash",
+        "allowed-tools": "Read Grep Glob Bash Agent"
+      },
+      "bodyHash": "1c9e7fd1d63fad5ba779b2984a480564a0cd33b1716e6e878cea8d614a69c60a"
+    },
+    {
+      "sourcePath": "skills/rollback-prod/SKILL.md",
+      "artifactKind": "skill",
+      "category": "A",
+      "compute": {
+        "mode": "pin",
+        "requirement": "routine",
+        "pin": {
+          "runtime": "claude",
+          "config": {
+            "model": "sonnet",
+            "reasoning": "medium"
+          }
+        },
+        "binding": "consumer",
+        "rationale": "Preserve the explicit selector for a fixed rollback workflow and its typed human confirmation (PB-3)."
+      },
+      "frontmatter": {
+        "id": "rollback-prod",
+        "name": "rollback-prod",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra", "devex"],
+        "platform": ["vercel", "flyio", "aws"],
+        "task": ["debugging", "incident-response"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-05",
+        "updated": "2026-05-05",
+        "description": "Roll back the most recent production release across configured deploy targets after an explicit typed confirmation. Use only when the user directly invokes /rollback-prod during incident response or release recovery.\n",
+        "argument-hint": "[--dry-run]",
+        "tools": "Bash, Read, Grep, Glob",
+        "model": "sonnet",
+        "effort": "medium",
+        "disable-model-invocation": true,
+        "user-invocable": true
+      },
+      "bodyHash": "8c3f02328b751db6c41b27614a51f683178b0c252fb4516e3624961a624cf3e3"
     }
   ],
   "neutral": {
@@ -748,5 +910,6 @@
       "user-invocable": true
     },
     "bodyHash": "2e619036b2c245fc211aafb1315be95b12d793806ca286824581d6d1ac94a1b3"
-  }
+  },
+  "securityOriginalCommit": "8827df12b990a3aa7cd9e61232a8003f3dcab037"
 }

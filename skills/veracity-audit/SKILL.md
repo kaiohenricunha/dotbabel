@@ -3,27 +3,35 @@ id: veracity-audit
 name: veracity-audit
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - testing
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-17
-updated: 2026-04-17
-description: >
-  Audit a data pipeline for Veracity and Value. Dispatches data-scientist,
-  compliance-auditor, and data-engineer agents with project context injected
-  at dispatch time. All source paths are supplied via flags — no defaults,
-  no project assumptions.
-  Subcommands: audit (full pipeline walk), score-check (scoring math only),
-  gate-check (gate coverage only), source-trace <label> (single source end-to-end).
-  Invoke when: "audit pipeline", "veracity check", "scoring math correct?",
-  "check gates", "trace source", "verify quality gates", "formula correct?".
-argument-hint: "audit | score-check | gate-check | source-trace <label> --config <path> --quality-config <path> --pipeline-dir <path> --scoring-dir <path>"
+created: 2026-04-17T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Audit a data pipeline for Veracity and Value. Dispatches data-scientist, compliance-auditor, and data-engineer agents with project context injected at dispatch time. All source paths are supplied via flags — no defaults, no project assumptions. Subcommands: audit (full pipeline walk), score-check (scoring math only), gate-check (gate coverage only), source-trace <label> (single source end-to-end). Invoke when: "audit pipeline", "veracity check", "scoring math correct?", "check gates", "trace source", "verify quality gates", "formula correct?".
+argument-hint: audit | score-check | gate-check | source-trace <label> --config <path> --quality-config <path> --pipeline-dir <path> --scoring-dir <path>
 effort: max
 model: opus
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash Agent
+dotbabel:
+  compute:
+    mode: pin
+    requirement: frontier
+    pin:
+      runtime: claude
+      config:
+        model: opus
+        reasoning: max
+    binding: consumer
+    rationale: Preserve the high-compute integrity-audit pin while worker topology remains unresolved (PB-2).
 ---
 
 # Veracity Audit

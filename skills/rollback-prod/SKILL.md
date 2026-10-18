@@ -3,23 +3,39 @@ id: rollback-prod
 name: rollback-prod
 type: skill
 version: 1.0.0
-domain: [infra, devex]
-platform: [vercel, flyio, aws]
-task: [debugging, incident-response]
+domain:
+  - infra
+  - devex
+platform:
+  - vercel
+  - flyio
+  - aws
+task:
+  - debugging
+  - incident-response
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-05-05
-updated: 2026-05-05
-description: >
-  Roll back the most recent production release across configured deploy targets
-  after an explicit typed confirmation. Use only when the user directly invokes
-  /rollback-prod during incident response or release recovery.
+created: 2026-05-05T00:00:00.000Z
+updated: 2026-05-05T00:00:00.000Z
+description: |
+  Roll back the most recent production release across configured deploy targets after an explicit typed confirmation. Use only when the user directly invokes /rollback-prod during incident response or release recovery.
 argument-hint: "[--dry-run]"
 tools: Bash, Read, Grep, Glob
 model: sonnet
 effort: medium
 disable-model-invocation: true
 user-invocable: true
+dotbabel:
+  compute:
+    mode: pin
+    requirement: routine
+    pin:
+      runtime: claude
+      config:
+        model: sonnet
+        reasoning: medium
+    binding: consumer
+    rationale: Preserve the explicit selector for a fixed rollback workflow and its typed human confirmation (PB-3).
 ---
 
 # Rollback Prod

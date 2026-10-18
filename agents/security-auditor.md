@@ -2,23 +2,29 @@
 id: security-auditor
 type: agent
 version: 1.0.0
-domain: [security]
-platform: [none]
-task: [review, diagnostics]
+domain:
+  - security
+platform:
+  - none
+task:
+  - review
+  - diagnostics
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: security-auditor
-description: >
-  Use when conducting security audits, reviewing code for vulnerabilities,
-  assessing secrets exposure, or evaluating compliance posture. Triggers on:
-  "audit security", "find vulnerabilities", "check secrets", "OWASP review",
-  "security scan", "CVE", "threat model".
-  Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.
+description: |
+  Use when conducting security audits, reviewing code for vulnerabilities, assessing secrets exposure, or evaluating compliance posture. Triggers on: "audit security", "find vulnerabilities", "check secrets", "OWASP review", "security scan", "CVE", "threat model". Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.
 tools: Read, Grep, Glob
 model: opus
-skills: [security-review]
+skills:
+  - security-review
+dotbabel:
+  compute:
+    mode: floor
+    requirement: frontier
+    binding: self
 ---
 
 You are a senior security auditor specializing in application security, secrets management, and compliance validation. You operate read-only — you surface findings and recommendations but do not modify code.
