@@ -22,29 +22,38 @@ export function resolve(input) {
     const explanation = constraints.reasons;
     if (!constraints.requirement && !constraints.pin) return failure("unresolved", "runtime_inheritance_preserved", explanation);
     const allCandidates = candidates(input);
-    if (!allCandidates.length) return failure("unresolved", constraints.pin ? "pin_unavailable" : "insufficient_capability_evidence", explanation);
+    const unresolved = code => {
+      const result = failure("unresolved", code, explanation);
+      const observed = enforcement(input, constraints, undefined, allCandidates);
+      if (observed.basis === "session-observation") {
+        result.enforcement = { state: observed.state, basis: observed.basis };
+        result.explanation.push({ code: observed.reason, message: observed.reason });
+      }
+      return result;
+    };
+    if (!allCandidates.length) return unresolved(constraints.pin ? "pin_unavailable" : "insufficient_capability_evidence");
     const pinnedAxes = constraints.pin?.config ?? {};
     const modelPinned = pinnedAxes.model !== undefined;
-    if (constraints.pin && !modelPinned && !constraints.manualOverrides) return failure("unresolved", "pin_unavailable", explanation);
-    if (!constraints.requirement && !modelPinned) return failure("unresolved", "runtime_inheritance_preserved", explanation);
+    if (constraints.pin && !modelPinned && !constraints.manualOverrides) return unresolved("pin_unavailable");
+    if (!constraints.requirement && !modelPinned) return unresolved("runtime_inheritance_preserved");
     let available = modelPinned ? allCandidates.filter(c => c.model === pinnedAxes.model) : allCandidates;
-    if (!available.length) return failure("unresolved", "pin_unavailable", explanation);
+    if (!available.length) return unresolved("pin_unavailable");
     if (constraints.ordinarySelection) {
       available = available.filter(c => c.selectionEvidence?.value === "listed");
-      if (!available.length) return failure("unresolved", "ordinary_selection_unverified", explanation);
+      if (!available.length) return unresolved("ordinary_selection_unverified");
     }
     if (modelPinned && !available.some(c => constraints.requirement === undefined || c.classes.includes(constraints.requirement))) {
-      return available.some(c => c.classStates[constraints.requirement] === false) ? failure("conflict", "pin_floor_conflict", explanation) : failure("unresolved", "insufficient_capability_evidence", explanation);
+      return available.some(c => c.classStates[constraints.requirement] === false) ? failure("conflict", "pin_floor_conflict", explanation) : unresolved("insufficient_capability_evidence");
     }
     available = available.filter(c => constraints.requirement === undefined || c.classes.includes(constraints.requirement));
-    if (!available.length) return failure("unresolved", "insufficient_capability_evidence", explanation);
+    if (!available.length) return unresolved("insufficient_capability_evidence");
     const requiredCapabilities = Object.entries(constraints.requiredCapabilities);
     if (modelPinned && available.some(c => requiredCapabilities.some(([key, expected]) => Object.hasOwn(c.capabilities, key) && c.capabilities[key] !== expected))) return failure("conflict", "pin_capability_conflict", explanation);
     available = available.filter(c => requiredCapabilities.every(([key, expected]) => Object.hasOwn(c.capabilities, key) && c.capabilities[key] === expected));
-    if (!available.length) return failure("unresolved", "required_capability_unavailable", explanation);
+    if (!available.length) return unresolved("required_capability_unavailable");
     if (constraints.requiredModalities.length) {
       available = available.filter(c => Array.isArray(c.modalityEvidence?.value) && constraints.requiredModalities.every(modality => c.modalityEvidence.value.includes(modality)));
-      if (!available.length) return failure("unresolved", "input_modality_unavailable", explanation);
+      if (!available.length) return unresolved("input_modality_unavailable");
     }
     const supportedAxes = (input.runtimeContract.capabilities ?? input.runtimeContract).invocation?.axes ?? {};
     if (Object.keys(pinnedAxes).length) {
@@ -63,7 +72,7 @@ export function resolve(input) {
       const evidence = [...(constraints.ordinarySelection ? [c.selectionEvidence] : []), ...(constraints.requiredModalities.length ? [c.modalityEvidence] : [])];
       return [configureCandidate(c, axes, evidence)];
     });
-    if (!available.length) return failure("unresolved", "effort_intent_unavailable", explanation);
+    if (!available.length) return unresolved("effort_intent_unavailable");
     const rank = c => Math.max(...c.classes.map(level => WORKLOAD_CLASSES.indexOf(level)));
     available.sort((a, b) => (input.policy.preferences?.prefer_fresher_evidence === false ? 0 : a.freshness - b.freshness) || rank(a) - rank(b) || (a.model > b.model ? 1 : a.model < b.model ? -1 : 0));
     const selected = available[0];

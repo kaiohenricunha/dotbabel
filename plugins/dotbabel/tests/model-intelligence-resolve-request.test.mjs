@@ -89,6 +89,16 @@ describe("read-only resolution file boundaries", () => {
     expect(value).toMatchObject({ exitCode: 1, result: { status: "invalid", diagnostics: [{ code: "invalid_model_intelligence_policy" }] } });
     expect(JSON.stringify(value)).not.toContain("private-policy-marker");
   });
+  it("rejects a repository class-table override instead of redefining the user's floor", () => {
+    const { repoRoot, request } = fixture();
+    mkdirSync(join(repoRoot, "config", "dotbabel"), { recursive: true });
+    writeFileSync(join(repoRoot, "config", "dotbabel", "model-intelligence.json"), JSON.stringify({ floor: { mode: "floor", requirement: "frontier" } }));
+    expect(resolveRequest(request).result.status).toBe("unresolved");
+    writeFileSync(join(repoRoot, ".dotbabel.json"), JSON.stringify({ model_intelligence: { classes: { frontier: { satisfied_by: {} } } } }));
+    const value = resolveRequest(request);
+    expect(value).toMatchObject({ exitCode: 1, result: { status: "invalid", diagnostics: [{ code: "invalid_model_intelligence_policy" }] } });
+    expect(value.result.configuration).toBeUndefined();
+  });
   it("reports unsupported runtime adapters without pretending that a catalog can enable them", () => {
     const { request } = fixture();
     const value = resolveRequest({ ...request, runtimeId: "gemini" });

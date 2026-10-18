@@ -3,7 +3,7 @@
  * Assess an artifact's verified binding, or a supplied as-run session observation.
  * @param {object} input
  * @param {object} constraints
- * @param {object} selected
+ * @param {object|undefined} selected Omit when only assessing an observation after failed selection.
  * @param {object[]} available
  * @returns {{state: string, basis: string, reason: string, diagnostic?: string}}
  */
@@ -11,8 +11,8 @@ export function enforcement(input, constraints, selected, available) {
   const contract = input.runtimeContract.capabilities ?? input.runtimeContract;
   const artifact = contract.binding?.[input.target.artifactKind];
   const mayBind = input.requirement?.mode !== "inherit" && (constraints.binding === "self" || constraints.binding === "session" && input.requirement?.mode === "pin");
-  const axes = Object.keys(selected.axes);
-  if (mayBind && artifact?.support === "supported" && axes.every(axis => artifact.axes?.[axis] === "supported")) {
+  const axes = Object.keys(selected?.axes ?? {});
+  if (selected !== undefined && mayBind && artifact?.support === "supported" && axes.every(axis => artifact.axes?.[axis] === "supported")) {
     return { state: "enforced", basis: "artifact-binding", reason: "artifact_binding_supported" };
   }
   const observed = input.observed;
