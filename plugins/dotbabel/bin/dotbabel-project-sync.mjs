@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * dotbabel-project-sync — repo-local fan-out of CLAUDE.md, .claude/commands,
- * and .claude/skills into Codex / Gemini / Copilot project-scope analogues.
+ * and .claude/skills into Codex / Antigravity / optional Gemini / OpenCode / Copilot project-scope analogues.
  *
  * Flags:
  *   --repo <path>   target repo root (default: cwd)
@@ -24,7 +24,7 @@ const META = {
   name: "dotbabel-project-sync",
   synopsis: "dotbabel-project-sync [OPTIONS]",
   description:
-    "Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex / Gemini / Copilot project-scope analogues.",
+    "Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex / Antigravity / optional Gemini / OpenCode / Copilot project-scope analogues.",
   flags: {
     repo: { type: "string" },
     all: { type: "boolean" },

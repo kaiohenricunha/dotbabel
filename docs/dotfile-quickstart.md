@@ -12,6 +12,12 @@ open in Claude Code. You manage it like any dotfile — pull to update, push to 
 
 ## 1. Clone
 
+Antigravity CLI (`agy`) is the recommended Google runtime for new individual installations.
+Install it with [Google’s guide](https://antigravity.google/docs/cli/install/) before bootstrap.
+Installed Gemini CLI (`gemini`) remains supported for legacy/enterprise use. Bootstrap detects
+both independently; `--all` configures all supported runtimes even when absent.
+See [migration guidance](quickstart.md#google-runtime-migration) for project defaults and safe coexistence.
+
 ```bash
 git clone https://github.com/kaiohenricunha/dotbabel.git ~/projects/dotbabel
 cd ~/projects/dotbabel

@@ -26,6 +26,32 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+@test "agy presence configures Antigravity without Gemini and preserves custom files on rerun" {
+  mkdir -p "$HOME/bin" "$HOME/.gemini/config/skills/custom"
+  printf '#!/bin/sh\nexit 0\n' > "$HOME/bin/agy"
+  chmod +x "$HOME/bin/agy"
+  printf 'user skill\n' > "$HOME/.gemini/config/skills/custom/SKILL.md"
+  printf '{"user":true}\n' > "$HOME/.gemini/settings.json"
+  for attempt in 1 2; do
+    run env -i HOME="$HOME" PATH="$HOME/bin:/usr/bin:/bin" "$BOOT" --quiet
+    [ "$status" -eq 0 ]
+  done
+  [ -L "$HOME/.gemini/config/skills/changelog/SKILL.md" ]
+  [ ! -e "$HOME/.gemini/skills" ]
+  [ "$(cat "$HOME/.gemini/config/skills/custom/SKILL.md")" = "user skill" ]
+  [ "$(cat "$HOME/.gemini/settings.json")" = '{"user":true}' ]
+}
+
+@test "installed Gemini remains supported without Antigravity" {
+  mkdir -p "$HOME/bin"
+  printf '#!/bin/sh\nexit 0\n' > "$HOME/bin/gemini"
+  chmod +x "$HOME/bin/gemini"
+  run env -i HOME="$HOME" PATH="$HOME/bin:/usr/bin:/bin" "$BOOT" --quiet
+  [ "$status" -eq 0 ]
+  [ -L "$HOME/.gemini/skills/changelog/SKILL.md" ]
+  [ ! -e "$HOME/.gemini/config/skills" ]
+}
+
 @test "idempotent: second run reports 'ok:' for existing links" {
   "$BOOT" >/dev/null
   run "$BOOT"

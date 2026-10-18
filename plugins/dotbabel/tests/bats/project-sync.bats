@@ -71,7 +71,8 @@ teardown() {
   [ "$resolved" = "$REPO/.claude/commands/commit.md" ]
 }
 
-@test "project-sync creates Gemini symlinks at .gemini/skills" {
+@test "project-sync creates Gemini symlinks with explicit opt-in" {
+  printf '{"fan_out":["gemini"]}\n' > "$REPO/.dotbabel.json"
   run $PSYNC --repo "$REPO" --all
   [ "$status" -eq 0 ]
   [ -L "$REPO/.gemini/skills/deploy" ]
@@ -148,7 +149,7 @@ teardown() {
 
 # fan_out_layout: shared — one canonical tree, a redirect per CLI (#219, C).
 @test "shared layout: codex and gemini redirect to one .cli/skills tree" {
-  printf '{"fan_out_layout":"shared"}\n' > "$REPO/.dotbabel.json"
+  printf '{"fan_out_layout":"shared","fan_out":["codex","gemini","antigravity","opencode","copilot"]}\n' > "$REPO/.dotbabel.json"
   run $PSYNC --repo "$REPO" --all
   [ "$status" -eq 0 ]
 
