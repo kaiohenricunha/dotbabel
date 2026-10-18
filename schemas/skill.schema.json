@@ -3,26 +3,40 @@
   "$id": "https://dotbabel.dev/schemas/skill.schema.json",
   "title": "dotbabel skill artifact",
   "description": "Shape for skill YAML frontmatter. Phase 1: every field optional.",
-  "allOf": [{ "$ref": "common.schema.json" }],
+  "allOf": [
+    {
+      "$ref": "common.schema.json"
+    }
+  ],
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "type": { "const": "skill" },
+    "type": {
+      "const": "skill"
+    },
     "tools": {
       "oneOf": [
-        { "type": "string" },
+        {
+          "type": "string"
+        },
         {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
     "allowed-tools": {
       "oneOf": [
-        { "type": "string" },
+        {
+          "type": "string"
+        },
         {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
@@ -34,19 +48,33 @@
       "type": "string",
       "enum": ["low", "medium", "max"]
     },
-    "disable-model-invocation": { "type": "boolean" },
+    "disable-model-invocation": {
+      "type": "boolean"
+    },
     "inputs": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "outputs": {
       "type": "array",
-      "items": { "type": "string" }
+      "items": {
+        "type": "string"
+      }
     },
     "prerequisites": {
       "type": "array",
-      "items": { "$ref": "facets.schema.json#/$defs/slug" }
+      "items": {
+        "$ref": "facets.schema.json#/$defs/slug"
+      }
     },
-    "dotbabel": { "$ref": "dotbabel.compute.schema.json" }
+    "dotbabel": {
+      "$ref": "dotbabel.compute.schema.json"
+    },
+    "headless_safe": {
+      "type": "boolean",
+      "description": "Author-declared headless suitability metadata. This field does not grant permission, bypass confirmation, or change native projection."
+    }
   }
 }

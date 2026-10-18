@@ -3,17 +3,27 @@
   "$id": "https://dotbabel.dev/schemas/agent.schema.json",
   "title": "dotbabel agent artifact",
   "description": "Shape for agent YAML frontmatter. Phase 1: every field optional.",
-  "allOf": [{ "$ref": "common.schema.json" }],
+  "allOf": [
+    {
+      "$ref": "common.schema.json"
+    }
+  ],
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "type": { "const": "agent" },
+    "type": {
+      "const": "agent"
+    },
     "tools": {
       "oneOf": [
-        { "type": "string" },
+        {
+          "type": "string"
+        },
         {
           "type": "array",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       ]
     },
@@ -23,8 +33,12 @@
     },
     "invocation": {
       "type": "string",
-      "enum": ["passive", "explicit"]
+      "enum": ["passive", "explicit"],
+      "deprecated": true,
+      "description": "Deprecated authoring metadata retained for compatibility; no execution effect. This field does not register a command or control native invocation."
     },
-    "dotbabel": { "$ref": "dotbabel.compute.schema.json" }
+    "dotbabel": {
+      "$ref": "dotbabel.compute.schema.json"
+    }
   }
 }
