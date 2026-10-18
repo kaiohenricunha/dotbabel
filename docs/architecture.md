@@ -1,6 +1,6 @@
 # Architecture
 
-_Last updated: v4.1.0_
+_Last updated: v4.2.0_
 
 ## Layers
 
@@ -120,3 +120,29 @@ policy defaults -> user defaults -> project overrides -> profile
 
 A component identity is a normalized root and a language. Several languages can share one root.
 Explicit components override discovery at their root but do not disable discovery elsewhere.
+
+## Persistent peer collaboration
+
+`src/peer/` owns same-machine Main/Advisor pairing independently of Handoff.
+`identity.mjs` reuses Fleet's origin normalization, Claude registry, and process
+incarnation checks. `store.mjs` uses the shared process lock helper and fsynced
+atomic JSON snapshots. `state.mjs` owns deterministic pairing, FIFO investigations,
+fenced completion, correlation, deduplication, and bounded conversation rules.
+
+The per-pair relay reserves a delivery under a transaction, releases the lock,
+calls a harness adapter, and records the transport outcome in another transaction.
+It never runs a model. The existing interactive Advisor handles all investigations
+and explicitly records results. A crash between reservation and outcome is
+uncertain, so a later relay does not silently replay. Native transport acceptance,
+mailbox receipt, processing, acknowledgment, and investigation completion are
+separate observations. Waiting for a correlated reply releases the active slot.
+
+The `peer` skill handles semantic intent. Hooks guard Advisor tools and restore
+role context. An explicitly installed and trusted PreToolUse hook also handles
+literal peer coordination on the host, where Codex process ancestry and private
+state remain visible. It never executes proposed shell text: it calls only the
+internal peer operations and replaces the shell input with result printing.
+Other tools retain per-session permissions. The independent CLI
+input channel accepts durable work while the model is busy. See
+[the user guide, compatibility matrix, and smoke test](peer-collaboration.md) for
+state layout, failure semantics, installed-version evidence, and limitations.

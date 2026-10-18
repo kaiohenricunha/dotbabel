@@ -1,6 +1,10 @@
 # Handoff guide — cross-CLI, cross-machine session transfer
 
-_Last updated: v4.1.0_
+_Last updated: v4.2.0_
+
+For concurrent sessions that exchange messages without transferring context, use
+[Peer collaboration](peer-collaboration.md). Handoff remains the context-transfer
+interface.
 
 > **Added in v0.5.0; later reworked** to drop the `init` ceremony —
 > `push` now auto-bootstraps the remote store on first run.

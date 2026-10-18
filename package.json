@@ -1,6 +1,6 @@
 {
   "name": "@dotbabel/dotbabel",
-  "version": "4.1.0",
+  "version": "4.2.0",
   "description": "Make an AI coding agent show its work. A verification layer for agentic development: skills that force an agent to ground every claim in real source, reproduce a bug before fixing it, and cite file:line — plus gates that check the result. Includes local CI attestation, spec-governance checks, and one rule floor fanned out to Claude Code, Codex, Gemini, and Copilot CLI.",
   "type": "module",
   "main": "plugins/dotbabel/src/index.mjs",
@@ -40,7 +40,8 @@
     "dotbabel-fleet": "./plugins/dotbabel/bin/dotbabel-fleet.mjs",
     "dotbabel-task": "./plugins/dotbabel/bin/dotbabel-task.mjs",
     "dotbabel-decide": "./plugins/dotbabel/bin/dotbabel-decide.mjs",
-    "dotbabel-export": "./plugins/dotbabel/bin/dotbabel-export.mjs"
+    "dotbabel-export": "./plugins/dotbabel/bin/dotbabel-export.mjs",
+    "dotbabel-peer": "./plugins/dotbabel/bin/dotbabel-peer.mjs"
   },
   "scripts": {
     "build-plugin": "node scripts/build-plugin.mjs",

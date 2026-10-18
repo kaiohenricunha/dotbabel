@@ -178,6 +178,22 @@
       "description": "Project-level Model Intelligence policy (spec model-intelligence, §5). Policy and configuration overrides only: never a store for discovered models, resolved recommendations, cache evidence, generated projections, or release snapshot data.",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Explicit project opt-in. Absent or false disables automatic Model Intelligence behavior."
+        },
+        "adaptive_routing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Independent main-session routing opt-in. Requires the engine and a verified runtime integration."
+            }
+          }
+        },
         "floor": {
           "type": "object",
           "description": "A minimum capability bound for this repository. The strongest applicable floor wins, and no layer may lower a more specific one.",

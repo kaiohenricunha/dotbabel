@@ -886,3 +886,9 @@ Why each group exists:
 
 - **IMPL-15**: Two units may share a pull request only while all five of these hold: they share the same dependency boundary; each unit keeps its named TDD tests and acceptance evidence from §6.3; the combined pull request remains one coherent review topic; failure and revert semantics stay understandable; and the grouping does not hide a safety-sensitive migration inside unrelated work. When one stops holding during implementation, split the pull request rather than forcing this table. The number of pull requests is never reduced merely to lower review cost.
 - **IMPL-16**: The §6.3 implementation prompt stays the unit of TDD and acceptance evidence even when two prompts ship in one pull request. A grouped pull request runs both prompts' named tests and reports both sets of evidence; the prompts' contents are not rewritten to merge their tests.
+
+## 6.7 Project activation and linked routing amendment — 2026-10-16
+
+The owner adds a project activation unit before automatic consumers ship: tests first for independent flags, concurrent enabled/disabled repositories, preserving unrelated config, malformed configuration, symlink refusal and serialized mutations. Implement `activation/` and `models enable|disable --routing`; verify schema and CLI integration. Default disabled does not remove legacy behavior or native agent pins.
+
+P-10/P-11 remain the next resolver units. AR-2 classification may proceed independently; AR-3 application depends on the shared resolver. Continue P-12 through P-23 with the original scope, preserving disabled-project behavior. Do not mix runtime routing into artifact migrations. ARCH-73/74 supplement, rather than replace, the existing constraints.
