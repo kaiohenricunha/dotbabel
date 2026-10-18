@@ -591,6 +591,15 @@ resolve(input: ResolverInput): ResolverResult
 interface ResolverInput {
   requirement?: NormalizedComputeRequirement;
 
+  invocation?: {
+    pin?: RuntimePin;
+    overrides?: Record<string, string>;
+    requiredModalities?: string[];
+    requiredCapabilities?: Record<string, boolean>;
+    effortIntent?: "low" | "medium" | "high";
+    modelSelection?: "automatic" | "explicit";
+  };
+
   policy: EffectivePolicy;
 
   target: {
