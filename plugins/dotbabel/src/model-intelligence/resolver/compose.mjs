@@ -19,7 +19,7 @@ export function compose(input) {
   if (!object(input) || !object(input.target) || !isRuntimeId(input.target.runtimeId) || !ARTIFACT_KINDS.includes(input.target.artifactKind) || !object(input.policy) || !object(input.policy.classes) || !object(input.catalog) || !Array.isArray(input.catalog.runtimes) || !object(input.runtimeContract)) return { valid: false };
   if (input.target.sourcePath !== undefined && !isArtifactSourcePath(input.target.sourcePath)) return { valid: false };
   let scopedFloors;
-  try { scopedFloors = normalizeScopedFloors(input.policy.scoped_floors).filter(entry => entry.scope.source_path === input.target.sourcePath && entry.scope.artifact_kind === input.target.artifactKind); }
+  try { scopedFloors = normalizeScopedFloors(input.policy.scoped_floors, 512).filter(entry => entry.scope.source_path === input.target.sourcePath && entry.scope.artifact_kind === input.target.artifactKind); }
   catch { return { valid: false }; }
   const declaration = input.requirement;
   if (declaration !== undefined && (!object(declaration) || !BINDINGS.includes(declaration.binding) || !RESOLUTION_MODES.includes(declaration.mode) || (declaration.mode === "inherit" ? declaration.requirement !== undefined || declaration.pin !== undefined : !WORKLOAD_CLASSES.includes(declaration.requirement)) || (declaration.mode === "pin" ? !validPin(declaration.pin, input.target.runtimeId) : declaration.pin !== undefined))) return { valid: false };

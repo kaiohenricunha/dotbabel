@@ -12,11 +12,12 @@ export function isArtifactSourcePath(value) {
  * Validate and copy a bounded scoped-floor list without echoing untrusted input.
  * Scopes contain an exact source path and kind, never a glob, model or runtime alias.
  * @param {unknown} value Optional policy declarations.
+ * @param {number} [maxEntries=128] Trusted boundary limit: one layer has 128 entries; four merged layers have 512.
  * @returns {object[]} Validated declarations independent of caller mutation.
  */
-export function normalizeScopedFloors(value) {
+export function normalizeScopedFloors(value, maxEntries = 128) {
   if (value === undefined) return [];
-  if (!Array.isArray(value) || value.length > 128) throw fail();
+  if (!Array.isArray(value) || value.length > maxEntries) throw fail();
   return value.map(entry => {
     if (!object(entry) || Object.keys(entry).some(key => !["mode", "requirement", "scope", "rationale"].includes(key)) || entry.mode !== "floor" || !WORKLOAD_CLASSES.includes(entry.requirement) || !object(entry.scope)) throw fail();
     if (Object.keys(entry.scope).length !== 2 || !ARTIFACT_KINDS.includes(entry.scope.artifact_kind) || !isArtifactSourcePath(entry.scope.source_path)) throw fail();

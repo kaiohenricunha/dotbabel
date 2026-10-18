@@ -103,3 +103,23 @@ it("rejects glob-looking scope selectors in both schema and runtime validation",
  const {default:Ajv}=await import("ajv");const {readFileSync}=await import("node:fs");const schema=JSON.parse(readFileSync(new URL("../../../schemas/dotbabel.config.schema.json",import.meta.url),"utf8"));const validate=new Ajv({strict:true}).compile(schema.properties.model_intelligence.properties.scoped_floors);
  for(const source_path of ["agents/*.md","agents/?.md","agents/[ab].md","agents/{a,b}.md"]){const value=[floor("frontier",{...scope,source_path})];expect(validate(value)).toBe(false);expect(()=>mergePolicy({shipped:SHIPPED_POLICY,project:{scoped_floors:value}})).toThrow("invalid scoped policy floor");}
 });
+it("resolves the combined maximum of four valid scoped-floor layers without losing any minimum", () => {
+ const entries=(prefix,level)=>Array.from({length:128},(_,i)=>floor(level,{artifact_kind:"agent",source_path:`agents/${prefix}-${i}.md`}));
+ const merged=mergePolicy({shipped:{...SHIPPED_POLICY,scoped_floors:entries("shipped","routine")},user:{scoped_floors:entries("user","deep")},project:{scoped_floors:entries("project","frontier")},artifact:{scoped_floors:entries("artifact","exceptional")}});
+ expect(merged.scoped_floors).toHaveLength(512);
+ for(const [prefix,expected]of[["shipped","routine-model"],["user","deep-model"],["project","frontier-model"],["artifact","exceptional-model"]]) {
+  const result=run({policy:merged,requirement:requirement("mechanical"),target:{...target,sourcePath:`agents/${prefix}-127.md`}});
+  expect(result.status).toBe("resolved");expect(result.configuration.axes.model).toBe(expected);
+ }
+ const ordinary=mergePolicy({shipped:SHIPPED_POLICY,project:{scoped_floors:entries("project","frontier")}});
+ expect(run({policy:ordinary}).configuration.axes.model).toBe("frontier-model");
+ expect(run({policy:{...merged,scoped_floors:[...merged.scoped_floors,floor("frontier")]}}).status).toBe("invalid");
+});
+it("rejects low-confidence release evidence for an effective scoped floor on a dynamic artifact",async()=>{
+ const {readSnapshot}=await import("../src/model-intelligence/snapshot/index.mjs"); const {createSnapshot}=await import("../src/model-intelligence/snapshot/core.mjs"); const {buildClaudeBaseline}=await import("../src/model-intelligence/materialize/runtime/claude-build.mjs");
+ const seed=structuredClone(readSnapshot());
+ for(const item of seed.runtimes.claude.models)for(const entries of Object.values(item.fields))for(const entry of entries)entry.confidence="low";
+ const snapshot=createSnapshot(seed);
+ const sourceContent="---\nname: security-auditor\ndotbabel:\n  compute:\n    mode: dynamic\n    requirement: routine\n    binding: self\n---\nBody\n";
+ expect(()=>buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[{sourcePath:scope.source_path,sourceContent,target:{path:scope.source_path,artifactKind:"agent"}}]})).toThrow("release_requirement_unsatisfied");
+});

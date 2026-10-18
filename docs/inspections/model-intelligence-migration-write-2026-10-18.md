@@ -164,3 +164,24 @@ changed-branch coverage is 94.16%. Seventeen active original criteria pass after
 P-20, and all ten migration/recommendation/example shell cases pass. The shell fixture executes
 the actual index, skills, build and project-sync checks against a real isolated migrated repository.
 The final merge preserves all eight mutation-measured product modules byte-for-byte.
+
+## Four-role review corrections
+
+The full architecture, security, compliance and documentation fleet reviews commit
+cbb28d69f4cc83db9d6245b6d1e7d926d02e4820 once. Four findings identify two independent defects.
+Three roles reproduce the same accumulated-floor limit mismatch; documentation returns no finding.
+The built-in review-triage decisions require full validation for every finding.
+
+For the combined-list failure, candidate one is malformed project policy. The per-layer validator
+accepts 128 exact declarations, which disproves that explanation. Candidate two is a boundary
+mismatch: `policy/index.mjs` accumulates four valid layers while `resolver/compose.mjs:22` applies
+one layer's 128 limit again. A failing regression proves 512 valid combined declarations cannot
+resolve. Preserve the 128 per-layer limit and allow the resolver's combined four-layer bound.
+
+For release confidence, candidate one is an invalid capability snapshot. The same valid snapshot
+passes the structural validator and rejects an authored floor. Candidate two is incomplete mandatory
+constraint detection at `materialize/runtime/claude.mjs:31`: its low-confidence gate overlooks
+policy and scoped minima on dynamic declarations. A failing regression reproduces the successful
+unsafe projection. Include all effective policy/scoped floors in this existing release rejection.
+The autonomous contract authorizes these corrections. No thresholds, runtime permissions, owner
+intent or preserved native controls change.

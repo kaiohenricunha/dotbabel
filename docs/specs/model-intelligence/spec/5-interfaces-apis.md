@@ -1167,6 +1167,9 @@ N/A — there is no database (ARCH-22). The five file stores and their access pa
 
 ### P-18 migration and exact scoped-floor contract
 
+Each of the four policy layers accepts at most 128 exact scoped floors. The merged resolver
+input accepts all 512 declarations and preserves every applicable minimum.
+
 `model_intelligence.scoped_floors` is a bounded array of declarations with `mode: floor`, a
 canonical workload `requirement`, and an exact `scope` containing `artifact_kind` and
 `source_path`. Optional `rationale` is nonempty and bounded. Portable canonical source paths

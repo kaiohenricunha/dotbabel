@@ -28,7 +28,7 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     const legacyAxes = artifact.legacyAxes;
     const invocation = legacyAxes ? { ...context.invocation, pin: { runtime: "claude", config: legacyAxes }, omitDefaultReasoning: true } : context.invocation;
     const resolverResult = resolve({ ...context, ...(invocation ? { invocation } : {}), requirement: requirement ?? undefined, target: { ...target, sourcePath: artifact.sourcePath }, runtimeContract });
-    if (artifact.releaseBaseline === true && (legacyAxes || ["floor", "pin"].includes(requirement?.mode)) && resolverResult.confidence === "low") throw fail("release_requirement_unsatisfied");
+    if (artifact.releaseBaseline === true && (legacyAxes || ["floor", "pin"].includes(requirement?.mode) || context.policy.floor !== undefined || resolverResult.explanation.some(entry => entry.code === "scoped_floor_applied")) && resolverResult.confidence === "low") throw fail("release_requirement_unsatisfied");
     const binding = (runtimeContract.capabilities ?? runtimeContract).binding?.[kind];
     if (requirement?.mode === "pin") {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
