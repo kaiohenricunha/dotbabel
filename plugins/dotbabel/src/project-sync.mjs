@@ -16,6 +16,7 @@
  */
 
 import fs from "node:fs";
+import { projectProjectionTrees } from "./model-intelligence/materialize/project-sync.mjs";
 import path from "node:path";
 import { createOutput } from "./lib/output.mjs";
 import {
@@ -248,6 +249,19 @@ export function excludedNamesFor(cli, cfg) {
 }
 
 /**
+ * Apply the same runtime and artifact exclusions to generated copies and symlink fan-out.
+ * @param {object} artifact Canonical source and target runtime.
+ * @param {object} cfg Loaded project sync configuration.
+ * @param {{allCli?:boolean}} [options] Explicit CLI presence override.
+ * @returns {boolean} Whether this artifact is eligible for the configured project fan-out.
+ */
+export function projectionAllowedFor(artifact, cfg, options = {}) {
+  const runtime = artifact.target.runtimeId;
+  const id = artifact.sourcePath.endsWith("/SKILL.md") ? path.basename(path.dirname(artifact.sourcePath)) : path.basename(artifact.sourcePath, ".md");
+  return cfg.fan_out.includes(runtime) && shouldFanOutCli(runtime, cfg, options) && !excludedNamesFor(runtime, cfg).has(id);
+}
+
+/**
  * Whether `cli`'s skills tree is served by the canonical shared tree.
  *
  * The single answer to that question. `projectSync` writes the layout,
@@ -311,6 +325,7 @@ export function extractRuleFloorOrWhole(body) {
 /**
  * @typedef {object} ProjectSyncOpts
  * @property {string} repoRoot
+ * @property {object[]} [projectionTrees] Explicit canonical runtime plans; no discovery or implicit opt-in.
  * @property {boolean} [allCli]   Force fan-out even if a target CLI binary is missing.
  * @property {boolean} [force]    Reserved for collision overrides (currently unused — see warning path).
  * @property {boolean} [dryRun]   Report planned actions, do not mutate.
@@ -366,6 +381,15 @@ export async function projectSync(opts) {
   let written = 0;
   let removed = 0;
   let generated = 0;
+  let projected = new Set();
+  try {
+    const projections = await projectProjectionTrees({ ...opts, allowArtifact: artifact => projectionAllowedFor(artifact, cfg, { allCli: opts.allCli }) });
+    projected = projections.targets; generated += projections.generated;
+  } catch {
+    out.fail("projection sync failed"); out.flush();
+    return { ok: false, linked, skipped, backed_up, written, removed, generated };
+  }
+
 
   // ---- 1. Instruction files (AGENTS.md, GEMINI.md, copilot-instructions.md)
 
@@ -510,6 +534,13 @@ export async function projectSync(opts) {
   }
 
   function doLink(src, dst) {
+    if (projected.has(dst)) return;
+    if ([...projected].some(target => target.startsWith(dst + path.sep))) {
+      doEnsureRealDir(dst);
+      for (const entry of fs.readdirSync(src)) doLink(path.join(src, entry), path.join(dst, entry));
+      return;
+    }
+
     // Store the symlink target as a path relative to the link's own
     // directory. fs.symlinkSync persists the string verbatim, so a relative
     // target keeps the link portable across clones and survives a parent-repo
@@ -615,6 +646,7 @@ export async function projectSync(opts) {
    * @param {"command"|"skill"} kind
    */
   function doWriteGenerated(dst, src, kind) {
+    if (projected.has(dst)) return;
     const relDst = path.relative(repoRoot, dst);
     const relSrc = path.relative(repoRoot, src);
     const { content, dropped } = composeGeneratedFrontmatter(
