@@ -124,6 +124,20 @@ describe("deterministic materialization core", () => {
     expect(parseFrontmatter(file(result).content).frontmatter).toEqual({ name: "inherited" });
     expect(entry(result).resolverResultHash).toMatch(/^sha256:/);
   });
+  it("preserves native inheritance for an artifact without a compute declaration", () => {
+    const value = fixture(); const artifact = value.artifacts[0];
+    artifact.sourceContent = "---\nname: plain\n---\nOriginal body.\n";
+    artifact.requirement = undefined;
+    artifact.resolverResult = resolve(input({ requirement: undefined }));
+    expect(parseFrontmatter(file(output(value)).content).frontmatter).toEqual({ name: "plain" });
+  });
+  it("cannot hide a canonical floor behind an inherited supplied result", () => {
+    const value = fixture(); const artifact = value.artifacts[0];
+    artifact.sourceContent = artifact.sourceContent.replace("mode: dynamic", "mode: floor");
+    artifact.requirement = { mode: "inherit", binding: "self" };
+    artifact.resolverResult = resolve(input({ requirement: artifact.requirement }));
+    expect(() => output(value)).toThrow(/resolution/);
+  });
   it("does not turn a consumer recommendation into an artifact binding", () => {
     const value = fixture(); const artifact = value.artifacts[0];
     artifact.sourceContent = artifact.sourceContent.replace("binding: self", "binding: consumer");

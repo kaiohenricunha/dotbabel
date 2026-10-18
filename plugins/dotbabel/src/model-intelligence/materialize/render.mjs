@@ -5,15 +5,27 @@ import { checkOpaqueValue } from "../domain/index.mjs";
 import { parseComputeDeclaration } from "../requirement/index.mjs";
 
 /**
+ * Parse canonical source once through the shared YAML and requirement boundaries.
+ * @param {object} artifact Source content and canonical path.
+ * @returns {object} Parsed metadata, body and normalized authored requirement.
+ */
+export function parseProjectionSource(artifact) {
+  const { frontmatter, body, warnings } = parseFrontmatter(artifact.sourceContent);
+  if (warnings.some(warning => !warning.startsWith("no YAML frontmatter"))) throw new TypeError("invalid projection source frontmatter");
+  const parsed = parseComputeDeclaration(frontmatter, { sourcePath: artifact.sourcePath });
+  if (parsed.errors.length) throw new TypeError("invalid canonical compute declaration");
+  return { frontmatter, body, requirement: parsed.requirement };
+}
+
+/**
  * Render one canonical artifact without leaking private metadata or claiming native execution.
  * @param {object} artifact Canonical source, resolved configuration and explicit emission contract.
  * @param {string} projectionId Deterministic derivation identity.
+ * @param {object} source Already parsed canonical data, shared with identity validation.
  * @returns {string} Generated runtime bytes, preserving the canonical body.
  */
-export function renderProjection(artifact, projectionId) {
-  const { frontmatter, body, warnings } = parseFrontmatter(artifact.sourceContent);
-  if (warnings.some(warning => !warning.startsWith("no YAML frontmatter"))) throw new TypeError("invalid projection source frontmatter");
-  if (parseComputeDeclaration(frontmatter, { sourcePath: artifact.sourcePath }).errors.length) throw new TypeError("invalid canonical compute declaration");
+export function renderProjection(artifact, projectionId, source) {
+  const { frontmatter, body } = source;
   const contract = artifact.projectionContract;
   if (!contract || !Array.isArray(contract.frontmatterKeys) || contract.frontmatterKeys.some(key => typeof key !== "string" || !/^[A-Za-z][A-Za-z0-9_.-]*$/.test(key) || ["constructor", "prototype"].includes(key))) throw new TypeError("invalid projection metadata contract");
   if (contract.permitsCompute === true && (typeof contract.computeConsumer !== "string" || contract.computeConsumer.trim() === "")) throw new TypeError("private compute metadata needs an explicit consumer");

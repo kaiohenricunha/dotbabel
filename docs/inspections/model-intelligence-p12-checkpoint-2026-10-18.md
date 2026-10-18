@@ -23,3 +23,9 @@ Eight active original criteria pass, including newly active AC-12/13. Ten specs 
 ## Remaining work
 
 Complete this unit's required four-role protected-path review, posted exact-head criteria and CI before merge. Do not close the initiative. P-13 through P-23, applicable P-8b, native user-facing setup/status/managed routing, Claude integration and the final full-spec audit remain open. Runtime-specific binding and transaction behavior are not claimed from pure generated objects.
+
+## Canonical inheritance boundary
+
+Two further regressions initially fail: an artifact without any compute declaration must preserve native inheritance, and a supplied inherited result must not conceal a canonical floor. The shared YAML/requirement reader now parses canonical source once before identity and status validation, supplying the same parsed data to rendering. The materializer uses the supplied effective requirement or falls back to the authored requirement. Inheritance is allowed only when both authored and effective declarations are absent/inherited and the resolver explicitly reports runtime inheritance preservation. All 28 tests pass, and the static golden bytes remain unchanged. Full quality is rechecked after this focused correction; no pending native binding is claimed.
+
+Final follow-up PR quality exits 0 with WARN and no environment error: 5,159 tests pass, 14 skip, changed lines are 100% and changed branches are 92.80%. Every configured execution succeeds. The warning does not convert unavailable measurements into passes.
