@@ -10,8 +10,8 @@ import { materialize } from "../index.mjs";
 const fail = code => Object.assign(new Error(code), { code });
 const sourcePath = "plugins/dotbabel/src/model-intelligence/workflows/ai-review.source.yml";
 const quote = value => "'" + value.replaceAll("'", "'\"'\"'") + "'";
-function parse(text, code) {
-  try { if (typeof text !== "string" || Buffer.byteLength(text) > 1024 * 1024) throw fail(code); return yaml.load(text); }
+function parse(text, code, maxBytes = 1024 * 1024) {
+  try { if (typeof text !== "string" || Buffer.byteLength(text) > maxBytes) throw fail(code); return yaml.load(text); }
   catch { throw fail(code); }
 }
 
@@ -40,7 +40,13 @@ export function buildClaudeReviewWorkflow({ toolVersion, snapshot, sourceContent
   const target = { path: "ai-review.yml", runtimeId: "claude", artifactKind: "workflow" };
   const resolverResult = resolve({ requirement: parsed.requirement, target, catalog: snapshotCatalog(snapshot), policy, runtimeContract });
   if (resolverResult.status !== "resolved" || resolverResult.confidence === "low" || resolverResult.enforcement.state === "unsatisfied" || typeof resolverResult.configuration?.axes.model !== "string") throw fail("release_requirement_unsatisfied");
-  const nativeArgs = " " + renderInvocation(resolverResult.configuration).args.map((value, index) => index % 2 === 0 ? value : quote(value)).join(" ");
+  const native = renderInvocation(resolverResult.configuration);
+  if (native.unsupportedAxes.length) throw fail("workflow_invocation_axes_unsupported");
+  if (native.args.some(value => value.includes("${{"))) throw fail("workflow_native_value_invalid");
+  const nativeArgs = " " + native.args.map((value, index) => index % 2 === 0 ? value : quote(value)).join(" ");
   const outputBody = sourceContent.replace(command, "npx @anthropic-ai/claude-code" + nativeArgs + " -p ");
+  const generated = parse(outputBody, "workflow_invocation_invalid", 1024 * 1024 + 4096);
+  const expectedRun = step.run.replace(command, "npx @anthropic-ai/claude-code" + nativeArgs + " -p ");
+  if (generated.jobs.review.steps.find(item => item.name === "Run /review-prs headless").run !== expectedRun) throw fail("workflow_invocation_invalid");
   return materialize({ toolVersion, artifacts: [{ sourcePath, sourceContent, target, requirement: parsed.requirement, policy, resolverResult, runtimeContract, snapshotId: snapshot.snapshotId, capabilityEvidence: { sidecar: declaration }, projectionContract: { outputFormat: "yaml", outputBody, frontmatterKeys: [] } }] });
 }

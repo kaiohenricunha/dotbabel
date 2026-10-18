@@ -138,3 +138,25 @@ describe("native projection emission contract", () => {
     }
   });
 });
+
+it("rejects a replacement that reaches a comment instead of the executable run string", () => {
+  const doc = yaml.load(sourceContent); const current = doc.jobs.review.steps[1].run;
+  const prefix = sourceContent.slice(0, sourceContent.indexOf("        run: |"));
+  const encoded = JSON.stringify(current).replace("claude-code -p", "claude-code\\u0020-p");
+  const changed = prefix + "        run: " + encoded + "\n# npx @anthropic-ai/claude-code -p not-executed\n";
+  expect(yaml.load(changed).jobs.review.steps[1].run).toBe(current);
+  expect(() => build({ sourceContent: changed })).toThrow("workflow_invocation_invalid");
+});
+it("rejects every exact axis that the native invocation renderer cannot express", () => {
+  const seed = structuredClone(snapshot); seed.runtimes.claude.runtimeContract.capabilities.invocation.axes.contextTier = "supported";
+  const compute = { dotbabel: { compute: { requirement: "deep", mode: "pin", binding: "session", rationale: "Preserve every selected axis.", pin: { runtime: "claude", config: { model: "opus", contextTier: "1m" } } } } };
+  expect(() => build({ snapshot: createSnapshot(seed), computeContent: yaml.dump(compute) })).toThrow("workflow_invocation_axes_unsupported");
+});
+it("rejects Actions interpolation in model and effort values before writing workflow code", () => {
+  for (const axis of ["model", "reasoning"]) {
+    const seed = structuredClone(snapshot); const model = seed.runtimes.claude.models[0]; seed.runtimes.claude.models = [model];
+    if (axis === "model") { model.model = "${{ github.event.pull_request.title }}"; for (const entry of model.fields.id) entry.value = model.model; }
+    else { model.fields.supportedReasoningLevels[0].value = [{ effort: "${{ inputs.effort }}" }]; model.fields.defaultReasoningLevel[0].value = "${{ inputs.effort }}"; }
+    expect(() => build({ snapshot: createSnapshot(seed) })).toThrow("workflow_native_value_invalid");
+  }
+});
