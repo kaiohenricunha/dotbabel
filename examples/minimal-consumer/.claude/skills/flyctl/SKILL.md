@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1151e049861f03f7f2b2cf798fa8bc66a8bea1168a740058c6c817f426dab367 source=skills/flyctl/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:0a5f1813f66c0679800053d4786bf2277e25360f3aeddb2b9e5e193c1c1e0bce source=skills/flyctl/SKILL.md — do not edit directly
 argument-hint: <subcommand> [-a <app>] [--no-confirm] [...]
 description: |
   Explicit-invocation Fly.io operations wrapper. Run `/flyctl <subcommand>` to deploy (with --image), tail logs, manage secrets, inspect machines, scale, SSH, proxy, check health, list releases, and show status. Auto-discovers the app from fly.toml in the current directory. Side-effectful ops on prod-flavored apps require typed confirmation matching the app name. Rollback is delegated to /rollback-prod; cross-provider SHA reporting is delegated to /deploy-status. Unlisted subcommands require `flyctl <subcommand> --help` first.

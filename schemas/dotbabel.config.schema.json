@@ -178,6 +178,48 @@
       "description": "Project-level Model Intelligence policy (spec model-intelligence, §5). Policy and configuration overrides only: never a store for discovered models, resolved recommendations, cache evidence, generated projections, or release snapshot data.",
       "additionalProperties": false,
       "properties": {
+        "scoped_floors": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "description": "A monotonic safety minimum for one exact canonical artifact and kind.",
+            "additionalProperties": false,
+            "required": ["mode", "requirement", "scope"],
+            "properties": {
+              "mode": {
+                "const": "floor"
+              },
+              "requirement": {
+                "type": "string",
+                "enum": ["mechanical", "routine", "deep", "frontier", "exceptional"]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Why this floor exists. Carried into the explanation so a later maintainer can tell a deliberate safety fence from an experiment.",
+                "maxLength": 1000,
+                "pattern": "\\S"
+              },
+              "scope": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["artifact_kind", "source_path"],
+                "properties": {
+                  "artifact_kind": {
+                    "enum": ["agent", "command", "skill", "workflow"]
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^(?!.*[*?\\[\\]{}])(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^:\\\\\\p{Cc}\\p{Cf}]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
         "enabled": {
           "type": "boolean",
           "default": false,

@@ -60,7 +60,7 @@ describe("read-only resolution file boundaries", () => {
     const invalid = resolveRequest(artifact("---\nmodel: sonnet\ndotbabel:\n  compute: private-parse-marker\n---\n"));
     expect(invalid).toMatchObject({ exitCode: 1, result: { status: "invalid", diagnostics: [{ code: "MI_COMPUTE_INVALID" }] } });
     expect(JSON.stringify(invalid)).not.toContain("private-parse-marker");
-    const conflict = resolveRequest(artifact("---\nmodel: haiku\ndotbabel:\n  compute:\n    requirement: frontier\n    mode: floor\n    binding: consumer\n---\n"));
+    const conflict = resolveRequest(artifact("---\nmodel: haiku\ndotbabel:\n  compute:\n    requirement: frontier\n    mode: pin\n    binding: consumer\n    rationale: Preserve an explicit native choice.\n    pin:\n      runtime: claude\n      config:\n        model: sonnet\n---\n"));
     expect(conflict).toMatchObject({ exitCode: 1, result: { status: "conflict", diagnostics: [{ code: "MI_DUAL_DECLARATION_CONFLICT" }] } });
   });
   it("does not guess a requirement for ambiguous legacy effort metadata", () => {

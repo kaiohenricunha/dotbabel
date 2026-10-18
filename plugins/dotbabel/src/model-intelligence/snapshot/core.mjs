@@ -109,7 +109,7 @@ export function checkReleaseRequirements(snapshot, requests, policy = mergePolic
   const catalog = snapshotCatalog(snapshot);
   const results = requests.map(request => {
     const runtime = snapshot.runtimes[request.runtimeId];
-    return resolve({ requirement: request.requirement, target: { runtimeId: request.runtimeId, artifactKind: request.artifactKind }, catalog, policy, runtimeContract: runtime?.runtimeContract });
+    return resolve({ requirement: request.requirement, target: { runtimeId: request.runtimeId, artifactKind: request.artifactKind, ...(request.sourcePath === undefined ? {} : { sourcePath: request.sourcePath }) }, catalog, policy, runtimeContract: runtime?.runtimeContract });
   });
   const valid = results.every(result => result.status === "resolved" && result.confidence !== "low" && result.enforcement.state !== "unsatisfied");
   return { valid, results, diagnostics: valid ? [] : [{ code: "release_requirement_unsatisfied" }] };

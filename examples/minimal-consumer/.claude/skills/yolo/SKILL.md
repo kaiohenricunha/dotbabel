@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:2dcd4ed007855c74ee4cd083f8590eacab111c6366186a98f2ba9f80e69165b9 source=skills/yolo/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:ac56730b4b269ffbf733c0ae765306a1b2bc8db0b79044cb4b63bad91744a52d source=skills/yolo/SKILL.md — do not edit directly
 argument-hint: "--for <duration> [--merge|--no-merge] [scope] | off"
 description: |
   Start a temporary autonomy mode for this session: one approval from the owner covers the current task or an explicit scope. The session asks nothing else for work inside it until the scope is done, yolo off, the required --for expiry, or the end of the session. It still stops for force pushes, hard resets, deletions, production deploys, destroys, spec-text edits, a check it cannot fix, and work outside the scope.

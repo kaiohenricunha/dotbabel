@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:cac93b12c546c13ee0a1da403f23fefca3559e7528bc52f23f451769fdbf393e source=skills/handoff/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:28fe43b0f48eb068d46bde74039a5b4ddf86dfdc1b124c277145da34da2ac6a4 source=skills/handoff/SKILL.md — do not edit directly
 argument-hint: "[pull|push|fetch|list|search|prune|doctor] [args...]"
 description: |
   Transfer conversation context between agentic CLIs (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a source session transcript by UUID and produces either an inline summary, a paste-ready handoff digest, a written markdown file, or a branch in a user-owned private git repo that another machine can fetch. Use when switching agents mid-task, recovering context, or moving between Windows/Linux/macOS setups. Triggers on: "handoff", "transfer context", "continue in codex", "continue in claude", "continue in copilot", "switch to codex", "switch to claude", "what was that session about", "claude --resume", "copilot --resume", "codex resume", "find the session where", "search sessions", "which session did I", "push handoff", "fetch handoff", "handoff to other machine", "resume on my other laptop".
