@@ -8,6 +8,7 @@
  */
 
 import fs from "node:fs";
+import { projectProjectionTrees } from "./model-intelligence/materialize/project-sync.mjs";
 import path from "node:path";
 import { createOutput } from "./lib/output.mjs";
 import {
@@ -20,6 +21,7 @@ import {
 } from "./generate-instructions.mjs";
 import {
   excludedNamesFor,
+  projectionAllowedFor,
   extractRuleFloorOrWhole,
   loadProjectConfig,
   shouldFanOutCli,
@@ -35,6 +37,7 @@ import { ValidationError } from "./lib/errors.mjs";
 
 /**
  * @typedef {object} CheckProjectSyncOpts
+ * @property {object[]} [projectionTrees] Explicit canonical runtime plans, matching projectSync.
  * @property {string} repoRoot
  * @property {boolean} [allCli]  Inspect every CLI in `fan_out` even when its binary is absent from PATH.
  * @property {boolean} [json]
@@ -78,6 +81,21 @@ export async function checkProjectSync(opts) {
   }
 
   const cfg = loadProjectConfig(repoRoot);
+  let projected = new Set();
+  try {
+    const projections = await projectProjectionTrees({ ...opts, check: true, allowArtifact: artifact => projectionAllowedFor(artifact, cfg, { allCli: opts.allCli }) });
+    projected = projections.targets;
+    for (const entry of projections.entries) {
+      const value = { kind: "projection", path: entry.path, actual: entry.state };
+      if (entry.state === "clean") okEntries.push(value);
+      else if (entry.state === "missing") missing.push(value);
+      else stale.push(value);
+    }
+  } catch {
+    out.fail("projection inspection failed"); out.flush();
+    return { ok: false, missing, stale, okEntries, skipped };
+  }
+
   const sourcePath = path.join(repoRoot, cfg.rule_floor_source);
   if (!fs.existsSync(sourcePath)) {
     out.fail(`rule-floor source does not exist: ${cfg.rule_floor_source}`);
@@ -142,6 +160,16 @@ export async function checkProjectSync(opts) {
    * naturally surfaces dangling symlinks when realpath throws.
    */
   function checkLink(dstAbs, srcAbs, kind = "symlink") {
+    if (projected.has(dstAbs)) return;
+    if ([...projected].some(target => target.startsWith(dstAbs + path.sep))) {
+      try {
+        const stat = fs.lstatSync(dstAbs);
+        if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error("projection directory unavailable");
+        for (const entry of fs.readdirSync(srcAbs)) checkLink(path.join(dstAbs, entry), path.join(srcAbs, entry));
+      } catch { stale.push({ kind: "projection", path: path.relative(repoRoot, dstAbs), actual: "directory unavailable" }); }
+      return;
+    }
+
     const relDst = path.relative(repoRoot, dstAbs);
     let lstat;
     try {
@@ -202,6 +230,7 @@ export async function checkProjectSync(opts) {
    * @param {"command"|"skill"} kind
    */
   function checkGenerated(dstAbs, srcAbs, kind) {
+    if (projected.has(dstAbs)) return;
     const relDst = path.relative(repoRoot, dstAbs);
     let existing;
     try {
