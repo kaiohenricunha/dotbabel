@@ -41,13 +41,15 @@ teardown() {
 }
 
 @test "models migrate: a canonical declaration disagreeing with its legacy value exits 1" {
-  printf -- '---\nid: conflicted\ntype: agent\nname: conflicted\ndescription: probe\nmodel: haiku\ndotbabel:\n  compute:\n    requirement: frontier\n    binding: self\n    mode: floor\n---\n\nbody\n' > "$REPO/agents/conflicted.md"
+  printf -- '---\nid: conflicted\ntype: agent\nname: conflicted\ndescription: probe\nmodel: haiku\ndotbabel:\n  compute:\n    requirement: frontier\n    binding: self\n    mode: pin\n    rationale: Preserve an explicit native choice.\n    pin:\n      runtime: claude\n      config:\n        model: sonnet\n---\n\nbody\n' > "$REPO/agents/conflicted.md"
   run $MODELS migrate --repo-root "$REPO" --no-color
   [ "$status" -eq 1 ]
   [[ "$output" == *"conflict: 1"* ]]
   # Rule 3 of KD-1: the report names the disagreement and picks no winner.
-  [[ "$output" == *"frontier"* ]]
-  [[ "$output" == *"mechanical"* ]]
+  [[ "$output" == *"canonical native pin disagrees with retained legacy controls"* ]]
+  run --separate-stderr $MODELS migrate --repo-root "$REPO" --json
+  [ "$status" -eq 1 ]
+  printf '%s' "$output" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const r=JSON.parse(s);const a=r.artifacts.find(a=>a.sourcePath==="agents/conflicted.md");if(a.disposition!=="conflict"||a.conflict.declared!=="frontier"||a.conflict.legacy!=="mechanical"||!a.codes.includes("MI_DUAL_DECLARATION_CONFLICT"))throw new Error("pin conflict evidence");})'
 }
 
 @test "models migrate: unknown verb and missing verb are usage errors" {

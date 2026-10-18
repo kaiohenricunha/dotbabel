@@ -1190,7 +1190,8 @@ replacement. The no-flag analysis envelope remains compatible.
 
 The complete batch is read and prevalidated before replacement. The existing descriptor-anchored
 filesystem, root lock and compare-before-replace operation guard writes. Every intermediate
-canonical file keeps its native compatibility controls and exact body. The release adapter keeps
-those controls as shared-resolver pins while their legacy declaration remains. A separate verified
+canonical file keeps its native compatibility controls and exact body. For mandatory floor intent, the release adapter keeps
+those controls as shared-resolver pins while their legacy declaration remains. Explicit dynamic
+and inherit declarations keep their existing canonical precedence. A separate verified
 migration removes the bridge. Explicit canonical pins and retained native pins cannot disagree.
 Interrupted batches retain completed usable files and preserve conflicting user edits.

@@ -5,7 +5,7 @@ const fail = () => Object.assign(new TypeError("invalid scoped policy floor"), {
 
 /** @param {unknown} value Canonical repository-relative artifact path. @returns {boolean} Whether exact matching is unambiguous. */
 export function isArtifactSourcePath(value) {
-  return typeof value === "string" && value.length > 0 && value.length <= 4096 && !/[:\\\p{Cc}\p{Cf}]/u.test(value) && !value.startsWith("/") && value.split("/").every(part => part !== "" && part !== "." && part !== "..");
+  return typeof value === "string" && value.length > 0 && value.length <= 4096 && !/[:\\\p{Cc}\p{Cf}]/u.test(value) && !/[*?\[\]{}]/.test(value) && !value.startsWith("/") && value.split("/").every(part => part !== "" && part !== "." && part !== "..");
 }
 
 /**

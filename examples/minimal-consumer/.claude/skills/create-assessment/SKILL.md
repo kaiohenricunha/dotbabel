@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:0ab9c8d8dca7822f1b960d13693cb5a85f9d46154ac6a9cd97be3c5ac8119ee2 source=skills/create-assessment/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:7f32f5c749a760a6efc2dd05b30305d64ed899b1d1153e639855136d800551c2 source=skills/create-assessment/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash Write
 argument-hint: "[target]"
 description: |

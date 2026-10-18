@@ -3,6 +3,8 @@ import { openSync, closeSync, fstatSync, readSync, constants } from "node:fs";
 import { relative, sep, resolve as resolvePath } from "node:path";
 import { parseFrontmatter } from "../../build-index.mjs";
 import { parseComputeDeclaration } from "../requirement/index.mjs";
+import { legacySatisfiesDeclaration } from "../compat/compatibility.mjs";
+import { loadCompatibilityContext } from "../compat/release.mjs";
 import { interpretLegacy, detectDualDeclarationConflict } from "../compat/index.mjs";
 import { isArtifactSourcePath } from "../policy/scopes.mjs";
 import { loadPolicyLayers, mergePolicy } from "../policy/index.mjs";
@@ -54,7 +56,7 @@ export function resolveRequest({ repoRoot, runtimeId, artifactKind, workloadClas
     const canonical = parseComputeDeclaration(parsed.frontmatter, { sourcePath });
     if (canonical.errors.length) return { result: failed("invalid", "MI_COMPUTE_INVALID"), exitCode: 1 };
     const legacy = interpretLegacy(parsed.frontmatter, { sourcePath, artifactKind });
-    if (detectDualDeclarationConflict(canonical.requirement, legacy)) return { result: failed("conflict", "MI_DUAL_DECLARATION_CONFLICT"), exitCode: 1 };
+    if (detectDualDeclarationConflict(canonical.requirement, legacy, legacySatisfiesDeclaration(canonical.requirement, legacy, { ...loadCompatibilityContext(repoRoot), sourcePath: relative(resolvePath(repoRoot), sourcePath).split(sep).join("/"), artifactKind }))) return { result: failed("conflict", "MI_DUAL_DECLARATION_CONFLICT"), exitCode: 1 };
     if (!canonical.declared && legacy.disposition === "ambiguous") return { result: failed("unresolved", "legacy_requirement_ambiguous"), exitCode: 1 };
     requirement = canonical.requirement ?? legacy.requirement ?? undefined;
   } else {

@@ -33,7 +33,7 @@ it("--check and --write together exit 64",()=>{
  const result=spawnSync(process.execPath,["plugins/dotbabel/bin/dotbabel-models.mjs","migrate","--check","--write"],{encoding:"utf8"});expect(result.status).toBe(64);expect(result.stderr).toContain("cannot be combined");
 });
 it("rejects malformed decisions and conflicting declarations before writing any artifact",async()=>{
- const root=fixture(),a=put(root,"a","model: opus\n"),b=put(root,"b","model: sonnet\n"),before=read(root,a);
+ const root=fixture(),a=put(root,"a","model: opus\n"),b=put(root,"b","model: sonnet\ndotbabel:\n  compute:\n    requirement: routine\n    mode: floor\n    binding: self\n"),before=read(root,a);
  await expect(migrateArtifacts({root,paths:[a,b],decisions:[decision(a),decision(b)],mode:"write"})).rejects.toThrow("migration_decision_conflict");expect(read(root,a)).toBe(before);
  await expect(migrateArtifacts({root,paths:[a],decisions:[decision("../escape.md")],mode:"write"})).rejects.toThrow("migration_decision_invalid");
 });
@@ -66,4 +66,27 @@ it("preserves an explicit native pin against a different retained compatibility 
  const compute={requirement:"mechanical",mode:"pin",binding:"self",rationale:"An explicit native model choice.",pin:{runtime:"claude",config:{model:"sonnet"}}};
  const sourceContent="---\n"+yaml.dump({name:"fixture",model:"haiku",dotbabel:{compute}})+"---\nBody\n";
  expect(()=>buildClaudeBaseline({toolVersion:"4.2.0",snapshot:readSnapshot(),artifacts:[{sourcePath:"agents/fixture.md",sourceContent,target:{path:"agents/fixture.md",artifactKind:"agent"}}]})).toThrow("claude_baseline_legacy_pin_conflict");
+});
+it("reports invalid decision input with a stable validation code and no private values",()=>{
+ const root=fixture();put(root,"approved","model: opus\n");const file=path.join(root,"decisions.json");fs.writeFileSync(file,'{"PRIVATE_MARKER":');
+ const result=spawnSync(process.execPath,["plugins/dotbabel/bin/dotbabel-models.mjs","migrate","--write","--decisions",file,"--repo-root",root,"--json"],{encoding:"utf8"});
+ expect(result.status).toBe(1);expect(JSON.parse(result.stdout).diagnostics).toEqual([{code:"migration_decision_invalid"}]);expect(result.stdout+result.stderr).not.toContain("PRIVATE_MARKER");
+});
+it("uses shared capability evidence to preserve a compatible native selector when approved semantic intent differs from its coarse alias proposal",async()=>{
+ const root=fixture(),a=put(root,"approved","model: opus\n");const intent={requirement:"deep",mode:"floor",binding:"self"};
+ const result=await migrateArtifacts({root,paths:[a],decisions:[decision(a,intent)],mode:"write"});expect(result.written).toEqual([a]);const header=yaml.load(read(root,a).split("---\n")[1]);expect(header.model).toBe("opus");expect(header.dotbabel.compute).toEqual(intent);
+});
+it("reports completed writes as canonical with no remaining pending changes",async()=>{
+ const root=fixture(),a=put(root,"approved","model: opus\n");const report=await migrateArtifacts({root,paths:[a],decisions:[decision(a)],mode:"write"});expect(report.compliant).toBe(true);expect(report.pending).toEqual([]);expect(report.artifacts).toEqual([{sourcePath:a,state:"canonical"}]);expect(report.planned).toEqual([a]);
+});
+it("identifies the accepted snapshot and exact paths used to verify compatibility",async()=>{
+ const root=fixture(),a=put(root,"approved","model: opus\n");const intent={requirement:"deep",mode:"floor",binding:"self"};const report=await migrateArtifacts({root,paths:[a],decisions:[decision(a,intent)],mode:"check"});
+ expect(report.compatibility).toMatchObject({basis:"accepted-release-capability-evidence",paths:[a]});expect(report.compatibility.snapshotId).toMatch(/^sha256:[a-f0-9]{64}$/);
+});
+it("preserves snapshot check/evidence-file mutual exclusion before reading evidence",()=>{
+ const result=spawnSync(process.execPath,["plugins/dotbabel/bin/dotbabel-models.mjs","snapshot","--check","--evidence-file","/unavailable-snapshot-evidence.json","--json"],{encoding:"utf8"});expect(result.status).toBe(64);expect(result.stderr).toContain("cannot be combined");
+});
+it("checks an existing incompatible canonical pin even without a migration decision file",async()=>{
+ const root=fixture(),a=put(root,"existing","model: haiku\ndotbabel:\n  compute:\n    requirement: frontier\n    mode: pin\n    binding: self\n    rationale: Preserve the exact native selection.\n    pin:\n      runtime: claude\n      config:\n        model: sonnet\n");const before=read(root,a);
+ for(const mode of ["check","write"])await expect(migrateArtifacts({root,paths:[a],mode})).rejects.toThrow("migration_decision_conflict");expect(read(root,a)).toBe(before);
 });

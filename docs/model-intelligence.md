@@ -105,6 +105,8 @@ configuration; activation does not weaken them.
 semantic proposals require review. Explicit `model: inherit` can become an inherited declaration;
 an omitted model never creates a concrete requirement. The writer preserves native model/effort
 fields and artifact bodies until a separate runtime projection migration proves replacement behavior.
+Mandatory floor projections retain the native compatibility pin. Explicit dynamic and inherit modes
+keep their existing canonical precedence.
 
 Create a reviewed JSON decision file for a selected batch:
 

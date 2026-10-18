@@ -79,3 +79,27 @@ it("emits the native axes needed to enforce an applicable scoped floor on a dyna
  const result=buildClaudeBaseline({toolVersion:"4.2.0",snapshot:readSnapshot(),artifacts:[{sourcePath:scope.source_path,sourceContent:content,target:{path:scope.source_path,artifactKind:"agent"}}]});
  expect(result.files[0].content).toMatch(/^model: /m);expect(result.files[0].content).toMatch(/^effort: /m);
 });
+it("keeps scoped floors monotonic across every workload class and layer ordering",()=>{
+ const classes=["mechanical","routine","deep","frontier","exceptional"];
+ for(const first of classes)for(const second of classes){
+  for(const values of [[first,second],[second,first]]){
+   const p=policy({user:{scoped_floors:[floor(values[0])]},project:{scoped_floors:[floor(values[1])]}});
+   // The shipped security minimum stays Frontier even when all later requests are weaker.
+   const effective=classes.indexOf(first)>3||classes.indexOf(second)>3?"exceptional-model":"frontier-model";
+   expect(run({policy:p,requirement:requirement("mechanical")} ).configuration.axes.model).toBe(effective);
+  }
+ }
+});
+it("validates bounded exact selectors and rationale without accepting unknown keys",async()=>{
+ const {normalizeScopedFloors,isArtifactSourcePath}=await import("../src/model-intelligence/policy/scopes.mjs");
+ expect(normalizeScopedFloors(undefined)).toEqual([]);expect(normalizeScopedFloors(Array(128).fill(floor("deep")))).toHaveLength(128);
+ for(const item of [null,[],{},Object.create({mode:"floor"}),{...floor("deep"),mode:"dynamic"},{...floor("deep"),rationale:""},{...floor("deep"),rationale:5},{...floor("deep"),rationale:"x".repeat(1001)},floor("deep",{...scope,extra:true})])expect(()=>normalizeScopedFloors([item])).toThrow("invalid scoped policy floor");
+ expect(()=>normalizeScopedFloors(Array(129).fill(floor("deep")))).toThrow();
+ for(const source of [null,5,"","/absolute","drive:C","bad\\path","x//y","x/./y","x/../y","a\u202eb","a\u0000b","x".repeat(4097)])expect(isArtifactSourcePath(source)).toBe(false);
+ expect(isArtifactSourcePath("x".repeat(4096))).toBe(true);
+ const value={...floor("deep",{...scope}),rationale:"x".repeat(1000)};const copied=normalizeScopedFloors([value]);value.scope.source_path="agents/changed.md";expect(copied[0].scope.source_path).toBe(scope.source_path);
+});
+it("rejects glob-looking scope selectors in both schema and runtime validation",async()=>{
+ const {default:Ajv}=await import("ajv");const {readFileSync}=await import("node:fs");const schema=JSON.parse(readFileSync(new URL("../../../schemas/dotbabel.config.schema.json",import.meta.url),"utf8"));const validate=new Ajv({strict:true}).compile(schema.properties.model_intelligence.properties.scoped_floors);
+ for(const source_path of ["agents/*.md","agents/?.md","agents/[ab].md","agents/{a,b}.md"]){const value=[floor("frontier",{...scope,source_path})];expect(validate(value)).toBe(false);expect(()=>mergePolicy({shipped:SHIPPED_POLICY,project:{scoped_floors:value}})).toThrow("invalid scoped policy floor");}
+});

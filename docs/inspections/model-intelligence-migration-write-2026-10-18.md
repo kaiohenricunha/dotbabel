@@ -55,3 +55,89 @@ A cyclic YAML metadata fixture reproduces stack overflow in the writer's `noRefs
 Malformed YAML is ruled out because the shared YAML parser reads the graph successfully.
 Preserve YAML references with the dumper's normal reference support; the body remains exact.
 This avoids recursive expansion while preserving unrelated authored metadata.
+
+The first full regression also catches two existing canonical precedence cases: explicit dynamic
+intent must not freeze old native axes, and explicit inherit must discard shadowed native axes.
+A universal legacy bridge is therefore too broad. Restrict retained native compatibility pins to
+absent canonical intent and mandatory floor migrations. Existing dynamic/inherit tests then pass.
+Explicit canonical pins still reject a conflicting retained native selector.
+
+The initial mutation dry run catches a second deterministic golden identity change in the core
+materializer. Regeneration verifies unchanged native body bytes before recording the new policy
+provenance. The first executed mutation scope measures 69.39%, with 209 actual semantic tests.
+Add the writer boundary tests, scope monotonicity/validation cases and the existing route and
+projection regression suites before repeating the same module scope plus the changed release
+builder. The 85% threshold stays unchanged. Three performance benchmarks are outside mutation
+only; the ordinary regression still runs them.
+
+Concurrent fast quality fails Markdown lint inside `.stryker-tmp/.../node_modules/markdownlint/`.
+Canonical Markdown passes formatting and the previous complete lint. The failing files belong to
+an active generated mutation sandbox, not authored source. Finish mutation and remove this unit's
+own sandbox before final lint; do not change the lint gate or classify an untested baseline as clean.
+
+## Coarse alias proposal versus verified capability
+
+An approved Deep floor with retained `model: opus` fails `compat/migrate.mjs:58` because
+`compat/index.mjs:260` compares the canonical class with the coarse alias proposal for equality.
+Candidate one is a real capability conflict. The accepted release catalog and public resolver
+can establish that the exact retained selector satisfies Deep; its native value need not change.
+Candidate two is treating MI_PROPOSAL_DEFAULTED as an upper capability bound. The compat layer
+itself documents that this mapping is a report-only inference, not the authored per-artifact intent.
+Keep the conservative conflict without evidence. Allow it only when the shared resolver proves
+that exact retained native configuration satisfies the canonical declaration and all floors.
+This proves structural compatibility, not live account availability or empirical model ranking.
+
+The first compatibility integration attempts to import the resolver consumer into the compat leaf.
+The existing module-boundary regression rejects that dependency. Keep the leaf's domain/requirement
+imports unchanged: the caller computes an explicit boolean proof and supplies verified paths to the
+pure report. The evidence consumer and offline loader stay separate. No resolver code is duplicated.
+
+Two original negative fixtures assume `haiku` can never satisfy Frontier. Current accepted capability
+facts and the shared class rules invalidate that assumption; it is not a genuine pin disagreement.
+Replace those fixtures with an explicit canonical `sonnet` pin against retained `haiku`. The same
+negative assertions and criterion names remain: incompatible native controls must report conflict.
+Add positive exact-selector compatibility and negative missing/weak/floor/pin/source-identity cases.
+This changes neither an acceptance assertion nor a threshold. It replaces a stale capability assumption
+with a conflict that remains real even when provider capabilities improve.
+
+A completed-write report initially keeps `pending` states despite `compliant: true`. The write result
+now records the original batch under `planned`, clears completed pending paths, and marks each
+completed artifact canonical. A regression fails before the correction.
+
+Runtime/schema selector tests also catch accepted glob-looking paths despite the documented exact
+selector contract. Reject wildcard metacharacters in both validators; never interpret them as patterns.
+
+Canonical-pin boundary tests expose two further validation gaps before publication. First, equal
+workload classes can hide different exact native selectors in the original class-only comparison.
+Compare known explicit native model/agent-effort pins before accepting any caller capability proof;
+proof cannot discard contradictory exact controls. Second, a check without a decision file skips
+comparison of an existing canonical declaration. Validate that declaration before the no-new-decision
+branch. Both regressions fail before correction, and matching native pins remain valid.
+
+The mutation measurement is stopped before each new provenance/pin correction rather than reported
+as final evidence for changed code. The completed earlier expanded measurement remains 87.52%
+(1,265 killed, 18 timed out, 170 survived, 13 uncovered over 1,466 mutants). Its killed-only score
+also exceeds 85%. Final expanded measurement includes the separate compatibility consumer and leaf.
+
+The final ordinary suite passes 5,580 tests with 18 explicit skips. Its shell suite finds a stale
+presentation assertion in `tests/bats/models-migrate-dryrun.bats:49`: the fixture now tests different
+native pins, while the expected prose still describes a class-only disagreement. Candidate one is
+lost conflict reporting; `compat/index.mjs:267` still returns the conflict and both semantic labels.
+Candidate two is stale expected text after the fixture correction; the CLI prints the native-pin
+diagnostic. Keep the rejection and verify both labels in the public JSON report, plus the actual
+native-pin explanation in human output. No product behavior or acceptance threshold changes.
+
+The first final PR quality attempt exits 2 with failed test and missing coverage evidence, not a pass.
+It runs alongside the expanded mutation measurement. Its compile/test/coverage legs report routing
+p95 28–36 ms against 25 ms, resolver p95 14.34 ms against 10 ms, and one native subprocess timeout.
+Candidate one is a scoped-floor implementation regression; the same source passes all 5,580 ordinary
+tests immediately before this concurrent load. Candidate two is CPU contention from overlapping
+full-suite coverage and mutation workers. Do not infer a baseline defect or relax deadlines. Run
+unchanged quality checks serially after the mutation workers finish, retaining this failure record.
+
+The final eight-module mutation measurement completes with the unchanged 85% gate: 86.96%,
+1,601 killed, 86 timed out, 221 survived and 32 uncovered over 1,940 mutants. It executes 391 semantic
+tests; three timing benchmarks are excluded only from mutation and execute in the ordinary suite.
+The killed-only score is 82.53%; do not describe that stricter calculation as passing 85%. Standard
+Stryker includes timeouts in its score. This measurement is not evidence that every mutant dies
+through a semantic assertion. The JSON report and earlier unsuccessful measurements are retained.
