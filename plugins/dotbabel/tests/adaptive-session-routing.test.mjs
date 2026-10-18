@@ -6,6 +6,7 @@ import { route } from "../src/adaptive-session-routing/route.mjs";
 import { prepareRoute } from "../src/adaptive-session-routing/prepare.mjs";
 import { classify } from "../src/adaptive-session-routing/classifier/index.mjs";
 import { input, model, evidence, requirement } from "./fixtures/model-intelligence/resolver.mjs";
+import { registerClaudeRouting } from "../src/adaptive-session-routing/claude-mod.mjs";
 
 const activation = { enabled: true, routingEnabled: true };
 const runtimeCapability = { support: "supported", axes: { model: "supported", reasoning: "supported" } };
@@ -25,6 +26,24 @@ function request(changes = {}) {
 const codes = decision => decision.diagnostics.map(item => item.code);
 
 describe("adaptive session routing decisions", () => {
+  it("uncertain classification and failed application preserve current configuration", async () => {
+    const current = { axes: { model: "native-current", reasoning: "calm" } };
+    const before = structuredClone(current); const loadResolverInput = vi.fn();
+    const uncertain = await prepareRoute({ repoRoot: "/project", prompt: "Do this.", current, manual, runtimeCapability }, { readActivation: async () => activation, loadResolverInput });
+    expect(uncertain).toMatchObject({ status: "preserved", diagnostics: [{ code: "classification_uncertain" }] });
+    expect(loadResolverInput).not.toHaveBeenCalled();
+    const hooks = new Map();
+    registerClaudeRouting((name, handler) => { hooks.set(name, handler); return { catch() {} }; }, { manual, prepare: async () => ({ status: "proposed", changes: { model: "selected", reasoning: "high" }, diagnostics: [] }) });
+    const $ = { session: { root: async () => "/project" }, ui: { log: vi.fn() } };
+    await hooks.get("turn.start")($, { turnId: "one", text: "Implement integration tests." }, async () => ({ turnId: "one" }));
+    const native = vi.fn(async function* () { throw Error("native application failed"); });
+    const stream = hooks.get("turn.step")($, { turnId: "one", index: 0, model: current.axes.model, effort: current.axes.reasoning, messageCount: 4 }, native);
+    await expect(stream.next()).rejects.toThrow("native application failed");
+    expect(native).toHaveBeenCalledTimes(1); expect(current).toEqual(before);
+    const reports = $.ui.log.mock.calls.map(([text]) => JSON.parse(text));
+    expect(reports.at(-1)).toMatchObject({ accepted: { state: "unknown" }, effective: { state: "unknown" } });
+    expect(reports.some(report => report.effective?.state === "observed")).toBe(false);
+  });
   it("never uses release snapshot acceptance as live account availability", () => {
     const value = request(); value.resolverInput.catalog.scope = "release";
     const result = route(value);

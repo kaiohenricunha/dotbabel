@@ -9,10 +9,25 @@ it("shows the managed session and independent automatic-axis controls in help", 
   const result = spawnSync(process.execPath, [bin, "--help"], { encoding: "utf8" });
   expect(result.status).toBe(0); expect(result.stdout).toContain("session"); expect(result.stdout).toContain("--effort"); expect(result.stdout).toContain("--model");
 });
+it("reports experimental Claude integration separately from opt-in and effective session state", () => {
+  const root = mkdtempSync(join(tmpdir(), "mi-routing-status-"));
+  try {
+    const result = spawnSync(process.execPath, [bin, "status", "--repo-root", root, "--json"], { encoding: "utf8", env: { ...process.env, PATH: "" } });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout).mainSessionIntegrations).toContainEqual({ runtimeId: "claude", mechanism: "session-only-native-mods", implementation: "experimental", verifiedHostVersions: ["2.1.302"], providerExecution: "unverified", effective: { state: "unknown" } });
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 it("rejects session usage errors before reading activation or starting a runtime", () => {
-  for (const args of [["session", "extra"], ["session", "--runtime", "claude"], ["session", "--effort", "\u0001"], ["session", "--requirement", "deep"]]) {
+  for (const args of [["session", "extra"], ["session", "--runtime", "gemini"], ["session", "--runtime", "claude", "--json"], ["session", "--effort", "\u0001"], ["session", "--requirement", "deep"]]) {
     expect(spawnSync(process.execPath, [bin, ...args], { encoding: "utf8" }).status).toBe(64);
   }
+});
+it("accepts Claude session selection but starts no native process for a disabled project", () => {
+  const root = mkdtempSync(join(tmpdir(), "mi-claude-disabled-"));
+  try {
+    const result = spawnSync(process.execPath, [bin, "session", "--runtime", "claude", "--repo-root", root], { encoding: "utf8", env: { ...process.env, PATH: "" } });
+    expect(result.status).toBe(2); expect(result.stdout + result.stderr).toContain("routing_disabled");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 it("starts no native process for a disabled project", () => {
   const root = mkdtempSync(join(tmpdir(), "mi-session-disabled-"));
