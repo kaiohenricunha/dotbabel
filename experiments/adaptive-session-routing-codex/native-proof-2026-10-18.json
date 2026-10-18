@@ -2,7 +2,7 @@
   "turns": [
     {
       "index": 0,
-      "turnId": "01a14d57-b50e-7511-8b7a-42928610dcc0",
+      "turnId": "01a14d69-3ee7-7a61-bf58-b445b954cf7a",
       "promptSha256": "264fe1ef389f41489d1df35c6ea423010add76d33ba8053e99cce21c213f98c5",
       "status": "completed",
       "decision": "proposed",
@@ -24,7 +24,7 @@
     },
     {
       "index": 1,
-      "turnId": "01a14d57-c44e-7ba3-8f66-2890010c66c3",
+      "turnId": "01a14d69-508a-7371-bb3a-9ba3936f767b",
       "promptSha256": "c99c3e87e8c234906809f0e2eabf16361023789bb878695bbe901cf1aea51a3b",
       "status": "completed",
       "decision": "proposed",
@@ -49,18 +49,18 @@
   "approvalHandler": "no automatic tool approval",
   "transcriptReplayed": false,
   "runtime": "dotbabel-routing-real-proof/0.163.0 (Ubuntu 24.4.0; x86_64) WindowsTerminal (dotbabel-routing-real-proof; 0.1.0)",
-  "threadId": "01a14d57-b4a3-7730-ab4e-e3b17a585395",
+  "threadId": "01a14d69-3d61-7ed2-866c-17b252fbaf47",
   "initial": {
     "model": "gpt-6.1-sol",
     "reasoning": "high"
   },
   "observedUserMessages": [
     {
-      "turnId": "01a14d57-b50e-7511-8b7a-42928610dcc0",
+      "turnId": "01a14d69-3ee7-7a61-bf58-b445b954cf7a",
       "textSha256": ["264fe1ef389f41489d1df35c6ea423010add76d33ba8053e99cce21c213f98c5"]
     },
     {
-      "turnId": "01a14d57-c44e-7ba3-8f66-2890010c66c3",
+      "turnId": "01a14d69-508a-7371-bb3a-9ba3936f767b",
       "textSha256": ["c99c3e87e8c234906809f0e2eabf16361023789bb878695bbe901cf1aea51a3b"]
     }
   ],
@@ -78,19 +78,18 @@
     "hook/completed": 6,
     "item/started": 5,
     "item/completed": 5,
-    "item/agentMessage/delta": 35,
+    "item/agentMessage/delta": 33,
     "turn/moderationMetadata": 2,
     "thread/tokenUsage/updated": 2,
     "account/rateLimits/updated": 2,
     "turn/completed": 2
   },
   "transportDiagnostics": [],
-  "implementationSourceHashes": {
-    "plugins/dotbabel/src/adaptive-session-routing/codex.mjs": "06d291e7e22a9842e31c477f658818e1e116dae66133e4fa929b152470cd5585",
-    "plugins/dotbabel/src/adaptive-session-routing/codex-rpc.mjs": "d750863421d8fa4e4a788da3ee6102ac3d87bb4d1ac8edbb22bf7808d0a77e44",
-    "plugins/dotbabel/src/adaptive-session-routing/route.mjs": "d87e5946edfadf32a536c0e52a5d4047b93cb73b2039c79b3b1e921d901cfb46",
-    "plugins/dotbabel/src/adaptive-session-routing/prepare.mjs": "380b004ca5696c2416f84d28634fcc357b75bcded5716d861496ae408b611cd4"
-  },
-  "completedAt": "2026-10-18T04:49:21.425066+00:00",
-  "evidenceKind": "controlled native App Server execution; not a mocked acknowledgement"
+  "completedAt": "2026-10-18T05:08:32.136283+00:00",
+  "sourceHashes": {
+    "codex": "e61f5eaa6e0c8e73ce96d78d684782b7827edb2feecec1f17817ac43f5577746",
+    "codex-rpc": "d750863421d8fa4e4a788da3ee6102ac3d87bb4d1ac8edbb22bf7808d0a77e44",
+    "route": "b808b68e2fd8cab3114431944d1c3e252c08a1395607c4890022b935c8b8b934",
+    "prepare": "380b004ca5696c2416f84d28634fcc357b75bcded5716d861496ae408b611cd4"
+  }
 }

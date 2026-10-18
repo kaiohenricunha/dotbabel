@@ -4,10 +4,13 @@
   "status": "approved",
   "owners": ["@kaiohenricunha"],
   "linked_paths": [
+    "experiments/adaptive-session-routing-codex/**",
     "plugins/dotbabel/src/adaptive-session-routing/**",
-    "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
     "plugins/dotbabel/tests/adaptive-session-routing-*.test.mjs",
-    "plugins/dotbabel/tests/integration/adaptive-session-routing-*.integration.test.mjs"
+    "plugins/dotbabel/tests/adaptive-session-routing-codex*.test.mjs",
+    "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
+    "plugins/dotbabel/tests/integration/adaptive-session-routing-*.integration.test.mjs",
+    "plugins/dotbabel/tests/integration/adaptive-session-routing-codex.integration.test.mjs"
   ],
   "acceptance_commands": [
     "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
@@ -118,7 +121,7 @@
     },
     {
       "id": "AC-5",
-      "status": "planned",
+      "status": "active",
       "given": "conversation continuity",
       "when": "two configurations retain the same thread and original input exactly once",
       "then": "different consecutive routes retain the thread and submit each original input once",
@@ -293,7 +296,7 @@
     },
     {
       "id": "AC-12",
-      "status": "planned",
+      "status": "active",
       "given": "Codex real runtime",
       "when": "observes two effective configurations in one real Codex thread",
       "then": "real Codex evidence identifies two effective routes on one retained thread",
