@@ -35,6 +35,7 @@ import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
 import { resolveRequest } from "../src/model-intelligence/cli/resolve.mjs";
 import { catalogStatus, refreshSources } from "../src/model-intelligence/catalog/index.mjs";
 import { readSnapshot, updateSnapshot, collectReleaseEvidence, releaseSnapshotStatus, DEFAULT_SNAPSHOT_PATH } from "../src/model-intelligence/snapshot/index.mjs";
+import { inspectWorkflowProjection } from "../src/model-intelligence/materialize/runtime/claude-workflow-status.mjs";
 import { inspectClaudeProjection } from "../src/model-intelligence/materialize/runtime/claude-baseline.mjs";
 import { fileURLToPath } from "node:url";
 import { cacheRoot } from "../src/model-intelligence/catalog/cache.mjs";
@@ -234,7 +235,9 @@ function runStatus() {
   catch (error) { releaseSnapshot = { valid: false, reason: error.code ?? "snapshot_invalid", releaseSnapshotAgeMs: null }; }
   const shippedBaseline = inspectClaudeProjection(fileURLToPath(new URL("../templates/claude", import.meta.url)));
   const localProjection = inspectClaudeProjection(resolve(resolveRepoRoot(true), ".claude"));
-  const report = { activation, releaseSnapshot, shippedBaseline, localProjection, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };
+  const shippedWorkflow = inspectWorkflowProjection(fileURLToPath(new URL("../templates/workflows", import.meta.url)));
+  const installedWorkflow = inspectWorkflowProjection(resolve(resolveRepoRoot(true), ".github/workflows"), shippedWorkflow);
+  const report = { activation, releaseSnapshot, shippedBaseline, localProjection, shippedWorkflow, installedWorkflow, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };
   if (argv.flags.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   for (const s of report.sources) {
     const cache = s.cache === null ? "no cache" : `cache ${s.cache.freshness}, observed ${s.cache.observedAt}, ${s.cache.models} model(s)`;
@@ -248,6 +251,7 @@ function runStatus() {
     out.fail(releaseSnapshot.reason); process.exit(releaseSnapshot.reason === "snapshot_unavailable" ? EXIT_CODES.ENV : EXIT_CODES.VALIDATION);
   }
   out.info(`shipped baseline: ${shippedBaseline.status}; local projection: ${localProjection.status}; session execution: not observed`);
+  out.info(`shipped workflow: ${shippedWorkflow.status}; installed workflow: ${installedWorkflow.status}; matches shipped: ${installedWorkflow.matchesShipped ?? "unknown"}; session execution: not observed`);
   const { totalBytes, maxBytes, withinLimit } = report.cache;
   if (argv.flags.check && !withinLimit) {
     out.fail(`the capability cache holds ${totalBytes} bytes, above the ${maxBytes}-byte limit (OPS-2)`);
