@@ -71,6 +71,7 @@ import { commandExists } from "./lib/symlink.mjs";
  * @property {"skills-dir" | "copilot-files"} kind  Shape written into a repo.
  * @property {string} [dir]        Repo-relative skills dir, for `skills-dir`.
  * @property {boolean} [shareable] Whether the tree can be shared via a redirect.
+ * @property {boolean} [defaultEnabled] Included in new projects unless false.
  */
 
 /**
@@ -129,7 +130,12 @@ export const RUNTIMES = Object.freeze({
     }),
     configDir: Object.freeze({ envVar: "GEMINI_HOME", baseDir: ".gemini" }),
     globalSkills: Object.freeze({ subdir: "skills" }),
-    projectFanOut: Object.freeze({ kind: "skills-dir", dir: ".gemini/skills", shareable: true }),
+    projectFanOut: Object.freeze({
+      kind: "skills-dir",
+      dir: ".gemini/skills",
+      shareable: true,
+      defaultEnabled: false,
+    }),
   }),
   // Antigravity CLI.
   //
@@ -142,8 +148,9 @@ export const RUNTIMES = Object.freeze({
   //
   // `shareable: false` is the load-bearing field. Antigravity is the first
   // skills-dir runtime that cannot join the `fan_out_layout: "shared"` tree,
-  // because `.agents/skills` is a directory codex and gemini do not read — a
-  // redirect there would point at a tree nothing follows.
+  // because its verified contract requires an independent `.agents/skills`
+  // tree. Compatibility discovery by another CLI does not establish that agy
+  // follows a redirect to the shared tree.
   antigravity: Object.freeze({
     id: "antigravity",
     label: "Antigravity",
@@ -310,6 +317,16 @@ export function fanOutRuntimes() {
   return Object.values(RUNTIMES)
     .filter((runtime) => runtime.projectFanOut !== null)
     .map((runtime) => runtime.id);
+}
+
+/**
+ * Default project destinations, distinct from all supported fan-out runtimes.
+ * Explicit project configuration can still select any supported runtime.
+ *
+ * @returns {string[]}
+ */
+export function defaultFanOutRuntimes() {
+  return fanOutRuntimes().filter((id) => RUNTIMES[id].projectFanOut.defaultEnabled !== false);
 }
 
 /**

@@ -4,6 +4,10 @@
 # Idempotent: safe to re-run after pulling new commits.
 # Backs up pre-existing real files (not symlinks) to <name>.bak-<timestamp>.
 #
+# Antigravity CLI (agy) is the recommended Google runtime for new installs.
+# Installed Gemini CLI remains supported; --all continues to configure both.
+# Project fan_out defaults do not restrict this user-scope bootstrap.
+#
 # Flags:
 #   --quiet   suppress per-file progress output; only warnings + the final
 #             one-line summary are printed.
