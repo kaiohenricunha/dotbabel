@@ -538,6 +538,28 @@ describe("build-plugin release baseline integration", () => {
     writeFileSync(join(root, SNAPSHOT_REL), JSON.stringify(createSnapshot(seed)));
     expect(runBuild(root).status).toBe(2); expect(readFileSync(generated, "utf8")).toBe(previous);
   });
+  it("does not expose malformed snapshot input in build diagnostics", () => {
+    const root = mkRepo(); writeAgent(root, "private-input-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = join(root, "plugins/dotbabel/templates/claude/agents/private-input-agent.md"); const previous = readFileSync(generated, "utf8");
+    const privateMarker = "pvtValue_do_not_echo";
+    writeFileSync(join(root, SNAPSHOT_REL), privateMarker);
+    for (const flags of [[], ["--check"]]) {
+      const result = runBuild(root, flags);
+      expect(result.status).toBe(2);
+      expect(result.stdout + result.stderr).not.toContain(privateMarker);
+      expect(result.stdout + result.stderr).toContain("snapshot_invalid");
+      expect(readFileSync(generated, "utf8")).toBe(previous);
+    }
+  });
+  it("preserves output when required release evidence has low confidence", () => {
+    const root = mkRepo(); writeAgent(root, "confidence-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = join(root, "plugins/dotbabel/templates/claude/agents/confidence-agent.md"); const previous = readFileSync(generated, "utf8");
+    const seed = structuredClone(RELEASE_SNAPSHOT);
+    for (const model of seed.runtimes.claude.models) for (const entries of Object.values(model.fields)) for (const entry of entries) entry.confidence = "low";
+    writeFileSync(join(root, SNAPSHOT_REL), JSON.stringify(createSnapshot(seed)));
+    expect(runBuild(root).status).toBe(2);
+    expect(readFileSync(generated, "utf8")).toBe(previous);
+  });
   it("checks the projection manifest rather than silently accepting changed provenance", () => {
     const root = mkRepo(); writeAgent(root, "baseline-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
     writeFileSync(projectionPath(root), "{}\n"); expect(runBuild(root, ["--check"]).status).toBe(1);
