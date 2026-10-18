@@ -110,6 +110,8 @@ that recipe, changes runtime settings, refreshes capability data or submits the 
 An optional `--observation-file <path>` supplies a validated runtime observation record. This is
 an explicit saved record, not a new live session probe. The command preserves its basis and
 reported provider/model/effort fields. A reconstructed probe is not treated as the user's session.
+The saved-observation reader currently requires Linux and `/proc/self/fd`. Recommendations
+without this flag do not use that filesystem backend.
 Without an as-run observation, advice reports unknown comparison. Missing capability evidence
 never becomes a model ranking. Escalation and de-escalation compare semantic capability classes
 established by exact configuration queries to the same public resolver, with mandatory floors
