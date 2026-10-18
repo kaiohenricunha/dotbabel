@@ -186,3 +186,12 @@ git worktree remove .claude/worktrees/pr-N   # for each N
 - **Sandbox write blocks:** sub-agents emit JSON to stdout; the coordinator captures from stdout, not from files.
 - **Every Status row** must cite the `evidence_url` from the sub-agent's JSON (CI run URL or test output).
 - **Pre-flight failures are non-fatal** to the batch — removed PRs are reported in the pre-flight table and excluded from dispatch. The remaining PRs proceed.
+
+## Compute scope
+
+The coordinator's consumer requirement is inheritance. It sets no model or effort,
+and native skill frontmatter does not enforce compute. Keep the existing generic
+per-PR workers, their inheritance, rounds and review workflow. Record any observed
+coordinator configuration separately from each worker's observation. Do not infer
+a worker's configuration from the coordinator or from an inert skill selector;
+missing observations remain unknown. Keep the existing worker result contract.

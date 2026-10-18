@@ -103,6 +103,7 @@ runnable surface, such as a pure refactor that the tests already cover.
 5. **Reference the spec doc by section** — not by line number (lines change)
 6. **One prompt = one deliverable** — don't combine unrelated work
 7. **Command selection:**
-   - `/think` — implementation tasks with a locked spec
-   - `/ultraplan` — complex tasks requiring deep reasoning
-   - `/plan` — when CC previously got an approach wrong
+   - Use the existing `/plan` workflow for an implementation approach or a revised plan.
+   - For complex work, recommend an explicit reasoning effort only if the active runtime
+     supports that control. Keep effort selection separate from model selection.
+   - Do not invent a slash command to request more reasoning.

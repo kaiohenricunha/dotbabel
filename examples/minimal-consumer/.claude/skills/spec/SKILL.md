@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:6ec82c2957a331a2afa0829c6597d916d0b18f1f5536f1fe88119c98df968a2e source=skills/spec/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:f11091b21ba634bfb5b67e16c67731f1a20cc400a081e061b93bea3a5308a862 source=skills/spec/SKILL.md — do not edit directly
 argument-hint: "[spec-name] [description] [--brownfield]"
 description: |
   Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on "let's spec this out", "create a spec", "design doc", "write a technical plan", "plan the architecture". Works for greenfield and brownfield projects. Outputs to docs/specs/.
@@ -277,7 +277,8 @@ Use these templates when creating each section file in Phase 1.
 <!--
 Each prompt should include:
 - <read-first> block listing 4-6 specific source files
-- Command recommendation (/think, /ultraplan, /plan)
+- The existing /plan workflow; recommend an explicit reasoning effort only when
+  the active runtime supports that control. Do not invent a slash command.
 - TDD test names (the test is the first deliverable)
 - Exact file paths to create/modify
 - A <proof> block: the tests, the command that runs the new behavior, what the

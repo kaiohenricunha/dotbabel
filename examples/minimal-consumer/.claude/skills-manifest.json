@@ -5,14 +5,14 @@
     {
       "name": "agents-search",
       "path": ".claude/skills/agents-search/SKILL.md",
-      "checksum": "sha256:46c1a61c2c057c17a32b9fd8d04a7d05969ae763e6cf4b6bf93aa8d9f94b00c6",
+      "checksum": "sha256:7f1cd54d899cf606f0956700604d1782a9f7edb3119e72c56aedc35bb225a273",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "audit-and-fix",
       "path": ".claude/skills/audit-and-fix/SKILL.md",
-      "checksum": "sha256:0b1de031eec9cdacaca7ec21f572aca9b246154d6e8fd6bbb21f1fed5bc1b0c3",
+      "checksum": "sha256:c6cc2634a73c0762aa806c476e33239aa3f0b9097a3d0ff017eecfd9ab73c6b2",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -271,7 +271,7 @@
     {
       "name": "review-prs",
       "path": ".claude/skills/review-prs/SKILL.md",
-      "checksum": "sha256:196ae7928effd09462e4dbe0a3d51fcfc4bda8062fc1ecd1b03434b5229f5a93",
+      "checksum": "sha256:c327725a356a2e1f97dbb82c4abd49f20e0f65441b1870a8bfe61d906e1b8603",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -306,7 +306,7 @@
     {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
-      "checksum": "sha256:042a549172c483c3369981035c568db70f26deb3060d72b805b294e48977c192",
+      "checksum": "sha256:b3bf464e6d788a5db5bb645d22d3741a11bbcea1295e19f38d7fa3887d8b1820",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },

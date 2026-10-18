@@ -375,11 +375,11 @@
       "runtimeContractHash": "sha256:0d3f0c9b8c743cc05aa6458b255fa86a85c405c657bfef4eb25358df91e22798"
     },
     "skills/agents-search/SKILL.md": {
-      "projectionId": "sha256:fe601a6304ec1e62da7d6971f19a1bc4ad941074a697e7c3dbd0c7181af01328",
+      "projectionId": "sha256:8dd13b5053bc3966a478a6a086996ff59809f1a181cee3d0b0bfde10e93a0803",
       "sourcePath": "skills/agents-search/SKILL.md",
-      "sourceHash": "sha256:ed2f98dc0344f7c57f19b92c0f08a1bf02e517435175bc690b51fee2a78136b3",
-      "inputsHash": "sha256:d1a1f77306216973033edfc2a68e2bf6fa2866016dbe765fc76309085da6dd9d",
-      "outputHash": "sha256:46c1a61c2c057c17a32b9fd8d04a7d05969ae763e6cf4b6bf93aa8d9f94b00c6",
+      "sourceHash": "sha256:66cef1eb1b50bae97fff9384402deebe96b70a0af75c061615029c56a0a06487",
+      "inputsHash": "sha256:e75fc1f3650f45c8add6bfc4aad737fdb5fb47e8d5b98ff6160c6e1483f803d2",
+      "outputHash": "sha256:7f1cd54d899cf606f0956700604d1782a9f7edb3119e72c56aedc35bb225a273",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
@@ -387,15 +387,15 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/audit-and-fix/SKILL.md": {
-      "projectionId": "sha256:f0b2d05eb994c6bdcc597ced1324d1e113d3b41067f522e8ab12014c803a231c",
+      "projectionId": "sha256:e3587d04f360c04ddeccf6368254bbbae0c69f587eb7f50060cd5dfc7708469e",
       "sourcePath": "skills/audit-and-fix/SKILL.md",
-      "sourceHash": "sha256:ac8ee5735fa846a54da111bebcf2c9ef550d48d3cfcc7da75c070c527a29991a",
-      "inputsHash": "sha256:ae087a5d0bff72eddb149454775620bc133f5b8f6ec176f210bc4a77be06989a",
-      "outputHash": "sha256:0b1de031eec9cdacaca7ec21f572aca9b246154d6e8fd6bbb21f1fed5bc1b0c3",
+      "sourceHash": "sha256:57abe7f28d0f01f6bf76c13642d9325b516a81ae4f08ec8a4f51e453b3679ac7",
+      "inputsHash": "sha256:16e581fb9d637d95a79efc196fdf2dc4d89f650428ad965c631df632210c0478",
+      "outputHash": "sha256:c6cc2634a73c0762aa806c476e33239aa3f0b9097a3d0ff017eecfd9ab73c6b2",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
-      "resolverResultHash": "sha256:6afeed774bfa2334e9074f1767eda45c50bcf8f0a7d0971dce4e2f6078cb0511",
+      "resolverResultHash": "sha256:b285bec4ab9515edcb4230860cc6d0ee7d77ba993a6a4b9f2004065e6fa913fd",
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/aws-specialist/SKILL.md": {
@@ -759,11 +759,11 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/review-prs/SKILL.md": {
-      "projectionId": "sha256:5b2d5e8b46008edbc86ab839038c46f69313f14a535df7a3eec7b3670862bde9",
+      "projectionId": "sha256:b4c4354b555f5258bbb27483a2f6853ddb46dfa234118ede5f535fdf3ef22f79",
       "sourcePath": "skills/review-prs/SKILL.md",
-      "sourceHash": "sha256:d5f394dfb1944956f45231304ddc164f7ddc90142e4a419943b3a7102635f9a7",
-      "inputsHash": "sha256:d65326451ffec53fd3eb55ffa37fec0135b12583367093f87179a9d0d99174be",
-      "outputHash": "sha256:196ae7928effd09462e4dbe0a3d51fcfc4bda8062fc1ecd1b03434b5229f5a93",
+      "sourceHash": "sha256:9c0b037d0bea5738a16d596bef1b798e5ab1508ba2585661271d5eb81d907283",
+      "inputsHash": "sha256:60688e490867257d57ab04cb7ef5a40fb6555c630de44d4a44bb75c958609457",
+      "outputHash": "sha256:c327725a356a2e1f97dbb82c4abd49f20e0f65441b1870a8bfe61d906e1b8603",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
@@ -819,11 +819,11 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/spec/SKILL.md": {
-      "projectionId": "sha256:6ec82c2957a331a2afa0829c6597d916d0b18f1f5536f1fe88119c98df968a2e",
+      "projectionId": "sha256:f11091b21ba634bfb5b67e16c67731f1a20cc400a081e061b93bea3a5308a862",
       "sourcePath": "skills/spec/SKILL.md",
-      "sourceHash": "sha256:d4e069c172b0bd14f9dbed18276051f3b8d85211d8a2d217cd02d8b0650ae182",
-      "inputsHash": "sha256:4d2a6548ce261ea1eeecb8fc3ef70ac5e9bd0acc94d5f049d7eb491fc6f506f3",
-      "outputHash": "sha256:042a549172c483c3369981035c568db70f26deb3060d72b805b294e48977c192",
+      "sourceHash": "sha256:7a18eea65429b9af03f318fd949240f3693108d0ae4b8d74b9b54e509239ec4e",
+      "inputsHash": "sha256:70359e814be7ae7c4267dacc77c0708040aa19253aeecd082e847a6f1bac5bd7",
+      "outputHash": "sha256:b3bf464e6d788a5db5bb645d22d3741a11bbcea1295e19f38d7fa3887d8b1820",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
