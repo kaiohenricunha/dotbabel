@@ -13,7 +13,7 @@ function fixture() {
   vi.stubEnv("XDG_CACHE_HOME", join(repoRoot, "cache"));
   vi.stubEnv("XDG_CONFIG_HOME", join(repoRoot, "config"));
   writeFileSync(join(repoRoot, ".dotbabel.json"), "{}");
-  const model = makeModelFact({ id: "opaque-request-model", capabilities: { reasoning: true, tool_call: true }, supportedReasoningLevels: [{ effort: "native-low" }, { effort: "native-high" }], defaultReasoningLevel: "native-low" });
+  const model = makeModelFact({ id: "opaque-request-model", selectionVisibility: "listed", capabilities: { reasoning: true, tool_call: true }, supportedReasoningLevels: [{ effort: "native-low" }, { effort: "native-high" }], defaultReasoningLevel: "native-low" });
   const result = makeAdapterResult({ status: "ok", provenance: { sourceId: "codex", sourceKind: "runtime", adapterVersion: ADAPTER_VERSION }, observedAt: new Date().toISOString(), evidence: makeDiscoveryEvidence({ models: [model] }) });
   expect(writeEntry(cacheRoot(), makeCacheEntry({ result })).written).toBe(true);
   const request = { repoRoot, runtimeId: "codex", artifactKind: "skill", workloadClass: "deep" };
@@ -88,6 +88,16 @@ describe("read-only resolution file boundaries", () => {
     const value = resolveRequest(request);
     expect(value).toMatchObject({ exitCode: 1, result: { status: "invalid", diagnostics: [{ code: "invalid_model_intelligence_policy" }] } });
     expect(JSON.stringify(value)).not.toContain("private-policy-marker");
+  });
+  it("rejects a repository class-table override instead of redefining the user's floor", () => {
+    const { repoRoot, request } = fixture();
+    mkdirSync(join(repoRoot, "config", "dotbabel"), { recursive: true });
+    writeFileSync(join(repoRoot, "config", "dotbabel", "model-intelligence.json"), JSON.stringify({ floor: { mode: "floor", requirement: "frontier" } }));
+    expect(resolveRequest(request).result.status).toBe("unresolved");
+    writeFileSync(join(repoRoot, ".dotbabel.json"), JSON.stringify({ model_intelligence: { classes: { frontier: { satisfied_by: {} } } } }));
+    const value = resolveRequest(request);
+    expect(value).toMatchObject({ exitCode: 1, result: { status: "invalid", diagnostics: [{ code: "invalid_model_intelligence_policy" }] } });
+    expect(value.result.configuration).toBeUndefined();
   });
   it("reports unsupported runtime adapters without pretending that a catalog can enable them", () => {
     const { request } = fixture();

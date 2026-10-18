@@ -166,7 +166,7 @@ export function checkAdapterResult(result, { operation, sentEtag }) {
   return result;
 }
 
-const FACT_FIELDS = Object.freeze(["id", "capabilities", "displayName", "visibility", "defaultReasoningLevel", "supportedReasoningLevels", "contextWindow", "maxContextWindow", "supportVerbosity", "defaultVerbosity"]);
+const FACT_FIELDS = Object.freeze(["id", "capabilities", "selectionVisibility", "inputModalities", "displayName", "visibility", "defaultReasoningLevel", "supportedReasoningLevels", "contextWindow", "maxContextWindow", "supportVerbosity", "defaultVerbosity"]);
 
 /**
  * Append one source's value of each field a model fact states.

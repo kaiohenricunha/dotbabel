@@ -18,6 +18,9 @@ import { RUNTIMES } from "../../agents.mjs";
 /** Semantic workload classes, ordered by required reasoning capability. Not a model score. */
 export const WORKLOAD_CLASSES = Object.freeze(["mechanical", "routine", "deep", "frontier", "exceptional"]);
 
+/** Semantic effort intent, independent of model capability and native runtime values. */
+export const EFFORT_INTENTS = Object.freeze(["low", "medium", "high"]);
+
 /** Where a requirement applies, independent of the artifact's file type. */
 export const BINDINGS = Object.freeze(["self", "session", "consumer"]);
 

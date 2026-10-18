@@ -135,6 +135,16 @@ describe("resolver policy and uncertainty boundaries", () => {
     expect(result.enforcement).toEqual({ state: "unknown", basis: "none" });
     validateResult(result);
   });
+  it("reports an observed floor violation when no eligible replacement exists", () => {
+    const value = only(model("routine-only", "routine"), { requirement: requirement("frontier", "floor", { binding: "consumer" }), observed: { runtimeId: "codex", configurationBasis: "as-run", freshness: "fresh", axes: { model: "routine-only" } } });
+    const result = resolve(value);
+    expect(result.status).toBe("unresolved");
+    expect(result.enforcement).toEqual({ state: "unsatisfied", basis: "session-observation" });
+    expect(result.explanation.map(x => x.code)).toContain("observed_session_below_requirement");
+    expect(result.configuration).toBeUndefined();
+    value.observed.freshness = "stale";
+    expect(resolve(value).enforcement.state).toBe("unknown");
+  });
   it("returns structured invalid results for malformed normalized constraints", () => {
     const invalid = [null, [], { target: null }, { policy: null }, { runtimeContract: null }, { catalog: null }, { catalog: { runtimes: {} } }, { requirement: [] }, { requirement: { mode: "inherit", binding: "self", requirement: "deep" } }, { requirement: { mode: "inherit", binding: "self", pin: { runtime: "codex", config: { model: "deep-model" } } } }, { requirement: requirement("deep", "dynamic", { binding: "invalid" }) }, { requirement: requirement("deep", "pin") }, { requirement: requirement("deep", "dynamic", { pin: { runtime: "codex", config: { model: "deep-model" } } }) }];
     for (const change of invalid) {
