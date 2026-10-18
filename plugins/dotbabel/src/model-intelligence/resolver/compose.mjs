@@ -1,4 +1,5 @@
 /** Pure semantic constraint composition; specificity never removes a safety floor. */
+import { isArtifactSourcePath, normalizeScopedFloors } from "../policy/scopes.mjs";
 import { ARTIFACT_KINDS, WORKLOAD_CLASSES, EFFORT_INTENTS, BINDINGS, RESOLUTION_MODES, isRuntimeId, compareWorkloadClass, checkOpaqueValue } from "../domain/index.mjs";
 
 /** @param {unknown} value @returns {boolean} */
@@ -16,6 +17,10 @@ function validPin(pin, runtime) {
  */
 export function compose(input) {
   if (!object(input) || !object(input.target) || !isRuntimeId(input.target.runtimeId) || !ARTIFACT_KINDS.includes(input.target.artifactKind) || !object(input.policy) || !object(input.policy.classes) || !object(input.catalog) || !Array.isArray(input.catalog.runtimes) || !object(input.runtimeContract)) return { valid: false };
+  if (input.target.sourcePath !== undefined && !isArtifactSourcePath(input.target.sourcePath)) return { valid: false };
+  let scopedFloors;
+  try { scopedFloors = normalizeScopedFloors(input.policy.scoped_floors).filter(entry => entry.scope.source_path === input.target.sourcePath && entry.scope.artifact_kind === input.target.artifactKind); }
+  catch { return { valid: false }; }
   const declaration = input.requirement;
   if (declaration !== undefined && (!object(declaration) || !BINDINGS.includes(declaration.binding) || !RESOLUTION_MODES.includes(declaration.mode) || (declaration.mode === "inherit" ? declaration.requirement !== undefined || declaration.pin !== undefined : !WORKLOAD_CLASSES.includes(declaration.requirement)) || (declaration.mode === "pin" ? !validPin(declaration.pin, input.target.runtimeId) : declaration.pin !== undefined))) return { valid: false };
   if (input.policy.floor !== undefined && (!object(input.policy.floor) || input.policy.floor.mode !== "floor" || !WORKLOAD_CLASSES.includes(input.policy.floor.requirement))) return { valid: false };
@@ -45,7 +50,9 @@ export function compose(input) {
   }
   if (invocation.modelSelection === "explicit" && pin?.config.model === undefined) return { valid: false };
   const ordinarySelection = invocation.modelSelection === "automatic" || pin?.config.model === undefined;
-  const floor = strongest(input.policy.floor?.requirement, declaration?.mode === "floor" ? declaration.requirement : undefined);
+  const scopedMinimum = scopedFloors.reduce((minimum, entry) => strongest(minimum, entry.requirement), undefined);
+  const floor = strongest(strongest(input.policy.floor?.requirement, scopedMinimum), declaration?.mode === "floor" ? declaration.requirement : undefined);
+  if (scopedMinimum !== undefined) reasons.push({ code: "scoped_floor_applied", message: `An artifact-scoped minimum of ${scopedMinimum} applies.` });
   if (floor !== undefined) reasons.push({ code: "artifact_floor_applied", message: `The effective minimum is ${floor}.`, ...(declaration?.provenance ? { provenance: declaration.provenance } : {}) });
   if (pin !== undefined) reasons.push({ code: `${pinLayer}_pin_selected`, message: `The ${pinLayer} pin is the effective exact configuration.` });
   return { valid: true, requirement: strongest(floor, declaration?.mode === "inherit" ? undefined : declaration?.requirement), floor, pin, pinLayer, binding: declaration?.binding ?? "self", requiredModalities: [...(invocation.requiredModalities ?? [])], requiredCapabilities: { ...(invocation.requiredCapabilities ?? {}) }, effortIntent: invocation.effortIntent, omitDefaultReasoning: invocation.omitDefaultReasoning === true, manualOverrides, ordinarySelection, reasons };

@@ -17,8 +17,9 @@ export function buildClaudeBaseline({ toolVersion, snapshot, artifacts }) {
     const source = parseProjectionSource(artifact);
     const legacy = source.frontmatter;
     const kind = artifact.target.artifactKind;
-    if (source.requirement === null && kind === "agent" && legacy.effort !== undefined && (legacy.model === undefined || legacy.model === "inherit")) throw Object.assign(new Error("claude_baseline_effort_model_unverified"), { code: "claude_baseline_effort_model_unverified" });
-    const legacyAxes = source.requirement === null && kind !== "skill" && legacy.model !== undefined && legacy.model !== "inherit" ? { model: legacy.model, ...(kind === "agent" && legacy.effort !== undefined ? { reasoning: legacy.effort } : {}) } : undefined;
+    if (kind === "agent" && legacy.effort !== undefined && (legacy.model === undefined || legacy.model === "inherit")) throw Object.assign(new Error("claude_baseline_effort_model_unverified"), { code: "claude_baseline_effort_model_unverified" });
+    const legacyAxes = kind !== "skill" && legacy.model !== undefined && legacy.model !== "inherit" ? { model: legacy.model, ...(kind === "agent" && legacy.effort !== undefined ? { reasoning: legacy.effort } : {}) } : undefined;
+    if (source.requirement?.mode === "pin" && legacyAxes && Object.entries(legacyAxes).some(([axis, value]) => source.requirement.pin.config[axis] !== value)) throw Object.assign(new Error("claude_baseline_legacy_pin_conflict"), { code: "claude_baseline_legacy_pin_conflict" });
     return { ...artifact, snapshotId: snapshot.snapshotId, releaseBaseline: true, ...(legacyAxes ? { legacyAxes } : {}) };
   }) });
 }

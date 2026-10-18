@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1e8bd52084bda0b2dbf685d5b982e9ca43a502b698be7f5001401159ede9413a source=commands/changelog.md — do not edit directly
+# dotbabel:generated projection=sha256:d3782172c75a7e88da1d18146a574289eeaf292e06569b70f5dbe884dab7349f source=commands/changelog.md — do not edit directly
 argument-hint: "[ref-range|count|since-deploy]"
 description: |
   Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.

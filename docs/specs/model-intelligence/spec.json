@@ -1,6 +1,6 @@
 {
   "id": "model-intelligence",
-  "title": "Model Intelligence \u2014 provider-neutral compute requirements resolved to runtime-native configurations",
+  "title": "Model Intelligence — provider-neutral compute requirements resolved to runtime-native configurations",
   "status": "approved",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
@@ -552,7 +552,7 @@
     },
     {
       "id": "AC-21",
-      "status": "planned",
+      "status": "active",
       "given": "an artifact with an omitted model or inherit",
       "when": "migrate --write runs",
       "then": "no concrete requirement is introduced",

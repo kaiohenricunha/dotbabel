@@ -1,9 +1,10 @@
 /** Read-only CLI orchestration. The shared resolver receives only already-loaded data. */
 import { openSync, closeSync, fstatSync, readSync, constants } from "node:fs";
-import { resolve as resolvePath } from "node:path";
+import { relative, sep, resolve as resolvePath } from "node:path";
 import { parseFrontmatter } from "../../build-index.mjs";
 import { parseComputeDeclaration } from "../requirement/index.mjs";
 import { interpretLegacy, detectDualDeclarationConflict } from "../compat/index.mjs";
+import { isArtifactSourcePath } from "../policy/scopes.mjs";
 import { loadPolicyLayers, mergePolicy } from "../policy/index.mjs";
 import { SOURCE_ADAPTERS } from "../sources/index.mjs";
 import { loadCatalog } from "../catalog/index.mjs";
@@ -67,7 +68,8 @@ export function resolveRequest({ repoRoot, runtimeId, artifactKind, workloadClas
   const adapter = SOURCE_ADAPTERS.find(module => module.descriptor.kind === "runtime" && module.descriptor.id === runtimeId);
   if (!adapter) return { result: failed("unresolved", "runtime_adapter_unavailable"), exitCode: 2 };
   const catalog = loadCatalog({ sources: SOURCE_ADAPTERS.map(module => ({ module })), now: new Date().toISOString() });
-  const target = { runtimeId, artifactKind };
+  const candidatePath = artifactPath === undefined ? undefined : relative(resolvePath(repoRoot), resolvePath(repoRoot, artifactPath)).split(sep).join("/");
+  const target = { runtimeId, artifactKind, ...(isArtifactSourcePath(candidatePath) ? { sourcePath: candidatePath } : {}) };
   const result = resolve({ requirement, policy, catalog, target, runtimeContract: adapter.descriptor });
   const localEvidence = catalog.runtimes.find(runtime => runtime.runtimeId === runtimeId)?.models.length > 0;
   const exitCode = result.status === "resolved" ? 0 : result.status === "unresolved" && !localEvidence ? 2 : 1;

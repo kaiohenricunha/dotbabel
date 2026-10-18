@@ -12,8 +12,8 @@
  * - `resolve` (P-11) explains artifact or ad hoc requirements using cached evidence only.
  *   It does not discover models, observe a session, or apply runtime configuration.
  * - `migrate` reports what migrating each artifact's legacy `model:` / `effort:` frontmatter would mean
- *   and writes nothing. `--write` and `--check` arrive with P-18, behind the batching and
- *   preserved-behaviour gates of IMPL-2.
+ *   by default. Explicit `--write` and `--check` use reviewed decisions and preserve native
+ *   controls behind the batching and preserved-behaviour gates of IMPL-2.
  *
  * Exits: 0 completed; 1 a declaration conflict (`migrate`) or a cache above the OPS-2 limit
  * (`status --check`); 2 a required source, runtime, or the repository is unavailable; 64 usage error.
@@ -39,15 +39,19 @@ import { inspectClaudeProjection } from "../src/model-intelligence/materialize/r
 import { fileURLToPath } from "node:url";
 import { cacheRoot } from "../src/model-intelligence/catalog/cache.mjs";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { resolve, dirname, basename } from "node:path";
 
+import { migrateArtifacts } from "../src/model-intelligence/compat/migrate.mjs";
+import { openProjectionTree } from "../src/model-intelligence/materialize/projection-fs.mjs";
 const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
   description:
-    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
+    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; migrate [--check | --write] [--decisions <path>] [--batch <A-F>] — report or apply reviewed canonical migrations; class-F decisions remain untouched.",
   flags: {
     write: { type: "boolean" },
+    batch: { type: "string" },
+    decisions: { type: "string" },
     "snapshot-file": { type: "string" },
     "evidence-file": { type: "string" },
     routing: { type: "boolean" },
@@ -70,7 +74,7 @@ const VERB_FLAGS = Object.freeze({
   snapshot: ["check", "write", "snapshot-file", "evidence-file"],
   enable: ["routing", "repo-root"],
   disable: ["routing", "repo-root"],
-  migrate: ["repo-root"],
+  migrate: ["repo-root", "write", "check", "batch", "decisions"],
   resolve: ["repo-root", "runtime", "requirement", "artifact-kind"],
 });
 
@@ -103,10 +107,12 @@ if (argv.version) {
 const verb = argv.positional?.[0];
 if (verb === undefined) usage(`a verb is required (one of: ${VERBS.join(", ")})`);
 if (!VERBS.includes(verb)) usage(`unknown verb "${verb}" (expected one of: ${VERBS.join(", ")})`);
-for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file"]) {
+for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file", "batch", "decisions"]) {
   if (argv.flags[flag] !== undefined && !VERB_FLAGS[verb].includes(flag)) usage(`--${flag} does not apply to ${verb}`);
 }
-if (verb === "snapshot" && argv.flags.check && (argv.flags.write || argv.flags["evidence-file"])) usage("snapshot --check cannot be combined with --write or --evidence-file");
+if (verb === "migrate" && argv.flags.check && argv.flags.write) usage("migrate --check and --write cannot be combined");
+if (verb === "migrate" && argv.flags.batch !== undefined && !["A", "B", "C", "D", "E", "F"].includes(argv.flags.batch)) usage("migrate --batch requires A, B, C, D, E or F");
+if (verb === "snapshot" && argv.flags.check && (argv.flags.write || argv.flags["evidence-file", "batch", "decisions"])) usage("snapshot --check cannot be combined with --write or --evidence-file");
 if (!["migrate", "resolve"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
 
 // Under `--json`, stdout carries exactly one JSON document, so every human line
@@ -120,7 +126,7 @@ try {
   else if (verb === "snapshot") await runSnapshot();
   else if (verb === "resolve") runResolve();
   else if (["enable", "disable"].includes(verb)) runActivation();
-  else runMigrate();
+  else await runMigrate();
 } catch (error) {
   const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_)/.test(error.code) ? error.code : undefined;
   const code = snapshotCode ?? (["invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
@@ -295,7 +301,7 @@ function resolveRepoRoot(allowCurrentDirectory = false) {
  * `migrate`: report what migrating each artifact's legacy frontmatter would mean. Writes nothing.
  * @returns {void}
  */
-function runMigrate() {
+async function runMigrate() {
   const repoRoot = resolveRepoRoot();
   // The library owns which kinds can carry a compute declaration, so this filter and
   // the one `interpretLegacy` applies cannot disagree (IMPL-4).
@@ -309,6 +315,18 @@ function runMigrate() {
       frontmatter: parseFrontmatter(artifact.content).frontmatter ?? {},
     }));
 
+  if (argv.flags.write || argv.flags.check || argv.flags.batch !== undefined || argv.flags.decisions !== undefined) {
+    let decisions;
+    if (argv.flags.decisions !== undefined) {
+      const file = resolve(argv.flags.decisions); const tree = openProjectionTree(dirname(file));
+      try { try { decisions = JSON.parse(tree.read(basename(file))); } catch { throw Object.assign(new Error("migration_decision_invalid"), { code: "migration_decision_invalid" }); } } finally { tree.close(); }
+    }
+    const report = await migrateArtifacts({ root: repoRoot, paths: inputs.map(input => input.sourcePath), decisions, batch: argv.flags.batch, mode: argv.flags.write ? "write" : argv.flags.check ? "check" : "analysis" });
+    if (argv.flags.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    else { out.info(`Migration ${report.mode}: ${report.pending.length} pending, ${report.written.length} written, ${report.unresolved.length} owner decisions`); }
+    if (argv.flags.check && !report.compliant) process.exitCode = EXIT_CODES.VALIDATION;
+    return;
+  }
   const report = analyzeMigration(inputs);
 
   if (argv.flags.json) {
