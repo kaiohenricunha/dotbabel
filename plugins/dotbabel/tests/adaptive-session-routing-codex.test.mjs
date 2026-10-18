@@ -112,6 +112,52 @@ describe("Codex main-session submission routing", () => {
     expect(await router.submit("second", submission())).toMatchObject({ status: "accepted" });
     expect(request).toHaveBeenCalledTimes(2);
   });
+  it.each([["new-turn", "old-turn"], ["old-turn", "new-turn"]])("retains a matching early completion across notification order %s then %s", async (first, second) => {
+    const { router, request } = setup();
+    request.mockImplementationOnce(async () => {
+      for (const id of [first, second]) router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id, status: "completed" } } });
+      return { turn: { id: "new-turn", status: "inProgress" } };
+    });
+    await router.submit("first", submission());
+    expect(await router.submit("second", submission())).toMatchObject({ status: "accepted" });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+  it("reports completion evidence overflow without erasing a retained match", async () => {
+    const { router, request } = setup();
+    request.mockImplementationOnce(async () => {
+      for (const id of ["new-turn", ...Array.from({ length: 80 }, (_, index) => `old-${index}`)]) router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id, status: "completed" } } });
+      return { turn: { id: "new-turn", status: "inProgress" } };
+    });
+    const first = await router.submit("first", submission());
+    expect(first.diagnostics).toContainEqual({ code: "native_completion_buffer_full" });
+    const next = await router.submit("second", submission());
+    expect(next.status).toBe("accepted");
+    expect(next.diagnostics).not.toContainEqual({ code: "native_completion_buffer_full" });
+  });
+  it.each([31, 32])("bounds early completion evidence after %i distinct prior completions", async count => {
+    const { router, request } = setup();
+    request.mockImplementationOnce(async () => {
+      for (const id of [...Array.from({ length: count }, (_, index) => `old-${index}`), "new-turn"]) router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id, status: "completed" } } });
+      return { turn: { id: "new-turn", status: "inProgress" } };
+    });
+    const first = await router.submit("first", submission());
+    expect(first.diagnostics.some(item => item.code === "native_completion_buffer_full")).toBe(count === 32);
+    expect((await router.submit("second", submission())).status).toBe(count === 32 ? "blocked" : "accepted");
+    if (count === 32) {
+      router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id: "new-turn", status: "completed" } } });
+      expect((await router.submit("second", submission())).status).toBe("accepted");
+    }
+  });
+  it("duplicate early completions do not consume distinct evidence slots", async () => {
+    const { router, request } = setup();
+    request.mockImplementationOnce(async () => {
+      for (const id of [...Array(80).fill("old-turn"), "new-turn"]) router.notify({ method: "turn/completed", params: { threadId: "thread-1", turn: { id, status: "completed" } } });
+      return { turn: { id: "new-turn", status: "inProgress" } };
+    });
+    const first = await router.submit("first", submission());
+    expect(first.diagnostics).not.toContainEqual({ code: "native_completion_buffer_full" });
+    expect(await router.submit("second", submission())).toMatchObject({ status: "accepted" });
+  });
   it("stops a prepared submission when native manual state changes before execution", async () => {
     const { router, request, prepare } = setup();
     prepare.mockImplementationOnce(async () => {

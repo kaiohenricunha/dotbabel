@@ -11,6 +11,7 @@ const result = (status, code, extra = {}) => ({ status, effective: { state: "unk
  * an uncertain write; uncorrelated completion events cannot release that barrier.
  * The caller must inspect native state before creating another boundary, without replaying it.
  * The deduplication ledger lasts for this router instance; it is never evicted.
+ * Up to 32 distinct pre-acknowledgement completions are retained; overflow is diagnosed.
  * Current axes and manual provenance come from that caller, never from an acknowledgement.
  * @param {object} options Thread id, project root, runtime capability, current/manual state,
  * native request function, optional preparation strategy/dependencies and bounded ledger limit.
@@ -26,10 +27,12 @@ export function createCodexTurnRouter(options) {
   let busy = false;
   let revision = 0;
   let activeTurn;
-  let earlyCompletion;
+  const earlyCompletions = new Set();
+  let earlyCompletionOverflow = false;
   const uncertainTurn = Symbol("uncertain native turn");
 
   const execute = async (original, context) => {
+    earlyCompletionOverflow = false;
     try {
       for (const [axis, native] of [["model", "model"], ["reasoning", "effort"]]) {
         if (typeof original[native] === "string") manual[axis] = { source: "manual", value: original[native] };
@@ -73,10 +76,11 @@ export function createCodexTurnRouter(options) {
       try { response = await options.request("turn/start", params); }
       catch { activeTurn = uncertainTurn; return result("uncertain", "native_submission_unknown", { decision, requested }); }
       if (!validId(response?.turn?.id)) { activeTurn = uncertainTurn; return result("uncertain", "native_submission_unknown", { decision, requested }); }
-      if (!["completed", "interrupted", "failed"].includes(response.turn.status) && earlyCompletion !== response.turn.id) activeTurn = response.turn.id;
-      earlyCompletion = undefined;
-      return result("accepted", "native_submission_accepted", { decision, requested, accepted: { turnId: response.turn.id, status: response.turn.status } });
-    } finally { busy = false; }
+      if (!["completed", "interrupted", "failed"].includes(response.turn.status) && !earlyCompletions.has(response.turn.id)) activeTurn = response.turn.id;
+      const accepted = result("accepted", "native_submission_accepted", { decision, requested, accepted: { turnId: response.turn.id, status: response.turn.status } });
+      if (earlyCompletionOverflow) accepted.diagnostics.push({ code: "native_completion_buffer_full" });
+      return accepted;
+    } finally { busy = false; earlyCompletions.clear(); }
   };
 
   return {
@@ -103,7 +107,10 @@ export function createCodexTurnRouter(options) {
     notify(notification) {
       const params = notification?.params;
       if (notification?.method !== "turn/completed" || params?.threadId !== options.threadId || !validId(params.turn?.id) || !["completed", "interrupted", "failed"].includes(params.turn.status)) return false;
-      if (busy) earlyCompletion = params.turn.id;
+      if (busy && !earlyCompletions.has(params.turn.id)) {
+        if (earlyCompletions.size < 32) earlyCompletions.add(params.turn.id);
+        else earlyCompletionOverflow = true;
+      }
       if (activeTurn === params.turn.id) activeTurn = undefined;
       return true;
     },
