@@ -32,6 +32,14 @@ teardown() {
   [ ! -e "$XDG_CACHE_HOME/dotbabel/model-intelligence" ]
 }
 
+@test "models refresh: Anthropic metadata needs native transport and never guesses credentials" {
+  cd "$WORK"
+  run "$REAL_NODE" "$MODELS_BIN" refresh --source anthropic-models-api --no-color
+  [ "$status" -eq 2 ]
+  [[ "$output" == *"native_transport_unavailable"* ]]
+  [ ! -e "$XDG_CACHE_HOME/dotbabel/model-intelligence/entries/anthropic-models-api.json" ]
+}
+
 @test "models refresh: exits 2 when a required source is unavailable and no cache exists" {
   cd "$WORK"
   run "$REAL_NODE" "$MODELS_BIN" refresh --runtime codex --no-color
