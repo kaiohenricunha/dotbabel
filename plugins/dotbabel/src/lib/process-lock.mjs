@@ -18,7 +18,7 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { closeSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeSync } from "node:fs";
+import { closeSync, constants, fstatSync, fsyncSync, linkSync, mkdirSync, openSync, readFileSync, readSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname } from "node:path";
 
@@ -130,19 +130,42 @@ export function judgeLock(owner, { now, host, isAlive, processStartOf }) {
 }
 
 /**
- * Read a lock file: its parsed owner, `null` when it exists but holds no JSON object, or `undefined`
- * when there is no lock.
+ * Read bounded regular-file lock metadata without following symbolic links.
+ * A fixed buffer also bounds reads when the file grows after the size check.
+ * @param {string} path
+ * @returns {string | null | undefined}
+ */
+function readLockText(path) {
+  const maxBytes = 64 * 1024;
+  let fd;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > maxBytes) return null;
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let length = 0;
+    while (length < buffer.length) {
+      const count = readSync(fd, buffer, length, buffer.length - length, null);
+      if (count === 0) break;
+      length += count;
+    }
+    return length > maxBytes ? null : buffer.toString("utf8", 0, length);
+  } catch (err) {
+    if (/** @type {any} */ (err)?.code === "ENOENT") return undefined;
+    return null;
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+/**
+ * Read a lock owner, `null` for unreadable or invalid metadata, or `undefined` if absent.
  * @param {string} path
  * @returns {Record<string, unknown> | null | undefined}
  */
 export function readLockOwner(path) {
-  let text;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (err) {
-    if (/** @type {any} */ (err)?.code === "ENOENT") return undefined;
-    return null;
-  }
+  const text = readLockText(path);
+  if (text === undefined || text === null) return text;
   try {
     const parsed = JSON.parse(text);
     return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : null;
@@ -228,7 +251,18 @@ function removeStale(path, judged) {
     if (/** @type {any} */ (err)?.code === "ENOENT") return true;
     throw err;
   }
-  const text = readFileSync(aside, "utf8");
+  const text = readLockText(aside);
+  if (typeof text !== "string") {
+    // The path changed to unreadable metadata after judgement. Restore that exact
+    // directory entry without following it; never overwrite a new holder's lock.
+    try {
+      linkSync(aside, path);
+      unlinkSync(aside);
+    } catch (err) {
+      if (/** @type {any} */ (err)?.code !== "EEXIST") throw err;
+    }
+    return false;
+  }
   let moved;
   try {
     moved = JSON.parse(text);

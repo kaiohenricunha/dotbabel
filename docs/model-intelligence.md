@@ -1,5 +1,7 @@
 # Model Intelligence
 
+_Last updated: v4.2.0_
+
 Model Intelligence is an optional project capability. Installation does not enable it. The current
 activation interface stores project flags; resolver and adaptive runtime integrations are separate
 implementation work. An enabled routing preference alone does not prove a runtime is routing prompts.
@@ -33,7 +35,7 @@ an integration is installed, supported, or active. Runtime mechanism and effecti
 be verified independently. No automatic per-prompt routing ships in the activation unit.
 
 Disabling the engine preserves the routing preference and makes it ineffective. Disabling routing
-leaves the engine enabled. Both operations retain policy, agent configurations and unrelated files.
+preserves the engine's enabled flag. Both operations retain policy, agent configurations and unrelated files.
 They do not alter global Claude Code or Codex settings. Parallel projects read their own flags.
 
 Explicit `models refresh`, `status` and migration analysis remain available when disabled. Status

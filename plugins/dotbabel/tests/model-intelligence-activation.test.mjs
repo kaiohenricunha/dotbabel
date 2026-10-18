@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, symlinkSync, readdirSync, mkdirSync, chmod
 import fs from "node:fs";
 import { acquireLock } from "../src/model-intelligence/catalog/lock.mjs";
 import { join } from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
@@ -63,7 +63,7 @@ describe("project Model Intelligence activation", () => {
       expect(readFileSync(`${file}.model-intelligence.lock`, "utf8")).toBe(before);
     } finally { lock.release(); }
   });
-  it.each(["writeFileSync", "fsyncSync", "closeSync", "renameSync"])("a %s failure preserves the old document and removes temporary files", operation => {
+  it.each(["fchmodSync", "writeFileSync", "fsyncSync", "closeSync", "renameSync"])("a %s failure preserves the old document and removes temporary files", operation => {
     const repo = makeTempDir("mi-activation-");
     const file = join(repo, ".dotbabel.json");
     writeFileSync(file, "{}");
@@ -159,6 +159,18 @@ describe("project Model Intelligence activation", () => {
     const directoryRepo = makeTempDir("mi-activation-");
     mkdirSync(join(directoryRepo, ".dotbabel.json"));
     expect(() => readProjectActivation(directoryRepo)).toThrow(/project_config_unavailable/);
+  });
+  it("preserves group-write permissions excluded by the process umask", () => {
+    const repo = makeTempDir("mi-activation-");
+    const file = join(repo, ".dotbabel.json");
+    writeFileSync(file, "{}");
+    chmodSync(file, 0o660);
+    const moduleUrl = new URL("../src/model-intelligence/activation/index.mjs", import.meta.url).href;
+    const child = spawnSync(process.execPath, ["--input-type=module", "-e",
+      `import { setProjectActivation } from ${JSON.stringify(moduleUrl)}; process.umask(0o022); setProjectActivation(${JSON.stringify(repo)}, { enabled: true });`], { encoding: "utf8" });
+    expect(child.status, child.stderr).toBe(0);
+    expect(statSync(file).mode & 0o777).toBe(0o660);
+    expect(readProjectActivation(repo).enabled).toBe(true);
   });
   it("refuses an expanded configuration above the read limit before replacing it", () => {
     const repo = makeTempDir("mi-activation-");

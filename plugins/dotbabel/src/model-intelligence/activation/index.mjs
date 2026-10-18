@@ -86,6 +86,7 @@ function replaceDocument(file, document, mode) {
   let fd;
   try {
     fd = fs.openSync(temporary, "wx", mode);
+    fs.fchmodSync(fd, mode);
     fs.writeFileSync(fd, text);
     fs.fsyncSync(fd);
     fs.closeSync(fd);
