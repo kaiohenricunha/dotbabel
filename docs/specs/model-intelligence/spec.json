@@ -602,7 +602,7 @@
     },
     {
       "id": "AC-23",
-      "status": "planned",
+      "status": "active",
       "given": "a recommendation that differs from the current configuration",
       "when": "models recommend runs",
       "then": "it exits 0 and changes nothing",
