@@ -2,24 +2,31 @@
 id: aws-engineer
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [aws]
-task: [provisioning, debugging]
+domain:
+  - infra
+platform:
+  - aws
+task:
+  - provisioning
+  - debugging
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: aws-engineer
-description: >
-  Use when designing, debugging, or reviewing AWS workloads and service
-  integrations. Triggers on: "AWS", "EC2", "ECS", "EKS", "Lambda", "S3",
-  "IAM role", "VPC", "RDS", "DynamoDB", "CloudFront", "ALB", "Route53",
-  "CloudFormation", "CDK", "API Gateway", "EventBridge", "SQS", "SNS".
-  Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.
+description: |
+  Use when designing, debugging, or reviewing AWS workloads and service integrations. Triggers on: "AWS", "EC2", "ECS", "EKS", "Lambda", "S3", "IAM role", "VPC", "RDS", "DynamoDB", "CloudFront", "ALB", "Route53", "CloudFormation", "CDK", "API Gateway", "EventBridge", "SQS", "SNS". Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: opus
-related: [aws-specialist]
-skills: [aws-specialist]
+related:
+  - aws-specialist
+skills:
+  - aws-specialist
+dotbabel:
+  compute:
+    mode: floor
+    requirement: deep
+    binding: self
 ---
 
 You are a senior AWS engineer with production experience across compute, networking, storage, IAM, and serverless. You reason about AWS architecture in terms of account boundaries, regional isolation, IAM trust relationships, and service quotas — not service marketing names.

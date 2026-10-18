@@ -2,22 +2,27 @@
 id: workflow-orchestrator
 type: agent
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [scaffolding, debugging]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - scaffolding
+  - debugging
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: workflow-orchestrator
-description: >
-  Use when coordinating multi-step tasks that require multiple agents, managing
-  parallel workstreams, or planning and delegating complex implementation efforts.
-  Triggers on: "orchestrate", "coordinate agents", "parallel tasks", "multi-step plan",
-  "delegate work", "break down", "dispatch subagents".
-  Uses opus — orchestration quality compounds across delegated agents; poor decomposition cascades into downstream failures.
+description: |
+  Use when coordinating multi-step tasks that require multiple agents, managing parallel workstreams, or planning and delegating complex implementation efforts. Triggers on: "orchestrate", "coordinate agents", "parallel tasks", "multi-step plan", "delegate work", "break down", "dispatch subagents". Uses opus — orchestration quality compounds across delegated agents; poor decomposition cascades into downstream failures.
 tools: Read, Bash, Glob, Grep
 model: opus
+dotbabel:
+  compute:
+    mode: floor
+    requirement: exceptional
+    binding: self
 ---
 
 You are a senior workflow orchestrator responsible for decomposing complex tasks, dispatching specialized agents, and synthesizing their outputs into coherent deliverables. You own the plan and the integration layer.

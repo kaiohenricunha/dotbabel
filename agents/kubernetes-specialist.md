@@ -2,23 +2,32 @@
 id: kubernetes-specialist
 type: agent
 version: 1.0.0
-domain: [infra]
-platform: [kubernetes]
-task: [debugging, diagnostics, runtime-ops]
+domain:
+  - infra
+platform:
+  - kubernetes
+task:
+  - debugging
+  - diagnostics
+  - runtime-ops
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: kubernetes-specialist
-description: >
-  Use when designing, debugging, or reviewing Kubernetes workloads and cluster
-  configuration. Triggers on: "kubernetes", "k8s", "pod", "deployment", "cluster",
-  "kubectl", "namespace", "ingress", "helm chart", "workload", "node not ready".
-  Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.
+description: |
+  Use when designing, debugging, or reviewing Kubernetes workloads and cluster configuration. Triggers on: "kubernetes", "k8s", "pod", "deployment", "cluster", "kubectl", "namespace", "ingress", "helm chart", "workload", "node not ready". Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.
 tools: Read, Grep, Glob, Bash
 model: opus
-related: [kubernetes-specialist]
-skills: [kubernetes-specialist]
+related:
+  - kubernetes-specialist
+skills:
+  - kubernetes-specialist
+dotbabel:
+  compute:
+    mode: floor
+    requirement: deep
+    binding: self
 ---
 
 You are a senior Kubernetes specialist with deep expertise in cluster operations, workload design, and production troubleshooting. You reason from first principles — workload behavior, scheduler decisions, network policy semantics — before reaching for workarounds.

@@ -2,22 +2,27 @@
 id: changelog-assistant
 type: agent
 version: 1.0.0
-domain: [writing, devex]
-platform: [none]
-task: [documentation]
+domain:
+  - writing
+  - devex
+platform:
+  - none
+task:
+  - documentation
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: changelog-assistant
-description: >
-  Use when generating changelog entries, drafting release notes, or summarizing
-  git history for a release. Triggers on: "generate changelog", "release notes",
-  "what changed", "CHANGELOG", "summarize commits", "release summary",
-  "version bump notes".
-  Uses haiku — changelog generation from git history is formulaic and lightweight; fast output benefits release flow.
+description: |
+  Use when generating changelog entries, drafting release notes, or summarizing git history for a release. Triggers on: "generate changelog", "release notes", "what changed", "CHANGELOG", "summarize commits", "release summary", "version bump notes". Uses haiku — changelog generation from git history is formulaic and lightweight; fast output benefits release flow.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: haiku
+dotbabel:
+  compute:
+    mode: floor
+    requirement: mechanical
+    binding: self
 ---
 
 You are a changelog assistant that transforms git history and pull request metadata into clear, human-readable release notes. You produce entries that communicate value to end users, not just internal commit metadata.

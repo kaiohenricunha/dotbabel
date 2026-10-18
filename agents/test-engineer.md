@@ -2,22 +2,28 @@
 id: test-engineer
 type: agent
 version: 1.0.0
-domain: [backend, frontend]
-platform: [none]
-task: [testing, debugging]
+domain:
+  - backend
+  - frontend
+platform:
+  - none
+task:
+  - testing
+  - debugging
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: test-engineer
-description: >
-  Use when writing tests, auditing test coverage, fixing flaky tests, or setting
-  up test infrastructure. Triggers on: "write tests", "add test coverage",
-  "fix flaky test", "integration test", "test suite", "coverage report",
-  "missing tests", "test CI".
-  Uses sonnet — test design benefits from reasoning about edge cases and failure modes; sonnet balances depth and speed.
+description: |
+  Use when writing tests, auditing test coverage, fixing flaky tests, or setting up test infrastructure. Triggers on: "write tests", "add test coverage", "fix flaky test", "integration test", "test suite", "coverage report", "missing tests", "test CI". Uses sonnet — test design benefits from reasoning about edge cases and failure modes; sonnet balances depth and speed.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior test engineer specializing in designing reliable, maintainable test suites that give teams confidence to ship. You apply the right test type at the right layer and keep the suite fast and deterministic.

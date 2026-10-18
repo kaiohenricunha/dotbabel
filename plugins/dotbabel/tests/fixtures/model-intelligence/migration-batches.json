@@ -1,0 +1,752 @@
+{
+  "entries": [
+    {
+      "sourcePath": "agents/architect-reviewer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "architect-reviewer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "architect-reviewer",
+        "description": "Use when evaluating system design, reviewing architectural decisions, assessing technology choices, or identifying structural anti-patterns. Triggers on: \"review architecture\", \"design review\", \"architecture concerns\", \"tech stack\", \"coupling\", \"scalability review\", \"ADR review\". Uses opus — cross-cutting architectural analysis requires deep reasoning across large codebases.\n",
+        "tools": "Read, Grep, Glob",
+        "model": "opus"
+      },
+      "bodyHash": "a8ed3ff52ffd87e0e01d88266fa8da24d2336d98dc276a18e99abc6900b10614"
+    },
+    {
+      "sourcePath": "agents/platform-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "platform-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["devex", "infra"],
+        "platform": ["none"],
+        "task": ["scaffolding", "provisioning"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "platform-engineer",
+        "description": "Use when designing or improving internal developer platforms, golden paths, self-service tooling, or environment parity. Triggers on: \"developer platform\", \"internal tooling\", \"golden path\", \"paved road\", \"developer experience\", \"self-service\", \"environment parity\", \"platform team\", \"scaffolding\", \"service catalog\". Uses opus — platform design decisions compound over time; deep reasoning prevents golden-path choices that become maintenance burdens.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "opus"
+      },
+      "bodyHash": "f7b3d64781840fb1c2bb23bba2f5c59e21c5f3fe4796a142c761e30a295a5ea5"
+    },
+    {
+      "sourcePath": "agents/aws-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "deep",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "aws-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["aws"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "aws-engineer",
+        "description": "Use when designing, debugging, or reviewing AWS workloads and service integrations. Triggers on: \"AWS\", \"EC2\", \"ECS\", \"EKS\", \"Lambda\", \"S3\", \"IAM role\", \"VPC\", \"RDS\", \"DynamoDB\", \"CloudFront\", \"ALB\", \"Route53\", \"CloudFormation\", \"CDK\", \"API Gateway\", \"EventBridge\", \"SQS\", \"SNS\". Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "opus",
+        "related": ["aws-specialist"],
+        "skills": ["aws-specialist"]
+      },
+      "bodyHash": "94e30f593bab3a7dcfaa47a121cdfc0dc055eae938adb9da2cb155dc4dc05eee"
+    },
+    {
+      "sourcePath": "agents/azure-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "deep",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "azure-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["azure"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "azure-engineer",
+        "description": "Use when designing, debugging, or reviewing Azure workloads and service integrations. Triggers on: \"Azure\", \"AKS\", \"ACI\", \"App Service\", \"Azure Functions\", \"Blob Storage\", \"VNet\", \"App Gateway\", \"Front Door\", \"EntraID\", \"Managed Identity\", \"ARM template\", \"Bicep\", \"Azure DevOps\", \"ACR\", \"Service Bus\", \"Logic Apps\", \"Cosmos DB\". Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "opus",
+        "skills": ["azure-specialist"]
+      },
+      "bodyHash": "2bec2020911daeaa0bb09e50991ea66ed88c6f907ac87c0f7cca1e27ab395685"
+    },
+    {
+      "sourcePath": "agents/gcp-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "deep",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "gcp-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["gcp"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "gcp-engineer",
+        "description": "Use when designing, debugging, or reviewing Google Cloud workloads and service integrations. Triggers on: \"GCP\", \"Google Cloud\", \"GKE\", \"Cloud Run\", \"GCE\", \"Cloud Functions\", \"Pub/Sub\", \"GCS\", \"BigQuery\", \"Cloud Build\", \"Workload Identity\", \"Service Account\", \"VPC\", \"Cloud Armor\", \"Cloud CDN\", \"Deployment Manager\", \"Config Connector\". Uses opus — GCP architecture across Workload Identity, VPC networks, and IAM hierarchies requires deep reasoning to avoid security gaps.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "opus",
+        "skills": ["gcp-specialist"]
+      },
+      "bodyHash": "bef32eac800499a230432c8105f23c2a8edcc88c4d26ca0ced4bb0385779d5ff"
+    },
+    {
+      "sourcePath": "agents/kubernetes-specialist.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "deep",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "kubernetes-specialist",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["kubernetes"],
+        "task": ["debugging", "diagnostics", "runtime-ops"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "kubernetes-specialist",
+        "description": "Use when designing, debugging, or reviewing Kubernetes workloads and cluster configuration. Triggers on: \"kubernetes\", \"k8s\", \"pod\", \"deployment\", \"cluster\", \"kubectl\", \"namespace\", \"ingress\", \"helm chart\", \"workload\", \"node not ready\". Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.\n",
+        "tools": "Read, Grep, Glob, Bash",
+        "model": "opus",
+        "related": ["kubernetes-specialist"],
+        "skills": ["kubernetes-specialist"]
+      },
+      "bodyHash": "6ff629f694d223ecc92b8e7ebcd4e135264ff8e2eb82ca3e2c8ffac453b5a397"
+    },
+    {
+      "sourcePath": "agents/workflow-orchestrator.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "exceptional",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "workflow-orchestrator",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["scaffolding", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "workflow-orchestrator",
+        "description": "Use when coordinating multi-step tasks that require multiple agents, managing parallel workstreams, or planning and delegating complex implementation efforts. Triggers on: \"orchestrate\", \"coordinate agents\", \"parallel tasks\", \"multi-step plan\", \"delegate work\", \"break down\", \"dispatch subagents\". Uses opus — orchestration quality compounds across delegated agents; poor decomposition cascades into downstream failures.\n",
+        "tools": "Read, Bash, Glob, Grep",
+        "model": "opus"
+      },
+      "bodyHash": "ce23d6c8db37c8d3404b9a59188e6664bb6907c4dd74deecd86c26cc7a337299"
+    },
+    {
+      "sourcePath": "agents/backend-developer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "backend-developer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["backend"],
+        "platform": ["none"],
+        "task": ["scaffolding", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "backend-developer",
+        "description": "Use when building or modifying server-side code: APIs, services, data models, background jobs, or infrastructure logic. Triggers on: \"build API\", \"add endpoint\", \"database schema\", \"backend service\", \"server-side\", \"REST\", \"GraphQL\", \"background job\", \"migration\". Uses sonnet — everyday backend implementation benefits from balanced capability and throughput.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "sonnet"
+      },
+      "bodyHash": "a0ae7c2aa5ca6b6a592e79dd8ebedcc746c0b68089453a2b641b8fff7e85f349"
+    },
+    {
+      "sourcePath": "agents/frontend-developer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "frontend-developer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["frontend"],
+        "platform": ["none"],
+        "task": ["scaffolding", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "frontend-developer",
+        "description": "Use when building or modifying client-side code: UI components, pages, forms, state management, or client-side data fetching. Triggers on: \"build UI\", \"React component\", \"frontend\", \"CSS\", \"accessibility\", \"form validation\", \"client-side\", \"Next.js page\", \"Tailwind\". Uses sonnet — everyday frontend implementation benefits from balanced capability and response speed.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "sonnet"
+      },
+      "bodyHash": "997615301beb9b7f0ea73a4b0b44afc71caf309bd100ad3941725b84fca2e21b"
+    },
+    {
+      "sourcePath": "agents/test-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "test-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["backend", "frontend"],
+        "platform": ["none"],
+        "task": ["testing", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "test-engineer",
+        "description": "Use when writing tests, auditing test coverage, fixing flaky tests, or setting up test infrastructure. Triggers on: \"write tests\", \"add test coverage\", \"fix flaky test\", \"integration test\", \"test suite\", \"coverage report\", \"missing tests\", \"test CI\". Uses sonnet — test design benefits from reasoning about edge cases and failure modes; sonnet balances depth and speed.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "sonnet"
+      },
+      "bodyHash": "0729b9e2d7657c978148ac32e12ce6f0ca96ed1019dd7e462df2d6cc5098663b"
+    },
+    {
+      "sourcePath": "agents/container-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "container-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["docker"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "container-engineer",
+        "description": "Use when authoring, optimizing, or reviewing container images and build pipelines. Triggers on: \"Dockerfile\", \"container image\", \"multi-stage build\", \"image size\", \"OCI\", \"Docker Compose\", \"container registry\", \"base image\", \"layer cache\". Uses sonnet — container image optimization is structured and pattern-driven; sonnet provides the right depth without excess cost.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet"
+      },
+      "bodyHash": "3137e386302263f4aefda2bbccd8aa8589683d20f775d98e8e51d875b01fa5ae"
+    },
+    {
+      "sourcePath": "agents/crossplane-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "crossplane-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["kubernetes", "crossplane"],
+        "task": ["provisioning"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "crossplane-engineer",
+        "description": "Use when designing, debugging, or reviewing Crossplane configurations and Kubernetes-native IaC. Triggers on: \"Crossplane\", \"XRD\", \"Composition\", \"CompositeResource\", \"Claim\", \"managed resource\", \"provider config\", \"ProviderConfig\", \"composite resource definition\", \"Crossplane package\". Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet",
+        "skills": ["crossplane-specialist"]
+      },
+      "bodyHash": "04d34e9aa0b179234b4a6929b7b5e5675c547dc3133a765ba51fcc17fe4cfd42"
+    },
+    {
+      "sourcePath": "agents/deployment-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "deployment-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["devex", "infra"],
+        "platform": ["none"],
+        "task": ["runtime-ops"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "deployment-engineer",
+        "description": "Use when planning or executing deployment strategies, release coordination, traffic shifting, or rollback procedures. Triggers on: \"deployment strategy\", \"blue/green\", \"canary release\", \"rolling update\", \"traffic shifting\", \"rollback\", \"release coordination\", \"feature flag\", \"progressive delivery\", \"deploy to production\". Uses sonnet — deployment strategy execution is structured; sonnet handles the reasoning without over-provisioning cost.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet"
+      },
+      "bodyHash": "954572dd1147ab04a18f7ef48d6aee43b318f1958c9b762c2c9aa80d6a9bd4ff"
+    },
+    {
+      "sourcePath": "agents/devops-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "devops-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["scaffolding", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "devops-engineer",
+        "description": "Use when building or improving CI/CD pipelines, release workflows, build automation, or developer tooling. Triggers on: \"CI pipeline\", \"CD workflow\", \"GitHub Actions\", \"build automation\", \"artifact\", \"release workflow\", \"environment promotion\", \"pipeline stage\", \"deploy pipeline\", \"lint CI\". Uses sonnet — CI/CD pipeline work is structured and iterative; sonnet matches the workload.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet"
+      },
+      "bodyHash": "0d50f85dbe3fe1bfd2de0e081d2f843330a03921737067b2645f594ad4a1b88f"
+    },
+    {
+      "sourcePath": "agents/docker-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "docker-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["docker"],
+        "task": ["debugging", "runtime-ops"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "docker-engineer",
+        "description": "Use when designing, operating, or debugging Docker Compose stacks and running containers. Triggers on: \"docker compose up\", \"docker compose exec\", \"docker compose ps\", \"docker compose down\", \"docker compose restart\", \"compose stack\", \"multi-service compose\", \"service dependencies\", \"docker exec\", \"inspect container\", \"container logs\", \"docker logs\", \"container networking\", \"docker network\", \"running container\", \"container debug\", \"docker stats\", \"docker scout\". Uses sonnet — Compose design and runtime ops are structured; sonnet provides the right depth.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet"
+      },
+      "bodyHash": "647623f9514bbc6d4dccfdfb54f24f0ffc8dc5769f64a9bd3292bd15039e11cd"
+    },
+    {
+      "sourcePath": "agents/iac-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "iac-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["terraform", "terragrunt", "pulumi"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "iac-engineer",
+        "description": "Use when writing, reviewing, or refactoring infrastructure-as-code modules, managing state, or handling drift detection. Triggers on: \"Terraform\", \"Pulumi\", \"OpenTofu\", \"infrastructure as code\", \"IaC module\", \"state file\", \"drift detection\", \"resource graph\", \"provider\", \"workspace\", \"remote state\". Uses sonnet — IaC authoring is structured and pattern-driven; sonnet covers the depth needed without excess cost.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet",
+        "skills": ["terraform-specialist", "terragrunt-specialist"]
+      },
+      "bodyHash": "90671b91f3bad4d6df909f4879edef83dc4d7027c7f5a1256e16d39be014e3c0"
+    },
+    {
+      "sourcePath": "agents/pulumi-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "pulumi-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["pulumi"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "pulumi-engineer",
+        "description": "Use when working with Pulumi stacks, component resources, or the Automation API. Triggers on: \"Pulumi\", \"pulumi up\", \"pulumi stack\", \"ComponentResource\", \"Pulumi ESC\", \"Automation API\", \"pulumi.Config\", \"pulumi new\", \"stack reference\", \"StackReference\". Uses sonnet — Pulumi stack work is code-first and structured; sonnet matches the task depth.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet",
+        "skills": ["pulumi-specialist"]
+      },
+      "bodyHash": "2723da132f8dcc63d574cb823e157101396055d9092916829e6dd94fc28b9984"
+    },
+    {
+      "sourcePath": "agents/terragrunt-engineer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "routine",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "terragrunt-engineer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["infra"],
+        "platform": ["terragrunt", "terraform"],
+        "task": ["provisioning", "debugging"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "terragrunt-engineer",
+        "description": "Use when working with Terragrunt configurations, DRY Terraform patterns, or multi-environment root-module hierarchies. Triggers on: \"Terragrunt\", \"terragrunt.hcl\", \"run-all\", \"DRY Terraform\", \"dependency block\", \"env hierarchy\", \"root module\", \"terragrunt hooks\", \"generate block\". Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.\n",
+        "tools": "Read, Write, Edit, Bash, Grep, Glob",
+        "model": "sonnet",
+        "skills": ["terragrunt-specialist"]
+      },
+      "bodyHash": "1b8938e233ec3f9d32760dafe067239322787f4401ab5a9262fd21567b6e0af7"
+    },
+    {
+      "sourcePath": "agents/changelog-assistant.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "mechanical",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "changelog-assistant",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["writing", "devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "changelog-assistant",
+        "description": "Use when generating changelog entries, drafting release notes, or summarizing git history for a release. Triggers on: \"generate changelog\", \"release notes\", \"what changed\", \"CHANGELOG\", \"summarize commits\", \"release summary\", \"version bump notes\". Uses haiku — changelog generation from git history is formulaic and lightweight; fast output benefits release flow.\n",
+        "tools": "Read, Write, Edit, Bash, Glob, Grep",
+        "model": "haiku"
+      },
+      "bodyHash": "8dc2bbb39dfd760ff99248bc5a0cefdda4aff74eabbb24a404c16938a100aaa3"
+    },
+    {
+      "sourcePath": "agents/documentation-writer.md",
+      "artifactKind": "agent",
+      "category": "C",
+      "compute": {
+        "mode": "floor",
+        "requirement": "mechanical",
+        "binding": "self"
+      },
+      "frontmatter": {
+        "id": "documentation-writer",
+        "type": "agent",
+        "version": "1.0.0",
+        "domain": ["writing", "devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-28",
+        "updated": "2026-04-28",
+        "name": "documentation-writer",
+        "description": "Use when writing or updating documentation: user guides, READMEs, API references, onboarding materials, docstrings, or inline docs. Triggers on: \"write docs\", \"update README\", \"API documentation\", \"document this\", \"user guide\", \"onboarding guide\", \"add examples\", \"explain how\". Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.\n",
+        "tools": "Read, Write, Edit, Glob, Grep, WebFetch, WebSearch",
+        "model": "haiku"
+      },
+      "bodyHash": "0026ae741338a5a5e23a0afc4b738aaca1999d27c661d1e48132f720e8db74cb"
+    },
+    {
+      "sourcePath": "skills/pr-conductor/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "pr-conductor",
+        "name": "pr-conductor",
+        "type": "skill",
+        "version": "1.4.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "testing"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-08-08",
+        "updated": "2026-10-13",
+        "description": "Land one pull request end to end: pre-PR quality gate, open the PR, AI review, apply review fixes, local CI attestation — then STOP with a go/no-go summary. Never merges; merging stays an explicit human call handed to /merge-pr. Understands stacked PRs, where a child must retarget and rebase --onto after its parent squash-merges. Delegates every phase to an existing artifact rather than reimplementing it. On demand only: the default path from a task to a pull request is /deliver. Triggers on: \"land this PR\", \"run the PR pipeline\", \"run the review pipeline\", \"ship this branch\", \"what's blocking my PR\".\n",
+        "argument-hint": "[PR#] [--stack] [--from <phase>] [--dry-run]",
+        "model": "sonnet",
+        "user-invocable": true,
+        "disable-model-invocation": false,
+        "headless_safe": false,
+        "allowed-tools": "Read Bash Grep Glob"
+      },
+      "bodyHash": "760958261c90c42cc5f7e54d4dc77343e4b92c50c901189bcd8733eae2996e03"
+    },
+    {
+      "sourcePath": "skills/release-conductor/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "release-conductor",
+        "name": "release-conductor",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "runtime-ops"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-26",
+        "updated": "2026-08-07",
+        "description": "Gate the open release-please PR before merging: verify CI green, feature PRs landed, no release blockers, changelog reflects intent. One-word approval, then merge. Reports the resulting release.yml run URL. release-please owns the changelog/bump/tag; release.yml owns OIDC npm publish — this skill only gates the merge in between. Triggers on: \"ship a release\", \"cut a release\", \"merge the release PR\", \"is the release ready\", \"verify the release\".\n",
+        "argument-hint": "[verify <tag>]",
+        "model": "sonnet",
+        "user-invocable": true,
+        "disable-model-invocation": true,
+        "headless_safe": false,
+        "allowed-tools": "Read Bash Grep Glob"
+      },
+      "bodyHash": "c2c53e0965bcdfb7379127c8d78bed611b891bf88179943520fd5eb1ea763cfd"
+    },
+    {
+      "sourcePath": "skills/deploy-status/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "deploy-status",
+        "name": "deploy-status",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra", "devex"],
+        "platform": ["vercel", "flyio", "aws"],
+        "task": ["diagnostics", "runtime-ops"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-05",
+        "updated": "2026-05-05",
+        "description": "Show deployed git SHAs across configured production targets and compare them against origin/main. Use during deploy verification, incident response, and release drift checks. Triggers on: \"what is deployed\", \"deploy status\", \"production drift\", \"is prod on main\", \"compare prod to main\".\n",
+        "argument-hint": "[--dry-run] [--no-fetch]",
+        "tools": "Bash, Read, Grep, Glob",
+        "allowed-tools": "Read Grep Glob Bash",
+        "model": "sonnet",
+        "effort": "medium",
+        "disable-model-invocation": false,
+        "user-invocable": true
+      },
+      "bodyHash": "6d79c8de9216d021a51397c5bbc7a6aff861ce5651a8acd8f2506590879c280b"
+    },
+    {
+      "sourcePath": "skills/flyctl/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "flyctl",
+        "name": "flyctl",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra", "devex", "observability"],
+        "platform": ["flyio"],
+        "task": ["runtime-ops", "diagnostics", "incident-response"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-10",
+        "updated": "2026-05-10",
+        "description": "Explicit-invocation Fly.io operations wrapper. Run `/flyctl <subcommand>` to deploy (with --image), tail logs, manage secrets, inspect machines, scale, SSH, proxy, check health, list releases, and show status. Auto-discovers the app from fly.toml in the current directory. Side-effectful ops on prod-flavored apps require typed confirmation matching the app name. Rollback is delegated to /rollback-prod; cross-provider SHA reporting is delegated to /deploy-status. Unlisted subcommands require `flyctl <subcommand> --help` first.\n",
+        "argument-hint": "<subcommand> [-a <app>] [--no-confirm] [...]",
+        "tools": "Bash, Read, Grep, Glob",
+        "model": "sonnet",
+        "effort": "medium",
+        "disable-model-invocation": true,
+        "user-invocable": true
+      },
+      "bodyHash": "94666b101428d612c8b768a95a35f26a5c85a4f3a57bec42192e202853253210"
+    },
+    {
+      "sourcePath": "skills/git/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "git",
+        "name": "git",
+        "type": "skill",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-13",
+        "description": "Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions. Triggers on: \"conventional commit\", \"create PR\", \"push changes\".\n",
+        "argument-hint": "[subcommand]",
+        "tools": "Bash, Read",
+        "model": "sonnet"
+      },
+      "bodyHash": "a4ae712692b7b0e81e4febf04660c46c719d37b2898c4fe095ff9a40ce0739a6"
+    },
+    {
+      "sourcePath": "skills/project-sync/SKILL.md",
+      "artifactKind": "skill",
+      "category": "E",
+      "compute": {
+        "mode": "inherit",
+        "binding": "consumer"
+      },
+      "frontmatter": {
+        "id": "project-sync",
+        "name": "project-sync",
+        "type": "skill",
+        "version": "0.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["scaffolding"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-09",
+        "updated": "2026-05-09",
+        "description": "Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex, Gemini, and Copilot project-scope analogues (.codex/skills, .gemini/skills, .github/prompts, .github/instructions) plus refresh AGENTS.md, GEMINI.md, and .github/copilot-instructions.md from the project's rule floor. Wraps `dotbabel project-sync`. Use when adopting cross-CLI workflows in a repo for the first time, or when adding a new command/skill that needs to be visible to Codex/Gemini/Copilot. Triggers on: \"sync this repo\", \"project sync\", \"fan out commands\", \"wire up gemini for this project\", \"add this command to codex\", \"make this skill available in copilot\", \"regenerate AGENTS.md for this project\".\n",
+        "argument-hint": "[--dry-run] [--all] [--repo <path>]",
+        "tools": "Bash, Read, Glob",
+        "effort": "low",
+        "model": "sonnet"
+      },
+      "bodyHash": "c4222e1de2cc1931c9bfdc747a35e9a8d6734f3511f226b9b3351a7c74d3b6f5"
+    }
+  ],
+  "neutral": {
+    "sourcePath": "skills/local-attest/SKILL.md",
+    "frontmatter": {
+      "id": "local-attest",
+      "name": "local-attest",
+      "type": "skill",
+      "version": "1.2.0",
+      "domain": ["devex", "observability"],
+      "platform": ["github-actions"],
+      "task": ["testing", "runtime-ops"],
+      "maturity": "draft",
+      "owner": "@kaiohenricunha",
+      "created": "2026-05-23",
+      "updated": "2026-08-14",
+      "description": "Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned OWNER-authored PR comment that gates downstream GitHub Actions jobs off for that exact commit. Skips the redundant remote run after a maintainer has already verified locally, saving runner minutes without weakening the gate. A new push changes the head SHA, the attestation stops matching, CI runs again. Side-effectful (posts a PR comment, applies a label, optionally pushes) and slow — minutes to tens of minutes, whatever the configured matrix costs. Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can never attest; --fail-fast works in both modes. Invoke only on explicit request.\n",
+      "argument-hint": "[--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--only <leg>] [--from <leg>] [--config <path>]",
+      "tools": "Bash",
+      "disable-model-invocation": true,
+      "user-invocable": true
+    },
+    "bodyHash": "2e619036b2c245fc211aafb1315be95b12d793806ca286824581d6d1ac94a1b3"
+  }
+}

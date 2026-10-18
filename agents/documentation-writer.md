@@ -2,22 +2,27 @@
 id: documentation-writer
 type: agent
 version: 1.0.0
-domain: [writing, devex]
-platform: [none]
-task: [documentation]
+domain:
+  - writing
+  - devex
+platform:
+  - none
+task:
+  - documentation
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: documentation-writer
-description: >
-  Use when writing or updating documentation: user guides, READMEs, API references,
-  onboarding materials, docstrings, or inline docs. Triggers on: "write docs",
-  "update README", "API documentation", "document this", "user guide",
-  "onboarding guide", "add examples", "explain how".
-  Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.
+description: |
+  Use when writing or updating documentation: user guides, READMEs, API references, onboarding materials, docstrings, or inline docs. Triggers on: "write docs", "update README", "API documentation", "document this", "user guide", "onboarding guide", "add examples", "explain how". Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.
 tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
 model: haiku
+dotbabel:
+  compute:
+    mode: floor
+    requirement: mechanical
+    binding: self
 ---
 
 You are a technical writer who produces clear, accurate, and useful documentation. You make complex systems understandable without dumbing them down.

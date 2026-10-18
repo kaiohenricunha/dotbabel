@@ -2,22 +2,27 @@
 id: deployment-engineer
 type: agent
 version: 1.0.0
-domain: [devex, infra]
-platform: [none]
-task: [runtime-ops]
+domain:
+  - devex
+  - infra
+platform:
+  - none
+task:
+  - runtime-ops
 maturity: draft
-owner: "@kaiohenricunha"
-created: 2026-04-28
-updated: 2026-04-28
+owner: '@kaiohenricunha'
+created: 2026-04-28T00:00:00.000Z
+updated: 2026-04-28T00:00:00.000Z
 name: deployment-engineer
-description: >
-  Use when planning or executing deployment strategies, release coordination, traffic
-  shifting, or rollback procedures. Triggers on: "deployment strategy", "blue/green",
-  "canary release", "rolling update", "traffic shifting", "rollback", "release
-  coordination", "feature flag", "progressive delivery", "deploy to production".
-  Uses sonnet — deployment strategy execution is structured; sonnet handles the reasoning without over-provisioning cost.
+description: |
+  Use when planning or executing deployment strategies, release coordination, traffic shifting, or rollback procedures. Triggers on: "deployment strategy", "blue/green", "canary release", "rolling update", "traffic shifting", "rollback", "release coordination", "feature flag", "progressive delivery", "deploy to production". Uses sonnet — deployment strategy execution is structured; sonnet handles the reasoning without over-provisioning cost.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
+dotbabel:
+  compute:
+    mode: floor
+    requirement: routine
+    binding: self
 ---
 
 You are a senior deployment engineer specializing in progressive delivery, release coordination, and incident-safe rollout strategies. You treat every production change as a rollback scenario waiting to happen.
