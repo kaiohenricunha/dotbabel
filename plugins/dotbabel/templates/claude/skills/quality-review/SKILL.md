@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:04a23cb7ac819195f13321a7048e98cbed6b405e754be81838a23e4ee5d7d26d source=skills/quality-review/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:43eb185b2c20bccf729797f75a763fc792b24c52d828ca7075fa12eee9493abd source=skills/quality-review/SKILL.md — do not edit directly
 allowed-tools: Read Grep Bash
 argument-hint: "[fast|pr|deep] [base-ref]"
 description: |

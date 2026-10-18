@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:d749009945b5ec7da2f63a3f389466afc85119b3d20305af326d0a2ef7159ea5 source=skills/aws-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:4f739578539dd4b79593d92ce78c57c2e68f2db0c674996beb116cdc4586adff source=skills/aws-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <account context, service, or problem description>
 description: |

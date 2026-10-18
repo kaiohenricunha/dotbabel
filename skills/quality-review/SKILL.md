@@ -3,19 +3,29 @@ id: quality-review
 name: quality-review
 type: skill
 version: 0.1.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - testing
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-09-04
-updated: 2026-09-04
-description: >
+created: 2026-09-04T00:00:00.000Z
+updated: 2026-09-04T00:00:00.000Z
+description: |
   Check changed code against the resolved dotbabel quality policy, then review semantic risks that tools cannot judge. Triggers on: "quality review", "quality check", "review code quality".
 argument-hint: "[fast|pr|deep] [base-ref]"
 tools: Bash, Read, Grep
 allowed-tools: Read Grep Bash
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Semantic review evaluates risks that deterministic quality measurements cannot judge.
 ---
 
 # Quality review

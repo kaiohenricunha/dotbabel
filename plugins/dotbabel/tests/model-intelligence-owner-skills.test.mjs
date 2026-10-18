@@ -9,6 +9,7 @@ import { resolve } from "../src/model-intelligence/resolver/index.mjs";
 import { mergePolicy, SHIPPED_POLICY } from "../src/model-intelligence/policy/index.mjs";
 
 const fixture = JSON.parse(readFileSync(new URL("./fixtures/model-intelligence/owner-skills.json", import.meta.url), "utf8"));
+const laterMigrations = JSON.parse(readFileSync(new URL("./fixtures/model-intelligence/migration-batches.json", import.meta.url), "utf8")).entries.filter(entry => entry.batch === "P-19c-skills");
 const snapshot = readSnapshot();
 const artifact = entry => ({ sourcePath: entry.sourcePath, sourceContent: readFileSync(new URL(`../../../${entry.sourcePath}`, import.meta.url), "utf8"), target: { path: entry.sourcePath, artifactKind: "skill" } });
 const project = source => {
@@ -31,7 +32,9 @@ describe("P-19f: approved skill decisions F3/F4/F5/F7", () => {
       const original = { ...parsed.frontmatter };
       delete original.dotbabel;
       expect(original, entry.sourcePath).toEqual(entry.frontmatter);
-      if (!entry.compute) expect(parsed.requirement).toBeNull();
+      const expectedCompute = entry.compute ?? laterMigrations.find(later => later.sourcePath === entry.sourcePath)?.compute;
+      if (expectedCompute) expect(parsed.requirement).toMatchObject(expectedCompute);
+      else expect(parsed.requirement).toBeNull();
     }
   });
 

@@ -3,31 +3,29 @@ id: handoff
 name: handoff
 type: skill
 version: 1.3.0
-domain: [devex]
-platform: [none]
-task: [documentation, debugging]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - documentation
+  - debugging
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-17
-updated: 2026-05-04
-description: >
-  Transfer conversation context between agentic CLIs (Claude Code, GitHub
-  Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a
-  source session transcript by UUID and produces either an inline summary,
-  a paste-ready handoff digest, a written markdown file, or a branch in a
-  user-owned private git repo that another machine can fetch. Use when
-  switching agents mid-task, recovering context, or moving between
-  Windows/Linux/macOS setups. Triggers on: "handoff", "transfer context",
-  "continue in codex", "continue in claude", "continue in copilot",
-  "switch to codex", "switch to claude", "what was that session about",
-  "claude --resume", "copilot --resume", "codex resume",
-  "find the session where", "search sessions", "which session did I",
-  "push handoff", "fetch handoff", "handoff to other machine",
-  "resume on my other laptop".
+created: 2026-04-17T00:00:00.000Z
+updated: 2026-05-04T00:00:00.000Z
+description: |
+  Transfer conversation context between agentic CLIs (Claude Code, GitHub Copilot CLI, OpenAI Codex CLI) locally and across machines. Reads a source session transcript by UUID and produces either an inline summary, a paste-ready handoff digest, a written markdown file, or a branch in a user-owned private git repo that another machine can fetch. Use when switching agents mid-task, recovering context, or moving between Windows/Linux/macOS setups. Triggers on: "handoff", "transfer context", "continue in codex", "continue in claude", "continue in copilot", "switch to codex", "switch to claude", "what was that session about", "claude --resume", "copilot --resume", "codex resume", "find the session where", "search sessions", "which session did I", "push handoff", "fetch handoff", "handoff to other machine", "resume on my other laptop".
 argument-hint: "[pull|push|fetch|list|search|prune|doctor] [args...]"
 tools: Glob, Read, Grep, Bash, Write
 effort: medium
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: consumer
+    rationale: The coordinator maps user intent to a bounded context-transfer CLI and verifies its output.
 ---
 
 # Handoff — Cross-CLI Session Context Transfer

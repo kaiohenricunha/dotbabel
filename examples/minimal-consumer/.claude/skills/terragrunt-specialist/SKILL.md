@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:4156e415fcae7e74bf875ba9bbf5d398c5a6dd7f1d23b0515e5dffe2eb90c1ce source=skills/terragrunt-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:f7e9428937109a71c2157273b62906c5e7145a6ab296d1e5a61200397cbd79b1 source=skills/terragrunt-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <repo root or terragrunt.hcl path>
 description: |

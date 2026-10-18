@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T18:11:11.405Z",
+  "generatedAt": "2026-10-18T19:25:39.249Z",
   "skills": [
     {
       "name": "agents-search",
@@ -19,14 +19,14 @@
     {
       "name": "aws-specialist",
       "path": ".claude/skills/aws-specialist/SKILL.md",
-      "checksum": "sha256:ba954a78351a0988ccd7ab00574bde2f6aa0d4dab0b5a32fb755f14957411358",
+      "checksum": "sha256:fda5c0dda779091ccc38031ad126a03aa51a85ece5b328717a22007db492d273",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "azure-specialist",
       "path": ".claude/skills/azure-specialist/SKILL.md",
-      "checksum": "sha256:7c1625de68e13e15ab0beb179e4cf6f9a3d2a80ec294a04cbb46e430cb0ab425",
+      "checksum": "sha256:5420f1e9d5c335daf44e93d2a5765ca439ae11129cd90610a8323a8bda47a590",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -40,42 +40,42 @@
     {
       "name": "code-simplifier",
       "path": ".claude/skills/code-simplifier/SKILL.md",
-      "checksum": "sha256:e24c64485f950d93815f492de5673aaa3ff65abb0df91fb41e41a40b68017cff",
+      "checksum": "sha256:87b662f669a9ccfde85d5d4ee19d2156f122db8a6acc929cf7a24814645191ef",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "create-assessment",
       "path": ".claude/skills/create-assessment/SKILL.md",
-      "checksum": "sha256:7d364824b0ce34d5703a3db91956b4607182b52be79bc5fdec9583c73ef6f73c",
+      "checksum": "sha256:78c39048dcfc9e9bf9848f76cfbab8df9a2274bc4df2130a080f5ed9e2f0467b",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "create-audit",
       "path": ".claude/skills/create-audit/SKILL.md",
-      "checksum": "sha256:c65ff762a76e721fd0169cee087c582198c628a7a79b518792b168b2b6001cd4",
+      "checksum": "sha256:4ece1f782bd57a2b5009715b2718ade1849bc25bf3de796e5c7e2aed5d0b322d",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "create-experiment",
       "path": ".claude/skills/create-experiment/SKILL.md",
-      "checksum": "sha256:424f23db1e1ba2cfc32c215bc4ae8f8dd8f710274161884252ac1fcfb28dcd3c",
+      "checksum": "sha256:d67924c506863a94e1e2f0be0538dc594e7ea1b1e23a13273c53395a6c013530",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "create-inspection",
       "path": ".claude/skills/create-inspection/SKILL.md",
-      "checksum": "sha256:d8febaf15dd98a5d72fe97f8f41fd7d0a83ed98f0a11ab7ecedeedeaec544e85",
+      "checksum": "sha256:52afec3e6ec86ec781f0283679f444e778616474f85b48271c18672c95bef947",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "crossplane-specialist",
       "path": ".claude/skills/crossplane-specialist/SKILL.md",
-      "checksum": "sha256:ef78a49da882582f409c0c166d74112c6d37af437592e05bf6cd218bb8c34476",
+      "checksum": "sha256:21557c4d99a22893bf613157c981a857dc28d5623b7d51a61b13541e7773f79f",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -103,14 +103,14 @@
     {
       "name": "detect-flaky",
       "path": ".claude/skills/detect-flaky/SKILL.md",
-      "checksum": "sha256:088b6790ca5a2a3e17c333a1325e9a0789fd7887071b18df92378e4a3ae88edc",
+      "checksum": "sha256:43b3857ac60745eb4fea0589cfb539bd44ba41c8b4fb41c9a358e785b7e6674f",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "fix-with-evidence",
       "path": ".claude/skills/fix-with-evidence/SKILL.md",
-      "checksum": "sha256:4543ad0d3b7fdb0670d41b680d45de127fb4701f87a4aa5e948e73201d464494",
+      "checksum": "sha256:484610e6da118ad89fea1ffb7d3eba7de00ec8fc80b9eb31f7af7528d730ccf0",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -124,7 +124,7 @@
     {
       "name": "gcp-specialist",
       "path": ".claude/skills/gcp-specialist/SKILL.md",
-      "checksum": "sha256:39763f741bbff9bd6f9b72908ed3ea8de1870e2d5017b3ddab9015e0db4ff108",
+      "checksum": "sha256:6227d3fdb4481a4aeb6a91a06ba9defc5059c381f72480bbbf06e6006fac455c",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -138,21 +138,21 @@
     {
       "name": "ground-first",
       "path": ".claude/skills/ground-first/SKILL.md",
-      "checksum": "sha256:0a8a9c125bc3fd0a3fe5cacb4f8cf6ff5971895ea1b703037a8712d3b5e15dd6",
+      "checksum": "sha256:cd89c0d4238652b06cfb2e1788f9927b6fe5d558caf533b5a804181497acd30d",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "handoff",
       "path": ".claude/skills/handoff/SKILL.md",
-      "checksum": "sha256:dcb590aeb5859f004465fd94c4f9d4c591cb2eed2c184e0f0957f2e7edba003b",
+      "checksum": "sha256:f90ad3fb319ea1618f53118d8537055625ed729810bf73e84043360970579da1",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "kubernetes-specialist",
       "path": ".claude/skills/kubernetes-specialist/SKILL.md",
-      "checksum": "sha256:e3f0404dbd80ebdfce9df79df0a9bf501574abafcb7cd5a656c2afd4519428fb",
+      "checksum": "sha256:9ae1cd6606d3b058aacbb9e7dc225d343d14424aa7d1c5aaa92342d9a1dca9bf",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -194,7 +194,7 @@
     {
       "name": "plan-grader",
       "path": ".claude/skills/plan-grader/SKILL.md",
-      "checksum": "sha256:50ba919efa0b4235e182a7d5b1ff2308481086a3ddddbf9166b0560370c3af27",
+      "checksum": "sha256:bd8176f5b69d4532b5c90486060f7534361fac465e45b1e6c165c344bc878ba6",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -245,14 +245,14 @@
     {
       "name": "pulumi-specialist",
       "path": ".claude/skills/pulumi-specialist/SKILL.md",
-      "checksum": "sha256:6620a3862749142cf450245e9c6fc6c398530208848f64e2c34132e138f6f5ef",
+      "checksum": "sha256:9fdc6e451c8e18bb65e7c878ff6f540c4abbd6d3d320ccf2e73a88c2e5ad68a5",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "quality-review",
       "path": ".claude/skills/quality-review/SKILL.md",
-      "checksum": "sha256:5e0cc09ed66620fbeace447cc7ab2cb4dd8bbdf86b492e41cd2c8bcadd9f7493",
+      "checksum": "sha256:5716fc812883b177736abab0e26b70f465bc0bcabd237246558dcf37569b162f",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -268,14 +268,14 @@
     {
       "name": "reproduce-bug",
       "path": ".claude/skills/reproduce-bug/SKILL.md",
-      "checksum": "sha256:e73ae70e76b0c4a0ba43dc42d01596b2df1e97ffa7813a9fab45012711408b51",
+      "checksum": "sha256:69d4d6d54331f67fdfb41fd35518cce1393b915ed16bf2937309185e45dfefce",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "review-pr",
       "path": ".claude/skills/review-pr/SKILL.md",
-      "checksum": "sha256:fe8f4ca9e8c6e9852d869534ba59a2b90134ee00d7bb06411cd8b001ea918004",
+      "checksum": "sha256:b2ee629cb3aced86c6a3b1aaf4a0aa9ccc7251fadba6dcf701583e4af3e8d184",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -319,21 +319,21 @@
     {
       "name": "spec",
       "path": ".claude/skills/spec/SKILL.md",
-      "checksum": "sha256:7a18eea65429b9af03f318fd949240f3693108d0ae4b8d74b9b54e509239ec4e",
+      "checksum": "sha256:f567c65f1116ae053c3eca5e2a4ac8c8f5cfa0dfcc128efbc8f79a8f59c2cc62",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "terraform-specialist",
       "path": ".claude/skills/terraform-specialist/SKILL.md",
-      "checksum": "sha256:9e9c0d8b36ef44fb7f4f604aa706c2f380787c38c0282987c24436ec7bd53b85",
+      "checksum": "sha256:a96ca5b2466d445bf05b4743dd2827aff4c76295eccf04e8731ad3510fe830a1",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
     {
       "name": "terragrunt-specialist",
       "path": ".claude/skills/terragrunt-specialist/SKILL.md",
-      "checksum": "sha256:fc7f266342f1686a5ca394398f048742b5f249144f45354d5f8c2520e359a2bb",
+      "checksum": "sha256:249f2d1ca51fd4b76ae4fbe61e22ef403b76396e7f1c0e6b511a3dd02c69c473",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },

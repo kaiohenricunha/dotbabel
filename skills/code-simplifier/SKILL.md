@@ -3,21 +3,27 @@ id: code-simplifier
 name: code-simplifier
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-05-11
-updated: 2026-05-11
-description: >
-  Simplify and refine changed code for clarity, consistency, and maintainability
-  while preserving all functionality. PR-scoped by default.
-  Accepts an optional PR number, file glob, or base branch to narrow scope.
-  Triggers on: "simplify code", "code simplifier", "clean up the code", "simplify the PR".
+created: 2026-05-11T00:00:00.000Z
+updated: 2026-05-11T00:00:00.000Z
+description: |
+  Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default. Accepts an optional PR number, file glob, or base branch to narrow scope. Triggers on: "simplify code", "code simplifier", "clean up the code", "simplify the PR".
 argument-hint: "[PR# | file-glob | base-branch]"
 tools: Read, Grep, Glob, Bash, Edit
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: consumer
+    rationale: Scoped engineering follows an existing implementation or review workflow with checkable results.
 ---
 
 Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default — operates only on files changed in the current branch.

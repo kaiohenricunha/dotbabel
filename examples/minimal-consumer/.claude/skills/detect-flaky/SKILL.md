@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:d62e19fd13a12abe74ddab4f2daf0115dc5934d06266c7d8d260d88f90f0b715 source=skills/detect-flaky/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:48bdc00229474fbdf615668be5f912cebef55dbc640466af573948a653133dac source=skills/detect-flaky/SKILL.md — do not edit directly
 argument-hint: "[test-command]"
 description: |
   Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis. Triggers on: "detect flaky tests", "find flaky tests", "diagnose flaky tests".

@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:f434dc110dc191b98680505e8a5aa127fff3f5c017b62883abde58356774191f source=skills/crossplane-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:ba9456c7d4de7f6b7b4caeeb2af6904b9eba10619eeafdad9fc87ad55e2a42a8 source=skills/crossplane-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <XRD name, Claim name, or problem description>
 description: |
