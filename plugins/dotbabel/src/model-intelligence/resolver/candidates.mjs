@@ -13,6 +13,7 @@ const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function field(entries = [], preferences = {}) {
   const usable = entries.filter(e => e && (e.freshness === "fresh" || e.freshness === "stale" && preferences.allow_stale_evidence !== false || e.freshness === "expired" && preferences.allow_expired_evidence === true));
   if (!usable.length) return undefined;
+  if (usable.length === 1) return usable[0].availability === "available" ? usable[0] : undefined;
   const ranked = [...usable].sort((a, b) => (a.provenance?.sourceKind === "runtime" ? 0 : 1) - (b.provenance?.sourceKind === "runtime" ? 0 : 1) || freshnessOrder[a.freshness] - freshnessOrder[b.freshness]);
   const best = ranked[0];
   const peers = ranked.filter(e => e.provenance?.sourceKind === best.provenance?.sourceKind && e.freshness === best.freshness);
@@ -53,12 +54,13 @@ export function configureCandidate(candidate, axes, extraEvidence = []) {
  * Build eligible native configurations from runtime-local evidence. Global presence alone never qualifies.
  * Missing capability facts remain unknown; caller-owned adapters/catalogs must supply them explicitly.
  * @param {object} input
+ * @param {Set<string>|undefined} [relevantModels] Exact pin and independent observation, when applicable.
  * @returns {object[]}
  */
-export function candidates(input) {
+export function candidates(input, relevantModels) {
   const preferences = input.policy.preferences ?? {};
   const models = input.catalog.runtimes.find(r => r.runtimeId === input.target.runtimeId)?.models ?? [];
-  return models.flatMap(record => {
+  return models.filter(record => relevantModels === undefined || relevantModels.has(record.model)).flatMap(record => {
     const fields = record.fields ?? {};
     const identity = field(fields.id, preferences);
     if (!identity || identity.availability !== "available" || identity.value !== record.model || identity.provenance?.sourceKind !== "runtime" || identity.provenance?.sourceId !== input.target.runtimeId) return [];

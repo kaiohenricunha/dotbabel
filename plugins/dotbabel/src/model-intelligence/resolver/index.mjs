@@ -21,7 +21,9 @@ export function resolve(input) {
     if (!constraints.valid) return failure("invalid", "invalid_resolver_input");
     const explanation = constraints.reasons;
     if (!constraints.requirement && !constraints.pin) return failure("unresolved", "runtime_inheritance_preserved", explanation);
-    const allCandidates = candidates(input);
+    const pinnedModel = constraints.pin?.config.model;
+    // An exact pin cannot select another identity. Still evaluate the independent observation.
+    const allCandidates = candidates(input, pinnedModel === undefined ? undefined : new Set([pinnedModel, input.observed?.axes?.model]));
     const unresolved = code => {
       const result = failure("unresolved", code, explanation);
       const observed = enforcement(input, constraints, undefined, allCandidates);
