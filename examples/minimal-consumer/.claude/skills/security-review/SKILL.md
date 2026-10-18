@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:c0ae6d4d1db8c739a02f9c7bde99f8eda10c175f2161a76cd6f828460afde0e5 source=skills/security-review/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:cce2bd7f82d713dc7bbf7672ddb7b141ba2c94619502f36a0c5b781d75c85e32 source=skills/security-review/SKILL.md — do not edit directly
 allowed-tools: Read Grep Bash
 argument-hint: "[PR# | path | staged]"
 description: |

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-10-18T17:56:54.867Z",
+  "generatedAt": "2026-10-18T18:11:11.405Z",
   "skills": [
     {
       "name": "agents-search",
@@ -289,7 +289,7 @@
     {
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
-      "checksum": "sha256:32a58bb0feb413e7f44148347d62283332ba259273a6c8f6d4a514876cc484dd",
+      "checksum": "sha256:64dea263bfad0ef873c2abfbdd6078d86dcbf0951533a604fbee246bd6917775",
       "dependencies": [
         "deploy-status"
       ],
@@ -305,7 +305,7 @@
     {
       "name": "security-review",
       "path": ".claude/skills/security-review/SKILL.md",
-      "checksum": "sha256:c364e2b6987f76be42042fea3bfd43a1c3b7bb83fa7b9b154f269ea9a771c779",
+      "checksum": "sha256:5f05ee4e4acdb82021ba836af2e91486ccf5c572e1d580e7d1aab8197ed5ccba",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -354,7 +354,7 @@
     {
       "name": "veracity-audit",
       "path": ".claude/skills/veracity-audit/SKILL.md",
-      "checksum": "sha256:2f66c14a71e88734d8a734bf1ce6f220f74ce28a9e302635e4e225edc1f9300e",
+      "checksum": "sha256:ec97ffd558144f83ae4007f3f489894dc7629500abda5ce0215b539b8ca707df",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },

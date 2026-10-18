@@ -577,7 +577,7 @@
     },
     {
       "id": "AC-22",
-      "status": "planned",
+      "status": "active",
       "given": "the migrated security agents",
       "when": "they are resolved and projected for Claude",
       "then": "each keeps a frontier floor and a strong model in its generated copy",

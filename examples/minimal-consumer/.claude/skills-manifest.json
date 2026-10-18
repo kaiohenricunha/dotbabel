@@ -278,7 +278,7 @@
     {
       "name": "rollback-prod",
       "path": ".claude/skills/rollback-prod/SKILL.md",
-      "checksum": "sha256:e3b9f7772989831e51b1169c982efb8de8ca0581d85874f37da7736c65e628fd",
+      "checksum": "sha256:c55b1418d6957c799765ec213a391d4abdd4f0fc7014191710695e86b58745ac",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -292,7 +292,7 @@
     {
       "name": "security-review",
       "path": ".claude/skills/security-review/SKILL.md",
-      "checksum": "sha256:0f75ca9769a496562d7138d937431f3ffb5f23a1545aa17633d68be1e377d5d9",
+      "checksum": "sha256:b17ac5a055d3c2aa831502ac71645c5556e4031cd355f8d8280bf89789bbba96",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },
@@ -341,7 +341,7 @@
     {
       "name": "veracity-audit",
       "path": ".claude/skills/veracity-audit/SKILL.md",
-      "checksum": "sha256:18bbfb8d86b827880e896f16fea07c11c673e113e5fb9bbf3d5b18e38db75d70",
+      "checksum": "sha256:9be6d9d324296749d252a3bb1fda5683aa8a6a582fbbbc46cc83fb7ddb6ef371",
       "dependencies": [],
       "lastValidated": "2026-10-18"
     },

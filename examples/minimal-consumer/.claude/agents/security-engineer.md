@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:4c45fc57717621081bd035167fb8615e3f78de824b2d8244898ccde989ac7652 source=agents/security-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:3397dc801d12a9b03bace3c9d3ae7974a4e6f882430d7b9352abfe5a6c7747a9 source=agents/security-engineer.md — do not edit directly
 description: |
   Use when hardening infrastructure security posture, reviewing network policies, managing secrets, or assessing supply-chain risks. Triggers on: "infrastructure hardening", "network policy", "secrets management", "RBAC", "admission controller", "mTLS", "supply chain", "image signing", "privilege escalation", "security posture". Uses opus — infrastructure hardening and privilege analysis require deep reasoning; a missed vector has high downstream cost.
 model: opus
