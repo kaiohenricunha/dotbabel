@@ -124,3 +124,11 @@ acceptance boundary, before waiting. Preserve unknown state until an actual comp
 arrives. This neither replays a prompt nor permits routing during an active turn. The autonomous
 contract authorizes the correction. The earlier mutation report covers the earlier bytes; rerun
 the same three-module measurement for this source correction.
+
+## Single-fleet review corrections
+
+The four-role review at 277b423 reports three defects. Concurrent native requests preserve their RPC identifiers, so transport correlation is not the approval defect. The terminal prints both prompts before independently consuming answers; the second prompt can be visible when an answer authorizes the first request. A failing concurrent-request regression confirms this. Serialize each complete display-and-answer operation on one terminal queue. Unsupported and piped requests still never approve; an interrupted queued request declines.
+
+The native hidden model is not necessarily unavailable: the runtime allows explicit selection. Removing its catalog record also removes known capability facts, so the public resolver cannot detect a manual below-floor pin. Retain every discovered record. Build current native visibility evidence through the existing evidence constructors and catalog; replace only the visibility field from the current model/list response. The existing resolver excludes non-listed automatic choices and rejects known below-floor explicit pins. The new regression exercises both decisions through the public resolver. There is no separate chooser or capability table.
+
+A close race occurs after native acceptance but before completion waiting. A missing completion is one possible cause of a timeout; the reproducing fixture instead emits the matching early completion, and the caller closes during that event. Close clears buffered completion before the waiter exists. Check the closed state immediately after the awaited submission. The failing regression now returns session_closed promptly without installing a completion deadline. No turn is replayed. The initial loader retention and close tests fail before correction; the concurrent approval test fails with both prompts visible. All corrected focused tests pass. Complete mutation and quality measurements must cover these new production bytes before merge.

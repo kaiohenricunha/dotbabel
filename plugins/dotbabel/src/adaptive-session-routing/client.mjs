@@ -85,6 +85,7 @@ export async function openCodexSession(options, dependencies = {}) {
           const params = { threadId, input };
           for (const [axis, key] of [["model", "model"], ["reasoning", "effort"]]) if (manual[axis].source === "manual") params[key] = manual[axis].value;
           const accepted = await router.submit(`submission-${++sequence}`, params);
+          if (closed) throw fail("session_closed");
           if (accepted.status !== "accepted") return accepted;
           latestObservation = undefined;
           router.updateState({ current: { axes: {}, turnExecuted: true } });

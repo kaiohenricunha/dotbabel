@@ -23,7 +23,9 @@ it("loads each caller's project policy without leaking it through shared capabil
   for (const input of [first, second]) {
     expect(input.target).toEqual({ runtimeId: "codex", artifactKind: "workflow" });
     expect(input.runtimeContract.id).toBe("codex");
-    expect(input.catalog.runtimes[0].models.map(model => model.model)).toEqual(["visible"]);
+    expect(input.catalog.runtimes[0].models.map(model => model.model)).toEqual(["visible", "hidden", "unknown"]);
+    expect(input.catalog.runtimes[0].models[1].fields.selectionVisibility[0].value).toBe("hidden");
+    expect(input.catalog.runtimes[0].models[2].fields.selectionVisibility[0].value).toBe("unknown");
     expect(input.catalog.runtimes[0].models[0].fields.id[0]).toMatchObject({ freshness: "fresh", refresh: "idle" });
   }
 });
@@ -38,4 +40,15 @@ it("uses the actual clock by default and refreshes expired evidence without cach
   await expect(load(repoRoot)).rejects.toMatchObject({ code: "capability_evidence_unavailable", message: "capability_evidence_unavailable" });
   const refreshed = await load(repoRoot); expect(discover).toHaveBeenCalledTimes(3); expect(rpc.request).toHaveBeenCalledTimes(3);
   expect(refreshed.catalog.runtimes[0].models[0].fields.id[0].freshness).toBe("fresh");
+});
+it("retains a hidden manual model's capability facts so the public resolver rejects a lower-floor pin", async () => {
+ const {resolve}=await import("../src/model-intelligence/resolver/index.mjs");
+ const repoRoot=root("frontier"),now="2026-10-18T00:00:00.000Z";
+ const discover=async()=>makeAdapterResult({status:"ok",provenance:{sourceId:"codex",sourceKind:"runtime",adapterVersion:"fixture"},observedAt:now,evidence:makeDiscoveryEvidence({models:[makeModelFact({id:"hidden",selectionVisibility:"hidden",supportedReasoningLevels:[],capabilities:{reasoning:false,tool_call:true}}),makeModelFact({id:"visible",selectionVisibility:"listed",supportedReasoningLevels:[{effort:"calm"},{effort:"focused"},{effort:"thorough"}],capabilities:{reasoning:true,tool_call:true}})]})});
+ const load=createCodexSessionInputLoader({discover,now:()=>now,rpc:{request:async()=>({data:[{model:"visible",hidden:false},{model:"hidden",hidden:true}]})}});
+ const input=await load(repoRoot);
+ const result=resolve({...input,requirement:{mode:"dynamic",requirement:"routine",binding:"self",provenance:{sourceId:"fixture",sourceKind:"artifact"}},invocation:{pin:{runtime:"codex",config:{model:"hidden"}},omitDefaultReasoning:true}});
+ expect(result.status).toBe("conflict");expect(result.diagnostics.map(x=>x.code)).toContain("pin_floor_conflict");
+ const ordinary=resolve({...input,requirement:{mode:"dynamic",requirement:"routine",binding:"self",provenance:{sourceId:"fixture",sourceKind:"artifact"}}});
+ expect(ordinary.configuration.axes.model).toBe("visible");
 });

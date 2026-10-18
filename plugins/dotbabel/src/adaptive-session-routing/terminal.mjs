@@ -13,6 +13,7 @@ export async function runManagedTerminal(options) {
   const lines = createInterface({ input: process.stdin, output: process.stderr, terminal: Boolean(process.stdin.isTTY) });
   const iterator = lines[Symbol.asyncIterator]();
   let session;
+  let approvalQueue = Promise.resolve();
   const interrupted = () => { lines.close(); session?.close(); process.exitCode = 130; };
   process.on("SIGINT", interrupted);
   const json = record => process.stdout.write(`${JSON.stringify(record)}\n`);
@@ -20,9 +21,14 @@ export async function runManagedTerminal(options) {
     session = await openCodexSession({ ...options,
       onServerRequest: async (method, params) => {
         if (!process.stdin.isTTY || !["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(method)) throw Error("native_handler_unavailable");
-        process.stderr.write(`Native approval request: ${method}\n${JSON.stringify(params)}\nType accept to approve once; any other answer declines: `);
-        const answer = await iterator.next();
-        return { decision: !answer.done && answer.value === "accept" ? "accept" : "decline" };
+        const approval = approvalQueue.then(async () => {
+          if (process.exitCode === 130) return { decision: "decline" };
+          process.stderr.write(`Native approval request: ${method}\n${JSON.stringify(params)}\nType accept to approve once; any other answer declines: `);
+          const answer = await iterator.next();
+          return { decision: !answer.done && answer.value === "accept" ? "accept" : "decline" };
+        });
+        approvalQueue = approval.catch(() => {});
+        return approval;
       },
       onEvent: message => {
         if (message.method !== "item/agentMessage/delta" || typeof message.params?.delta !== "string") return;

@@ -165,7 +165,7 @@ describe("managed Codex session", () => {
     expect(f.deps.discover).toHaveBeenCalledTimes(2);
     expect(f.calls.filter(([m]) => m === "model/list")).toHaveLength(3);
     expect(loaded).toHaveLength(3);
-    expect(loaded[0].catalog.runtimes[0].models.map(m => m.model)).toEqual(["visible"]); session.close();
+    expect(loaded[0].catalog.runtimes[0].models.map(m => m.model)).toEqual(["visible", "hidden"]); session.close();
   });
   it("does not cache a failed discovery as usable fresh input", async () => {
     const loaded = [], f = fixture({ load: true, loaded, repoRoot: process.cwd() }); delete f.deps.loadResolverInput;
@@ -311,4 +311,10 @@ it("does not reuse an earlier observation after a later accepted turn times out"
  try{await session.submit([{type:"text",text:"First"}]);await expect(session.submit([{type:"text",text:"Second"}])).rejects.toMatchObject({code:"native_completion_unknown"});
  f.notify({method:"turn/completed",params:{threadId:"retained-thread",turn:{id:"timed-out-turn",status:"completed"}}});
  expect((await session.submit([{type:"text",text:"Third"}])).status).toBe("completed");expect(loaded[1].observed.configurationBasis).toBe("as-run");expect(loaded[2].observed).toBeUndefined();}finally{session.close();}
+});
+it("reports closure before a completion waiter can be installed", async () => {
+ const f=fixture(); let session;
+ session=await openCodexSession({repoRoot:"/project",completionTimeoutMs:20,onEvent:message=>{if(message.method==="turn/completed")session.close();}},f.deps);
+ await expect(session.submit([{type:"text",text:"Prompt"}])).rejects.toMatchObject({code:"session_closed"});
+ expect(f.rpc.close).toHaveBeenCalledOnce();
 });

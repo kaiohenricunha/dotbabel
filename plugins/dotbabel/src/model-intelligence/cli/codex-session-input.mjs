@@ -2,6 +2,8 @@
 import { loadPolicyLayers, mergePolicy } from "../policy/index.mjs";
 import { buildCatalog, deriveFreshness, freshnessPolicyFor } from "../catalog/index.mjs";
 import * as codex from "../sources/runtime/codex.mjs";
+import { makeAdapterResult } from "../sources/contract.mjs";
+import { makeDiscoveryEvidence, makeModelFact } from "../sources/evidence.mjs";
 
 /**
  * Create a session-local input loader. Discovery remains local and uses the shared freshness policy.
@@ -20,10 +22,13 @@ export function createCodexSessionInputLoader(options) {
       discovered = next;
     }
     const listing = await options.rpc.request("model/list", { includeHidden: true });
-    const visible = new Set(listing.data.filter(model => model.hidden === false).map(model => model.model));
+    const visibility = new Map(listing.data.map(model => [model.model, model.hidden === false ? "listed" : model.hidden === true ? "hidden" : "unknown"]));
     const freshness = deriveFreshness({ observedAt: discovered.observedAt, policy, now: now() });
     const loaded = buildCatalog([{ result: discovered, freshness, refresh: "idle" }]);
-    const catalog = { ...loaded, runtimes: loaded.runtimes.map(runtime => ({ ...runtime, models: runtime.models.filter(model => visible.has(model.model)) })) };
+    const selection = makeAdapterResult({ status: "ok", provenance: discovered.provenance, observedAt: now(), evidence: makeDiscoveryEvidence({ models: discovered.evidence.models.map(model => makeModelFact({ id: model.id, supportedReasoningLevels: [], selectionVisibility: visibility.get(model.id) ?? "unknown" })) }) });
+    const current = buildCatalog([{ result: selection, freshness: "fresh", refresh: "idle" }]);
+    const selectionFields = new Map(current.runtimes.flatMap(runtime => runtime.models.map(model => [model.model, model.fields.selectionVisibility])));
+    const catalog = { ...loaded, runtimes: loaded.runtimes.map(runtime => ({ ...runtime, models: runtime.models.map(model => ({ ...model, fields: { ...model.fields, selectionVisibility: selectionFields.get(model.model) } })) })) };
     const { shipped, user, project } = loadPolicyLayers({ repoRoot });
     return { policy: mergePolicy({ shipped, user, project }), catalog, target: { runtimeId: "codex", artifactKind: "workflow" }, runtimeContract: codex.descriptor };
   };

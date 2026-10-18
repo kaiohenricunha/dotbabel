@@ -114,3 +114,33 @@ it("closes input if interrupted while native initialization is pending", async (
   openCodexSession.mockImplementation(async () => { process.emit("SIGINT"); return session; });
   await runManagedTerminal({ repoRoot: "/project" }); expect(input.close).toHaveBeenCalled(); expect(session.submit).not.toHaveBeenCalled(); expect(session.close).toHaveBeenCalled(); expect(process.exitCode).toBe(130);
 });
+it("keeps simultaneous approval prompts and answers paired in request order", async () => {
+  Object.defineProperty(process.stdin, "isTTY", { configurable: true, value: true });
+  let reads = 0, answers;
+  input[Symbol.asyncIterator] = () => ({ next: async () => {
+    reads++;
+    if (reads === 1) return { done: false, value: "Prompt" };
+    if (reads === 2) {
+      await Promise.resolve();
+      expect(errorOutput.join("").match(/Native approval request:/g)).toHaveLength(1);
+      expect(errorOutput.join("")).toContain('"request":"first"');
+      return { done: false, value: "accept" };
+    }
+    if (reads === 3) {
+      expect(errorOutput.join("").match(/Native approval request:/g)).toHaveLength(2);
+      expect(errorOutput.join("")).toContain('"request":"second"');
+      return { done: false, value: "decline" };
+    }
+    return { done: true };
+  } });
+  session.submit.mockImplementation(async () => {
+    const handle = openCodexSession.mock.calls[0][0].onServerRequest;
+    answers = await Promise.all([
+      handle("item/commandExecution/requestApproval", { request: "first" }),
+      handle("item/fileChange/requestApproval", { request: "second" }),
+    ]);
+    return completed();
+  });
+  await runManagedTerminal({ repoRoot: "/project" });
+  expect(answers).toEqual([{ decision: "accept" }, { decision: "decline" }]);
+});
