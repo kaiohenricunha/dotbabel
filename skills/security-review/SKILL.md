@@ -3,20 +3,28 @@ id: security-review
 name: security-review
 type: skill
 version: 1.0.0
-domain: [devex, security]
-platform: [none]
-task: [review]
+domain:
+  - devex
+  - security
+platform:
+  - none
+task:
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes.
-  Triggers on: "security review", "check for secrets", "vulnerability scan".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Analyze a diff or changed files for common security vulnerabilities (injection, XSS, SSRF, secrets). Defaults to staged changes. Triggers on: "security review", "check for secrets", "vulnerability scan".
 argument-hint: "[PR# | path | staged]"
 tools: Bash, Read, Grep
 allowed-tools: Read Grep Bash
 model: opus
+dotbabel:
+  compute:
+    mode: floor
+    requirement: frontier
+    binding: consumer
 ---
 
 Analyze a diff or set of changed files for common security vulnerabilities.

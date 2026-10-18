@@ -11,9 +11,10 @@ import {mergePolicy,SHIPPED_POLICY}from"../src/model-intelligence/policy/index.m
 const fixture=JSON.parse(readFileSync(new URL("./fixtures/model-intelligence/migration-batches.json",import.meta.url),"utf8"));
 const snapshot=readSnapshot();
 const artifact=entry=>({sourcePath:entry.sourcePath,sourceContent:readFileSync(new URL(`../../../${entry.sourcePath}`,import.meta.url),"utf8"),target:{path:entry.sourcePath,artifactKind:entry.artifactKind??"skill"}});
-for(const[batch,category]of[["P-19a","E"],["P-19b","C"]])describe(batch,()=>{
+for(const[batch,category]of[["P-19a","E"],["P-19b","C"],["P-19d","A"]])describe(batch,()=>{
  const entries=fixture.entries.filter(entry=>entry.category===category);
  it(`${batch}: every artifact in the batch parses to the expected NormalizedComputeRequirement`,()=>{
+  expect(entries).toHaveLength(category==="A"?5:category==="C"?20:6);
   for(const entry of entries){const parsed=parseProjectionSource(artifact(entry));const compute=parseComputeDeclaration(parsed.frontmatter,{sourcePath:entry.sourcePath});expect(compute.errors).toEqual([]);expect(compute.declared,entry.sourcePath).toBe(true);expect(compute.requirement).toMatchObject(entry.compute);}
  });
  it(`${batch}: preserves original bodies, tools, native controls and unrelated metadata`,()=>{
@@ -31,4 +32,39 @@ for(const[batch,category]of[["P-19a","E"],["P-19b","C"]])describe(batch,()=>{
 it("P-19a: local-attest still has no requirement and no projection",()=>{
  const source=artifact(fixture.neutral),parsed=parseProjectionSource(source);expect(parsed.requirement).toBeNull();expect(parsed.frontmatter).toEqual(fixture.neutral.frontmatter);expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(fixture.neutral.bodyHash);
  const output=buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[source]}).files[0];const native=parseProjectionSource({sourcePath:fixture.neutral.sourcePath,sourceContent:output.content});expect(native.requirement).toBeNull();expect(native.frontmatter).not.toHaveProperty("model");expect(native.frontmatter).not.toHaveProperty("effort");expect(native.frontmatter["disable-model-invocation"]).toBe(true);
+});
+
+it("P-19d: the security agents resolve to a floor of frontier and their generated copies still carry a strong model",()=>{
+ const securityAgents=fixture.entries.filter(item=>item.category==="A"&&item.artifactKind==="agent");expect(securityAgents).toHaveLength(2);
+ for(const entry of securityAgents){
+  const source=artifact(entry),parsed=parseProjectionSource(source);
+  expect(parsed.requirement,entry.sourcePath).toMatchObject({mode:"floor",requirement:"frontier",binding:"self"});
+  const result=resolve({requirement:parsed.requirement,target:{runtimeId:"claude",artifactKind:"agent",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY,user:{floor:{mode:"floor",requirement:"mechanical"}}}),runtimeContract:snapshot.runtimes.claude.runtimeContract,invocation:{pin:{runtime:"claude",config:{model:entry.frontmatter.model}},omitDefaultReasoning:true}});
+  expect(result.status).toBe("resolved");expect(result.confidence).toBe("high");expect(result.enforcement).toEqual({state:"enforced",basis:"artifact-binding"});expect(result.configuration.axes).toEqual({model:entry.frontmatter.model});
+  expect(result.explanation).toContainEqual(expect.objectContaining({code:"artifact_floor_applied",message:"The effective minimum is frontier."}));
+  const generated=parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:readFileSync(new URL(`../../../plugins/dotbabel/templates/claude/${entry.sourcePath}`,import.meta.url),"utf8")});
+  expect(generated.frontmatter.model).toBe(entry.frontmatter.model);expect(generated.frontmatter.tools).toBe(entry.frontmatter.tools);expect(generated.frontmatter).not.toHaveProperty("effort");expect(createHash("sha256").update(generated.body).digest("hex")).toBe(entry.bodyHash);
+ }
+});
+
+it("P-19d: rollback-prod keeps the typed confirmation text unchanged",()=>{
+ const entry=fixture.entries.find(item=>item.sourcePath==="skills/rollback-prod/SKILL.md");
+ const source=artifact(entry),parsed=parseProjectionSource(source);expect(parsed.body).toContain("ROLLBACK PROD");expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(entry.bodyHash);expect(parsed.frontmatter["disable-model-invocation"]).toBe(true);
+ const output=buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[source]}).files[0];const native=parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:output.content});expect(native.body).toBe(parsed.body);expect(native.frontmatter["disable-model-invocation"]).toBe(true);expect(native.frontmatter["user-invocable"]).toBe(true);
+});
+
+it("P-19d: consumer pins retain native axes as explicit intent without claiming native skill enforcement",()=>{
+ for(const entry of fixture.entries.filter(item=>item.category==="A"&&item.compute.mode==="pin")){
+  const parsed=parseProjectionSource(artifact(entry));expect(parsed.requirement).toMatchObject(entry.compute);
+  const result=resolve({requirement:parsed.requirement,target:{runtimeId:"claude",artifactKind:"skill",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract});expect(result.status,entry.sourcePath).toBe("resolved");expect(result.configuration.axes).toEqual(entry.compute.pin.config);expect(result.enforcement).toEqual({state:"unknown",basis:"none"});
+ }
+});
+
+it("P-19d: explicit native pins cannot satisfy the Frontier minimum with insufficient capability evidence",()=>{
+ const entries=fixture.entries.filter(item=>item.category==="A"&&item.compute.requirement==="frontier");expect(entries).toHaveLength(4);
+ for(const entry of entries){
+  const catalog=snapshotCatalog(snapshot);for(const model of catalog.runtimes.find(runtime=>runtime.runtimeId==="claude").models)for(const fact of model.fields.capabilities)fact.value={reasoning:false,tool_call:true};
+  const result=resolve({requirement:parseProjectionSource(artifact(entry)).requirement,target:{runtimeId:"claude",artifactKind:entry.artifactKind,sourcePath:entry.sourcePath},catalog,policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract,invocation:{pin:{runtime:"claude",config:entry.compute.pin?.config??{model:entry.frontmatter.model}},omitDefaultReasoning:true}});
+  expect(result.status,entry.sourcePath).toBe("conflict");expect(result.enforcement.state).toBe("unsatisfied");expect(result.configuration).toBeUndefined();
+ }
 });
