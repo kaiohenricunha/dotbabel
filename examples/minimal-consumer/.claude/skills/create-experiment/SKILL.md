@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:6cdc1ed239546403a79e240699aeb5d19e4aea701ec988a27b841b1473aec13b source=skills/create-experiment/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:f4172a4fa1ba477d909080706ced6d7cd3984eb877a4404c1b09f4ea52c874cc source=skills/create-experiment/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash Write
 argument-hint: "[topic or hypothesis]"
 description: |

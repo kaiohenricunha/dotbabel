@@ -704,3 +704,18 @@ AI review workflow
 - **The workflow has no canonical source today.** No script or source file generates `ai-review.yml`; the file under `plugins/dotbabel/templates/workflows/` is hand-authored. KD-6 makes it a generated file. §5 `Declaration for an artifact without frontmatter` names its canonical source and its compute sidecar.
 - **A consumer copy is fixed at `init` time.** `dotbabel init` copies `workflows/` into `.github/workflows/` once (`plugins/dotbabel/src/init-harness-scaffold.mjs:10`) and refuses an initialized repository without `--force` (`:69-91`). A later release projection does not reach an existing consumer copy, so that copy needs the same staleness report that ARCH-43 gives a plugin baseline.
 - **A second copy exists** at `examples/minimal-consumer/.github/workflows/ai-review.yml`.
+
+### P-18 evidence-backed dual-declaration compatibility
+
+A coarse `MI_PROPOSAL_DEFAULTED` alias class is an inferred migration proposal, not an upper bound
+on that selector's capability. A retained native selector and authored semantic declaration are
+compatible when the public resolver verifies that exact native configuration against the declaration
+and all applicable floors, using accepted capability evidence with high confidence. The compatibility
+reader remains pure and conservative without explicit caller-supplied verification. It imports no
+resolver or I/O module. A separate orchestration consumer obtains the proof through the public resolver.
+
+An explicit native pin that disagrees with the retained native selector still conflicts. Unknown,
+low-confidence or unsatisfied evidence never authorizes a winner. The migration report identifies
+verified structural compatibility and its accepted release snapshot. This is not proof of live account
+availability or an empirical model-performance ranking; runtime selection keeps its independent
+usable-evidence gate. An alias-derived proposal without an approved artifact decision remains report-only.
