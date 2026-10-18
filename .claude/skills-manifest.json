@@ -187,9 +187,9 @@
     {
       "name": "peer",
       "path": ".claude/skills/peer/SKILL.md",
-      "checksum": "sha256:57ae3301d232fd40c9b06161283690054a552ee8dc83e91d6f677e500946a9ff",
+      "checksum": "sha256:c52c3586ae7b5088c4b2537be2d7f849a61e95a5dd51d9547838dff3fa50dc0e",
       "dependencies": [],
-      "lastValidated": "2026-10-16"
+      "lastValidated": "2026-10-18"
     },
     {
       "name": "plan-grader",
