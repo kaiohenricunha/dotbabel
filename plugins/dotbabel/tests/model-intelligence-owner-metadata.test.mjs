@@ -22,8 +22,9 @@ it("F8/F9: metadata does not change native invocation, tools, permissions or pro
  expect(project(sourceContent.replace("name: fixture","invocation: explicit\nheadless_safe: true\nname: fixture"))).toEqual(project(sourceContent));}
 });
 it("F9: reports invalid skill metadata through the existing public artifact validator",async()=>{
- const {validateArtifacts}=await import("../src/build-index.mjs");
- const artifact=value=>({type:"skill",path:"skills/fixture/SKILL.md",warnings:[],frontmatter:{headless_safe:value}});
+ const {validateArtifacts,parseFrontmatter}=await import("../src/build-index.mjs");
+ const metadata=parseFrontmatter(readFileSync(new URL("../../../skills/review-prs/SKILL.md",import.meta.url),"utf8")).frontmatter;
+ const artifact=value=>({type:"skill",path:"skills/fixture/SKILL.md",warnings:[],frontmatter:{...metadata,headless_safe:value}});
  expect(validateArtifacts([artifact(true),artifact(false)]).warnings).toEqual([]);
  expect(validateArtifacts([artifact("true")]).warnings).toContain("skills/fixture/SKILL.md: schema skill /headless_safe must be boolean (type)");
 });
