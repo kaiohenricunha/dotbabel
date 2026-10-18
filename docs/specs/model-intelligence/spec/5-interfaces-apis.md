@@ -218,6 +218,16 @@ interface SourceAdapterDescriptor {
     };
 
     validation: OperationCapability;
+
+    mainSession?: Record<
+      string, // runtime mechanism identifier, not a model id
+      {
+        support: SupportState;
+        axes: Record<string, SupportState>;
+        observation: { support: SupportState; axes: Record<string, SupportState> };
+        manualSelection?: { support: SupportState; axes: Record<string, SupportState> };
+      }
+    >;
   };
 }
 ```
@@ -300,6 +310,14 @@ This is different from artifact binding. A runtime can support selecting a model
 ### Main-session capability extension — 2026-10-16 amendment
 
 Runtime capability data additionally distinguishes the main-session mechanism, model and effort override support, manual-selection provenance and effective-axis observation. Each uses the existing `supported | unsupported | unverified` vocabulary with versioned evidence. An absent extension is unverified, never supported. The linked routing spec defines its application contract; the resolver continues to consume plain supplied data and performs no runtime call.
+
+`mainSession` is optional for existing descriptors and runtime-only. It holds at most 16 named
+mechanisms, each with independent control axes and effective-axis observation. `manualSelection`
+describes whether a mechanism exposes selection provenance for each axis. Missing fields remain
+unverified. Registry getters require supported enclosing blocks before returning a supported axis.
+An App Server declaration cannot establish stock CLI support; native discovery, invocation and
+artifact binding remain separate capabilities. No production adapter gains verified routing solely
+from adding this contract.
 
 ### Adapter calls
 
@@ -461,6 +479,34 @@ Field-level facts retain their individual provenance as required by ARCH-28. A m
 Models.dev supplies its declared boolean fields. Codex supplies reasoning support from its native reasoning-level list, and tool-call support only for recognized native shell interfaces. Unknown interfaces remain unknown. The adapter never derives these facts from model names. Semantic classes remain the policy's judgment; accepted effort values remain per-model evidence. Neither these coarse rules nor passing fixture tests establish model-ranking accuracy.
 
 The pure resolver accepts an optional `invocation.pin` with the existing runtime/config shape for the most-specific explicit pin. It composes this after policy and artifact pins while preserving every mandatory floor. Catalogs lacking sufficient identity or capability evidence produce structured unresolved results.
+
+### Routing constraint evidence — 2026-10-18 implementation amendment
+
+Model facts may include `selectionVisibility: listed|hidden|unknown` and explicit `inputModalities`.
+The native adapter normalizes picker visibility without claiming account entitlement. Automatic model
+selection requires known listed eligibility; an explicit model pin may preserve a hidden selection.
+Older caches without this fact remain readable but cannot prove automatic eligibility. An explicit
+refresh supplies the newer evidence; read-only resolution never refreshes implicitly.
+
+Each supported native effort may carry paired `intent: low|medium|high` and `order: 0..100`
+annotations from its runtime adapter. The ordinal compares recognized native effort controls, not
+model quality. An unfamiliar control stays opaque and unannotated. Values remain per-model: support
+on one model never implies support on another. Raw native values and descriptions remain preserved.
+
+The resolver accepts optional invocation constraints `requiredModalities`, `requiredCapabilities`,
+`effortIntent`, `overrides` and `modelSelection`. Required modalities need explicit per-model evidence.
+Required operation capabilities form a bounded boolean map, independent of task class. A coding
+harness can require tool calls even for mechanical work. Missing facts remain unknown; an exact
+manual model with a contradictory required capability produces a conflict. These are operation
+constraints, not another policy or model registry. Semantic effort intent
+selects a supported annotated native control; absent semantics produce an unresolved result.
+`overrides` preserves explicit axes independently, retaining untouched lower-scope pins and every
+mandatory floor. Native manual effort is exact and wins over automatic effort intent.
+`modelSelection: automatic` keeps ordinary eligibility binding even when a retention probe constrains
+the current model; `explicit` requires a specified model. A dynamic command or an inherit declaration
+does not gain artifact enforcement merely because invocation controls exist. Observed compliance
+checks required modalities, operation capabilities and effort as well as model capability. Missing observed axes remain
+unknown; they are not proof of compliance or a known violation.
 
 ### Authority
 

@@ -109,6 +109,9 @@ const OPERATIONAL_KEYS = Object.freeze(["network", "auth", "cacheable", "executi
 /** Keys a binding entry or the invocation block may carry. */
 const SUPPORT_AXES_KEYS = Object.freeze(["support", "axes", "$comment"]);
 
+/** Optional main-session controls distinguish execution mechanisms and observation. */
+const SESSION_MECHANISM_KEYS = Object.freeze([...SUPPORT_AXES_KEYS, "observation", "manualSelection"]);
+
 /** Operation blocks, as opposed to `binding` and `invocation`. */
 const OPERATION_KEYS = Object.freeze(["discovery", "observation", "validation"]);
 
@@ -322,14 +325,15 @@ function checkOperation(block, path, errors) {
  * @param {unknown} block
  * @param {string} path
  * @param {DescriptorError[]} errors
+ * @param {ReadonlyArray<string>} [allowedKeys]
  * @returns {void}
  */
-function checkSupportAndAxes(block, path, errors) {
+function checkSupportAndAxes(block, path, errors, allowedKeys = SUPPORT_AXES_KEYS) {
   if (!isPlainObject(block)) {
     errors.push({ path, message: `must be an object, got ${typeOf(block)}` });
     return;
   }
-  rejectUnknownKeys(block, SUPPORT_AXES_KEYS, path, errors);
+  rejectUnknownKeys(block, allowedKeys, path, errors);
   const { support, axes } = /** @type {any} */ (block);
   if (!SUPPORT_STATES.includes(support)) {
     errors.push({ path: `${path}.support`, message: `must be one of ${SUPPORT_STATES.join(", ")}` });
@@ -395,7 +399,7 @@ export function validateDescriptor(descriptor) {
     }
   }
   for (const key of ownKeys(capabilities)) {
-    if (!CAPABILITY_KEYS.includes(key)) errors.push({ path: `capabilities.${key}`, message: "unknown capability" });
+    if (!CAPABILITY_KEYS.includes(key) && key !== "mainSession") errors.push({ path: `capabilities.${key}`, message: "unknown capability" });
   }
 
   for (const key of OPERATION_KEYS) {
@@ -426,6 +430,25 @@ export function validateDescriptor(descriptor) {
 
   if (Object.hasOwn(capabilities, "invocation")) {
     checkSupportAndAxes(capabilities.invocation, "capabilities.invocation", errors);
+  }
+
+  if (Object.hasOwn(capabilities, "mainSession")) {
+    const mechanisms = capabilities.mainSession;
+    if (kind !== "runtime" || !isPlainObject(mechanisms) || ownKeys(mechanisms).length > 16) {
+      errors.push({ path: "capabilities.mainSession", message: "must be a runtime mechanism table with at most 16 entries" });
+    } else {
+      for (const mechanism of ownKeys(mechanisms)) {
+        const at = `capabilities.mainSession.${mechanism}`;
+        if (UNSAFE_KEYS.includes(mechanism) || !IDENTIFIER_RE.test(mechanism)) {
+          errors.push({ path: at, message: "must be a safe mechanism identifier" });
+          continue;
+        }
+        const block = mechanisms[mechanism];
+        checkSupportAndAxes(block, at, errors, SESSION_MECHANISM_KEYS);
+        checkSupportAndAxes(block?.observation, `${at}.observation`, errors);
+        if (isPlainObject(block) && Object.hasOwn(block, "manualSelection")) checkSupportAndAxes(block.manualSelection, `${at}.manualSelection`, errors);
+      }
+    }
   }
 
   return { errors };
@@ -1008,7 +1031,7 @@ const TIMED_OUT = Symbol("model-intelligence/timeout");
  * defaulted to `unsupported` would look safe while quietly asserting a fact nobody
  * measured; one that defaulted to `supported` would emit projections on a guess.
  * @param {object[]} descriptors
- * @returns {{get: (id: string) => object, has: (id: string) => boolean, ids: string[], bindingSupport: (id: string, kind: string) => string, axisSupport: (id: string, kind: string, axis: string) => string, invocationAxisSupport: (id: string, axis: string) => string, isVerified: (id: string, kind: string, axis?: string) => boolean}}
+ * @returns {{get: (id: string) => object, has: (id: string) => boolean, ids: string[], bindingSupport: (id: string, kind: string) => string, axisSupport: (id: string, kind: string, axis: string) => string, invocationAxisSupport: (id: string, axis: string) => string, mainSessionSupport: (id: string, mechanism: string) => string, mainSessionAxisSupport: (id: string, mechanism: string, axis: string) => string, mainSessionObservationSupport: (id: string, mechanism: string, axis: string) => string, mainSessionManualSupport: (id: string, mechanism: string, axis: string) => string, isVerified: (id: string, kind: string, axis?: string) => boolean}}
  */
 export function createRegistry(descriptors) {
   if (!Array.isArray(descriptors)) throw new TypeError(`createRegistry: descriptors must be an array, got ${typeOf(descriptors)}`);
@@ -1074,6 +1097,33 @@ export function createRegistry(descriptors) {
    */
   const invocationAxisSupport = (id, axis) => safeOwn(/** @type {any} */ (get(id)).capabilities.invocation.axes, axis) ?? "unverified";
 
+  /** @param {string} id @param {string} mechanism @returns {object|undefined} */
+  const mainSessionFor = (id, mechanism) => safeOwn(/** @type {any} */ (get(id)).capabilities.mainSession, mechanism);
+
+  /** @param {string} id @param {string} mechanism @returns {string} */
+  const mainSessionSupport = (id, mechanism) => mainSessionFor(id, mechanism)?.support ?? "unverified";
+
+  /** @param {string} id @param {string} mechanism @param {string} axis @returns {string} */
+  const mainSessionAxisSupport = (id, mechanism, axis) => {
+    const block = mainSessionFor(id, mechanism);
+    if (block?.support !== "supported") return block?.support ?? "unverified";
+    return safeOwn(block.axes, axis) ?? "unverified";
+  };
+
+  /** @param {string} id @param {string} mechanism @param {string} axis @returns {string} */
+  const mainSessionObservationSupport = (id, mechanism, axis) => {
+    const block = mainSessionFor(id, mechanism)?.observation;
+    if (block?.support !== "supported") return block?.support ?? "unverified";
+    return safeOwn(block.axes, axis) ?? "unverified";
+  };
+
+  /** @param {string} id @param {string} mechanism @param {string} axis @returns {string} */
+  const mainSessionManualSupport = (id, mechanism, axis) => {
+    const block = mainSessionFor(id, mechanism)?.manualSelection;
+    if (block?.support !== "supported") return block?.support ?? "unverified";
+    return safeOwn(block.axes, axis) ?? "unverified";
+  };
+
   /**
    * @param {string} id
    * @param {string} kind
@@ -1094,6 +1144,10 @@ export function createRegistry(descriptors) {
     bindingSupport,
     axisSupport,
     invocationAxisSupport,
+    mainSessionSupport,
+    mainSessionAxisSupport,
+    mainSessionObservationSupport,
+    mainSessionManualSupport,
     isVerified,
   });
 }

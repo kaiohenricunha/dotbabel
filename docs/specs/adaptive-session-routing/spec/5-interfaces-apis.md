@@ -36,9 +36,27 @@ negated clauses do not automatically raise demand; relevant failure facts belong
 
 `route({activation, classification, resolverInput, current, manual, runtimeCapability})` returns a decision, selected configuration, observed configuration, confidence, reasons and diagnostics. `current` is not automatically manual: `manual` tracks explicit selections per axis where the harness exposes provenance. Unknown provenance preserves the affected axis.
 
+Routing delegates modality, operation capability, ordinary-selection, semantic effort and per-axis override constraints to
+the existing resolver. An automatic current-model retention probe must still require ordinary listed
+eligibility. Retention cannot smuggle an internal/hidden model into an automatic choice. Runtime
+control application and effective-state observation remain separate from successful resolution.
+
+`prepareRoute(request, dependencies)` reads project activation before accessing the prompt or loading
+capabilities. Unsupported mechanisms and uncertain classifications also stop before capability
+loading. Dependency failures return coded fallback without copying rejected input or exception text.
+A proposal remains distinct from an applied or observed configuration. Hysteresis uses a second
+shared-resolver probe and cannot shadow an existing model pin.
+
 `apply(decision, originalSubmission)` is runtime-specific and called once before execution. Requested, accepted and observed effective configurations are separate states. A successful submission acknowledgement alone does not prove the actual model.
 
 ## Runtime contracts
+
+The shared source descriptor accepts an optional `capabilities.mainSession` table keyed by execution
+mechanism. Each entry carries support/axis states, an observation support/axis block, and optional
+manual-selection provenance support. Existing five-block descriptors remain valid. Unknown mechanisms
+and absent axes stay unverified; a supported invocation recipe alone never proves per-turn control.
+The registry snapshots and freezes this metadata. The runtime integration must still verify the
+installed interface before proposing or applying a control change.
 
 Claude: investigate documented mods `prompt.submit` and `turn.step`, field mutability, main-agent identification, effort support, effective response model and manual provenance on the installed build. Regular settings hooks and frontmatter do not establish main-session routing support.
 

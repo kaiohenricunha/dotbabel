@@ -224,6 +224,11 @@ describe("policy layer merge", () => {
     expect(() => mergePolicy({ project: { classes: "nope" } })).toThrow(/project policy: classes must be an object/);
   });
 
+  it("rejects non-shipped class redefinitions that could change a mandatory floor", () => {
+    for (const layer of ["user", "project", "artifact"]) {
+      expect(() => mergePolicy({ shipped: SHIPPED_POLICY, user: { floor: floor("frontier") }, [layer]: { classes: { frontier: { satisfied_by: {} } } } })).toThrow(/classes.*shipped/);
+    }
+  });
   it("records a shadowed pin without copying its opaque config values", () => {
     // `pin.config` may legitimately hold an endpoint or a credential, and `shadowed`
     // exists to be rendered as a diagnostic (OPS-4). The shadowed pin is usually the

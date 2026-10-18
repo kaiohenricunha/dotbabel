@@ -30,7 +30,7 @@
  * The module is pure: it validates data it is given and performs no I/O.
  */
 
-import { PROVIDERS, RUNTIME_IDS, isRuntimeId } from "../domain/index.mjs";
+import { PROVIDERS, RUNTIME_IDS, EFFORT_INTENTS, isRuntimeId } from "../domain/index.mjs";
 import { boundText, deepFreeze, isPlainObject, isVersionString } from "./contract.mjs";
 
 /** Freeze a value and everything reachable from it; defined once, in `contract.mjs`. */
@@ -248,8 +248,8 @@ export function makeObservedConfiguration(input) {
   return /** @type {any} */ (Object.freeze(out));
 }
 
-const LEVEL_FIELDS = Object.freeze(["effort", "description"]);
-const MODEL_FACT_FIELDS = Object.freeze(["id", "capabilities", "displayName", "visibility", "defaultReasoningLevel", "supportedReasoningLevels", "contextWindow", "maxContextWindow", "supportVerbosity", "defaultVerbosity"]);
+const LEVEL_FIELDS = Object.freeze(["effort", "description", "intent", "order"]);
+const MODEL_FACT_FIELDS = Object.freeze(["id", "capabilities", "selectionVisibility", "inputModalities", "displayName", "visibility", "defaultReasoningLevel", "supportedReasoningLevels", "contextWindow", "maxContextWindow", "supportVerbosity", "defaultVerbosity"]);
 
 /**
  * @param {string} name
@@ -270,13 +270,18 @@ const BUILT_FACTS = new WeakSet();
 
 /**
  * @param {unknown} level
- * @returns {Readonly<{effort: string, description?: string}>}
+ * @returns {Readonly<{effort: string, description?: string, intent?: string, order?: number}>}
  */
 function reasoningLevel(level) {
   const fields = knownFields("ModelFact.supportedReasoningLevels entry", level, LEVEL_FIELDS);
   /** @type {Record<string, unknown>} */
   const out = { effort: identifier("ModelFact.supportedReasoningLevels.effort", fields.effort) };
   if (fields.description !== undefined) out.description = boundText(fields.description);
+  if (fields.intent !== undefined || fields.order !== undefined) {
+    if (!EFFORT_INTENTS.includes(fields.intent) || !Number.isSafeInteger(fields.order) || fields.order < 0 || fields.order > 100) throw new TypeError("ModelFact effort annotations require a semantic intent and bounded native order");
+    out.intent = fields.intent;
+    out.order = fields.order;
+  }
   return /** @type {any} */ (Object.freeze(out));
 }
 
@@ -284,10 +289,12 @@ function reasoningLevel(level) {
  * @typedef {object} ModelFact
  * @property {string} id Opaque model identifier, verbatim.
  * @property {{reasoning?: boolean, tool_call?: boolean}} [capabilities] Explicit source facts, never inferred model strength.
+ * @property {"listed"|"hidden"|"unknown"} [selectionVisibility] Ordinary picker visibility, not entitlement.
+ * @property {ReadonlyArray<string>} [inputModalities] Explicitly advertised input modalities.
  * @property {string} [displayName]
  * @property {string} [visibility]
  * @property {string} [defaultReasoningLevel]
- * @property {ReadonlyArray<{effort: string, description?: string}>} supportedReasoningLevels Effort values THIS model accepts. Effort support is per model, never per runtime (ARCH-1).
+ * @property {ReadonlyArray<{effort: string, description?: string, intent?: string, order?: number}>} supportedReasoningLevels Effort values THIS model accepts. Effort support is per model, never per runtime (ARCH-1).
  * @property {number} [contextWindow]
  * @property {number} [maxContextWindow]
  * @property {boolean} [supportVerbosity]
@@ -313,6 +320,14 @@ export function makeModelFact(input) {
     supportVerbosity: flag,
     defaultVerbosity: identifier,
   });
+  if (fields.selectionVisibility !== undefined) {
+    if (!["listed", "hidden", "unknown"].includes(fields.selectionVisibility)) throw new TypeError("ModelFact.selectionVisibility must be listed, hidden or unknown");
+    out.selectionVisibility = fields.selectionVisibility;
+  }
+  if (fields.inputModalities !== undefined) {
+    if (!Array.isArray(fields.inputModalities) || fields.inputModalities.length > 32) throw new TypeError("ModelFact.inputModalities must be a bounded array");
+    out.inputModalities = Object.freeze([...new Set(fields.inputModalities.map(value => identifier("ModelFact.inputModalities entry", value)))]);
+  }
   if (fields.capabilities !== undefined) {
     const capabilities = knownFields("ModelFact.capabilities", fields.capabilities, ["reasoning", "tool_call"]);
     out.capabilities = Object.freeze(Object.fromEntries(Object.entries(capabilities).map(([key, value]) => [key, flag(`ModelFact.capabilities.${key}`, value)])));

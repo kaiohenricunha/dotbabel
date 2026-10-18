@@ -8,7 +8,7 @@ import { input, provenance, model, evidence } from "./fixtures/model-intelligenc
 
 describe("resolver catalog boundary", () => {
   it("carries explicit capability facts through real source validation and catalog normalization", () => {
-    const model = makeModelFact({ id: "opaque-runtime-model", capabilities: { reasoning: true, tool_call: true }, supportedReasoningLevels: [{ effort: "native-low" }, { effort: "native-high" }], defaultReasoningLevel: "native-low" });
+    const model = makeModelFact({ id: "opaque-runtime-model", selectionVisibility: "listed", capabilities: { reasoning: true, tool_call: true }, supportedReasoningLevels: [{ effort: "native-low" }, { effort: "native-high" }], defaultReasoningLevel: "native-low" });
     const result = makeAdapterResult({ status: "ok", provenance, observedAt: "2026-10-17T04:00:00.000Z", evidence: makeDiscoveryEvidence({ models: [model] }) });
     const catalog = buildCatalog([{ result, freshness: "fresh", refresh: "idle" }]);
     const r = resolve(input({ catalog }));

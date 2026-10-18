@@ -405,10 +405,11 @@ export function mergePolicy(layers) {
     // The class table is the substance of Dotbabel's judgement: it says which
     // capabilities satisfy which workload class. Carrying it through means the
     // resolver reads one effective policy instead of importing `SHIPPED_POLICY`
-    // directly and reaching around this layering. The schema lets no other layer
-    // declare it today, so in practice `shipped` always wins.
+    // directly and reaching around this layering. Enforce shipped-only ownership
+    // here: configuration loading does not apply the project schema.
     if (declarations.classes !== undefined) {
       if (!isPlainObject(declarations.classes)) throw new TypeError(`${layer} policy: classes must be an object, got ${typeOf(declarations.classes)}`);
+      if (layer !== "shipped") throw new TypeError(`${layer} policy: classes may only be declared by shipped policy`);
       classes = declarations.classes;
       provenance.classes = layer;
     }
