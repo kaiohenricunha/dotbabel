@@ -1,18 +1,9 @@
 ---
-id: review-pr
-name: review-pr
-type: skill
-version: 1.1.0
-domain: [devex]
-platform: [github-actions]
-task: [review]
-maturity: validated
-description: >
-  Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.
-  Triggers on: "review PR", "review pull request", "check PR".
+# dotbabel:generated projection=sha256:1a757e529f676783109cec54d8e26ca4c061d50c859a35f648e215195fd227b2 source=skills/review-pr/SKILL.md — do not edit directly
 argument-hint: "[PR#] [--conductor]"
-tools: Bash, Read, Grep, Glob
-model: sonnet
+description: |
+  Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads. Triggers on: "review PR", "review pull request", "check PR".
+name: review-pr
 ---
 
 Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.

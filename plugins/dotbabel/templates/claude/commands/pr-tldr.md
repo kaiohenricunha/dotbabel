@@ -1,17 +1,9 @@
 ---
-id: pr-tldr
-name: pr-tldr
-type: command
-version: 1.0.0
-domain: [devex, writing]
-platform: [none]
-task: [review]
-maturity: draft
-description: >
-  Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.
+# dotbabel:generated projection=sha256:cd25abfed5e74440a9cd76e75600c6781b2f3cc2ba847b964b5c3ef2e84653b4 source=commands/pr-tldr.md — do not edit directly
 argument-hint: "[PR number | branch] (default: current branch vs origin/main)"
+description: |
+  Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.
 model: haiku
-related: [tldr]
 ---
 
 Explain what a pull request gives us, for a reader who is not a developer.

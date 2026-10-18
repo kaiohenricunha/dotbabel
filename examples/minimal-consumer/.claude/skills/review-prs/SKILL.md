@@ -1,20 +1,9 @@
 ---
-id: review-prs
+# dotbabel:generated projection=sha256:df9722791a280e7734c81cffbb0f29104b3e07c765623d05313ecfeef0ce2907 source=skills/review-prs/SKILL.md — do not edit directly
+argument-hint: <N1> [N2 N3 ...] — space-separated PR numbers
+description: |
+  Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table. Triggers on: "review all PRs", "check my PRs", "PR status".
 name: review-prs
-type: skill
-version: 1.0.1
-domain: [devex]
-platform: [github-actions]
-task: [review]
-maturity: draft
-description: >
-  Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated
-  worktree, aggregate results into a summary table.
-  Triggers on: "review all PRs", "check my PRs", "PR status".
-argument-hint: "<N1> [N2 N3 ...] — space-separated PR numbers"
-tools: Bash, Read, Grep
-model: opus
-headless_safe: false
 ---
 
 Batch-review a list of PRs in parallel. Each PR gets its own sub-agent running the full `review-pr` workflow (fetch comments → validate → apply fixes → push → resolve threads → CI gate). Results are aggregated into a single summary table.

@@ -1,15 +1,8 @@
 ---
-id: merge-pr
-name: merge-pr
-type: command
-version: 2.1.0
-domain: [devex]
-platform: [github-actions]
-task: [review, testing]
-maturity: validated
-description: >
-  Merge a pull request only after verifying that trusted evidence covers its exact head SHA.
+# dotbabel:generated projection=sha256:43e98f5a0875c4a6abf6073f2133f72e734e6d795c5bcf02100abbbb0f92b803 source=commands/merge-pr.md — do not edit directly
 argument-hint: "[PR#]"
+description: |
+  Merge a pull request only after verifying that trusted evidence covers its exact head SHA.
 model: sonnet
 ---
 

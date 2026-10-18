@@ -80,3 +80,15 @@ describe("Claude projection rules", () => {
     expect(() => materializeClaude(unsupported)).toThrow(/kind_invalid/);
   });
 });
+
+it("keeps quoted native argument hints formatted without changing their value or body", async () => {
+  const { format } = await import("prettier");
+  const options = fixture("skill");
+  options.artifacts[0].releaseBaseline = true;
+  const hint = '[--json] <text:"plan" | "plan">';
+  options.artifacts[0].sourceContent = options.artifacts[0].sourceContent.replace("description: A projection fixture.", "description: A projection fixture.\nargument-hint: " + JSON.stringify(hint));
+  const result = materializeClaude(options); const content = result.files[0].content;
+  expect(parseFrontmatter(content).frontmatter["argument-hint"]).toBe(hint);
+  expect(content.endsWith("\nPreserve this exact body.\n")).toBe(true);
+  expect(await format(content, { parser: "markdown", printWidth: 100 })).toBe(content);
+});

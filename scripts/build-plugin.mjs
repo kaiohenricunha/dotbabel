@@ -5,16 +5,16 @@
  *
  * For each skill in skills/<slug>/SKILL.md:
  *   → plugins/dotbabel/templates/claude/skills/<slug>/SKILL.md
- *     (frontmatter stripped of owner, created, updated)
+ *     (native metadata projected from the reviewed release snapshot)
  *   → supporting references/, examples/, scripts/, and agents/ files copied verbatim
  *
  * For each command in commands/<slug>.md:
  *   → plugins/dotbabel/templates/claude/commands/<slug>.md
- *     (frontmatter stripped of owner, created, updated)
+ *     (native metadata projected from the reviewed release snapshot)
  *
  * For each agent in agents/<slug>.md:
  *   → plugins/dotbabel/templates/claude/agents/<slug>.md
- *     (frontmatter stripped of owner, created, updated)
+ *     (native metadata projected from the reviewed release snapshot)
  *
  * The generated skills-manifest.json uses {{today}} as the generatedAt
  * placeholder so init-harness-scaffold.mjs substitutes the real date at
@@ -31,6 +31,9 @@
  * Exits: 0 ok, 1 stale (--check mode), 2 env error, 64 usage error.
  */
 
+import { version as dotbabelVersion } from "../plugins/dotbabel/src/index.mjs";
+import { readSnapshot } from "../plugins/dotbabel/src/model-intelligence/snapshot/index.mjs";
+import { buildClaudeBaseline } from "../plugins/dotbabel/src/model-intelligence/materialize/runtime/claude-build.mjs";
 import { parse, helpText } from "../plugins/dotbabel/src/lib/argv.mjs";
 import { EXIT_CODES } from "../plugins/dotbabel/src/lib/exit-codes.mjs";
 import { createOutput } from "../plugins/dotbabel/src/lib/output.mjs";
@@ -39,8 +42,6 @@ import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const TOOL_VERSION = "1.0.0";
-/** Fields stripped from consumer-facing frontmatter. */
-const AUTHORING_FIELDS = new Set(["owner", "created", "updated"]);
 const SKILL_SUPPORT_DIRS = ["references", "examples", "scripts", "agents"];
 
 const META = {
@@ -108,27 +109,6 @@ const artifacts = (envelope.artifacts ?? []).filter(
 );
 
 /**
- * Parse frontmatter + body from a SKILL.md or command.md file.
- * Returns stripped frontmatter text (authoring-only fields removed) + body.
- *
- * @param {string} content
- * @returns {string}
- */
-function stripAuthoringFields(content) {
-  const sep = "---";
-  const first = content.indexOf(sep);
-  const second = content.indexOf(sep, first + 3);
-  if (first === -1 || second === -1) return content;
-
-  const fmLines = content.slice(first + 3, second).split("\n");
-  const kept = fmLines.filter((line) => {
-    const key = line.split(":")[0].trim();
-    return !AUTHORING_FIELDS.has(key);
-  });
-  return `---${kept.join("\n")}---${content.slice(second + 3)}`;
-}
-
-/**
  * Return all regular files below a directory, relative to that directory.
  *
  * @param {string} dir
@@ -162,15 +142,15 @@ function buildExpected() {
   const files = new Map();
 
   const manifestEntries = [];
+  const projections = [];
 
   for (const artifact of artifacts.slice().sort((a, b) => a.id.localeCompare(b.id))) {
     if (artifact.type === "skill") {
       const srcPath = join(repoRoot, "skills", artifact.id, "SKILL.md");
       if (!existsSync(srcPath)) continue;
       const raw = readFileSync(srcPath, "utf8");
-      const stripped = stripAuthoringFields(raw);
-      const destPath = join(templateRoot, "skills", artifact.id, "SKILL.md");
-      files.set(destPath, stripped);
+      const projectionPath = artifact.type === "skill" ? `skills/${artifact.id}/SKILL.md` : `${artifact.type}s/${artifact.id}.md`;
+      projections.push({ sourcePath: projectionPath, sourceContent: raw, target: { path: projectionPath, artifactKind: artifact.type } });
 
       // Copy lazy-loaded support files so SKILL.md references and helper scripts
       // resolve in both bootstrap and npm template installs.
@@ -196,9 +176,8 @@ function buildExpected() {
       const srcPath = join(repoRoot, "commands", `${artifact.id}.md`);
       if (!existsSync(srcPath)) continue;
       const raw = readFileSync(srcPath, "utf8");
-      const stripped = stripAuthoringFields(raw);
-      const destPath = join(templateRoot, "commands", `${artifact.id}.md`);
-      files.set(destPath, stripped);
+      const projectionPath = artifact.type === "skill" ? `skills/${artifact.id}/SKILL.md` : `${artifact.type}s/${artifact.id}.md`;
+      projections.push({ sourcePath: projectionPath, sourceContent: raw, target: { path: projectionPath, artifactKind: artifact.type } });
       manifestEntries.push({
         name: artifact.id,
         path: `.claude/commands/${artifact.id}.md`,
@@ -210,12 +189,15 @@ function buildExpected() {
       const srcPath = join(repoRoot, "agents", `${artifact.id}.md`);
       if (!existsSync(srcPath)) continue;
       const raw = readFileSync(srcPath, "utf8");
-      const stripped = stripAuthoringFields(raw);
-      const destPath = join(templateRoot, "agents", `${artifact.id}.md`);
-      files.set(destPath, stripped);
+      const projectionPath = artifact.type === "skill" ? `skills/${artifact.id}/SKILL.md` : `${artifact.type}s/${artifact.id}.md`;
+      projections.push({ sourcePath: projectionPath, sourceContent: raw, target: { path: projectionPath, artifactKind: artifact.type } });
     }
   }
 
+  const snapshot = readSnapshot(join(repoRoot, "plugins/dotbabel/src/model-intelligence/snapshot/release-capabilities.json"));
+  const baseline = buildClaudeBaseline({ toolVersion: dotbabelVersion, snapshot, artifacts: projections });
+  for (const file of baseline.files) files.set(join(templateRoot, file.path), file.content);
+  files.set(join(templateRoot, ".dotbabel-projection.json"), JSON.stringify(baseline.manifest, null, 2) + "\n");
   const manifest = { version: 1, generatedAt: "{{today}}", skills: manifestEntries };
   const manifestText = JSON.stringify(manifest, null, 2) + "\n";
   return { files, manifestText };
@@ -282,7 +264,10 @@ function buildExpectedPluginJson() {
   return JSON.stringify(updated, null, 2) + "\n";
 }
 
-const { files, manifestText } = buildExpected();
+let expected;
+try { expected = buildExpected(); }
+catch (error) { out.fail(`release baseline unavailable: ${error.code ?? error.message}`); out.flush(); process.exit(EXIT_CODES.ENV); }
+const { files, manifestText } = expected;
 const pluginJsonText = buildExpectedPluginJson();
 
 if (argv.flags.check) {

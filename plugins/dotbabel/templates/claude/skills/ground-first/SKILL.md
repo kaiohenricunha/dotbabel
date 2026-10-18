@@ -1,19 +1,10 @@
 ---
-id: ground-first
-name: ground-first
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [debugging, review]
-maturity: validated
-description: >
-  Produce a code-grounded analysis before any edit is proposed.
-  Triggers on: "analyze", "understand behavior", "how does this work".
-argument-hint: "[subject]"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:49d11a0b76d7aa2897944e9a443c9402550771df83cf393312254378ff6f556f source=skills/ground-first/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-model: opus
+argument-hint: "[subject]"
+description: |
+  Produce a code-grounded analysis before any edit is proposed. Triggers on: "analyze", "understand behavior", "how does this work".
+name: ground-first
 ---
 
 Produce a code-grounded analysis of a subject before any edits are proposed.

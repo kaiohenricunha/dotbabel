@@ -1,25 +1,10 @@
 ---
-id: local-attest
-name: local-attest
-type: skill
-version: 1.2.0
-domain: [devex, observability]
-platform: [github-actions]
-task: [testing, runtime-ops]
-maturity: draft
-description: >
-  Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned
-  OWNER-authored PR comment that gates downstream GitHub Actions jobs off for
-  that exact commit. Skips the redundant remote run after a maintainer has
-  already verified locally, saving runner minutes without weakening the gate.
-  A new push changes the head SHA, the attestation stops matching, CI runs
-  again. Side-effectful (posts a PR comment, applies a label, optionally pushes)
-  and slow — minutes to tens of minutes, whatever the configured matrix costs.
-  Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can
-  never attest; --fail-fast works in both modes. Invoke only on explicit request.
+# dotbabel:generated projection=sha256:77d6ab295f490b12dd332feb3298b29c9cece428daac1b02953dc6512ba50a24 source=skills/local-attest/SKILL.md — do not edit directly
 argument-hint: "[--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--only <leg>] [--from <leg>] [--config <path>]"
-tools: Bash
+description: |
+  Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned OWNER-authored PR comment that gates downstream GitHub Actions jobs off for that exact commit. Skips the redundant remote run after a maintainer has already verified locally, saving runner minutes without weakening the gate. A new push changes the head SHA, the attestation stops matching, CI runs again. Side-effectful (posts a PR comment, applies a label, optionally pushes) and slow — minutes to tens of minutes, whatever the configured matrix costs. Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can never attest; --fail-fast works in both modes. Invoke only on explicit request.
 disable-model-invocation: true
+name: local-attest
 user-invocable: true
 ---
 

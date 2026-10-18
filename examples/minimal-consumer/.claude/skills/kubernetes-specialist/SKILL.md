@@ -1,23 +1,10 @@
 ---
-id: kubernetes-specialist
-name: kubernetes-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [kubernetes]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Kubernetes troubleshooting, workload design, and cluster health review.
-  Use when you need a structured investigation of a cluster issue, a design review
-  of Kubernetes manifests, or a health audit of a namespace or workload.
-  Triggers on: "debug kubernetes", "why is my pod", "review my manifests",
-  "cluster health", "kubernetes design review", "k8s audit".
-argument-hint: "<cluster context, namespace, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:231577bd1c553c5d879c8b3c22a660ecffcb087fdca15489f2bc40b1bc5c7c8f source=skills/kubernetes-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <cluster context, namespace, or problem description>
+description: |
+  Deep-dive Kubernetes troubleshooting, workload design, and cluster health review. Use when you need a structured investigation of a cluster issue, a design review of Kubernetes manifests, or a health audit of a namespace or workload. Triggers on: "debug kubernetes", "why is my pod", "review my manifests", "cluster health", "kubernetes design review", "k8s audit".
+name: kubernetes-specialist
 ---
 
 # Kubernetes Specialist

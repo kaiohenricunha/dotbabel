@@ -1,23 +1,10 @@
 ---
-id: gcp-specialist
-name: gcp-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [gcp]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Google Cloud architecture review, debugging, and service design.
-  Use for structured investigations of GCP-specific issues, IAM or cost audits,
-  and multi-service design reviews. Triggers on: "GCP audit", "GCP design review",
-  "Workload Identity debug", "IAM review GCP", "review my GKE",
-  "GCP troubleshooting", "Cloud Run deep-dive".
-argument-hint: "<project context, service, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:df6e1316a500ef22e428187056c1c46db9951eee2616b12da058fe9511e0e4e7 source=skills/gcp-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <project context, service, or problem description>
+description: |
+  Deep-dive Google Cloud architecture review, debugging, and service design. Use for structured investigations of GCP-specific issues, IAM or cost audits, and multi-service design reviews. Triggers on: "GCP audit", "GCP design review", "Workload Identity debug", "IAM review GCP", "review my GKE", "GCP troubleshooting", "Cloud Run deep-dive".
+name: gcp-specialist
 ---
 
 # GCP Specialist

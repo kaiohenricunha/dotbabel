@@ -1,23 +1,11 @@
 ---
-id: deploy-status
-name: deploy-status
-type: skill
-version: 1.0.0
-domain: [infra, devex]
-platform: [vercel, flyio, aws]
-task: [diagnostics, runtime-ops]
-maturity: draft
-description: >
-  Show deployed git SHAs across configured production targets and compare them
-  against origin/main. Use during deploy verification, incident response, and
-  release drift checks. Triggers on: "what is deployed", "deploy status",
-  "production drift", "is prod on main", "compare prod to main".
-argument-hint: "[--dry-run] [--no-fetch]"
-tools: Bash, Read, Grep, Glob
+# dotbabel:generated projection=sha256:f7aaad2f4600a4ab7fb3e72cac620da6801df8d03015e3ed93ad7e1d93b103ee source=skills/deploy-status/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-model: sonnet
-effort: medium
+argument-hint: "[--dry-run] [--no-fetch]"
+description: |
+  Show deployed git SHAs across configured production targets and compare them against origin/main. Use during deploy verification, incident response, and release drift checks. Triggers on: "what is deployed", "deploy status", "production drift", "is prod on main", "compare prod to main".
 disable-model-invocation: false
+name: deploy-status
 user-invocable: true
 ---
 

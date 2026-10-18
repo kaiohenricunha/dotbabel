@@ -4,19 +4,26 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { createSnapshot } from "../src/model-intelligence/snapshot/core.mjs";
+import { parseFrontmatter } from "../src/build-index.mjs";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..", "..", "..");
 const BUILD_PLUGIN_BIN = join(REPO_ROOT, "scripts", "build-plugin.mjs");
+const SNAPSHOT_REL = "plugins/dotbabel/src/model-intelligence/snapshot/release-capabilities.json";
+const RELEASE_SNAPSHOT = JSON.parse(readFileSync(join(REPO_ROOT, SNAPSHOT_REL), "utf8"));
 const INDEX_BIN = join(REPO_ROOT, "plugins", "dotbabel", "bin", "dotbabel-index.mjs");
 
 function mkRepo() {
   const root = makeTempDir("dc-phase4-");
+  const snapshotFile = join(root, SNAPSHOT_REL);
+  mkdirSync(dirname(snapshotFile), { recursive: true });
+  writeFileSync(snapshotFile, JSON.stringify(RELEASE_SNAPSHOT));
   mkdirSync(join(root, "commands"), { recursive: true });
   mkdirSync(join(root, "skills"), { recursive: true });
   mkdirSync(join(root, "agents"), { recursive: true });
@@ -196,8 +203,8 @@ describe("build-plugin", () => {
     expect(content).not.toContain("created:");
     expect(content).not.toContain("updated:");
     // taxonomy fields preserved
-    expect(content).toContain("domain:");
-    expect(content).toContain("maturity:");
+    expect(parseFrontmatter(content).frontmatter).not.toHaveProperty("domain");
+    expect(parseFrontmatter(content).frontmatter).not.toHaveProperty("maturity");
   });
 
   it("copies skill references, examples, and scripts to templates", () => {
@@ -364,7 +371,7 @@ describe("build-plugin", () => {
       "my-agent.md",
     );
     const content = readFileSync(agentPath, "utf8");
-    expect(content).toContain('name: "my-agent"');
+    expect(parseFrontmatter(content).frontmatter.name).toBe("my-agent");
     expect(content).toContain("Agent body.");
   });
 
@@ -388,7 +395,8 @@ describe("build-plugin", () => {
     expect(content).not.toMatch(/^updated:/m);
     // but the operational fields remain
     expect(content).toMatch(/^name:/m);
-    expect(content).toMatch(/^model:/m);
+    expect(parseFrontmatter(content).frontmatter.model).toBe("sonnet");
+    expect(parseFrontmatter(content).frontmatter).not.toHaveProperty("effort");
     expect(content).toMatch(/^tools:/m);
   });
 
@@ -490,4 +498,77 @@ describe("build-plugin", () => {
     const r = runBuild(root);
     expect(r.status).toBe(0); // absent plugin.json must not error
   });
+});
+
+
+describe("build-plugin release baseline integration", () => {
+  const projectionPath = root => join(root, "plugins/dotbabel/templates/claude/.dotbabel-projection.json");
+  it("records the one snapshot identity for every generated artifact", () => {
+    const root = mkRepo(); writeAgent(root, "baseline-agent"); writeCommand(root, "baseline-command"); writeSkill(root, "baseline-skill"); buildIndex(root);
+    expect(runBuild(root).status).toBe(0);
+    const manifest = JSON.parse(readFileSync(projectionPath(root), "utf8"));
+    expect(Object.keys(manifest.entries)).toHaveLength(3);
+    for (const entry of Object.values(manifest.entries)) expect(entry.snapshotId).toBe(RELEASE_SNAPSHOT.snapshotId);
+    expect(runBuild(root, ["--check"]).status).toBe(0);
+    expect(runBuild(root, ["--check"]).status).toBe(0);
+  });
+  it("resolves a canonical floor into the generated native agent", () => {
+    const root = mkRepo(); writeAgent(root, "floor-agent");
+    const file = join(root, "agents/floor-agent.md");
+    writeFileSync(file, readFileSync(file, "utf8").replace('model: "sonnet"', 'dotbabel:\n  compute:\n    requirement: deep\n    mode: floor\n    binding: self'));
+    buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = readFileSync(join(root, "plugins/dotbabel/templates/claude/agents/floor-agent.md"), "utf8");
+    expect(parseFrontmatter(generated).frontmatter.model).toEqual(expect.any(String));
+    expect(parseFrontmatter(generated).frontmatter).not.toHaveProperty("dotbabel");
+  });
+  it("fails before replacing generated output when the release input is missing or invalid", () => {
+    const root = mkRepo(); writeAgent(root, "baseline-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const destination = join(root, "plugins/dotbabel/templates/claude/agents/baseline-agent.md"); const before = readFileSync(destination, "utf8");
+    writeFileSync(join(root, SNAPSHOT_REL), '{"snapshotId":"unreviewed"}');
+    expect(runBuild(root).status).toBe(2); expect(readFileSync(destination, "utf8")).toBe(before);
+    rmSync(join(root, SNAPSHOT_REL)); expect(runBuild(root).status).toBe(2); expect(readFileSync(destination, "utf8")).toBe(before);
+  });
+  it("fails the build when the snapshot cannot satisfy a floor", () => {
+    const root = mkRepo(); writeAgent(root, "required-agent"); const file = join(root, "agents/required-agent.md");
+    writeFileSync(file, readFileSync(file, "utf8").replace('model: "sonnet"', 'dotbabel:\n  compute:\n    requirement: deep\n    mode: floor\n    binding: self'));
+    buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = join(root, "plugins/dotbabel/templates/claude/agents/required-agent.md"); const previous = readFileSync(generated, "utf8");
+    const seed = structuredClone(RELEASE_SNAPSHOT);
+    for (const model of seed.runtimes.claude.models) model.fields.capabilities[0].value.reasoning = false;
+    writeFileSync(join(root, SNAPSHOT_REL), JSON.stringify(createSnapshot(seed)));
+    expect(runBuild(root).status).toBe(2); expect(readFileSync(generated, "utf8")).toBe(previous);
+  });
+  it("does not expose malformed snapshot input in build diagnostics", () => {
+    const root = mkRepo(); writeAgent(root, "private-input-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = join(root, "plugins/dotbabel/templates/claude/agents/private-input-agent.md"); const previous = readFileSync(generated, "utf8");
+    const privateMarker = "pvtValue_do_not_echo";
+    writeFileSync(join(root, SNAPSHOT_REL), privateMarker);
+    for (const flags of [[], ["--check"]]) {
+      const result = runBuild(root, flags);
+      expect(result.status).toBe(2);
+      expect(result.stdout + result.stderr).not.toContain(privateMarker);
+      expect(result.stdout + result.stderr).toContain("snapshot_invalid");
+      expect(readFileSync(generated, "utf8")).toBe(previous);
+    }
+  });
+  it("preserves output when required release evidence has low confidence", () => {
+    const root = mkRepo(); writeAgent(root, "confidence-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    const generated = join(root, "plugins/dotbabel/templates/claude/agents/confidence-agent.md"); const previous = readFileSync(generated, "utf8");
+    const seed = structuredClone(RELEASE_SNAPSHOT);
+    for (const model of seed.runtimes.claude.models) for (const entries of Object.values(model.fields)) for (const entry of entries) entry.confidence = "low";
+    writeFileSync(join(root, SNAPSHOT_REL), JSON.stringify(createSnapshot(seed)));
+    expect(runBuild(root).status).toBe(2);
+    expect(readFileSync(generated, "utf8")).toBe(previous);
+  });
+  it("checks the projection manifest rather than silently accepting changed provenance", () => {
+    const root = mkRepo(); writeAgent(root, "baseline-agent"); buildIndex(root); expect(runBuild(root).status).toBe(0);
+    writeFileSync(projectionPath(root), "{}\n"); expect(runBuild(root, ["--check"]).status).toBe(1);
+  });
+});
+it("records the generator version separately from a target repository version", () => {
+  const root = mkRepo(); writeAgent(root, "versioned-agent"); buildIndex(root);
+  writeFileSync(join(root, "package.json"), JSON.stringify({ version: "99.0.0" }));
+  expect(runBuild(root).status).toBe(0);
+  const manifest = JSON.parse(readFileSync(join(root, "plugins/dotbabel/templates/claude/.dotbabel-projection.json"), "utf8"));
+  expect(manifest.toolVersion).toBe(JSON.parse(readFileSync(join(REPO_ROOT, "package.json"), "utf8")).version);
 });

@@ -502,7 +502,7 @@
     },
     {
       "id": "AC-19",
-      "status": "planned",
+      "status": "active",
       "given": "a template agent with a floor that the snapshot cannot satisfy",
       "when": "build-plugin runs",
       "then": "the build fails and ships no template without a baseline",

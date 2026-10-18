@@ -1,17 +1,9 @@
 ---
-id: tldr
-name: tldr
-type: command
-version: 1.0.0
-domain: [devex, writing]
-platform: [none]
-task: [documentation]
-maturity: draft
-description: >
-  Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.
+# dotbabel:generated projection=sha256:5d3d4984fd386832cc9e967f06371f4334448c7a4c619f2bd8b8f852b80e0ee3 source=commands/tldr.md — do not edit directly
 argument-hint: "[PR number | branch | path | URL | topic] (default: current branch vs origin/main)"
+description: |
+  Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.
 model: haiku
-related: [pr-tldr]
 ---
 
 Explain the target in a few plain-language lines, at whatever altitude a reader unfamiliar with the internals needs.

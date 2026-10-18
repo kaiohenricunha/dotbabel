@@ -1,23 +1,10 @@
 ---
-id: terraform-specialist
-name: terraform-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [terraform]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Terraform architecture review, module design, state management, and
-  migration. Use for structured investigations of Terraform workspaces, provider
-  configuration, module coupling, import workflows, and test coverage. Triggers on:
-  "Terraform audit", "module review", "state management", "Terraform import",
-  "workspace design", "provider config review", "Terraform testing".
-argument-hint: "<module path, workspace, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:c40d8604644ed492f5fb9504e2e2b635bcc8129b00e3ad0c8452e70f5f4c94d8 source=skills/terraform-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <module path, workspace, or problem description>
+description: |
+  Deep-dive Terraform architecture review, module design, state management, and migration. Use for structured investigations of Terraform workspaces, provider configuration, module coupling, import workflows, and test coverage. Triggers on: "Terraform audit", "module review", "state management", "Terraform import", "workspace design", "provider config review", "Terraform testing".
+name: terraform-specialist
 ---
 
 # Terraform Specialist

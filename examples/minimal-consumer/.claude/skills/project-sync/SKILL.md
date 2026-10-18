@@ -1,27 +1,9 @@
 ---
-id: project-sync
-name: project-sync
-type: skill
-version: 0.1.0
-domain: [devex]
-platform: [none]
-task: [scaffolding]
-maturity: draft
-description: >
-  Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills
-  into Codex, Gemini, and Copilot project-scope analogues (.codex/skills,
-  .gemini/skills, .github/prompts, .github/instructions) plus refresh
-  AGENTS.md, GEMINI.md, and .github/copilot-instructions.md from the project's
-  rule floor. Wraps `dotbabel project-sync`. Use when adopting cross-CLI
-  workflows in a repo for the first time, or when adding a new command/skill
-  that needs to be visible to Codex/Gemini/Copilot. Triggers on:
-  "sync this repo", "project sync", "fan out commands", "wire up gemini for
-  this project", "add this command to codex", "make this skill available in
-  copilot", "regenerate AGENTS.md for this project".
+# dotbabel:generated projection=sha256:34edcfefd77ddc4643fc4468b4c47613f46d6ce4a8a5e6d792b9d3164afa7f17 source=skills/project-sync/SKILL.md — do not edit directly
 argument-hint: "[--dry-run] [--all] [--repo <path>]"
-tools: Bash, Read, Glob
-effort: low
-model: sonnet
+description: |
+  Fan out the current repo's CLAUDE.md, .claude/commands, and .claude/skills into Codex, Gemini, and Copilot project-scope analogues (.codex/skills, .gemini/skills, .github/prompts, .github/instructions) plus refresh AGENTS.md, GEMINI.md, and .github/copilot-instructions.md from the project's rule floor. Wraps `dotbabel project-sync`. Use when adopting cross-CLI workflows in a repo for the first time, or when adding a new command/skill that needs to be visible to Codex/Gemini/Copilot. Triggers on: "sync this repo", "project sync", "fan out commands", "wire up gemini for this project", "add this command to codex", "make this skill available in copilot", "regenerate AGENTS.md for this project".
+name: project-sync
 ---
 
 # project-sync — Repo-local cross-CLI fan-out

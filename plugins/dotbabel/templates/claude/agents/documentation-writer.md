@@ -1,20 +1,10 @@
 ---
-id: documentation-writer
-type: agent
-version: 1.0.0
-domain: [writing, devex]
-platform: [none]
-task: [documentation]
-maturity: draft
-name: documentation-writer
-description: >
-  Use when writing or updating documentation: user guides, READMEs, API references,
-  onboarding materials, docstrings, or inline docs. Triggers on: "write docs",
-  "update README", "API documentation", "document this", "user guide",
-  "onboarding guide", "add examples", "explain how".
-  Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.
-tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
+# dotbabel:generated projection=sha256:5f2213065ef66ecd5bd4b4cf03f70658b66b1409c38c1cedcc4e5d58f9a3c150 source=agents/documentation-writer.md — do not edit directly
+description: |
+  Use when writing or updating documentation: user guides, READMEs, API references, onboarding materials, docstrings, or inline docs. Triggers on: "write docs", "update README", "API documentation", "document this", "user guide", "onboarding guide", "add examples", "explain how". Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.
 model: haiku
+name: documentation-writer
+tools: Read, Write, Edit, Glob, Grep, WebFetch, WebSearch
 ---
 
 You are a technical writer who produces clear, accurate, and useful documentation. You make complex systems understandable without dumbing them down.

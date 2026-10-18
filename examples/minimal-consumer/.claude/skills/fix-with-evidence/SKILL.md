@@ -1,18 +1,9 @@
 ---
-id: fix-with-evidence
-name: fix-with-evidence
-type: skill
-version: 1.1.0
-domain: [devex]
-platform: [none]
-task: [debugging, testing]
-maturity: validated
-description: >
-  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop.
-  Triggers on: "fix this", "apply fix", "solve issue".
+# dotbabel:generated projection=sha256:75b6a5dbfd899dd5a430d462c50628d9e5962ff82423e5927a11586ad2681cc6 source=skills/fix-with-evidence/SKILL.md — do not edit directly
 argument-hint: "[issue]"
-tools: Read, Grep, Glob, Bash
-model: sonnet
+description: |
+  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on: "fix this", "apply fix", "solve issue".
+name: fix-with-evidence
 ---
 
 Fix a bug using a strict four-phase evidence loop: Reproduce → Fix → Verify → PR. Each phase gates on the previous.

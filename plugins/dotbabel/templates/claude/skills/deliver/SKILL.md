@@ -1,24 +1,11 @@
 ---
-id: deliver
-name: deliver
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [github-actions]
-task: [testing, review]
-maturity: draft
-description: >
-  Take one task contract (goal, inputs, constraints, done_when) from a prompt to
-  a reviewable pull request in one run: test first, implement, prove the change
-  works by running it, review the diff once, and open the pull request with the
-  proof. CI on the head is the merge evidence. No review rounds, no local
-  attestation, no merge. Triggers on: "deliver this", "build this and open a
-  PR", "implement this issue and open a PR", "take this task to a PR", or a
-  task contract whose output is a pull request.
-argument-hint: "<task contract as JSON or prose> [--draft]"
-user-invocable: true
+# dotbabel:generated projection=sha256:c9e0de17ecf150e5bc20bee5fdf091b7e9243bf23643fe7cb0c794394a4fd20f source=skills/deliver/SKILL.md — do not edit directly
+argument-hint: <task contract as JSON or prose> [--draft]
+description: |
+  Take one task contract (goal, inputs, constraints, done_when) from a prompt to a reviewable pull request in one run: test first, implement, prove the change works by running it, review the diff once, and open the pull request with the proof. CI on the head is the merge evidence. No review rounds, no local attestation, no merge. Triggers on: "deliver this", "build this and open a PR", "implement this issue and open a PR", "take this task to a PR", or a task contract whose output is a pull request.
 disable-model-invocation: false
-headless_safe: false
+name: deliver
+user-invocable: true
 ---
 
 Take one task from its contract to a reviewable pull request, back to back. The proof that the change works is part of the deliverable, not a later phase. Review rounds, `/pr-conductor`, and `local-attest` are not steps of this flow: the user runs them on demand.

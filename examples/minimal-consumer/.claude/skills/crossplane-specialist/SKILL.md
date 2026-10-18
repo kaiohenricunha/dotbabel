@@ -1,24 +1,10 @@
 ---
-id: crossplane-specialist
-name: crossplane-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [crossplane, kubernetes]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive Crossplane platform review: XRD design, Composition correctness,
-  provider config audit, managed resource health, and GitOps integration.
-  Use for structured investigations of stuck Claims, composition pipeline bugs,
-  and credential injection patterns. Triggers on: "Crossplane audit", "XRD review",
-  "Composition debug", "stuck Claim", "managed resource stuck", "provider config
-  review", "Crossplane GitOps".
-argument-hint: "<XRD name, Claim name, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:bf133b532e86fda4d4900075c9160fb112bd76cced1d47197ab1bf17edc38412 source=skills/crossplane-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <XRD name, Claim name, or problem description>
+description: |
+  Deep-dive Crossplane platform review: XRD design, Composition correctness, provider config audit, managed resource health, and GitOps integration. Use for structured investigations of stuck Claims, composition pipeline bugs, and credential injection patterns. Triggers on: "Crossplane audit", "XRD review", "Composition debug", "stuck Claim", "managed resource stuck", "provider config review", "Crossplane GitOps".
+name: crossplane-specialist
 ---
 
 # Crossplane Specialist
