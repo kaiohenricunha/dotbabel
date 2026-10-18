@@ -32,6 +32,10 @@ import {
 import { readProjectActivation, setProjectActivation } from "../src/model-intelligence/activation/index.mjs";
 import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS } from "../src/model-intelligence/domain/index.mjs";
 import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
+import { resolve as resolveCompute } from "../src/model-intelligence/resolver/index.mjs";
+import { makeObservedConfiguration } from "../src/model-intelligence/sources/evidence.mjs";
+import { openProjectionTree } from "../src/model-intelligence/materialize/projection-fs.mjs";
+import { buildRecommendation } from "../src/model-intelligence/recommend/index.mjs";
 import { resolveRequest } from "../src/model-intelligence/cli/resolve.mjs";
 import { catalogStatus, refreshSources } from "../src/model-intelligence/catalog/index.mjs";
 import { readSnapshot, updateSnapshot, collectReleaseEvidence, releaseSnapshotStatus, DEFAULT_SNAPSHOT_PATH } from "../src/model-intelligence/snapshot/index.mjs";
@@ -40,16 +44,17 @@ import { inspectClaudeProjection } from "../src/model-intelligence/materialize/r
 import { fileURLToPath } from "node:url";
 import { cacheRoot } from "../src/model-intelligence/catalog/cache.mjs";
 import { spawnSync } from "node:child_process";
-import { resolve } from "node:path";
+import { resolve, dirname, basename } from "node:path";
 
 const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
   description:
-    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
+    "Model Intelligence. enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; recommend [artifact | --requirement <class>] --runtime <id> — read-only advice and native invocation recipe; migrate — report what migrating each artifact's legacy model/effort frontmatter would mean, writing nothing.",
   flags: {
     write: { type: "boolean" },
     "snapshot-file": { type: "string" },
+    "observation-file": { type: "string" },
     "evidence-file": { type: "string" },
     routing: { type: "boolean" },
     "repo-root": { type: "string" },
@@ -62,7 +67,7 @@ const META = {
   },
 };
 
-const VERBS = Object.freeze(["refresh", "status", "snapshot", "migrate", "resolve", "enable", "disable"]);
+const VERBS = Object.freeze(["refresh", "status", "snapshot", "migrate", "resolve", "recommend", "enable", "disable"]);
 
 /** The flags each verb accepts, beyond the harness-wide set. Any other is a usage error. */
 const VERB_FLAGS = Object.freeze({
@@ -73,6 +78,7 @@ const VERB_FLAGS = Object.freeze({
   disable: ["routing", "repo-root"],
   migrate: ["repo-root"],
   resolve: ["repo-root", "runtime", "requirement", "artifact-kind"],
+  recommend: ["repo-root", "runtime", "requirement", "artifact-kind", "observation-file"],
 });
 
 /**
@@ -104,11 +110,11 @@ if (argv.version) {
 const verb = argv.positional?.[0];
 if (verb === undefined) usage(`a verb is required (one of: ${VERBS.join(", ")})`);
 if (!VERBS.includes(verb)) usage(`unknown verb "${verb}" (expected one of: ${VERBS.join(", ")})`);
-for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file"]) {
+for (const flag of ["repo-root", "source", "runtime", "check", "requirement", "artifact-kind", "routing", "write", "snapshot-file", "evidence-file", "observation-file"]) {
   if (argv.flags[flag] !== undefined && !VERB_FLAGS[verb].includes(flag)) usage(`--${flag} does not apply to ${verb}`);
 }
 if (verb === "snapshot" && argv.flags.check && (argv.flags.write || argv.flags["evidence-file"])) usage("snapshot --check cannot be combined with --write or --evidence-file");
-if (!["migrate", "resolve"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
+if (!["migrate", "resolve", "recommend"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
 
 // Under `--json`, stdout carries exactly one JSON document, so every human line
 // goes to stderr. A caller piping the report into `jq` gets the report, not the
@@ -119,15 +125,15 @@ try {
   if (verb === "refresh") await runRefresh();
   else if (verb === "status") runStatus();
   else if (verb === "snapshot") await runSnapshot();
-  else if (verb === "resolve") runResolve();
+  else if (["resolve", "recommend"].includes(verb)) runResolve();
   else if (["enable", "disable"].includes(verb)) runActivation();
   else runMigrate();
 } catch (error) {
-  const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_)/.test(error.code) ? error.code : undefined;
+  const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_|recommendation_)/.test(error.code) ? error.code : undefined;
   const code = snapshotCode ?? (["invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
   if (argv.flags.json) process.stdout.write(`${JSON.stringify({ diagnostics: [{ code }] })}\n`);
   out.fail(code);
-  process.exit(["invalid_project_config", "invalid_activation_change", "release_evidence_stale", "release_evidence_time_invalid", "release_requirement_unsatisfied"].includes(code) || code.startsWith("snapshot_") && !["snapshot_unavailable", "snapshot_locked"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);
+  process.exit(["invalid_project_config", "invalid_activation_change", "release_evidence_stale", "release_evidence_time_invalid", "release_requirement_unsatisfied", "recommendation_observation_invalid"].includes(code) || code.startsWith("snapshot_") && !["snapshot_unavailable", "snapshot_locked"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);
 }
 
 /** Explicit project-local enable/disable operation. @returns {void} */
@@ -373,7 +379,30 @@ function runResolve() {
   if (argv.positional.length > 2 || (artifactPath === undefined) === (workloadClass === undefined)) usage("resolve requires exactly one artifact or --requirement");
   if (workloadClass !== undefined && !WORKLOAD_CLASSES.includes(workloadClass)) usage("unknown workload class");
   if (!ARTIFACT_KINDS.includes(artifactKind)) usage("unknown artifact kind");
-  const { result, exitCode, context } = resolveRequest({ repoRoot: resolveRepoRoot(), runtimeId, artifactKind, workloadClass, artifactPath });
+  let observation;
+  if (argv.flags["observation-file"] !== undefined) {
+    const file = resolve(argv.flags["observation-file"]); const tree = openProjectionTree(dirname(file));
+    try { try { observation = makeObservedConfiguration(JSON.parse(tree.read(basename(file)))); } catch { throw Object.assign(new Error("recommendation_observation_invalid"), { code: "recommendation_observation_invalid" }); } } finally { tree.close(); }
+  }
+  const { result, exitCode, context, inputs } = resolveRequest({ repoRoot: resolveRepoRoot(), runtimeId, artifactKind, workloadClass, artifactPath, observed: observation, includeInputs: verb === "recommend" });
+  if (verb === "recommend") {
+    const adapter = SOURCE_ADAPTERS.find(module => module.descriptor.kind === "runtime" && module.descriptor.id === runtimeId);
+    const invocation = result.configuration && typeof adapter?.renderInvocation === "function" ? adapter.renderInvocation(result.configuration) : undefined;
+    const assess = configuration => {
+      if (!inputs || !configuration?.axes?.model) return undefined;
+      return WORKLOAD_CLASSES.filter(requirement => resolveCompute({ ...inputs, observed: undefined, requirement: { requirement, mode: "dynamic", binding: "consumer" }, invocation: { pin: { runtime: runtimeId, config: configuration.axes } } }).status === "resolved").at(-1);
+    };
+    const assessment = observation?.configurationBasis === "as-run" ? { observedClass: assess(observation), recommendedClass: assess(result.configuration) } : undefined;
+    const report = buildRecommendation({ resolverResult: result, observation, assessment, invocation });
+    if (argv.flags.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    else {
+      out.info(`recommendation: ${report.advice}; confidence: ${result.confidence}; configuration basis: advice`);
+      if (result.configuration) out.info(`recommended configuration: ${JSON.stringify(result.configuration.axes)}`);
+      if (invocation) out.info(`Invocation: ${invocation.command} ${invocation.args.map(value => "'" + value.replaceAll("'", "'\"'\"'") + "'").join(" ")}`);
+      for (const diagnostic of [...result.diagnostics, ...report.diagnostics]) out.warn(diagnostic.code);
+    }
+    process.exit(exitCode);
+  }
   if (argv.flags.json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else {
     out.info(`target: ${runtimeId} / ${artifactKind}`);
