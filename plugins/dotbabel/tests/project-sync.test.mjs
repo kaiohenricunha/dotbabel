@@ -112,7 +112,7 @@ describe("loadProjectConfig", () => {
     const repo = makeTmpDir();
     const cfg = loadProjectConfig(repo);
     expect(cfg.rule_floor_source).toBe("CLAUDE.md");
-    expect(cfg.fan_out).toEqual(["codex", "gemini", "antigravity", "opencode", "copilot"]);
+    expect(cfg.fan_out).toEqual(["codex", "antigravity", "opencode", "copilot"]);
     expect(cfg.targets).toHaveLength(3);
   });
 
@@ -129,8 +129,16 @@ describe("loadProjectConfig", () => {
     expect(cfg.rule_floor_source).toBe("CLAUDE.md");
   });
 
-  // Adding a runtime to the registry widens the DEFAULT fan-out — that is the
-  // public contract, and the upgrade note in #365 describes it. It must never
+  it.each([{ fan_out: ["gemini"] }, { fan_out: ["gemini", "antigravity"] }, { fan_out: [] }])("preserves an explicit fan_out list $fan_out", ({ fan_out }) => {
+    const repo = makeTmpDir();
+    const configPath = path.join(repo, ".dotbabel.json");
+    const original = JSON.stringify({ fan_out, custom: "keep" });
+    fs.writeFileSync(configPath, original);
+    expect(loadProjectConfig(repo).fan_out).toEqual(fan_out);
+    expect(fs.readFileSync(configPath, "utf8")).toBe(original);
+  });
+
+  // Adding a default-enabled runtime widens the DEFAULT fan-out. It must never
   // widen a fan_out the consumer wrote down. A config predating OpenCode keeps
   // exactly the CLIs it names, so an existing repo does not silently start
   // emitting .opencode/skills on upgrade.
@@ -252,6 +260,46 @@ describe("extractRuleFloorOrWhole", () => {
 // ---------------------------------------------------------------------------
 
 describe("projectSync", () => {
+  it("defaults to Antigravity without creating a Gemini skills tree", async () => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo);
+    stubClisOnPath("agy", "gemini");
+    const result = await projectSync({ repoRoot: repo, quiet: true });
+    expect(result.ok).toBe(true);
+    expect(fs.readFileSync(path.join(repo, ".agents/skills/commit/SKILL.md"), "utf8")).toBe("# /commit\n");
+    expect(fs.existsSync(path.join(repo, ".gemini"))).toBe(false);
+    expect(fs.readFileSync(path.join(repo, "GEMINI.md"), "utf8")).toContain("be terse");
+  });
+
+  it.each(["per-cli", "shared"])("preserves inactive Gemini artifacts across repeated %s syncs", async (layout) => {
+    const repo = makeTmpDir();
+    buildFakeRepo(repo, { withDotbabelJson: {
+      fan_out: ["gemini", "antigravity"], fan_out_layout: layout,
+    } });
+    await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+    const legacyLink = path.join(repo, ".gemini/skills");
+    const beforeLink = fs.lstatSync(legacyLink).isSymbolicLink()
+      ? fs.readlinkSync(legacyLink) : null;
+    const userFile = path.join(repo, ".gemini/settings.json");
+    fs.writeFileSync(userFile, '{"custom":true}\n');
+    const custom = path.join(repo, ".gemini/skills/custom/SKILL.md");
+    fs.mkdirSync(path.dirname(custom), { recursive: true });
+    fs.writeFileSync(custom, "user skill\n");
+    fs.writeFileSync(path.join(repo, ".dotbabel.json"), JSON.stringify({
+      fan_out_layout: layout,
+    }));
+    for (let run = 0; run < 2; run++) {
+      const result = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
+      expect(result.ok).toBe(true);
+      expect(result.backed_up).toBe(0);
+    }
+    expect(fs.readFileSync(userFile, "utf8")).toBe('{"custom":true}\n');
+    expect(fs.readFileSync(custom, "utf8")).toBe("user skill\n");
+    expect(fs.readFileSync(path.join(legacyLink, "commit/SKILL.md"), "utf8")).toBe("# /commit\n");
+    if (beforeLink !== null) expect(fs.readlinkSync(legacyLink)).toBe(beforeLink);
+    expect(fs.lstatSync(path.join(repo, ".agents/skills")).isSymbolicLink()).toBe(false);
+  });
+
   it("writes AGENTS.md, GEMINI.md, copilot-instructions.md from CLAUDE.md rule-floor", async () => {
     const repo = makeTmpDir();
     buildFakeRepo(repo);
@@ -285,7 +333,7 @@ describe("projectSync", () => {
 
   it("creates Gemini symlinks with the same shape as Codex", async () => {
     const repo = makeTmpDir();
-    buildFakeRepo(repo);
+    buildFakeRepo(repo, { withDotbabelJson: { fan_out: [...KNOWN_FAN_OUT_CLIS] } });
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     const skillLink = path.join(repo, ".gemini", "skills", "deploy");
     expect(fs.lstatSync(skillLink).isSymbolicLink()).toBe(true);
@@ -755,7 +803,7 @@ describe("projectSync", () => {
 
   it("symlink targets are stored as relative paths (issue #218)", async () => {
     const repo = makeTmpDir();
-    buildFakeRepo(repo);
+    buildFakeRepo(repo, { withDotbabelJson: { fan_out: [...KNOWN_FAN_OUT_CLIS] } });
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     // Copilot targets are generated files, not symlinks (#324), so #218's
     // "relative target" premise does not apply to them — covered separately.
@@ -773,7 +821,7 @@ describe("projectSync", () => {
 
   it("symlinks survive a repo rename (the regression #218 caught)", async () => {
     const original = makeTmpDir();
-    buildFakeRepo(original);
+    buildFakeRepo(original, { withDotbabelJson: { fan_out: [...KNOWN_FAN_OUT_CLIS] } });
     await projectSync({ repoRoot: original, allCli: true, quiet: true });
 
     // Rename the entire repo to simulate a fresh clone at a different path
@@ -832,13 +880,14 @@ describe("projectSync", () => {
 describe("projectSync — shared fan-out layout", () => {
   const shared = (repo, ...rest) => path.join(repo, ".cli", "skills", ...rest);
 
-  function buildSharedRepo() {
+  function buildSharedRepo(extra = {}) {
     const repo = makeTmpDir();
     buildFakeRepo(repo, {
       withDotbabelJson: {
         ...DEFAULT_PROJECT_CONFIG,
         targets: [...DEFAULT_PROJECT_CONFIG.targets],
         fan_out_layout: "shared",
+        ...extra,
       },
     });
     return repo;
@@ -853,7 +902,7 @@ describe("projectSync — shared fan-out layout", () => {
   });
 
   it("writes one canonical tree and a redirect per CLI", async () => {
-    const repo = buildSharedRepo();
+    const repo = buildSharedRepo({ fan_out: [...KNOWN_FAN_OUT_CLIS] });
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
 
     expect(fs.existsSync(shared(repo, "commit", "SKILL.md"))).toBe(true);
@@ -1047,6 +1096,7 @@ describe("projectSync — cli_excluded", () => {
         ...DEFAULT_PROJECT_CONFIG,
         targets: [...DEFAULT_PROJECT_CONFIG.targets],
         cli_excluded,
+        fan_out: [...KNOWN_FAN_OUT_CLIS],
         ...extra,
       },
     });
@@ -1074,14 +1124,14 @@ describe("projectSync — cli_excluded", () => {
 
   it("removes a previously fanned-out entry once it is excluded", async () => {
     const repo = makeTmpDir();
-    buildFakeRepo(repo);
+    buildFakeRepo(repo, { withDotbabelJson: { fan_out: [...KNOWN_FAN_OUT_CLIS] } });
     await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     expect(fs.existsSync(path.join(repo, ".codex", "skills", "review", "SKILL.md"))).toBe(true);
     expect(fs.existsSync(path.join(repo, ".github", "prompts", "review.prompt.md"))).toBe(true);
 
     fs.writeFileSync(
       path.join(repo, ".dotbabel.json"),
-      JSON.stringify({ cli_excluded: { codex: ["review"], copilot: ["review"] } }),
+      JSON.stringify({ fan_out: [...KNOWN_FAN_OUT_CLIS], cli_excluded: { codex: ["review"], copilot: ["review"] } }),
     );
     const r = await projectSync({ repoRoot: repo, allCli: true, quiet: true });
     expect(r.ok).toBe(true);

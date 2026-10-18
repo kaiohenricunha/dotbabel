@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:9a6519f763a2894c961c61b04f488a8768654a34c8f88620de67211664f2d415 source=agents/platform-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:5216fad2d0066a0fb00ea3f66ffa734551068eedff2f72e4f340921d9e8ec660 source=agents/platform-engineer.md — do not edit directly
 description: |
   Use when designing or improving internal developer platforms, golden paths, self-service tooling, or environment parity. Triggers on: "developer platform", "internal tooling", "golden path", "paved road", "developer experience", "self-service", "environment parity", "platform team", "scaffolding", "service catalog". Uses opus — platform design decisions compound over time; deep reasoning prevents golden-path choices that become maintenance burdens.
 model: opus

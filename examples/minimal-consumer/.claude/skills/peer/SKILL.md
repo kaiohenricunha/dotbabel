@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:fefc0d224b9e6fc30a5785824d1d6ef82751575a83e962bdf3b6e91c568dee48 source=skills/peer/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:f4a93c80d0268fb26563fd71e447c1a1c7568e4f9cf188447f35ea3f9afebff6 source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status
 description: |

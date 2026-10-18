@@ -72,6 +72,19 @@ Artifacts must be regular files of at most 1 MiB. Missing, non-file or oversized
 diagnostics. Use explicit refresh when older cached evidence lacks the capabilities needed by a
 requirement; resolution never performs that refresh on its own.
 
+## Google runtime policy
+
+Antigravity is the preferred Google project fan-out target. Gemini CLI remains an optional
+legacy/enterprise runtime. The `antigravity` and `gemini` runtime identifiers stay distinct;
+Gemini model identifiers do not imply Gemini CLI. Existing explicit fan-out lists remain authoritative.
+
+The default change does not activate Model Intelligence or adaptive routing and does not alter
+models or reasoning settings. The runtime registry recognizes both Google runtimes independently.
+The shipped live discovery adapters currently cover Claude and Codex; this policy adds no adapter.
+The [capability investigation](audits/model-runtime-capability-investigation.md) records Antigravity’s
+`agy models` discovery separately from Gemini CLI’s lack of an equivalent verified command.
+Those differences remain intact. See the [migration guidance](quickstart.md#google-runtime-migration).
+
 ## Runtime availability
 
 The [adaptive routing spec](specs/adaptive-session-routing/README.md) defines the planned runtime
@@ -98,6 +111,67 @@ carry `diagnostics[].code`.
 To roll back, disable routing and then disable the engine with the commands above. No global files
 or unrelated artifacts need removal. Keep explicit pins and mandatory safety floors in their existing
 configuration; activation does not weaken them.
+
+## Canonical migration
+
+`dotbabel models migrate --json` reports legacy metadata without changing files. Alias-derived
+semantic proposals require review. Explicit `model: inherit` can become an inherited declaration;
+an omitted model never creates a concrete requirement. The writer preserves native model/effort
+fields and artifact bodies until a separate runtime projection migration proves replacement behavior.
+Mandatory floor projections retain the native compatibility pin. Explicit dynamic and inherit modes
+keep their existing canonical precedence.
+
+Create a reviewed JSON decision file for a selected batch:
+
+```json
+[
+  {
+    "sourcePath": "agents/changelog-assistant.md",
+    "artifactKind": "agent",
+    "category": "C",
+    "compute": { "requirement": "mechanical", "mode": "floor", "binding": "self" }
+  }
+]
+```
+
+Run `dotbabel models migrate --check --decisions migration.json --batch C --json` to inspect the
+required changes. Check returns 1 while that selected batch needs changes, and 0 when compliant.
+Apply the same reviewed input with `--write` instead of `--check`. The flags are mutually exclusive.
+Omit both flags to preview a decision file. Categories A through F follow the migration audit;
+class F remains unchanged and reports an owner decision. Unselected legacy artifacts remain
+unchanged. A compliant selected batch does not mean the entire repository has completed migration.
+
+The writer prevalidates the complete batch under the existing project lock. Each replacement
+compares the original bytes. A concurrent edit stops replacement and preserves that edit. Earlier
+completed files keep their legacy controls and remain usable; resolve the changed source before
+resuming. The current write backend requires Linux, `/proc/self/fd`, Python 3 and `renameat2`.
+No migration command discovers models, executes an inference or changes project activation.
+
+## Exact artifact floors
+
+`model_intelligence.scoped_floors` adds minima for exact canonical paths and artifact kinds:
+
+```json
+{
+  "model_intelligence": {
+    "scoped_floors": [
+      {
+        "mode": "floor",
+        "requirement": "frontier",
+        "scope": {
+          "artifact_kind": "agent",
+          "source_path": "agents/security-auditor.md"
+        }
+      }
+    ]
+  }
+}
+```
+
+Paths are portable repository-relative paths, with no globs or traversal. Every policy layer adds
+floors; a later layer cannot remove an earlier minimum. The shipped security-agent and
+security-review selectors use Frontier minima. They do not impose a global floor on other artifacts.
+Resolution receives the canonical source path separately from the runtime output destination.
 
 ## Recommendations
 

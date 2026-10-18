@@ -184,7 +184,7 @@ the full key-by-key table. A generated file that is hand-edited is backed up
 before the next sync overwrites it.
 
 `.dotbabel.json` is optional — without one, project-sync uses defaults
-(`fan_out: ["codex", "gemini", "antigravity", "opencode", "copilot"]`, the
+(`fan_out: ["codex", "antigravity", "opencode", "copilot"]`, the
 standard target list, no `cli_substitutions`). When `CLAUDE.md` has no `<!-- dotbabel:rule-floor:begin -->`
 markers, the whole file becomes the rule floor.
 
@@ -193,7 +193,7 @@ Add `$schema` to the top of the file for editor autocomplete and validation:
 ```json
 {
   "$schema": "https://dotbabel.dev/schemas/dotbabel.config.schema.json",
-  "fan_out": ["codex", "gemini", "antigravity", "opencode", "copilot"],
+  "fan_out": ["codex", "antigravity", "opencode", "copilot"],
   "fan_out_layout": "per-cli",
   "gate_on_cli_presence": true
 }
@@ -202,7 +202,7 @@ Add `$schema` to the top of the file for editor autocomplete and validation:
 `fan_out` accepts only `codex`, `gemini`, `antigravity`, `opencode`, and
 `copilot`. A typo such as `co-pilot` fails with `CONFIG_UNKNOWN_CLI` instead of being skipped.
 
-`fan_out_layout` (default `per-cli`) decides whether Codex, Gemini, and OpenCode
+`fan_out_layout` (default `per-cli`) decides whether enabled Codex, Gemini, and OpenCode
 get one tree each or share a canonical one. Under `shared`, the table above collapses:
 `.claude/` fans out once to `.cli/skills/`, and `.codex/skills`,
 `.gemini/skills`, and `.opencode/skills` become symlinks to it, so each command
@@ -212,9 +212,40 @@ unknown value fails with `CONFIG_UNKNOWN_LAYOUT`. Revert to `per-cli` if a CLI
 will not follow the redirect.
 
 **Antigravity keeps its own tree even under `shared`.** It reads
-`.agents/skills/`, a directory Codex and Gemini do not read, so a redirect there
-would point at a tree it never follows. Only CLIs that can read the same
-canonical tree share one; Antigravity is fanned out separately in both layouts.
+`.agents/skills/`, and Dotbabel preserves its verified independent-tree contract.
+Compatibility discovery by another runtime does not prove that Antigravity follows
+a shared redirect. Antigravity is fanned out separately in both layouts.
+
+### Google runtime migration
+
+Antigravity CLI (`agy`) is the preferred Google runtime for new individual installations.
+Gemini CLI (`gemini`) remains supported as an optional legacy/enterprise integration.
+Gemini models are not deprecated. Claude Code remains the canonical authoring runtime.
+
+Existing explicit `fan_out` lists remain unchanged. To enable Gemini alongside Antigravity,
+set the list explicitly:
+
+```json
+{
+  "fan_out": ["codex", "antigravity", "opencode", "copilot", "gemini"]
+}
+```
+
+A Gemini-only list, `"fan_out": ["gemini"]`, remains valid. Without a `fan_out` key,
+the new defaults apply. `project-sync --all` ignores presence checks for the configured
+runtimes; it does not add Gemini to the list.
+
+Install `agy` using [Google’s installation guide](https://antigravity.google/docs/cli/install/).
+Dotbabel bootstrap detects installed runtimes, including optional `gemini`, and preserves
+that contract in both the Node and shell implementations. Bootstrap `--all` still
+configures every supported runtime, including Gemini, even when absent from `PATH`.
+Neither bootstrap installs a runtime or changes credentials.
+
+Before editing an existing list, run `dotbabel project-sync --dry-run`. Removing `gemini`
+from the list stops its fan-out; it does not remove `.gemini` files or links. Keep those
+artifacts if Gemini remains in use. No cleanup is required. Under `shared`, an existing
+Gemini redirect still reads the canonical tree, so active runtime updates can remain visible
+through that link. Dotbabel does not change the inactive redirect or user configuration.
 
 **Antigravity and Gemini CLI coexist.** They are separate runtimes with separate
 skills directories — `.agents/skills/` and `.gemini/skills/` per repo,
@@ -222,7 +253,18 @@ skills directories — `.agents/skills/` and `.gemini/skills/` per repo,
 migrates one into the other. What they do share is the instruction file: both
 read `GEMINI.md`, so it is generated once rather than per CLI. Set
 `ANTIGRAVITY_CONFIG_HOME` to relocate the global Antigravity root, exactly as
-`GEMINI_HOME` relocates Gemini's.
+`GEMINI_HOME` relocates Gemini's. These overrides remain independent.
+
+Current Gemini CLI versions can also discover `.agents/skills/` for compatibility.
+When both trees contain a skill with the same name, Gemini can report an override.
+Dotbabel does not merge those trees or choose a runtime’s discovery precedence.
+
+The shared `GEMINI.md` contract is project-local; Dotbabel does not add an Antigravity
+global instruction link. The global paths above retain the verified runtime contract.
+Google’s [migration guide](https://antigravity.google/docs/cli/gcli-migration/) currently
+lists a different Antigravity global skills path. Check the installed runtime version
+before changing an override; the historical [runtime investigation](audits/model-runtime-capability-investigation.md)
+records the measured capability differences. A file write alone does not prove discovery.
 
 **OpenCode gets a native tree even though it can read Claude's.** OpenCode
 v2.0.5 discovers `.claude/skills/` and `.agents/skills/` through a

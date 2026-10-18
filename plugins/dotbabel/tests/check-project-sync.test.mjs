@@ -335,7 +335,7 @@ describe("checkProjectSync — cli_excluded", () => {
     fs.writeFileSync(path.join(repo, ".claude", "commands", "review.md"), "# /review\n");
     fs.writeFileSync(
       path.join(repo, ".dotbabel.json"),
-      JSON.stringify({ cli_excluded, ...extra }, null, 2),
+      JSON.stringify({ fan_out: ["codex", "gemini", "antigravity", "opencode", "copilot"], cli_excluded, ...extra }, null, 2),
     );
     return repo;
   }

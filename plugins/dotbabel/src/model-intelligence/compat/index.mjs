@@ -255,15 +255,22 @@ export function interpretLegacy(frontmatter, options) {
  * choosing a side, so this reports the mismatch and returns no winner.
  * @param {import("../domain/index.mjs").NormalizedComputeRequirement | null} declared
  * @param {LegacyReading | null} reading
+ * @param {boolean} [compatibilityVerified] Explicit caller proof from the public resolver; absent proof stays conservative.
  * @returns {{code: string, message: string, declared: string, legacy: string} | null}
  */
-export function detectDualDeclarationConflict(declared, reading) {
-  if (!declared || !reading || reading.requirement === null) return null;
+export function detectDualDeclarationConflict(declared, reading, compatibilityVerified = false) {
+  if (!declared || !reading) return null;
+  const nativePin = declared.mode === "pin" && declared.pin?.runtime === "claude" ? declared.pin.config : undefined;
+  const nativeModel = reading.legacy?.model;
+  const modelConflict = nativePin?.model !== undefined && typeof nativeModel === "string" && nativeModel !== "inherit" && nativePin.model !== nativeModel;
+  const effortConflict = nativePin?.reasoning !== undefined && reading.requirement?.binding === "self" && reading.legacy?.effort !== undefined && nativePin.reasoning !== reading.legacy.effort;
+  if (modelConflict || effortConflict) return { code: MI_DUAL_DECLARATION_CONFLICT, message: "the canonical native pin disagrees with retained legacy controls; resolve the artifact rather than choosing a winner", declared: declared.requirement ?? "pin", legacy: reading.requirement?.requirement ?? "unknown" };
+  if (reading.requirement === null) return null;
   const declaredClass = declared.requirement;
   const legacyClass = reading.requirement.requirement;
   if (declaredClass === undefined || legacyClass === undefined) return null;
   if (!WORKLOAD_CLASSES.includes(declaredClass) || !WORKLOAD_CLASSES.includes(legacyClass)) return null;
-  if (compareWorkloadClass(declaredClass, legacyClass) === 0) return null;
+  if (compareWorkloadClass(declaredClass, legacyClass) === 0 || compatibilityVerified === true) return null;
   return {
     code: MI_DUAL_DECLARATION_CONFLICT,
     message: `the canonical declaration requires "${declaredClass}" while the legacy value reads as "${legacyClass}"; resolve the artifact rather than letting one win`,
@@ -285,9 +292,10 @@ export function detectDualDeclarationConflict(declared, reading) {
  * Reports only. Nothing here writes an artifact: `migrate --write` arrives with
  * P-18, behind the batching and preserved-behaviour gates of IMPL-2.
  * @param {MigrationInput[]} inputs
+ * @param {Set<string>} [verifiedCompatibility] Paths whose exact legacy configuration the caller has verified against canonical intent.
  * @returns {{envelope: string, version: number, mode: string, artifacts: object[], totals: Record<string, number>}}
  */
-export function analyzeMigration(inputs) {
+export function analyzeMigration(inputs, verifiedCompatibility = new Set()) {
   /** @type {object[]} */
   const artifacts = [];
   /** @type {Record<string, number>} */
@@ -297,7 +305,7 @@ export function analyzeMigration(inputs) {
     const { sourcePath, artifactKind, frontmatter } = input;
     const canonical = parseComputeDeclaration(frontmatter, { sourcePath });
     const reading = interpretLegacy(frontmatter, { sourcePath, artifactKind });
-    const conflict = detectDualDeclarationConflict(canonical.requirement, reading);
+    const conflict = detectDualDeclarationConflict(canonical.requirement, reading, verifiedCompatibility instanceof Set && verifiedCompatibility.has(sourcePath));
     // A canonical declaration that does not parse is worse than one that merely
     // disagrees, and it used to read as `mapped` with a proposal: `requirement` is
     // null, so the conflict check found nothing to compare (KD-1 rule 4).
@@ -309,6 +317,7 @@ export function analyzeMigration(inputs) {
 
     /** @type {string[]} */
     const codes = [...reading.codes];
+    if (verifiedCompatibility instanceof Set && verifiedCompatibility.has(sourcePath)) codes.push("MI_LEGACY_COMPATIBILITY_VERIFIED");
     if (conflict) codes.push(conflict.code);
     if (declarationInvalid) codes.push(MI_DECLARATION_INVALID);
 

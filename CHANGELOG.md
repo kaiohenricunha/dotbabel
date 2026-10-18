@@ -10,6 +10,12 @@ preserved verbatim because they describe state at the time of release.
 
 ## Unreleased
 
+### Changed
+
+- Prefer Antigravity CLI for new Google runtime installations. New project fan-out defaults
+  exclude Gemini CLI, which remains supported through explicit configuration. Existing explicit
+  lists, Gemini artifacts, bootstrap detection, and Model Intelligence activation remain unchanged.
+
 ## [4.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.1.0...v4.2.0) (2026-10-17)
 
 

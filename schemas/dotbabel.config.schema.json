@@ -27,8 +27,8 @@
     },
     "fan_out": {
       "type": "array",
-      "description": "CLIs to fan commands and skills out to. An unknown name is rejected at config load rather than skipped.",
-      "default": ["codex", "gemini", "antigravity", "opencode", "copilot"],
+      "description": "CLIs to fan commands and skills out to. Antigravity is the default Google runtime; Gemini CLI remains supported through explicit opt-in. An unknown name is rejected at config load rather than skipped.",
+      "default": ["codex", "antigravity", "opencode", "copilot"],
       "items": {
         "type": "string",
         "enum": ["codex", "gemini", "antigravity", "opencode", "copilot"]
@@ -36,7 +36,7 @@
     },
     "fan_out_layout": {
       "type": "string",
-      "description": "Whether Codex and Gemini get their own skills trees or share one. 'per-cli' writes .codex/skills/ and .gemini/skills/ as two identical trees. 'shared' writes one canonical tree at .cli/skills/ and points both CLIs at it with a directory symlink, halving the tracked entries. Copilot is unaffected. Switch back to 'per-cli' if a CLI will not follow the redirect.",
+      "description": "Whether enabled Codex, Gemini CLI, and OpenCode runtimes get separate skills trees or share .cli/skills/ through directory symlinks. Antigravity keeps an independent .agents/skills/ tree in both layouts; Copilot keeps its own file shape. Gemini CLI requires explicit fan_out opt-in. Switch back to 'per-cli' if a CLI will not follow the redirect.",
       "default": "per-cli",
       "enum": ["per-cli", "shared"]
     },
@@ -178,6 +178,48 @@
       "description": "Project-level Model Intelligence policy (spec model-intelligence, §5). Policy and configuration overrides only: never a store for discovered models, resolved recommendations, cache evidence, generated projections, or release snapshot data.",
       "additionalProperties": false,
       "properties": {
+        "scoped_floors": {
+          "type": "array",
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "description": "A monotonic safety minimum for one exact canonical artifact and kind.",
+            "additionalProperties": false,
+            "required": ["mode", "requirement", "scope"],
+            "properties": {
+              "mode": {
+                "const": "floor"
+              },
+              "requirement": {
+                "type": "string",
+                "enum": ["mechanical", "routine", "deep", "frontier", "exceptional"]
+              },
+              "rationale": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Why this floor exists. Carried into the explanation so a later maintainer can tell a deliberate safety fence from an experiment.",
+                "maxLength": 1000,
+                "pattern": "\\S"
+              },
+              "scope": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["artifact_kind", "source_path"],
+                "properties": {
+                  "artifact_kind": {
+                    "enum": ["agent", "command", "skill", "workflow"]
+                  },
+                  "source_path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^(?!.*[*?\\[\\]{}])(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))[^:\\\\\\p{Cc}\\p{Cf}]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
         "enabled": {
           "type": "boolean",
           "default": false,
