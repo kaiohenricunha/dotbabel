@@ -185,3 +185,10 @@ policy and scoped minima on dynamic declarations. A failing regression reproduce
 unsafe projection. Include all effective policy/scoped floors in this existing release rejection.
 The autonomous contract authorizes these corrections. No thresholds, runtime permissions, owner
 intent or preserved native controls change.
+
+The eight-module post-review rerun is stopped without a passing verdict. Five measured modules
+remain byte-identical to the completed 86.96% report, verified by SHA-256. Only
+`materialize/runtime/claude.mjs`, `resolver/compose.mjs` and `policy/scopes.mjs` change in the review
+correction. Measure those three complete modules with the same 393 semantic tests and unchanged
+85% gate. Preserve the earlier full report and the stopped-run log; do not combine them into a
+fabricated single-run report or count an interrupted measurement as a pass.
