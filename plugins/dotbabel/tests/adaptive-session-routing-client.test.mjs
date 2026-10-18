@@ -2,19 +2,25 @@ import { describe, it, expect, vi } from "vitest";
 import { openCodexSession } from "../src/adaptive-session-routing/client.mjs";
 import { makeAdapterResult } from "../src/model-intelligence/sources/contract.mjs";
 import { makeDiscoveryEvidence, makeModelFact } from "../src/model-intelligence/sources/evidence.mjs";
-import { input as resolverInput, model } from "./fixtures/model-intelligence/resolver.mjs";
+import { input as resolverInput, model, evidence } from "./fixtures/model-intelligence/resolver.mjs";
 import { prepareRoute } from "../src/adaptive-session-routing/prepare.mjs";
+
+function native(id) {
+ const value=model(id); value.fields.inputModalities=[evidence(["text"])]; value.fields.supportedReasoningLevels[0].value.forEach((entry,index)=>Object.assign(entry,{intent:index?"high":"medium",order:index})); return value;
+}
 
 function fixture(options = {}) {
   let notify;
   let number = 0;
+  let initialized = false;
   const calls = [];
   const rpc = {
-    close: vi.fn(), sendNotification: vi.fn(), onNotification: fn => { notify = fn; return () => {}; },
+    close: vi.fn(), sendNotification: vi.fn((method, params) => { expect(method).toBe("initialized"); expect(params).toEqual({}); initialized = true; }), onNotification: fn => { notify = fn; return () => {}; },
     request: vi.fn(async (method, params) => {
       calls.push([method, structuredClone(params)]);
-      if (method === "initialize") return { userAgent: options.userAgent ?? "dotbabel-managed-session/0.163.0 (fixture)" };
-      if (method === "config/read") return options.config ?? { config: {}, origins: {} };
+      if (method === "initialize") { expect(params.clientInfo.name).toBeTruthy(); expect(params.clientInfo.version).toMatch(/^\d+\.\d+\.\d+$/); expect(params.capabilities.experimentalApi).toBe(true); return { userAgent: options.userAgent ?? "dotbabel-managed-session/0.163.0 (fixture)" }; }
+      expect(initialized).toBe(true);
+      if (method === "config/read") { expect(params).toEqual({ cwd: options.repoRoot ?? "/project", includeLayers: false }); return options.config ?? { config: {}, origins: {} }; }
       if (method === "thread/start") return { thread: { id: "retained-thread", turns: [] }, model: "default", reasoningEffort: "medium", approvalPolicy: "on-request", sandbox: { type: "readOnly" } };
       if (method === "turn/start") {
         if (options.turnFailure) throw Error("private native request text");
@@ -25,7 +31,7 @@ function fixture(options = {}) {
         });
         return { turn: { id, status: "inProgress" } };
       }
-      if (method === "thread/read") return options.observation ?? { thread: { model: "selected", reasoningEffort: "high", modelProvider: "native-provider" } };
+      if (method === "thread/read") { expect(params).toEqual({ threadId: "retained-thread", includeTurns: false }); return options.observation ?? { thread: { model: "selected", reasoningEffort: "high", modelProvider: "native-provider" } }; }
       if (method === "model/list") return { data: [{ model: "visible", hidden: false }, { model: "hidden", hidden: true }] };
       throw Error("unexpected native request");
     }),
@@ -50,7 +56,7 @@ describe("managed Codex session", () => {
     expect(f.calls.find(([m]) => m === "turn/start")[1]).toEqual({ threadId: "retained-thread", input: [{ type: "text", text: "Implement integration tests for the payment gateway." }] }); session.close();
   });
   it("gates activation before starting a native process", async () => {
-    for (const activation of [{ enabled: false }, { enabled: true, routingEnabled: false }]) {
+    for (const activation of [{ enabled: false, routingEnabled: true }, { enabled: true, routingEnabled: false }, { enabled: "true", routingEnabled: true }, { enabled: true, routingEnabled: "true" }]) {
       const f = fixture(); f.deps.readActivation = () => activation;
       await expect(openCodexSession({ repoRoot: "/project" }, f.deps)).rejects.toMatchObject({ code: "routing_disabled" });
       expect(f.createTransport).not.toHaveBeenCalled(); expect(f.prepare).not.toHaveBeenCalled();
@@ -147,7 +153,7 @@ describe("managed Codex session", () => {
   });
   it("refreshes expired local discovery and checks native eligibility on each classified turn", async () => {
     let now = "2026-10-18T00:00:00.000Z";
-    const loaded = [], f = fixture({ load: true, loaded }); delete f.deps.loadResolverInput;
+    const loaded = [], f = fixture({ load: true, loaded, repoRoot: process.cwd() }); delete f.deps.loadResolverInput;
     f.deps.now = () => now;
     f.deps.discover = vi.fn(async () => makeAdapterResult({ status: "ok", provenance: { sourceId: "codex", sourceKind: "runtime", adapterVersion: "4" }, observedAt: now,
       evidence: makeDiscoveryEvidence({ models: ["visible", "hidden"].map(id => makeModelFact({ id, supportedReasoningLevels: [] })) }) }));
@@ -162,7 +168,7 @@ describe("managed Codex session", () => {
     expect(loaded[0].catalog.runtimes[0].models.map(m => m.model)).toEqual(["visible"]); session.close();
   });
   it("does not cache a failed discovery as usable fresh input", async () => {
-    const loaded = [], f = fixture({ load: true, loaded }); delete f.deps.loadResolverInput;
+    const loaded = [], f = fixture({ load: true, loaded, repoRoot: process.cwd() }); delete f.deps.loadResolverInput;
     const now = "2026-10-18T00:00:00.000Z"; f.deps.now = () => now;
     f.deps.discover = vi.fn().mockResolvedValueOnce({ status: "unavailable", observedAt: now }).mockResolvedValue(makeAdapterResult({ status: "ok", provenance: { sourceId: "codex", sourceKind: "runtime", adapterVersion: "4" }, observedAt: now, evidence: makeDiscoveryEvidence({ models: [makeModelFact({ id: "visible", supportedReasoningLevels: [] })] }) }));
     const session = await openCodexSession({ repoRoot: process.cwd() }, f.deps);
@@ -214,5 +220,75 @@ describe("managed Codex session", () => {
     expect((await session.submit(base)).status).toBe("completed");
     base[0].text += "x"; await expect(session.submit(base)).rejects.toMatchObject({ code: "session_input_invalid" });
     const cycle = []; cycle.push(cycle); await expect(session.submit(cycle)).rejects.toMatchObject({ code: "session_input_invalid" }); session.close();
+  });
+});
+
+
+describe("managed native protocol and lifetime boundaries", () => {
+  it("correlates a late completion to both thread and turn, forwards events, and cancels its deadline", async () => {
+    const f = fixture({ noCompletion: true }), onEvent = vi.fn();
+    const session = await openCodexSession({ repoRoot: "/project", onEvent }, f.deps);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      let settled = false;
+      const pending = session.submit([{ type: "text", text: "Prompt" }]).then(result => { settled = true; return result; });
+      for (let i = 0; i < 30 && vi.getTimerCount() === 0; i++) await Promise.resolve();
+      expect(vi.getTimerCount()).toBe(1);
+      f.notify({ method: "turn/completed", params: { threadId: "other", turn: { id: "turn-1", status: "failed" } } });
+      f.notify({ method: "turn/completed", params: { threadId: "retained-thread", turn: { id: "other", status: "failed" } } });
+      await Promise.resolve(); expect(settled).toBe(false); expect(vi.getTimerCount()).toBe(1);
+      const event = { method: "turn/completed", params: { threadId: "retained-thread", turn: { id: "turn-1", status: "completed" } } };
+      f.notify(event); expect((await pending).status).toBe("completed"); expect(vi.getTimerCount()).toBe(0); expect(onEvent).toHaveBeenCalledWith(event);
+    } finally { session.close(); vi.useRealTimers(); }
+  });
+  it.each([false, true])("clears per-turn early completion and reroute state across forty ordinary turns: %s", async reroute => {
+    const f = fixture({ reroute }), session = await openCodexSession({ repoRoot: "/project", completionTimeoutMs: 20 }, f.deps);
+    try {
+      for (let i = 0; i < 40; i++) {
+        const result = await session.submit([{ type: "text", text: `Prompt ${i}` }]);
+        expect(result.status).toBe("completed"); expect(result.effective.state).toBe(reroute ? "unknown" : "observed");
+      }
+      expect(f.calls.filter(([m]) => m === "turn/start")).toHaveLength(40);
+    } finally { session.close(); }
+  });
+  it.each([{}, { thread: {} }, { thread: { id: 7, turns: [] } }, { thread: { id: "bad" } }])("rejects malformed native thread initialization: %s", async started => {
+    const f = fixture(), original = f.rpc.request.getMockImplementation();
+    f.rpc.request.mockImplementation((method, params) => method === "thread/start" ? started : original(method, params));
+    await expect(openCodexSession({ repoRoot: "/project" }, f.deps)).rejects.toMatchObject({ code: "session_initialization_failed" }); expect(f.rpc.close).toHaveBeenCalledOnce();
+  });
+  it.each(["prefix-dotbabel-managed-session/0.163.0", "dotbabel-managed-session/0.163.0-preview", "dotbabel-managed-session/0.163.0x", 7])("does not verify a malformed native interface identity: %s", async userAgent => {
+    const f = fixture({ userAgent }), session = await openCodexSession({ repoRoot: "/project" }, f.deps);
+    expect(session.routing.support).toBe("unverified"); session.close();
+  });
+  it("reports a measured runtime identity even without an operating-system suffix", async () => {
+    const f = fixture({ userAgent: "dotbabel-managed-session/0.163.0" }), session = await openCodexSession({ repoRoot: "/project" }, f.deps);
+    expect(session.routing).toEqual({ support: "supported", mechanism: "managed-app-server", runtimeVersion: "0.163.0" }); session.close();
+  });
+  it.each([undefined, null])("treats an absent native configured axis as inherited: %s", async value => {
+    let seen; const f = fixture({ config: { config: { model: value, model_reasoning_effort: value } }, prepared: request => { seen = request; } });
+    const session = await openCodexSession({ repoRoot: "/project" }, f.deps); await session.submit([{ type: "text", text: "Prompt" }]);
+    expect(seen.manual).toEqual({ model: { source: "inherited" }, reasoning: { source: "inherited" } }); session.close();
+  });
+  it("retains complete as-run provenance for the next resolver call", async () => {
+    const loaded = [], f = fixture({ load: true, loaded });
+    f.deps.loadResolverInput = vi.fn(async () => ({}));
+    const session = await openCodexSession({ repoRoot: "/project" }, f.deps);
+    await session.submit([{ type: "text", text: "First" }]); const result = await session.submit([{ type: "text", text: "Second" }]);
+    expect(loaded[1].observed).toMatchObject({ runtimeId: "codex", turnExecuted: true, configurationBasis: "as-run", provider: "codex.native-provider", axes: { model: "selected", reasoning: "high" }, fieldSources: { "axes.model": "thread/read:model", "axes.reasoning": "thread/read:reasoningEffort", provider: "thread/read:modelProvider" } });
+    expect(result.effective.source).toBe("thread/read after turn/completed"); session.close();
+  });
+  it.each(["user", "project", "sessionFlags"])("keeps manual native axes with the real resolver when their origin is %s", async origin => {
+    const f = fixture({ config: { config: { model: "z-deep", model_reasoning_effort: "focused" }, origins: { model: { name: { type: origin } }, model_reasoning_effort: { name: { type: origin } } } } });
+    f.deps.prepare = prepareRoute; f.deps.loadResolverInput = async () => resolverInput({ catalog: { runtimes: [{ runtimeId: "codex", models: [native("a-deep"), native("z-deep")] }] } });
+    const session = await openCodexSession({ repoRoot: "/project" }, f.deps);
+    const result = await session.submit([{ type: "text", text: "Implement integration tests for the payment gateway." }]);
+    expect(result.decision.status).toBe("preserved"); expect(f.calls.find(([m]) => m === "turn/start")[1]).toMatchObject({ model: "z-deep", effort: "focused" }); session.close();
+  });
+  it.each([{}, { model: "auto", effort: "auto" }])("uses independently inherited axes with the real preparation path: %s", async options => {
+    const f = fixture(); f.deps.prepare = prepareRoute;
+    f.deps.loadResolverInput = async () => resolverInput({ catalog: { runtimes: [{ runtimeId: "codex", models: [native("a-deep"), native("z-deep")] }] } });
+    const session = await openCodexSession({ repoRoot: "/project", ...options }, f.deps);
+    const result = await session.submit([{ type: "text", text: "Implement integration tests for the payment gateway." }]);
+    expect(result.decision.status).toBe("proposed"); expect(f.calls.find(([m]) => m === "turn/start")[1]).toMatchObject({ model: "a-deep", effort: "calm" }); session.close();
   });
 });

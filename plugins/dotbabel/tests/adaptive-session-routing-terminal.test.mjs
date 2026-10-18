@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.spyOn(process.stderr, "write").mockImplementation(text => { errorOutput.push(text); return true; });
   input = { close: vi.fn(), [Symbol.asyncIterator]: () => ({ next: async () => queue.length ? { done: false, value: queue.shift() } : { done: true } }) };
   createInterface.mockReturnValue(input);
-  session = { threadId: "same-thread", native: { approvalPolicy: "on-request" }, close: vi.fn(), submit: vi.fn(async () => completed()) };
+  session = { threadId: "same-thread", routing: { support: "supported", mechanism: "managed-app-server", runtimeVersion: "0.163.0" }, native: { approvalPolicy: "on-request" }, close: vi.fn(), submit: vi.fn(async () => completed()) };
   openCodexSession.mockResolvedValue(session);
 });
 afterEach(() => {
@@ -93,4 +93,24 @@ it("closes input on initialization failure and removes its signal handler", asyn
 it("stops on an interrupt without submitting another prompt", async () => {
   queue.push("First", "Second"); session.submit.mockImplementationOnce(async () => { process.emit("SIGINT"); return completed(); });
   await runManagedTerminal({ repoRoot: "/project" }); expect(process.exitCode).toBe(130); expect(session.submit).toHaveBeenCalledOnce(); expect(input.close).toHaveBeenCalled(); expect(session.close).toHaveBeenCalled();
+});
+
+it("identifies the native runtime and control boundary in a clean piped JSON stream", async () => {
+  await runManagedTerminal({ repoRoot: "/project", json: true });
+  expect(createInterface).toHaveBeenCalledWith({ input: process.stdin, output: process.stderr, terminal: false });
+  expect(output.map(JSON.parse)).toEqual([{ type: "session", runtime: "codex", mechanism: "managed-app-server", threadId: "same-thread", routing: session.routing, native: session.native }]);
+  expect(errorOutput.join("")).toBe("");
+});
+it("gives interactive guidance and keeps malformed assistant notifications out of the response", async () => {
+  queue.push("Prompt"); session.submit.mockImplementation(async () => {
+    const emit = openCodexSession.mock.calls[0][0].onEvent;
+    emit({ method: "item/agentMessage/delta" }); emit({ method: "item/agentMessage/delta", params: { delta: 42 } });
+    return { status: "completed", effective: { state: "unknown" }, diagnostics: [{ code: "first" }, { code: "second" }] };
+  });
+  await runManagedTerminal({ repoRoot: "/project" });
+  expect(output).toEqual([]); expect(errorOutput.join("")).toContain("Enter an ordinary prompt"); expect(errorOutput.join("")).toContain("requested {}"); expect(errorOutput.join("")).toContain("first,second"); expect(errorOutput.join("")).not.toContain("You> ");
+});
+it("closes input if interrupted while native initialization is pending", async () => {
+  openCodexSession.mockImplementation(async () => { process.emit("SIGINT"); return session; });
+  await runManagedTerminal({ repoRoot: "/project" }); expect(input.close).toHaveBeenCalled(); expect(session.submit).not.toHaveBeenCalled(); expect(session.close).toHaveBeenCalled(); expect(process.exitCode).toBe(130);
 });

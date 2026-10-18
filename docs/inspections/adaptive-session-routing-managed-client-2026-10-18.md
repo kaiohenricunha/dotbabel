@@ -87,3 +87,25 @@ native thread schema permits a null reasoningEffort while still reporting a mode
 is no model evidence; the fixture explicitly reports it. Candidate two is requiring both axes in
 the observation guard. Preserve the known model and omit the unknown effort. Normalize a reported
 provider through the existing shared toProviderId helper and keep its own field source.
+
+## Protocol and mutation follow-up
+
+The first complete three-module measurement executes 60 semantic tests and reports 75.46%, below
+85%. It kills 342 mutants, times out 24, leaves 114 alive and five uncovered over 485 mutants.
+This is a failed gate, not completion. The missing cases concern real boundaries: late correlated
+completion, cancellation of the completion timer, native initialization ordering, configuration and
+history-read scope, repeated-turn cleanup, manual controls through the real resolver, complete
+as-run provenance, project policy isolation, default-clock refresh and clean terminal metadata.
+
+The extended suite executes 85 tests without skips. The second full measurement keeps the same
+three production modules, 485 mutants and unchanged 85% threshold. It reports 89.48%: 406 killed,
+28 timed out, 51 survived and none uncovered. The killed-only score is 83.71%, not an 85% pass.
+Standard Stryker includes timeouts. The loader scores 100%, terminal 98.95% and client 85.42%.
+No production source, threshold, timeout or test scope changes to obtain this result. The new tests
+verify public protocol behavior; a fixture lacking modality evidence is corrected before the
+positive real-resolver test can pass. Forty-turn sessions check bounded early-event cleanup.
+
+The existing real public-CLI proof remains applicable to unchanged production bytes: two ordinary
+prompts share one native thread, each original input appears once, and selected/effective axes match.
+Native read-only sandbox and on-request approval remain effective. This is the dotbabel-managed
+terminal, not interception in the stock Codex CLI. Final quality, review and CI remain required.
