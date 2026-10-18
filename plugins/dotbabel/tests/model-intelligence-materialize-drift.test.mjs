@@ -157,6 +157,26 @@ describe("projection filesystem transaction", () => {
     await expect(syncProjectionTree(options)).rejects.toThrow(/path|symlink/);
     expect(fs.readdirSync(outside)).toEqual([]);
   });
+  it("refuses a destination that leaves its owning root through .., an absolute path, a symlink, or a manifest entry, and refuses a file not proven Dotbabel-owned", async () => {
+    for (const kind of ["traversal", "absolute", "symlink", "manifest", "unowned"]) {
+      const options = setup(); const outside = makeTempDir("mi-projection-boundary-");
+      fs.writeFileSync(join(outside, "sentinel"), "untouched");
+      if (kind === "traversal") options.inputs.artifacts[0].target.path = "../escaped.md";
+      if (kind === "absolute") options.inputs.artifacts[0].target.path = join(outside, "escaped.md");
+      if (kind === "symlink") fs.symlinkSync(outside, join(options.root, "agents"));
+      if (kind === "manifest") {
+        const manifest = materialize(options.inputs).manifest;
+        manifest.entries["../escaped.md"] = manifest.entries["agents/example.md"];
+        fs.writeFileSync(join(options.root, manifestName), JSON.stringify(manifest));
+      }
+      if (kind === "unowned") { fs.mkdirSync(join(options.root, "agents")); fs.writeFileSync(join(options.root, "agents/example.md"), "unowned"); }
+      await expect(syncProjectionTree(options)).rejects.toThrow(/path|manifest|owned/);
+      expect(fs.readdirSync(outside)).toEqual(["sentinel"]);
+      expect(fs.readFileSync(join(outside, "sentinel"), "utf8")).toBe("untouched");
+      if (kind === "unowned") expect(fs.readFileSync(join(options.root, "agents/example.md"), "utf8")).toBe("unowned");
+      expect(fs.existsSync(join(options.root, pendingName))).toBe(false);
+    }
+  });
   it("does not follow a destination-file symlink or a manifest symlink", async () => {
     for (const target of ["agents/example.md", manifestName]) {
       const options = setup(); const outside = join(makeTempDir("mi-projection-outside-"), "untouched");
@@ -188,7 +208,7 @@ describe("projection filesystem transaction", () => {
     expect(manifest).toEqual(materialize(fixture("second")).manifest);
     expect(manifest.entries["agents/example.md"].outputHash).toBe(hashContent(fs.readFileSync(join(options.root, "agents/example.md"), "utf8")));
   });
-  it("project-sync p95 is at most 1.5 seconds over 10 warmed runs on the sync fixture with a warm cache and no network", async () => {
+  it("projection transaction p95 stays within the 1.5 second sync budget", async () => {
     const options = setup(); await syncProjectionTree(options); const times = [];
     for (let i = 0; i < 10; i++) { const start = performance.now(); await syncProjectionTree(options); times.push(performance.now() - start); }
     expect(times.sort((a, b) => a - b)[9]).toBeLessThanOrEqual(1500);

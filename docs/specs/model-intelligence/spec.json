@@ -377,7 +377,7 @@
     },
     {
       "id": "AC-14",
-      "status": "planned",
+      "status": "active",
       "given": "a projection manifest and a projection tree",
       "when": "the drift check runs",
       "then": "it separates clean, user drift, stale, diverged, missing, and orphan",
@@ -402,7 +402,7 @@
     },
     {
       "id": "AC-15",
-      "status": "planned",
+      "status": "active",
       "given": "a projection destination that leaves its owning root",
       "when": "materialize plans the write",
       "then": "the write is refused before any mutation",

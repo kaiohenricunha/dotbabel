@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import { join } from "node:path";
+import { performance } from "node:perf_hooks";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 import { materializationFixture } from "./fixtures/model-intelligence/materialize.mjs";
 import { parseFrontmatter } from "../src/build-index.mjs";
@@ -70,5 +71,16 @@ describe("project sync projection transactions", () => {
     options.projectionTrees.push(another);
     expect((await projectSync(options)).ok).toBe(false);
     expect(fs.existsSync(join(options.repoRoot, ".codex"))).toBe(false);
+  });
+  it("project-sync p95 is at most 1.5 seconds over 10 warmed runs on the sync fixture with a warm cache and no network", async () => {
+    const options = fixture(); expect((await projectSync(options)).ok).toBe(true);
+    const times = [];
+    for (let i = 0; i < 10; i++) {
+      const start = performance.now(); const outcome = await projectSync(options);
+      times.push(performance.now() - start); expect(outcome.ok).toBe(true);
+    }
+    const p95 = times.sort((a, b) => a - b)[9];
+    console.info(JSON.stringify({ projectSyncP95Ms: p95, warmedSamples: 10, networkCalls: 0 }));
+    expect(p95).toBeLessThanOrEqual(1500);
   });
 });
