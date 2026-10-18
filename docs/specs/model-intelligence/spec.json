@@ -427,7 +427,7 @@
     },
     {
       "id": "AC-16",
-      "status": "planned",
+      "status": "active",
       "given": "a Claude command with a dynamic or floor requirement",
       "when": "its generated copy is rendered",
       "then": "the copy has no native model",
@@ -452,7 +452,7 @@
     },
     {
       "id": "AC-17",
-      "status": "planned",
+      "status": "active",
       "given": "a Claude skill with a requirement",
       "when": "its generated copy is rendered",
       "then": "the copy has no model, no effort, and no dotbabel.compute",

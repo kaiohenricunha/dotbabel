@@ -9,6 +9,7 @@
  *   --source <path>      Path to a local dotbabel git clone. Overrides DOTBABEL_DIR.
  *   --target <dir>       Override destination directory. Default: ~/.claude
  *   --all                Link all supported CLI instruction targets.
+ *   --projections        Install verified immutable Claude release projections.
  *   --quiet              Suppress per-file progress; print summary only.
  *   --json               Emit a JSON array of events on stdout.
  *   --no-color           Suppress ANSI colour.
@@ -32,6 +33,7 @@ const META = {
     source: { type: "string" },
     target: { type: "string" },
     all: { type: "boolean" },
+    projections: { type: "boolean" },
     quiet: { type: "boolean" },
   },
 };
@@ -72,6 +74,7 @@ try {
     source,
     target,
     allCli: Boolean(argv.flags.all),
+    projections: Boolean(argv.flags.projections),
     quiet,
     json: argv.json,
     noColor: argv.noColor,

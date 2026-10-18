@@ -14,6 +14,7 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { createOutput } from "./lib/output.mjs";
+import { installClaudeBaseline, protectClaudeBaseline } from "./model-intelligence/materialize/runtime/claude-baseline.mjs";
 import {
   buildTimestamp,
   ensureRealDir,
@@ -80,6 +81,25 @@ export function resolveSource(sourceOpt, env) {
   return pkgRoot();
 }
 
+function resolvedDestination(destination) {
+  try { return fs.realpathSync(destination); }
+  catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    return path.join(resolvedDestination(path.dirname(destination)), path.basename(destination));
+  }
+}
+
+function assertNoProjectionOverlap(target, homeRoot, allCli) {
+  const protectedRoots = ["agents", "commands", "skills"].map(name => resolvedDestination(path.resolve(target, name)));
+  for (const runtime of Object.values(RUNTIMES)) {
+    if (!allCli && !anyRuntimePresent([runtime.id])) continue;
+    for (const destination of [resolveGlobalInstructionPath(runtime.id, homeRoot, process.env), resolveGlobalSkillsDir(runtime.id, homeRoot, process.env)].filter(Boolean)) {
+      const resolved = resolvedDestination(path.resolve(destination));
+      if (protectedRoots.some(root => resolved === root || resolved.startsWith(root + path.sep) || root.startsWith(resolved + path.sep))) throw new Error("claude_baseline_runtime_overlap");
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // bootstrapGlobal — main entry point
 // ---------------------------------------------------------------------------
@@ -93,6 +113,7 @@ export function resolveSource(sourceOpt, env) {
  * @property {boolean} [noColor] Suppress ANSI colors.
  * @property {boolean} [allCli]  Link all supported CLI instructions even when
  *                               the CLI binary is not on PATH.
+ * @property {boolean} [projections] Explicitly install verified immutable Claude release projections; never enable project routing.
  *
  * @typedef {object} BootstrapResult
  * @property {boolean} ok
@@ -127,191 +148,202 @@ export async function bootstrapGlobal(opts = {}) {
 
   const timestamp = buildTimestamp();
 
+  if (opts.projections || [".dotbabel-projection.json", ".dotbabel-projection.pending.json"].some(name => fs.existsSync(path.join(target, name)))) assertNoProjectionOverlap(target, homeRoot, opts.allCli);
+
   fs.mkdirSync(target, { recursive: true });
 
-  let linked = 0;
-  let skipped = 0;
-  let backed_up = 0;
+  if (opts.projections && (await installClaudeBaseline({ source, target })).status === "absent") throw new Error("claude_baseline_unavailable");
+  const protection = protectClaudeBaseline(target);
+  try {
+    const protectedFiles = new Set(protection.paths.map(file => path.join(target, file)));
+    const protectedSkills = new Set(protection.paths.filter(file => file.startsWith("skills/")).map(file => path.dirname(path.join(target, file))));
 
-  /**
-   * Wrapper that counts outcomes.
-   */
-  function doLink(src, dst) {
-    const r = linkOne(src, dst, out, timestamp);
-    if (r.action === "linked" || r.action === "updated") linked++;
-    else if (r.action === "ok") {
-      // already correct — counts as "linked" for idempotency metrics but no
-      // new work done; we keep it in the linked tally
-      linked++;
-    } else if (r.action === "backed_up") {
-      backed_up++;
-      linked++;
-    }
-  }
+    let linked = protection.paths.length;
+    let skipped = 0;
+    let backed_up = 0;
 
-  function doEnsureRealDir(dst) {
-    const r = ensureRealDir(dst, out, timestamp);
-    if (r.action === "backed_up") backed_up++;
-  }
-
-  // --- CLAUDE.md (user-scope: canonical + optional user overlay; #228) ---
-  // Pre-2.7.0 this was a plain symlink to the canonical source. Now it's a
-  // generated file: <canonical> + a marker-delimited overlay block populated
-  // from ~/.config/dotbabel/local-rules.md (when present). Bootstrap
-  // regenerates the merged file every run, backing up direct edits or the
-  // legacy symlink before overwriting.
-  const claudeMdSrc = path.join(source, "CLAUDE.md");
-  if (fs.existsSync(claudeMdSrc)) {
-    const r = writeUserScopeClaudeMd({
-      canonicalSrc: claudeMdSrc,
-      target: path.join(target, "CLAUDE.md"),
-      overlaySrc: resolveLocalRulesPath(process.env),
-      out,
-      timestamp,
-    });
-    if (r.action === "migrated" || r.action === "regenerated") backed_up++;
-    linked++;
-  }
-
-  // --- commands/*.md ---
-  const commandsSrc = path.join(source, "commands");
-  if (fs.existsSync(commandsSrc)) {
-    fs.mkdirSync(path.join(target, "commands"), { recursive: true });
-    const entries = fs.readdirSync(commandsSrc);
-    for (const entry of entries) {
-      if (!entry.endsWith(".md")) continue;
-      const src = path.join(commandsSrc, entry);
-      const dst = path.join(target, "commands", entry);
-      doLink(src, dst);
-    }
-  }
-
-  // --- skills/*/ (directories) ---
-  const skillsSrc = path.join(source, "skills");
-  if (fs.existsSync(skillsSrc)) {
-    fs.mkdirSync(path.join(target, "skills"), { recursive: true });
-    const entries = fs.readdirSync(skillsSrc, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const src = path.join(skillsSrc, entry.name);
-      const dst = path.join(target, "skills", entry.name);
-      doLink(src, dst);
-    }
-  }
-
-  // --- hooks/*.sh ---
-  const hooksSrc = path.join(source, "plugins", "dotbabel", "hooks");
-  if (fs.existsSync(hooksSrc)) {
-    const hooksDst = path.join(target, "hooks");
-    fs.mkdirSync(hooksDst, { recursive: true });
-    for (const entry of fs.readdirSync(hooksSrc)) {
-      if (!entry.endsWith(".sh")) continue;
-      const src = path.join(hooksSrc, entry);
-      const dst = path.join(hooksDst, entry);
-      doLink(src, dst);
-    }
-  }
-
-  // --- agents (copy, not symlink) ---
-  const agentsSrc = path.join(source, "plugins", "dotbabel", "templates", "claude", "agents");
-  const agentsDst = path.join(target, "agents");
-  if (fs.existsSync(agentsSrc)) {
-    fs.mkdirSync(agentsDst, { recursive: true });
-    const agentFiles = fs.readdirSync(agentsSrc);
-    for (const agentFile of agentFiles) {
-      if (!agentFile.endsWith(".md")) continue;
-      const dstFile = path.join(agentsDst, agentFile);
-      if (fs.existsSync(dstFile)) {
-        out.info(`skipped (exists): ${agentFile}`);
-        skipped++;
-      } else {
-        fs.copyFileSync(path.join(agentsSrc, agentFile), dstFile);
-        out.pass(`installed agent: ${agentFile}`);
+    /**
+     * Wrapper that counts outcomes.
+     */
+    function doLink(src, dst) {
+      const r = linkOne(src, dst, out, timestamp);
+      if (r.action === "linked" || r.action === "updated") linked++;
+      else if (r.action === "ok") {
+        // already correct — counts as "linked" for idempotency metrics but no
+        // new work done; we keep it in the linked tally
+        linked++;
+      } else if (r.action === "backed_up") {
+        backed_up++;
+        linked++;
       }
     }
-  }
 
-  const cliInstructionsSrc = path.join(source, "plugins", "dotbabel", "templates", "cli-instructions");
-  // Every per-CLI destination comes from the registry in agents.mjs. A runtime
-  // that declares no globalSkills gets an instruction link and nothing else,
-  // which is how Copilot's missing skill auto-discovery dir is expressed now.
-  // Claude declares neither, because it is the tool being configured rather
-  // than a fan-out destination.
-  for (const runtime of Object.values(RUNTIMES)) {
-    if (runtime.globalInstruction) {
-      linkCliInstruction({
-        cli: runtime.id,
-        src: path.join(cliInstructionsSrc, runtime.globalInstruction.templateFile),
-        dst: resolveGlobalInstructionPath(runtime.id, homeRoot, process.env),
+    function doEnsureRealDir(dst) {
+      const r = ensureRealDir(dst, out, timestamp);
+      if (r.action === "backed_up") backed_up++;
+    }
+
+    // --- CLAUDE.md (user-scope: canonical + optional user overlay; #228) ---
+    // Pre-2.7.0 this was a plain symlink to the canonical source. Now it's a
+    // generated file: <canonical> + a marker-delimited overlay block populated
+    // from ~/.config/dotbabel/local-rules.md (when present). Bootstrap
+    // regenerates the merged file every run, backing up direct edits or the
+    // legacy symlink before overwriting.
+    const claudeMdSrc = path.join(source, "CLAUDE.md");
+    if (fs.existsSync(claudeMdSrc)) {
+      const r = writeUserScopeClaudeMd({
+        canonicalSrc: claudeMdSrc,
+        target: path.join(target, "CLAUDE.md"),
+        overlaySrc: resolveLocalRulesPath(process.env),
+        out,
+        timestamp,
       });
+      if (r.action === "migrated" || r.action === "regenerated") backed_up++;
+      linked++;
     }
-    const skillsDir = resolveGlobalSkillsDir(runtime.id, homeRoot, process.env);
-    if (skillsDir) {
-      fanOutSkillsToDir({ cli: runtime.id, dstDir: skillsDir });
-    }
-  }
 
-  out.flush();
-  return { ok: true, linked, skipped, backed_up };
-
-  /**
-   * @param {{ cli: string, src: string, dst: string }} cfg
-   */
-  function linkCliInstruction({ cli, src, dst }) {
-    if (!opts.allCli && !anyRuntimePresent([cli])) {
-      out.info(`skipped ${cli} instructions (command not found; use --all to force)`);
-      skipped++;
-      return;
+    // --- commands/*.md ---
+    const commandsSrc = path.join(source, "commands");
+    if (fs.existsSync(commandsSrc)) {
+      fs.mkdirSync(path.join(target, "commands"), { recursive: true });
+      const entries = fs.readdirSync(commandsSrc);
+      for (const entry of entries) {
+        if (!entry.endsWith(".md")) continue;
+        const src = path.join(commandsSrc, entry);
+        const dst = path.join(target, "commands", entry);
+        if (protectedFiles.has(dst)) continue;
+        doLink(src, dst);
+      }
     }
-    if (!fs.existsSync(src)) {
-      out.info(`skipped ${cli} instructions (missing source: ${src})`);
-      skipped++;
-      return;
-    }
-    fs.mkdirSync(path.dirname(dst), { recursive: true });
-    doLink(src, dst);
-  }
 
-  /**
-   * Fan out skills/ + commands/ into a CLI-specific skills directory.
-   *
-   * Each skills/<id>/ becomes <dstDir>/<id>/ (whole-dir symlink). Each
-   * commands/<name>.md becomes <dstDir>/<name>/SKILL.md so the host CLI sees
-   * the canonical skill shape. Skips entries named ".system" defensively —
-   * Codex reserves that namespace for its bundled built-in skills.
-   *
-   * @param {{ cli: string, dstDir: string }} cfg
-   */
-  function fanOutSkillsToDir({ cli, dstDir }) {
-    if (!opts.allCli && !anyRuntimePresent([cli])) {
-      out.info(`skipped ${cli} skills (command not found; use --all to force)`);
-      skipped++;
-      return;
-    }
-    fs.mkdirSync(dstDir, { recursive: true });
-
+    // --- skills/*/ (directories) ---
+    const skillsSrc = path.join(source, "skills");
     if (fs.existsSync(skillsSrc)) {
+      fs.mkdirSync(path.join(target, "skills"), { recursive: true });
       const entries = fs.readdirSync(skillsSrc, { withFileTypes: true });
       for (const entry of entries) {
         if (!entry.isDirectory()) continue;
-        if (entry.name === ".system") continue;
         const src = path.join(skillsSrc, entry.name);
-        const dst = path.join(dstDir, entry.name);
+        const dst = path.join(target, "skills", entry.name);
+        if (protectedSkills.has(dst)) continue;
         doLink(src, dst);
       }
     }
 
-    if (fs.existsSync(commandsSrc)) {
-      for (const entry of fs.readdirSync(commandsSrc)) {
-        if (!entry.endsWith(".md")) continue;
-        const name = entry.replace(/\.md$/, "");
-        if (name === ".system") continue;
-        const src = path.join(commandsSrc, entry);
-        const wrapDir = path.join(dstDir, name);
-        doEnsureRealDir(wrapDir);
-        const dst = path.join(wrapDir, "SKILL.md");
+    // --- hooks/*.sh ---
+    const hooksSrc = path.join(source, "plugins", "dotbabel", "hooks");
+    if (fs.existsSync(hooksSrc)) {
+      const hooksDst = path.join(target, "hooks");
+      fs.mkdirSync(hooksDst, { recursive: true });
+      for (const entry of fs.readdirSync(hooksSrc)) {
+        if (!entry.endsWith(".sh")) continue;
+        const src = path.join(hooksSrc, entry);
+        const dst = path.join(hooksDst, entry);
         doLink(src, dst);
       }
     }
-  }
+
+    // --- agents (copy, not symlink) ---
+    const agentsSrc = path.join(source, "plugins", "dotbabel", "templates", "claude", "agents");
+    const agentsDst = path.join(target, "agents");
+    if (fs.existsSync(agentsSrc)) {
+      fs.mkdirSync(agentsDst, { recursive: true });
+      const agentFiles = fs.readdirSync(agentsSrc);
+      for (const agentFile of agentFiles) {
+        if (!agentFile.endsWith(".md")) continue;
+        const dstFile = path.join(agentsDst, agentFile);
+        if (fs.existsSync(dstFile)) {
+          out.info(`skipped (exists): ${agentFile}`);
+          skipped++;
+        } else {
+          fs.copyFileSync(path.join(agentsSrc, agentFile), dstFile);
+          out.pass(`installed agent: ${agentFile}`);
+        }
+      }
+    }
+
+    const cliInstructionsSrc = path.join(source, "plugins", "dotbabel", "templates", "cli-instructions");
+    // Every per-CLI destination comes from the registry in agents.mjs. A runtime
+    // that declares no globalSkills gets an instruction link and nothing else,
+    // which is how Copilot's missing skill auto-discovery dir is expressed now.
+    // Claude declares neither, because it is the tool being configured rather
+    // than a fan-out destination.
+    for (const runtime of Object.values(RUNTIMES)) {
+      if (runtime.globalInstruction) {
+        linkCliInstruction({
+          cli: runtime.id,
+          src: path.join(cliInstructionsSrc, runtime.globalInstruction.templateFile),
+          dst: resolveGlobalInstructionPath(runtime.id, homeRoot, process.env),
+        });
+      }
+      const skillsDir = resolveGlobalSkillsDir(runtime.id, homeRoot, process.env);
+      if (skillsDir) {
+        fanOutSkillsToDir({ cli: runtime.id, dstDir: skillsDir });
+      }
+    }
+
+    out.flush();
+    return { ok: true, linked, skipped, backed_up };
+
+    /**
+     * @param {{ cli: string, src: string, dst: string }} cfg
+     */
+    function linkCliInstruction({ cli, src, dst }) {
+      if (!opts.allCli && !anyRuntimePresent([cli])) {
+        out.info(`skipped ${cli} instructions (command not found; use --all to force)`);
+        skipped++;
+        return;
+      }
+      if (!fs.existsSync(src)) {
+        out.info(`skipped ${cli} instructions (missing source: ${src})`);
+        skipped++;
+        return;
+      }
+      fs.mkdirSync(path.dirname(dst), { recursive: true });
+      doLink(src, dst);
+    }
+
+    /**
+     * Fan out skills/ + commands/ into a CLI-specific skills directory.
+     *
+     * Each skills/<id>/ becomes <dstDir>/<id>/ (whole-dir symlink). Each
+     * commands/<name>.md becomes <dstDir>/<name>/SKILL.md so the host CLI sees
+     * the canonical skill shape. Skips entries named ".system" defensively —
+     * Codex reserves that namespace for its bundled built-in skills.
+     *
+     * @param {{ cli: string, dstDir: string }} cfg
+     */
+    function fanOutSkillsToDir({ cli, dstDir }) {
+      if (!opts.allCli && !anyRuntimePresent([cli])) {
+        out.info(`skipped ${cli} skills (command not found; use --all to force)`);
+        skipped++;
+        return;
+      }
+      fs.mkdirSync(dstDir, { recursive: true });
+
+      if (fs.existsSync(skillsSrc)) {
+        const entries = fs.readdirSync(skillsSrc, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          if (entry.name === ".system") continue;
+          const src = path.join(skillsSrc, entry.name);
+          const dst = path.join(dstDir, entry.name);
+          doLink(src, dst);
+        }
+      }
+
+      if (fs.existsSync(commandsSrc)) {
+        for (const entry of fs.readdirSync(commandsSrc)) {
+          if (!entry.endsWith(".md")) continue;
+          const name = entry.replace(/\.md$/, "");
+          if (name === ".system") continue;
+          const src = path.join(commandsSrc, entry);
+          const wrapDir = path.join(dstDir, name);
+          doEnsureRealDir(wrapDir);
+          const dst = path.join(wrapDir, "SKILL.md");
+          doLink(src, dst);
+        }
+      }
+    }
+  } finally { protection.release(); }
 }

@@ -1,0 +1,8 @@
+{
+  "agent": "---\n# dotbabel:generated projection=sha256:527f58fb6dd2d8384ef141ea50e7cc231fb00f3e5237fc923ce0a7aea2ddc4e5 source=agents/example.md — do not edit directly\ndescription: A projection fixture.\neffort: focused\nmodel: deep-model\nname: projection-example\ntools:\n  - Read\n---\n\nPreserve this exact body.\n",
+  "dynamicCommand": "---\n# dotbabel:generated projection=sha256:060a002c8256595106e19828fd0cc0f5f627fa790a81aa941a1ab3d124d3f22f source=commands/example-command.md — do not edit directly\ndescription: A projection fixture.\n---\n\nPreserve this exact body.\n",
+  "floorCommand": "---\n# dotbabel:generated projection=sha256:e0ead6582913650d41cb16a5fccf90d3b5b43b553f8a9d0c89818206360397a6 source=commands/example-command.md — do not edit directly\ndescription: A projection fixture.\n---\n\nPreserve this exact body.\n",
+  "pinnedCommand": "---\n# dotbabel:generated projection=sha256:2efb7116fa4d86af3d3b9e37749d30aa4bc750cf1d2c077cd6096dc0a75b009c source=commands/example-command.md — do not edit directly\ndescription: A projection fixture.\nmodel: deep-model\n---\n\nPreserve this exact body.\n",
+  "skill": "---\n# dotbabel:generated projection=sha256:c6a5312d5e210ed465240c769f3559906749f6862afecd874d98a56430cd3e25 source=skills/example-skill/SKILL.md — do not edit directly\ndescription: A projection fixture.\nname: projection-example\n---\n\nPreserve this exact body.\n",
+  "inherit": "---\n# dotbabel:generated projection=sha256:4b5cce956a579fabcfdf00362292ab2ae2c53e610e4399e945201441bb2bbb7e source=agents/example.md — do not edit directly\ndescription: A projection fixture.\nname: projection-example\ntools:\n  - Read\n---\n\nPreserve this exact body.\n"
+}
