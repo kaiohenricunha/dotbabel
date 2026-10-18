@@ -140,6 +140,21 @@ Public project setup loads the generated OpenCode plugin and Antigravity hooks.
 The unmodified generated Copilot extension reports `dotbabel-peer (running, project)` in the native `/env` diagnostics after one native hook approval. This final setup smoke uses no model turn.
 No release or production deployment is performed.
 
+The first CI runs expose stale skill inventory and generated peer copies. The
+checksum, Copilot project instructions, and consumer example are refreshed from
+the canonical skill. The focused shell checks then pass:
+
+```bash
+npx bats plugins/dotbabel/tests/bats/project-sync-parity.bats plugins/dotbabel/tests/bats/example-parity.bats
+```
+
+```text
+1..3
+ok 1 project-sync-parity: the committed fan-out matches what project-sync would write
+ok 2 project-sync-parity: the checker reports a stale generated file, so the gate is not vacuous
+ok 3 example-parity: minimal-consumer matches fresh scaffolder output
+```
+
 ## Limits
 
 Antigravity support uses the managed launcher; attachment to an ordinary existing
