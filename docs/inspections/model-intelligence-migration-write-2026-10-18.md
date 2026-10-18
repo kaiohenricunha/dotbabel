@@ -206,3 +206,10 @@ before correcting the test. Keep the 100 ms production request deadline, warm th
 and advance the host timer deterministically at 99/100 ms. Count held requests in the real fixture
 to prove no retry. This changes no production timeout or acceptance threshold. It strengthens a
 shared verification case that already failed during P18's earlier contended validation.
+
+The three changed complete modules pass the unchanged 85% mutation gate at 89.74%: 689 killed,
+11 timed out, 76 survived, four uncovered and no errors over 780 mutants. The killed-only score
+is 88.33%, also above 85%. All 393 selected semantic tests execute. Every unchanged module remains
+covered by the earlier completed full eight-module measurement, not by the interrupted rerun.
+The explicit delayed-start RPC case fails before correction; all 39 protocol cases then pass
+with the real delayed child, exact 99/100 ms host-timer assertions, one held request, and no retry.
