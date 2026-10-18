@@ -36,8 +36,14 @@ import { firstLine, parseVersion, probeVersion, resolveContext, runIsolated } fr
 export const RUNTIME_ID = "codex";
 
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
-export const ADAPTER_VERSION = "3";
+export const ADAPTER_VERSION = "4";
 
+// Semantics of recognized Codex controls, applied only when THIS model advertises the value.
+// The order compares native effort controls, never model quality. Future values stay unannotated.
+const EFFORT_SEMANTICS = Object.freeze({
+  none: { intent: "low", order: 0 }, minimal: { intent: "low", order: 1 }, low: { intent: "low", order: 2 },
+  medium: { intent: "medium", order: 3 }, high: { intent: "high", order: 4 }, xhigh: { intent: "high", order: 5 }, max: { intent: "high", order: 6 },
+});
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CODEX_HOME", rootDirName: ".codex" });
 
@@ -87,11 +93,17 @@ function factFromEntry(entry) {
         const effort = isPlainObject(level) ? optionalIdentifier(/** @type {any} */ (level).effort) : undefined;
         if (effort === undefined) return [];
         const description = /** @type {any} */ (level).description;
-        return [{ effort, ...(typeof description === "string" ? { description } : {}) }];
+        return [{ effort, ...(typeof description === "string" ? { description } : {}), ...(Object.hasOwn(EFFORT_SEMANTICS, effort) ? EFFORT_SEMANTICS[effort] : {}) }];
       })
     : [];
   /** @type {Record<string, unknown>} */
   const fields = { id, supportedReasoningLevels: levels };
+  if (optionalIdentifier(e.visibility) !== undefined) fields.selectionVisibility = e.visibility === "list" ? "listed" : e.visibility === "hide" ? "hidden" : "unknown";
+  if (Array.isArray(e.input_modalities)) {
+    const modalities = e.input_modalities.flatMap(value => { const modality = optionalIdentifier(value); return modality === undefined ? [] : [modality]; });
+    if (modalities.length > 32) return undefined;
+    fields.inputModalities = modalities;
+  }
   // Native catalog controls, not a model-name heuristic: reported reasoning levels and a known
   // shell tool interface are explicit evidence. Future unknown tool modes remain unknown.
   const capabilities = {};

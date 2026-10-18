@@ -13,7 +13,7 @@ function fixture() {
   vi.stubEnv("XDG_CACHE_HOME", join(repoRoot, "cache"));
   vi.stubEnv("XDG_CONFIG_HOME", join(repoRoot, "config"));
   writeFileSync(join(repoRoot, ".dotbabel.json"), "{}");
-  const model = makeModelFact({ id: "opaque-request-model", capabilities: { reasoning: true, tool_call: true }, supportedReasoningLevels: [{ effort: "native-low" }, { effort: "native-high" }], defaultReasoningLevel: "native-low" });
+  const model = makeModelFact({ id: "opaque-request-model", selectionVisibility: "listed", capabilities: { reasoning: true, tool_call: true }, supportedReasoningLevels: [{ effort: "native-low" }, { effort: "native-high" }], defaultReasoningLevel: "native-low" });
   const result = makeAdapterResult({ status: "ok", provenance: { sourceId: "codex", sourceKind: "runtime", adapterVersion: ADAPTER_VERSION }, observedAt: new Date().toISOString(), evidence: makeDiscoveryEvidence({ models: [model] }) });
   expect(writeEntry(cacheRoot(), makeCacheEntry({ result })).written).toBe(true);
   const request = { repoRoot, runtimeId: "codex", artifactKind: "skill", workloadClass: "deep" };

@@ -15,7 +15,7 @@ function fixture({ seed = true, reasoning = true, project = {} } = {}) {
   const env = { ...process.env, XDG_CACHE_HOME: join(repo, "cache"), XDG_CONFIG_HOME: join(repo, "config") };
   writeFileSync(join(repo, ".dotbabel.json"), JSON.stringify(project));
   if (seed) {
-    const result = makeAdapterResult({ status: "ok", provenance: { sourceId: "codex", sourceKind: "runtime", adapterVersion: ADAPTER_VERSION }, observedAt: new Date().toISOString(), evidence: makeDiscoveryEvidence({ models: [makeModelFact({ id: "opaque-cli-model", capabilities: { reasoning, tool_call: true }, supportedReasoningLevels: reasoning ? [{ effort: "native-low" }, { effort: "native-middle" }] : [], ...(reasoning ? { defaultReasoningLevel: "native-middle" } : {}) })] }) });
+    const result = makeAdapterResult({ status: "ok", provenance: { sourceId: "codex", sourceKind: "runtime", adapterVersion: ADAPTER_VERSION }, observedAt: new Date().toISOString(), evidence: makeDiscoveryEvidence({ models: [makeModelFact({ id: "opaque-cli-model", selectionVisibility: "listed", capabilities: { reasoning, tool_call: true }, supportedReasoningLevels: reasoning ? [{ effort: "native-low" }, { effort: "native-middle" }] : [], ...(reasoning ? { defaultReasoningLevel: "native-middle" } : {}) })] }) });
     expect(writeEntry(cacheRoot(env), makeCacheEntry({ result })).written).toBe(true);
   }
   const run = (...args) => spawnSync(process.execPath, [bin, "resolve", ...args, "--repo-root", repo, "--json"], { cwd: repo, env, encoding: "utf8", timeout: 15000 });

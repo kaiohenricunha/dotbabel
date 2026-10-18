@@ -39,6 +39,17 @@ function satisfies(level, policy, capabilities, levels, levelsKnown) {
   return checks.includes(false) ? false : checks.includes(undefined) ? undefined : true;
 }
 /**
+ * Recompute metadata from the fields actually used by the chosen axes and constraints.
+ * @param {object} candidate
+ * @param {object} axes
+ * @param {object[]} [extraEvidence]
+ * @returns {object}
+ */
+export function configureCandidate(candidate, axes, extraEvidence = []) {
+  const used = [...new Set([...candidate.baseEvidence, ...extraEvidence, ...(axes.reasoning !== undefined && axes.reasoning === candidate.defaultEvidence?.value ? [candidate.defaultEvidence] : [])])];
+  return { ...candidate, axes, used, freshness: Math.max(...used.map(e => freshnessOrder[e.freshness])), confidence: used.some(e => e.confidence === "low") ? "low" : used.some(e => e.confidence === "medium") ? "medium" : "high" };
+}
+/**
  * Build eligible native configurations from runtime-local evidence. Global presence alone never qualifies.
  * Missing capability facts remain unknown; caller-owned adapters/catalogs must supply them explicitly.
  * @param {object} input
@@ -50,7 +61,7 @@ export function candidates(input) {
   return models.flatMap(record => {
     const fields = record.fields ?? {};
     const identity = field(fields.id, preferences);
-    if (!identity || identity.availability !== "available" || identity.value !== record.model) return [];
+    if (!identity || identity.availability !== "available" || identity.value !== record.model || identity.provenance?.sourceKind !== "runtime" || identity.provenance?.sourceId !== input.target.runtimeId) return [];
     const capability = field(fields.capabilities, preferences);
     const supported = field(fields.supportedReasoningLevels, preferences);
     const levels = Array.isArray(supported?.value) ? supported.value : [];
@@ -59,7 +70,9 @@ export function candidates(input) {
     const classes = WORKLOAD_CLASSES.filter(level => classStates[level] === true);
     const defaultLevel = field(fields.defaultReasoningLevel, preferences);
     const reasoning = levels.some(e => e.effort === defaultLevel?.value) ? defaultLevel.value : undefined;
-    const used = [identity, capability, supported, ...(reasoning === undefined ? [] : [defaultLevel])].filter(Boolean);
-    return [{ model: record.model, axes: { model: record.model, ...(reasoning === undefined ? {} : { reasoning }) }, classes, classStates, levels, used, provenance: identity.provenance, freshness: Math.max(...used.map(e => freshnessOrder[e.freshness])), confidence: used.some(e => e.confidence === "low") ? "low" : used.some(e => e.confidence === "medium") ? "medium" : "high", representation: "native-id" }];
+    const axes = { model: record.model, ...(reasoning === undefined ? {} : { reasoning }) };
+    const selectionEvidence = field(fields.selectionVisibility, preferences);
+    const modalityEvidence = field(fields.inputModalities, preferences);
+    return [configureCandidate({ model: record.model, classes, classStates, capabilities: caps, levels, baseEvidence: [identity, capability, supported].filter(Boolean), defaultEvidence: defaultLevel, selectionEvidence, modalityEvidence, provenance: identity.provenance, representation: "native-id" }, axes)];
   });
 }
