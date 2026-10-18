@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 load helpers
+bats_require_minimum_version 1.5.0
 
 MODELS="node $REPO_ROOT/plugins/dotbabel/bin/dotbabel-models.mjs"
 UMBRELLA="node $REPO_ROOT/plugins/dotbabel/bin/dotbabel.mjs"

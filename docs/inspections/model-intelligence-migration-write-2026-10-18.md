@@ -141,3 +141,26 @@ tests; three timing benchmarks are excluded only from mutation and execute in th
 The killed-only score is 82.53%; do not describe that stricter calculation as passing 85%. Standard
 Stryker includes timeouts in its score. This measurement is not evidence that every mutant dies
 through a semantic assertion. The JSON report and earlier unsuccessful measurements are retained.
+
+The first shell-serial retry still overlaps tools internally: `quality/runner.mjs:146` defaults to
+two jobs, and `quality/index.mjs:125` passes that default. Its normal test leg passes, but the
+coverage leg reports routing p95 37.68 ms against 25 ms, so coverage evidence is unavailable and
+the quality result is exit 2. Candidate one remains a product latency regression; candidate two is
+internal test/coverage overlap. Use the existing `--jobs 1` option to execute identical checks
+sequentially. Do not alter test filters, thresholds, deadlines, profiles or measured source.
+
+One tool job alone still fails routing p95 (26.27 ms against 25 ms). Vitest independently starts
+parallel test files from the host's 16 available CPUs. The installed runner explicitly reads
+VITEST_MAX_WORKERS at `node_modules/vitest/dist/chunks/index.B89dZ0-N.js:14514`. Run the unchanged
+quality profiles with one tool job and one Vitest file worker through the existing per-run
+--pass-env mechanism. Every test, integration race, coverage threshold and timing assertion remains
+active. This resource configuration changes no repository policy or native runtime configuration.
+
+The single-file-worker verification passes with no environment error: all 21 PR executions and
+all 20 fast executions exit 0 (WARN is advisory). The ordinary suite and its coverage run each
+pass 5,595 tests with 18 explicit external-integration skips. Routing p95 is 2.63 ms normally and
+3.79 ms with coverage, against the unchanged 25 ms assertion. Changed-line coverage is 97.41%;
+changed-branch coverage is 94.16%. Seventeen active original criteria pass after integration with
+P-20, and all ten migration/recommendation/example shell cases pass. The shell fixture executes
+the actual index, skills, build and project-sync checks against a real isolated migrated repository.
+The final merge preserves all eight mutation-measured product modules byte-for-byte.
