@@ -164,3 +164,20 @@ describe("resolver policy and uncertainty boundaries", () => {
     }
   });
 });
+
+it("can preserve native effort inheritance without suppressing an explicit effort pin", () => {
+  const value = input({ invocation: { pin: { runtime: "codex", config: { model: "deep-model" } }, omitDefaultReasoning: true } });
+  expect(resolve(value).configuration.axes).toEqual({ model: "deep-model" });
+  value.invocation.pin.config.reasoning = "calm";
+  expect(resolve(value).configuration.axes).toEqual({ model: "deep-model", reasoning: "calm" });
+  delete value.invocation.pin.config.reasoning; value.invocation.omitDefaultReasoning = false;
+  expect(resolve(value).configuration.axes.reasoning).toBe("focused");
+});
+it("does not erase independently requested semantic effort when preserving default inheritance", () => {
+  const value = input({ invocation: { pin: { runtime: "codex", config: { model: "deep-model" } }, omitDefaultReasoning: true, effortIntent: "high" } });
+  value.catalog.runtimes[0].models.find(row => row.model === "deep-model").fields.supportedReasoningLevels[0].value = [{ effort: "focused", order: 1, intent: "high" }];
+  expect(resolve(value).configuration.axes).toEqual({ model: "deep-model", reasoning: "focused" });
+});
+it.each(["true", 1, null, {}])("rejects a nonboolean omit-default control %j", omitDefaultReasoning => {
+  expect(resolve(input({ invocation: { omitDefaultReasoning } })).status).toBe("invalid");
+});

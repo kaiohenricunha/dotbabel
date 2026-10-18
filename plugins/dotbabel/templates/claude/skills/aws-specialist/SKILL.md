@@ -1,23 +1,10 @@
 ---
-id: aws-specialist
-name: aws-specialist
-type: skill
-version: 1.0.0
-domain: [infra]
-platform: [aws]
-task: [debugging, review]
-maturity: validated
-description: >
-  Deep-dive AWS architecture review, debugging, and service design. Use for
-  structured investigations of AWS-specific issues, cost or IAM audits, and
-  multi-service design reviews. Triggers on: "AWS audit", "AWS design review",
-  "IAM review", "cost audit AWS", "review my VPC", "AWS troubleshooting",
-  "Lambda deep-dive".
-argument-hint: "<account context, service, or problem description>"
-tools: Read, Grep, Glob, Bash
+# dotbabel:generated projection=sha256:f358ef5371be975ad5be9c3f0f117741b8be9a210b47c4a2ed5385a8ddb66626 source=skills/aws-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
-effort: max
-model: opus
+argument-hint: <account context, service, or problem description>
+description: |
+  Deep-dive AWS architecture review, debugging, and service design. Use for structured investigations of AWS-specific issues, cost or IAM audits, and multi-service design reviews. Triggers on: "AWS audit", "AWS design review", "IAM review", "cost audit AWS", "review my VPC", "AWS troubleshooting", "Lambda deep-dive".
+name: aws-specialist
 ---
 
 # AWS Specialist

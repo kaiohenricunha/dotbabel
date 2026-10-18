@@ -508,6 +508,11 @@ does not gain artifact enforcement merely because invocation controls exist. Obs
 checks required modalities, operation capabilities and effort as well as model capability. Missing observed axes remain
 unknown; they are not proof of compliance or a known violation.
 
+A trusted consumer may set `omitDefaultReasoning: true` to preserve native effort inheritance.
+It suppresses only an optional catalog default. An exact reasoning pin and explicit semantic effort
+intent remain binding. The release build uses this control for legacy model-only declarations so
+that it preserves their existing model without introducing a new effort override.
+
 ### Authority
 
 The adapter descriptor does not declare itself globally authoritative. Authority is field-specific and is applied by `catalog/` according to the source rules in §3 (ARCH-28): local Codex invokability comes from Codex runtime discovery, provider API model existence comes from the provider API for that fact, and Dotbabel workload classification comes from Dotbabel policy. A source adapter supplies evidence and provenance. It does not decide how its evidence ranks for unrelated fields.
@@ -598,6 +603,7 @@ interface ResolverInput {
     requiredCapabilities?: Record<string, boolean>;
     effortIntent?: "low" | "medium" | "high";
     modelSelection?: "automatic" | "explicit";
+    omitDefaultReasoning?: boolean;
   };
 
   policy: EffectivePolicy;
@@ -884,7 +890,7 @@ Decided by the owner on 2026-09-18. `materialize/` turns canonical artifacts plu
 
 `materialize({toolVersion, artifacts})` returns `{files, manifest}` and performs no filesystem, discovery, resolver selection or runtime execution. Each artifact supplies `sourcePath`, `sourceContent`, `target: {path, runtimeId, artifactKind}`, the effective `requirement`, `policy`, `resolverResult`, `runtimeContract`, relevant `capabilityEvidence`, optional `snapshotId`, and an explicit `projectionContract`.
 
-The initial format is YAML frontmatter plus the unchanged canonical body. The adapter supplies `projectionContract.frontmatterKeys` as a verified allowlist and `axisKeys` as semantic-axis-to-native-field names. The core contains no runtime field table. It emits native axes only when the supplied resolver establishes enforced artifact binding and the current runtime contract independently supports each emitted axis. Consumer/advisory resolutions emit no native binding. An absent or explicit inherited canonical requirement may carry the resolver's unresolved runtime_inheritance_preserved result; a supplied inherited result cannot hide an authored floor or other active declaration; other unusable or known-unsatisfied resolutions fail. Runtime-specific projection rules remain P-14.
+The initial format is YAML frontmatter plus the unchanged canonical body. The adapter supplies `projectionContract.frontmatterKeys` as a verified allowlist and `axisKeys` as semantic-axis-to-native-field names. The core contains no runtime field table. It emits native axes only when the supplied resolver establishes enforced artifact binding and the current runtime contract independently supports each emitted axis. Consumer/advisory resolutions emit no native binding. An absent or explicit inherited canonical requirement may carry the resolver's unresolved runtime_inheritance_preserved result; a supplied inherited result cannot hide an authored floor or other active declaration; other unusable or known-unsatisfied resolutions fail. Runtime-specific projection rules remain P-14. A baseline may set `projectionContract.preferUnescapedQuotes: true` to use single quotes around native string fields containing double quotes but no apostrophe. The explicit formatting contract enters the runtime contract hash; it does not change source values or body bytes.
 
 The core parses YAML through the shared frontmatter parser and validates authored compute declarations through requirement/. It removes Dotbabel metadata by default. Retaining compute requires both `permitsCompute: true` and a named `computeConsumer`; a retained field must also be allowlisted. Malformed declarations do not become valid merely because generation strips them.
 

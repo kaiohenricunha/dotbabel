@@ -1,21 +1,9 @@
 ---
-id: security-audit
-name: security-audit
-type: skill
-version: 1.0.0
-domain: [devex, security]
-platform: [none]
-task: [review, diagnostics]
-maturity: draft
-description: >
-  Whole-repository security audit with independent verification of every finding,
-  vendored from cloudflare/security-audit-skill. Guidance by default; runs the full
-  six-phase audit (parallel hunters, verifiers that did not hunt, coverage ledger,
-  schema-validated findings.json) only on an explicit audit or pen-test request.
-  Triggers on: "security audit", "audit this codebase", "pen test the code",
-  "full security review", "end-to-end security review", "security audit report".
+# dotbabel:generated projection=sha256:4c482e7d4691769db9237ad28bae3ee95bb6148145bcf7b90cf47b70d1111565 source=skills/security-audit/SKILL.md — do not edit directly
 argument-hint: "[scope path | subsystem | <base>..<head>] [--profile quick|standard|deep]"
-model: opus
+description: |
+  Whole-repository security audit with independent verification of every finding, vendored from cloudflare/security-audit-skill. Guidance by default; runs the full six-phase audit (parallel hunters, verifiers that did not hunt, coverage ledger, schema-validated findings.json) only on an explicit audit or pen-test request. Triggers on: "security audit", "audit this codebase", "pen test the code", "full security review", "end-to-end security review", "security audit report".
+name: security-audit
 ---
 
 # Security Audit

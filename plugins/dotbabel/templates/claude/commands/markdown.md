@@ -1,15 +1,8 @@
 ---
-id: markdown
-name: markdown
-type: command
-version: 1.0.0
-domain: [devex, writing]
-platform: [none]
-task: [documentation]
-maturity: validated
-description: >
-  Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.
+# dotbabel:generated projection=sha256:38a6c19397c05c4b46c8af21e5c359da1ad1afbec2c99bd48f7d2a7a123c912a source=commands/markdown.md — do not edit directly
 argument-hint: "[file | dir]"
+description: |
+  Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.
 model: haiku
 ---
 

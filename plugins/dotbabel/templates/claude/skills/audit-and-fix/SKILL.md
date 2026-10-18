@@ -1,18 +1,9 @@
 ---
-id: audit-and-fix
-name: audit-and-fix
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, debugging]
-maturity: validated
-description: >
-  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.
-  Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
+# dotbabel:generated projection=sha256:3ce3257c301d7d26413f34d83c6d75a733d9a38d5a7aea9468ba25315c4dff5b source=skills/audit-and-fix/SKILL.md — do not edit directly
 argument-hint: "[domain]"
-tools: Read, Grep, Glob, Bash
-model: opus
+description: |
+  Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: "audit and fix", "clean up domain", "overnight cleanup".
+name: audit-and-fix
 ---
 
 Run a long-horizon audit-then-implement pipeline: produce a structured audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs.

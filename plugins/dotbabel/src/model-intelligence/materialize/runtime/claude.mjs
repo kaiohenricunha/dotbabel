@@ -25,19 +25,22 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     const source = parseProjectionSource(artifact);
     const requirement = source.requirement;
     const target = { ...artifact.target, runtimeId: "claude" };
-    const resolverResult = resolve({ ...context, requirement: requirement ?? undefined, target, runtimeContract });
+    const legacyAxes = requirement === null ? artifact.legacyAxes : undefined;
+    const invocation = legacyAxes ? { ...context.invocation, pin: { runtime: "claude", config: legacyAxes }, omitDefaultReasoning: true } : context.invocation;
+    const resolverResult = resolve({ ...context, ...(invocation ? { invocation } : {}), requirement: requirement ?? undefined, target, runtimeContract });
     const binding = (runtimeContract.capabilities ?? runtimeContract).binding?.[kind];
     if (requirement?.mode === "pin") {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
       if (kind !== "skill" && Object.keys(requirement.pin.config).some(axis => binding?.support !== "supported" || binding.axes?.[axis] !== "supported" || kind === "command" && axis !== "model")) throw fail("claude_projection_pin_binding_unverified");
     }
     if (kind === "agent" && resolverResult.status === "resolved" && resolverResult.enforcement?.state !== "enforced") throw fail("claude_projection_agent_binding_unverified");
-    const pinnedCommand = kind === "command" && requirement?.mode === "pin";
+    const pinnedCommand = kind === "command" && (requirement?.mode === "pin" || legacyAxes?.model !== undefined);
+    const dynamicBaseline = artifact.releaseBaseline === true && kind === "agent" && requirement?.mode === "dynamic" && context.policy.floor === undefined;
     const frontmatterKeys = kind === "agent" ? AGENT_KEYS : kind === "skill" ? SKILL_KEYS : [...COMMAND_KEYS, ...(pinnedCommand ? ["model"] : [])];
     const axisKeys = kind === "agent" ? { model: "model", reasoning: "effort" } : pinnedCommand ? { model: "model" } : {};
     return { ...artifact, target, requirement, policy: context.policy, resolverResult, runtimeContract,
       capabilityEvidence: artifact.capabilityEvidence ?? null,
-      projectionContract: { frontmatterKeys, axisKeys, allowExplicitPinAxes: pinnedCommand },
+      projectionContract: { ...(artifact.releaseBaseline === true ? { preferUnescapedQuotes: true } : {}), frontmatterKeys: dynamicBaseline ? frontmatterKeys.filter(key => !["model", "effort"].includes(key)) : frontmatterKeys, axisKeys: dynamicBaseline ? {} : axisKeys, allowExplicitPinAxes: pinnedCommand },
     };
   }) });
 }

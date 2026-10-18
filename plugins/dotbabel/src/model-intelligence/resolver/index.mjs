@@ -64,6 +64,7 @@ export function resolve(input) {
     }
     available = available.flatMap(c => {
       const axes = { ...c.axes, ...pinnedAxes };
+      if (constraints.omitDefaultReasoning && pinnedAxes.reasoning === undefined) delete axes.reasoning;
       if (constraints.effortIntent !== undefined && pinnedAxes.reasoning === undefined) {
         if (supportedAxes.reasoning !== "supported") return [];
         const efforts = c.levels.filter(level => level.intent === constraints.effortIntent && Number.isSafeInteger(level.order) && level.order >= 0 && level.order <= 100);

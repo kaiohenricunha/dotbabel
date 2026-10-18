@@ -1,20 +1,9 @@
 ---
-id: agents-search
+# dotbabel:generated projection=sha256:2bfaacb520e166d7fabdc2abb82c50a88f13214f61a50496f9e53cd3c994ec5e source=skills/agents-search/SKILL.md — do not edit directly
+argument-hint: search <query> | list | fetch <name> | invalidate [--fetch]
+description: |
+  Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: "search agents", "list agents", "find agent", "what agents", "agent catalog".
 name: agents-search
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [debugging]
-maturity: validated
-description: >
-  Discover, search, and manage Claude Code agents. Use when you want to find available
-  agents, list installed agents, or refresh the agent catalog.
-  Triggers on: "search agents", "list agents", "find agent", "what agents", "agent catalog".
-argument-hint: "search <query> | list | fetch <name> | invalidate [--fetch]"
-tools: Glob, Read, Grep, Write, Bash, WebFetch
-effort: medium
-model: sonnet
 ---
 
 # Agents Search — Discovery and Management

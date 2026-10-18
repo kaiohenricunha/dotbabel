@@ -1,25 +1,10 @@
 ---
-id: validate-spec
-name: validate-spec
-type: skill
-version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
-maturity: validated
-description: >
-  Audit an already-implemented spec against the codebase. Walks each constraint
-  (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in
-  file:line evidence, runs the spec.json acceptance_commands, and writes a
-  single audit doc to docs/audits/. Use whenever the user asks to "validate a
-  spec", "audit a spec", "check if spec is implemented", "verify the spec is
-  done", "is this spec really done", or otherwise wants closure on spec-driven
-  work. Read-only against the spec — produces an audit, never modifies the
-  spec itself.
-argument-hint: "[spec-id] [--no-run]"
-effort: max
-model: sonnet
+# dotbabel:generated projection=sha256:54d9167718241d89ced0189138f4edb628718308853aa53e3e7ea1418436ca6b source=skills/validate-spec/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
+argument-hint: "[spec-id] [--no-run]"
+description: |
+  Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to "validate a spec", "audit a spec", "check if spec is implemented", "verify the spec is done", "is this spec really done", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.
+name: validate-spec
 ---
 
 # Validate Spec — Implementation Audit

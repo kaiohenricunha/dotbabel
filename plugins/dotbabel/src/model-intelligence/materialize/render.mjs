@@ -41,6 +41,12 @@ export function renderProjection(artifact, projectionId, source) {
     const explicitPin = contract.allowExplicitPinAxes === true && source.requirement?.mode === "pin" && ["self", "session"].includes(source.requirement.binding) && source.requirement.pin.runtime === artifact.target.runtimeId && source.requirement.pin.config[axis] === value;
     if ((bound || explicitPin) && value !== undefined && binding?.support === "supported" && binding.axes?.[axis] === "supported" && contract.frontmatterKeys.includes(key)) metadata[key] = value;
   }
-  const header = yaml.dump(metadata, { sortKeys: true, noRefs: true, lineWidth: -1, quotingType: '"', forceQuotes: false });
+  const options = { sortKeys: true, noRefs: true, lineWidth: -1, quotingType: '"', forceQuotes: false };
+  const keys = Object.keys(metadata).sort();
+  const header = contract.preferUnescapedQuotes === true && keys.length ? keys.map(key => {
+    const value = metadata[key];
+    const quotingType = typeof value === "string" && value.includes('"') && !value.includes("'") ? "'" : '"';
+    return yaml.dump({ [key]: value }, { ...options, quotingType });
+  }).join("") : yaml.dump(metadata, options);
   return `---\n# dotbabel:generated projection=${projectionId} source=${artifact.sourcePath} — do not edit directly\n${header}---\n${body}`;
 }

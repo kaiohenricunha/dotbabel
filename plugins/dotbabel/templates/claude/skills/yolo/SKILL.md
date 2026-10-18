@@ -1,21 +1,10 @@
 ---
-id: yolo
-name: yolo
-type: skill
-version: 1.4.0
-domain: [devex]
-platform: [none]
-task: [runtime-ops]
-maturity: draft
-description: >
-  Start a temporary autonomy mode for this session: one approval from the owner
-  covers the current task or an explicit scope. The session asks nothing else
-  for work inside it until the scope is done, yolo off, the required --for expiry,
-  or the end of the session. It still stops for force pushes, hard resets, deletions,
-  production deploys, destroys, spec-text edits, a check it cannot fix, and
-  work outside the scope.
+# dotbabel:generated projection=sha256:2dcd4ed007855c74ee4cd083f8590eacab111c6366186a98f2ba9f80e69165b9 source=skills/yolo/SKILL.md — do not edit directly
 argument-hint: "--for <duration> [--merge|--no-merge] [scope] | off"
+description: |
+  Start a temporary autonomy mode for this session: one approval from the owner covers the current task or an explicit scope. The session asks nothing else for work inside it until the scope is done, yolo off, the required --for expiry, or the end of the session. It still stops for force pushes, hard resets, deletions, production deploys, destroys, spec-text edits, a check it cannot fix, and work outside the scope.
 disable-model-invocation: true
+name: yolo
 user-invocable: true
 ---
 
