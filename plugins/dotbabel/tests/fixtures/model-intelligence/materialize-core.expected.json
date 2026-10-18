@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "4.2.0",
+  "entries": {
+    "agents/example.md": {
+      "projectionId": "sha256:d32e513caa768d78658694c1d455e6446b1472a80283aa097d4dc9acb3db6c78",
+      "sourcePath": "agents/example.md",
+      "sourceHash": "sha256:ec6f86881785f6b2001521cb99f4ec3c93c679fef4961565e6f8df93eca1ccdb",
+      "inputsHash": "sha256:ce81316170db6536ecdc3e27edcac0d4cfddf57b99dd5511ea0f09cef59a3235",
+      "outputHash": "sha256:e6016fc22c81e5bc0ba85cf341ea1e897d56e5238784d74459ed17067b31f4a8",
+      "runtimeId": "codex",
+      "artifactKind": "agent",
+      "snapshotId": null,
+      "resolverResultHash": "sha256:084710d6f7ceaf26ddf1e4092d787675ee68ba70de62b512bef4b87891d2d38a",
+      "runtimeContractHash": "sha256:26ab54c9ee355193a37b6780d43373f7e68e7fb3b685f943670d6ba22dde618f"
+    }
+  }
+}

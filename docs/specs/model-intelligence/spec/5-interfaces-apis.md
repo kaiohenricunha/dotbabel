@@ -880,6 +880,18 @@ No read-oriented Model Intelligence command silently changes the user's active m
 
 Decided by the owner on 2026-09-18. `materialize/` turns canonical artifacts plus a resolved runtime configuration into deterministic runtime-specific projections (KD-2 to KD-6, ARCH-38, ARCH-51, ARCH-52). A projection has three parts: canonical inputs → materializer → a generated runtime file plus a projection manifest entry. The generated file is runtime-facing; the manifest is Dotbabel-facing.
 
+### Pure materialization API — P-12 implementation contract
+
+`materialize({toolVersion, artifacts})` returns `{files, manifest}` and performs no filesystem, discovery, resolver selection or runtime execution. Each artifact supplies `sourcePath`, `sourceContent`, `target: {path, runtimeId, artifactKind}`, the effective `requirement`, `policy`, `resolverResult`, `runtimeContract`, relevant `capabilityEvidence`, optional `snapshotId`, and an explicit `projectionContract`.
+
+The initial format is YAML frontmatter plus the unchanged canonical body. The adapter supplies `projectionContract.frontmatterKeys` as a verified allowlist and `axisKeys` as semantic-axis-to-native-field names. The core contains no runtime field table. It emits native axes only when the supplied resolver establishes enforced artifact binding and the current runtime contract independently supports each emitted axis. Consumer/advisory resolutions emit no native binding. Explicit inheritance may carry the resolver's unresolved runtime_inheritance_preserved result; other unusable or known-unsatisfied resolutions fail. Runtime-specific projection rules remain P-14.
+
+The core parses YAML through the shared frontmatter parser and validates authored compute declarations through requirement/. It removes Dotbabel metadata by default. Retaining compute requires both `permitsCompute: true` and a named `computeConsumer`; a retained field must also be allowlisted. Malformed declarations do not become valid merely because generation strips them.
+
+Relative portable source and destination paths may contain no traversal, absolute root, backslash, drive spelling or control character. Duplicate destinations fail before any write. Filesystem/symlink ownership is verified by the later P-13 transaction; the pure core cannot establish it.
+
+The seven provenance fields below use SHA-256 digests with a `sha256:` prefix, except nullable snapshotId. Identities include the tool/materializer schema version, canonical source hash/path, target, effective requirement and policy, normalized resolver result, runtime/emission contracts, relevant capability facts and snapshotId. Object key order and allowlist order are normalized. Operational envelope fields such as observedAt, generatedAt, refreshedAt, refresh state, PID and temporary path do not enter derivation identities. Authored source bytes remain intact in sourceHash. Non-JSON/cyclic derivation inputs fail. Files and manifest entries sort by destination path; no timestamp enters output.
+
 ### Determinism
 
 - **ARCH-68**: For identical canonical inputs, policy, capability evidence, runtime contract, resolver result, and Dotbabel version, `materialize(inputs)` produces byte-identical output. No wall-clock value participates in generated output: `generatedAt` appears neither in generated runtime files nor in projection identity; reproducibility does not depend on file modification time; operational timestamps, if useful, belong in logs/status output rather than the projection contract. This preserves ARCH-39 and ARCH-62.

@@ -327,7 +327,7 @@
     },
     {
       "id": "AC-12",
-      "status": "planned",
+      "status": "active",
       "given": "identical materialization inputs",
       "when": "materialize runs twice",
       "then": "the output is byte-identical and holds no timestamp",
@@ -352,7 +352,7 @@
     },
     {
       "id": "AC-13",
-      "status": "planned",
+      "status": "active",
       "given": "a canonical skill that carries dotbabel.compute",
       "when": "a runtime projection is rendered",
       "then": "the runtime-visible frontmatter has no dotbabel.compute",
