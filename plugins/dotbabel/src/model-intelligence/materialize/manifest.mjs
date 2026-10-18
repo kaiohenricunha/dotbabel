@@ -31,7 +31,7 @@ export const hashContent = bytes => "sha256:" + createHash("sha256").update(byte
 /**
  * Build the deterministic manifest for a complete pure materialization batch.
  * @param {string} toolVersion Dotbabel version that produces the files.
- * @param {object[]} projections Files carrying their provenance entries.
+ * @param {object[]} projections Files carrying provenance entries, already sorted by target path.
  * @returns {object} A manifest with target paths in lexical order.
  */
 export function makeManifest(toolVersion, projections) {

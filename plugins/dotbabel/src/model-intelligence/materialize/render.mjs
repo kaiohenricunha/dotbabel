@@ -31,7 +31,7 @@ export function renderProjection(artifact, projectionId, source) {
   if (contract.permitsCompute === true && (typeof contract.computeConsumer !== "string" || contract.computeConsumer.trim() === "")) throw new TypeError("private compute metadata needs an explicit consumer");
   const mappings = Object.entries(contract.axisKeys ?? {});
   if (mappings.some(([axis, key]) => !["model", "reasoning"].includes(axis) || typeof key !== "string") || new Set(mappings.map(([, key]) => key)).size !== mappings.length) throw new TypeError("invalid projection axis mapping");
-  const metadata = Object.fromEntries(contract.frontmatterKeys.filter(key => Object.hasOwn(frontmatter, key) && (key !== "dotbabel" || contract.permitsCompute === true)).map(key => [key, structuredClone(frontmatter[key])]));
+  const metadata = Object.fromEntries(contract.frontmatterKeys.filter(key => Object.hasOwn(frontmatter, key) && (key !== "dotbabel" || contract.permitsCompute === true)).map(key => [key, structuredClone(key === "dotbabel" ? { compute: frontmatter.dotbabel.compute } : frontmatter[key])]));
   const binding = (artifact.runtimeContract.capabilities ?? artifact.runtimeContract).binding?.[artifact.target.artifactKind];
   const bound = artifact.resolverResult.enforcement?.state === "enforced" && artifact.resolverResult.enforcement.basis === "artifact-binding";
   for (const [axis, key] of mappings) {

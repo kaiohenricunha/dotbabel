@@ -1,5 +1,5 @@
 /** Pure materialization core (P-12). Filesystem ownership and transactions belong to P-13. */
-import { RUNTIME_IDS, ARTIFACT_KINDS } from "../domain/index.mjs";
+import { RUNTIME_IDS, ARTIFACT_KINDS, WORKLOAD_CLASSES, compareWorkloadClass } from "../domain/index.mjs";
 import { canonicalJson, hashContent, makeManifest } from "./manifest.mjs";
 import { renderProjection, parseProjectionSource } from "./render.mjs";
 
@@ -23,6 +23,8 @@ export function materialize(inputs) {
     if (typeof artifact.sourceContent !== "string") throw new TypeError("invalid projection source content");
     const source = parseProjectionSource(artifact);
     const requirement = artifact.requirement ?? source.requirement;
+    if (source.requirement?.mode === "floor" && (!WORKLOAD_CLASSES.includes(requirement?.requirement) || compareWorkloadClass(requirement.requirement, source.requirement.requirement) < 0)) throw new TypeError("resolution weakens canonical floor");
+    if (source.requirement?.mode === "pin" && (requirement?.pin?.runtime !== source.requirement.pin.runtime || Object.entries(source.requirement.pin.config).some(([axis, value]) => requirement.pin.config?.[axis] !== value))) throw new TypeError("resolution replaces canonical pin");
     const mayInherit = (requirement === null || requirement.mode === "inherit") && (source.requirement === null || source.requirement.mode === "inherit");
     const resolution = artifact.resolverResult;
     const inherited = mayInherit && resolution?.status === "unresolved" && resolution.diagnostics?.some(item => item.code === "runtime_inheritance_preserved");

@@ -138,6 +138,38 @@ describe("deterministic materialization core", () => {
     artifact.resolverResult = resolve(input({ requirement: artifact.requirement }));
     expect(() => output(value)).toThrow(/resolution/);
   });
+  it.each(["routine", "deep"])("refuses a genuine resolved %s requirement below an authored frontier floor", level => {
+    const value = fixture(); const artifact = value.artifacts[0];
+    artifact.sourceContent = artifact.sourceContent.replace("requirement: deep", "requirement: frontier").replace("mode: dynamic", "mode: floor");
+    artifact.requirement.requirement = level;
+    artifact.resolverResult = resolve(input({ requirement: artifact.requirement }));
+    expect(artifact.resolverResult.status).toBe("resolved");
+    expect(() => output(value)).toThrow(/resolution|floor/);
+  });
+  it("accepts a composed stronger requirement while retaining the authored floor", () => {
+    const value = fixture(); const artifact = value.artifacts[0];
+    artifact.sourceContent = artifact.sourceContent.replace("mode: dynamic", "mode: floor");
+    artifact.requirement.requirement = "frontier";
+    artifact.resolverResult = resolve(input({ requirement: artifact.requirement }));
+    expect(parseFrontmatter(file(output(value)).content).frontmatter.model).toBe("frontier-model");
+  });
+  it("does not replace an authored pin with a different resolved pin", () => {
+    const value = fixture(); const artifact = value.artifacts[0];
+    artifact.sourceContent = artifact.sourceContent.replace("mode: dynamic", "mode: pin\n    pin:\n      runtime: codex\n      config:\n        model: deep-model\n    rationale: Preserve the authored exact model.");
+    artifact.requirement.mode = "pin";
+    artifact.requirement.pin = { runtime: "codex", config: { model: "frontier-model" } };
+    artifact.resolverResult = resolve(input({ requirement: artifact.requirement }));
+    expect(artifact.resolverResult.status).toBe("resolved");
+    expect(() => output(value)).toThrow(/pin/);
+  });
+  it("retains only approved compute metadata inside the private Dotbabel namespace", () => {
+    const value = fixture(); const artifact = value.artifacts[0];
+    artifact.sourceContent = artifact.sourceContent.replace("dotbabel:\n", "dotbabel:\n  internal: private-metadata-marker\n");
+    artifact.projectionContract = { ...artifact.projectionContract, frontmatterKeys: ["name", "dotbabel"], permitsCompute: true, computeConsumer: "explicit compute extension" };
+    const metadata = parseFrontmatter(file(output(value)).content).frontmatter;
+    expect(metadata.dotbabel).toEqual({ compute: { requirement: "deep", mode: "dynamic", binding: "self" } });
+    expect(file(output(value)).content).not.toContain("private-metadata-marker");
+  });
   it("does not turn a consumer recommendation into an artifact binding", () => {
     const value = fixture(); const artifact = value.artifacts[0];
     artifact.sourceContent = artifact.sourceContent.replace("binding: self", "binding: consumer");
