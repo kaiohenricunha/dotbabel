@@ -1,0 +1,7 @@
+# Classifier review audit — 2026-10-18
+
+The full four-role review of PR #501 reports one finding. Candidate A is missing authentication demand vocabulary, but `classifier/index.mjs:55` already includes authentication and the equivalent sentence without apostrophes correctly selects deep/high. Candidate B is the unrestricted single-quote removal at `classifier/index.mjs:31`: two ordinary possessive apostrophes delete the intervening authentication instruction. The new regression fails before the change.
+
+Choose B. Require single-quote delimiters to occur outside word characters. Preserve singular and plural possessive instructions while continuing to exclude explicit quoted examples. The classifier remains local and bounded, with separate semantic capability and effort outputs. No model-name rule, network call, configuration write or weakened acceptance threshold is added. The owner authorizes this scoped fix and its delivery through 2026-10-18 15:23:34 UTC.
+
+Final verification: all 36 classifier tests pass. Classifier mutation scores 87.90%: 327 killed, 45 surviving, no uncovered mutants or timeouts across 372 mutants, with 8.83 tests per mutant. The PR quality profile exits 0 with verdict pass, no environment error and all configured executions exiting 0; changed-line and changed-branch coverage both measure 100%. Logs: `/tmp/ar-501-final-tests.log`, `/tmp/ar-501-final-mutation.log`, `/tmp/ar-501-final-quality-pr.json`. Head CI and current PR criteria remain required after the fix push.
