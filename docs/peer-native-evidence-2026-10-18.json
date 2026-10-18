@@ -1,0 +1,321 @@
+{
+  "capturedAt": "2026-10-18T14:12:00.475Z",
+  "implementationCommit": "9da219b59617c3629a1db971b2784bcd1eeb1f43",
+  "tests": 117,
+  "pairs": [
+    {
+      "id": "pair-f12e31af-181d-4ce7-a945-b2bd961807c9",
+      "closed": true,
+      "main": {
+        "harness": "opencode",
+        "sessionId": "ses_eb10fd349ffeubqyrhT8kiREsv",
+        "alive": false
+      },
+      "advisor": {
+        "harness": "copilot",
+        "sessionId": "53d38c65-1346-4d2a-b04e-64dcdfe75576",
+        "alive": false
+      },
+      "relayAlive": false,
+      "requests": [
+        {
+          "id": "adv-a78ee96a-23de-4b90-8b2e-0cdfa6613488",
+          "seq": 1,
+          "parentId": null,
+          "state": "completed",
+          "forward": "actionable",
+          "attempts": 1,
+          "createdAt": "2026-10-18T12:47:29.488Z",
+          "startedAt": "2026-10-18T12:47:29.576Z"
+        },
+        {
+          "id": "adv-150d675a-d0b9-4d44-aebb-84e515b44e49",
+          "seq": 2,
+          "parentId": null,
+          "state": "completed",
+          "forward": "never",
+          "attempts": 1,
+          "createdAt": "2026-10-18T12:47:29.867Z",
+          "startedAt": "2026-10-18T12:56:24.093Z"
+        },
+        {
+          "id": "adv-9d10540c-2073-4065-ab4a-686bd8d82125",
+          "seq": 3,
+          "parentId": null,
+          "state": "completed",
+          "forward": "never",
+          "attempts": 1,
+          "createdAt": "2026-10-18T12:47:29.956Z",
+          "startedAt": "2026-10-18T12:59:00.446Z"
+        },
+        {
+          "id": "adv-ee58c22b-11d8-408b-b154-81f91637ddd1",
+          "seq": 6,
+          "parentId": null,
+          "state": "failed",
+          "forward": "actionable",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:14:46.254Z",
+          "startedAt": "2026-10-18T13:14:46.656Z"
+        }
+      ],
+      "messages": [
+        {
+          "id": "msg-0da5e4e5-d95f-496e-83d4-3f6c1a0ce5fe",
+          "from": "copilot:53d38c65-1346-4d2a-b04e-64dcdfe75576",
+          "to": "opencode:ses_eb10fd349ffeubqyrhT8kiREsv",
+          "kind": "finding",
+          "requestId": "adv-a78ee96a-23de-4b90-8b2e-0cdfa6613488",
+          "replyTo": null,
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-42367e5a-7e71-4eef-9fe6-8a7a5e1a12db",
+          "from": "opencode:ses_eb10fd349ffeubqyrhT8kiREsv",
+          "to": "copilot:53d38c65-1346-4d2a-b04e-64dcdfe75576",
+          "kind": "status",
+          "requestId": "adv-a78ee96a-23de-4b90-8b2e-0cdfa6613488",
+          "replyTo": "msg-0da5e4e5-d95f-496e-83d4-3f6c1a0ce5fe",
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-938e134f-5d10-4b06-934c-e876352855ca",
+          "from": "copilot:53d38c65-1346-4d2a-b04e-64dcdfe75576",
+          "to": "opencode:ses_eb10fd349ffeubqyrhT8kiREsv",
+          "kind": "finding",
+          "requestId": "adv-ee58c22b-11d8-408b-b154-81f91637ddd1",
+          "replyTo": null,
+          "state": "transport_accepted",
+          "attempts": 1,
+          "unresponsive": true
+        }
+      ]
+    },
+    {
+      "id": "pair-0dba6c7b-4954-4194-8373-21bab9a18c13",
+      "closed": true,
+      "main": {
+        "harness": "antigravity",
+        "sessionId": "ddaa131e-d930-4a38-b90f-e3299a138cee",
+        "alive": false
+      },
+      "advisor": {
+        "harness": "opencode",
+        "sessionId": "ses_eb0ebd76bffe5gMGBCoE6crLCJ",
+        "alive": false
+      },
+      "relayAlive": false,
+      "requests": [
+        {
+          "id": "adv-fc99bd1a-8ac3-4fa6-906d-255b745d422d",
+          "seq": 1,
+          "parentId": null,
+          "state": "completed",
+          "forward": "actionable",
+          "attempts": 1,
+          "createdAt": "2026-10-18T12:58:20.953Z",
+          "startedAt": "2026-10-18T12:58:21.378Z"
+        },
+        {
+          "id": "adv-720662e1-c68e-42ac-9e5e-aadf80a9f4b5",
+          "seq": 4,
+          "parentId": null,
+          "state": "completed",
+          "forward": "actionable",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:10:00.209Z",
+          "startedAt": "2026-10-18T13:09:59.846Z"
+        },
+        {
+          "id": "adv-ec54b8f5-b36f-4e3f-a7f8-d65685a1d3b7",
+          "seq": 5,
+          "parentId": null,
+          "state": "completed",
+          "forward": "never",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:10:00.636Z",
+          "startedAt": "2026-10-18T13:11:10.187Z"
+        },
+        {
+          "id": "adv-2e4e4244-0f0c-44ec-af90-80ad84f3fc22",
+          "seq": 6,
+          "parentId": null,
+          "state": "completed",
+          "forward": "never",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:10:00.966Z",
+          "startedAt": "2026-10-18T13:12:02.784Z"
+        }
+      ],
+      "messages": [
+        {
+          "id": "msg-b18f7e32-f3df-4d3a-8e9d-535fc1c24490",
+          "from": "opencode:ses_eb0ebd76bffe5gMGBCoE6crLCJ",
+          "to": "antigravity:ddaa131e-d930-4a38-b90f-e3299a138cee",
+          "kind": "finding",
+          "requestId": "adv-fc99bd1a-8ac3-4fa6-906d-255b745d422d",
+          "replyTo": null,
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-029d25d7-e397-469f-9925-ed20da9ea958",
+          "from": "antigravity:ddaa131e-d930-4a38-b90f-e3299a138cee",
+          "to": "opencode:ses_eb0ebd76bffe5gMGBCoE6crLCJ",
+          "kind": "reply",
+          "requestId": "adv-fc99bd1a-8ac3-4fa6-906d-255b745d422d",
+          "replyTo": "msg-b18f7e32-f3df-4d3a-8e9d-535fc1c24490",
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-f68f6b24-8c36-4d5d-b83d-367ab8e7b142",
+          "from": "opencode:ses_eb0ebd76bffe5gMGBCoE6crLCJ",
+          "to": "antigravity:ddaa131e-d930-4a38-b90f-e3299a138cee",
+          "kind": "finding",
+          "requestId": "adv-720662e1-c68e-42ac-9e5e-aadf80a9f4b5",
+          "replyTo": null,
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-1d1df707-a9da-4115-9881-322e7293c6b8",
+          "from": "antigravity:ddaa131e-d930-4a38-b90f-e3299a138cee",
+          "to": "opencode:ses_eb0ebd76bffe5gMGBCoE6crLCJ",
+          "kind": "reply",
+          "requestId": "adv-720662e1-c68e-42ac-9e5e-aadf80a9f4b5",
+          "replyTo": "msg-f68f6b24-8c36-4d5d-b83d-367ab8e7b142",
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        }
+      ]
+    },
+    {
+      "id": "pair-b3c5a831-7242-47ed-8958-9e04d2265d9b",
+      "closed": true,
+      "main": {
+        "harness": "copilot",
+        "sessionId": "d5a7eff2-ffcf-4518-8148-a82217f41849",
+        "alive": false
+      },
+      "advisor": {
+        "harness": "antigravity",
+        "sessionId": "41b962c3-948c-4ba5-81a9-dbaf9535e985",
+        "alive": false
+      },
+      "relayAlive": false,
+      "requests": [
+        {
+          "id": "adv-9c09d3e6-7070-459f-abd4-4909192906fb",
+          "seq": 1,
+          "parentId": null,
+          "state": "cancelled",
+          "forward": "actionable",
+          "attempts": 3,
+          "createdAt": "2026-10-18T13:26:10.022Z",
+          "startedAt": "2026-10-18T13:35:54.119Z"
+        },
+        {
+          "id": "adv-99963bca-f5ba-45c4-ad9b-f7f27fee4a4e",
+          "seq": 2,
+          "parentId": null,
+          "state": "completed",
+          "forward": "never",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:26:10.310Z",
+          "startedAt": "2026-10-18T13:37:41.385Z"
+        },
+        {
+          "id": "adv-2d694f45-5dfe-46a5-a7f4-9e32390b46a7",
+          "seq": 3,
+          "parentId": null,
+          "state": "completed",
+          "forward": "never",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:26:10.560Z",
+          "startedAt": "2026-10-18T13:38:07.575Z"
+        },
+        {
+          "id": "adv-b889f455-d059-4abf-aca0-81709010af9b",
+          "seq": 6,
+          "parentId": "adv-9c09d3e6-7070-459f-abd4-4909192906fb",
+          "state": "completed",
+          "forward": "actionable",
+          "attempts": 1,
+          "createdAt": "2026-10-18T13:42:53.894Z",
+          "startedAt": "2026-10-18T13:42:54.303Z"
+        }
+      ],
+      "messages": [
+        {
+          "id": "msg-26abe2c8-daa1-4707-9ede-cbc6125266cd",
+          "from": "antigravity:41b962c3-948c-4ba5-81a9-dbaf9535e985",
+          "to": "copilot:d5a7eff2-ffcf-4518-8148-a82217f41849",
+          "kind": "finding",
+          "requestId": "adv-9c09d3e6-7070-459f-abd4-4909192906fb",
+          "replyTo": null,
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": true
+        },
+        {
+          "id": "msg-6e87c814-d154-4dfc-becb-db819ba5e1de",
+          "from": "antigravity:41b962c3-948c-4ba5-81a9-dbaf9535e985",
+          "to": "copilot:d5a7eff2-ffcf-4518-8148-a82217f41849",
+          "kind": "question",
+          "requestId": "adv-9c09d3e6-7070-459f-abd4-4909192906fb",
+          "replyTo": null,
+          "state": "delivered",
+          "attempts": 0,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-8835fa59-7e67-42f8-901b-e81bcc19371b",
+          "from": "antigravity:41b962c3-948c-4ba5-81a9-dbaf9535e985",
+          "to": "copilot:d5a7eff2-ffcf-4518-8148-a82217f41849",
+          "kind": "finding",
+          "requestId": "adv-b889f455-d059-4abf-aca0-81709010af9b",
+          "replyTo": null,
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-e92fbdef-3fed-4716-a412-2e43fd5f7785",
+          "from": "copilot:d5a7eff2-ffcf-4518-8148-a82217f41849",
+          "to": "antigravity:41b962c3-948c-4ba5-81a9-dbaf9535e985",
+          "kind": "reply",
+          "requestId": "adv-9c09d3e6-7070-459f-abd4-4909192906fb",
+          "replyTo": "msg-26abe2c8-daa1-4707-9ede-cbc6125266cd",
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        },
+        {
+          "id": "msg-69743d9f-ea84-47f3-80e8-808befa78501",
+          "from": "copilot:d5a7eff2-ffcf-4518-8148-a82217f41849",
+          "to": "antigravity:41b962c3-948c-4ba5-81a9-dbaf9535e985",
+          "kind": "reply",
+          "requestId": "adv-b889f455-d059-4abf-aca0-81709010af9b",
+          "replyTo": "msg-8835fa59-7e67-42f8-901b-e81bcc19371b",
+          "state": "processed",
+          "attempts": 1,
+          "unresponsive": false
+        }
+      ]
+    }
+  ],
+  "runtimeVersions": {
+    "opencode": "2.0.5",
+    "copilot": "1.0.98",
+    "antigravity": "1.4.2"
+  }
+}
