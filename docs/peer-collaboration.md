@@ -282,8 +282,47 @@ reasons to preserve the session's own permission boundary. Peer content never
 grants human approval or authority to change settings. Message bodies are limited
 to 16 KiB; notifications contain no body text or full transcripts. Each sender is
 limited to thirty messages per minute and six correlated reply levels. Each history
-is capped at 10,000 items and each repository snapshot at 32 MiB; a full ledger
-requires an operator to archive state before starting a fresh repository ledger.
+is capped at 10,000 items. New work uses a repository-wide 32 MiB admission budget,
+including reserved space for completion and recovery. An unfinished request reserves
+its maximum 16 KiB result in both the result and outcome fields, including worst-case
+JSON escaping. Requests, pending messages, and open pairs also reserve bounded
+control metadata. Admission can therefore stop before the live file reaches 32 MiB.
+
+Existing ledgers remain readable. Non-admitting updates whose capacity charge stays
+constant or decreases can use bounded legacy recovery space, up to a 48 MiB snapshot
+ceiling. This permits recovery, cancellation, acknowledgment, and closing at the old
+32 MiB boundary while new work remains refused. The recovery allowance does not
+provide an unlimited history budget. Archive closed history to restore admission.
+
+### Archive closed history
+
+`unpair` closes a pair and preserves its history. It does not reclaim repository
+space. Once the pair is finished, an operator can archive it explicitly:
+
+```bash
+dotbabel peer unpair --pair PAIR_ID
+dotbabel peer archive --pair PAIR_ID
+dotbabel peer history --pair PAIR_ID
+```
+
+Replace `PAIR_ID` with the durable ID printed by `status`. When a closed pair is
+already available, the capacity error includes an eligible ID. The archive command
+refuses open pairs and needs no running model session. It writes and syncs a private,
+content-addressed archive before replacing the live pair with a catalog reference.
+An interrupted commit leaves the source history intact; a retry safely reuses the
+archive. No history is automatically deleted or pruned.
+
+`history --pair` reads both live and archived pairs, with the same request and message
+output. Archived content, delivery states, correlation IDs, and deduplication keys
+remain intact. Normal transactions read only the live ledger and catalog. They do
+not deserialize archived bodies and serialize the live snapshot once per transaction.
+Live history still uses atomic JSON snapshots; this change does not add a database.
+
+Keep the repository ledger and its `archives/` directory together when backing up
+`DOTBABEL_PEER_STATE_DIR`. Missing or changed archives fail integrity checks. Use the
+current CLI to inspect archived pairs; older versions only understand live entries.
+Archival through the native hook coordination shortcut is unavailable; use an
+operator shell with its normal permissions.
 
 ## Compatibility and measured evidence
 
