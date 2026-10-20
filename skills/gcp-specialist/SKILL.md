@@ -3,24 +3,30 @@ id: gcp-specialist
 name: gcp-specialist
 type: skill
 version: 1.0.0
-domain: [infra]
-platform: [gcp]
-task: [debugging, review]
+domain:
+  - infra
+platform:
+  - gcp
+task:
+  - debugging
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Deep-dive Google Cloud architecture review, debugging, and service design.
-  Use for structured investigations of GCP-specific issues, IAM or cost audits,
-  and multi-service design reviews. Triggers on: "GCP audit", "GCP design review",
-  "Workload Identity debug", "IAM review GCP", "review my GKE",
-  "GCP troubleshooting", "Cloud Run deep-dive".
-argument-hint: "<project context, service, or problem description>"
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Deep-dive Google Cloud architecture review, debugging, and service design. Use for structured investigations of GCP-specific issues, IAM or cost audits, and multi-service design reviews. Triggers on: "GCP audit", "GCP design review", "Workload Identity debug", "IAM review GCP", "review my GKE", "GCP troubleshooting", "Cloud Run deep-dive".
+argument-hint: <project context, service, or problem description>
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 # GCP Specialist

@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:698576516a2fa7cc1c1b858278e3c4fe91978c40574ff42427fed5812a8545e6 source=skills/plan-grader/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:8f2632fd41c2c171c7fc3497d81d960e445f662d9bf06b9651c1e260f174bd05 source=skills/plan-grader/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: '[--json] [--blind] <plan-path | file:<path> | text:"plan" | "plan" | latest <agent> plan>'
 description: |

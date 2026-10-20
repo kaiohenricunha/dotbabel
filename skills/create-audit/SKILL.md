@@ -3,20 +3,29 @@ id: create-audit
 name: create-audit
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - documentation
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Create an evidence-based audit document and save it to docs/audits/.
-  Triggers on: "audit", "review", "assessment".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Create an evidence-based audit document and save it to docs/audits/. Triggers on: "audit", "review", "assessment".
 argument-hint: "[subject]"
 tools: Read, Grep, Glob, Bash, Write
 allowed-tools: Read Grep Glob Bash Write
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 Create a structured audit document and save it to the project's `docs/audits/` directory.

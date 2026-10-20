@@ -3,24 +3,30 @@ id: terraform-specialist
 name: terraform-specialist
 type: skill
 version: 1.0.0
-domain: [infra]
-platform: [terraform]
-task: [debugging, review]
+domain:
+  - infra
+platform:
+  - terraform
+task:
+  - debugging
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Deep-dive Terraform architecture review, module design, state management, and
-  migration. Use for structured investigations of Terraform workspaces, provider
-  configuration, module coupling, import workflows, and test coverage. Triggers on:
-  "Terraform audit", "module review", "state management", "Terraform import",
-  "workspace design", "provider config review", "Terraform testing".
-argument-hint: "<module path, workspace, or problem description>"
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Deep-dive Terraform architecture review, module design, state management, and migration. Use for structured investigations of Terraform workspaces, provider configuration, module coupling, import workflows, and test coverage. Triggers on: "Terraform audit", "module review", "state management", "Terraform import", "workspace design", "provider config review", "Terraform testing".
+argument-hint: <module path, workspace, or problem description>
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 effort: max
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 # Terraform Specialist

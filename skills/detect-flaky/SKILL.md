@@ -3,20 +3,28 @@ id: detect-flaky
 name: detect-flaky
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [testing, debugging]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - testing
+  - debugging
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript
-  codebases by repeated execution + root-cause analysis.
-  Triggers on: "detect flaky tests", "find flaky tests", "diagnose flaky tests".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Detect, diagnose, and fix flaky tests in Python, Go, or JavaScript/TypeScript codebases by repeated execution + root-cause analysis. Triggers on: "detect flaky tests", "find flaky tests", "diagnose flaky tests".
 argument-hint: "[test-command]"
 tools: Grep, Glob, Read, Bash
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Repeated experiments distinguish nondeterministic failures and their root causes.
 ---
 
 # /detect-flaky — Flaky Test Detection and Diagnosis Agent

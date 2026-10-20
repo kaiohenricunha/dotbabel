@@ -26,7 +26,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
     return { on() {}, unref() {} };
   },
 }));
-import { runPeer } from "../../src/peer/cli.mjs";
+import { runPeer, invokePeer, peerCommand } from "../../src/peer/cli.mjs";
 import { repository } from "../../src/peer/identity.mjs";
 import { PeerStore } from "../../src/peer/store.mjs";
 let repo, env, out, err, store, main, advisor;
@@ -260,4 +260,31 @@ it("coordinates literal peer operations in a trusted host hook with scoped resul
   expect(await hook("pwd")).toBe(null);
   expect(await hook("dotbabel peer setup --harness both")).toBe(null);
   expect(await hook("node /unrelated/script.mjs peer main")).toBe(null);
+});
+
+it("archives a closed pair as an operator and keeps its history accessible", async () => {
+  const p = await pair();
+  await run("ask", "retained investigation");
+  await run("send", "main", "retained finding");
+  expect((await run("archive", "--pair", p.id)).code).toBe(1);
+  await run("unpair", "--pair", p.id);
+  const before = (await run("history", "--pair", p.id)).value;
+  ctx.who = null;
+  const archived = await run("archive", "--pair", p.id);
+  expect(archived.code).toBe(0);
+  expect(fs.existsSync(archived.value.path)).toBe(true);
+  expect((await store.read()).pairs).toEqual([]);
+  expect((await run("history", "--pair", p.id)).value).toEqual(before);
+  expect((await run("archive", "--pair", p.id)).value.path).toBe(archived.value.path);
+  expect((await run("archive")).code).toBe(64);
+  expect((await run("archive", "extra", "--pair", p.id)).code).toBe(64);
+  expect(ctx.spawned).toBe(0);
+  expect(
+    peerCommand({
+      hook_event_name: "PreToolUse",
+      tool_name: "Bash",
+      tool_input: { command: `dotbabel peer archive --pair ${p.id}` },
+    }),
+  ).toBe(null);
+  await expect(invokePeer(main, ["archive", "--pair", p.id], env)).rejects.toThrow(/unavailable/);
 });

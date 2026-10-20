@@ -3,19 +3,27 @@ id: review-pr
 name: review-pr
 type: skill
 version: 1.1.0
-domain: [devex]
-platform: [github-actions]
-task: [review]
+domain:
+  - devex
+platform:
+  - github-actions
+task:
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-08-12
-description: >
-  Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.
-  Triggers on: "review PR", "review pull request", "check PR".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-08-12T00:00:00.000Z
+description: |
+  Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads. Triggers on: "review PR", "review pull request", "check PR".
 argument-hint: "[PR#] [--conductor]"
 tools: Bash, Read, Grep, Glob
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: consumer
+    rationale: Scoped engineering follows an existing implementation or review workflow with checkable results.
 ---
 
 Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads.

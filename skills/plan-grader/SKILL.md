@@ -3,20 +3,29 @@ id: plan-grader
 name: plan-grader
 type: skill
 version: 2.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - documentation
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-05-07
-updated: 2026-05-07
-description: >
-  Grade implementation plans on a 0-10 scale without mutating the workspace. Accepts plan files,
-  quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.
+created: 2026-05-07T00:00:00.000Z
+updated: 2026-05-07T00:00:00.000Z
+description: |
+  Grade implementation plans on a 0-10 scale without mutating the workspace. Accepts plan files, quoted inline plans, or best-effort latest-plan discovery for Claude, Codex, Copilot, and Gemini.
 argument-hint: '[--json] [--blind] <plan-path | file:<path> | text:"plan" | "plan" | latest <agent> plan>'
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Rubric-based plan evaluation must compare interacting constraints without mutating the target.
 ---
 
 Grade an implementation plan on a 0-10 scale using the plan-grader rubric. This skill is

@@ -3,20 +3,29 @@ id: create-assessment
 name: create-assessment
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - documentation
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/.
-  Triggers on: "grade", "rate", "score", "evaluate", "assess".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Create a structured assessment document grading a target on a 0-10 scale with a weighted rubric, saved to docs/assessments/. Triggers on: "grade", "rate", "score", "evaluate", "assess".
 argument-hint: "[target]"
 tools: Read, Grep, Glob, Bash, Write
 allowed-tools: Read Grep Glob Bash Write
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 Create a structured assessment document that grades a target on a 0-10 scale using a weighted rubric and save it to the project's `docs/assessments/` directory.

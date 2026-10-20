@@ -3,19 +3,28 @@ id: fix-with-evidence
 name: fix-with-evidence
 type: skill
 version: 1.1.0
-domain: [devex]
-platform: [none]
-task: [debugging, testing]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - debugging
+  - testing
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-10-12
-description: >
-  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop.
-  Triggers on: "fix this", "apply fix", "solve issue".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-10-12T00:00:00.000Z
+description: |
+  Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on: "fix this", "apply fix", "solve issue".
 argument-hint: "[issue]"
 tools: Read, Grep, Glob, Bash
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: consumer
+    rationale: Scoped engineering follows an existing implementation or review workflow with checkable results.
 ---
 
 Fix a bug using a strict four-phase evidence loop: Reproduce → Fix → Verify → PR. Each phase gates on the previous.

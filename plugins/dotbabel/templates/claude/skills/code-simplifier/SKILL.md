@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:cceb4efe655f12b76533cfbb561fead9dda0f7c28592b231c5a81d7f7991d862 source=skills/code-simplifier/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:4d88c6492ff4911557a96c30b474670c3bf2d512f74abc9c2ab4eca13cb1636c source=skills/code-simplifier/SKILL.md — do not edit directly
 argument-hint: "[PR# | file-glob | base-branch]"
 description: |
   Simplify and refine changed code for clarity, consistency, and maintainability while preserving all functionality. PR-scoped by default. Accepts an optional PR number, file glob, or base branch to narrow scope. Triggers on: "simplify code", "code simplifier", "clean up the code", "simplify the PR".
