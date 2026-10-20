@@ -5,11 +5,11 @@ import { openClaudeRoutingBridge } from "../src/adaptive-session-routing/claude-
 
 const sessions = [];
 afterEach(async () => { for (const session of sessions.splice(0)) await session.close(); });
-const request = (socketPath, body, url = "/prepare") => new Promise((resolve, reject) => {
-  const req = http.request({ socketPath, path: url, method: "POST", agent: false, headers: { "content-type": "application/json" } }, response => {
+const request = (socketPath, body, url = "/prepare", method = "POST") => new Promise((resolve, reject) => {
+  const req = http.request({ socketPath, path: url, method, agent: false, headers: { "content-type": "application/json" } }, response => {
     let text = ""; response.setEncoding("utf8"); response.on("data", chunk => { text += chunk; }); response.on("end", () => resolve({ status: response.statusCode, body: JSON.parse(text) }));
   });
-  req.on("error", reject); req.end(typeof body === "string" ? body : JSON.stringify(body));
+  req.on("error", reject); req.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 });
 const input = repoRoot => ({ repoRoot, prompt: "Implement payment integration tests.", runtimeVersion: "2.1.302", current: { axes: { model: "native", reasoning: "medium" } }, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } });
 async function bridge(options = {}) { const server = await openClaudeRoutingBridge(options); sessions.push(server); return server; }
@@ -51,4 +51,67 @@ it.each(["{", JSON.stringify({ request: { ...input("/a"), repoRoot: "relative" }
 it("removes only its own socket and private directory when the session closes", async () => {
   const server = await bridge(); const socket = server.socketPath; expect(fs.existsSync(socket)).toBe(true);
   await server.close(); expect(fs.existsSync(socket)).toBe(false);
+});
+
+it.each([
+  [true, true, "2.1.302", { ready: true }],
+  [false, true, "2.1.302", "intelligence_disabled"],
+  [true, false, "2.1.302", "routing_disabled"],
+  [true, true, "2.1.303", "routing_unverified"],
+])("checks each activation axis before any native discovery: %s %s %s", async (enabled, routingEnabled, runtimeVersion, expected) => {
+  const readActivation = vi.fn(async () => ({ enabled, routingEnabled }));
+  const classify = vi.fn(); const loadResolverInput = vi.fn();
+  const server = await bridge({ readActivation, classify, loadResolverInput });
+  const result = await request(server.socketPath, { action: "activation", request: { ...input("/enabled"), runtimeVersion } });
+  expect(readActivation).toHaveBeenCalledExactlyOnceWith("/enabled");
+  if (typeof expected === "object") expect(result).toEqual({ status: 200, body: expected });
+  else expect(result.body.decision.diagnostics).toContainEqual(expect.objectContaining({ code: expected }));
+  expect(classify).not.toHaveBeenCalled(); expect(loadResolverInput).not.toHaveBeenCalled();
+});
+
+it("returns a bounded generic diagnostic if activation cannot be read", async () => {
+  const server = await bridge({ readActivation: async () => { throw Error("private filesystem contents"); } });
+  const result = await request(server.socketPath, { action: "activation", request: input("/a") });
+  expect(result).toEqual({ status: 200, body: { decision: { status: "preserved", diagnostics: [{ code: "routing_preparation_failed" }] } } });
+});
+
+it.each([
+  null, {}, { request: null }, { request: { ...input("/a"), repoRoot: 3 } },
+  { request: input("/" + "a".repeat(4096)) }, { request: input("/a\u0000b") },
+  { request: input("/a\u200db") }, { request: { ...input("/a"), prompt: 3 } },
+  { request: { ...input("/a"), prompt: "x".repeat(16385) } },
+  { request: { ...input("/a"), runtimeVersion: 302 } },
+  { request: input("/a"), action: "execute" },
+])("rejects invalid request fields before reading project state: %j", async body => {
+  const readActivation = vi.fn(); const server = await bridge({ readActivation });
+  expect((await request(server.socketPath, body)).status).toBe(400);
+  expect(readActivation).not.toHaveBeenCalled();
+});
+
+it("enforces UTF-8 and the byte boundary even for otherwise valid JSON", async () => {
+  const readActivation = vi.fn(async () => ({ enabled: false }));
+  const server = await bridge({ readActivation });
+  const base = JSON.stringify({ request: { ...input("/" + "a".repeat(4095)), prompt: "x".repeat(16384) } });
+  const bounded = base + " ".repeat(1048576 - Buffer.byteLength(base));
+  expect((await request(server.socketPath, bounded)).status).toBe(200);
+  expect(readActivation).toHaveBeenCalledTimes(1);
+  expect((await request(server.socketPath, bounded + " ")).status).toBe(400);
+  const invalidUtf8 = Buffer.concat([Buffer.from('{"ignored":"'), Buffer.from([0xc3, 0x28]), Buffer.from('","request":' + JSON.stringify(input("/a")) + '}')]);
+  expect((await request(server.socketPath, invalidUtf8)).status).toBe(400);
+  expect(readActivation).toHaveBeenCalledTimes(1);
+  expect(fs.statSync(server.socketPath.slice(0, server.socketPath.lastIndexOf("/"))).mode & 0o777).toBe(0o700);
+});
+
+it.each(["GET", "PUT", "DELETE"])("rejects the %s method without reading activation", async method => {
+  const readActivation = vi.fn(); const server = await bridge({ readActivation });
+  expect((await request(server.socketPath, "", "/prepare", method)).status).toBe(404);
+  expect(readActivation).not.toHaveBeenCalled();
+});
+
+it.each(["routing_unverified", "native_catalog_invalid", "native_catalog_unavailable", "session_project_limit"])("reports a bounded %s source failure", async code => {
+  const server = await bridge({ readActivation: async () => ({ enabled: true, routingEnabled: true }), loadResolverInput: async () => { throw Object.assign(Error("private"), { code }); } });
+  const result = await request(server.socketPath, { action: "prepare", request: input("/a") });
+  expect(result.body.decision.status).toBe("preserved");
+  expect(result.body.decision.diagnostics).toContainEqual({ code });
+  expect(JSON.stringify(result)).not.toContain("private");
 });

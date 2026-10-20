@@ -4,7 +4,7 @@ import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { prepareRoute } from "./prepare.mjs";
-import { createClaudeSessionInputLoader } from "./claude-input.mjs";
+import { createClaudeSessionInputLoader } from "../model-intelligence/cli/claude-session-input.mjs";
 import { readProjectActivation } from "../model-intelligence/activation/index.mjs";
 import { route } from "./route.mjs";
 

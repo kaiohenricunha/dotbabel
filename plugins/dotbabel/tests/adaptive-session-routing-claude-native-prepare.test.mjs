@@ -75,6 +75,12 @@ it("preserves a session-only native axis change even when no settings or classic
   const second = await prepareClaudeRoute(f.$, { ...ordinary(), manual: first.manual, current: { axes: { model: "new-native", reasoning: "low" } } }, f.options);
   expect(second.manual).toEqual({ model: { source: "unknown" }, reasoning: { source: "unknown" } });
 });
+it("validates unknown manual lineage against native axes instead of a different previously observed model", async () => {
+  const f = fixture(); f.$.http.fetch.mockResolvedValueOnce(response({ ready: true })).mockResolvedValueOnce(response({ decision: { status: "preserved", diagnostics: [] } }));
+  await prepareClaudeRoute(f.$, { ...ordinary(), current: { axes: { model: "previous-observed", reasoning: "high" }, turnExecuted: true }, nativeAxes: { model: "native-ui", reasoning: "low" }, manual: { model: { source: "unknown" }, reasoning: { source: "unknown" } } }, f.options);
+  const passed = JSON.parse(f.$.http.fetch.mock.calls[1][1].body).request;
+  expect(passed.current.axes).toEqual({ model: "native-ui", reasoning: "low" });
+});
 it.each(["missing authorization", "HTTP failure", "invalid pagination"])("preserves the native configuration on %s", async failure => {
   const f = fixture(); f.$.http.fetch.mockResolvedValueOnce(response({ ready: true })).mockResolvedValueOnce(response({ needsEvidence: true }));
   if (failure === "missing authorization") f.$.session.authorize.mockResolvedValue(null);
@@ -82,4 +88,152 @@ it.each(["missing authorization", "HTTP failure", "invalid pagination"])("preser
   else f.$.http.fetch.mockResolvedValue(response({ data: [], has_more: true }));
   await expect(prepareClaudeRoute(f.$, ordinary(), f.options)).rejects.toThrow();
   expect(f.$.http.fetch.mock.calls.filter(([url]) => url.startsWith("http:")).length).toBe(2);
+});
+
+// This responder validates the wire protocol rather than relying on call order alone.
+function protocol(f, pages = [{ data: [{ id: "opaque-model" }], has_more: false }]) {
+  const received = [];
+  f.$.http.fetch.mockImplementation(async (url, init) => {
+    if (url.startsWith("https:")) {
+      expect(init).toEqual({ method: "GET", auth: "opaque-native-handle", headers: { accept: "application/json", "anthropic-version": "2023-06-01" } });
+      expect(url).not.toContain("Implement");
+      return response(pages.shift());
+    }
+    expect(url).toBe("http://localhost/prepare");
+    expect(init.method).toBe("POST"); expect(init.socketPath).toBe(f.options.socketPath);
+    expect(init.headers).toEqual({ "content-type": "application/json" });
+    expect(init).not.toHaveProperty("auth");
+    const body = JSON.parse(init.body); received.push(body);
+    if (body.action === "activation") {
+      expect(body.request).toEqual({ repoRoot: root, prompt: "", runtimeVersion: "2.1.302" });
+      expect(body).not.toHaveProperty("native"); return response({ ready: true });
+    }
+    expect(body.action).toBe("prepare");
+    expect(body.request.prompt).toBe(ordinary().prompt);
+    expect(body.request.runtimeVersion).toBe("2.1.302");
+    return response(body.native ? { decision: { status: "proposed", diagnostics: [] } } : { needsEvidence: true });
+  });
+  return received;
+}
+
+it("sends paginated metadata without changing the original prompt or authorization boundary", async () => {
+  const f = fixture(); const pages = [
+    { data: [{ id: "one" }], has_more: true, last_id: "one + /?" },
+    { data: [{ id: "two" }], has_more: false },
+  ];
+  const expected = structuredClone(pages); const received = protocol(f, pages);
+  const before = new Date().getTime(); await prepareClaudeRoute(f.$, ordinary(), f.options);
+  expect(f.$.http.fetch.mock.calls.filter(([url]) => url.startsWith("https:")).map(([url]) => url)).toEqual([
+    "https://api.anthropic.com/v1/models?limit=100", "https://api.anthropic.com/v1/models?limit=100&after_id=one%20%2B%20%2F%3F",
+  ]);
+  expect(received).toHaveLength(3);
+  expect(received[2].native).toMatchObject({ version: "2.1.302", selectors: ["small", "large"], providerPages: expected });
+  const observed = Date.parse(received[2].native.observedAt);
+  expect(observed).toBeGreaterThanOrEqual(before); expect(observed).toBeLessThanOrEqual(Date.now());
+  expect(received[2].request).toEqual(received[1].request);
+});
+
+it.each([undefined, 7, "relative", "/" + "a".repeat(100)])("rejects an invalid private socket before HTTP: %s", async socketPath => {
+  const f = fixture(); f.options.socketPath = socketPath;
+  await expect(prepareClaudeRoute(f.$, ordinary(), f.options)).rejects.toThrow("native_bridge_unavailable");
+  expect(f.$.http.fetch).not.toHaveBeenCalled();
+});
+
+it.each([
+  { ok: false, text: "{}" }, { ok: true, text: 3 },
+  { ok: true, text: " ".repeat(262143) + "{}" }, { ok: true, text: "{" },
+])("rejects failed, malformed or oversized IPC responses", async invalid => {
+  const f = fixture(); f.$.http.fetch.mockResolvedValue(invalid);
+  await expect(prepareClaudeRoute(f.$, ordinary(), f.options)).rejects.toThrow();
+  expect(f.$.settings.read).not.toHaveBeenCalled(); expect(f.$.session.authorize).not.toHaveBeenCalled();
+});
+
+it("accepts a valid IPC response exactly at its size boundary", async () => {
+  const f = fixture(); const text = JSON.stringify({ decision: { status: "preserved" } });
+  f.$.http.fetch.mockResolvedValue({ ok: true, text: text.padEnd(262144) });
+  expect(await prepareClaudeRoute(f.$, ordinary(), f.options)).toEqual({ status: "preserved" });
+});
+
+it.each([undefined, [], Array(33).fill("model"), [""], [2], ["a".repeat(201)], ["x\u0000"], ["x\u200d"]])("rejects invalid native selectors before authorization: %j", async selectors => {
+  const f = fixture(); protocol(f); f.$.config.list.mockResolvedValue([{ key: "other", options: ["ignored"] }, { key: "model", options: selectors }]);
+  await expect(prepareClaudeRoute(f.$, ordinary(), f.options)).rejects.toThrow("native_catalog_invalid");
+  expect(f.$.session.authorize).not.toHaveBeenCalled();
+});
+
+it("accepts the native selector count and value boundaries", async () => {
+  const f = fixture(); const received = protocol(f); const selectors = Array.from({ length: 32 }, (_, index) => `${index}`.padEnd(200, "x"));
+  f.$.config.list.mockResolvedValue([{ key: "model", options: selectors }]);
+  await prepareClaudeRoute(f.$, ordinary(), f.options);
+  expect(received.at(-1).native.selectors).toEqual(selectors);
+});
+
+it.each([
+  [{ data: [], has_more: "false" }], [{ data: {}, has_more: false }],
+  [{ data: [], has_more: true, last_id: "a" }, { data: [], has_more: true, last_id: "a" }],
+  [{ data: [], has_more: true, last_id: "x".repeat(201) }],
+  [{ data: [], has_more: true, last_id: "x\u0000" }],
+  Array.from({ length: 10 }, (_, index) => ({ data: [], has_more: true, last_id: String(index) })),
+].map(pages => [pages]))("rejects malformed, repeated or unbounded provider pagination", async pages => {
+  const f = fixture(); protocol(f, pages);
+  await expect(prepareClaudeRoute(f.$, ordinary(), f.options)).rejects.toThrow("native_catalog_invalid");
+  expect(f.$.http.fetch.mock.calls.filter(([url, init]) => url.startsWith("http:") && JSON.parse(init.body).native)).toHaveLength(0);
+});
+
+it("accepts the tenth terminal provider page and never asks for an eleventh", async () => {
+  const f = fixture(); const pages = Array.from({ length: 10 }, (_, index) => ({ data: [], has_more: index !== 9, last_id: String(index) }));
+  const received = protocol(f, pages); await prepareClaudeRoute(f.$, ordinary(), f.options);
+  expect(received.at(-1).native.providerPages).toHaveLength(10);
+  expect(f.$.http.fetch.mock.calls.filter(([url]) => url.startsWith("https:"))).toHaveLength(10);
+});
+
+it.each(["nontext", "too large", "aggregate too large"])("rejects %s provider bodies", async variant => {
+  const f = fixture(); protocol(f);
+  const real = f.$.http.fetch.getMockImplementation(); let count = 0;
+  f.$.http.fetch.mockImplementation(async (url, init) => {
+    if (!url.startsWith("https:")) return real(url, init);
+    count++;
+    if (variant === "nontext") return { ok: true, text: 4 };
+    if (variant === "too large") return { ok: true, text: " ".repeat(262145) };
+    return { ok: true, text: JSON.stringify({ data: [], has_more: true, last_id: String(count) }).padEnd(140000) };
+  });
+  await expect(prepareClaudeRoute(f.$, ordinary(), f.options)).rejects.toThrow("native_catalog_unavailable");
+  expect(count).toBe(variant === "aggregate too large" ? 2 : 1);
+});
+
+it("accepts a terminal provider response exactly at its size boundary", async () => {
+  const f = fixture(); protocol(f); const real = f.$.http.fetch.getMockImplementation();
+  f.$.http.fetch.mockImplementation(async (url, init) => url.startsWith("https:") ? { ok: true, text: JSON.stringify({ data: [], has_more: false }).padEnd(262144) } : real(url, init));
+  expect((await prepareClaudeRoute(f.$, ordinary(), f.options)).status).toBe("proposed");
+});
+
+it.each(["ANTHROPIC_DEFAULT_HAIKU_MODEL", "ANTHROPIC_DEFAULT_SONNET_MODEL", "ANTHROPIC_DEFAULT_OPUS_MODEL", "ANTHROPIC_DEFAULT_FABLE_MODEL", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST"])("does not override the native %s control", async name => {
+  const f = fixture(); f.$.env.get.mockImplementation(async key => key === name ? "configured" : undefined);
+  f.$.http.fetch.mockResolvedValue(response({ ready: true }));
+  expect((await prepareClaudeRoute(f.$, ordinary(), f.options)).diagnostics).toEqual([{ code: "native_policy_unverified" }]);
+  expect(f.$.http.fetch).toHaveBeenCalledTimes(1);
+});
+
+it("preserves even another model's native maximum effort until enforcement is verified", async () => {
+  const f = fixture(); f.settings.modelSettings = { other: { maxEffortLevel: "medium" } };
+  f.$.http.fetch.mockResolvedValue(response({ ready: true }));
+  expect((await prepareClaudeRoute(f.$, ordinary(), f.options)).diagnostics).toEqual([{ code: "native_policy_unverified" }]);
+});
+
+it("uses model-specific effort before global or environment controls, with independent manual axes", async () => {
+  const f = fixture(); f.settings.modelSettings = { native: { effortLevel: "low" } }; f.settings.effortLevel = "high";
+  f.$.env.get.mockImplementation(async key => key === "CLAUDE_CODE_EFFORT_LEVEL" ? "medium" : undefined);
+  f.$.http.fetch.mockImplementation(async () => response({ ready: true, decision: { status: "preserved" } }));
+  const first = await prepareClaudeRoute(f.$, ordinary(), f.options);
+  expect(first.manual).toEqual({ model: { source: "inherited" }, reasoning: { source: "manual", value: "medium" } });
+  expect(f.options.state.signatures.reasoning).toBe('"low"');
+  expect(f.options.state.axes).toEqual(ordinary().current.axes);
+});
+
+it("reads environment intent without forwarding its private values, and rejects invalid actual manual axes", async () => {
+  const f = fixture(); f.$.env.get.mockImplementation(async key => key === "ANTHROPIC_MODEL" ? "private-alias" : undefined);
+  f.$.http.fetch.mockImplementation(async () => response({ ready: true, decision: { status: "preserved" } }));
+  const input = ordinary(); input.current.axes.model = "x\u0000";
+  const result = await prepareClaudeRoute(f.$, input, f.options);
+  expect(result.manual.model).toEqual({ source: "unknown" });
+  expect(JSON.stringify(f.$.http.fetch.mock.calls)).not.toContain("private-alias");
 });

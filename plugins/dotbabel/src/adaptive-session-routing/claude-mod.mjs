@@ -13,7 +13,7 @@ async function report($, value) {
  * Native results and stream chunks pass through once. A binding conflict answers locally without
  * executing a below-floor provider request; a failed preparation preserves native configuration.
  * @param {Function} on Native Mods event registration.
- * @param {{prepare?:Function,manual?:object,socketPath?:string}} options Trusted preparation and initial axis provenance.
+ * @param {{prepare?:Function,manual?:object,socketPath?:string,freshSession?:boolean}} options Trusted preparation and initial axis provenance.
  * @returns {void}
  */
 export function registerClaudeRouting(on, options) {
@@ -21,7 +21,7 @@ export function registerClaudeRouting(on, options) {
   let active;
   let uncertainMedia = false;
   let priorFailures = 0;
-  let current = { axes: {}, turnExecuted: false };
+  let current = { axes: {}, ...(options.freshSession === true ? { turnExecuted: false } : {}) };
   const manual = { model: { source: "unknown" }, reasoning: { source: "unknown" }, ...options.manual };
   const revision = { model: 0, reasoning: 0 };
   const chooseManual = (axis, value, source = "manual") => { manual[axis] = { source, ...(opaque(value) ? { value } : {}) }; revision[axis]++; };
@@ -39,9 +39,18 @@ export function registerClaudeRouting(on, options) {
     return next(e);
   });
 
+  on("classic.SessionStart", async ($, e, next) => {
+    if (e.agent_id === undefined && e.source !== "startup") current = { axes: {}, ...(e.source === "clear" ? { turnExecuted: false } : {}) };
+    return next(e);
+  });
+
   on("classic.PostModelSwitch", async ($, e, next) => {
     const result = await next(e);
     if (e.agent_id === undefined && ["command", "picker", "sdk"].includes(e.source)) chooseManual("model", e.to_model);
+    if (e.agent_id === undefined && e.source === "auto" && active?.prepared) {
+      active.changes = {};
+      active.decision = preserved("native_model_rerouted");
+    }
     return result;
   });
   on("config.set", async ($, e, next) => {
@@ -53,8 +62,9 @@ export function registerClaudeRouting(on, options) {
     return result;
   });
   on("command.run", async ($, e, next) => {
+    if (["resume", "fork", "compact"].includes(e.command)) current = { axes: {} };
     // A picker can select the same value. Record intent even when no value-change event fires.
-    if (["model", "effort"].includes(e.command) && e.origin?.kind !== "plugin") {
+    if (["model", "effort"].includes(e.command) && !(e.command === "effort" && e.args.trim() === "status") && e.origin?.kind !== "plugin") {
       chooseManual(e.command === "model" ? "model" : "reasoning", undefined, "unknown");
       if (e.command === "model" && !e.args.trim()) chooseManual("reasoning", undefined, "unknown");
     }
@@ -80,14 +90,14 @@ export function registerClaudeRouting(on, options) {
       const axes = { model: e.model, ...(typeof e.effort === "string" ? { reasoning: e.effort } : {}) };
       try {
         const before = { ...revision };
-        turn.decision = uncertainMedia ? preserved("input_modality_unverified") : e.index !== 0 ? preserved("turn_boundary_unverified") : await prepareClaudeRoute($, { repoRoot: root, prompt: turn.prompt, context: { priorFailures }, current: { ...current, axes }, manual: structuredClone(manual) }, preparation);
+        turn.decision = uncertainMedia ? preserved("input_modality_unverified") : e.index !== 0 ? preserved("turn_boundary_unverified") : await prepareClaudeRoute($, { repoRoot: root, prompt: turn.prompt, context: { priorFailures }, nativeAxes: axes, current: { ...current, axes: current.turnExecuted === true ? { ...current.axes } : axes }, manual: structuredClone(manual) }, preparation);
         if (turn.decision.manual) for (const axis of ["model", "reasoning"]) if (before[axis] === revision[axis]) manual[axis] = turn.decision.manual[axis];
       } catch { turn.decision = preserved("routing_preparation_failed"); }
       // Do not retain prompt text after the one bounded preparation call.
       turn.prompt = undefined;
       turn.revision = { ...revision };
-      if (turn.decision?.status === "proposed") for (const axis of ["model", "reasoning"]) {
-        const value = turn.decision.changes?.[axis];
+      if (["proposed", "preserved"].includes(turn.decision?.status)) for (const axis of ["model", "reasoning"]) {
+        const value = turn.decision.configuration?.axes?.[axis] ?? turn.decision.changes?.[axis];
         if (manual[axis].source === "inherited" && opaque(value)) turn.changes[axis] = value;
       }
     }
@@ -112,10 +122,10 @@ export function registerClaudeRouting(on, options) {
     const model = result.usage?.model;
     const effective = opaque(model) ? { state: "observed", axes: { model }, source: "turn.step:usage.model" } : { state: "unknown" };
     // A native fallback is an observed substitution, never a reason to force the old model again.
-    if (opaque(model) && model !== request.model) { turn.changes = {}; await report($, { status: "preserved", diagnostics: [{ code: "native_model_rerouted" }], effective }); }
+    if (opaque(model) && model !== request.model) { turn.changes = {}; turn.decision = preserved("native_model_rerouted"); await report($, { status: "preserved", diagnostics: [{ code: "native_model_rerouted" }], effective }); }
     turn.effective = effective;
-    current = { axes: effective.axes ?? {}, turnExecuted: opaque(model) };
-    await report($, { status: decision.status, intended, accepted: { state: "unknown" }, effective });
+    current = { axes: effective.axes ?? {}, ...(opaque(model) ? { turnExecuted: true } : {}) };
+    await report($, { status: turn.decision.status, intended, accepted: { state: "unknown" }, effective });
     return result;
   }).catch(async function* ($, e) {
     const answer = "Routing interrupted. No automatic retry was made. Inspect the native session before continuing.";
@@ -127,7 +137,8 @@ export function registerClaudeRouting(on, options) {
   on("classic.Stop", async ($, e, next) => {
     if (e.agent_id === undefined && active?.effective?.state === "observed" && opaque(e.effort?.level)) {
       active.effective = { ...active.effective, axes: { ...active.effective.axes, reasoning: e.effort.level }, reasoningSource: "classic.Stop:effort.level" };
-      await report($, { status: "completed", effective: active.effective });
+      current.axes.reasoning = e.effort.level;
+      await report($, { status: "observed", effective: active.effective });
     }
     return next(e);
   });

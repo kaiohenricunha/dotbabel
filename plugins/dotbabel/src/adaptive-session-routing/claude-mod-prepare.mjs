@@ -10,6 +10,7 @@ async function privatePrepare($, options, request, action, native) {
 }
 
 async function nativeManual($, request, options) {
+  const baseline = request.nativeAxes ?? request.current.axes;
   const settings = await $.settings.read();
   if (["availableModels", "deniedModels", "enforceAvailableModels", "maxEffortLevel", "modelOverrides", "availableModelsMatch"].some(key => Object.hasOwn(settings, key)) || Object.values(settings.modelSettings ?? {}).some(model => model && Object.hasOwn(model, "maxEffortLevel"))) return { unverifiedPolicy: true };
   // These documented controls can change the scratch probe's selector mapping or native limits.
@@ -22,7 +23,7 @@ async function nativeManual($, request, options) {
   if (overrides.some(value => value !== undefined && value !== "")) return { unverifiedPolicy: true };
   const modelEnv = await $.env.get("ANTHROPIC_MODEL");
   const effortEnv = await $.env.get("CLAUDE_CODE_EFFORT_LEVEL");
-  const values = { model: settings.model ?? modelEnv, reasoning: settings.modelSettings?.[request.current.axes.model]?.effortLevel ?? settings.effortLevel ?? effortEnv };
+  const values = { model: settings.model ?? modelEnv, reasoning: settings.modelSettings?.[baseline.model]?.effortLevel ?? settings.effortLevel ?? effortEnv };
   const signatures = Object.fromEntries(Object.entries(values).map(([axis, value]) => [axis, JSON.stringify(value ?? null)]));
   const sameRoot = options.state.root === request.repoRoot;
   const manual = {};
@@ -31,13 +32,13 @@ async function nativeManual($, request, options) {
     if (!sameRoot && chosen.source === "inherited" && options.manual?.[axis]?.source === "native-initial") chosen = { source: "native-initial" };
     if (chosen.source === "native-initial") chosen = { source: values[axis] === undefined ? "inherited" : "manual" };
     if (sameRoot && options.state.signatures[axis] !== signatures[axis]) chosen = { source: "manual" };
-    else if (sameRoot && chosen.source === "inherited" && options.state.axes[axis] !== request.current.axes[axis]) chosen = { source: "unknown" };
-    const actual = request.current.axes[axis];
+    else if (sameRoot && chosen.source === "inherited" && options.state.axes[axis] !== baseline[axis]) chosen = { source: "unknown" };
+    const actual = baseline[axis];
     manual[axis] = chosen.source === "manual" ? { source: validValue(actual) ? "manual" : "unknown", ...(validValue(actual) ? { value: actual } : {}) } : { ...chosen };
   }
   options.state.root = request.repoRoot;
   options.state.signatures = signatures;
-  options.state.axes = { ...request.current.axes };
+  options.state.axes = { ...baseline };
   return manual;
 }
 
@@ -77,6 +78,11 @@ export async function prepareClaudeRoute($, request, options) {
   const manual = await nativeManual($, request, options);
   if (manual.unverifiedPolicy) return { status: "preserved", diagnostics: [{ code: "native_policy_unverified" }] };
   const prepared = { ...base, manual };
+  prepared.current = { ...request.current, axes: { ...request.current.axes } };
+  for (const axis of ["model", "reasoning"]) if (manual[axis].source !== "inherited") {
+    const value = (request.nativeAxes ?? request.current.axes)[axis];
+    if (value === undefined) delete prepared.current.axes[axis]; else prepared.current.axes[axis] = value;
+  }
   const first = await privatePrepare($, options, prepared, "prepare");
   if (!first.needsEvidence) return { ...first.decision, manual };
   const rows = await $.config.list();

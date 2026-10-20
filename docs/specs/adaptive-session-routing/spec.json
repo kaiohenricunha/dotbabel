@@ -12,6 +12,7 @@
     "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
     "plugins/dotbabel/tests/integration/adaptive-session-routing-*.integration.test.mjs",
     "plugins/dotbabel/tests/integration/adaptive-session-routing-codex.integration.test.mjs",
+    "plugins/dotbabel/src/model-intelligence/cli/claude-session-input.mjs",
     "experiments/adaptive-session-routing-claude/**",
     "plugins/dotbabel/tests/fixtures/adaptive-session-routing/claude-mod/**"
   ],

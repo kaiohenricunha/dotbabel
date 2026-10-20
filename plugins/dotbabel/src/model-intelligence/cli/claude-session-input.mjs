@@ -1,11 +1,11 @@
 /** Session-local Claude evidence joining. Release eligibility never becomes live availability. */
-import { loadPolicyLayers, mergePolicy } from "../model-intelligence/policy/index.mjs";
-import { deriveFreshness, freshnessPolicyFor } from "../model-intelligence/catalog/index.mjs";
-import { checkOpaqueValue } from "../model-intelligence/domain/index.mjs";
-import { readSnapshot } from "../model-intelligence/snapshot/index.mjs";
-import { releaseSourceFor } from "../model-intelligence/snapshot/core.mjs";
-import * as anthropic from "../model-intelligence/sources/knowledge/anthropic.mjs";
-import * as claude from "../model-intelligence/sources/runtime/claude.mjs";
+import { loadPolicyLayers, mergePolicy } from "../policy/index.mjs";
+import { deriveFreshness, freshnessPolicyFor } from "../catalog/index.mjs";
+import { checkOpaqueValue } from "../domain/index.mjs";
+import { readSnapshot } from "../snapshot/index.mjs";
+import { releaseSourceFor } from "../snapshot/core.mjs";
+import * as anthropic from "../sources/knowledge/anthropic.mjs";
+import * as claude from "../sources/runtime/claude.mjs";
 
 const fail = code => Object.assign(new Error(code), { code });
 const providerWindow = freshnessPolicyFor(anthropic);
@@ -18,12 +18,13 @@ const safeSelector = value => typeof value === "string" && checkOpaqueValue("mod
  * The release's availability, accepted dates, identity facts and eligibility are never copied.
  * Native/provider observations expire in six hours; documentation keeps its original date.
  * Each project has independent native membership and policy. No cache or configuration is written.
- * @param {{observe?:Function,loadPolicy?:Function,snapshot?:object,now?:Function}} [options] Trusted source handles.
+ * @param {{observe?:Function,loadPolicy?:Function,snapshot?:object,now?:Function,monotonic?:Function}} [options] Trusted source handles and clocks.
  * @returns {{load:Function}} Resolver-input loader; missing live evidence requests a native catalog.
  */
 export function createClaudeSessionInputLoader(options = {}) {
   const cache = new Map();
   const now = options.now ?? (() => new Date().toISOString());
+  const monotonic = options.monotonic ?? (() => performance.now());
   const snapshot = options.snapshot ?? readSnapshot();
   const observe = options.observe ?? claude.observe;
   const fresh = observedAt => deriveFreshness({ observedAt, now: now(), policy: providerWindow }) === "fresh";
@@ -37,9 +38,9 @@ export function createClaudeSessionInputLoader(options = {}) {
     if (provider.status !== "ok" || page !== native.providerPages.length) throw fail("native_catalog_invalid");
     const facts = new Map(provider.evidence.providers[0].discovery.models.map(model => [model.id, model]));
     const models = new Map();
-    const started = performance.now();
+    const started = monotonic();
     for (const selector of [...new Set(native.selectors)]) {
-      const remaining = Math.floor(10000 - (performance.now() - started));
+      const remaining = Math.floor(10000 - (monotonic() - started));
       if (remaining <= 0) break;
       const observation = await observe({ model: selector, timeoutMs: remaining });
       const id = observation.evidence?.axes?.model;

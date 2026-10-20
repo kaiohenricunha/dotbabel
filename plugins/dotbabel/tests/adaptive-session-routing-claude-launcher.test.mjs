@@ -47,3 +47,31 @@ it("cleans up its plugin and bridge after native startup failure", async () => {
   await expect(runClaudeTerminal({ repoRoot: "/project" }, { readActivation: enabled, runtimeVersion: async () => "2.1.302", startNative: async ({ args }) => { plugin = args[1]; throw Error("native startup failed"); } })).rejects.toThrow("native startup failed");
   expect(fs.existsSync(plugin)).toBe(false);
 });
+
+it.each([{ enabled: true, routingEnabled: false }, { enabled: false, routingEnabled: true }, { enabled: true }, { routingEnabled: true }])("requires both project opt-ins before native startup: %j", async activation => {
+  const runtimeVersion = vi.fn(); const startNative = vi.fn();
+  await expect(runClaudeTerminal({ repoRoot: "/project" }, { readActivation: async () => activation, runtimeVersion, startNative })).rejects.toMatchObject({ code: "routing_disabled" });
+  expect(runtimeVersion).not.toHaveBeenCalled(); expect(startNative).not.toHaveBeenCalled();
+});
+
+it.each(["model", "effort"])("rejects invalid %s values before probing or opening any native session", async axis => {
+  const runtimeVersion = vi.fn(); const startNative = vi.fn();
+  for (const value of [3, "", "bad\nvalue", "bad\u200dvalue", "-option"]) {
+    await expect(runClaudeTerminal({ repoRoot: "/project", [axis]: value }, { readActivation: enabled, runtimeVersion, startNative })).rejects.toMatchObject({ code: "session_axis_invalid" });
+  }
+  expect(runtimeVersion).not.toHaveBeenCalled(); expect(startNative).not.toHaveBeenCalled();
+});
+
+it("starts the plugin through its native hook manifest with independent automatic and manual axes", async () => {
+  await runClaudeTerminal({ repoRoot: "/project", model: "auto", effort: "low" }, { readActivation: enabled, runtimeVersion: async () => "2.1.302", startNative: async ({ args, socketPath }) => {
+    expect(args.slice(2)).toEqual(["--effort", "low"]);
+    const hooks = JSON.parse(fs.readFileSync(path.join(args[1], "hooks/hooks.json"), "utf8")); expect(hooks.modules).toEqual(["./register.js"]);
+    const module = await import(path.join(args[1], "hooks", hooks.modules[0]));
+    const registered = new Map(); module.register((name, handler) => { registered.set(name, handler); return { catch() {} }; });
+    expect(registered.has("turn.step")).toBe(true); expect(registered.has("prompt.submit")).toBe(true);
+    const entry = fs.readFileSync(path.join(args[1], "hooks/register.js"), "utf8");
+    expect(entry).toContain(JSON.stringify(socketPath)); expect(entry).toContain('"freshSession":true');
+    for (const file of [".claude-plugin/plugin.json", "hooks/hooks.json", "hooks/register.js", "hooks/claude-mod.mjs", "hooks/claude-mod-prepare.mjs"]) expect(fs.statSync(path.join(args[1], file)).mode & 0o777).toBe(0o600);
+    return 0;
+  } });
+});

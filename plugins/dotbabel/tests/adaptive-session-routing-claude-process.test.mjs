@@ -34,3 +34,7 @@ it("removes signal handlers and reports a sanitized native spawn failure", async
   await expect(running).rejects.toMatchObject({ code: "native_runtime_unavailable", message: "native_runtime_unavailable" });
   expect(process.listenerCount("SIGTERM")).toBe(before);
 });
+
+it.each([[" 12.34.567 ", "12.34.567"], ["12.34.567", "12.34.567"], ["banner 2.1.302", undefined], ["2.1.302suffix", undefined]])("requires an exact version prefix and token boundary: %s", async (stdout, expected) => {
+  expect(await readClaudeVersion(async () => ({ stdout }))).toBe(expected);
+});

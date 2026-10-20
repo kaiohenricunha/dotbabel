@@ -22,7 +22,7 @@ async function pluginFor(socketPath, manual) {
     await writeFile(join(directory, ".claude-plugin/plugin.json"), JSON.stringify({ name: "dotbabel-adaptive-session-routing", version: "0.1.0", description: "Project opt-in MAIN model and effort routing", author: { name: "dotbabel" } }), { mode: 0o600 });
     await writeFile(join(directory, "hooks/hooks.json"), JSON.stringify({ modules: ["./register.js"] }), { mode: 0o600 });
     for (const name of ["claude-mod.mjs", "claude-mod-prepare.mjs"]) await writeFile(join(directory, "hooks", name), await readFile(new URL(name, import.meta.url)), { mode: 0o600 });
-    const entry = `import { registerClaudeRouting } from "./claude-mod.mjs";\nexport function register(on) { registerClaudeRouting(on, ${JSON.stringify({ socketPath, manual })}); }\n`;
+    const entry = `import { registerClaudeRouting } from "./claude-mod.mjs";\nexport function register(on) { registerClaudeRouting(on, ${JSON.stringify({ socketPath, manual, freshSession: true })}); }\n`;
     await writeFile(join(directory, "hooks/register.js"), entry, { mode: 0o600 });
     return directory;
   } catch (error) { await rm(directory, { recursive: true, force: true }); throw error; }
