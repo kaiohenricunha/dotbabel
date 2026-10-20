@@ -9,6 +9,7 @@ import {
   finishRequest,
   sendMessage,
   receiveMessages,
+  nativeMessage,
 } from "../../src/peer/state.mjs";
 function world() {
   const s = createState("r"),
@@ -199,4 +200,48 @@ it("reminds the Advisor about unread Main messages, also while paused, beside qu
   expect(stop().reason).toContain("1 unread");
   receiveMessages(p, advisor);
   expect(prompt()).toBe(null);
+});
+
+it("lets the Advisor mirror its own ledger messages natively to the paired Main only", () => {
+  const s = createState("r"),
+    main = { key: "m", repo: "r", harness: "claude", socket: "/run/user/1/cc-socks/10.sock" },
+    advisor = { key: "a", repo: "r", harness: "claude", socket: "/run/user/1/cc-socks/20.sock" };
+  const p = registerMain(s, main, { alive: () => true });
+  pairAdvisor(s, advisor, p.code, { alive: () => true });
+  const mine = nativeMessage(p, sendMessage(p, advisor, "main", "finding"));
+  const theirs = nativeMessage(p, sendMessage(p, main, "advisor", "note"));
+  const send = (to, message, summary = mine.summary) =>
+    peerHook(p, advisor, {
+      hook_event_name: "PreToolUse",
+      tool_name: "SendMessage",
+      tool_input: { to, summary, message },
+    });
+  const decision = (r) => r?.hookSpecificOutput?.permissionDecision ?? "allow";
+  expect(decision(send(mine.to, mine.message))).toBe("allow");
+  expect(decision(send(mine.to, mine.message, "other words"))).toBe("deny");
+  expect(decision(send("uds:/run/user/1/cc-socks/99.sock", mine.message))).toBe("deny");
+  expect(decision(send("insights", mine.message))).toBe("deny");
+  expect(decision(send(mine.to, "free text without a ledger record"))).toBe("deny");
+  expect(decision(send(mine.to, mine.message.replace("finding", "other text")))).toBe("deny");
+  expect(decision(send(mine.to, theirs.message))).toBe("deny");
+  expect(
+    decision(send(mine.to, "[peer msg-00000000-0000-0000-0000-000000000000 seq 9 status] x")),
+  ).toBe("deny");
+  expect(send(mine.to, "x").hookSpecificOutput.permissionDecisionReason).toContain(
+    "dotbabel peer send",
+  );
+  const tool = (tool_name, tool_input) =>
+    decision(peerHook(p, advisor, { hook_event_name: "PreToolUse", tool_name, tool_input }));
+  expect(tool("ToolSearch", { query: "select:SendMessage" })).toBe("allow");
+  expect(tool("Skill", { skill: "peer" })).toBe("allow");
+  expect(tool("Skill", { skill: "deliver" })).toBe("deny");
+  p.main.socket = null;
+  expect(decision(send(mine.to, mine.message))).toBe("deny");
+});
+it("asks each member to handle unread messages in sequence and acknowledge each", () => {
+  const { p, main, advisor } = world();
+  sendMessage(p, advisor, "main", "first");
+  const reason = peerHook(p, main, { hook_event_name: "Stop" }).reason;
+  expect(reason).toContain("in seq order");
+  expect(reason).toContain("dotbabel peer ack");
 });

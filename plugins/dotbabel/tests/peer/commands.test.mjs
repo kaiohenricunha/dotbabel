@@ -72,6 +72,29 @@ async function pair() {
   expect((await run("advisor", p.code)).code).toBe(0);
   return p;
 }
+it("returns native mirror fields with a send between Claude sessions, never storing them", async () => {
+  main.socket = "/run/user/1/cc-socks/10.sock";
+  advisor = {
+    ...advisor,
+    key: "claude:advisor",
+    harness: "claude",
+    socket: "/run/user/1/cc-socks/20.sock",
+  };
+  await pair();
+  const sent = (await run("send", "main", "race in save()", "--kind", "finding")).value;
+  expect(sent.native.to).toBe("uds:/run/user/1/cc-socks/10.sock");
+  expect(sent.native.message.startsWith(`[peer ${sent.id} seq ${sent.seq} finding]`)).toBe(true);
+  expect((await store.read()).pairs[0].messages[0].native).toBeUndefined();
+  ctx.who = main;
+  const received = (await run("receive")).value;
+  expect(received[0].id).toBe(sent.id);
+  expect(received[0].native).toBeUndefined();
+});
+it("returns no native mirror when the recipient is not a Claude session", async () => {
+  await pair();
+  ctx.who = main;
+  expect((await run("send", "advisor", "note")).value.native).toBe(null);
+});
 it("runs registration, queue management, results, history and member messages in process", async () => {
   const p = await pair();
   const a = (await run("ask", "one", "--dedupe", "one", "--forward", "explicit")).value;

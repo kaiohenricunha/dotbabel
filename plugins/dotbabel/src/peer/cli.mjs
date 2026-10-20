@@ -220,13 +220,16 @@ async function execute(store, command, args, flags, who, env = process.env) {
           priority: flags.priority === undefined ? 0 : Number(flags.priority),
           forward: flags.forward ?? "actionable",
         });
-      case "send":
-        return domain.sendMessage(p, who, args[0], args.slice(1).join(" "), {
+      case "send": {
+        const m = domain.sendMessage(p, who, args[0], args.slice(1).join(" "), {
           kind: flags.kind,
           replyTo: flags["reply-to"],
           requestId: flags.request,
           dedupe: flags.dedupe,
         });
+        // The mirror fields are output only; the ledger message stays unchanged.
+        return { ...m, native: domain.nativeMessage(p, m) };
+      }
       case "queue":
         return p.requests;
       case "receive":
