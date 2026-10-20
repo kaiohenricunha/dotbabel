@@ -4,7 +4,7 @@
 
 ## System Overview
 
-Three layers run on the user's machine. Each component is a CLI command or a hook that runs and exits.
+Three layers run on the user's machine (DOC-10). Each component is a CLI command or a hook that runs and exits.
 
 1. **Work graph (Phase 1).** Task files gain `depends_on` edges. The graph view is computed on each read from the task files of every worktree of the clone (KD-1), and a topological sort orders the work, as `pr-stack` does for stacks (KD-7).
 2. **Coordination (Phase 2).** The fleet's claims, merge token, event feed, and CPU lanes run behind host adapters, for session identity and liveness, and platform adapters, for CPU pinning. Phase 2 also adds a merge queue that the Phase 1 graph orders.
@@ -38,5 +38,5 @@ Three layers run on the user's machine. Each component is a CLI command or a hoo
 
 - Runs locally on the user's machine, on Node 20 or later (`package.json` `engines`).
 - The user installs the hooks into each host's settings, as for the fleet hooks today (`docs/fleet.md:67-70`).
-- Phase 2 starts with research on each CLI's hooks, session identity, and liveness. Claude Code is the first host adapter, and the other CLIs report `unsupported` until verified (ARCH-4).
+- Phase 2 starts with research on each CLI's hooks, session identity, and liveness. Claude Code is the first host adapter, and the other CLIs report `unsupported` until verified (ARCH-4). The research found no other host or platform ready for an adapter (DOC-14).
 - CPU lanes run on Linux today (`docs/fleet.md:171`, `:190`). Other systems arrive through platform adapters in Phase 2.

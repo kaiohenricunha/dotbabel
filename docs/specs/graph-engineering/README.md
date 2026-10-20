@@ -24,6 +24,9 @@ REJECT, dispatch REJECT, and retry INCONCLUSIVE, so no model adapter is adopted
 ([adoption status](research/adoption-status.md)). The validation audit
 `docs/audits/spec-graph-engineering-validation-2026-10-20.md` found 33 constraints implemented, 1 partial,
 12 N/A, and all 14 acceptance criteria passing. The owner chose to close the spec on 2026-10-20.
+After #538 added the R-9 rejoin tests, the second audit of that day,
+`docs/audits/spec-graph-engineering-validation-2026-10-20-2.md`, found 34 constraints implemented,
+0 partial, and 12 N/A, with no CRITICAL or WARNING issue.
 
 ## Quick Start
 
