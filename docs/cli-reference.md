@@ -1099,7 +1099,7 @@ including a five-second timeout, returns the built-in answer with
 `fallback: true` and exit 0. Error messages never include vendor errors or keys.
 
 All Jev steps remain in shadow mode. The triage and dispatch experiments
-returned REJECT; retry has no locked result. `shadow` records the bounded
+returned REJECT; the retry experiment returned INCONCLUSIVE. `shadow` records the bounded
 model answer, but skills follow `answer`. Configuration cannot promote a step.
 Doctor reports adapter support, committed consent, and key presence.
 

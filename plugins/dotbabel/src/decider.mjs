@@ -4,7 +4,7 @@ import { DECISION_STEPS, validAnswer, probability } from "./decision-value.mjs";
 /** Locked adoption evidence; configuration cannot promote a step. */
 export const ADOPTION = Object.freeze({
   "review-triage": Object.freeze({ status: "REJECT", report: "docs/experiments/2026-10-12-jev-finding-triage.md", hi: 0.9, lo: 0.1 }),
-  retry: Object.freeze({ status: "UNMEASURED", report: null }),
+  retry: Object.freeze({ status: "INCONCLUSIVE", report: "docs/experiments/graph-step-adoption-v4/retry-results-2026-10-20.md" }),
   dispatch: Object.freeze({ status: "REJECT", report: "docs/experiments/graph-step-adoption-v3/dispatch-results-2026-10-19.md" }),
 });
 
