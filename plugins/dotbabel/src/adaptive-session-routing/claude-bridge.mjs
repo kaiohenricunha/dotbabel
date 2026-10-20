@@ -4,7 +4,7 @@ import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { prepareRoute } from "./prepare.mjs";
-import { createClaudeSessionInputLoader } from "../model-intelligence/cli/claude-session-input.mjs";
+import { createClaudeSessionInputLoader, VERIFIED_CLAUDE_MAIN_VERSIONS } from "../model-intelligence/cli/claude-session-input.mjs";
 import { readProjectActivation } from "../model-intelligence/activation/index.mjs";
 import { route } from "./route.mjs";
 
@@ -51,7 +51,7 @@ export async function openClaudeRoutingBridge(dependencies = {}) {
       let sourceFailure;
       try {
         const { runtimeVersion, ...routingRequest } = input.request;
-        const support = runtimeVersion === "2.1.302" ? "supported" : "unverified";
+        const support = VERIFIED_CLAUDE_MAIN_VERSIONS.includes(runtimeVersion) ? "supported" : "unverified";
         if (input.action === "activation") {
           const activation = await (dependencies.readActivation ?? readProjectActivation)(routingRequest.repoRoot);
           if (activation.enabled !== true || activation.routingEnabled !== true || support !== "supported") answer(response, 200, { decision: route({ activation, runtimeCapability: { support } }) });

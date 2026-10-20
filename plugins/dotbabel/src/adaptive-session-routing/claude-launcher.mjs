@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { readProjectActivation } from "../model-intelligence/activation/index.mjs";
 import { checkOpaqueValue } from "../model-intelligence/domain/index.mjs";
 import { openClaudeRoutingBridge } from "./claude-bridge.mjs";
+import { VERIFIED_CLAUDE_MAIN_VERSIONS } from "../model-intelligence/cli/claude-session-input.mjs";
 
 const fail = code => Object.assign(Error(code), { code });
 const executeFile = promisify(execFile);
@@ -47,7 +48,7 @@ export async function startClaudeNative({ args, cwd }, spawnProcess = spawn) {
  * Launch the native interactive CLI with one private, session-only Mods plugin. Standard input,
  * attachments, history, approvals, sandbox and existing subagents stay with native Claude Code.
  * Auto releases each axis explicitly; omitted values preserve native initial provenance. Only the
- * measured 2.1.302 contract is enabled. Temporary plugin and IPC are removed after native exit.
+ * measured host contracts in VERIFIED_CLAUDE_MAIN_VERSIONS are enabled. Temporary plugin and IPC are removed after native exit.
  * @param {{repoRoot:string,model?:string,effort?:string}} options Explicit project and optional axes.
  * @param {{readActivation?:Function,runtimeVersion?:Function,startNative?:Function}} [dependencies] Trusted test seams.
  * @returns {Promise<number>} Native process exit code, without an automatic restart or replay.
@@ -61,7 +62,7 @@ export async function runClaudeTerminal(options, dependencies = {}) {
     manual[axis] = value === "auto" ? { source: "inherited" } : value === undefined ? { source: "native-initial" } : { source: "manual", value };
     if (value !== undefined && value !== "auto") args.push(flag, value);
   }
-  if (await (dependencies.runtimeVersion ?? readClaudeVersion)() !== "2.1.302") throw fail("routing_unverified");
+  if (!VERIFIED_CLAUDE_MAIN_VERSIONS.includes(await (dependencies.runtimeVersion ?? readClaudeVersion)())) throw fail("routing_unverified");
   const bridge = await openClaudeRoutingBridge(); let plugin;
   try {
     plugin = await pluginFor(bridge.socketPath, manual);

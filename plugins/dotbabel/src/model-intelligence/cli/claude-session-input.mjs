@@ -7,6 +7,8 @@ import { releaseSourceFor } from "../snapshot/core.mjs";
 import * as anthropic from "../sources/knowledge/anthropic.mjs";
 import * as claude from "../sources/runtime/claude.mjs";
 
+export const VERIFIED_CLAUDE_MAIN_VERSIONS = claude.VERIFIED_MAIN_VERSIONS;
+
 const fail = code => Object.assign(new Error(code), { code });
 const providerWindow = freshnessPolicyFor(anthropic);
 const documentationWindow = { staleAfterMs: 86400000, expireAfterMs: 604800000 };
@@ -30,7 +32,7 @@ export function createClaudeSessionInputLoader(options = {}) {
   const fresh = observedAt => deriveFreshness({ observedAt, now: now(), policy: providerWindow }) === "fresh";
 
   async function collect(native) {
-    if (native?.version !== "2.1.302") throw fail("routing_unverified");
+    if (!claude.VERIFIED_MAIN_VERSIONS.includes(native?.version)) throw fail("routing_unverified");
     if (!Array.isArray(native.selectors) || native.selectors.length < 1 || native.selectors.length > 32 || !native.selectors.every(safeSelector) || !fresh(native.observedAt) || !Array.isArray(native.providerPages) || native.providerPages.length < 1 || native.providerPages.length > 10 || Buffer.byteLength(JSON.stringify(native.providerPages)) > 1048576) throw fail("native_catalog_invalid");
     let page = 0;
     const provider = await anthropic.discover({ providers: ["anthropic"], now: () => native.observedAt,

@@ -43,6 +43,9 @@ export const RUNTIME_ID = "claude";
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
 export const ADAPTER_VERSION = "3";
 
+/** Exact native releases whose Mods MAIN contract passed the installed host test kit. Others stay unverified. */
+export const VERIFIED_MAIN_VERSIONS = Object.freeze(["2.1.302", "2.1.304"]);
+
 // Native control semantics documented in model-config#choose-an-effort-level, measured on 2.1.302.
 // This orders Claude effort controls, not models or another runtime's vocabulary.
 const EFFORT_SEMANTICS = Object.freeze({ low: { intent: "low", order: 0 }, medium: { intent: "medium", order: 1 }, high: { intent: "high", order: 2 }, xhigh: { intent: "high", order: 3 }, max: { intent: "high", order: 4 } });

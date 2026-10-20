@@ -57,6 +57,7 @@ it.each([
   [true, true, "2.1.302", { ready: true }],
   [false, true, "2.1.302", "intelligence_disabled"],
   [true, false, "2.1.302", "routing_disabled"],
+  [true, true, "2.1.304", { ready: true }],
   [true, true, "2.1.303", "routing_unverified"],
 ])("checks each activation axis before any native discovery: %s %s %s", async (enabled, routingEnabled, runtimeVersion, expected) => {
   const readActivation = vi.fn(async () => ({ enabled, routingEnabled }));
