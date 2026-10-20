@@ -48,9 +48,10 @@ it("in shadow mode the skill follows the built-in answer", async () => {
   expect(out).toMatchObject({ answer: "full-validation", decider: "builtin", shadow: { decider: "jev", answer: "auto-valid", confidence: 0.99 } });
 });
 it("an adapter answers a step only when that step is adopted", async () => {
-  // The locked triage and dispatch experiments returned REJECT; retry has no locked result.
+  // Triage and dispatch returned REJECT; retry returned INCONCLUSIVE (sample floor). No step is adopted.
   expect(ADOPTION.dispatch).toMatchObject({ status: "REJECT", report: "docs/experiments/graph-step-adoption-v3/dispatch-results-2026-10-19.md" });
-  expect(ADOPTION.retry.status).toBe("UNMEASURED");
+  expect(ADOPTION.retry).toMatchObject({ status: "INCONCLUSIVE", report: "docs/experiments/graph-step-adoption-v4/retry-results-2026-10-20.md" });
+  expect(fs.existsSync(new URL(`../../../${ADOPTION.retry.report}`, import.meta.url))).toBe(true);
   expect(fs.existsSync(new URL(`../../../${ADOPTION.dispatch.report}`, import.meta.url))).toBe(true);
   for (const step of ["review-triage", "retry", "dispatch"]) {
     expect(deciderAdapter("jev").steps[step].support).toBe("unverified");
