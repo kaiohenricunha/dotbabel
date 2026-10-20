@@ -5,6 +5,8 @@ import { afterEach, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 import { processState } from "../../src/fleet/registry.mjs";
 import { setupHooks } from "../../src/peer/setup.mjs";
+import { PeerStore } from "../../src/peer/store.mjs";
+import { registerMain, pairAdvisor } from "../../src/peer/state.mjs";
 const bin = new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname;
 const children = [];
 afterEach(() => {
@@ -280,6 +282,35 @@ it("keeps only the Advisor read-only guard when a paired session's folder is gon
     const r = json(hook(1, "PreToolUse", payload));
     expect(r.hookSpecificOutput.permissionDecision).toBe("deny");
   }
+});
+it("keeps the Advisor guard when the same session is Main in another repository ledger", async () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const other = new PeerStore(w.env.DOTBABEL_PEER_STATE_DIR, "local:/other-repository");
+  await other.transaction((s) => {
+    const q = registerMain(
+      s,
+      { key: "claude:s1", sessionId: "s1", repo: "local:/other-repository" },
+      { alive: () => true },
+    );
+    pairAdvisor(s, { key: "claude:x", sessionId: "x", repo: "local:/other-repository" }, q.code, {
+      alive: () => true,
+    });
+  });
+  const r = json(
+    w.cli(
+      ["hook", "PreToolUse"],
+      1,
+      JSON.stringify({
+        session_id: w.ids[1].sessionId,
+        cwd: path.join(w.root, "removed-worktree"),
+        tool_name: "Write",
+        tool_input: { file_path: "a" },
+      }),
+    ),
+  );
+  expect(r.hookSpecificOutput.permissionDecision).toBe("deny");
 });
 it("still fails closed on a malformed ledger instead of guessing that a session is unpaired", () => {
   const w = world(),

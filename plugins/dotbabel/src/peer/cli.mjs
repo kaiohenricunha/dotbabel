@@ -491,11 +491,12 @@ export async function coordinatePeer(store, who, input, env) {
   };
 }
 
-/** Find the open pair that holds a session in any repository ledger, without Git. @param {string} root @param {string} [sessionId] @returns {Promise<{pair: object, role: string}|null|undefined>} null for no pair; undefined when unknown */
+/** Find the open pair that holds a session in any repository ledger, without Git. An Advisor role wins, so a fallback never drops its guard. @param {string} root @param {string} [sessionId] @returns {Promise<{pair: object, role: string}|null|undefined>} null for no pair; undefined when unknown */
 async function memberOf(root, sessionId) {
   if (!sessionId) return undefined;
   if (!fs.existsSync(root)) return null;
-  for (const name of fs.readdirSync(root)) {
+  let found = null;
+  for (const name of fs.readdirSync(root).sort()) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
     let state;
     try {
@@ -508,10 +509,11 @@ async function memberOf(root, sessionId) {
       return undefined;
     }
     for (const pair of state.pairs)
-      for (const role of ["main", "advisor"])
-        if (!pair.closed && pair[role]?.sessionId === sessionId) return { pair, role };
+      for (const role of ["advisor", "main"])
+        if (!pair.closed && pair[role]?.sessionId === sessionId && found?.role !== "advisor")
+          found = { pair, role };
   }
-  return null;
+  return found;
 }
 /** A paired session whose folder or identity cannot be resolved keeps only the Advisor's read-only guard. @param {{pair: object, role: string}} member @param {object} input @returns {number} */
 function unresolvedMember({ pair, role }, input) {
