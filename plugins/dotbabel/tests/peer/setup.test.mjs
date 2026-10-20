@@ -25,6 +25,8 @@ it("installs additive hooks for both harnesses, preserves settings, and is idemp
   expect(b.hooks.PreToolUse).toHaveLength(1);
   expect(b.hooks.Interrupt).toHaveLength(1);
   expect(a.hooks.SessionEnd[0].hooks[0].timeout).toBe(3);
+  expect(a.hooks.UserPromptSubmit).toHaveLength(1);
+  expect(b.hooks.UserPromptSubmit).toBeUndefined();
 });
 it("refuses malformed settings, symlinks, and unknown harnesses without losing data", () => {
   const root = makeTempDir("peer-settings-"),

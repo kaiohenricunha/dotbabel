@@ -202,6 +202,28 @@ it("routes correlated messages and requires recipient acknowledgments", () => {
   const reply = json(w.cli(["send", "advisor", "investigate", "--reply-to", m.id, "--json"]));
   expect(json(w.cli(["receive", "--json"], 1))[0].id).toBe(reply.id);
 });
+it("reminds Main about unread Advisor messages through its own hooks across processes", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const hook = (event, extra = {}) =>
+    w.cli(
+      ["hook", event],
+      0,
+      JSON.stringify({ session_id: w.ids[0].sessionId, cwd: w.repo, ...extra }),
+    );
+  expect(hook("Stop").stdout.trim()).toBe("");
+  json(w.cli(["send", "main", "B and C approved", "--kind", "finding", "--json"], 1));
+  const blocked = json(hook("Stop", { stop_hook_active: false }));
+  expect(blocked.decision).toBe("block");
+  expect(blocked.reason).toContain(p.id);
+  expect(hook("Stop").stdout.trim()).toBe("");
+  expect(
+    json(hook("UserPromptSubmit", { prompt: "status?" })).hookSpecificOutput.additionalContext,
+  ).toContain("1 unread");
+  expect(json(w.cli(["receive", "--json"]))[0].body).toBe("B and C approved");
+  expect(hook("UserPromptSubmit", { prompt: "status?" }).stdout.trim()).toBe("");
+});
 it("persists an early Main reply across processes and resumes Advisor after wait", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));

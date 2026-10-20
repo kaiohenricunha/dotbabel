@@ -56,7 +56,7 @@ export function setupHooks(harness, env = process.env, directory = process.cwd()
     files.push(
       install(
         path.join(env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude"), "settings.json"),
-        ["SessionStart", "SessionEnd", "PreToolUse", "Stop", "StopFailure"],
+        ["SessionStart", "SessionEnd", "PreToolUse", "Stop", "StopFailure", "UserPromptSubmit"],
       ),
     );
   if (harness !== "claude")

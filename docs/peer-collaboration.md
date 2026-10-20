@@ -238,6 +238,15 @@ or refuse inbound text. Codex queue acceptance does not prove an active turn was
 interrupted. After five minutes without a recipient observation, status marks an
 accepted notification unresponsive. It does not resend it automatically.
 
+A live probe on interactive Claude Code 2.1.304 shows `transport_accepted` for the
+plain notification line, during a turn and after it, but no queued input. Main's own
+hooks therefore report unread Advisor messages without that push. While a message
+is not yet `delivered`, `UserPromptSubmit` adds a short context line to each prompt.
+`Stop` blocks once for each new unread message and honors `stop_hook_active`. The
+reminder gives only the count and pair ID, never a message body. Native integrations
+use the same Stop reminder at idle. Run `dotbabel peer setup --harness claude` again
+to add the `UserPromptSubmit` hook to an existing installation.
+
 A failure before socket connection can retry with exponential backoff, at most
 three attempts. An interrupted send, timeout after submission, or nonzero Codex
 queue exit is `uncertain`; it never silently replays. First inspect `receive` and
