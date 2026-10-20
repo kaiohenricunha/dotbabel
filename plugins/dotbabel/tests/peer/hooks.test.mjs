@@ -7,6 +7,8 @@ import {
   enqueue,
   nextRequest,
   finishRequest,
+  sendMessage,
+  receiveMessages,
 } from "../../src/peer/state.mjs";
 function world() {
   const s = createState("r"),
@@ -139,4 +141,30 @@ it("follows the same live session into another worktree of the same repository",
   peerHook(p, { ...main, repo: "other", worktree: "/other/repo" }, tool);
   peerHook(p, { ...main, worktree: undefined }, tool);
   expect(p.main.worktree).toBe("/r/wt/check-bc");
+});
+
+it("reminds Main once at Stop and on each prompt while Advisor messages are unread", () => {
+  const { p, main, advisor } = world();
+  const stop = (extra = {}) => peerHook(p, main, { hook_event_name: "Stop", ...extra });
+  const prompt = () => peerHook(p, main, { hook_event_name: "UserPromptSubmit" });
+  expect(stop()).toBe(null);
+  expect(prompt()).toBe(null);
+  sendMessage(p, main, "advisor", "to the Advisor");
+  expect(stop()).toBe(null);
+  sendMessage(p, advisor, "main", "UNTRUSTED-BODY", { kind: "finding" });
+  expect(stop({ stop_hook_active: true })).toBe(null);
+  const blocked = stop({ stop_hook_active: false });
+  expect(blocked.decision).toBe("block");
+  expect(blocked.reason).toContain("dotbabel peer receive");
+  expect(blocked.reason).not.toContain("UNTRUSTED-BODY");
+  expect(stop()).toBe(null);
+  const context = prompt().hookSpecificOutput;
+  expect(context.hookEventName).toBe("UserPromptSubmit");
+  expect(context.additionalContext).toContain(p.id);
+  expect(context.additionalContext).not.toContain("UNTRUSTED-BODY");
+  sendMessage(p, advisor, "main", "second finding", { kind: "finding" });
+  expect(stop().reason).toContain("2 unread");
+  receiveMessages(p, main);
+  expect(stop()).toBe(null);
+  expect(prompt()).toBe(null);
 });
