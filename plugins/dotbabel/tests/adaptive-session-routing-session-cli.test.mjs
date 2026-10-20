@@ -14,7 +14,7 @@ it("reports experimental Claude integration separately from opt-in and effective
   try {
     const result = spawnSync(process.execPath, [bin, "status", "--repo-root", root, "--json"], { encoding: "utf8", env: { ...process.env, PATH: "" } });
     expect(result.status).toBe(0);
-    expect(JSON.parse(result.stdout).mainSessionIntegrations).toContainEqual({ runtimeId: "claude", mechanism: "session-only-native-mods", implementation: "experimental", verifiedHostVersions: ["2.1.302"], providerExecution: "unverified", effective: { state: "unknown" } });
+    expect(JSON.parse(result.stdout).mainSessionIntegrations).toContainEqual({ runtimeId: "claude", mechanism: "session-only-native-mods", implementation: "experimental", verifiedHostVersions: ["2.1.302", "2.1.304"], providerExecution: "unverified", effective: { state: "unknown" } });
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 it("rejects session usage errors before reading activation or starting a runtime", () => {

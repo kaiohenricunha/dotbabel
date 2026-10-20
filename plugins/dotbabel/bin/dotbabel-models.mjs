@@ -32,6 +32,7 @@ import {
 import { readProjectActivation, setProjectActivation } from "../src/model-intelligence/activation/index.mjs";
 import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS, checkOpaqueValue } from "../src/model-intelligence/domain/index.mjs";
 import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
+import { VERIFIED_MAIN_VERSIONS } from "../src/model-intelligence/sources/runtime/claude.mjs";
 import { resolve as resolveCompute } from "../src/model-intelligence/resolver/index.mjs";
 import { makeObservedConfiguration } from "../src/model-intelligence/sources/evidence.mjs";
 import { buildRecommendation } from "../src/model-intelligence/recommend/index.mjs";
@@ -269,7 +270,7 @@ function runStatus() {
   const shippedWorkflow = inspectWorkflowProjection(fileURLToPath(new URL("../templates/workflows", import.meta.url)));
   const installedWorkflow = inspectWorkflowProjection(resolve(resolveRepoRoot(true), ".github/workflows"), shippedWorkflow);
   const mainSessionIntegrations = [
-    { runtimeId: "claude", mechanism: "session-only-native-mods", implementation: "experimental", verifiedHostVersions: ["2.1.302"], providerExecution: "unverified", effective: { state: "unknown" } },
+    { runtimeId: "claude", mechanism: "session-only-native-mods", implementation: "experimental", verifiedHostVersions: [...VERIFIED_MAIN_VERSIONS], providerExecution: "unverified", effective: { state: "unknown" } },
     { runtimeId: "codex", mechanism: "managed-app-server", implementation: "supported", verifiedRuntimeVersions: ["0.163.0"], effective: { state: "unknown" } },
   ];
   const report = { activation, mainSessionIntegrations, releaseSnapshot, shippedBaseline, localProjection, shippedWorkflow, installedWorkflow, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };

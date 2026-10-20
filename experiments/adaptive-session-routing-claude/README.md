@@ -48,6 +48,21 @@ On 2026-10-20 the same command runs on 2.1.304 after the weekly reset. The first
 
 The first metadata attempt exposes missing native effort intent annotations; the corrected shared runtime adapter resolves the same task. The inspection records both candidate causes and the failing regression. The first proof fixture used a `.git` placeholder, which made the existing native SessionEnd hook fail its git query. The fixture now runs `git init --quiet`; the final metadata proof has empty stderr and zero inference cost. The earlier live attempt, including that fixture error, remains failed evidence.
 
+## Verify a new Claude Code release
+
+Routing runs only on an exact Claude Code release listed in `VERIFIED_MAIN_VERSIONS` (`plugins/dotbabel/src/model-intelligence/sources/runtime/claude.mjs`). Each Claude Code update can change the Mods contract, so a new release stays unverified until it passes these checks.
+
+On an unlisted release, `dotbabel models session --runtime claude` stops with `routing_unverified` before Claude Code starts. The failure is explicit, and nothing changes silently. `dotbabel models status --json` lists the accepted releases in `mainSessionIntegrations[].verifiedHostVersions`. Run `claude` directly to keep working without routing.
+
+To accept a new release:
+
+1. Install the release, and confirm the exact version with `claude --version`.
+2. Run `python3 experiments/adaptive-session-routing-claude/verify-host.py`. Plugin validation and the host test must pass.
+3. Run `node experiments/adaptive-session-routing-claude/verify-native.mjs`. The metadata run must return `configuration_proposed` with zero turns, zero API time and zero cost. A `preserved` result needs a diagnosis first.
+4. Run `node experiments/adaptive-session-routing-claude/verify-native.mjs --live`. One ordinary turn must report the intended model in `usage.model`. Record the observed effort without a claim beyond the evidence.
+5. Add the version to `VERIFIED_MAIN_VERSIONS`, test-first. Add an accept row for the new release, and keep a reject row for an unmeasured neighbor, in the bridge, input, launcher and status tests.
+6. Open a pull request that names the release and pastes the output of steps 2 to 4. A failed step keeps the release unverified, and the pull request records the failure and its diagnosis.
+
 ## Sources and limits
 
 The [Mods events contract](https://code.claude.com/docs/en/plugins/mods/events) defines the MAIN request boundary and stream forwarding. The [Mods test guide](https://code.claude.com/docs/en/plugins/mods/test) distinguishes host tests from live execution. The [model configuration guide](https://code.claude.com/docs/en/model-config) documents per-model effort and native restrictions. Installed type generation and actual CLI validation bind the experiment to 2.1.302. On 2.1.304, plugin validation, the host relay test, the metadata run and one live run pass; other releases return `routing_unverified`.
