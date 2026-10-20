@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { beforeEach, afterEach, vi, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
@@ -29,6 +30,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
 import { runPeer, invokePeer, peerCommand } from "../../src/peer/cli.mjs";
 import { repository } from "../../src/peer/identity.mjs";
 import { PeerStore } from "../../src/peer/store.mjs";
+import { registerMain, pairAdvisor } from "../../src/peer/state.mjs";
 let repo, env, out, err, store, main, advisor;
 beforeEach(() => {
   repo = makeTempDir("peer-commands-");
@@ -194,6 +196,74 @@ it("restores Advisor context through hooks and blocks mutation tools", async () 
   expect((await run("status")).value.paused).toBe(true);
   await run("hook", "SessionEnd");
   expect((await store.read()).pairs[0].advisor.ended).toBe(true);
+});
+
+it("skips unpaired sessions and keeps only the Advisor guard when a member cannot be resolved", async () => {
+  const original = fs.readFileSync,
+    gone = path.join(makeTempDir("peer-gone-"), "removed-worktree");
+  let input;
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  async function hook(event, payload) {
+    input = payload;
+    out.mockClear();
+    const code = await runPeer(["hook", event, "--json"], env);
+    const text = out.mock.calls.map((x) => x[0]).join("");
+    return { code, value: text ? JSON.parse(text) : null };
+  }
+  const silent = { code: 0, value: null };
+  const write = { tool_name: "Write", tool_input: { file_path: "a" } };
+  const state = env.DOTBABEL_PEER_STATE_DIR;
+  env.DOTBABEL_PEER_STATE_DIR = path.join(state, "not-created");
+  expect(await hook("PreToolUse", { session_id: "stranger", cwd: gone, ...write })).toEqual(silent);
+  env.DOTBABEL_PEER_STATE_DIR = state;
+  expect(await hook("Stop", { session_id: "stranger", cwd: gone })).toEqual(silent);
+  await pair();
+  fs.writeFileSync(path.join(state, "notes.txt"), "not a ledger");
+  expect(await hook("Stop", { session_id: "stranger", cwd: gone })).toEqual(silent);
+  expect(await hook("PreToolUse", { session_id: "main", cwd: gone, ...write })).toEqual(silent);
+  expect(await hook("Stop", { session_id: "advisor", cwd: gone })).toEqual(silent);
+  expect(await hook("PreToolUse", { session_id: "advisor", cwd: gone, tool_name: "Read" })).toEqual(
+    silent,
+  );
+  const denied = await hook("PreToolUse", { session_id: "advisor", cwd: gone, ...write });
+  expect(denied.value.hookSpecificOutput.permissionDecision).toBe("deny");
+  ctx.who = null;
+  const unresolved = await hook("PreToolUse", { session_id: "advisor", cwd: repo, ...write });
+  expect(unresolved.value.hookSpecificOutput.permissionDecision).toBe("deny");
+  ctx.who = main;
+  const literal = await hook("PreToolUse", {
+    session_id: "main",
+    cwd: repo,
+    tool_name: "Bash",
+    tool_input: { command: "dotbabel peer status --json" },
+  });
+  expect(literal.value.hookSpecificOutput.permissionDecision).toBe("allow");
+  expect((await hook("PreToolUse", { cwd: gone, tool_name: "Read" })).code).toBe(2);
+  const other = new PeerStore(state, "local:/other-repository");
+  await other.transaction((s) => {
+    const q = registerMain(
+      s,
+      { ...advisor, key: "codex:advisor", repo: "local:/other-repository" },
+      { alive: () => true },
+    );
+    pairAdvisor(
+      s,
+      { ...main, key: "claude:x", sessionId: "x", repo: "local:/other-repository" },
+      q.code,
+      {
+        alive: () => true,
+      },
+    );
+  });
+  const preferred = await hook("PreToolUse", { session_id: "advisor", cwd: gone, ...write });
+  expect(preferred.value.hookSpecificOutput.permissionDecision).toBe("deny");
+  fs.writeFileSync(
+    path.join(state, `${"0".repeat(64)}.json`),
+    JSON.stringify({ repo: "elsewhere" }),
+  );
+  expect((await hook("PreToolUse", { session_id: "stranger", cwd: gone, ...write })).code).toBe(2);
 });
 
 it("coordinates literal peer operations in a trusted host hook with scoped results and usage failures", async () => {
