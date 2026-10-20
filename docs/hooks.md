@@ -231,9 +231,11 @@ These entries apply to Claude Code. The user's Claude settings may already
 register them globally; check those before adding project entries. Codex uses
 different events and transcript formats, so these four entries do not install
 a Codex permission hook. In Codex, the skill accepts a direct
-`$yolo --for <duration> [--merge|--no-merge] [scope]` as session instructions.
-It records an expiry in the conversation and preserves host permission checks;
-it does not create a hook grant or approve permission dialogs. See the
+`$yolo --for <duration> [--merge|--no-merge] [scope]` as standing approval for the
+task, including deploys and releases after strict testing and validation. It
+records an expiry in the conversation; it does not create a Claude hook grant.
+Codex needs Full access to remove shell approval prompts. The Codex reference
+includes a launcher for new sessions and setup for existing sessions. See the
 [host selection rules](../skills/yolo/SKILL.md#choose-the-runtime).
 
 It has four entries:
