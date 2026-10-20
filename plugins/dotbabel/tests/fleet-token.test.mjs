@@ -52,6 +52,24 @@ describe("merge queue", () => {
     expect(take(dir, C, { now: T0 + 599999 }).taken).toBe(false);
     expect(take(dir, C, { now: T0 + 600000 }).taken).toBe(true);
   });
+  it("an expired head rejoins with a new joinedAt on its next retry", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A); take(dir, B); take(dir, C);
+    releaseToken(dir, A.key, { now: T0, isAlive });
+    expect(take(dir, C, { now: T0 + 600000 }).taken).toBe(true);
+    const retry = T0 + 600001;
+    const denied = take(dir, B, { now: retry });
+    expect(denied.taken).toBe(false);
+    expect(denied.position).toBe(1);
+    expect(readToken(dir).queue.map((q) => [q.owner.key, q.joinedAt])).toEqual([[B.key, new Date(retry).toISOString()]]);
+  });
+  it("an expired head takes a free token on its retry when the queue is empty", () => {
+    const dir = makeTempDir("fleet-queue-");
+    take(dir, A); take(dir, B);
+    releaseToken(dir, A.key, { now: T0, isAlive });
+    expect(take(dir, B, { now: T0 + 600000 }).taken).toBe(true);
+    expect(readToken(dir)).toMatchObject({ owner: { key: B.key }, queue: [] });
+  });
   it("the queue orders sessions by the work graph, then by arrival", () => {
     const dir = makeTempDir("fleet-queue-");
     const tasks = [{ slug: "b", branch: "feat/b", status: "open", depends_on: ["a"] }, { slug: "a", branch: "feat/a", status: "open", depends_on: [] }];
