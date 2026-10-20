@@ -3,17 +3,26 @@ id: merge-pr
 name: merge-pr
 type: command
 version: 2.1.0
-domain: [devex]
-platform: [github-actions]
-task: [review, testing]
+domain:
+  - devex
+platform:
+  - github-actions
+task:
+  - review
+  - testing
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-10-13
-description: >
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-10-13T00:00:00.000Z
+description: |
   Merge a pull request only after verifying that trusted evidence covers its exact head SHA.
 argument-hint: "[PR#]"
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: session
 ---
 
 Merge a pull request only after verifying that trusted evidence covers its exact head SHA.

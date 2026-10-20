@@ -1571,6 +1571,204 @@
         "binding": "consumer",
         "rationale": "The coordinator maps user intent to a bounded context-transfer CLI and verifies its output."
       }
+    },
+    {
+      "sourcePath": "commands/changelog.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "changelog",
+        "name": "changelog",
+        "type": "command",
+        "description": "Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.\n",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "argument-hint": "[ref-range|count|since-deploy]",
+        "model": "haiku"
+      },
+      "bodyHash": "55fd58d9ecd0cfde0fb9a961a396e0873949785913a24a8a344f118b2345b79c",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/markdown.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "markdown",
+        "name": "markdown",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.\n",
+        "argument-hint": "[file | dir]",
+        "model": "haiku"
+      },
+      "bodyHash": "3058932f1169a4f5092bbdfa6fc1f2bf32afe5afec65e45dc71d40e61cd30f20",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/tldr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "tldr",
+        "name": "tldr",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-16",
+        "updated": "2026-09-16",
+        "description": "Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.\n",
+        "argument-hint": "[PR number | branch | path | URL | topic] (default: current branch vs origin/main)",
+        "model": "haiku",
+        "related": ["pr-tldr"]
+      },
+      "bodyHash": "956457639687e55d62773ea2a71d53f56a985c5f9e206f91b31236ec458a2cba",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/pr-tldr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "pr-tldr",
+        "name": "pr-tldr",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-13",
+        "updated": "2026-09-16",
+        "description": "Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.\n",
+        "argument-hint": "[PR number | branch] (default: current branch vs origin/main)",
+        "model": "haiku",
+        "related": ["tldr"]
+      },
+      "bodyHash": "2b41e18f7d0a2c6e92ad5ee2948050376721f14ae2e27a39c4fe0a424cb8095a",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/merge-pr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "merge-pr",
+        "name": "merge-pr",
+        "type": "command",
+        "version": "2.1.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "testing"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-13",
+        "description": "Merge a pull request only after verifying that trusted evidence covers its exact head SHA.\n",
+        "argument-hint": "[PR#]",
+        "model": "sonnet"
+      },
+      "bodyHash": "3f99e6551210f94ee1813397740765fe18401e05a976dd083a788f918e77dc00",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/pre-pr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "pre-pr",
+        "name": "pre-pr",
+        "type": "command",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-18",
+        "updated": "2026-08-12",
+        "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the quality profile, and surface a go/no-go summary before opening a pull request.\n",
+        "argument-hint": "[base-branch] [--conductor] — default: origin/main",
+        "model": "sonnet",
+        "headless_safe": false
+      },
+      "bodyHash": "aee56d31f6a0198d61ea3c2cedb822ba1782836e89d0ee38c853f2c79f1e38ed",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/dependabot-sweep.md",
+      "artifactKind": "command",
+      "category": "D",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "dependabot-sweep",
+        "name": "dependabot-sweep",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "security"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.\n",
+        "model": "sonnet"
+      },
+      "bodyHash": "5a5ec8fc06a5862f24790ca74dcc25d1fe0ab2580ba1f10557632de4c0a350d1",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
     }
   ],
   "neutral": {
@@ -1596,5 +1794,6 @@
     "bodyHash": "2e619036b2c245fc211aafb1315be95b12d793806ca286824581d6d1ac94a1b3"
   },
   "securityOriginalCommit": "8827df12b990a3aa7cd9e61232a8003f3dcab037",
-  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be"
+  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be",
+  "dynamicCommandsOriginalCommit": "b8bffed0e17b2c3cdcce482717a2e5cbab0eb627"
 }

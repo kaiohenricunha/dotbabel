@@ -54,6 +54,26 @@ describe("P-19c skills",()=>{
   }
  });
 });
+describe("P-19c commands",()=>{
+ const entries=fixture.entries.filter(entry=>entry.batch==="P-19c-commands");
+ const native=(entry,content)=>parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[{...artifact(entry),...(content?{sourceContent:content}:{})}]}).files[0].content});
+ it("P-19c commands: every command parses to the expected dynamic session requirement",()=>{
+  expect(entries).toHaveLength(7);
+  expect(entries.filter(entry=>entry.category==="C")).toHaveLength(6);expect(entries.filter(entry=>entry.category==="D").map(entry=>entry.sourcePath)).toEqual(["commands/dependabot-sweep.md"]);
+  for(const entry of entries){const parsed=parseProjectionSource(artifact(entry));expect(parsed.requirement,entry.sourcePath).toMatchObject(entry.compute);expect(parsed.requirement.mode).toBe("dynamic");expect(parsed.requirement.binding).toBe("session");}
+ });
+ it("P-19c commands: bodies, authored native model and unrelated metadata remain unchanged",()=>{
+  for(const entry of entries){const parsed=parseProjectionSource(artifact(entry));const{dotbabel,...metadata}=parsed.frontmatter;expect(metadata,entry.sourcePath).toEqual(entry.frontmatter);expect(metadata.model).toMatch(/^(haiku|sonnet)$/);expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(entry.bodyHash);expect(dotbabel.compute).toEqual(entry.compute);}
+ });
+ it("P-19c commands: release projections keep the pre-migration native model through the compatibility bridge",()=>{
+  for(const entry of entries){const parsed=parseProjectionSource(artifact(entry)),before=`---\n${yaml.dump(entry.frontmatter,{lineWidth:-1})}---\n${parsed.body}`;
+   const oldNative=native(entry,before),newNative=native(entry);
+   expect(newNative,entry.sourcePath).toEqual(oldNative);expect(newNative.frontmatter.model).toBe(entry.frontmatter.model);expect(newNative.frontmatter).not.toHaveProperty("dotbabel");expect(newNative.frontmatter).not.toHaveProperty("effort");
+   const result=resolve({requirement:parsed.requirement,target:{runtimeId:"claude",artifactKind:"command",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract,invocation:{pin:{runtime:"claude",config:{model:entry.frontmatter.model}},omitDefaultReasoning:true}});
+   expect(result.status,entry.sourcePath).toBe("resolved");expect(result.configuration.axes.model).toBe(entry.frontmatter.model);
+  }
+ });
+});
 it("P-19a: local-attest still has no requirement and no projection",()=>{
  const source=artifact(fixture.neutral),parsed=parseProjectionSource(source);expect(parsed.requirement).toBeNull();expect(parsed.frontmatter).toEqual(fixture.neutral.frontmatter);expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(fixture.neutral.bodyHash);
  const output=buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[source]}).files[0];const native=parseProjectionSource({sourcePath:fixture.neutral.sourcePath,sourceContent:output.content});expect(native.requirement).toBeNull();expect(native.frontmatter).not.toHaveProperty("model");expect(native.frontmatter).not.toHaveProperty("effort");expect(native.frontmatter["disable-model-invocation"]).toBe(true);

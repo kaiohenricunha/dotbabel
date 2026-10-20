@@ -2,18 +2,26 @@
 id: changelog
 name: changelog
 type: command
-description: >
+description: |
   Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - documentation
 maturity: validated
-owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-argument-hint: "[ref-range|count|since-deploy]"
+owner: '@kaiohenricunha'
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+argument-hint: '[ref-range|count|since-deploy]'
 model: haiku
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: mechanical
+    binding: session
 ---
 
 Generate a changelog entry from git history.
