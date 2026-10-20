@@ -38,7 +38,8 @@ test("the inspector admits attempts 1 and 2, counts cap-determined cases and unk
   const result = inspectDataset(fixture.root);
   assert.deepEqual(result.eligible, { rows: 120, prs: 120, classes: { retry: 40, fix: 40, "ask-owner": 40 } });
   assert.equal(result.cap_determined, 3); assert.equal(result.unknown, 2); assert.equal(result.sample_floors_met, true);
-  assert.equal(result.tail_sufficient_both, 120); assert.equal(result.repositories.length, 35);
+  assert.equal(result.tail_sufficient_both, 120); assert.deepEqual(result.attempts, { 1: 60, 2: 60, 3: 3 });
+  assert.deepEqual(result.strata_classes.enriched, { retry: 40, fix: 0, "ask-owner": 0 }); assert.equal(result.repositories.length, 35);
   assert.match(result.repositories_sha256, /^[a-f0-9]{64}$/);
   assert.equal(validateLock(lock).compatible, true); assert.equal(fs.statSync(lock).mode & 0o777, 0o600);
   assert.throws(() => createLock(fixture.root, lock), /output must be new/);
@@ -77,6 +78,13 @@ test("the inspector refuses each broken contract field", () => {
     const dir = copy(); mutate(dir);
     assert.throws(() => inspectDataset(dir), message, `case ${i}`);
   }
+});
+
+test("a manifest written after the freeze is accepted, and a seal after the cutoff or before the freeze is not", () => {
+  const set = (dir, change) => { const file = path.join(dir, "manifest.json"); fs.writeFileSync(file, JSON.stringify({ ...read(file), ...change }), { mode: 0o600 }); };
+  const late = copy(); set(late, { created_at: fixture.manifest.sealed_at }); assert.equal(inspectDataset(late).sample_floors_met, true);
+  const after = copy(); set(after, { created_at: "2026-10-19T01:00:00.000Z" }); assert.throws(() => inspectDataset(after), /chronology/);
+  const early = copy(); set(early, { sealed_at: "2026-10-19T00:05:00.000Z" }); assert.throws(() => inspectDataset(early), /chronology/);
 });
 
 test("manifest counts compare by value, not by key order", () => {

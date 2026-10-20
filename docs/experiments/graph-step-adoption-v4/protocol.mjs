@@ -97,7 +97,8 @@ export function inspectDataset(directory, cutoff = new Date().toISOString()) {
   if (DATA_FILES.some(name => manifest.files?.[name] !== hashes[name])) throw new Error("dataset file hashes differ");
   if (manifest.label_source !== POLICY.label_source) throw new Error("dataset label source differs");
   const frozen = date(manifest.packet_frozen_at), sealed = date(manifest.sealed_at), created = date(manifest.created_at);
-  if (!(created <= frozen && frozen <= sealed && sealed <= date(cutoff))) throw new Error("dataset chronology differs");
+  // created_at is when the manifest was written, so it follows the freeze; only freeze <= labels <= seal is ordered.
+  if (!(frozen <= sealed && created <= sealed && sealed <= date(cutoff))) throw new Error("dataset chronology differs");
   const all = lines(path.join(root, "retry.jsonl")), unknown = lines(path.join(root, "unknown.jsonl"));
   const am = unique(lines(path.join(root, "annotations.jsonl")), "annotation");
   const vm = unique(lines(path.join(root, "verification.jsonl")), "verification");
@@ -113,14 +114,16 @@ export function inspectDataset(directory, cutoff = new Date().toISOString()) {
   if (am.size !== all.length || vm.size !== all.length) throw new Error("checked sidecar coverage differs");
   const ids = new Set(), groups = new Map(), strata = Object.fromEntries(STRATA.map(s => [s, 0])), cohorts = {}, rows = [];
   let capDetermined = 0, tailSufficient = 0;
+  const attempts = {}, strataClasses = Object.fromEntries(STRATA.map(s => [s, Object.fromEntries(ACTIONS.map(a => [a, 0]))]));
   for (const row of all) {
     checkRow(row);
     if (ids.has(row.id)) throw new Error("duplicate retry id");
     ids.add(row.id); strata[row.selection_stratum]++; cohorts[row.cohort] = (cohorts[row.cohort] ?? 0) + 1;
+    attempts[row.input.attempt] = (attempts[row.input.attempt] ?? 0) + 1;
     const group = `${row.repo}#${row.pr}`; groups.set(group, (groups.get(group) ?? 0) + 1);
     checkAnnotationPair(row, am.get(row.id), vm.get(row.id), frozen, sealed);
     if (row.input.attempt >= RULES.max_attempts) { capDetermined++; continue; }
-    rows.push(row);
+    rows.push(row); strataClasses[row.selection_stratum][row.label]++;
     if (am.get(row.id).tail_sufficient && vm.get(row.id).tail_sufficient) tailSufficient++;
   }
   if ([...groups.values()].some(count => count > 2)) throw new Error("more than two cases from one pull request");
@@ -136,7 +139,7 @@ export function inspectDataset(directory, cutoff = new Date().toISOString()) {
     files: hashes };
   return { rows, binding, repositories, repositories_sha256: repositoriesHash(repositories), label_source: POLICY.label_source,
     human_labels: false, collected: all.length + unknown.length, cap_determined: capDetermined, unknown: unknown.length, strata, cohorts,
-    tail_sufficient_both: tailSufficient, eligible: { rows: rows.length, prs, classes: eligible }, shortfall: { rows: Math.max(0, RULES.minimum_rows - rows.length),
+    attempts, strata_classes: strataClasses, tail_sufficient_both: tailSufficient, eligible: { rows: rows.length, prs, classes: eligible }, shortfall: { rows: Math.max(0, RULES.minimum_rows - rows.length),
       prs: Math.max(0, RULES.minimum_prs - prs), classes: Object.fromEntries(ACTIONS.map(a => [a, Math.max(0, RULES.minimum_per_class - eligible[a])])) },
     sample_floors_met: floors };
 }

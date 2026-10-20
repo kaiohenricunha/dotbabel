@@ -34,7 +34,8 @@ reason for each of the three actions, and a timestamp between `packet_frozen_at`
 The verifier records `status: "agree"` with no disagreements. Disagreements and insufficient
 evidence go to `unknown.jsonl` with `label: null` and a reason.
 
-The manifest has the four file hashes, `created_at` ≤ `packet_frozen_at` ≤ `sealed_at`, the
+The manifest has the four file hashes, `packet_frozen_at` ≤ `sealed_at`, a `created_at` (the time the
+manifest was written) not after `sealed_at`, the
 sorted repository list, and counts that the inspector recomputes. At most two cases come from one
 pull request.
 
