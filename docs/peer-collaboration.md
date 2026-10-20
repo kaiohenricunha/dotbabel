@@ -239,13 +239,16 @@ interrupted. After five minutes without a recipient observation, status marks an
 accepted notification unresponsive. It does not resend it automatically.
 
 A live probe on interactive Claude Code 2.1.304 shows `transport_accepted` for the
-plain notification line, during a turn and after it, but no queued input. Main's own
-hooks therefore report unread Advisor messages without that push. While a message
-is not yet `delivered`, `UserPromptSubmit` adds a short context line to each prompt.
-`Stop` blocks once for each new unread message and honors `stop_hook_active`. The
-reminder gives only the count and pair ID, never a message body. Native integrations
-use the same Stop reminder at idle. Run `dotbabel peer setup --harness claude` again
-to add the `UserPromptSubmit` hook to an existing installation.
+plain notification line, during a turn and after it, but no queued input. Each
+member's own hooks therefore report its unread messages without that push: Main
+sees unread Advisor messages, and the Advisor sees unread Main messages. While a
+message is not yet `delivered`, `UserPromptSubmit` adds a short context line to each
+prompt. `Stop` blocks once for each new unread message and honors `stop_hook_active`.
+For the Advisor, the unread note joins a running or queued work reminder, and it
+also appears while scheduling is paused. The reminder gives only the count and pair
+ID, never a message body. Native integrations use the same Stop reminder at idle.
+Run `dotbabel peer setup --harness claude` again to add the `UserPromptSubmit` hook
+to an existing installation.
 
 A failure before socket connection can retry with exponential backoff, at most
 three attempts. An interrupted send, timeout after submission, or nonzero Codex
@@ -253,9 +256,14 @@ queue exit is `uncertain`; it never silently replays. First inspect `receive` an
 `next`, then use `retry-delivery ID` only when appropriate. A retry can repeat a
 native notification, but request IDs, deduplication, and fenced state transitions
 prevent a duplicate request or stale completion. Exactly-once native delivery is
-not claimed. Message ordering blocks a later notification in each direction until
-the recipient reads earlier messages. `receive` returns unread/unhandled messages
-in their persisted order, including repeated reads until processing is recorded.
+not claimed. A notification carries no message body, and `receive` returns
+unread/unhandled messages in their persisted order, including repeated reads until
+processing is recorded. So one wake-up covers a burst: while an earlier unread
+message's push was accepted less than five minutes ago, a newer message gets no
+notification of its own. After five minutes, that push counts as unresponsive, and the
+next waiting message gets a notification. A `failed` or `uncertain` earlier push does
+not delay a newer one, and the earlier one is not replayed. A push in flight
+(`sending`) or a retry in backoff still holds the later notifications in that direction.
 
 ## Storage, repository awareness, and boundaries
 

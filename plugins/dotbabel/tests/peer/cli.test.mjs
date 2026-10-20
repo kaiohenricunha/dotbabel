@@ -268,6 +268,28 @@ it("reminds Main about unread Advisor messages through its own hooks across proc
   expect(json(w.cli(["receive", "--json"]))[0].body).toBe("B and C approved");
   expect(hook("UserPromptSubmit", { prompt: "status?" }).stdout.trim()).toBe("");
 });
+it("reminds the Advisor about unread Main messages through its own hooks across processes", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const hook = (event, extra = {}) =>
+    w.cli(
+      ["hook", event],
+      1,
+      JSON.stringify({ session_id: w.ids[1].sessionId, cwd: w.repo, ...extra }),
+    );
+  expect(hook("Stop").stdout.trim()).toBe("");
+  json(w.cli(["send", "advisor", "please check the migration", "--json"]));
+  const blocked = json(hook("Stop", { stop_hook_active: false }));
+  expect(blocked.decision).toBe("block");
+  expect(blocked.reason).toContain(p.id);
+  expect(hook("Stop").stdout.trim()).toBe("");
+  expect(
+    json(hook("UserPromptSubmit", { prompt: "status?" })).hookSpecificOutput.additionalContext,
+  ).toContain("1 unread");
+  expect(json(w.cli(["receive", "--json"], 1))[0].body).toBe("please check the migration");
+  expect(hook("UserPromptSubmit", { prompt: "status?" }).stdout.trim()).toBe("");
+});
 it("persists an early Main reply across processes and resumes Advisor after wait", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));

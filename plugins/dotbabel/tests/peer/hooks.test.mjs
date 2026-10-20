@@ -168,3 +168,35 @@ it("reminds Main once at Stop and on each prompt while Advisor messages are unre
   expect(stop()).toBe(null);
   expect(prompt()).toBe(null);
 });
+
+it("reminds the Advisor about unread Main messages, also while paused, beside queued work", () => {
+  const { p, main, advisor } = world();
+  const stop = (extra = {}) => peerHook(p, advisor, { hook_event_name: "Stop", ...extra });
+  const prompt = () => peerHook(p, advisor, { hook_event_name: "UserPromptSubmit" });
+  expect(stop()).toBe(null);
+  expect(prompt()).toBe(null);
+  sendMessage(p, advisor, "main", "to Main");
+  expect(stop()).toBe(null);
+  sendMessage(p, main, "advisor", "UNTRUSTED-BODY");
+  expect(stop({ stop_hook_active: true })).toBe(null);
+  const blocked = stop({ stop_hook_active: false });
+  expect(blocked.decision).toBe("block");
+  expect(blocked.reason).toContain("Peer Main messages wait for Advisor: 1 unread");
+  expect(blocked.reason).not.toContain("UNTRUSTED-BODY");
+  expect(stop()).toBe(null);
+  const context = prompt().hookSpecificOutput;
+  expect(context.hookEventName).toBe("UserPromptSubmit");
+  expect(context.additionalContext).toContain(p.id);
+  sendMessage(p, main, "advisor", "second");
+  const r = enqueue(p, "review");
+  const both = stop();
+  expect(both.decision).toBe("block");
+  expect(both.reason).toContain(r.id);
+  expect(both.reason).toContain("2 unread");
+  receiveMessages(p, advisor);
+  p.paused = true;
+  sendMessage(p, main, "advisor", "while paused");
+  expect(stop().reason).toContain("1 unread");
+  receiveMessages(p, advisor);
+  expect(prompt()).toBe(null);
+});
