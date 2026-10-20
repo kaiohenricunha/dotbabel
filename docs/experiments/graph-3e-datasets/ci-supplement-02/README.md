@@ -11,9 +11,9 @@ agreement is not statistical independence.
 ## Results
 
 | Dataset | Rows | PRs | retry | fix | ask-owner | Unknown | Floors (100 / 30 / 20 each) |
-| ------- | ---- | --- | ----- | --- | --------- | ------- | ---------------------------- |
-| v4-01   | 177  | 177 | 50    | 118 | 9         | 151     | ask-owner short by 11        |
-| v4-02   | 245  | 245 | 53    | 173 | 19        | 183     | ask-owner short by 1         |
+| ------- | ---- | --- | ----- | --- | --------- | ------- | --------------------------- |
+| v4-01   | 177  | 177 | 50    | 118 | 9         | 151     | ask-owner short by 11       |
+| v4-02   | 245  | 245 | 53    | 173 | 19        | 183     | ask-owner short by 1        |
 
 The retry step of unit 3e is recorded as INCONCLUSIVE (sample floor). Nothing was sent to Jev.
 
