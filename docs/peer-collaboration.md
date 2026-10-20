@@ -307,8 +307,19 @@ Until then, liveness reports that member as unavailable and the relay skips it.
 Fleet's claim behavior remains unchanged. Peer does not acquire claims for reads.
 
 Advisor's hook denies write tools and commands outside a conservative read-only
-list. It also allows `ToolSearch`, which only loads tool schemas, and `Skill` for
-the `peer` skill only. It allows `SendMessage` only to the paired Main's socket, and
+list. The shell list is `cat`, `head`, `tail`, `wc`, `ls`, `pwd`, `rg`, `grep`,
+`egrep`, `fgrep`, and `find` without its execute or write actions (`-exec`,
+`-execdir`, `-ok`, `-okdir`, `-delete`, `-fprint*`, `-fls`), plus Git `status`,
+`diff`, `show`, `log`, `ls-files`, `rev-parse`, `grep`, `blame`, `ls-tree`,
+`cat-file`, `merge-base`, `rev-list`, and `worktree list`. Git options that run a
+program or write a file (`--output`, `--ext-diff`, `--textconv`, `--exec-path`,
+`--filters`, `-O`/`--open-files-in-pager`) are refused. Each call must be one
+literal command: patterns and globs go in single quotes, because an unquoted glob
+could expand into an option. It also allows `ToolSearch`, which only loads tool
+schemas, `Skill` for the `peer` skill only, and `Agent` with `subagent_type:
+Explore` and no `isolation`. A subagent's tool calls reach the hook with the
+parent's `session_id` (with `agent_id` and `agent_type`), so the guard covers them
+too. It allows `SendMessage` only to the paired Main's socket, and
 only when `to`, `summary`, and `message` equal the mirror of the Advisor's own ledger message
 to Main. Other text and native messages to any other session stay denied. The installed hook runs in every session, so a session in no open pair exits
 at once, before any Git or registry work. A literal peer command still takes the

@@ -108,7 +108,12 @@ numbers. Read them again before reporting if Main has changed them.
 
 The Advisor does not edit implementation files, run migrations, install packages,
 or execute tests with repository side effects. Ask Main to run necessary checks.
-Use read tools and read-only Git commands. Fleet claims continue to apply to Main;
+Use read tools and read-only Git commands. To search, run one literal command per
+call: `grep`, `rg`, or `find`, or `git grep`, `blame`, `ls-tree`, `cat-file`,
+`worktree list`, `status`, `diff`, `show`, or `log`. Put patterns and globs in single
+quotes, for example `grep -rn 'a\|b' src --include='*.mjs'`. Pipes, redirects,
+chains, `$`, and backslashes outside single quotes are refused. Delegate a wide
+search to an `Explore` agent; the guard covers its tool calls too. Fleet claims continue to apply to Main;
 Advisor inspection does not acquire a write claim. Peer hooks enforce a conservative
 read-only tool list when installed. They are not a sandbox; without them this role
 is instruction-enforced. Do not claim a hook is installed without checking it.
