@@ -18,7 +18,7 @@ export function retryFixture(root, { perClass = 40, capped = 3 } = {}) {
       source: `https://github.com/${repo}/actions/runs/${i}/job/${i}`, visibility: "public",
       selection_stratum: ["enriched", "control", "unselected-prior"][i % 3], cohort: `cohort-${i % 2}`,
       tail_rule: i % 4 ? "last-error" : "log-end", tail_line_range: [10, 40],
-      input: { phase: "ci", attempt: i >= perClass * 3 ? 3 : 1 + (i % 2), failure_tail: `##[error]synthetic failure ${i}` },
+      input: { phase: "ci", attempt: i >= perClass * 3 ? 3 : 1 + (i % 2), failure_tail: i % 4 ? `step ${i} ran\n##[error]synthetic failure ${i}` : `synthetic log end ${i}` },
       label, label_source: "ai-annotation-verified", labeled_before_replay: true });
   }
   const common = r => ({ id: r.id, head_sha: r.head_sha, label: r.label, blind_to_predictions: true, inspection_complete: true,

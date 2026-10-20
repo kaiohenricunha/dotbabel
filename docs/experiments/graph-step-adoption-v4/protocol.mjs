@@ -31,6 +31,14 @@ const hashFile = file => digest(fs.readFileSync(file));
 const read = file => JSON.parse(fs.readFileSync(file, "utf8"));
 const lines = file => fs.readFileSync(file, "utf8").split("\n").filter(Boolean).map(JSON.parse);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// Key order is not meaning: compare counts with every object's keys sorted.
+const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === "object"
+  ? Object.fromEntries(Object.keys(value).sort().map(k => [k, canonical(value[k])])) : value;
+const unique = (records, what) => {
+  const map = new Map(records.map(r => [r.id, r]));
+  if (map.size !== records.length) throw new Error(`duplicate ${what} id`);
+  return map;
+};
 const text = value => typeof value === "string" && value.trim().length > 0;
 const date = (value, what = "provenance") => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) throw new Error(`invalid ${what} timestamp`);
@@ -59,8 +67,11 @@ function checkRow(row) {
       !Array.isArray(row.tail_line_range) || row.tail_line_range.length !== 2 || !row.tail_line_range.every(Number.isInteger) ||
       row.tail_line_range[0] < 1 || row.tail_line_range[0] > row.tail_line_range[1]) throw new Error("invalid retry provenance");
   validateDecisionInput("retry", row.input);
-  if (Object.keys(row.input).length !== 3 || row.input.phase !== POLICY.input.phase ||
-      row.input.failure_tail.length > POLICY.input.failure_tail_max_chars || !row.input.failure_tail.trim()) throw new Error("invalid retry input");
+  const tail = row.input.failure_tail, tailLines = tail.split("\n").filter(Boolean);
+  if (row.input.phase !== POLICY.input.phase || tail.length > POLICY.input.failure_tail_max_chars || !tail.trim()) throw new Error("invalid retry input");
+  // last-error: the tail ends on an error line; log-end: the log has no error line at all.
+  if ((row.tail_rule === "last-error" ? !tailLines.at(-1)?.includes("##[error]") : tail.includes("##[error]")) ||
+      tailLines.length > row.tail_line_range[1] - row.tail_line_range[0] + 1) throw new Error("failure tail differs from its tail rule");
   if (!ACTIONS.includes(row.label) || row.label_source !== POLICY.label_source || row.labeled_before_replay !== true) throw new Error("invalid retry label");
 }
 
@@ -74,6 +85,7 @@ export function checkAnnotationPair(row, a, v, frozen, sealed) {
         !Array.isArray(record.evidence) || !record.evidence.length || at < frozen || at > sealed ||
         ACTIONS.some(action => !text(record.per_action_reasons?.[action]))) throw new Error("incomplete checked AI inspection");
   }
+  if (date(v.verified_at) < date(a.labeled_at)) throw new Error("verification precedes its annotation");
 }
 
 /** Reconstruct and check the whole sealed retry dataset. Cap-determined cases are counted, never admitted. */
@@ -81,13 +93,23 @@ export function inspectDataset(directory, cutoff = new Date().toISOString()) {
   const root = path.resolve(directory);
   privateTree(root);
   const manifest = read(path.join(root, "manifest.json"));
-  for (const name of DATA_FILES) if (manifest.files?.[name] !== hashFile(path.join(root, name))) throw new Error("dataset file hashes differ");
+  const hashes = Object.fromEntries(DATA_FILES.map(name => [name, hashFile(path.join(root, name))]));
+  if (DATA_FILES.some(name => manifest.files?.[name] !== hashes[name])) throw new Error("dataset file hashes differ");
   if (manifest.label_source !== POLICY.label_source) throw new Error("dataset label source differs");
   const frozen = date(manifest.packet_frozen_at), sealed = date(manifest.sealed_at), created = date(manifest.created_at);
   if (!(created <= frozen && frozen <= sealed && sealed <= date(cutoff))) throw new Error("dataset chronology differs");
   const all = lines(path.join(root, "retry.jsonl")), unknown = lines(path.join(root, "unknown.jsonl"));
-  const am = new Map(lines(path.join(root, "annotations.jsonl")).map(a => [a.id, a]));
-  const vm = new Map(lines(path.join(root, "verification.jsonl")).map(v => [v.id, v]));
+  const am = unique(lines(path.join(root, "annotations.jsonl")), "annotation");
+  const vm = unique(lines(path.join(root, "verification.jsonl")), "verification");
+  unique(unknown, "unknown");
+  // GitHub repository names ignore case; one repository must have one spelling, so groups and consent agree.
+  const spelling = new Map();
+  for (const r of [...all, ...unknown]) {
+    if (typeof r.repo !== "string") continue;
+    const key = r.repo.toLowerCase();
+    if (spelling.has(key) && spelling.get(key) !== r.repo) throw new Error("repository spelled two ways");
+    spelling.set(key, r.repo);
+  }
   if (am.size !== all.length || vm.size !== all.length) throw new Error("checked sidecar coverage differs");
   const ids = new Set(), groups = new Map(), strata = Object.fromEntries(STRATA.map(s => [s, 0])), cohorts = {}, rows = [];
   let capDetermined = 0, tailSufficient = 0;
@@ -104,15 +126,14 @@ export function inspectDataset(directory, cutoff = new Date().toISOString()) {
   if ([...groups.values()].some(count => count > 2)) throw new Error("more than two cases from one pull request");
   if (unknown.some(r => typeof r.id !== "string" || ids.has(r.id) || r.label !== null || !text(r.reason))) throw new Error("unknown or repeated case admitted");
   const repositories = [...new Set(all.map(r => r.repo))].sort();
-  if (!Array.isArray(manifest.repositories) || repositories.some(r => !manifest.repositories.includes(r)) ||
-      !same(manifest.repositories, [...manifest.repositories].sort())) throw new Error("manifest repositories differ");
+  if (!same(manifest.repositories, repositories)) throw new Error("manifest repositories differ");
   const classes = Object.fromEntries(ACTIONS.map(a => [a, all.filter(r => r.label === a).length]));
-  if (!same(manifest.counts, { rows: all.length, prs: groups.size, classes, unknown: unknown.length, strata, cohorts })) throw new Error("manifest counts differ");
+  if (!same(canonical(manifest.counts), canonical({ rows: all.length, prs: groups.size, classes, unknown: unknown.length, strata, cohorts }))) throw new Error("manifest counts differ");
   const eligible = Object.fromEntries(ACTIONS.map(a => [a, rows.filter(r => r.label === a).length]));
   const prs = new Set(rows.map(r => `${r.repo}#${r.pr}`)).size;
   const floors = rows.length >= RULES.minimum_rows && prs >= RULES.minimum_prs && ACTIONS.every(a => eligible[a] >= RULES.minimum_per_class);
   const binding = { root, manifest_sha256: hashFile(path.join(root, "manifest.json")),
-    files: Object.fromEntries(DATA_FILES.map(name => [name, hashFile(path.join(root, name))])) };
+    files: hashes };
   return { rows, binding, repositories, repositories_sha256: repositoriesHash(repositories), label_source: POLICY.label_source,
     human_labels: false, collected: all.length + unknown.length, cap_determined: capDetermined, unknown: unknown.length, strata, cohorts,
     tail_sufficient_both: tailSufficient, eligible: { rows: rows.length, prs, classes: eligible }, shortfall: { rows: Math.max(0, RULES.minimum_rows - rows.length),

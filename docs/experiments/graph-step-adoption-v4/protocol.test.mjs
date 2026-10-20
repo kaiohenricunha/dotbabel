@@ -62,6 +62,14 @@ test("the inspector refuses each broken contract field", () => {
     [dir => rewrite(dir, "verification.jsonl", r => r.map((x, i) => i ? x : { ...x, label: "retry" === x.label ? "fix" : "retry" })), /inspection/],
     [dir => rewrite(dir, "unknown.jsonl", r => [...r, { id: fixture.rows[0].id, label: null, reason: "repeat" }]), /unknown/],
     [dir => rewrite(dir, "retry.jsonl", r => r.map((x, i) => i < 3 ? { ...x, repo: "owner0/repo0", pr: 100, source: "https://github.com/owner0/repo0/x" } : x)), /pull request|counts/],
+    [dir => rewrite(dir, "retry.jsonl", r => r.map((x, i) => i !== 1 ? x : { ...x, input: { ...x.input, failure_tail: x.input.failure_tail + "\nPost job cleanup." } })), /tail rule/],
+    [dir => rewrite(dir, "retry.jsonl", r => r.map((x, i) => i !== 0 ? x : { ...x, input: { ...x.input, failure_tail: "##[error]boom" } })), /tail rule/],
+    [dir => rewrite(dir, "retry.jsonl", r => r.map((x, i) => i !== 1 ? x : { ...x, tail_line_range: [10, 10] })), /tail rule/],
+    [dir => rewrite(dir, "verification.jsonl", r => r.map((x, i) => i ? x : { ...x, verified_at: "2026-10-19T00:15:00.000Z" })), /precedes/],
+    [dir => rewrite(dir, "annotations.jsonl", r => [...r, r[0]]), /duplicate annotation/],
+    [dir => rewrite(dir, "unknown.jsonl", r => [...r, r[0]]), /duplicate unknown/],
+    [dir => rewrite(dir, "retry.jsonl", r => r.map((x, i) => i !== 7 ? x : { ...x, repo: "Owner0/Repo0", source: x.source.replace("owner0/repo0", "Owner0/Repo0") })), /spelled two ways/],
+    [dir => { const m = read(path.join(dir, "manifest.json")); m.repositories.push("zz/extra"); fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(m), { mode: 0o600 }); }, /repositories differ/],
     [dir => { const m = read(path.join(dir, "manifest.json")); m.counts.rows++; fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(m), { mode: 0o600 }); }, /counts/],
     [dir => { const m = read(path.join(dir, "manifest.json")); m.sealed_at = "2099-01-01T00:00:00.000Z"; fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(m), { mode: 0o600 }); }, /chronology/],
   ];
@@ -69,6 +77,14 @@ test("the inspector refuses each broken contract field", () => {
     const dir = copy(); mutate(dir);
     assert.throws(() => inspectDataset(dir), message, `case ${i}`);
   }
+});
+
+test("manifest counts compare by value, not by key order", () => {
+  const dir = copy(), file = path.join(dir, "manifest.json"), m = read(file);
+  const reversed = value => value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.keys(value).reverse().map(k => [k, reversed(value[k])])) : value;
+  fs.writeFileSync(file, JSON.stringify({ ...m, counts: reversed(m.counts) }), { mode: 0o600 });
+  assert.equal(inspectDataset(dir).sample_floors_met, true);
 });
 
 test("an underpowered dataset is valid but cannot export requests and evaluates INCONCLUSIVE", () => {
