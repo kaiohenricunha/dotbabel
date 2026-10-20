@@ -1,6 +1,6 @@
 /** Read-only Advisor guard and recovery context for the two supported hook protocols. */
 import { literalWords } from "./shell.mjs";
-import { nextRequest, recoverRequests } from "./state.mjs";
+import { followWorktree, nextRequest, recoverRequests } from "./state.mjs";
 import { fileURLToPath } from "node:url";
 const PEER_BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
 const UMBRELLA_BIN = fileURLToPath(new URL("../../bin/dotbabel.mjs", import.meta.url));
@@ -94,6 +94,8 @@ function mainReminder(pair, who, input) {
 export function peerHook(pair, who, input) {
   const advisor = pair.advisor?.key === who.key;
   const event = input.hook_event_name;
+  // Liveness and Advisor context read the recorded worktree; a removed one hides a live member.
+  followWorktree(pair, who);
   if (event === "SessionEnd") {
     const role = advisor ? "advisor" : "main";
     pair[role].ended = true;

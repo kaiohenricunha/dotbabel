@@ -3,19 +3,27 @@ id: pre-pr
 name: pre-pr
 type: command
 version: 1.1.0
-domain: [devex]
-platform: [none]
-task: [review, testing]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - testing
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-04-18
-updated: 2026-08-12
-description: >
-  Pre-PR quality gate: simplify changed code, security-review the diff, run the quality
-  profile, and surface a go/no-go summary before opening a pull request.
+created: 2026-04-18T00:00:00.000Z
+updated: 2026-08-12T00:00:00.000Z
+description: |
+  Pre-PR quality gate: simplify changed code, security-review the diff, run the quality profile, and surface a go/no-go summary before opening a pull request.
 argument-hint: "[base-branch] [--conductor] — default: origin/main"
 model: sonnet
 headless_safe: false
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: session
 ---
 
 Quality gate to run before `/git pr`. Simplifies changed code, security-reviews the diff, runs the quality profile, and surfaces a go/no-go summary. Does not open the PR — that is `/git pr`.

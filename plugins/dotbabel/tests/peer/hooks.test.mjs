@@ -129,6 +129,20 @@ it("rebinds the same resumed session without leaving it marked terminated", () =
   expect(p.main.ended).toBe(false);
 });
 
+it("follows the same live session into another worktree of the same repository", () => {
+  const s = createState("r"),
+    main = { key: "m", repo: "r", pid: 1, procStart: "10", worktree: "/r/wt/es9" };
+  const p = registerMain(s, { ...main }, { alive: () => true });
+  pairAdvisor(s, { key: "a", repo: "r" }, p.code, { alive: () => true });
+  const tool = { hook_event_name: "PreToolUse", tool_name: "Bash" };
+  expect(peerHook(p, { ...main, worktree: "/r/wt/check-bc" }, tool)).toBe(null);
+  expect(p.main.worktree).toBe("/r/wt/check-bc");
+  peerHook(p, { ...main, pid: 2, worktree: "/r/wt/other-process" }, tool);
+  peerHook(p, { ...main, repo: "other", worktree: "/other/repo" }, tool);
+  peerHook(p, { ...main, worktree: undefined }, tool);
+  expect(p.main.worktree).toBe("/r/wt/check-bc");
+});
+
 it("reminds Main once at Stop and on each prompt while Advisor messages are unread", () => {
   const { p, main, advisor } = world();
   const stop = (extra = {}) => peerHook(p, main, { hook_event_name: "Stop", ...extra });

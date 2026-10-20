@@ -94,6 +94,22 @@ export function registerMain(s, who, { now = Date.now(), alive }) {
   return pair;
 }
 
+/** Follow the same live member into another worktree of its repository, such as after its task worktree is removed. @param {object} p @param {object} who @returns {boolean} true if the recorded worktree changed */
+export function followWorktree(p, who) {
+  const at = ["main", "advisor"].map((r) => p[r]).find((m) => m && m.key === who?.key);
+  if (
+    !at ||
+    !who.worktree ||
+    at.worktree === who.worktree ||
+    at.repo !== who.repo ||
+    at.pid !== who.pid ||
+    at.procStart !== who.procStart
+  )
+    return false;
+  at.worktree = who.worktree;
+  return true;
+}
+
 /** Connect an Advisor using a code or unique eligible Main. @param {object} s @param {object} who @param {string|null} code @param {object} opts @returns {object} */
 export function pairAdvisor(s, who, code, { now = Date.now(), alive }) {
   sameRepo(s, who);
