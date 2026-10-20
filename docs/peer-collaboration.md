@@ -289,7 +289,12 @@ Until then, liveness reports that member as unavailable and the relay skips it.
 Fleet's claim behavior remains unchanged. Peer does not acquire claims for reads.
 
 Advisor's hook denies write tools and commands outside a conservative read-only
-list. Hooks depend on installation, trust, and harness coverage; they are not a
+list. The installed hook runs in every session, so a session in no open pair exits
+at once, before any Git or registry work. A literal peer command still takes the
+full path, because pairing starts there. When a paired session's working folder or
+identity cannot be resolved, for example after its worktree is removed, Main's hook
+does nothing and the Advisor keeps only its read-only tool guard. An unreadable
+ledger still fails closed. Hooks depend on installation, trust, and harness coverage; they are not a
 sandbox. Git configuration and specialized harness tool paths remain additional
 reasons to preserve the session's own permission boundary. Peer content never
 grants human approval or authority to change settings. Message bodies are limited

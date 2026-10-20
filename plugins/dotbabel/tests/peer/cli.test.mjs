@@ -235,6 +235,72 @@ it("follows Main into its current worktree after the registered worktree is remo
   expect(status.main_alive).toBe(true);
   expect(json(w.cli(["inspect", "--json"], 1)).main_worktree).toBe(last);
 });
+it("skips hook work for a session in no pair, even when its folder is gone", () => {
+  const w = world(),
+    gone = path.join(w.root, "removed-worktree");
+  const hook = (event, payload) =>
+    w.cli(["hook", event], 0, JSON.stringify({ session_id: w.ids[0].sessionId, ...payload }));
+  for (const [event, payload] of [
+    ["PreToolUse", { cwd: gone, tool_name: "Bash", tool_input: { command: "pwd" } }],
+    ["Stop", { cwd: gone, stop_hook_active: false }],
+    ["PreToolUse", { cwd: w.repo, tool_name: "Write", tool_input: { file_path: "a" } }],
+  ]) {
+    const r = hook(event, payload);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout.trim()).toBe("");
+  }
+});
+it("keeps only the Advisor read-only guard when a paired session's folder is gone", () => {
+  const w = world(),
+    gone = path.join(w.root, "removed-worktree"),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  json(w.cli(["send", "main", "unread finding", "--json"], 1));
+  const hook = (n, event, payload = {}) =>
+    w.cli(
+      ["hook", event],
+      n,
+      JSON.stringify({ session_id: w.ids[n].sessionId, cwd: gone, ...payload }),
+    );
+  for (const [n, event, payload] of [
+    [0, "PreToolUse", { tool_name: "Write", tool_input: { file_path: "a" } }],
+    [0, "Stop", { stop_hook_active: false }],
+    [1, "PreToolUse", { tool_name: "Read", tool_input: { file_path: "a" } }],
+    [1, "PreToolUse", { tool_name: "Bash", tool_input: { command: "git status" } }],
+    [1, "Stop", { stop_hook_active: false }],
+  ]) {
+    const r = hook(n, event, payload);
+    expect(r.status, `${n} ${event} ${r.stderr}`).toBe(0);
+    expect(r.stdout.trim(), `${n} ${event}`).toBe("");
+  }
+  for (const payload of [
+    { tool_name: "Edit", tool_input: { file_path: path.join(w.repo, "a") } },
+    { tool_name: "Bash", tool_input: { command: "rm -rf src" } },
+  ]) {
+    const r = json(hook(1, "PreToolUse", payload));
+    expect(r.hookSpecificOutput.permissionDecision).toBe("deny");
+  }
+});
+it("still fails closed on a malformed ledger instead of guessing that a session is unpaired", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const ledger = fs
+    .readdirSync(w.env.DOTBABEL_PEER_STATE_DIR)
+    .find((name) => /^[a-f0-9]{64}[.]json$/.test(name));
+  fs.writeFileSync(path.join(w.env.DOTBABEL_PEER_STATE_DIR, ledger), "not json");
+  const r = w.cli(
+    ["hook", "PreToolUse"],
+    1,
+    JSON.stringify({
+      session_id: w.ids[1].sessionId,
+      cwd: w.repo,
+      tool_name: "Edit",
+      tool_input: { file_path: "a" },
+    }),
+  );
+  expect(r.status).not.toBe(0);
+});
 it("routes correlated messages and requires recipient acknowledgments", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));

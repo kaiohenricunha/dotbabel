@@ -491,6 +491,37 @@ export async function coordinatePeer(store, who, input, env) {
   };
 }
 
+/** Find the open pair that holds a session in any repository ledger, without Git. @param {string} root @param {string} [sessionId] @returns {Promise<{pair: object, role: string}|null|undefined>} null for no pair; undefined when unknown */
+async function memberOf(root, sessionId) {
+  if (!sessionId) return undefined;
+  if (!fs.existsSync(root)) return null;
+  for (const name of fs.readdirSync(root)) {
+    if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
+    let state;
+    try {
+      const { repo } = JSON.parse(fs.readFileSync(path.join(root, name), "utf8"));
+      const store = new PeerStore(root, repo);
+      if (path.basename(store.file) !== name) return undefined;
+      state = await store.read();
+    } catch {
+      // Unknown membership takes the full hook path, which fails closed on this ledger.
+      return undefined;
+    }
+    for (const pair of state.pairs)
+      for (const role of ["main", "advisor"])
+        if (!pair.closed && pair[role]?.sessionId === sessionId) return { pair, role };
+  }
+  return null;
+}
+/** A paired session whose folder or identity cannot be resolved keeps only the Advisor's read-only guard. @param {{pair: object, role: string}} member @param {object} input @returns {number} */
+function unresolvedMember({ pair, role }, input) {
+  if (role === "advisor" && input.hook_event_name === "PreToolUse") {
+    const result = peerHook(structuredClone(pair), pair.advisor, input);
+    if (result) process.stdout.write(JSON.stringify(result) + "\n");
+  }
+  return 0;
+}
+
 /** Run the peer CLI with common Dotbabel flags and stable exit categories. @param {string[]} argv @param {NodeJS.ProcessEnv} [env] @returns {Promise<number>} */
 export async function runPeer(argv, env = process.env) {
   let parsed;
@@ -574,7 +605,7 @@ export async function runPeer(argv, env = process.env) {
       }
       return 0;
     }
-    let input;
+    let input, member;
     if (command === "hook") {
       const text = fs.readFileSync(0, "utf8");
       if (Buffer.byteLength(text) > 65536) throw new Error("hook input too large");
@@ -585,9 +616,21 @@ export async function runPeer(argv, env = process.env) {
         process.stdout.write(JSON.stringify(await antigravityHook(args[0], input, { env })) + "\n");
         return 0;
       }
+      // Every session runs this hook. A session in no pair must not fail its tool calls
+      // and turn ends, for example after its worktree is removed. Pairing still starts here.
+      if (!peerCommand(input)) {
+        member = await memberOf(peerRoot(env), input.session_id || env.DOTBABEL_PEER_HOOK_SESSION);
+        if (member === null) return 0;
+      }
     }
-    const repo = environment(() => repository(flags["repo-root"] || input?.cwd || process.cwd())),
+    let repo, store;
+    try {
+      repo = environment(() => repository(flags["repo-root"] || input?.cwd || process.cwd()));
       store = environment(() => new PeerStore(peerRoot(env), repo.key));
+    } catch (err) {
+      if (member) return unresolvedMember(member, input);
+      throw err;
+    }
     if (command === "archive") {
       print(await store.archive(flags.pair), parsed.json, command);
       return 0;
@@ -604,6 +647,7 @@ export async function runPeer(argv, env = process.env) {
         sessionId: input?.session_id || env.DOTBABEL_PEER_HOOK_SESSION,
       });
     } catch (err) {
+      if (member) return unresolvedMember(member, input);
       if (!flags.pair || !EXTERNAL.has(command)) {
         err.exitCode = 2;
         throw err;
