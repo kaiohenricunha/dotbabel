@@ -4,8 +4,10 @@ Status: **approved by the owner** on 2026-10-20 ("Approve all three").
 
 ## Why a decision is required
 
-IMPL-7 forbids a guessed semantic requirement. Three skills postdate the migration audit
-(`docs/audits/model-selection-audit.md`), so no audit row classifies them:
+IMPL-7 (`6-implementation-plan.md:777`) applies only to the DOC-1 class-F entries. These skills
+follow the same principle: a semantic requirement is never guessed. Three skills postdate the
+migration audit (`docs/audits/model-selection-audit.md`), so no audit row classifies them, and
+the owner chose their requirements:
 
 - `skills/language-review/SKILL.md` (created 2026-10-15)
 - `skills/security-audit/SKILL.md` (created 2026-09-22)
@@ -26,5 +28,14 @@ IMPL-7 forbids a guessed semantic requirement. Three skills postdate the migrati
 
 Each migration keeps the authored native `model` and `effort`, every body byte, and all tools.
 Skill model and effort metadata have no verified native binding, so resolver enforcement stays
-`unknown`. These decisions do not claim measured quality rankings. The `agents-search` taxonomy
-redesign (F3) is a separate unit because it changes the skill body.
+`unknown`. These decisions do not claim measured quality rankings.
+
+## Scope against the plan
+
+The plan defines P-19e as `post-pr-review`, `agents-search` and the `veracity-audit` topology
+(`6-implementation-plan.md:558`). This unit migrates `post-pr-review` from that list. The three
+other skills are outside the plan list; they join this unit because they are the remaining
+unmigrated skills with an owner decision. Still open from P-19e: the `agents-search` taxonomy
+redesign (F3), which changes the skill body and gets its own unit, and the `veracity-audit`
+coordinator/worker topology check. The spec migration mapping does not yet name the three new
+skills; adding them there is a spec change that needs owner approval.
