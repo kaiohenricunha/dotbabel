@@ -250,6 +250,16 @@ ID, never a message body. Native integrations use the same Stop reminder at idle
 Run `dotbabel peer setup --harness claude` again to add the `UserPromptSubmit` hook
 to an existing installation.
 
+The ledger is the FIFO record of a pair's messages, and the recipient works through
+it in `seq` order with `receive` and `ack`. Between two Claude sessions, `send` also
+returns a `native` object: `to` (`uds:` plus the recipient's messaging socket),
+`summary`, and `message`. The message starts with `[peer MESSAGE_ID seq N KIND]`,
+then the body and the ledger instruction. The skill passes these fields unchanged to
+Claude Code's native `SendMessage`, so the message shows in both terminals and queues
+as input in the recipient's session. The native message is only a mirror. It holds
+no delivery state, and the recipient runs `receive` for the record before it acts.
+`native` is `null` when either side is not a Claude session or has no socket.
+
 A failure before socket connection can retry with exponential backoff, at most
 three attempts. An interrupted send, timeout after submission, or nonzero Codex
 queue exit is `uncertain`; it never silently replays. First inspect `receive` and
@@ -297,7 +307,10 @@ Until then, liveness reports that member as unavailable and the relay skips it.
 Fleet's claim behavior remains unchanged. Peer does not acquire claims for reads.
 
 Advisor's hook denies write tools and commands outside a conservative read-only
-list. The installed hook runs in every session, so a session in no open pair exits
+list. It also allows `ToolSearch`, which only loads tool schemas, and `Skill` for
+the `peer` skill only. It allows `SendMessage` only to the paired Main's socket, and
+only when `to` and `message` equal the mirror of the Advisor's own ledger message
+to Main. Other text and native messages to any other session stay denied. The installed hook runs in every session, so a session in no open pair exits
 at once, before any Git or registry work. A literal peer command still takes the
 full path, because pairing starts there. When a paired session's working folder or
 identity cannot be resolved, for example after its worktree is removed, Main's hook

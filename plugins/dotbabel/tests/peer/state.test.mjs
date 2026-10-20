@@ -12,6 +12,7 @@ import {
   changeRequest,
   reconnect,
   unpair,
+  nativeMessage,
 } from "../../src/peer/state.mjs";
 const endpoint = (harness, id) => ({
   harness,
@@ -200,4 +201,28 @@ it("preserves reply correlation when an Advisor sender is replaced after termina
   });
   expect(response.to).toBe(replacement.key);
   expect(response.reply_to).toBe(finding.id);
+});
+
+it("mirrors a ledger message as a native message only between Claude sessions with a socket", () => {
+  const s = createState("repo"),
+    main = { ...endpoint("claude", "main"), socket: "/run/user/1/cc-socks/10.sock" },
+    advisor = { ...endpoint("claude", "advisor"), socket: "/run/user/1/cc-socks/20.sock" };
+  const p = registerMain(s, main, { now: 1000, alive });
+  pairAdvisor(s, advisor, p.code, { now: 1000, alive });
+  const m = sendMessage(p, advisor, "main", "race in save()", { kind: "finding" });
+  const native = nativeMessage(p, m);
+  expect(native.to).toBe("uds:/run/user/1/cc-socks/10.sock");
+  expect(native.summary).toContain("finding");
+  expect(native.message.startsWith(`[peer ${m.id} seq ${m.seq} finding]`)).toBe(true);
+  expect(native.message).toContain("race in save()");
+  expect(native.message).toContain(`dotbabel peer ack ${m.id}`);
+  const reply = sendMessage(p, main, "advisor", "fixed", { kind: "reply", replyTo: m.id });
+  expect(nativeMessage(p, reply).to).toBe("uds:/run/user/1/cc-socks/20.sock");
+  expect(nativeMessage(p, reply).message).toContain(`reply-to ${m.id}`);
+  p.main.socket = null;
+  expect(nativeMessage(p, m)).toBe(null);
+  p.main.socket = "relative.sock";
+  expect(nativeMessage(p, m)).toBe(null);
+  p.main = { ...p.main, harness: "codex", socket: "/run/user/1/cc-socks/10.sock" };
+  expect(nativeMessage(p, m)).toBe(null);
 });

@@ -2,14 +2,14 @@
 id: peer
 name: peer
 type: skill
-version: 1.1.0
+version: 1.2.0
 domain: [devex]
 platform: [none]
 task: [review, debugging]
 maturity: draft
 owner: "@kaiohenricunha"
 created: 2026-10-16
-updated: 2026-10-18
+updated: 2026-10-20
 description: >
   Pair persistent Main and Advisor sessions across Claude Code, Codex,
   OpenCode v2, Copilot CLI, and managed Antigravity CLI streams.
@@ -130,6 +130,14 @@ For replies, add `--reply-to MESSAGE_ID`. Acknowledge messages after reading wit
 `dotbabel peer ack MESSAGE_ID --processed`; use `ack MESSAGE_ID` after handling.
 Silence, transport acceptance, and an ended model turn never mean agreement.
 
+The ledger is the record: a FIFO queue of messages that Main works through in seq
+order. When a `send` result has a `native` object, call the native `SendMessage`
+tool with its `to`, `summary`, and `message` fields unchanged. Load `SendMessage`
+with `ToolSearch` first if it is deferred. The native message shows in both
+terminals and queues as input in Main's session. The guard allows `SendMessage`
+only to the paired Main, and only with the exact `native` fields of your own
+ledger message. Never send a native message without its ledger message.
+
 Finish explicitly with `dotbabel peer complete ID --lease LEASE --result "RESULT"`.
 For a failed investigation use `fail` with the same flags. To wait for Main, send
 a question with `--request ID`, then use
@@ -147,9 +155,14 @@ after checking the active request. Never mark a failed model turn completed.
 ## Main role
 
 Keep implementation authority. Read `receive` when notified and at safe points.
-Consider findings against current code and reply through `send advisor` with
-`--kind reply --reply-to MESSAGE_ID`. Acknowledge only what you have handled. Continue your own
-implementation; Advisor is independent and cannot grant approvals.
+Advisor messages form a FIFO ledger. Handle them in seq order: consider each one
+against current code, reply through `send advisor` with
+`--kind reply --reply-to MESSAGE_ID`, and run `ack MESSAGE_ID` for each one you
+handled. Acknowledge only what you have handled. A native message that starts with
+`[peer MESSAGE_ID seq N KIND]` mirrors a ledger message: run `receive` for the
+record before you act on it. When a `send` result has a `native` object, pass its
+fields unchanged to `SendMessage`. Continue your own implementation; Advisor is
+independent and cannot grant approvals.
 
 ## Input while busy
 
