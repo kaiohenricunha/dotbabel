@@ -153,27 +153,44 @@ async function messages(bodies) {
   };
   return { store, id, calls, opts };
 }
-it("pushes a new message although an older pushed message is still unread", async () => {
-  const { store, id, calls, opts } = await messages(["first"]);
-  await tick(store, id, opts);
+it("coalesces a burst behind a recent unread push, then pushes again after five minutes", async () => {
+  const at = 1_800_000_000_000,
+    { store, id, calls, opts } = await messages(["first"]);
+  await tick(store, id, { ...opts, now: at });
   expect(calls).toEqual([main.key]);
   await store.transaction((s) => {
-    const p = s.pairs[0];
-    sendMessage(p, advisor, "main", "second");
-    sendMessage(p, advisor, "main", "third");
-    p.messages[0].delivery.state = "uncertain";
+    sendMessage(s.pairs[0], advisor, "main", "second");
+    sendMessage(s.pairs[0], advisor, "main", "third");
   });
-  await tick(store, id, opts);
-  await tick(store, id, opts);
-  await tick(store, id, opts);
-  expect(calls).toEqual([main.key, main.key, main.key]);
+  await tick(store, id, { ...opts, now: at + 1000 });
+  await tick(store, id, { ...opts, now: at + 300000 });
+  expect(calls).toHaveLength(1);
+  await tick(store, id, { ...opts, now: at + 300001 });
+  await tick(store, id, { ...opts, now: at + 300002 });
+  expect(calls).toEqual([main.key, main.key]);
   const p = (await store.read()).pairs[0];
   expect(p.messages.map((m) => m.delivery.state)).toEqual([
-    "uncertain",
     "transport_accepted",
     "transport_accepted",
+    "persisted",
   ]);
-  expect(p.messages[0].delivery.attempts).toBe(1);
+  expect(p.messages[0].delivery.unresponsive).toBe(true);
+});
+it("pushes at once past an earlier failed or uncertain push, and never replays it", async () => {
+  const { store, id, calls, opts } = await messages(["first", "second", "third"]);
+  await store.transaction((s) => {
+    const [first, second] = s.pairs[0].messages;
+    first.delivery = { state: "failed", attempts: 3, nextAt: 0 };
+    second.delivery = { state: "uncertain", attempts: 1, nextAt: 0 };
+  });
+  await tick(store, id, opts);
+  expect(calls).toEqual([main.key]);
+  const p = (await store.read()).pairs[0];
+  expect(p.messages.map((m) => [m.delivery.state, m.delivery.attempts])).toEqual([
+    ["failed", 3],
+    ["uncertain", 1],
+    ["transport_accepted", 1],
+  ]);
 });
 it("keeps order behind a push in flight or a retry in backoff", async () => {
   const { store, id, calls, opts } = await messages(["first", "second"]);

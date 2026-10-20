@@ -258,10 +258,12 @@ native notification, but request IDs, deduplication, and fenced state transition
 prevent a duplicate request or stale completion. Exactly-once native delivery is
 not claimed. A notification carries no message body, and `receive` returns
 unread/unhandled messages in their persisted order, including repeated reads until
-processing is recorded. So an earlier message whose push finished (`transport_accepted`,
-`failed`, or `uncertain`) does not block the notification for a newer one, and the
-earlier one is not replayed. A push in flight (`sending`) or a retry in backoff still
-holds the later notifications in that direction.
+processing is recorded. So one wake-up covers a burst: while an earlier unread
+message's push was accepted less than five minutes ago, a newer message gets no
+notification of its own. After five minutes, that push counts as unresponsive, and the
+next waiting message gets a notification. A `failed` or `uncertain` earlier push does
+not delay a newer one, and the earlier one is not replayed. A push in flight
+(`sending`) or a retry in backoff still holds the later notifications in that direction.
 
 ## Storage, repository awareness, and boundaries
 
