@@ -30,6 +30,11 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     const resolverResult = resolve({ ...context, ...(invocation ? { invocation } : {}), requirement: requirement ?? undefined, target: { ...target, sourcePath: artifact.sourcePath }, runtimeContract });
     if (artifact.releaseBaseline === true && (legacyAxes || ["floor", "pin"].includes(requirement?.mode) || context.policy.floor !== undefined || resolverResult.explanation.some(entry => entry.code === "scoped_floor_applied")) && resolverResult.confidence === "low") throw fail("release_requirement_unsatisfied");
     const binding = (runtimeContract.capabilities ?? runtimeContract).binding?.[kind];
+    // Preserve an existing release command control during migration. This is the authored native
+    // selector, checked as an invocation pin above, never a dynamically selected session model.
+    const compatibilityCommand = artifact.releaseBaseline === true && kind === "command" && ["dynamic", "floor"].includes(requirement?.mode) && legacyAxes?.model !== undefined && legacyAxes.model === source.frontmatter.model;
+    if (compatibilityCommand && (binding?.support !== "supported" || binding.axes?.model !== "supported")) throw fail("claude_projection_pin_binding_unverified");
+    if (compatibilityCommand && resolverResult.configuration?.axes?.model !== source.frontmatter.model) throw fail("release_requirement_unsatisfied");
     if (requirement?.mode === "pin") {
       if (requirement.pin.runtime !== "claude") throw fail("claude_projection_pin_runtime");
       if (kind !== "skill" && Object.keys(requirement.pin.config).some(axis => binding?.support !== "supported" || binding.axes?.[axis] !== "supported" || kind === "command" && axis !== "model")) throw fail("claude_projection_pin_binding_unverified");
@@ -38,7 +43,7 @@ export function materializeClaude({ toolVersion, artifacts, context }) {
     const pinnedCommand = kind === "command" && (requirement?.mode === "pin" || legacyAxes?.model !== undefined);
     const dynamicBaseline = !legacyAxes && artifact.releaseBaseline === true && kind === "agent" && requirement?.mode === "dynamic" && context.policy.floor === undefined && !resolverResult.explanation.some(entry => entry.code === "scoped_floor_applied");
     const frontmatterKeys = kind === "agent" ? AGENT_KEYS : kind === "skill" ? SKILL_KEYS : [...COMMAND_KEYS, ...(pinnedCommand ? ["model"] : [])];
-    const axisKeys = kind === "agent" ? { model: "model", reasoning: "effort" } : pinnedCommand ? { model: "model" } : {};
+    const axisKeys = kind === "agent" ? { model: "model", reasoning: "effort" } : pinnedCommand && !compatibilityCommand ? { model: "model" } : {};
     return { ...artifact, target, requirement, policy: context.policy, resolverResult, runtimeContract,
       capabilityEvidence: artifact.capabilityEvidence ?? null,
       projectionContract: { ...(artifact.releaseBaseline === true ? { preferUnescapedQuotes: true } : {}), frontmatterKeys: dynamicBaseline ? frontmatterKeys.filter(key => !["model", "effort"].includes(key)) : frontmatterKeys, axisKeys: dynamicBaseline ? {} : axisKeys, allowExplicitPinAxes: pinnedCommand },
