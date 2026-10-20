@@ -13,9 +13,15 @@
         "id": "architect-reviewer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -40,9 +46,17 @@
         "id": "platform-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["devex", "infra"],
-        "platform": ["none"],
-        "task": ["scaffolding", "provisioning"],
+        "domain": [
+          "devex",
+          "infra"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "provisioning"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -67,9 +81,16 @@
         "id": "aws-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["aws"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "aws"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -78,8 +99,12 @@
         "description": "Use when designing, debugging, or reviewing AWS workloads and service integrations. Triggers on: \"AWS\", \"EC2\", \"ECS\", \"EKS\", \"Lambda\", \"S3\", \"IAM role\", \"VPC\", \"RDS\", \"DynamoDB\", \"CloudFront\", \"ALB\", \"Route53\", \"CloudFormation\", \"CDK\", \"API Gateway\", \"EventBridge\", \"SQS\", \"SNS\". Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.\n",
         "tools": "Read, Write, Edit, Bash, Glob, Grep",
         "model": "opus",
-        "related": ["aws-specialist"],
-        "skills": ["aws-specialist"]
+        "related": [
+          "aws-specialist"
+        ],
+        "skills": [
+          "aws-specialist"
+        ]
       },
       "bodyHash": "94e30f593bab3a7dcfaa47a121cdfc0dc055eae938adb9da2cb155dc4dc05eee"
     },
@@ -96,9 +121,16 @@
         "id": "azure-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["azure"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "azure"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -107,7 +139,9 @@
         "description": "Use when designing, debugging, or reviewing Azure workloads and service integrations. Triggers on: \"Azure\", \"AKS\", \"ACI\", \"App Service\", \"Azure Functions\", \"Blob Storage\", \"VNet\", \"App Gateway\", \"Front Door\", \"EntraID\", \"Managed Identity\", \"ARM template\", \"Bicep\", \"Azure DevOps\", \"ACR\", \"Service Bus\", \"Logic Apps\", \"Cosmos DB\". Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.\n",
         "tools": "Read, Write, Edit, Bash, Glob, Grep",
         "model": "opus",
-        "skills": ["azure-specialist"]
+        "skills": [
+          "azure-specialist"
+        ]
       },
       "bodyHash": "2bec2020911daeaa0bb09e50991ea66ed88c6f907ac87c0f7cca1e27ab395685"
     },
@@ -124,9 +158,16 @@
         "id": "gcp-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["gcp"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "gcp"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -135,7 +176,9 @@
         "description": "Use when designing, debugging, or reviewing Google Cloud workloads and service integrations. Triggers on: \"GCP\", \"Google Cloud\", \"GKE\", \"Cloud Run\", \"GCE\", \"Cloud Functions\", \"Pub/Sub\", \"GCS\", \"BigQuery\", \"Cloud Build\", \"Workload Identity\", \"Service Account\", \"VPC\", \"Cloud Armor\", \"Cloud CDN\", \"Deployment Manager\", \"Config Connector\". Uses opus — GCP architecture across Workload Identity, VPC networks, and IAM hierarchies requires deep reasoning to avoid security gaps.\n",
         "tools": "Read, Write, Edit, Bash, Glob, Grep",
         "model": "opus",
-        "skills": ["gcp-specialist"]
+        "skills": [
+          "gcp-specialist"
+        ]
       },
       "bodyHash": "bef32eac800499a230432c8105f23c2a8edcc88c4d26ca0ced4bb0385779d5ff"
     },
@@ -152,9 +195,17 @@
         "id": "kubernetes-specialist",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["kubernetes"],
-        "task": ["debugging", "diagnostics", "runtime-ops"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "diagnostics",
+          "runtime-ops"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -163,8 +214,12 @@
         "description": "Use when designing, debugging, or reviewing Kubernetes workloads and cluster configuration. Triggers on: \"kubernetes\", \"k8s\", \"pod\", \"deployment\", \"cluster\", \"kubectl\", \"namespace\", \"ingress\", \"helm chart\", \"workload\", \"node not ready\". Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.\n",
         "tools": "Read, Grep, Glob, Bash",
         "model": "opus",
-        "related": ["kubernetes-specialist"],
-        "skills": ["kubernetes-specialist"]
+        "related": [
+          "kubernetes-specialist"
+        ],
+        "skills": [
+          "kubernetes-specialist"
+        ]
       },
       "bodyHash": "6ff629f694d223ecc92b8e7ebcd4e135264ff8e2eb82ca3e2c8ffac453b5a397"
     },
@@ -181,9 +236,16 @@
         "id": "workflow-orchestrator",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -208,9 +270,16 @@
         "id": "backend-developer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["backend"],
-        "platform": ["none"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "backend"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -235,9 +304,16 @@
         "id": "frontend-developer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["frontend"],
-        "platform": ["none"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "frontend"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -262,9 +338,17 @@
         "id": "test-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["backend", "frontend"],
-        "platform": ["none"],
-        "task": ["testing", "debugging"],
+        "domain": [
+          "backend",
+          "frontend"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "testing",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -289,9 +373,16 @@
         "id": "container-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["docker"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "docker"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -316,9 +407,16 @@
         "id": "crossplane-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["kubernetes", "crossplane"],
-        "task": ["provisioning"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes",
+          "crossplane"
+        ],
+        "task": [
+          "provisioning"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -327,7 +425,9 @@
         "description": "Use when designing, debugging, or reviewing Crossplane configurations and Kubernetes-native IaC. Triggers on: \"Crossplane\", \"XRD\", \"Composition\", \"CompositeResource\", \"Claim\", \"managed resource\", \"provider config\", \"ProviderConfig\", \"composite resource definition\", \"Crossplane package\". Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.\n",
         "tools": "Read, Write, Edit, Bash, Grep, Glob",
         "model": "sonnet",
-        "skills": ["crossplane-specialist"]
+        "skills": [
+          "crossplane-specialist"
+        ]
       },
       "bodyHash": "04d34e9aa0b179234b4a6929b7b5e5675c547dc3133a765ba51fcc17fe4cfd42"
     },
@@ -344,9 +444,16 @@
         "id": "deployment-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["devex", "infra"],
-        "platform": ["none"],
-        "task": ["runtime-ops"],
+        "domain": [
+          "devex",
+          "infra"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "runtime-ops"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -371,9 +478,16 @@
         "id": "devops-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["scaffolding", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "scaffolding",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -398,9 +512,16 @@
         "id": "docker-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["docker"],
-        "task": ["debugging", "runtime-ops"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "docker"
+        ],
+        "task": [
+          "debugging",
+          "runtime-ops"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -425,9 +546,18 @@
         "id": "iac-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["terraform", "terragrunt", "pulumi"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform",
+          "terragrunt",
+          "pulumi"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -436,7 +566,10 @@
         "description": "Use when writing, reviewing, or refactoring infrastructure-as-code modules, managing state, or handling drift detection. Triggers on: \"Terraform\", \"Pulumi\", \"OpenTofu\", \"infrastructure as code\", \"IaC module\", \"state file\", \"drift detection\", \"resource graph\", \"provider\", \"workspace\", \"remote state\". Uses sonnet — IaC authoring is structured and pattern-driven; sonnet covers the depth needed without excess cost.\n",
         "tools": "Read, Write, Edit, Bash, Grep, Glob",
         "model": "sonnet",
-        "skills": ["terraform-specialist", "terragrunt-specialist"]
+        "skills": [
+          "terraform-specialist",
+          "terragrunt-specialist"
+        ]
       },
       "bodyHash": "90671b91f3bad4d6df909f4879edef83dc4d7027c7f5a1256e16d39be014e3c0"
     },
@@ -453,9 +586,16 @@
         "id": "pulumi-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["pulumi"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "pulumi"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -464,7 +604,9 @@
         "description": "Use when working with Pulumi stacks, component resources, or the Automation API. Triggers on: \"Pulumi\", \"pulumi up\", \"pulumi stack\", \"ComponentResource\", \"Pulumi ESC\", \"Automation API\", \"pulumi.Config\", \"pulumi new\", \"stack reference\", \"StackReference\". Uses sonnet — Pulumi stack work is code-first and structured; sonnet matches the task depth.\n",
         "tools": "Read, Write, Edit, Bash, Grep, Glob",
         "model": "sonnet",
-        "skills": ["pulumi-specialist"]
+        "skills": [
+          "pulumi-specialist"
+        ]
       },
       "bodyHash": "2723da132f8dcc63d574cb823e157101396055d9092916829e6dd94fc28b9984"
     },
@@ -481,9 +623,17 @@
         "id": "terragrunt-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["terragrunt", "terraform"],
-        "task": ["provisioning", "debugging"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terragrunt",
+          "terraform"
+        ],
+        "task": [
+          "provisioning",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -492,7 +642,9 @@
         "description": "Use when working with Terragrunt configurations, DRY Terraform patterns, or multi-environment root-module hierarchies. Triggers on: \"Terragrunt\", \"terragrunt.hcl\", \"run-all\", \"DRY Terraform\", \"dependency block\", \"env hierarchy\", \"root module\", \"terragrunt hooks\", \"generate block\". Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.\n",
         "tools": "Read, Write, Edit, Bash, Grep, Glob",
         "model": "sonnet",
-        "skills": ["terragrunt-specialist"]
+        "skills": [
+          "terragrunt-specialist"
+        ]
       },
       "bodyHash": "1b8938e233ec3f9d32760dafe067239322787f4401ab5a9262fd21567b6e0af7"
     },
@@ -509,9 +661,16 @@
         "id": "changelog-assistant",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["writing", "devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "writing",
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -536,9 +695,16 @@
         "id": "documentation-writer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["writing", "devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "writing",
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -563,9 +729,16 @@
         "name": "pr-conductor",
         "type": "skill",
         "version": "1.4.0",
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-08-08",
@@ -593,9 +766,16 @@
         "name": "release-conductor",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review", "runtime-ops"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review",
+          "runtime-ops"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-26",
@@ -623,9 +803,19 @@
         "name": "deploy-status",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra", "devex"],
-        "platform": ["vercel", "flyio", "aws"],
-        "task": ["diagnostics", "runtime-ops"],
+        "domain": [
+          "infra",
+          "devex"
+        ],
+        "platform": [
+          "vercel",
+          "flyio",
+          "aws"
+        ],
+        "task": [
+          "diagnostics",
+          "runtime-ops"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-05",
@@ -654,9 +844,19 @@
         "name": "flyctl",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra", "devex", "observability"],
-        "platform": ["flyio"],
-        "task": ["runtime-ops", "diagnostics", "incident-response"],
+        "domain": [
+          "infra",
+          "devex",
+          "observability"
+        ],
+        "platform": [
+          "flyio"
+        ],
+        "task": [
+          "runtime-ops",
+          "diagnostics",
+          "incident-response"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-10",
@@ -684,9 +884,15 @@
         "name": "git",
         "type": "skill",
         "version": "1.1.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -711,9 +917,15 @@
         "name": "project-sync",
         "type": "skill",
         "version": "0.1.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["scaffolding"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "scaffolding"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-09",
@@ -739,9 +951,16 @@
         "id": "security-auditor",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["security"],
-        "platform": ["none"],
-        "task": ["review", "diagnostics"],
+        "domain": [
+          "security"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "diagnostics"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -750,7 +969,9 @@
         "description": "Use when conducting security audits, reviewing code for vulnerabilities, assessing secrets exposure, or evaluating compliance posture. Triggers on: \"audit security\", \"find vulnerabilities\", \"check secrets\", \"OWASP review\", \"security scan\", \"CVE\", \"threat model\". Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.\n",
         "tools": "Read, Grep, Glob",
         "model": "opus",
-        "skills": ["security-review"]
+        "skills": [
+          "security-review"
+        ]
       },
       "bodyHash": "0f44ce839c3fac6543b53e7555f1a49cfa9d874ef1df802dcfd9a865d6fc8c6d"
     },
@@ -767,9 +988,17 @@
         "id": "security-engineer",
         "type": "agent",
         "version": "1.0.0",
-        "domain": ["security", "infra"],
-        "platform": ["kubernetes"],
-        "task": ["review", "provisioning"],
+        "domain": [
+          "security",
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "review",
+          "provisioning"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-28",
@@ -778,7 +1007,9 @@
         "description": "Use when hardening infrastructure security posture, reviewing network policies, managing secrets, or assessing supply-chain risks. Triggers on: \"infrastructure hardening\", \"network policy\", \"secrets management\", \"RBAC\", \"admission controller\", \"mTLS\", \"supply chain\", \"image signing\", \"privilege escalation\", \"security posture\". Uses opus — infrastructure hardening and privilege analysis require deep reasoning; a missed vector has high downstream cost.\n",
         "tools": "Read, Grep, Glob, Bash",
         "model": "opus",
-        "skills": ["security-review"]
+        "skills": [
+          "security-review"
+        ]
       },
       "bodyHash": "daa764c9f57bbc56e1bae38dca7d1550310683032419f26ffb71b0353f6613b8"
     },
@@ -796,9 +1027,16 @@
         "name": "security-review",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex", "security"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex",
+          "security"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -833,9 +1071,16 @@
         "name": "veracity-audit",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-17",
@@ -871,9 +1116,19 @@
         "name": "rollback-prod",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra", "devex"],
-        "platform": ["vercel", "flyio", "aws"],
-        "task": ["debugging", "incident-response"],
+        "domain": [
+          "infra",
+          "devex"
+        ],
+        "platform": [
+          "vercel",
+          "flyio",
+          "aws"
+        ],
+        "task": [
+          "debugging",
+          "incident-response"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-05",
@@ -898,9 +1153,15 @@
         "name": "spec",
         "type": "skill",
         "version": "1.1.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -928,9 +1189,16 @@
         "name": "plan-grader",
         "type": "skill",
         "version": "2.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-07",
@@ -959,9 +1227,16 @@
         "name": "create-audit",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -990,9 +1265,16 @@
         "name": "create-assessment",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1021,9 +1303,16 @@
         "name": "create-inspection",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1052,9 +1341,16 @@
         "name": "ground-first",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1083,9 +1379,16 @@
         "name": "aws-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["aws"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "aws"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1115,9 +1418,16 @@
         "name": "azure-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["azure"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "azure"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1147,9 +1457,16 @@
         "name": "gcp-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["gcp"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "gcp"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1179,9 +1496,17 @@
         "name": "crossplane-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["crossplane", "kubernetes"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "crossplane",
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1211,9 +1536,16 @@
         "name": "kubernetes-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["kubernetes"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "kubernetes"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1243,9 +1575,16 @@
         "name": "terraform-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["terraform"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1275,9 +1614,17 @@
         "name": "terragrunt-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["terraform", "terragrunt"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "terraform",
+          "terragrunt"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1307,9 +1654,16 @@
         "name": "pulumi-specialist",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["infra"],
-        "platform": ["pulumi"],
-        "task": ["debugging", "review"],
+        "domain": [
+          "infra"
+        ],
+        "platform": [
+          "pulumi"
+        ],
+        "task": [
+          "debugging",
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1339,9 +1693,16 @@
         "name": "detect-flaky",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["testing", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "testing",
+          "debugging"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1369,9 +1730,16 @@
         "name": "quality-review",
         "type": "skill",
         "version": "0.1.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-09-04",
@@ -1400,9 +1768,16 @@
         "name": "reproduce-bug",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "testing"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2026-06-14",
@@ -1430,9 +1805,15 @@
         "name": "code-simplifier",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-05-11",
@@ -1460,9 +1841,16 @@
         "name": "create-experiment",
         "type": "skill",
         "version": "1.0.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["review", "documentation"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "documentation"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2026-04-29",
@@ -1491,9 +1879,16 @@
         "name": "fix-with-evidence",
         "type": "skill",
         "version": "1.1.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["debugging", "testing"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "debugging",
+          "testing"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1521,9 +1916,15 @@
         "name": "review-pr",
         "type": "skill",
         "version": "1.1.0",
-        "domain": ["devex"],
-        "platform": ["github-actions"],
-        "task": ["review"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
         "maturity": "validated",
         "owner": "@kaiohenricunha",
         "created": "2025-01-01",
@@ -1551,9 +1952,16 @@
         "name": "handoff",
         "type": "skill",
         "version": "1.3.0",
-        "domain": ["devex"],
-        "platform": ["none"],
-        "task": ["documentation", "debugging"],
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation",
+          "debugging"
+        ],
         "maturity": "draft",
         "owner": "@kaiohenricunha",
         "created": "2026-04-17",
@@ -1571,6 +1979,256 @@
         "binding": "consumer",
         "rationale": "The coordinator maps user intent to a bounded context-transfer CLI and verifies its output."
       }
+    },
+    {
+      "sourcePath": "commands/changelog.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "changelog",
+        "name": "changelog",
+        "type": "command",
+        "description": "Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.\n",
+        "version": "1.0.0",
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "argument-hint": "[ref-range|count|since-deploy]",
+        "model": "haiku"
+      },
+      "bodyHash": "55fd58d9ecd0cfde0fb9a961a396e0873949785913a24a8a344f118b2345b79c",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/markdown.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "markdown",
+        "name": "markdown",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": [
+          "devex",
+          "writing"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.\n",
+        "argument-hint": "[file | dir]",
+        "model": "haiku"
+      },
+      "bodyHash": "3058932f1169a4f5092bbdfa6fc1f2bf32afe5afec65e45dc71d40e61cd30f20",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/tldr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "tldr",
+        "name": "tldr",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": [
+          "devex",
+          "writing"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "documentation"
+        ],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-16",
+        "updated": "2026-09-16",
+        "description": "Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.\n",
+        "argument-hint": "[PR number | branch | path | URL | topic] (default: current branch vs origin/main)",
+        "model": "haiku",
+        "related": [
+          "pr-tldr"
+        ]
+      },
+      "bodyHash": "956457639687e55d62773ea2a71d53f56a985c5f9e206f91b31236ec458a2cba",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/pr-tldr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "pr-tldr",
+        "name": "pr-tldr",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": [
+          "devex",
+          "writing"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review"
+        ],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-13",
+        "updated": "2026-09-16",
+        "description": "Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.\n",
+        "argument-hint": "[PR number | branch] (default: current branch vs origin/main)",
+        "model": "haiku",
+        "related": [
+          "tldr"
+        ]
+      },
+      "bodyHash": "2b41e18f7d0a2c6e92ad5ee2948050376721f14ae2e27a39c4fe0a424cb8095a",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/merge-pr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "merge-pr",
+        "name": "merge-pr",
+        "type": "command",
+        "version": "2.1.0",
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-13",
+        "description": "Merge a pull request only after verifying that trusted evidence covers its exact head SHA.\n",
+        "argument-hint": "[PR#]",
+        "model": "sonnet"
+      },
+      "bodyHash": "3f99e6551210f94ee1813397740765fe18401e05a976dd083a788f918e77dc00",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/pre-pr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "pre-pr",
+        "name": "pre-pr",
+        "type": "command",
+        "version": "1.1.0",
+        "domain": [
+          "devex"
+        ],
+        "platform": [
+          "none"
+        ],
+        "task": [
+          "review",
+          "testing"
+        ],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-18",
+        "updated": "2026-08-12",
+        "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the quality profile, and surface a go/no-go summary before opening a pull request.\n",
+        "argument-hint": "[base-branch] [--conductor] — default: origin/main",
+        "model": "sonnet",
+        "headless_safe": false
+      },
+      "bodyHash": "aee56d31f6a0198d61ea3c2cedb822ba1782836e89d0ee38c853f2c79f1e38ed",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/dependabot-sweep.md",
+      "artifactKind": "command",
+      "category": "D",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "dependabot-sweep",
+        "name": "dependabot-sweep",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": [
+          "devex",
+          "security"
+        ],
+        "platform": [
+          "github-actions"
+        ],
+        "task": [
+          "review"
+        ],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.\n",
+        "model": "sonnet"
+      },
+      "bodyHash": "5a5ec8fc06a5862f24790ca74dcc25d1fe0ab2580ba1f10557632de4c0a350d1",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
     }
   ],
   "neutral": {
@@ -1580,9 +2238,17 @@
       "name": "local-attest",
       "type": "skill",
       "version": "1.2.0",
-      "domain": ["devex", "observability"],
-      "platform": ["github-actions"],
-      "task": ["testing", "runtime-ops"],
+      "domain": [
+        "devex",
+        "observability"
+      ],
+      "platform": [
+        "github-actions"
+      ],
+      "task": [
+        "testing",
+        "runtime-ops"
+      ],
       "maturity": "draft",
       "owner": "@kaiohenricunha",
       "created": "2026-05-23",
@@ -1596,5 +2262,6 @@
     "bodyHash": "2e619036b2c245fc211aafb1315be95b12d793806ca286824581d6d1ac94a1b3"
   },
   "securityOriginalCommit": "8827df12b990a3aa7cd9e61232a8003f3dcab037",
-  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be"
+  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be",
+  "dynamicCommandsOriginalCommit": "b8bffed0e17b2c3cdcce482717a2e5cbab0eb627"
 }

@@ -3,16 +3,25 @@ id: dependabot-sweep
 name: dependabot-sweep
 type: command
 version: 1.0.0
-domain: [devex, security]
-platform: [github-actions]
-task: [review]
+domain:
+  - devex
+  - security
+platform:
+  - github-actions
+task:
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
   Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: session
 ---
 
 Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produce a risk-annotated table and merge only safe bumps.

@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:9fc69ff8ca4786d33bd32a63fe99f0bbb594db7a24ef44df5ac55d8d80d502d6 source=commands/markdown.md — do not edit directly
+# dotbabel:generated projection=sha256:571b9f6932aec939d65b0aef0f18908034b3289e896fe101f71013e6ff6aad58 source=commands/markdown.md — do not edit directly
 argument-hint: "[file | dir]"
 description: |
   Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.

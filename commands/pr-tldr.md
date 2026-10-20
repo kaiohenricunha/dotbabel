@@ -3,18 +3,28 @@ id: pr-tldr
 name: pr-tldr
 type: command
 version: 1.0.0
-domain: [devex, writing]
-platform: [none]
-task: [review]
+domain:
+  - devex
+  - writing
+platform:
+  - none
+task:
+  - review
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-09-13
-updated: 2026-09-16
-description: >
+created: 2026-09-13T00:00:00.000Z
+updated: 2026-09-16T00:00:00.000Z
+description: |
   Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.
 argument-hint: "[PR number | branch] (default: current branch vs origin/main)"
 model: haiku
-related: [tldr]
+related:
+  - tldr
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: mechanical
+    binding: session
 ---
 
 Explain what a pull request gives us, for a reader who is not a developer.
