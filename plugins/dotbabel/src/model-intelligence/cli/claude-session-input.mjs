@@ -12,6 +12,8 @@ export const VERIFIED_CLAUDE_MAIN_VERSIONS = claude.VERIFIED_MAIN_VERSIONS;
 
 const fail = code => Object.assign(new Error(code), { code });
 const providerWindow = freshnessPolicyFor(anthropic);
+// Only this reviewed source is release-scoped under REL-4; another knowledge source never substitutes.
+const RELEASE_DOCS_SOURCE_ID = "claude-release-docs";
 const safeSelector = value => typeof value === "string" && checkOpaqueValue("model", value);
 
 /**
@@ -58,12 +60,12 @@ export function createClaudeSessionInputLoader(options = {}) {
       // Reviewed exact-model documentation supplies native effort vocabulary and tool support.
       // A new model or contradiction retains only API facts; no family-name inference occurs.
       const documented = snapshot.runtimes.claude.models.find(model => model.model === id);
-      const caps = documented?.fields.capabilities?.find(entry => entry.provenance.sourceKind === "knowledge-source" && entry.provenance.sourceId !== anthropic.SOURCE_ID && entry.value.reasoning === fact.capabilities?.reasoning);
+      const caps = documented?.fields.capabilities?.find(entry => entry.provenance.sourceKind === "knowledge-source" && entry.provenance.sourceId === RELEASE_DOCS_SOURCE_ID && entry.value.reasoning === fact.capabilities?.reasoning);
       if (caps) {
         const source = releaseSourceFor(snapshot, caps.provenance);
         fields.capabilities = [envelope(caps.value, caps.provenance, source.observedAt)];
       }
-      const supported = documented?.fields.supportedReasoningLevels?.find(entry => entry.provenance.sourceKind === "knowledge-source" && entry.provenance.sourceId !== anthropic.SOURCE_ID);
+      const supported = documented?.fields.supportedReasoningLevels?.find(entry => entry.provenance.sourceKind === "knowledge-source" && entry.provenance.sourceId === RELEASE_DOCS_SOURCE_ID);
       if (supported) {
         const source = releaseSourceFor(snapshot, supported.provenance);
         const intersection = fact.supportedReasoningLevels.filter(level => supported.value.some(value => value.effort === level.effort));
@@ -72,7 +74,7 @@ export function createClaudeSessionInputLoader(options = {}) {
       models.set(id, { model: id, fields });
     }
     if (!models.size) throw fail("native_catalog_unavailable");
-    const observedAt = [native.observedAt, ...[...models.values()].flatMap(model => model.fields.id.map(entry => entry.observedAt))].sort()[0];
+    const observedAt = [native.observedAt, ...[...models.values()].flatMap(model => model.fields.id.map(entry => entry.observedAt))].sort((a, b) => Date.parse(a) - Date.parse(b))[0];
     return { observedAt, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [...models.values()] }] } };
   }
   return {

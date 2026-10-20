@@ -32,6 +32,24 @@ describe("Claude session resolver input", () => {
     const decision = await prepareRoute({ repoRoot: "/project", prompt: "Format the supplied JSON with two-space indentation.", runtimeCapability: { support: "supported", axes: { model: "supported", reasoning: "supported" } }, current: { axes: {}, turnExecuted: false }, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } }, { readActivation: async () => ({ enabled: true, routingEnabled: true }), loadResolverInput: f.loader.load });
     expect(decision).toMatchObject({ status: "proposed", changes: { model, reasoning: "low" } });
   });
+  it("ages the cache from the oldest observation in time order, not string order", async () => {
+    let at = "2026-10-18T18:00:00.000Z";
+    const observe = vi.fn(async () => ({ status: "ok", provenance: { sourceId: "claude", sourceKind: "runtime", sourceVersion: version, adapterVersion: "3" }, observedAt: "2026-10-18T17:30:00.000Z", evidence: { axes: { model }, runtimeVersion: version, turnExecuted: false } }));
+    const f = fixture({ observe, now: () => at });
+    // 19:00+05:00 is 14:00Z: older than the 17:30Z probe although it sorts later as a string.
+    await f.loader.load("/project", { ...native(), observedAt: "2026-10-18T19:00:00+05:00" });
+    at = "2026-10-18T20:30:00.000Z"; // 6.5 h after 14:00Z, 3 h after the probe.
+    await expect(f.loader.load("/project")).rejects.toMatchObject({ code: "native_catalog_required" });
+  });
+  it("uses only the reviewed release documentation source, not another knowledge source", async () => {
+    const snapshot = structuredClone(readSnapshot());
+    for (const entry of snapshot.runtimes.claude.models.flatMap(m => [...(m.fields.capabilities ?? []), ...(m.fields.supportedReasoningLevels ?? [])])) if (entry.provenance.sourceId === "claude-release-docs") entry.provenance.sourceId = "other-catalog";
+    snapshot.sources = snapshot.sources.map(source => source.sourceId === "claude-release-docs" ? { ...source, sourceId: "other-catalog" } : source);
+    const f = fixture({ snapshot }); const input = await f.loader.load("/project", native());
+    const fields = input.catalog.runtimes[0].models[0].fields;
+    expect(fields.capabilities?.[0]?.provenance.sourceId).not.toBe("other-catalog");
+    expect(fields.supportedReasoningLevels?.[0]?.provenance.sourceId).not.toBe("other-catalog");
+  });
   it("still expires live provider evidence on its own window", async () => {
     const later = "2026-10-27T12:00:00.000Z";
     const f = fixture({ now: () => later }); await expect(f.loader.load("/project", native())).rejects.toMatchObject({ code: "native_catalog_invalid" });
