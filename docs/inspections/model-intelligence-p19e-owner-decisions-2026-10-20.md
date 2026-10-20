@@ -28,7 +28,11 @@ the owner chose their requirements:
 
 Each migration keeps the authored native `model` and `effort`, every body byte, and all tools.
 Skill model and effort metadata have no verified native binding, so resolver enforcement stays
-`unknown`. These decisions do not claim measured quality rankings.
+`unknown`, and the `security-audit` Frontier floor is advisory for this skill: a consumer session
+on any model runs it without an error. The shipped classes are capability-defined
+(`policy/shipped.json`): Frontier needs reasoning and tool calls. Every current Claude model in the
+release snapshot has both, so the floor does not separate Claude models; it rejects only a model
+without reasoning or tool calls. These decisions do not claim measured quality rankings.
 
 ## Scope against the plan
 

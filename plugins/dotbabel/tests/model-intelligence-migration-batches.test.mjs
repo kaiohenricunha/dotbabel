@@ -92,6 +92,11 @@ describe("P-19e skills",()=>{
    const result=resolveFor(entry);expect(result.status,entry.sourcePath).toBe("resolved");expect(result.enforcement).toEqual({state:"unknown",basis:"none"});
   }
  });
+ it("P-19e skills: a lower user floor cannot lower the security-audit Frontier floor",()=>{
+  const entry=entries.find(item=>item.sourcePath==="skills/security-audit/SKILL.md");
+  const lowered=resolve({requirement:parseProjectionSource(artifact(entry)).requirement,target:{runtimeId:"claude",artifactKind:"skill",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY,user:{floor:{mode:"floor",requirement:"mechanical"}}}),runtimeContract:snapshot.runtimes.claude.runtimeContract});
+  expect(lowered.explanation).toContainEqual(expect.objectContaining({code:"artifact_floor_applied",message:"The effective minimum is frontier."}));
+ });
  it("P-19e skills: an explicit weak native choice cannot satisfy the Deep and Frontier requirements",()=>{
   const strong=entries.filter(entry=>["deep","frontier"].includes(entry.compute.requirement));expect(strong).toHaveLength(2);
   for(const entry of strong){const catalog=snapshotCatalog(snapshot);for(const model of catalog.runtimes[0].models)for(const fact of model.fields.capabilities)fact.value={reasoning:false,tool_call:true};
