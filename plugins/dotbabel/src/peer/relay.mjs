@@ -61,16 +61,22 @@ export async function tick(
     }
     for (const role of ["main", "advisor"]) {
       if (!live[role]) continue;
-      // One outstanding message at a time in each direction preserves order.
-      const m = p.messages.find(
-        (m) =>
-          m.to === p[role].key &&
-          !["delivered", "processed", "acknowledged"].includes(m.delivery.state),
-      );
-      if (!m) continue;
-      const token = reserve(m.delivery, now);
-      if (token)
-        out.push({ type: "message", id: m.id, token, who: p[role], text: notification(p, role) });
+      // receive returns every unread message in sequence, so a finished push (accepted,
+      // failed, or uncertain) must not block a newer one. A push in flight or a retry in
+      // backoff still holds the messages behind it.
+      for (const m of p.messages) {
+        if (
+          m.to !== p[role].key ||
+          ["delivered", "processed", "acknowledged"].includes(m.delivery.state)
+        )
+          continue;
+        const token = reserve(m.delivery, now);
+        if (token) {
+          out.push({ type: "message", id: m.id, token, who: p[role], text: notification(p, role) });
+          break;
+        }
+        if (["sending", "persisted"].includes(m.delivery.state)) break;
+      }
     }
     return out;
   });

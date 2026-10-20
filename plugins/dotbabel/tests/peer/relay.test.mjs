@@ -9,6 +9,7 @@ import {
   sendMessage,
 } from "../../src/peer/state.mjs";
 import { tick } from "../../src/peer/relay.mjs";
+import { processState } from "../../src/fleet/registry.mjs";
 const main = { harness: "claude", sessionId: "main", key: "claude:main", repo: "repo" },
   advisor = { harness: "codex", sessionId: "adv", key: "codex:adv", repo: "repo" };
 async function world() {
@@ -133,4 +134,67 @@ it("re-dispatches a waiting request after its correlated reply with a new lease"
   expect(r.lease).not.toBe(old);
   expect(r.dispatch.state).toBe("transport_accepted");
   expect(calls.filter((x) => x === advisor.key).length).toBeGreaterThan(1);
+});
+
+async function messages(bodies) {
+  const { store, id } = await world();
+  await store.transaction((s) => {
+    const p = s.pairs[0];
+    p.paused = true;
+    for (const body of bodies) sendMessage(p, advisor, "main", body);
+  });
+  const calls = [];
+  const opts = {
+    alive: () => true,
+    transport: async (w) => {
+      calls.push(w.key);
+      return { state: "transport_accepted" };
+    },
+  };
+  return { store, id, calls, opts };
+}
+it("pushes a new message although an older pushed message is still unread", async () => {
+  const { store, id, calls, opts } = await messages(["first"]);
+  await tick(store, id, opts);
+  expect(calls).toEqual([main.key]);
+  await store.transaction((s) => {
+    const p = s.pairs[0];
+    sendMessage(p, advisor, "main", "second");
+    sendMessage(p, advisor, "main", "third");
+    p.messages[0].delivery.state = "uncertain";
+  });
+  await tick(store, id, opts);
+  await tick(store, id, opts);
+  await tick(store, id, opts);
+  expect(calls).toEqual([main.key, main.key, main.key]);
+  const p = (await store.read()).pairs[0];
+  expect(p.messages.map((m) => m.delivery.state)).toEqual([
+    "uncertain",
+    "transport_accepted",
+    "transport_accepted",
+  ]);
+  expect(p.messages[0].delivery.attempts).toBe(1);
+});
+it("keeps order behind a push in flight or a retry in backoff", async () => {
+  const { store, id, calls, opts } = await messages(["first", "second"]);
+  await store.transaction((s) => {
+    s.pairs[0].messages[0].delivery = {
+      state: "sending",
+      attempts: 1,
+      nextAt: 0,
+      sender: { pid: process.pid, procStart: processState(process.pid).startTime },
+    };
+  });
+  await tick(store, id, opts);
+  expect(calls).toEqual([]);
+  await store.transaction((s) => {
+    s.pairs[0].messages[0].delivery = {
+      state: "persisted",
+      attempts: 1,
+      nextAt: Date.now() + 60000,
+    };
+  });
+  await tick(store, id, opts);
+  expect(calls).toEqual([]);
+  expect((await store.read()).pairs[0].messages[1].delivery.state).toBe("persisted");
 });
