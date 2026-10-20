@@ -77,9 +77,10 @@ function deny(reason) {
 function nativeMirror(pair, who, toolInput) {
   const id = /^\[peer (msg-[0-9a-f-]{36}) /.exec(toolInput?.message ?? "")?.[1];
   const m = pair.messages.find((x) => x.id === id && x.from === who.key && x.to === pair.main?.key);
-  // Exact equality keeps the native text identical to the ledger record.
+  // Exact equality keeps every native field identical to the ledger mirror.
   const mirror = m && nativeMessage(pair, m);
-  if (mirror && toolInput.to === mirror.to && toolInput.message === mirror.message) return null;
+  if (mirror && ["to", "summary", "message"].every((field) => toolInput[field] === mirror[field]))
+    return null;
   return deny(
     "Peer Advisor sends a native message only to its paired Main and only as a mirror of its own ledger message. Run dotbabel peer send main TEXT, then pass the native fields it returns to SendMessage unchanged.",
   );

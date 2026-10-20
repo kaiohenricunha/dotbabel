@@ -210,14 +210,15 @@ it("lets the Advisor mirror its own ledger messages natively to the paired Main 
   pairAdvisor(s, advisor, p.code, { alive: () => true });
   const mine = nativeMessage(p, sendMessage(p, advisor, "main", "finding"));
   const theirs = nativeMessage(p, sendMessage(p, main, "advisor", "note"));
-  const send = (to, message) =>
+  const send = (to, message, summary = mine.summary) =>
     peerHook(p, advisor, {
       hook_event_name: "PreToolUse",
       tool_name: "SendMessage",
-      tool_input: { to, summary: "s", message },
+      tool_input: { to, summary, message },
     });
   const decision = (r) => r?.hookSpecificOutput?.permissionDecision ?? "allow";
   expect(decision(send(mine.to, mine.message))).toBe("allow");
+  expect(decision(send(mine.to, mine.message, "other words"))).toBe("deny");
   expect(decision(send("uds:/run/user/1/cc-socks/99.sock", mine.message))).toBe("deny");
   expect(decision(send("insights", mine.message))).toBe("deny");
   expect(decision(send(mine.to, "free text without a ledger record"))).toBe("deny");

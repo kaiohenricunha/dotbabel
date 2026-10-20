@@ -309,7 +309,7 @@ Fleet's claim behavior remains unchanged. Peer does not acquire claims for reads
 Advisor's hook denies write tools and commands outside a conservative read-only
 list. It also allows `ToolSearch`, which only loads tool schemas, and `Skill` for
 the `peer` skill only. It allows `SendMessage` only to the paired Main's socket, and
-only when `to` and `message` equal the mirror of the Advisor's own ledger message
+only when `to`, `summary`, and `message` equal the mirror of the Advisor's own ledger message
 to Main. Other text and native messages to any other session stay denied. The installed hook runs in every session, so a session in no open pair exits
 at once, before any Git or registry work. A literal peer command still takes the
 full path, because pairing starts there. When a paired session's working folder or
