@@ -46,12 +46,13 @@ dotbabel task next  [--json] [--online]
 ### `dotbabel decide` (Phase 3)
 
 ```text
-dotbabel decide --step review-triage|retry|dispatch
+dotbabel decide --step review-triage|retry|dispatch [--base-ref <ref>]
   input:  JSON on stdin
   output: JSON on stdout: {step, answer, confidence, decider, fallback}
 ```
 
 - `decide()` is the library function behind the CLI (KD-5).
+- For the `retry` step, the attempt cap comes from the committed `.dotbabel.json` of a base ref, without a network call. `--base-ref <ref>` names that ref. Without it, the base is `origin/HEAD`, then `origin/main`, then `HEAD`.
 - The review skill calls `decide` only for a finding that the fast path does not take (`skills/review-pr/SKILL.md:83-89`).
 - When a model adapter fails, the built-in rule answers, and the output has `fallback: true`.
 - The run receipt records each answer through `pr-stack record`.
@@ -102,7 +103,7 @@ The repository's committed `.dotbabel.json` enables a model decider (KD-8):
 ```
 
 - `adapter` is `builtin` or `jev`.
-- The adapter's API key lives in user scope, in an environment variable or a user config file, and never in a repository.
+- The adapter's API key lives in user scope, in the `TYPESAFE_API_KEY` environment variable, and never in a repository. No configuration file holds it.
 - Without a key, the built-in rule answers, and the output has `fallback: true`.
 
 ### Host and platform adapters (Phase 2)

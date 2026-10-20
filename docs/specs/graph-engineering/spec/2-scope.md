@@ -39,6 +39,8 @@ The merge-verification work that also edited `plugins/dotbabel/bin/dotbabel-pr-s
 
 `spec.json` `linked_paths` holds only the code and schema files of the phase in progress. It gains the next phase's files when that phase starts (R-1). Shared documents, such as `docs/cli-reference.md`, stay out of `linked_paths`, because many unrelated pull requests edit them.
 
+For the same reason, these shared files that the phases touch also stay out of `linked_paths` on purpose: `package.json`, the dispatcher `plugins/dotbabel/bin/dotbabel.mjs`, `plugins/dotbabel/bin/dotbabel-doctor.mjs`, `plugins/dotbabel/bin/dotbabel-pr-stack.mjs`, `plugins/dotbabel/hooks/fleet-guard.sh`, `plugins/dotbabel/hooks/fleet-shell-prefix.sh`, `scripts/build-plugin.mjs`, the three skills `skills/review-pr/SKILL.md`, `skills/post-pr-review/SKILL.md`, and `skills/pr-conductor/SKILL.md`, and the fleet modules `registry.mjs`, `format.mjs`, `lanes.mjs`, `cpushare.mjs`, and `heavy.mjs` under `plugins/dotbabel/src/fleet/`. The 20 files in `linked_paths` are the modules, bins, and schemas that carry this spec's behavior. Recorded on 2026-10-20.
+
 ## Urgency
 
 No deadline. Finish and approve the spec first, and schedule the phases later. Decided on 2026-10-12.

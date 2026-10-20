@@ -45,6 +45,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `task-cli.test.mjs`: "task new refuses a slug that another worktree of the clone uses" (AC-2)
   - `task-cli.test.mjs`: "task update refuses an edge that closes a cycle" (AC-3)
 - **Files:** modify `task-state.mjs`, `dotbabel-task.mjs`, the task-state schema, and `docs/cli-reference.md`. Create `plugins/dotbabel/src/work-graph.mjs` with the worktree scan and the cycle check, and add it to `linked_paths`.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/task-state.test.mjs plugins/dotbabel/tests/task-cli.test.mjs`
 
 ### 1b — `task graph` and `task next`
 
@@ -57,6 +58,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `work-graph.test.mjs`: "a graph read names an unreadable task file and goes on" (REL-3)
   - `task-cli.test.mjs`: "the session-start context lists ready and blocked tasks"
 - **Files:** modify `work-graph.mjs`, `dotbabel-task.mjs`, `docs/cli-reference.md`, and `docs/hooks.md`, because the session-start context gains the ready and blocked tasks of the worktree.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/work-graph.test.mjs plugins/dotbabel/tests/task-cli.test.mjs`
 
 ### 1c — Cross-repo references
 
@@ -64,14 +66,16 @@ Each unit writes its tests first. A test name below is the exact name the test m
 - **Read first:** `plugins/dotbabel/src/work-graph.mjs`, `plugins/dotbabel/src/fleet/ledger.mjs:32-33`, `plugins/dotbabel/src/fleet/token.mjs:80-92`, `docs/fleet.md:40-46`, and §5.
 - **Tests first:**
   - `work-graph.test.mjs`: "an offline pull request reference is unknown and blocks without calling gh" (AC-5)
-  - `work-graph.test.mjs`: "the clone registry drops a path that no longer exists"
+  - `clone-registry.test.mjs`: "the clone registry drops a path that no longer exists"
 - **Files:** modify `work-graph.mjs` and `dotbabel-task.mjs`, which holds the `--online` flag and the `gh` calls. Create the clone-registry module.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/work-graph.test.mjs plugins/dotbabel/tests/clone-registry.test.mjs`
 
 ### 2-0 — Host and platform research
 
 - **Command:** `/think`
 - **Read first:** `plugins/dotbabel/src/agents.mjs`, `plugins/dotbabel/src/fleet/registry.mjs`, `plugins/dotbabel/src/fleet/lanes.mjs`, `plugins/dotbabel/src/fleet/cpushare.mjs`, `docs/fleet.md`, and `docs/specs/model-intelligence/research/phase-0-findings.md` as a precedent.
-- **Deliverable:** `docs/specs/graph-engineering/research/phase-2-0-hosts.md`. For each CLI, it gives the support state of each host capability (§5) with its evidence. For each operating system, it gives `pin` and `cpuShare`. It becomes a DOC entry. It has no tests.
+- **Deliverable:** `docs/specs/graph-engineering/research/phase-2-0-hosts.md`. For each CLI, it gives the support state of each host capability (§5) with its evidence. For each operating system, it gives `pin` and `cpuShare`. It is DOC-14. It has no tests.
+- **Verify:** `test -s docs/specs/graph-engineering/research/phase-2-0-hosts.md && grep -n "DOC-14" docs/specs/graph-engineering/research/sources.md`
 
 ### 2a — Host-adapter seam
 
@@ -82,6 +86,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `fleet-registry.test.mjs`: "a host without an adapter reports every capability as unsupported"
   - `dotbabel-doctor.test.mjs`: "doctor lists each host adapter's capability states" (OPS-2)
 - **Files:** modify `fleet/registry.mjs`, `dotbabel-doctor.mjs`, and `docs/fleet.md`. Create the host-adapter module.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/fleet-registry.test.mjs plugins/dotbabel/tests/dotbabel-doctor.test.mjs`
 
 ### 2b — Merge queue
 
@@ -95,15 +100,17 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `fleet-token.test.mjs`: "the queue check adds at most 50 ms to a token hook call" (PERF-2)
   - `fleet-token-cli.test.mjs`: "fleet token leave removes this session from the queue"
 - **Files:** modify `fleet/token.mjs`, `fleet/format.mjs`, `dotbabel-fleet.mjs`, and `docs/fleet.md`.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/fleet-token.test.mjs plugins/dotbabel/tests/fleet-token-cli.test.mjs plugins/dotbabel/tests/fleet-merge-queue.test.mjs`
 
 ### 2c — Platform adapters
 
 - **Command:** `/plan`
 - **Read first:** `plugins/dotbabel/src/fleet/lanes.mjs`, `plugins/dotbabel/src/fleet/cpushare.mjs`, `plugins/dotbabel/src/fleet/heavy.mjs`, `plugins/dotbabel/hooks/fleet-shell-prefix.sh`, `plugins/dotbabel/tests/fleet-lanes.test.mjs`, and the 2-0 document.
 - **Tests first:**
-  - `fleet-lanes.test.mjs`: "the Linux platform adapter reports pin and cpuShare as supported"
-  - `fleet-lanes.test.mjs`: "an unsupported platform turns the lanes off, and doctor says so"
+  - `fleet-platform.test.mjs`: "the Linux platform adapter reports pin and cpuShare as supported"
+  - `fleet-platform.test.mjs`: "an unsupported platform turns the lanes off, and doctor says so"
 - **Files:** modify `lanes.mjs`, `cpushare.mjs`, `heavy.mjs`, `fleet-shell-prefix.sh`, and `docs/fleet.md`. Create the platform-adapter module, and add each host adapter that 2-0 verifies.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/fleet-platform.test.mjs plugins/dotbabel/tests/fleet-lanes.test.mjs`
 
 ### 3a — The decider and `dotbabel decide`
 
@@ -118,6 +125,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `runtime-deps.test.mjs`: "the package has four runtime dependencies" (AC-13, OPS-1)
   - `dotbabel-doctor.test.mjs`: "doctor reports the decider's adapter, consent, and key presence, never the key" (OPS-2)
 - **Files:** create the decider module and `plugins/dotbabel/bin/dotbabel-decide.mjs`. Modify `plugins/dotbabel/bin/dotbabel.mjs`, `package.json`, `run-receipt.mjs` and its schema, `dotbabel-pr-stack.mjs` (`record`), `dotbabel-doctor.mjs`, and `schemas/dotbabel.config.schema.json`. The merge-verification changes to `dotbabel-pr-stack.mjs` and the config schema are on `main` (#465).
+- **Verify:** `npx vitest run plugins/dotbabel/tests/decider.test.mjs plugins/dotbabel/tests/decider-cli.test.mjs plugins/dotbabel/tests/run-receipt.test.mjs plugins/dotbabel/tests/decider-boundary.test.mjs plugins/dotbabel/tests/runtime-deps.test.mjs plugins/dotbabel/tests/dotbabel-doctor.test.mjs`
 
 ### 3b — The skills call `dotbabel decide`
 
@@ -126,6 +134,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
 - **Tests first:**
   - `skills-decide.test.mjs`: "each judgment step's skill runs dotbabel decide"
 - **Files:** modify the three skills, regenerate their copies with `scripts/build-plugin.mjs`, and update `examples/minimal-consumer/.claude/skills/`.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/skills-decide.test.mjs`
 
 ### 3c — The Jev adapter in shadow mode
 
@@ -137,6 +146,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `decider.test.mjs`: "in shadow mode the skill follows the built-in answer" (KD-9)
   - `run-receipt.test.mjs`: "records each decision with its shadow answer" (OPS-3)
 - **Files:** create the Jev adapter module, and modify the decider module.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/decider.test.mjs plugins/dotbabel/tests/jev-adapter.test.mjs plugins/dotbabel/tests/jev-transport.test.mjs plugins/dotbabel/tests/run-receipt.test.mjs`
 
 ### 3d — Exports
 
@@ -147,6 +157,7 @@ Each unit writes its tests first. A test name below is the exact name the test m
   - `export.test.mjs`: "the OTLP export names its convention version"
   - `decider.test.mjs`: "a canary key never reaches the receipt, an export, or a log line" (AC-11, SEC-1)
 - **Files:** create the exporter module and `plugins/dotbabel/bin/dotbabel-export.mjs`. Modify `plugins/dotbabel/bin/dotbabel.mjs` and `package.json`.
+- **Verify:** `npx vitest run plugins/dotbabel/tests/export.test.mjs plugins/dotbabel/tests/decider.test.mjs`
 
 ### 3e — Adoption per step
 
@@ -155,6 +166,8 @@ Each unit writes its tests first. A test name below is the exact name the test m
 - **Work:** run the step's experiment under its locked rule. On ADOPT, a reviewed pull request records the step's thresholds and links the experiment report. A configuration switch alone cannot adopt a step (KD-9, A-7). Retry and dispatch each need their own experiment and locked rule first.
 - **Tests first:**
   - `decider.test.mjs`: "an adapter answers a step only when that step is adopted"
+- **Result:** no step is adopted (DOC-15).
+- **Verify:** `npx vitest run plugins/dotbabel/tests/decider.test.mjs`
 
 ## 6.4 Testing Strategy
 

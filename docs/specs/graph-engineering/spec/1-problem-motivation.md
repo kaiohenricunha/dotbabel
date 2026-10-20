@@ -9,11 +9,11 @@
 ## Why
 
 - Agent sessions that run in parallel in one repository have no shared view of which work is ready and which waits on other work. Each session plans alone.
-- The fleet coordinates sessions only at run time, with file claims, a merge token, a merge event feed, and CPU lanes (`docs/fleet.md:1-21`). It works only in Claude Code, because it reads the Claude Code session registry (`docs/fleet.md:165-166`). dotbabel supports six CLIs (`plugins/dotbabel/src/agents.mjs:99-230`).
-- Nothing records that one task waits on another. The task contract has no dependency field, and each worktree keeps its own tasks (`plugins/dotbabel/src/task-state.mjs:15-16`). Only stacked pull requests get a dependency order (`plugins/dotbabel/src/pr-stack.mjs:240`, `:445-446`).
+- The fleet coordinates sessions only at run time, with file claims, a merge token, a merge event feed, and CPU lanes (`docs/fleet.md:1-21`, DOC-2). It works only in Claude Code, because it reads the Claude Code session registry (`docs/fleet.md:165-166`). dotbabel supports six CLIs (`plugins/dotbabel/src/agents.mjs:99-230`, DOC-5).
+- Nothing records that one task waits on another. The task contract has no dependency field, and each worktree keeps its own tasks (`plugins/dotbabel/src/task-state.mjs:15-16`, DOC-3). Only stacked pull requests get a dependency order (`plugins/dotbabel/src/pr-stack.mjs:240`, `:445-446`, DOC-4).
 - The merge token does not queue, so merges land in retry order, not in dependency order (`docs/fleet.md:514-515`).
 - Collisions are common. Of concurrent pull request pairs from different agents, 41.7% conflict, against 19.8% for pairs from one agent (DOC-1).
-- Judgment steps, such as review triage, send every non-mechanical finding to a full LLM validation (`skills/review-pr/SKILL.md:83-89`). A cheaper decision step has no place to plug in.
+- Judgment steps, such as review triage, send every non-mechanical finding to a full LLM validation (`skills/review-pr/SKILL.md:83-89`, DOC-6). A cheaper decision step has no place to plug in.
 
 ## What
 
