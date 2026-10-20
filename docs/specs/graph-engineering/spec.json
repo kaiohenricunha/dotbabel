@@ -1,7 +1,7 @@
 {
   "id": "graph-engineering",
   "title": "Graph engineering — a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
-  "status": "implementing",
+  "status": "done",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/task-state.mjs",

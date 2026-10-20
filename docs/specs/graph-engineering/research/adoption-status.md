@@ -1,10 +1,10 @@
-# Model adapter adoption — 2026-10-16
+# Model adapter adoption — 2026-10-16, updated 2026-10-20
 
-| Step          | Locked evidence                                                                                      | Disposition                       |
-| ------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------- |
-| review-triage | [Completed triage experiment](../../../experiments/2026-10-12-jev-finding-triage.md), run 2026-10-13 | REJECT; remain in shadow mode     |
-| retry         | No locked experiment or labeled dataset exists                                                       | UNMEASURED; remain in shadow mode |
-| dispatch      | No locked experiment or labeled dataset exists                                                       | UNMEASURED; remain in shadow mode |
+| Step          | Locked evidence                                                                                                  | Disposition                                        |
+| ------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| review-triage | [Completed triage experiment](../../../experiments/2026-10-12-jev-finding-triage.md), run 2026-10-13             | REJECT; remain in shadow mode                      |
+| retry         | [Protocol v4 result](../../../experiments/graph-step-adoption-v4/retry-results-2026-10-20.md), run 2026-10-20    | INCONCLUSIVE (sample floor); remain in shadow mode |
+| dispatch      | [Protocol v3 result](../../../experiments/graph-step-adoption-v3/dispatch-results-2026-10-19.md), run 2026-10-19 | REJECT; remain in shadow mode                      |
 
 The triage run measured kappa 0.069 against a 0.6 floor and auto-decided 6.5%
 against a 20% floor. Its 2,000 PR-clustered bootstrap samples do not rescue
@@ -21,3 +21,12 @@ representative labeled dataset, and a passing result. Retry and dispatch do
 not inherit triage thresholds or evidence. A reviewed change must cite the
 result and add the step's adopted thresholds. No live experiment runs in this
 continuation, and the repository remains on its built-in default.
+
+## Update — 2026-10-20
+
+On 2026-10-19 the owner approved checked `ai-annotation-verified` labels as adoption evidence
+(`docs/experiments/graph-step-adoption-v3/README.md`). Dispatch then ran under locked protocol v3:
+Jev named no reviewer in 124 cases, so recall was 0 and the result is REJECT. Retry ran under
+locked protocol v4: the sealed dataset has 9 agreed `ask-owner` cases against a floor of 20, so
+the result is INCONCLUSIVE, and no retry request was sent. No step is adopted, and every step
+keeps its built-in rule. A later retry study, with a larger dataset, is new work.
