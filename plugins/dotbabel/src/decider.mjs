@@ -5,7 +5,7 @@ import { DECISION_STEPS, validAnswer, probability } from "./decision-value.mjs";
 export const ADOPTION = Object.freeze({
   "review-triage": Object.freeze({ status: "REJECT", report: "docs/experiments/2026-10-12-jev-finding-triage.md", hi: 0.9, lo: 0.1 }),
   retry: Object.freeze({ status: "UNMEASURED", report: null }),
-  dispatch: Object.freeze({ status: "UNMEASURED", report: null }),
+  dispatch: Object.freeze({ status: "REJECT", report: "docs/experiments/graph-step-adoption-v3/dispatch-results-2026-10-19.md" }),
 });
 
 /** The adapter's execution capabilities and per-step adoption states.

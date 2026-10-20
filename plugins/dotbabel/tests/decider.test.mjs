@@ -1,5 +1,5 @@
 import { expect, it, vi } from "vitest";
-import { decide, deciderAdapter } from "../src/decider.mjs";
+import { decide, deciderAdapter, ADOPTION } from "../src/decider.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync, execFileSync } from "node:child_process";
@@ -48,7 +48,10 @@ it("in shadow mode the skill follows the built-in answer", async () => {
   expect(out).toMatchObject({ answer: "full-validation", decider: "builtin", shadow: { decider: "jev", answer: "auto-valid", confidence: 0.99 } });
 });
 it("an adapter answers a step only when that step is adopted", async () => {
-  // The locked triage experiment returned REJECT; retry and dispatch have no ADOPT evidence.
+  // The locked triage and dispatch experiments returned REJECT; retry has no locked result.
+  expect(ADOPTION.dispatch).toMatchObject({ status: "REJECT", report: "docs/experiments/graph-step-adoption-v3/dispatch-results-2026-10-19.md" });
+  expect(ADOPTION.retry.status).toBe("UNMEASURED");
+  expect(fs.existsSync(new URL(`../../../${ADOPTION.dispatch.report}`, import.meta.url))).toBe(true);
   for (const step of ["review-triage", "retry", "dispatch"]) {
     expect(deciderAdapter("jev").steps[step].support).toBe("unverified");
   }
