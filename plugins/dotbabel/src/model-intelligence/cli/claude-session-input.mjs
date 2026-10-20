@@ -11,7 +11,9 @@ export const VERIFIED_CLAUDE_MAIN_VERSIONS = claude.VERIFIED_MAIN_VERSIONS;
 
 const fail = code => Object.assign(new Error(code), { code });
 const providerWindow = freshnessPolicyFor(anthropic);
-const documentationWindow = { staleAfterMs: 86400000, expireAfterMs: 604800000 };
+// REL-4 source-specific override: reviewed exact-model facts ship inside this release's snapshot and
+// stay valid for that release. Live availability still comes from the fresh probe and Models API.
+export const RELEASE_DOCUMENTATION_FRESHNESS = Object.freeze({ basis: "release-snapshot", reason: "Reviewed exact-model tool and effort facts are fixed for the shipped release snapshot; availability stays on live evidence." });
 const safeSelector = value => typeof value === "string" && checkOpaqueValue("model", value);
 
 /**
@@ -48,7 +50,7 @@ export function createClaudeSessionInputLoader(options = {}) {
       const id = observation.evidence?.axes?.model;
       if (observation.status !== "ok" || observation.evidence?.turnExecuted !== false || observation.evidence.runtimeVersion !== native.version || !fresh(observation.observedAt) || observation.provenance?.sourceId !== "claude" || observation.provenance?.sourceKind !== "runtime" || observation.provenance?.sourceVersion !== native.version || !facts.has(id) || models.has(id)) continue;
       const fact = facts.get(id);
-      const envelope = (value, provenance, observedAt, window = providerWindow) => ({ value, provenance, observedAt, freshness: deriveFreshness({ observedAt, now: now(), policy: window }), confidence: "high", availability: "available", refresh: "idle" });
+      const envelope = (value, provenance, observedAt, window = providerWindow) => ({ value, provenance, observedAt, freshness: window === RELEASE_DOCUMENTATION_FRESHNESS ? "fresh" : deriveFreshness({ observedAt, now: now(), policy: window }), confidence: "high", availability: "available", refresh: "idle" });
       const runtimeFact = value => [envelope(value, observation.provenance, observation.observedAt)];
       const providerFact = value => [envelope(value, provider.provenance, provider.observedAt)];
       const fields = { id: runtimeFact(id), selectionVisibility: runtimeFact("listed") };
@@ -60,13 +62,13 @@ export function createClaudeSessionInputLoader(options = {}) {
       const caps = documented?.fields.capabilities?.find(entry => entry.provenance.sourceKind === "knowledge-source" && entry.provenance.sourceId !== anthropic.SOURCE_ID && entry.value.reasoning === fact.capabilities?.reasoning);
       if (caps) {
         const source = releaseSourceFor(snapshot, caps.provenance);
-        fields.capabilities = [envelope(caps.value, caps.provenance, source.observedAt, documentationWindow)];
+        fields.capabilities = [envelope(caps.value, caps.provenance, source.observedAt, RELEASE_DOCUMENTATION_FRESHNESS)];
       }
       const supported = documented?.fields.supportedReasoningLevels?.find(entry => entry.provenance.sourceKind === "knowledge-source" && entry.provenance.sourceId !== anthropic.SOURCE_ID);
       if (supported) {
         const source = releaseSourceFor(snapshot, supported.provenance);
         const intersection = fact.supportedReasoningLevels.filter(level => supported.value.some(value => value.effort === level.effort));
-        fields.supportedReasoningLevels = [envelope(claude.annotateReasoningLevels(intersection), supported.provenance, source.observedAt, documentationWindow)];
+        fields.supportedReasoningLevels = [envelope(claude.annotateReasoningLevels(intersection), supported.provenance, source.observedAt, RELEASE_DOCUMENTATION_FRESHNESS)];
       }
       models.set(id, { model: id, fields });
     }
@@ -84,7 +86,7 @@ export function createClaudeSessionInputLoader(options = {}) {
       const cached = cache.get(repoRoot);
       if (!cached || !fresh(cached.observedAt)) throw fail("native_catalog_required");
       const catalog = structuredClone(cached.catalog);
-      for (const model of catalog.runtimes[0].models) for (const entries of Object.values(model.fields)) for (const entry of entries) entry.freshness = deriveFreshness({ observedAt: entry.observedAt, now: now(), policy: entry.provenance.sourceId === "claude-release-docs" ? documentationWindow : providerWindow });
+      for (const model of catalog.runtimes[0].models) for (const entries of Object.values(model.fields)) for (const entry of entries) entry.freshness = entry.provenance.sourceId === "claude-release-docs" ? "fresh" : deriveFreshness({ observedAt: entry.observedAt, now: now(), policy: providerWindow });
       const { shipped, user, project } = (options.loadPolicy ?? loadPolicyLayers)({ repoRoot });
       return { policy: mergePolicy({ shipped, user, project }), catalog, target: { runtimeId: "claude", artifactKind: "workflow" }, runtimeContract: claude.descriptor, invocation: { requiredModalities: ["text", "image"] } };
     },

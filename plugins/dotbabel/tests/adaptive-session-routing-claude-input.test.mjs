@@ -20,6 +20,22 @@ describe("Claude session resolver input", () => {
     const decision = await prepareRoute({ repoRoot: "/project", prompt: "Format the supplied JSON with two-space indentation.", runtimeCapability: { support: "supported", axes: { model: "supported", reasoning: "supported" } }, current: { axes: {}, turnExecuted: false }, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } }, { readActivation: async () => ({ enabled: true, routingEnabled: true }), loadResolverInput: f.loader.load });
     expect(decision).toMatchObject({ status: "proposed", changes: { model, reasoning: "low" } });
   });
+  it("keeps reviewed release documentation valid for its release while live evidence stays fresh", async () => {
+    const later = "2026-10-27T12:00:00.000Z";
+    const observe = vi.fn(async () => ({ status: "ok", provenance: { sourceId: "claude", sourceKind: "runtime", sourceVersion: version, adapterVersion: "3" }, observedAt: later, evidence: { axes: { model }, runtimeVersion: version, turnExecuted: false } }));
+    const f = fixture({ observe, now: () => later }); const input = await f.loader.load("/project", { ...native(), observedAt: later });
+    const fields = input.catalog.runtimes[0].models[0].fields;
+    expect(fields.capabilities[0]).toMatchObject({ freshness: "fresh", provenance: { sourceId: "claude-release-docs" } });
+    expect(fields.supportedReasoningLevels[0]).toMatchObject({ freshness: "fresh", provenance: { sourceId: "claude-release-docs" } });
+    const cached = (await f.loader.load("/project")).catalog.runtimes[0].models[0].fields;
+    expect(cached.capabilities[0].freshness).toBe("fresh"); expect(cached.id[0].freshness).toBe("fresh");
+    const decision = await prepareRoute({ repoRoot: "/project", prompt: "Format the supplied JSON with two-space indentation.", runtimeCapability: { support: "supported", axes: { model: "supported", reasoning: "supported" } }, current: { axes: {}, turnExecuted: false }, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } }, { readActivation: async () => ({ enabled: true, routingEnabled: true }), loadResolverInput: f.loader.load });
+    expect(decision).toMatchObject({ status: "proposed", changes: { model, reasoning: "low" } });
+  });
+  it("still expires live provider evidence on its own window", async () => {
+    const later = "2026-10-27T12:00:00.000Z";
+    const f = fixture({ now: () => later }); await expect(f.loader.load("/project", native())).rejects.toMatchObject({ code: "native_catalog_invalid" });
+  });
   it("requires native evidence instead of using release eligibility as live availability", async () => {
     const f = fixture(); await expect(f.loader.load("/project")).rejects.toMatchObject({ code: "native_catalog_required" });
     expect(f.observe).not.toHaveBeenCalled();
