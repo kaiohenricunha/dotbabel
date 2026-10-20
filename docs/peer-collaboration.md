@@ -273,6 +273,10 @@ Advisor gets Main's actual worktree path, not a stale patch export. It can read
 current uncommitted and untracked files without checking out branches or applying
 patches. Main can change a file during inspection; there is no atomic multi-file
 snapshot. Re-read evidence before reporting and report stale/unavailable worktrees.
+A member can move to another worktree of the same repository, for example after
+its task worktree is removed. Its next hook event or peer command from the new
+worktree updates the recorded path. Only the same process incarnation can do this.
+Until then, liveness reports that member as unavailable and the relay skips it.
 Fleet's claim behavior remains unchanged. Peer does not acquire claims for reads.
 
 Advisor's hook denies write tools and commands outside a conservative read-only

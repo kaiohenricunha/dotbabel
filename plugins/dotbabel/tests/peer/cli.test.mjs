@@ -38,9 +38,9 @@ function world() {
     DOTBABEL_PEER_STATE_DIR: path.join(root, "state"),
     DOTBABEL_PEER_NO_RELAY: "1",
   };
-  function cli(args, n = 0, input) {
+  function cli(args, n = 0, input, cwd = repo) {
     return spawnSync(process.execPath, [bin, ...args], {
-      cwd: repo,
+      cwd,
       env: { ...env, DOTBABEL_PEER_HOOK_SESSION: ids[n].sessionId },
       input,
       encoding: "utf8",
@@ -190,6 +190,50 @@ it("guards Advisor mutation tools and shell writes while allowing read-only insp
   );
   expect(r.status).toBe(0);
   expect(r.stdout.trim()).toBe("");
+});
+it("follows Main into its current worktree after the registered worktree is removed", () => {
+  const w = world();
+  execFileSync("git", [
+    "-C",
+    w.repo,
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "fixture",
+  ]);
+  const [task, next, last] = ["es9", "check-bc", "final"].map((name) => {
+    const dir = path.join(w.root, name);
+    execFileSync("git", ["-C", w.repo, "worktree", "add", "-qb", name, dir]);
+    return fs.realpathSync(dir);
+  });
+  const p = json(w.cli(["main", "--json"], 0, undefined, task));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  execFileSync("git", ["-C", w.repo, "worktree", "remove", task]);
+  expect(json(w.cli(["status", "--json"], 1)).main_alive).toBe(false);
+  const hook = w.cli(
+    ["hook", "PreToolUse"],
+    0,
+    JSON.stringify({
+      session_id: w.ids[0].sessionId,
+      cwd: next,
+      tool_name: "Bash",
+      tool_input: { command: "npm test" },
+    }),
+  );
+  expect(hook.status, hook.stderr).toBe(0);
+  let status = json(w.cli(["status", "--json"], 1));
+  expect(status.main_alive).toBe(true);
+  expect(status.main.worktree).toBe(next);
+  execFileSync("git", ["-C", w.repo, "worktree", "remove", next]);
+  json(w.cli(["receive", "--json"], 0, undefined, last));
+  status = json(w.cli(["status", "--json"], 1));
+  expect(status.main_alive).toBe(true);
+  expect(json(w.cli(["inspect", "--json"], 1)).main_worktree).toBe(last);
 });
 it("routes correlated messages and requires recipient acknowledgments", () => {
   const w = world(),

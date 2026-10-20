@@ -211,6 +211,7 @@ async function execute(store, command, args, flags, who, env = process.env) {
     if (command === "advisor") return domain.pairAdvisor(s, who, args[0] ?? null, { alive });
     if (command === "reconnect") return domain.reconnect(s, flags.pair, args[0], who, { alive });
     const p = pairFor(s, flags.pair, who);
+    domain.followWorktree(p, who);
     switch (command) {
       case "ask":
         return domain.enqueue(p, args.join(" "), {
