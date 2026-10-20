@@ -324,11 +324,14 @@ The generated Claude command copy therefore:
 
 - strips `dotbabel.compute` from the runtime-visible frontmatter;
 - preserves the command body and other verified Claude-compatible metadata;
-- emits no native `model:` for `dynamic` or `floor`;
-- may retain/project a native `model:` only for an explicit `pin`, because changing the session is then an explicit property of that command rather than a resolver side effect (PB-7);
+- emits no dynamically selected native `model:` for `dynamic` or `floor`;
+- may project a native `model:` for an explicit `pin`, because changing the session is then an explicit property of that command rather than a resolver side effect (PB-7);
 - follows ARCH-51 and ARCH-52 for projection ownership, provenance, and drift.
 
+**Transitional release compatibility.** IMPL-2 and the migration rule in §6.6 prohibit removing an existing working native declaration before its replacement is proven. The release baseline therefore retains an already-authored command `model:` while a `dynamic` or `floor` declaration is introduced. The shared resolver checks that exact legacy selector as an invocation pin against the semantic minimum and accepted release evidence. Missing evidence, an insufficient selector or an unverified native model binding fails the release build. This bridge never invents a selector, emits effort or changes the canonical requirement into a semantic pin. Its resolver enforcement remains unknown for the dynamic session requirement. Ordinary non-release materialization still omits a dynamic/floor command model. Remove the retained authored field only in a separate migration that proves the replacement preserves behavior.
+
 ```text
+ordinary non-release command materialization
 canonical command
     ↓
 generated Claude projection
