@@ -12,7 +12,7 @@ const fixture=JSON.parse(readFileSync(new URL("./fixtures/model-intelligence/mig
 const snapshot=readSnapshot();
 const artifact=entry=>({sourcePath:entry.sourcePath,sourceContent:readFileSync(new URL(`../../../${entry.sourcePath}`,import.meta.url),"utf8"),target:{path:entry.sourcePath,artifactKind:entry.artifactKind??"skill"}});
 for(const[batch,category]of[["P-19a","E"],["P-19b","C"],["P-19d","A"]])describe(batch,()=>{
- const entries=fixture.entries.filter(entry=>entry.category===category);
+ const entries=fixture.entries.filter(entry=>entry.category===category&&(batch!=="P-19b"||entry.artifactKind==="agent"));
  it(`${batch}: every artifact in the batch parses to the expected NormalizedComputeRequirement`,()=>{
   expect(entries).toHaveLength(category==="A"?5:category==="C"?20:6);
   for(const entry of entries){const parsed=parseProjectionSource(artifact(entry));const compute=parseComputeDeclaration(parsed.frontmatter,{sourcePath:entry.sourcePath});expect(compute.errors).toEqual([]);expect(compute.declared,entry.sourcePath).toBe(true);expect(compute.requirement).toMatchObject(entry.compute);}
@@ -26,6 +26,31 @@ for(const[batch,category]of[["P-19a","E"],["P-19b","C"],["P-19d","A"]])describe(
    const newFile=buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[current]}).files[0];
    expect(parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:newFile.content})).toEqual(parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:oldFile.content}));
    if(entry.artifactKind==="agent") {const resolved=resolve({requirement:parseProjectionSource(current).requirement,target:{runtimeId:"claude",artifactKind:"agent",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract,invocation:{pin:{runtime:"claude",config:{model:entry.frontmatter.model}},omitDefaultReasoning:true}});expect(resolved.status,entry.sourcePath).toBe("resolved");expect(resolved.configuration.axes).toEqual({model:entry.frontmatter.model});expect(resolved.enforcement.state).toBe("enforced");}
+  }
+ });
+});
+describe("P-19c skills",()=>{
+ const entries=fixture.entries.filter(entry=>entry.batch==="P-19c-skills");
+ it("P-19c skills: every artifact parses to the expected dynamic consumer requirement",()=>{
+  expect(entries).toHaveLength(22);
+  expect(entries.filter(entry=>entry.category==="C")).toHaveLength(21);expect(entries.filter(entry=>entry.category==="D")).toHaveLength(1);
+  for(const entry of entries){const parsed=parseProjectionSource(artifact(entry));expect(parsed.requirement,entry.sourcePath).toMatchObject(entry.compute);expect(parsed.requirement.mode).toBe("dynamic");expect(parsed.requirement.binding).toBe("consumer");}
+ });
+ it("P-19c skills: bodies, native controls, workflow and unrelated metadata remain unchanged",()=>{
+  for(const entry of entries){const parsed=parseProjectionSource(artifact(entry));const{dotbabel,...metadata}=parsed.frontmatter;expect(metadata,entry.sourcePath).toEqual(entry.frontmatter);expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(entry.bodyHash);expect(dotbabel.compute).toEqual(entry.compute);}
+ });
+ it("P-19c skills: native projections reproduce the pre-migration configuration without claiming skill binding",()=>{
+  for(const entry of entries){const current=artifact(entry),parsed=parseProjectionSource(current),before={...current,sourceContent:`---\n${yaml.dump(entry.frontmatter,{lineWidth:-1})}---\n${parsed.body}`};
+   const oldNative=parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[before]}).files[0].content});
+   const newNative=parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[current]}).files[0].content});
+   expect(newNative,entry.sourcePath).toEqual(oldNative);expect(newNative.frontmatter).not.toHaveProperty("model");expect(newNative.frontmatter).not.toHaveProperty("effort");
+   const result=resolve({requirement:parsed.requirement,target:{runtimeId:"claude",artifactKind:"skill",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract});expect(result.status,entry.sourcePath).toBe("resolved");expect(result.enforcement).toEqual({state:"unknown",basis:"none"});
+  }
+ });
+ it("P-19c skills: explicit weak native choices cannot satisfy Deep or Frontier requirements",()=>{
+  const nonRoutine=entries.filter(entry=>entry.compute.requirement!=="routine");expect(nonRoutine).toHaveLength(17);
+  for(const entry of nonRoutine){const catalog=snapshotCatalog(snapshot);for(const model of catalog.runtimes[0].models)for(const fact of model.fields.capabilities)fact.value={reasoning:false,tool_call:true};
+   const result=resolve({requirement:parseProjectionSource(artifact(entry)).requirement,target:{runtimeId:"claude",artifactKind:"skill",sourcePath:entry.sourcePath},catalog,policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract,invocation:{pin:{runtime:"claude",config:{model:entry.frontmatter.model}},omitDefaultReasoning:true}});expect(result.status,entry.sourcePath).toBe("conflict");expect(result.enforcement.state).toBe("unsatisfied");expect(result.configuration).toBeUndefined();
   }
  });
 });

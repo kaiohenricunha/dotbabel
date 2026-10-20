@@ -3,20 +3,29 @@ id: create-experiment
 name: create-experiment
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - documentation
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2026-04-29
-updated: 2026-04-30
-description: >
-  Run a scoped, local-only experiment and save the report to docs/experiments/.
-  Triggers on: "let's try", "compare A vs B", "prototype", "explore".
+created: 2026-04-29T00:00:00.000Z
+updated: 2026-04-30T00:00:00.000Z
+description: |
+  Run a scoped, local-only experiment and save the report to docs/experiments/. Triggers on: "let's try", "compare A vs B", "prototype", "explore".
 argument-hint: "[topic or hypothesis]"
 tools: Read, Grep, Glob, Bash, Write
 allowed-tools: Read Grep Glob Bash Write
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: consumer
+    rationale: Scoped engineering follows an existing implementation or review workflow with checkable results.
 ---
 
 Run a scoped, local-only experiment and produce a structured report saved to the project's `docs/experiments/` directory.

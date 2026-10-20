@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:5c0dec3c0d545a2b2af520a879fa187f28519f2a5c00e11901f8916482b04b14 source=skills/azure-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:7dcd957e5c91fb626bca81ee84698f6dbbf5b4034eb06824693cc64d8f8397e9 source=skills/azure-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <subscription context, service, or problem description>
 description: |

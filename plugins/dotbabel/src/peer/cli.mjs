@@ -39,6 +39,7 @@ Usage:
   dotbabel peer pause|resume                 control Advisor scheduling
   dotbabel peer reconnect main|advisor --pair ID
   dotbabel peer unpair                       close pairing, preserve history
+  dotbabel peer archive --pair ID            archive a closed pair; history stays readable
   dotbabel peer inspect                     Main worktree path and read-only inspection instructions
   dotbabel peer input --pair ID              independent line-oriented submission pane
   dotbabel peer relay --pair ID            foreground notification pump / recovery
@@ -95,6 +96,7 @@ const COMMANDS = new Set([
   "resume",
   "reconnect",
   "unpair",
+  "archive",
   "inspect",
   "input",
   "relay",
@@ -137,6 +139,10 @@ function pairFor(s, id, who, allowClosed = false) {
   if (who && ![found[0].main?.key, found[0].advisor?.key].includes(who.key))
     throw new Error("session is not a member of the selected pair");
   return found[0];
+}
+async function selectedPair(store, id, who, allowClosed = false) {
+  const state = allowClosed && id ? { pairs: [await store.readPair(id)] } : await store.read();
+  return pairFor(state, id, who, allowClosed);
 }
 function launchRelay(store, p, env) {
   if (env.DOTBABEL_PEER_NO_RELAY === "1" || p.closed || !p.advisor) return;
@@ -196,11 +202,15 @@ function context(p, who, env = process.env) {
 }
 async function execute(store, command, args, flags, who, env = process.env) {
   const alive = (endpoint) => endpointAlive(endpoint, { env });
+  if (command === "history") {
+    const p = await selectedPair(store, flags.pair, who, true);
+    return { requests: p.requests, messages: p.messages };
+  }
   return store.transaction((s) => {
     if (command === "main") return domain.registerMain(s, who, { alive });
     if (command === "advisor") return domain.pairAdvisor(s, who, args[0] ?? null, { alive });
     if (command === "reconnect") return domain.reconnect(s, flags.pair, args[0], who, { alive });
-    const p = pairFor(s, flags.pair, who, command === "history");
+    const p = pairFor(s, flags.pair, who);
     switch (command) {
       case "ask":
         return domain.enqueue(p, args.join(" "), {
@@ -218,8 +228,6 @@ async function execute(store, command, args, flags, who, env = process.env) {
         });
       case "queue":
         return p.requests;
-      case "history":
-        return { requests: p.requests, messages: p.messages };
       case "receive":
         return domain.receiveMessages(p, who);
       case "ack":
@@ -320,7 +328,7 @@ export async function invokePeer(who, argv, env = process.env) {
     parsed.flags["repo-root"] ||
     parsed.flags.harness ||
     parsed.flags.conversation ||
-    ["setup", "launch", "hook", "relay", "input"].includes(command)
+    ["setup", "launch", "hook", "relay", "input", "archive"].includes(command)
   )
     throw new Error("operation is unavailable through a scoped peer integration");
   validateArgs(command, args, parsed.flags);
@@ -328,7 +336,7 @@ export async function invokePeer(who, argv, env = process.env) {
   const result = await execute(store, command, args, parsed.flags, who, env);
   const pair = ["main", "advisor", "reconnect"].includes(command)
     ? result
-    : pairFor(await store.read(), parsed.flags.pair, who, ["history", "unpair"].includes(command));
+    : await selectedPair(store, parsed.flags.pair, who, ["history", "unpair"].includes(command));
   launchRelay(store, pair, env);
   return result;
 }
@@ -381,7 +389,7 @@ function validateArgs(command, args, flags) {
   if (command === "send" && args.length < 2) usage("send requires a role and message");
   if (["complete", "fail", "wait"].includes(command) && (!flags.lease || !flags.result))
     usage("completion requires --lease and --result");
-  if (["reconnect", "input", "relay"].includes(command) && !flags.pair)
+  if (["reconnect", "input", "relay", "archive"].includes(command) && !flags.pair)
     usage(`${command} requires --pair ID`);
 }
 function print(value, json, command) {
@@ -416,7 +424,10 @@ export function peerCommand(input) {
     argv = words.slice(3);
   else return null;
   if (argv.length === 1 && ["--help", "-h"].includes(argv[0])) return argv;
-  if (!COMMANDS.has(argv[0]) || ["setup", "launch", "input", "relay", "hook"].includes(argv[0]))
+  if (
+    !COMMANDS.has(argv[0]) ||
+    ["setup", "launch", "input", "relay", "hook", "archive"].includes(argv[0])
+  )
     return null;
   return argv;
 }
@@ -443,7 +454,7 @@ export async function coordinatePeer(store, who, input, env) {
       value = await execute(store, op, args, parsed.flags, who, env);
       const pair = ["main", "advisor", "reconnect"].includes(op)
         ? value
-        : pairFor(await store.read(), parsed.flags.pair, who, ["history", "unpair"].includes(op));
+        : await selectedPair(store, parsed.flags.pair, who, ["history", "unpair"].includes(op));
       launchRelay(store, pair, env);
     }
   } catch (err) {
@@ -576,6 +587,10 @@ export async function runPeer(argv, env = process.env) {
     }
     const repo = environment(() => repository(flags["repo-root"] || input?.cwd || process.cwd())),
       store = environment(() => new PeerStore(peerRoot(env), repo.key));
+    if (command === "archive") {
+      print(await store.archive(flags.pair), parsed.json, command);
+      return 0;
+    }
     if (command === "relay") {
       const p = pairFor(await store.read(), flags.pair, null);
       await pump(store, p.id);
@@ -633,12 +648,7 @@ export async function runPeer(argv, env = process.env) {
     const p =
       command === "main" || command === "advisor" || command === "reconnect"
         ? result
-        : pairFor(
-            await store.read(),
-            flags.pair,
-            who,
-            command === "history" || command === "unpair",
-          );
+        : await selectedPair(store, flags.pair, who, ["history", "unpair"].includes(command));
     launchRelay(store, p, env);
     return 0;
   } catch (err) {

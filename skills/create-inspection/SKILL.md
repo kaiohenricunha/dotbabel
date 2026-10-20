@@ -3,20 +3,29 @@ id: create-inspection
 name: create-inspection
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [review, documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - review
+  - documentation
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/.
-  Triggers on: "how should I fix", "what are my options", "investigate before I touch".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Investigate a specific problem and surface viable fix paths with trade-offs, saved to docs/inspections/. Triggers on: "how should I fix", "what are my options", "investigate before I touch".
 argument-hint: "[problem]"
 tools: Read, Grep, Glob, Bash, Write
 allowed-tools: Read Grep Glob Bash Write
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 Investigate a specific problem and produce a structured fix-path document saved to the project's `docs/inspections/` directory.

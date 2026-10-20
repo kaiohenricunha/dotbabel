@@ -3,20 +3,29 @@ id: ground-first
 name: ground-first
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [debugging, review]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - debugging
+  - review
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-04-17
-description: >
-  Produce a code-grounded analysis before any edit is proposed.
-  Triggers on: "analyze", "understand behavior", "how does this work".
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-04-17T00:00:00.000Z
+description: |
+  Produce a code-grounded analysis before any edit is proposed. Triggers on: "analyze", "understand behavior", "how does this work".
 argument-hint: "[subject]"
 tools: Read, Grep, Glob, Bash
 allowed-tools: Read Grep Glob Bash
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Evidence-based investigation or evaluation must hold several technical constraints at once.
 ---
 
 Produce a code-grounded analysis of a subject before any edits are proposed.

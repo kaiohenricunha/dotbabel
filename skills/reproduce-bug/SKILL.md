@@ -3,21 +3,28 @@ id: reproduce-bug
 name: reproduce-bug
 type: skill
 version: 1.0.0
-domain: [devex]
-platform: [none]
-task: [debugging, testing]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - debugging
+  - testing
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2026-06-14
-updated: 2026-06-14
-description: >
-  Reproduce a bug in an isolated, production-mirroring sandbox and capture a
-  failing regression test as the objective baseline to fix against. Saves a
-  report to docs/reproductions/.
-  Triggers on: "reproduce this bug", "can't reproduce", "make it fail reliably", "repro".
+created: 2026-06-14T00:00:00.000Z
+updated: 2026-06-14T00:00:00.000Z
+description: |
+  Reproduce a bug in an isolated, production-mirroring sandbox and capture a failing regression test as the objective baseline to fix against. Saves a report to docs/reproductions/. Triggers on: "reproduce this bug", "can't reproduce", "make it fail reliably", "repro".
 argument-hint: "[bug or symptom]"
 tools: Read, Grep, Glob, Bash, Write, Edit
 model: sonnet
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
+    rationale: Isolation and regression capture must reproduce the actual triggering conditions.
 ---
 
 Reproduce a bug under isolation and the exact conditions that trigger it, then capture a **failing regression test** as the objective baseline to fix against. The output is a dated report under `docs/reproductions/` plus a failing test left in the sandbox.

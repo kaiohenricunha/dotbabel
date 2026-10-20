@@ -3,22 +3,27 @@ id: spec
 name: spec
 type: skill
 version: 1.1.0
-domain: [devex]
-platform: [none]
-task: [documentation]
+domain:
+  - devex
+platform:
+  - none
+task:
+  - documentation
 maturity: validated
 owner: "@kaiohenricunha"
-created: 2025-01-01
-updated: 2026-10-13
-description: >
-  Create structured engineering specs through interactive pairing.
-  Use when the user wants to create a spec, design doc, technical specification,
-  architecture document, RFC, or engineering plan. Triggers on "let's spec this out",
-  "create a spec", "design doc", "write a technical plan", "plan the architecture".
-  Works for greenfield and brownfield projects. Outputs to docs/specs/.
+created: 2025-01-01T00:00:00.000Z
+updated: 2026-10-13T00:00:00.000Z
+description: |
+  Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on "let's spec this out", "create a spec", "design doc", "write a technical plan", "plan the architecture". Works for greenfield and brownfield projects. Outputs to docs/specs/.
 argument-hint: "[spec-name] [description] [--brownfield]"
 effort: max
 model: opus
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: frontier
+    binding: consumer
+    rationale: Engineering specification design composes architectural constraints and cross-component trade-offs.
 ---
 
 # Spec-Driven Design
