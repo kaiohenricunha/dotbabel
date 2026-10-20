@@ -7,6 +7,7 @@ import { releaseSourceFor } from "../snapshot/core.mjs";
 import * as anthropic from "../sources/knowledge/anthropic.mjs";
 import * as claude from "../sources/runtime/claude.mjs";
 
+/** Exact native Claude releases whose MAIN routing contract is measured; re-exported for the launcher and bridge. */
 export const VERIFIED_CLAUDE_MAIN_VERSIONS = claude.VERIFIED_MAIN_VERSIONS;
 
 const fail = code => Object.assign(new Error(code), { code });
