@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:e8a58ad6fa774301fe4123a18f016b50803e1f65e74713f131672eb8f995a929 source=skills/post-pr-review/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:794273d76f5a1a2a6055830f609b5b457c7cc2ac0f6c182238bcc32f7365a6a5 source=skills/post-pr-review/SKILL.md — do not edit directly
 argument-hint: "[PR#] [--dry-run] [--auto --confirm-post] [--mode review|inline] [--max-comments N] [--summary-only] [--event COMMENT|REQUEST_CHANGES|APPROVE] [--agents <csv>]"
 description: |
   Post AI-generated review findings on a GitHub PR as inline review comments via the gh CLI — the bot-style review-comment workflow GitHub Copilot used to provide before it got rate-limited. Idempotent (hidden marker dedup), rate-limit conscious (respects GitHub's 80/min secondary limit), and dry-run by default in interactive mode. Pairs with `review-pr`, which consumes the comments this skill produces and applies fixes. Triggers on: "post PR review", "leave inline comments on PR", "AI review and comment on PR", "Copilot-style PR review".

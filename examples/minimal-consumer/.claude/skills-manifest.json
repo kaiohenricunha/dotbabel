@@ -159,7 +159,7 @@
     {
       "name": "language-review",
       "path": ".claude/skills/language-review/SKILL.md",
-      "checksum": "sha256:10612f90950c4b8c60e586acaa5a22e2b82f0575f1506e2d1fbc71c3f1df1b1d",
+      "checksum": "sha256:8dc1cc6b98d4eff5d6f0b48d3467f3244a3c81254c69b3ec943a482d811c2103",
       "dependencies": [],
       "lastValidated": "2026-10-20"
     },
@@ -201,7 +201,7 @@
     {
       "name": "post-pr-review",
       "path": ".claude/skills/post-pr-review/SKILL.md",
-      "checksum": "sha256:771204416fbbf3d82572e5708f8ea9fb34ab75723b868d65641ab6add48cca7d",
+      "checksum": "sha256:7fc9e7e15e0246d3891c09be22ebad35091cfd7f63834ad0ffc0b4085fd10dcf",
       "dependencies": [],
       "lastValidated": "2026-10-20"
     },
@@ -285,7 +285,7 @@
     {
       "name": "security-audit",
       "path": ".claude/skills/security-audit/SKILL.md",
-      "checksum": "sha256:9a7e991e8772097ad369c95c852ae17db9f8906f7eddc02734c140aadacce015",
+      "checksum": "sha256:78ce311e516794129fa30572936f27b0df11cd7de9cf8c3826eed863165fa90f",
       "dependencies": [],
       "lastValidated": "2026-10-20"
     },
@@ -299,7 +299,7 @@
     {
       "name": "smoke-test",
       "path": ".claude/skills/smoke-test/SKILL.md",
-      "checksum": "sha256:660a980126051449d59b3114fd75ac8d8d06636d932154c884897c58c544760b",
+      "checksum": "sha256:df49b5a41213c7690e0cb915d62003f700bb84d21cedb0499b88b65a68aebb2a",
       "dependencies": [],
       "lastValidated": "2026-10-20"
     },
