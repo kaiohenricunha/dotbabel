@@ -37,6 +37,14 @@ function bootstrap(rows) {
     })) };
 }
 
+/** One answer check for send and evaluate: a usable answer is bound to this lock and this sample. */
+export function validAnswer(lock, row, a) {
+  return Boolean(a) && a.id === row.id && a.protocol_hash === lock.protocol_hash && a.lock_sha256 === lock.lock_sha256 &&
+    a.sample_hash === sampleHash(row) && a.fallback === false && Number.isFinite(a.confidence) && a.confidence >= 0 &&
+    a.confidence <= 1 && Array.isArray(a.answer) && new Set(a.answer).size === a.answer.length &&
+    a.answer.every(r => row.input.candidates.includes(r));
+}
+
 /** The v1 decision: ADOPT on every gate; only a stable interval makes it eligible for a reviewed promotion. */
 export function disposition(gates, fragile) {
   const adopt = Object.values(gates).every(Boolean);
@@ -54,9 +62,7 @@ export function evaluate(file, answers = []) {
   const rows = [];
   for (const row of lock.rows) {
     const a = map.get(row.id);
-    if (!a || a.protocol_hash !== lock.protocol_hash || a.lock_sha256 !== lock.lock_sha256 || a.sample_hash !== sampleHash(row) ||
-        a.fallback !== false || !Number.isFinite(a.confidence) || a.confidence < 0 || a.confidence > 1 ||
-        !Array.isArray(a.answer) || new Set(a.answer).size !== a.answer.length || a.answer.some(r => !row.input.candidates.includes(r))) continue;
+    if (!validAnswer(lock, row, a)) continue;
     const baseline = row.input.profile.includes("security-auditor") ? [] : ["security-auditor"];
     rows.push({ ...row, baseline, predicted: a.confidence < RULES.confidence ? baseline : [...new Set([...baseline, ...a.answer])] });
   }

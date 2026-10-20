@@ -70,6 +70,7 @@ test("a fragile interval keeps an ADOPT decision shadow-only", () => {
   const gates = { precision: true, recall: true, improvement: true, availability: true };
   assert.deepEqual(disposition(gates, false), { decision: "ADOPT", promotion: "review-required", adoption_eligible: true });
   assert.deepEqual(disposition(gates, true), { decision: "ADOPT", promotion: "shadow-only", adoption_eligible: false });
+  assert.match(POLICY.adoption, /only ADOPT with a stable bootstrap interval is review-required/);
   assert.deepEqual(disposition({ ...gates, recall: false }, false), { decision: "REJECT", promotion: "shadow-only", adoption_eligible: false });
 });
 
@@ -131,6 +132,27 @@ test("a failed request is recorded as unanswered and --resume sends only that re
   const again = await sendPlan(lock, out, { ...opts, resume: true });
   assert.deepEqual({ sent: again.sent, failed: again.failed, answered: again.answered }, { sent: 1, failed: 0, answered: 100 });
   assert.equal(rows(out).length, 100); assert.equal(evaluate(lock, rows(out)).answered, 100);
+});
+
+test("send appends each answer as it arrives and --resume sends again every record that evaluate would reject", async () => {
+  const labels = gold(), jev = fakeJev(labels), out = path.join(root, "journal.jsonl"), seen = [];
+  const fetch = async (url, init) => { seen.push(fs.readFileSync(out, "utf8").split("\n").filter(Boolean).length); return jev.fetch(url, init); };
+  const opts = { consent: "owner/repo", key: "k", fetch, visibility: () => "public" };
+  await sendPlan(lock, out, opts);
+  assert.deepEqual(seen, Array.from({ length: 100 }, (_, i) => i));
+  const records = rows(out); records[0] = { ...records[0], confidence: 1.2 }; records[1] = { ...records[1], sample_hash: "stale" };
+  fs.writeFileSync(out, records.map(r => JSON.stringify(r)).join("\n") + "\n", { mode: 0o600 });
+  jev.expect([labels[0].id, labels[1].id]);
+  const again = await sendPlan(lock, out, { ...opts, fetch: jev.fetch, resume: true });
+  assert.deepEqual({ sent: again.sent, answered: again.answered }, { sent: 2, answered: 100 });
+  assert.equal(rows(out).length, 100); assert.equal(evaluate(lock, rows(out)).answered, 100);
+  assert.deepEqual(fs.readdirSync(root).filter(f => f.endsWith(".tmp")), []);
+});
+
+test("a lock with a malformed timestamp is rejected at the lock layer", () => {
+  const file = path.join(root, "bad-time.json"); fs.writeFileSync(file, JSON.stringify({ ...read(lock), locked_at: "garbage" }), { mode: 0o600 });
+  assert.throws(() => validateLock(file), /invalid lock timestamp/);
+  assert.throws(() => createLock(corpus, path.join(root, "bad-at.json"), { repo: "owner/repo", at: "2026-10-19" }), /invalid lock timestamp/);
 });
 
 test("the CLI send needs the key and the send consent, and makes no request without them", () => {

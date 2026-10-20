@@ -46,8 +46,10 @@ local path, or parent evidence. Before the first request, `send`:
 5. refuses an existing output file unless `--resume` is given.
 
 Each answer record carries the protocol hash, the lock hash, and the sample hash. A failed request
-is written with `fallback: true` and counts as unanswered. `--resume` sends only the rows without a
-usable answer and rewrites the file. The key never goes into the output or the error text.
+is written with `fallback: true` and counts as unanswered. `send` appends each record when it
+arrives, so an interruption keeps the paid answers. `--resume` sends again each row that `evaluate`
+would reject, with the same answer check. At the end, `send` keeps the latest record for each row.
+The key never goes into the output or the error text.
 
 ## Commands
 
