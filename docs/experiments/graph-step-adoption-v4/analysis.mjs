@@ -59,7 +59,7 @@ export function evaluate(file, answers = []) {
   const result = { step: "retry", protocol_hash: lock.protocol_hash, lock_sha256: lock.lock_sha256, model: JEV_MODEL,
     label_source: lock.label_source, human_labels: false, collected: lock.collected, cap_determined: lock.cap_determined,
     labeled: lock.rows.length, answered: rows.length, prs: new Set(rows.map(r => r.repo + "#" + r.pr)).size,
-    class_counts: classes, unknown: lock.unknown, strata: lock.strata, cohorts: lock.cohorts, tail_sufficient_both: lock.tail_sufficient_both, unanswered: lock.rows.length - rows.length };
+    class_counts: classes, unknown: lock.unknown, strata: lock.strata, cohorts: lock.cohorts, attempts: lock.attempts, strata_classes: lock.strata_classes, tail_sufficient_both: lock.tail_sufficient_both, unanswered: lock.rows.length - rows.length };
   if (rows.length < RULES.minimum_rows || result.prs < RULES.minimum_prs || classes.some(n => n < RULES.minimum_per_class)) {
     return { ...result, decision: "INCONCLUSIVE", reason: "sample-floor", promotion: "shadow-only", adoption_eligible: false, metrics: null, bootstrap: null };
   }
