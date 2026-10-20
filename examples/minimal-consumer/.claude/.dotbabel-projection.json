@@ -879,11 +879,11 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/yolo/SKILL.md": {
-      "projectionId": "sha256:ac56730b4b269ffbf733c0ae765306a1b2bc8db0b79044cb4b63bad91744a52d",
+      "projectionId": "sha256:6568c782658f7194f48f130021df81b2b9b79b27c68e346cd07343a97cef4f1e",
       "sourcePath": "skills/yolo/SKILL.md",
-      "sourceHash": "sha256:f0b8d29847a83cf3ed720d309bec2116b4b26c5980ec18587a3b797ad7c23141",
-      "inputsHash": "sha256:fba5aec758843276e457e9a4b0231c58554f250c63795175bee9b2619ccfa1bb",
-      "outputHash": "sha256:47ca388e4901cdbb28863a826845f237a21f2d4a2211a92415a1cee815af27aa",
+      "sourceHash": "sha256:0d81dbd88ee970db78707eff8bba36a04e11bdc93f4f68e384ca36be8dd39ca3",
+      "inputsHash": "sha256:03ccb579fb4808085c3e7ead84bb19337e456a8bbe43f7c2e3a078489d7a9e9a",
+      "outputHash": "sha256:4e08f8c9ecb144c545a3ed238033b3d5c6071d1cd08d6aee555a49f22306e6c1",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
