@@ -129,6 +129,29 @@ it("runs registration, queue management, results, history and member messages in
   expect((await run("unpair")).code).toBe(0);
   expect((await run("history", "--pair", p.id)).code).toBe(0);
 });
+it("unpairs a session that closed an earlier pair, through the CLI and the host hook", async () => {
+  await pair();
+  expect((await run("unpair")).code).toBe(0);
+  ctx.who = main;
+  const second = await pair();
+  expect(await run("unpair")).toEqual({ code: 0, value: { id: second.id, closed: true }, err: "" });
+  ctx.who = main;
+  const third = await pair();
+  const original = fs.readFileSync;
+  const input = {
+    cwd: repo,
+    session_id: advisor.sessionId,
+    tool_name: "Bash",
+    tool_input: { command: "dotbabel peer unpair" },
+  };
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  const hooked = (await run("hook", "PreToolUse")).value.hookSpecificOutput.updatedInput.command;
+  const output = spawnSync("bash", ["-c", hooked], { encoding: "utf8" });
+  expect(output.status).toBe(0);
+  expect(JSON.parse(output.stdout)).toEqual({ id: third.id, closed: true });
+});
 it("recovers an endpoint and explicitly retries uncertain delivery with a bound", async () => {
   const p = await pair(),
     m = (await run("send", "main", "finding")).value;

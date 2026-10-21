@@ -163,6 +163,14 @@ function launchRelay(store, p, env) {
   });
   child.unref();
 }
+/** Restart the relay of the pair an operation used. An unpair closes its pair, which needs no relay. @param {PeerStore} store @param {string} command @param {object} result @param {string} [id] @param {object} who @param {object} env */
+async function relayAfter(store, command, result, id, who, env) {
+  if (command === "unpair") return;
+  const pair = ["main", "advisor", "reconnect"].includes(command)
+    ? result
+    : await selectedPair(store, id, who, command === "history");
+  launchRelay(store, pair, env);
+}
 async function pump(store, pairId) {
   const owner = { pid: process.pid, procStart: processState(process.pid).startTime };
   const claimed = await store.transaction((s) => {
@@ -344,10 +352,7 @@ export async function invokePeer(who, argv, env = process.env) {
   validateArgs(command, args, parsed.flags);
   const store = new PeerStore(peerRoot(env), who.repo);
   const result = await execute(store, command, args, parsed.flags, who, env);
-  const pair = ["main", "advisor", "reconnect"].includes(command)
-    ? result
-    : await selectedPair(store, parsed.flags.pair, who, ["history", "unpair"].includes(command));
-  launchRelay(store, pair, env);
+  await relayAfter(store, command, result, parsed.flags.pair, who, env);
   return result;
 }
 function validateArgs(command, args, flags) {
@@ -462,10 +467,7 @@ export async function coordinatePeer(store, who, input, env) {
       if (parsed.help || parsed.version || parsed.flags["repo-root"])
         usage("trusted peer coordination requires a literal operation in the current repository");
       value = await execute(store, op, args, parsed.flags, who, env);
-      const pair = ["main", "advisor", "reconnect"].includes(op)
-        ? value
-        : await selectedPair(store, parsed.flags.pair, who, ["history", "unpair"].includes(op));
-      launchRelay(store, pair, env);
+      await relayAfter(store, op, value, parsed.flags.pair, who, env);
     }
   } catch (err) {
     code = err.exitCode === 64 || err.code === "USAGE_UNKNOWN_FLAG" ? 64 : 1;
@@ -710,11 +712,7 @@ export async function runPeer(argv, env = process.env) {
     }
     const result = await execute(store, command, args, flags, who, env);
     print(result, parsed.json, command);
-    const p =
-      command === "main" || command === "advisor" || command === "reconnect"
-        ? result
-        : await selectedPair(store, flags.pair, who, ["history", "unpair"].includes(command));
-    launchRelay(store, p, env);
+    await relayAfter(store, command, result, flags.pair, who, env);
     return 0;
   } catch (err) {
     if (command === "hook" && flags.harness === "antigravity" && args[0] === "PreToolUse") {
