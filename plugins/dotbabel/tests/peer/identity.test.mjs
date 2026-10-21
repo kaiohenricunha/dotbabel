@@ -3,7 +3,12 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { it, expect, vi } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
-import { repository, currentSession, endpointAlive } from "../../src/peer/identity.mjs";
+import {
+  repository,
+  currentSession,
+  endpointAlive,
+  processSession,
+} from "../../src/peer/identity.mjs";
 import { processState } from "../../src/fleet/registry.mjs";
 function repo() {
   const root = makeTempDir("peer-repo-");
@@ -105,4 +110,20 @@ it("identifies separate worktrees as one repository while exposing live uncommit
     execFileSync("git", ["-C", worktree, "status", "--porcelain"], { encoding: "utf8" }),
   ).toContain("?? new.txt");
   expect(fs.readFileSync(path.join(root, "evidence.txt"), "utf8")).toBe("committed\n");
+});
+
+it("names the Claude session that owns a process through the process tree", () => {
+  const config = makeTempDir("peer-owner-");
+  fs.mkdirSync(path.join(config, "sessions"));
+  const env = { CLAUDE_CONFIG_DIR: config };
+  expect(processSession(env, process.pid)).toBe(null);
+  fs.writeFileSync(
+    path.join(config, "sessions", `${process.pid}.json`),
+    JSON.stringify({
+      pid: process.pid,
+      procStart: processState(process.pid).startTime,
+      sessionId: "parent-session",
+    }),
+  );
+  expect(processSession(env, process.pid).sessionId).toBe("parent-session");
 });
