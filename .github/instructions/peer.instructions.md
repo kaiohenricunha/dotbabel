@@ -189,6 +189,12 @@ Advisor terminal: a `!` command is not a tool call, so no tool hook sees it.
 A session has at most one open pair, so `no unique pair` means that this
 session has no open pair to close.
 
+Closing Main does not end the pairing, so unpair from Main before you close it.
+If Main has already ended, the Advisor stays read-only. Read the pair ID with
+`dotbabel peer status` in the Advisor. Then, in a new session in the same
+repository, run `dotbabel peer reconnect main --pair PAIR_ID` and then
+`dotbabel peer unpair`. `reconnect` works only after the old Main has ended.
+
 Unpairing closes the pair, cancels its open requests, and keeps its history.
 Its output gives the pair ID. The peer hooks then ignore both sessions, so the
 Advisor guard and the unread reminders stop. Both sessions stay open as
