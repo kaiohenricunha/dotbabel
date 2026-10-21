@@ -351,6 +351,12 @@ export async function invokePeer(who, argv, env = process.env) {
     throw new Error("operation is unavailable through a scoped peer integration");
   validateArgs(command, args, parsed.flags);
   const store = new PeerStore(peerRoot(env), who.repo);
+  // The guard reads the native tool as Read, so refuse here the one operation that ends it.
+  if (
+    command === "unpair" &&
+    (await selectedPair(store, parsed.flags.pair, who)).advisor?.key === who.key
+  )
+    throw new Error("the Advisor cannot unpair itself; ask the user to unpair from Main");
   const result = await execute(store, command, args, parsed.flags, who, env);
   await relayAfter(store, command, result, parsed.flags.pair, who, env);
   return result;

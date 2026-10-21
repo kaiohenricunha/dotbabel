@@ -189,7 +189,7 @@ Useful operations:
 | Retry eligible failed/waiting work           | `dotbabel peer retry REQUEST`                                                    |
 | Pause/resume automatic scheduling            | `dotbabel peer pause` / `dotbabel peer resume`                                   |
 | Replace a terminated role                    | `dotbabel peer reconnect advisor --pair PAIR_ID`                                 |
-| Close the pair, retaining history            | `dotbabel peer unpair`                                                           |
+| Close the pair from Main, retaining history  | `dotbabel peer unpair`                                                           |
 
 A reply that arrives before `wait` is recorded also resumes the investigation.
 The next claim uses a fresh lease; a reply to another question cannot resume it.
@@ -324,7 +324,11 @@ its parent's Claude process, so if a subagent call ever carries its own unknown
 `session_id`, the hook names the parent session through the process tree and still
 applies the Advisor guard. It allows `SendMessage` only to the paired Main's socket, and
 only when `to`, `summary`, and `message` equal the mirror of the Advisor's own ledger message
-to Main. Other text and native messages to any other session stay denied. The installed hook runs in every session, so a session in no open pair exits
+to Main. Other text and native messages to any other session stay denied. The Advisor's peer
+commands exclude `unpair`: a closed pair has no guard, so only Main or the user can end a
+pairing. The native `dotbabel_peer` tool refuses `unpair` for the Advisor too. In Claude Code,
+the user can also type `! dotbabel peer unpair` in the Advisor terminal, because a `!` command
+is not a tool call and no tool hook sees it. The installed hook runs in every session, so a session in no open pair exits
 at once, before any Git or registry work. A literal peer command still takes the
 full path, because pairing starts there. When a paired session's working folder or
 identity cannot be resolved, for example after its worktree is removed, Main's hook
@@ -350,7 +354,7 @@ provide an unlimited history budget. Archive closed history to restore admission
 ### Archive closed history
 
 `unpair` closes a pair and preserves its history. It does not reclaim repository
-space. Once the pair is finished, an operator can archive it explicitly:
+space. Once the pair is finished, Main unpairs it and an operator can archive it explicitly:
 
 ```bash
 dotbabel peer unpair --pair PAIR_ID

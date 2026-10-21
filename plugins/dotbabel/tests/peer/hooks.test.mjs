@@ -33,7 +33,6 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     "dotbabel peer next",
     "dotbabel peer send main 'finding; x && y'",
     `node '${new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname}' queue`,
-    "dotbabel peer unpair",
   ]) {
     expect(
       peerHook(p, advisor, {
@@ -57,6 +56,10 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     "rg --pre rm a",
     "git diff --output=x",
     "dotbabel peer setup --harness both",
+    // Unpairing would end this guard, so only Main or the user can do it.
+    "dotbabel peer unpair",
+    `node '${new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname}' unpair`,
+    `node '${new URL("../../bin/dotbabel.mjs", import.meta.url).pathname}' peer unpair`,
     'dotbabel peer send main "$(rm x)"',
     "git\nstatus",
     "cat a | tee b",
@@ -298,6 +301,7 @@ it("lets the Advisor search with grep, find, and read-only git, and delegate to 
   }).hookSpecificOutput.permissionDecisionReason;
   expect(reason).toContain("Peer Advisor is read-only");
   expect(reason).toContain("single quotes");
+  expect(reason).toContain("Only Main or the user can unpair");
   const agent = (tool_input) =>
     peerHook(p, advisor, { hook_event_name: "PreToolUse", tool_name: "Agent", tool_input })
       ?.hookSpecificOutput?.permissionDecision ?? "allow";

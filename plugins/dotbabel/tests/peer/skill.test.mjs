@@ -27,6 +27,8 @@ it("tells either role how to end the pairing and keep its history", () => {
   expect(section).not.toContain("peer status");
   for (const command of [
     "dotbabel peer unpair",
+    "refuses `unpair` from the Advisor",
+    "! dotbabel peer unpair",
     "no unique pair",
     "dotbabel peer archive --pair PAIR_ID",
     "dotbabel peer history --pair PAIR_ID",
