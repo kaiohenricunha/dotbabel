@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:acfa55df484344b52a809de7b8121adc84f5fd3a94aee087f0428eabcdb3e7c6 source=skills/peer/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:c158f9d8ec542ed8df3d77baaddf2b35963ce4bc13242c4029c3e4f75665e6bc source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status | unpair
 description: |
@@ -185,6 +185,12 @@ Main. In Claude Code, the user can also type `! dotbabel peer unpair` in the
 Advisor terminal: a `!` command is not a tool call, so no tool hook sees it.
 A session has at most one open pair, so `no unique pair` means that this
 session has no open pair to close.
+
+Closing Main does not end the pairing, so unpair from Main before you close it.
+If Main has already ended, the Advisor stays read-only. Read the pair ID with
+`dotbabel peer status` in the Advisor. Then, in a new session in the same
+repository, run `dotbabel peer reconnect main --pair PAIR_ID` and then
+`dotbabel peer unpair`. `reconnect` works only after the old Main has ended.
 
 Unpairing closes the pair, cancels its open requests, and keeps its history.
 Its output gives the pair ID. The peer hooks then ignore both sessions, so the

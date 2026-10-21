@@ -328,7 +328,9 @@ to Main. Other text and native messages to any other session stay denied. The Ad
 commands exclude `unpair`: a closed pair has no guard, so only Main or the user can end a
 pairing. The native `dotbabel_peer` tool refuses `unpair` for the Advisor too. In Claude Code,
 the user can also type `! dotbabel peer unpair` in the Advisor terminal, because a `!` command
-is not a tool call and no tool hook sees it. The installed hook runs in every session, so a session in no open pair exits
+is not a tool call and no tool hook sees it. Closing Main does not end a pairing. If Main
+has ended, a new session in the same repository can run
+`dotbabel peer reconnect main --pair PAIR_ID` and then `dotbabel peer unpair`. The installed hook runs in every session, so a session in no open pair exits
 at once, before any Git or registry work. A literal peer command still takes the
 full path, because pairing starts there. When a paired session's working folder or
 identity cannot be resolved, for example after its worktree is removed, Main's hook

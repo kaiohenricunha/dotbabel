@@ -24,11 +24,15 @@ it("lists only real peer commands in the argument hint, including unpair", () =>
 it("tells either role how to end the pairing and keep its history", () => {
   const section = SKILL.split(/^## /m).find((s) => s.startsWith("End the pairing"));
   expect(section).toBeDefined();
-  expect(section).not.toContain("peer status");
+  // After an unpair, status finds no open pair, so it cannot be the recovery step.
+  const noPair = section.split(/(?<=\.)\s/).find((s) => s.includes("no unique pair"));
+  expect(noPair).not.toContain("status");
   for (const command of [
     "dotbabel peer unpair",
     "refuses `unpair` from the Advisor",
     "! dotbabel peer unpair",
+    "unpair from Main before you close it",
+    "dotbabel peer reconnect main --pair PAIR_ID",
     "no unique pair",
     "dotbabel peer archive --pair PAIR_ID",
     "dotbabel peer history --pair PAIR_ID",
