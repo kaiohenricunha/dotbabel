@@ -72,6 +72,7 @@ function readOnlyShell(command) {
         : bin === "node" && words[1] === UMBRELLA_BIN
           ? words.slice(2)
           : [];
+  // unpair is absent: a closed pair has no guard, so only Main or the user may end it.
   return (
     cli[0] === "peer" &&
     [
@@ -95,7 +96,6 @@ function readOnlyShell(command) {
       "resume",
       "retry",
       "retry-delivery",
-      "unpair",
     ].includes(cli[1])
   );
 }
@@ -199,7 +199,7 @@ export function peerHook(pair, who, input) {
     )
       return null;
     return deny(
-      "Peer Advisor is read-only. Run one literal read-only command per call (cat, grep, rg, find, or git status, diff, show, log, grep, blame). Put patterns and globs in single quotes; pipes, redirects, chains, $, and backslashes outside single quotes are refused. Delegate a wide search to an Explore agent. Inspect files and send findings through dotbabel peer. Main owns implementation. Ask the user to unpair before changing role or permissions.",
+      "Peer Advisor is read-only. Run one literal read-only command per call (cat, grep, rg, find, or git status, diff, show, log, grep, blame). Put patterns and globs in single quotes; pipes, redirects, chains, $, and backslashes outside single quotes are refused. Delegate a wide search to an Explore agent. Inspect files and send findings through dotbabel peer. Main owns implementation. Only Main or the user can unpair; ask the user before changing role or permissions.",
     );
   }
   if (["Interrupt", "StopFailure"].includes(event)) {

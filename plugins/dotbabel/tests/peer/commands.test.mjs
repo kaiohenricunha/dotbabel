@@ -137,10 +137,11 @@ it("unpairs a session that closed an earlier pair, through the CLI and the host 
   expect(await run("unpair")).toEqual({ code: 0, value: { id: second.id, closed: true }, err: "" });
   ctx.who = main;
   const third = await pair();
+  ctx.who = main;
   const original = fs.readFileSync;
   const input = {
     cwd: repo,
-    session_id: advisor.sessionId,
+    session_id: main.sessionId,
     tool_name: "Bash",
     tool_input: { command: "dotbabel peer unpair" },
   };
@@ -400,6 +401,9 @@ it("coordinates literal peer operations in a trusted host hook with scoped resul
     const result = await hook(command);
     expect(printed(result, 64).error.code, command).toBe("PEER_USAGE");
   }
+  expect((await hook("dotbabel peer unpair")).hookSpecificOutput.permissionDecision).toBe("deny");
+  expect((await store.read()).pairs[0].closed).toBe(false);
+  ctx.who = main;
   expect(printed(await hook("dotbabel peer unpair")).closed).toBe(true);
   expect(printed(await hook("dotbabel peer status"), 1).error.code).toBe("PEER_OPERATION");
   expect(await hook("pwd")).toBe(null);

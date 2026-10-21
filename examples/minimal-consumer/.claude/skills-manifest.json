@@ -187,7 +187,7 @@
     {
       "name": "peer",
       "path": ".claude/skills/peer/SKILL.md",
-      "checksum": "sha256:5b09f794795b3b170806ce4abce5685c468a0e2e39ce33844f24e411a771553a",
+      "checksum": "sha256:416361ad6a734e1e92db07600abbdc7926213e0bdac0201abee87ee36e4e6340",
       "dependencies": [],
       "lastValidated": "2026-10-21"
     },
