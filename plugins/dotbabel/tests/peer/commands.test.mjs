@@ -3,7 +3,7 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { beforeEach, afterEach, vi, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
-const ctx = vi.hoisted(() => ({ who: null, live: true, input: [], spawned: 0 }));
+const ctx = vi.hoisted(() => ({ who: null, live: true, input: [], spawned: 0, parent: null }));
 vi.mock("../../src/peer/identity.mjs", async (importOriginal) => ({
   ...(await importOriginal()),
   currentSession: () => {
@@ -11,6 +11,7 @@ vi.mock("../../src/peer/identity.mjs", async (importOriginal) => ({
     return ctx.who;
   },
   endpointAlive: (who) => Boolean(who && !who.ended && ctx.live),
+  processSession: () => ctx.parent,
 }));
 vi.mock("../../src/peer/relay.mjs", () => ({ tick: async () => false }));
 vi.mock("node:readline", () => ({
@@ -51,6 +52,7 @@ beforeEach(() => {
   ctx.live = true;
   ctx.input = [];
   ctx.spawned = 0;
+  ctx.parent = null;
   out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 });
@@ -287,6 +289,33 @@ it("skips unpaired sessions and keeps only the Advisor guard when a member canno
     JSON.stringify({ repo: "elsewhere" }),
   );
   expect((await hook("PreToolUse", { session_id: "stranger", cwd: gone, ...write })).code).toBe(2);
+});
+
+it("resolves a subagent call with its own session ID to the parent session through the process tree", async () => {
+  await pair();
+  const original = fs.readFileSync;
+  let input;
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  async function hook(payload) {
+    input = { cwd: repo, tool_name: "Write", tool_input: { file_path: "a" }, ...payload };
+    out.mockClear();
+    const code = await runPeer(["hook", "PreToolUse", "--json"], env);
+    const text = out.mock.calls.map((x) => x[0]).join("");
+    return { code, value: text ? JSON.parse(text) : null };
+  }
+  const subagent = { session_id: "own-id", agent_id: "a1", agent_type: "Explore" };
+  const silent = { code: 0, value: null };
+  expect(await hook(subagent)).toEqual(silent);
+  ctx.parent = { sessionId: "own-id" };
+  expect(await hook(subagent)).toEqual(silent);
+  ctx.parent = { sessionId: "unpaired-parent" };
+  expect(await hook(subagent)).toEqual(silent);
+  ctx.parent = { sessionId: "advisor" };
+  ctx.who = advisor;
+  expect((await hook(subagent)).value.hookSpecificOutput.permissionDecision).toBe("deny");
+  expect(await hook({ session_id: "own-id" })).toEqual(silent);
 });
 
 it("coordinates literal peer operations in a trusted host hook with scoped results and usage failures", async () => {

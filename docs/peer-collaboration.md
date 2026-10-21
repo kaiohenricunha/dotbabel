@@ -319,7 +319,10 @@ could expand into an option. It also allows `ToolSearch`, which only loads tool
 schemas, `Skill` for the `peer` skill only, and `Agent` with `subagent_type:
 Explore` and no `isolation`. A subagent's tool calls reach the hook with the
 parent's `session_id` (with `agent_id` and `agent_type`), so the guard covers them
-too. It allows `SendMessage` only to the paired Main's socket, and
+too. This was verified on Claude Code 2.1.304 and 2.1.305. A subagent also runs inside
+its parent's Claude process, so if a subagent call ever carries its own unknown
+`session_id`, the hook names the parent session through the process tree and still
+applies the Advisor guard. It allows `SendMessage` only to the paired Main's socket, and
 only when `to`, `summary`, and `message` equal the mirror of the Advisor's own ledger message
 to Main. Other text and native messages to any other session stay denied. The installed hook runs in every session, so a session in no open pair exits
 at once, before any Git or registry work. A literal peer command still takes the

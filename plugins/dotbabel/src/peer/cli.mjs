@@ -8,7 +8,13 @@ import { setTimeout as delay } from "node:timers/promises";
 import { parse } from "../lib/argv.mjs";
 import { isOwnerAlive, processState } from "../fleet/registry.mjs";
 import { PeerStore } from "./store.mjs";
-import { repository, currentSession, endpointAlive, peerRoot } from "./identity.mjs";
+import {
+  repository,
+  currentSession,
+  endpointAlive,
+  peerRoot,
+  processSession,
+} from "./identity.mjs";
 import * as domain from "./state.mjs";
 import { tick } from "./relay.mjs";
 import { setupHooks } from "./setup.mjs";
@@ -624,7 +630,16 @@ export async function runPeer(argv, env = process.env) {
       // Every session runs this hook. A session in no pair must not fail its tool calls
       // and turn ends, for example after its worktree is removed. Pairing still starts here.
       if (!peerCommand(input)) {
-        member = await memberOf(peerRoot(env), input.session_id || env.DOTBABEL_PEER_HOOK_SESSION);
+        const sessionId = input.session_id || env.DOTBABEL_PEER_HOOK_SESSION;
+        member = await memberOf(peerRoot(env), sessionId);
+        // A subagent runs inside its parent's Claude process. If its calls ever carry their
+        // own session ID, the process tree still names the parent, so an Advisor's helper
+        // keeps the read-only guard instead of passing as an unpaired session.
+        const parent = member === null && input.agent_id && processSession(env)?.sessionId;
+        if (parent && parent !== sessionId) {
+          member = await memberOf(peerRoot(env), parent);
+          if (member) input.session_id = parent;
+        }
         if (member === null) return 0;
       }
     }

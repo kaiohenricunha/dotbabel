@@ -151,6 +151,11 @@ export function currentSession(
   };
 }
 
+/** Name the live Claude session whose process owns this one, through the process tree only. @param {NodeJS.ProcessEnv} [env] @param {number} [startPid] @returns {object|null} registry entry */
+export function processSession(env = process.env, startPid = process.ppid) {
+  return findSelf({ entries: readRegistry(sessionsDir(env)).entries, startPid });
+}
+
 /** Check incarnation, worktree, repository, and Claude's current session ID. @param {object} who @param {object} [opts] @returns {boolean} */
 export function endpointAlive(who, { env = process.env } = {}) {
   if (!who || who.ended || (who.boot && who.boot !== bootId()) || !isOwnerAlive(who)) return false;
