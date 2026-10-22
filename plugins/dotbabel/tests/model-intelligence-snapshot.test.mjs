@@ -60,23 +60,23 @@ describe("release snapshot accepted evidence", () => {
   });
   it("snapshot --write fails when a required Claude fact is unavailable and leaves the committed file untouched", async () => {
     const target = file(); const original = JSON.stringify(createSnapshot(inputs())); fs.writeFileSync(target, original);
-    await expect(updateSnapshot({ file: target, collect: async () => { throw new Error("source unavailable"); }, write: true })).rejects.toThrow(/source unavailable/);
+    await expect(updateSnapshot({ now: at, file: target, collect: async () => { throw new Error("source unavailable"); }, write: true })).rejects.toThrow(/source unavailable/);
     expect(fs.readFileSync(target, "utf8")).toBe(original);
-    await expect(updateSnapshot({ file: target, collect: async () => ({ ...inputs(), runtimes: {} }), write: true })).rejects.toThrow(/snapshot/);
+    await expect(updateSnapshot({ now: at, file: target, collect: async () => ({ ...inputs(), runtimes: {} }), write: true })).rejects.toThrow(/snapshot/);
     expect(fs.readFileSync(target, "utf8")).toBe(original);
   });
   it("default generation reports a diff without writing; explicit write atomically saves valid facts", async () => {
-    const target = file(); const first = await updateSnapshot({ file: target, collect: async () => inputs() });
+    const target = file(); const first = await updateSnapshot({ now: at, file: target, collect: async () => inputs() });
     expect(first.changed).toBe(true); expect(first.written).toBe(false); expect(fs.existsSync(target)).toBe(false);
-    const written = await updateSnapshot({ file: target, collect: async () => inputs(), write: true });
+    const written = await updateSnapshot({ now: at, file: target, collect: async () => inputs(), write: true });
     expect(written.written).toBe(true); expect(readSnapshot(target).snapshotId).toBe(first.snapshot.snapshotId);
-    expect((await updateSnapshot({ file: target, collect: async () => inputs() })).changed).toBe(false);
+    expect((await updateSnapshot({ now: at, file: target, collect: async () => inputs() })).changed).toBe(false);
   });
   it("does not replace symlinks or conflicting caller content and does not collect when locked", async () => {
     const root = makeTempDir("mi-snapshot-ownership-"); const outside = path.join(root, "outside.json"); const target = path.join(root, "snapshot.json");
     fs.writeFileSync(outside, "keep"); fs.symlinkSync(outside, target);
     const collect = vi.fn(async () => inputs());
-    await expect(updateSnapshot({ file: target, collect, write: true })).rejects.toThrow(); expect(collect).not.toHaveBeenCalled(); expect(fs.readFileSync(outside, "utf8")).toBe("keep");
+    await expect(updateSnapshot({ now: at, file: target, collect, write: true })).rejects.toThrow(); expect(collect).not.toHaveBeenCalled(); expect(fs.readFileSync(outside, "utf8")).toBe("keep");
   });
 });
 
@@ -117,12 +117,12 @@ describe("snapshot failure boundaries", () => {
   it("does not collect or write when another process holds the shared snapshot lock", async () => {
     const target = file(); const lock = acquireLock(path.join(path.dirname(target), ".dotbabel-projection.lock"), { resource: "release-snapshot" });
     expect(lock.acquired).toBe(true); const collect = vi.fn(async () => inputs());
-    try { await expect(updateSnapshot({ file: target, collect, write: true })).rejects.toThrow(/snapshot_locked/); expect(collect).not.toHaveBeenCalled(); expect(fs.existsSync(target)).toBe(false); }
+    try { await expect(updateSnapshot({ now: at, file: target, collect, write: true })).rejects.toThrow(/snapshot_locked/); expect(collect).not.toHaveBeenCalled(); expect(fs.existsSync(target)).toBe(false); }
     finally { lock.release(); }
   });
   it("retains another writer's changed bytes instead of overwriting a displaced file", async () => {
     const target = file(); fs.writeFileSync(target, "original");
-    await expect(updateSnapshot({ file: target, collect: async () => { fs.writeFileSync(target, "other writer"); return inputs(); }, write: true })).rejects.toThrow(/drift/);
+    await expect(updateSnapshot({ now: at, file: target, collect: async () => { fs.writeFileSync(target, "other writer"); return inputs(); }, write: true })).rejects.toThrow(/drift/);
     expect(fs.readFileSync(target, "utf8")).toBe("other writer");
   });
   it("keeps required source dates in the age gate even when a field claims a later observation", () => {
@@ -151,7 +151,7 @@ describe("snapshot failure boundaries", () => {
   it("refuses insufficient required floors before writing any candidate", async () => {
     const target = file(); fs.writeFileSync(target, "previous");
     const data = inputs(); data.runtimes.claude.models[0].fields.capabilities[0].value.reasoning = false;
-    await expect(updateSnapshot({ file: target, collect: async () => data, write: true, requirements: [{ runtimeId: "claude", artifactKind: "agent", requirement: { mode: "floor", binding: "self", requirement: "frontier" } }] })).rejects.toThrow("release_requirement_unsatisfied");
+    await expect(updateSnapshot({ now: at, file: target, collect: async () => data, write: true, requirements: [{ runtimeId: "claude", artifactKind: "agent", requirement: { mode: "floor", binding: "self", requirement: "frontier" } }] })).rejects.toThrow("release_requirement_unsatisfied");
     expect(fs.readFileSync(target, "utf8")).toBe("previous");
   });
   it("does not renew documentation or provider source age while rechecking native selectors", async () => {
@@ -263,10 +263,10 @@ describe("protected review regressions", () => {
     const root = makeTempDir("mi-snapshot-reserved-"); const target = path.join(root, name); const isLock = name.endsWith(".lock");
     if (!isLock) fs.writeFileSync(target, "coordination metadata");
     const collect = vi.fn(async () => inputs());
-    await expect(updateSnapshot({ file: target, collect, write: true })).rejects.toThrow("snapshot_destination_reserved");
+    await expect(updateSnapshot({ now: at, file: target, collect, write: true })).rejects.toThrow("snapshot_destination_reserved");
     expect(collect).not.toHaveBeenCalled();
     if (!isLock) expect(fs.readFileSync(target, "utf8")).toBe("coordination metadata");
     expect(fs.existsSync(path.join(root, ".dotbabel-projection.lock"))).toBe(false);
-    expect((await updateSnapshot({ file: path.join(root, "normal.json"), collect, write: true })).written).toBe(true);
+    expect((await updateSnapshot({ now: at, file: path.join(root, "normal.json"), collect, write: true })).written).toBe(true);
   });
 });

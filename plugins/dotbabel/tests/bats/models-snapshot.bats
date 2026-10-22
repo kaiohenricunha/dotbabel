@@ -13,6 +13,9 @@ setup() {
   COPY_BIN=$(command -v cp)
   COMPARE_BIN=$(command -v cmp)
   isolate_path
+  # These cases test offline and write behavior, not freshness. Stamp the copy's sources with the
+  # current time so the shipped evidence age cannot fail them. Snapshot identity excludes observedAt.
+  "$REAL_NODE" -e 'const fs=require("fs"),p=process.argv[1],s=JSON.parse(fs.readFileSync(p));const t=new Date().toISOString();s.sources.forEach(x=>x.observedAt=t);fs.writeFileSync(p,JSON.stringify(s,null,2)+"\n")' "$SNAPSHOT"
 }
 
 teardown() {
