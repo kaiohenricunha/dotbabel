@@ -252,7 +252,15 @@ it("refuses a git grep over a tracked hidden secret that rg would skip", () => {
   expect(decide("Bash", { command: `git -C '${repo}' grep -n TOKEN` }, { cwd: mainTree })).toBe(
     "deny",
   );
-  expect(bash("git grep -n TOKEN -- src")).toBe("deny");
+  // Pathspecs after -- give the exact list; a pathspec can still reach above the folder.
+  expect(bash("git grep -n TOKEN -- src")).toBe("allow");
+  expect(bash("git -C src grep -n TOKEN -- ../.secrets")).toBe("deny");
+  expect(decide("Bash", { command: "git grep -n TOKEN" }, { cwd: path.join(repo, "src") })).toBe(
+    "deny",
+  );
+  expect(
+    decide("Bash", { command: "git grep -n TOKEN -- ':/'" }, { cwd: path.join(repo, "src") }),
+  ).toBe("deny");
 });
 
 it("searches an ignored folder that rg is given by name", () => {
@@ -282,4 +290,43 @@ it("walks the visible files of a folder outside git, up to a limit", () => {
     if (saved === undefined) delete process.env.DOTBABEL_PEER_READ_ROOTS;
     else process.env.DOTBABEL_PEER_READ_ROOTS = saved;
   }
+});
+
+it("lists the files of a nested repository that rg walks into", () => {
+  gitRepo({ "src/a.mjs": true });
+  const nested = path.join(repo, "vendor", "lib");
+  execFileSync("git", ["init", "-q", nested]);
+  fs.writeFileSync(path.join(nested, "credentials.json"), "TOKEN\n");
+  expect(bash("rg -n TOKEN")).toBe("deny");
+  expect(bash("rg -n TOKEN src")).toBe("allow");
+});
+
+it("refuses a search that git cannot list instead of allowing it", () => {
+  gitRepo({ "src/a.mjs": true });
+  expect(bash("rg -n TOKEN .git")).toBe("deny");
+  expect(reasonOf("Bash", { command: "rg -n TOKEN .git" })).toContain("could not list");
+});
+
+it("asks for --no-config when an rg config file can widen the search", () => {
+  gitRepo({ "src/a.mjs": true });
+  const saved = process.env.RIPGREP_CONFIG_PATH;
+  process.env.RIPGREP_CONFIG_PATH = path.join(root, "ripgreprc");
+  try {
+    expect(bash("rg -n TOKEN src")).toBe("deny");
+    expect(reasonOf("Bash", { command: "rg -n TOKEN src" })).toContain("--no-config");
+    expect(bash("rg --no-config -n TOKEN src")).toBe("allow");
+  } finally {
+    if (saved === undefined) delete process.env.RIPGREP_CONFIG_PATH;
+    else process.env.RIPGREP_CONFIG_PATH = saved;
+  }
+});
+
+it("resolves a Codex command in its workdir", () => {
+  fs.mkdirSync(path.join(mainTree, "config"), { recursive: true });
+  fs.writeFileSync(path.join(mainTree, "config", "credentials.json"), "TOKEN\n");
+  const codex = (cmd, workdir) => decide("exec_command", { cmd, workdir });
+  expect(codex("rg -n TOKEN", mainTree)).toBe("deny");
+  expect(codex("rg -n TOKEN", path.join(mainTree, "src"))).toBe("allow");
+  expect(codex("git status", outside)).toBe("deny");
+  expect(codex("cat secret.txt", outside)).toBe("deny");
 });

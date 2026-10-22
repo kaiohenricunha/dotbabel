@@ -376,9 +376,10 @@ cannot see what a recursive search reads, so recursive `grep`, `rg --hidden`,
 `-u`, `--no-ignore`, or `--follow`, and `git grep --untracked` or `--no-index`
 are refused. `rg` skips hidden and ignored files by default. Before an `rg`,
 Grep, or `git grep` search runs, the guard lists the files that it would read
-(with `git ls-files`, or a walk of at most 10,000 visible files outside git). If
-one of them is a secret file, even one that git tracks, the search is refused;
-search a narrower path. Each refusal says which rule applied. Git history is
+(with `git ls-files`, also inside nested repositories and submodules; outside
+git, a walk of at most 10,000 files). If one of them is a secret file, even one
+that git tracks, or if git cannot list them, the search is refused; search a
+narrower path. When `RIPGREP_CONFIG_PATH` is set, `rg` needs `--no-config`. Each refusal says which rule applied. Git history is
 not checked: `git log -p`, `git show COMMIT`, and `git grep PATTERN COMMIT` can
 still show a secret that an older commit held. So keep real secrets outside
 the project, use an Advisor grant only in a trusted project, and remember that a
