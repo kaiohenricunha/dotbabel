@@ -1893,6 +1893,43 @@
         "requirement": "frontier",
         "binding": "consumer"
       }
+    },
+    {
+      "sourcePath": "skills/agents-search/SKILL.md",
+      "artifactKind": "skill",
+      "category": "A",
+      "batch": "P-19e-agents-search",
+      "frontmatter": {
+        "id": "agents-search",
+        "name": "agents-search",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["debugging"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: \"search agents\", \"list agents\", \"find agent\", \"what agents\", \"agent catalog\".\n",
+        "argument-hint": "search <query> | list | fetch <name> | invalidate [--fetch]",
+        "tools": "Glob, Read, Grep, Write, Bash, WebFetch",
+        "effort": "medium",
+        "model": "sonnet"
+      },
+      "bodyHash": "c8cff7b03841ada3d78f26337c3bcbb380453857216db81383e46d77090bf4b1",
+      "compute": {
+        "mode": "pin",
+        "requirement": "mechanical",
+        "pin": {
+          "runtime": "claude",
+          "config": {
+            "model": "sonnet"
+          }
+        },
+        "binding": "consumer",
+        "rationale": "Audit class A: keep the authored native pin for this read-only file-parsing skill (DOC-1)."
+      }
     }
   ],
   "neutral": {

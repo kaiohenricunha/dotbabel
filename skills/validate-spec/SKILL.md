@@ -18,7 +18,7 @@ description: |
   Audit an already-implemented spec against the codebase. Walks each constraint (ARCH-N, PERF-N, KD-N, etc.) and acceptance criterion, grounds findings in file:line evidence, runs the spec.json acceptance_commands, and writes a single audit doc to docs/audits/. Use whenever the user asks to "validate a spec", "audit a spec", "check if spec is implemented", "verify the spec is done", "is this spec really done", or otherwise wants closure on spec-driven work. Read-only against the spec — produces an audit, never modifies the spec itself.
 argument-hint: "[spec-id] [--no-run]"
 effort: max
-model: sonnet
+model: opus
 allowed-tools: Read Grep Glob Bash
 dotbabel:
   compute:

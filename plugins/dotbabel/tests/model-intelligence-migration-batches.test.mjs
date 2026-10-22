@@ -104,6 +104,21 @@ describe("P-19e skills",()=>{
   }
  });
 });
+describe("P-19e agents-search",()=>{
+ const entry=fixture.entries.find(item=>item.batch==="P-19e-agents-search");
+ it("agents-search: declares the audit class-A pin to its authored native model",()=>{
+  const parsed=parseProjectionSource(artifact(entry));
+  expect(parsed.requirement).toMatchObject({mode:"pin",requirement:"mechanical",binding:"consumer",pin:{runtime:"claude",config:{model:"sonnet"}}});
+  const{dotbabel,...metadata}=parsed.frontmatter;expect(metadata).toEqual(entry.frontmatter);expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(entry.bodyHash);
+ });
+ it("agents-search: the native projection is unchanged and the shared resolver resolves the pin",()=>{
+  const current=artifact(entry),parsed=parseProjectionSource(current),before={...current,sourceContent:`---\n${yaml.dump(entry.frontmatter,{lineWidth:-1})}---\n${parsed.body}`};
+  const native=source=>parseProjectionSource({sourcePath:entry.sourcePath,sourceContent:buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[source]}).files[0].content});
+  expect(native(current)).toEqual(native(before));
+  const result=resolve({requirement:parsed.requirement,target:{runtimeId:"claude",artifactKind:"skill",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract});
+  expect(result.status).toBe("resolved");expect(result.configuration.axes.model).toBe("sonnet");expect(result.enforcement).toEqual({state:"unknown",basis:"none"});
+ });
+});
 it("P-19a: local-attest still has no requirement and no projection",()=>{
  const source=artifact(fixture.neutral),parsed=parseProjectionSource(source);expect(parsed.requirement).toBeNull();expect(parsed.frontmatter).toEqual(fixture.neutral.frontmatter);expect(createHash("sha256").update(parsed.body).digest("hex")).toBe(fixture.neutral.bodyHash);
  const output=buildClaudeBaseline({toolVersion:"4.2.0",snapshot,artifacts:[source]}).files[0];const native=parseProjectionSource({sourcePath:fixture.neutral.sourcePath,sourceContent:output.content});expect(native.requirement).toBeNull();expect(native.frontmatter).not.toHaveProperty("model");expect(native.frontmatter).not.toHaveProperty("effort");expect(native.frontmatter["disable-model-invocation"]).toBe(true);
@@ -129,7 +144,7 @@ it("P-19d: rollback-prod keeps the typed confirmation text unchanged",()=>{
 });
 
 it("P-19d: consumer pins retain native axes as explicit intent without claiming native skill enforcement",()=>{
- for(const entry of fixture.entries.filter(item=>item.category==="A"&&item.compute.mode==="pin")){
+ for(const entry of fixture.entries.filter(item=>item.batch===undefined&&item.category==="A"&&item.compute.mode==="pin")){
   const parsed=parseProjectionSource(artifact(entry));expect(parsed.requirement).toMatchObject(entry.compute);
   const result=resolve({requirement:parsed.requirement,target:{runtimeId:"claude",artifactKind:"skill",sourcePath:entry.sourcePath},catalog:snapshotCatalog(snapshot),policy:mergePolicy({shipped:SHIPPED_POLICY}),runtimeContract:snapshot.runtimes.claude.runtimeContract});expect(result.status,entry.sourcePath).toBe("resolved");expect(result.configuration.axes).toEqual(entry.compute.pin.config);expect(result.enforcement).toEqual({state:"unknown",basis:"none"});
  }
