@@ -97,6 +97,8 @@ import {
 import { cpuWeightSetting, sessionScope, setPropertyArgs } from "../src/fleet/cpushare.mjs";
 import { ownerFromEntry, readRegistry, sessionsDir } from "../src/fleet/registry.mjs";
 import { hostAdapter } from "../src/fleet/host-adapter.mjs";
+import { patchPaths } from "../src/fleet/patch-paths.mjs";
+import { addHookCommands, shellQuote } from "../src/lib/hooks-json.mjs";
 import { platformAdapter, describePlatformAdapter } from "../src/fleet/platform-adapter.mjs";
 import {
   DEFAULT_TOKEN_IDLE_MS,
@@ -114,12 +116,14 @@ import {
 import { listCloneTasks } from "../src/task-state.mjs";
 
 const TOOL = "dotbabel-fleet";
-const HOST = hostAdapter(process.env.DOTBABEL_FLEET_HOST || "claude");
+// The Codex tool shell exports CODEX_THREAD_ID (its hooks do not, so they set the host explicitly).
+const HOST = hostAdapter(process.env.DOTBABEL_FLEET_HOST || (process.env.CODEX_THREAD_ID ? "codex" : "claude"));
 const findSelf = (args) => HOST.identity?.(args) ?? null;
 const isOwnerAlive = (owner, opts) => HOST.isAlive?.(owner, opts) ?? true;
+const HOST_NAME = HOST.host === "claude" ? "Claude Code" : HOST.label;
 const SELF_PATH = fileURLToPath(import.meta.url);
 const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
-const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token", "cpu-share"]);
+const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token", "cpu-share", "setup"]);
 const TOKEN_ACTIONS = new Set(["status", "take", "release", "leave"]);
 const TOKEN_ACTION_TEXT = { rebase: "rebase onto the base", attest: "local-attest", merge: "gh pr merge" };
 const PR_FIELDS = "number,title,state,mergeCommit,baseRefName,headRefName,files,url";
@@ -131,7 +135,7 @@ const USAGE = `Usage:
   dotbabel fleet claim   <pattern>... [--note <text>]   claim paths or globs for this session
   dotbabel fleet release <pattern>... | --all           release this session's claims
   dotbabel fleet prune                                  remove claims of exited sessions
-  dotbabel fleet hook    <event>                        Claude Code hook entry (JSON on stdin):
+  dotbabel fleet hook    <event>                        hook entry for Claude Code or Codex (JSON on stdin):
                                                         pre-edit, pre-bash, session-start, post-tool, prompt
   dotbabel fleet lane    [--name <label>] -- <cmd>...   run a command in a free CPU lane
   dotbabel fleet lanes   [--json]                       show the CPU lanes and who holds them
@@ -139,6 +143,7 @@ const USAGE = `Usage:
   dotbabel fleet event   --pr <N> [--repo <owner/name>] record a merge made outside Claude Code
   dotbabel fleet token   [status | take | release | leave] show the token and queue, take, release, or leave
   dotbabel fleet cpu-share [--status]                    give every live session's scope an equal CPU weight
+  dotbabel fleet setup   --harness codex                add the fleet and task hooks to Codex's hooks.json
 
 Patterns are relative to the repo root. A bare path also covers everything
 below it; ** and * are globs.
@@ -319,28 +324,59 @@ function saveRecord(dir, record) {
 
 // --------------------------------------------------------------- hooks ----
 
+/** The paths an edit tool call writes: one for Claude Code, every file of a Codex patch. */
+function editTargets(input) {
+  if (EDIT_TOOLS.has(input.tool_name)) {
+    const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+    return typeof target === "string" && target !== "" ? [target] : [];
+  }
+  if (input.tool_name === "apply_patch") return patchPaths(input.tool_input?.command) ?? [];
+  return [];
+}
+
 /**
- * PreToolUse on Edit / Write / MultiEdit / NotebookEdit. Returns the hook
- * output object, or null to allow silently.
+ * PreToolUse on Edit / Write / MultiEdit / NotebookEdit, and on a Codex
+ * apply_patch. Returns the hook output object, or null to allow silently.
+ * A patch is judged file by file; when one file is refused, the claims this
+ * call made for the others are given back, so a refused patch claims nothing.
  */
 function preEdit(input, now) {
-  if (!EDIT_TOOLS.has(input.tool_name)) return null;
-  const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
-  if (typeof target !== "string" || target === "") return null;
-  const abs = path.isAbsolute(target) ? target : path.resolve(input.cwd || process.cwd(), target);
+  const cwd = input.cwd || process.cwd();
+  const claimed = [];
+  for (const target of editTargets(input)) {
+    const result = guardEdit(path.isAbsolute(target) ? target : path.resolve(cwd, target), input, now);
+    if (result.claimed) claimed.push(result.claimed);
+    if (result.out) {
+      for (const { dir, key, rel } of claimed) {
+        const record = readOwnerRecords(dir).find((r) => r.owner.key === key);
+        if (record) saveRecord(dir, releaseClaims(record, [rel]).record);
+      }
+      return result.out;
+    }
+  }
+  return null;
+}
 
+/**
+ * Judge and claim one path. Returns the hook output when the edit is refused,
+ * and the claim this call wrote, if any.
+ *
+ * @returns {{out: object|null, claimed: {dir: string, key: string, rel: string}|null}}
+ */
+function guardEdit(abs, input, now) {
+  const allow = { out: null, claimed: null };
   const repo = resolveRepo(abs);
-  if (!repo?.governed || fleetOff(repo) || !repo.rel) return null;
-  if (isIgnored(repo.toplevel, repo.rel)) return null;
+  if (!repo?.governed || fleetOff(repo) || !repo.rel) return allow;
+  if (isIgnored(repo.toplevel, repo.rel)) return allow;
   const shared = isSharedPath(repo.rel, sharedGlobs(repo));
 
   const registry = readRegistry(sessionsDir());
   const selfEntry = findSelf({ entries: registry.entries, sessionId: input.session_id, startPid: process.ppid });
-  if (!selfEntry) return null;
+  if (!selfEntry) return allow;
   const self = ownerFromEntry(selfEntry);
   const dir = repoDir(stateRoot(), repo.key);
   // A shared file is never claimed; it changes only outside a peer's merge token.
-  if (shared) return tokenDeny(dir, repo, self, `edit of ${repo.rel}`, now);
+  if (shared) return { out: tokenDeny(dir, repo, self, `edit of ${repo.rel}`, now), claimed: null };
   const window = escalateAfterMs(repo);
   const denials = readDenials(dir, self.key);
   const judge = (owners) =>
@@ -348,6 +384,7 @@ function preEdit(input, now) {
 
   let { owners } = loadOwners(dir, registry, { prune: true, selfKey: self.key });
   let verdict = judge(owners);
+  let claimed = null;
   if (verdict.action === "allow" && verdict.claimNeeded) {
     const claim = {
       pattern: repo.rel,
@@ -368,6 +405,8 @@ function preEdit(input, now) {
     if (verdict.action !== "allow") {
       const again = owners.find((o) => o.key === self.key)?.record;
       if (again) saveRecord(dir, releaseClaims(again, [repo.rel]).record);
+    } else {
+      claimed = { dir, key: self.key, rel: repo.rel };
     }
   }
 
@@ -376,7 +415,7 @@ function preEdit(input, now) {
       delete denials[repo.rel];
       writeDenials(dir, self.key, denials);
     }
-    return null;
+    return { out: null, claimed };
   }
   if (verdict.action === "deny" && window > 0) {
     denials[repo.rel] = { owner: verdict.conflict.owner.key, firstDeniedAt: verdict.firstDeniedAt };
@@ -393,8 +432,16 @@ function preEdit(input, now) {
           escalateAt: verdict.escalateAt,
           now,
         });
+  // Codex has no "ask": an unsupported decision fails the hook and the edit goes ahead.
+  const blocked = verdict.action === "ask" && !HOST.ask;
+  const text = blocked
+    ? `${reason}\nThis host cannot ask for approval from a hook, so the edit stays blocked. Stop and ask your user whether to wait, or to have the owner release the claim.`
+    : reason;
   return {
-    hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: verdict.action, permissionDecisionReason: reason },
+    out: {
+      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: blocked ? "deny" : verdict.action, permissionDecisionReason: text },
+    },
+    claimed: null,
   };
 }
 
@@ -491,6 +538,37 @@ function runHook(event) {
 
 // ------------------------------------------------------------ commands ----
 
+/**
+ * `setup --harness codex`: add the fleet hooks and the task context hook to
+ * Codex's hooks.json, additively. The user reviews and trusts them in Codex
+ * with /hooks; this command changes no trust or permission setting.
+ */
+function cmdSetup(args) {
+  if (args.positional.length > 0) throw new UsageError("setup takes no positional argument");
+  if (args.flags.harness !== "codex") throw new UsageError("setup needs --harness codex (Claude Code hooks come from dotbabel bootstrap)");
+  const hooksDir = path.resolve(path.dirname(SELF_PATH), "../hooks");
+  const guard = (event) => `DOTBABEL_FLEET_HOST=codex ${shellQuote(path.join(hooksDir, "fleet-guard.sh"))} ${event}`;
+  const file = path.join(process.env.CODEX_HOME || path.join(os.homedir(), ".codex"), "hooks.json");
+  let result;
+  try {
+    result = addHookCommands(file, [
+      { event: "PreToolUse", matcher: "^apply_patch$", command: guard("pre-edit"), timeout: 10 },
+      { event: "PreToolUse", matcher: "^Bash$", command: guard("pre-bash"), timeout: 10 },
+      { event: "PostToolUse", command: guard("post-tool"), timeout: 10 },
+      { event: "UserPromptSubmit", command: guard("prompt"), timeout: 10 },
+      { event: "SessionStart", command: guard("session-start"), timeout: 10 },
+      { event: "SessionStart", command: shellQuote(path.join(hooksDir, "task-context.sh")), timeout: 10 },
+    ]);
+  } catch (err) {
+    throw new EnvError(/** @type {Error} */ (err).message);
+  }
+  process.stdout.write(
+    `${result.added ? `Added ${result.added} hook(s) to` : "The hooks are already in"} ${result.file}.\n` +
+      "In Codex, review and trust them with /hooks, then restart or resume the session.\n",
+  );
+  return EXIT_CODES.OK;
+}
+
 function requireRepo() {
   const repo = resolveRepo(process.cwd());
   if (!repo) throw new EnvError("not inside a git repository");
@@ -501,7 +579,7 @@ function requireSelf(registry) {
   const entry = findSelf({ entries: registry.entries, startPid: process.ppid });
   if (!entry) {
     throw new EnvError(
-      "cannot find the Claude Code session that runs this command. Run it from a Claude Code session (Bash tool).",
+      `cannot find the ${HOST_NAME} session that runs this command. Run it from a ${HOST_NAME} session (its shell tool).`,
     );
   }
   return ownerFromEntry(entry);
@@ -939,6 +1017,7 @@ function main(argv) {
       pr: { type: "string" },
       repo: { type: "string" },
       status: { type: "boolean" },
+      harness: { type: "string" },
     });
   } catch (err) {
     process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n${USAGE}\n`);
@@ -972,6 +1051,7 @@ function main(argv) {
     if (sub === "event") return cmdEvent(subArgs);
     if (sub === "token") return cmdToken(subArgs);
     if (sub === "cpu-share") return cmdCpuShare(subArgs);
+    if (sub === "setup") return cmdSetup(subArgs);
     return cmdPrune();
   } catch (err) {
     if (err instanceof UsageError) {

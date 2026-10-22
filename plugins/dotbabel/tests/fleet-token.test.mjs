@@ -289,10 +289,10 @@ describe("token text", () => {
       now: T0 + 5 * 60_000,
       idleMs: DEFAULT_TOKEN_IDLE_MS,
     });
-    expect(text).toContain('the live Claude Code session "pane-a" holds the merge token for github.com/acme/widget');
+    expect(text).toContain('the live session "pane-a" holds the merge token for github.com/acme/widget');
     expect(text).toContain("branch feat/x");
     expect(text).toContain("gh pr merge");
-    expect(text).toContain('SendMessage "pane-a"');
+    expect(text).toContain('Message "pane-a" (SendMessage in Claude Code');
     expect(text).toContain("dotbabel fleet token release");
     expect(text).toMatch(/frees itself .* at \d\d:\d\d/);
   });

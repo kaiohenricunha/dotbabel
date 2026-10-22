@@ -14,16 +14,17 @@
  * may execute a model. Here every capability is local, needs no credentials,
  * is never cached, and executes no model.
  *
- * Claude Code is the one adapter today; its implementation is
+ * Claude Code and Codex have adapters; their implementation is
  * `registry.mjs`, which this module imports and which never imports this one.
  * Every other CLI that `agents.mjs` knows reports every capability as
- * unsupported until the Phase 2 research verifies it. The fleet bin selects
- * identity and liveness through this seam. Lower-level process readers keep
- * the Claude registry backend until another identity store is verified.
+ * unsupported until it is verified. The fleet bin selects the host with
+ * `DOTBABEL_FLEET_HOST` and reaches identity and liveness through this seam.
+ * Owners from both hosts share one ledger: liveness is a process incarnation
+ * on /proc, whatever the host.
  */
 
 import { RUNTIMES } from "../agents.mjs";
-import { findSelf, isOwnerAlive, readRegistry, sessionsDir } from "./registry.mjs";
+import { findCodexSelf, findSelf, isOwnerAlive, readRegistry, sessionsDir } from "./registry.mjs";
 
 /** The capabilities a host adapter declares, in the order the doctor prints them. */
 export const HOST_CAPABILITIES = Object.freeze(["identity", "liveness", "preEdit", "preBash", "postTool", "sessionStart"]);
@@ -46,6 +47,7 @@ export const SUPPORT_STATES = Object.freeze(["supported", "unsupported", "unveri
  * @property {string} host   the runtime id, as `agents.mjs` names it
  * @property {string} label
  * @property {boolean} adapter  whether an implementation exists
+ * @property {boolean} ask      whether a PreToolUse hook may answer "ask" (send the call to the user)
  * @property {Record<string, HostCapability>} capabilities  one entry per HOST_CAPABILITIES name
  * @property {((args: { sessionId?: string, startPid?: number, env?: NodeJS.ProcessEnv, procRoot?: string }) => object|null)|null} identity
  *   the live session entry this process runs in, or null; null when unsupported
@@ -75,6 +77,7 @@ const CLAUDE = Object.freeze({
   host: "claude",
   label: RUNTIMES.claude.label,
   adapter: true,
+  ask: true,
   capabilities: Object.freeze({
     identity: local("supported", "the session registry, ~/.claude/sessions/<pid>.json (registry.mjs findSelf)"),
     liveness: local("supported", "/proc on Linux, signal 0 elsewhere (registry.mjs isOwnerAlive)"),
@@ -85,6 +88,28 @@ const CLAUDE = Object.freeze({
   }),
   identity: ({ sessionId, startPid = process.ppid, env = process.env, procRoot } = {}) =>
     findSelf({ entries: readRegistry(sessionsDir(env)).entries, sessionId, startPid, procRoot }),
+  isAlive: (owner, opts = {}) => isOwnerAlive(owner, opts),
+});
+
+const CODEX_HOOKS = "~/.codex/hooks.json from `dotbabel fleet setup --harness codex`, verified with Codex CLI 0.163.0";
+
+/** @type {HostAdapter} */
+const CODEX = Object.freeze({
+  host: "codex",
+  label: RUNTIMES.codex.label,
+  adapter: true,
+  // Codex 0.163.0 fails a hook that answers "ask", and the tool call proceeds.
+  ask: false,
+  capabilities: Object.freeze({
+    identity: local("supported", "the hook session_id or CODEX_THREAD_ID, bound to the codex process above the hook (registry.mjs findCodexSelf)"),
+    liveness: local("supported", "the codex process incarnation on /proc (registry.mjs isOwnerAlive)"),
+    preEdit: local("supported", `${CODEX_HOOKS}: PreToolUse on apply_patch`),
+    preBash: local("supported", `${CODEX_HOOKS}: PreToolUse on Bash`),
+    postTool: local("supported", `${CODEX_HOOKS}: PostToolUse`),
+    sessionStart: local("supported", `${CODEX_HOOKS}: SessionStart`),
+  }),
+  identity: ({ sessionId, startPid = process.ppid, env = process.env, procRoot } = {}) =>
+    findCodexSelf({ sessionId, env, startPid, procRoot }),
   isAlive: (owner, opts = {}) => isOwnerAlive(owner, opts),
 });
 
@@ -101,6 +126,7 @@ function withoutAdapter(host, label) {
     host,
     label,
     adapter: false,
+    ask: false,
     capabilities: Object.fromEntries(HOST_CAPABILITIES.map((name) => [name, local("unsupported", evidence)])),
     identity: null,
     isAlive: null,
@@ -117,6 +143,7 @@ function withoutAdapter(host, label) {
  */
 export function hostAdapter(host) {
   if (host === "claude") return CLAUDE;
+  if (host === "codex") return CODEX;
   const runtime = Object.values(RUNTIMES).find((r) => r.id === host);
   return withoutAdapter(host, runtime === undefined ? host : runtime.label);
 }

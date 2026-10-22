@@ -360,11 +360,11 @@ export function formatTokenDeny({ repoKey, holder, action, cli, now, idleMs, pos
   if (!holder) return `The merge token for ${repoKey} is reserved for the queue head. ${queued}`;
   const owner = `"${holder.owner.name ?? `pid ${holder.owner.pid}`}"`;
   return [
-    `dotbabel fleet: the live Claude Code session ${owner} holds the merge token for ${repoKey} (${describeHolder(holder, now)}).`,
+    `dotbabel fleet: the live session ${owner} holds the merge token for ${repoKey} (${describeHolder(holder, now)}).`,
     `This ${action} is blocked. Only one session at a time rebases onto the base, attests, and merges in a repo, so that two pull requests do not both pass against an old base.`,
     ...(queued ? [queued] : []),
     "Do this:",
-    `1. SendMessage ${owner}. Ask when it merges, or ask it to give the token back with: ${cli} token release`,
+    `1. Message ${owner} (SendMessage in Claude Code; from another host, ask the user to relay it). Ask when it merges, or ask it to give the token back with: ${cli} token release`,
     "2. Continue with other work, then try again.",
     `The token frees itself when ${owner} merges or exits, or at ${clock(Date.parse(holder.touchedAt) + idleMs)} if it is not used again.`,
     "Do not run this step another way to get around the token.",

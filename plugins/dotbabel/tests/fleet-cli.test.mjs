@@ -32,7 +32,7 @@ function git(cwd, args) {
 function cleanEnv(extra = {}) {
   const env = { ...process.env };
   for (const k of Object.keys(env)) {
-    if (k.startsWith("DOTBABEL_FLEET_") || k.startsWith("GIT_") || k === "CLAUDE_PROJECT_DIR") delete env[k];
+    if (k.startsWith("DOTBABEL_FLEET_") || k.startsWith("GIT_") || k === "CLAUDE_PROJECT_DIR" || k === "CODEX_THREAD_ID") delete env[k];
   }
   delete env.XDG_STATE_HOME;
   // The session-start hook would give the real session scope a CPU weight.
