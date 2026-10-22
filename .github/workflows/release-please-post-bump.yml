@@ -10,10 +10,14 @@ name: release-please-post-bump
 #      2.18.1 release: package.json said 2.18.1, the plugin manifest still
 #      said 2.18.0, and both `build-plugin --check` and the plugin-manifest
 #      bats gate failed. Anything that derives from the version belongs here.
+#   4. examples/minimal-consumer (scaffolder output). build-plugin regenerates
+#      plugins/dotbabel/templates/workflows/ai-review.yml, whose projection
+#      hash changes with the version; the example keeps its own copy, so the
+#      4.3.0 release head failed example-parity.bats in test and dogfood.
 #
-# No-loop guarantee: the post-bump commit touches only index/, docs/, and the
-# plugin manifest — never package.json — so the paths filter never re-fires on
-# the commit itself.
+# No-loop guarantee: the post-bump commit touches only index/, docs/, the
+# plugin files, and the example — never package.json — so the paths filter
+# never re-fires on the commit itself.
 #
 # PAT required: GITHUB_TOKEN pushes suppress the pull_request (synchronize)
 # event on the open release PR — without the PAT, dogfood CI never re-runs
@@ -60,14 +64,33 @@ jobs:
       - name: regen plugin manifest
         run: node scripts/build-plugin.mjs
 
+      # The recipe from examples/minimal-consumer/README.md, which is the one
+      # hand-maintained file there and is kept.
+      - name: regen example consumer
+        run: |
+          readme="$(mktemp)"
+          cp examples/minimal-consumer/README.md "$readme"
+          rm -rf examples/minimal-consumer
+          mkdir examples/minimal-consumer
+          (
+            cd examples/minimal-consumer || exit 1
+            git init -q
+            node ../../plugins/dotbabel/bin/dotbabel-init.mjs --project-name minimal-consumer --project-type node
+            rm -rf .git
+          )
+          cp "$readme" examples/minimal-consumer/README.md
+
       - name: commit if anything changed
         run: |
-          git diff --quiet index/ docs/ plugins/dotbabel/ && {
-            echo "Nothing changed — index, stamps and plugin manifest already current."
+          paths="index/ docs/ plugins/dotbabel/ examples/minimal-consumer/"
+          # shellcheck disable=SC2086
+          if [ -z "$(git status --porcelain -- $paths)" ]; then
+            echo "Nothing changed — index, stamps, plugin files and example already current."
             exit 0
-          }
+          fi
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add index/ docs/ plugins/dotbabel/
-          git commit -m "chore: refresh index envelope + doc stamps + plugin manifest for $(node -p "require('./package.json').version")"
+          # shellcheck disable=SC2086
+          git add -- $paths
+          git commit -m "chore: refresh index envelope + doc stamps + plugin files + example for $(node -p "require('./package.json').version")"
           git push
