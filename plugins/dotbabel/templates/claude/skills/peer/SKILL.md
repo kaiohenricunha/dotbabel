@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:67cb8b0137a232091cc02cc8aed5e9251b3da6e747c756f3fdc896b1d8422839 source=skills/peer/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:99bd1636a31d2b110f80f0c0f81349296ee2ef38d05a6719666e4b4fd4b0a36d source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status | unpair
 description: |
@@ -100,6 +100,15 @@ If the user later explicitly authorizes forwarding, send a new scoped message
 that identifies that authorization; do not silently change the old policy.
 For `forward: actionable`, send only relevant actionable findings. Ordinary
 answers, queue operations, and acknowledgment messages need no reply to Main.
+
+While this session holds a live yolo grant (each prompt shows `YOLO active`),
+the pairing is the scope. Claim queued work with `next`, and send actionable
+findings to Main without asking the user first, also for an ordinary question
+that finds a defect. Then keep running `receive` and `next`. Never forward a
+request marked `forward: never`. The grant only approves permission
+dialogs: the Advisor guard still refuses writes, so ask Main for every change.
+A grant in Main does not reach this session. To run the pair autonomously, the
+user must type `/yolo --for DURATION` in both terminals.
 
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.

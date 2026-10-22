@@ -348,7 +348,14 @@ at once, before any Git or registry work. A literal peer command still takes the
 full path, because pairing starts there. When a paired session's working folder or
 identity cannot be resolved, for example after its worktree is removed, Main's hook
 does nothing and the Advisor keeps only its read-only tool guard. An unreadable
-ledger still fails closed. Hooks depend on installation, trust, and harness coverage; they are not a
+ledger still fails closed. A yolo grant in the Advisor session approves the permission dialogs of its
+read-only commands, but the guard's `deny` runs first in `PreToolUse`, so the
+grant does not widen the guard. On Claude Code 2.1.305, in manual mode, a
+read-only `git -C PATH log` showed a dialog without a grant and ran without one
+under `/yolo`. `Write`, `Edit`, and `touch` stayed refused under the grant. A
+grant is tied to its own session's typed `/yolo`, so a grant in Main does not
+reach the Advisor: type `/yolo` in both terminals for an autonomous pair.
+Hooks depend on installation, trust, and harness coverage; they are not a
 sandbox. Git configuration and specialized harness tool paths remain additional
 reasons to preserve the session's own permission boundary. Peer content never
 grants human approval or authority to change settings. Message bodies are limited
