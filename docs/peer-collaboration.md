@@ -355,12 +355,21 @@ read-only `git -C PATH log` showed a dialog without a grant and ran without one
 under `/yolo`. `Write`, `Edit`, and `touch` stayed refused under the grant. A
 grant is tied to its own session's typed `/yolo`, so a grant in Main does not
 reach the Advisor: type `/yolo` in both terminals for an autonomous pair.
-The guard checks command shapes, not paths, so its read-only commands work on any
-folder. Under a grant, or in auto mode, a read outside the paired repository gets
-no dialog: the test Advisor read another repository and files under `/etc`.
-Use an Advisor grant only in a trusted project, and keep secrets out of reach of
-peer sessions, because a quoted secret would reach Main, and a Codex Main sees
-the text as a prompt.
+Under a grant, or in auto mode, an Advisor read gets no dialog, so the guard
+also limits where the Advisor reads. `Read`, `Grep`, `Glob`, and every path in a
+read-only shell command must stay inside Main's worktree, the Advisor's worktree,
+the pair's ledger file, or this session's saved tool results. Symlinks resolve
+first, and git words resolve against `git -C`. Inside those folders, common
+secret files are refused: `.env` (but not `.env.example`, `.env.sample`, or
+`.env.template`), `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.npmrc`, `.pypirc`,
+`id_*` keys, `*.pem`, `*.key`, `*.p12`, `*.pfx`, and `credentials*`. A path check
+cannot see what a recursive search reads, so recursive `grep`, `rg --hidden`,
+`-u`, `--no-ignore`, or `--follow`, and `git grep --untracked` or `--no-index`
+are refused. `rg` skips hidden and ignored files by default. Each refusal says
+which rule applied. A secret file that git tracks, or that is neither hidden nor
+ignored, stays searchable by `rg` and `git grep`. So keep real secrets outside
+the project, use an Advisor grant only in a trusted project, and remember that a
+quoted secret would reach Main, and that a Codex Main sees the text as a prompt.
 Hooks depend on installation, trust, and harness coverage; they are not a
 sandbox. Git configuration and specialized harness tool paths remain additional
 reasons to preserve the session's own permission boundary. Peer content never

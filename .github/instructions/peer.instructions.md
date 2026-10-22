@@ -111,10 +111,12 @@ that finds a defect. Then keep running `receive` and `next`. Never forward a
 request marked `forward: never`. The grant only approves permission
 dialogs: the Advisor guard still refuses writes, so ask Main for every change.
 A grant in Main does not reach this session. To run the pair autonomously, the
-user must type `/yolo --for DURATION` in both terminals. The guard limits what
-the Advisor does, not where it reads: under a grant, reads outside the paired
-repository get no dialog. Read only the pair's files, never send secrets or
-credentials to Main, and use a grant only in a trusted project.
+user must type `/yolo --for DURATION` in both terminals. The guard also limits
+where the Advisor reads: only the pair's worktrees, its ledger, and this
+session's saved tool results, and never common secret files such as `.env`,
+keys, or credentials. A secret file that git tracks, or that is neither hidden
+nor ignored, stays searchable. So never send secrets or credentials to Main,
+and use a grant only in a trusted project.
 
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.
@@ -126,9 +128,12 @@ numbers. Read them again before reporting if Main has changed them.
 The Advisor does not edit implementation files, run migrations, install packages,
 or execute tests with repository side effects. Ask Main to run necessary checks.
 Use read tools and read-only Git commands. To search, run one literal command per
-call: `grep`, `rg`, or `find`, or `git grep`, `blame`, `ls-tree`, `cat-file`,
-`worktree list`, `status`, `diff`, `show`, or `log`. Put patterns and globs in single
-quotes, for example `grep -rn 'a\|b' src --include='*.mjs'`. Pipes, redirects,
+call: `rg`, `grep` on named files, or `find`, or `git grep`, `blame`, `ls-tree`,
+`cat-file`, `worktree list`, `status`, `diff`, `show`, or `log`. Search folders with
+`rg`, which skips hidden and ignored files: recursive `grep`, `rg --hidden`, `-u`,
+`--no-ignore`, or `--follow`, and `git grep --untracked` or `--no-index` are refused.
+Put patterns and globs in single quotes, for example
+`rg -n 'a|b' src --glob '*.mjs'`. Pipes, redirects,
 chains, `$`, and backslashes outside single quotes are refused. Delegate a wide
 search to an `Explore` agent; the guard covers its tool calls too. Fleet claims continue to apply to Main;
 Advisor inspection does not acquire a write claim. Peer hooks enforce a conservative
