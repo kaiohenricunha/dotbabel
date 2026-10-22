@@ -125,6 +125,8 @@ post_tool() { # <payload> [event]
 
 @test "post-tool starts no node when there is no event and no merge" {
   stub_node
+  mkdir -p "$WORK/state/owners"
+  echo "none" >"$WORK/state/owners/sess-a"
   post_tool '{"session_id":"sess-a","tool_name":"Read","tool_input":{}}'
   [ "$status" -eq 0 ]
   [ ! -e "$WORK/node-calls" ]
@@ -144,6 +146,30 @@ post_tool() { # <payload> [event]
   [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
 }
 
+@test "post-tool and prompt start node when the session's owner has a notice" {
+  stub_node
+  mkdir -p "$WORK/state/owners" "$WORK/state/inbox/200-2" "$WORK/state/inbox/100-1"
+  echo "100-1" >"$WORK/state/owners/sess-a"
+  echo '{}' >"$WORK/state/inbox/200-2/000000000000001-r-0000000a-ask.json"
+  post_tool '{"session_id":"sess-a","tool_name":"Read","tool_input":{}}'
+  [ ! -e "$WORK/node-calls" ]
+  echo '{}' >"$WORK/state/inbox/100-1/000000000000002-r-0000000b-reply.json"
+  post_tool '{"session_id":"sess-a","tool_name":"Read","tool_input":{}}'
+  post_tool '{"session_id":"sess-a","prompt":"hi"}' prompt
+  [ "$(wc -l <"$WORK/node-calls")" -eq 2 ]
+}
+
+@test "post-tool starts node once for a session id it has not mapped, never for none" {
+  stub_node
+  post_tool '{"session_id":"sess-new","tool_name":"Read","tool_input":{}}'
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
+  mkdir -p "$WORK/state/owners" "$WORK/state/inbox/none"
+  echo "none" >"$WORK/state/owners/sess-new"
+  echo '{}' >"$WORK/state/inbox/none/000000000000001-r-0000000c-ask.json"
+  post_tool '{"session_id":"sess-new","tool_name":"Read","tool_input":{}}'
+  [ "$(wc -l <"$WORK/node-calls")" -eq 1 ]
+}
+
 @test "post-tool starts node for a gh pr merge command, with the payload on stdin" {
   stub_node
   payload='{"session_id":"sess-a","tool_name":"Bash","tool_input":{"command":"gh pr merge 5 --squash"}}'
@@ -154,6 +180,8 @@ post_tool() { # <payload> [event]
 
 @test "prompt ignores a gh pr merge in the prompt text but delivers new events" {
   stub_node
+  mkdir -p "$WORK/state/owners"
+  echo "none" >"$WORK/state/owners/sess-a"
   post_tool '{"session_id":"sess-a","prompt":"please gh pr merge 5"}' prompt
   [ ! -e "$WORK/node-calls" ]
   mkdir -p "$WORK/state/events"

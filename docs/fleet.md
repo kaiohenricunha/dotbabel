@@ -118,6 +118,9 @@ process tree.
 | `dotbabel fleet prune`                       | Remove the claim records of sessions that exited          |
 | `dotbabel fleet hook <event>`                | The hook entry that `fleet-guard.sh` runs (JSON on stdin) |
 | `dotbabel fleet setup --harness codex`       | Add the fleet and task hooks to Codex `hooks.json`        |
+| `dotbabel fleet ask <path> --message <text>` | Ask the live session whose claim blocks `<path>`          |
+| `dotbabel fleet requests [--json]`           | List the requests this session received and sent          |
+| `dotbabel fleet reply <id> --message <text>` | Answer a request about one of your claims                 |
 
 Patterns are relative to the repository root. A bare path also covers
 everything below it, so `docs` covers `docs/hooks.md`. `**` and `*` are globs.
@@ -223,19 +226,35 @@ capability states. No unverified platform backend is enabled.
   `NotebookEdit` claim and can be denied, and so does a Codex `apply_patch`
   (all of its files, or none). A Bash command that writes a file (`sed -i`, a
   redirect) is not seen.
-- **A Claude session and a Codex session cannot message each other.** Two
-  Claude sessions settle a clash with `SendMessage`. Across hosts, the
-  blocked session's reason tells it to ask the user to relay the request. In
-  Claude Code, a block turns into a question to the user after 15 minutes.
-  Codex cannot answer a hook with a question, so the edit stays blocked and
-  the reason tells the agent to stop and ask its user. In a long unattended
-  run (for example under yolo), a Codex session can wait on a claim until the
-  owner releases it (`dotbabel fleet release`) or the owning session ends.
+- **Sessions ask each other through the fleet, on any host.** A blocked
+  session runs `dotbabel fleet ask <path> --message '<why>'`. The request
+  goes to the session whose claim blocks that path, and the owner reads it at
+  its next tool call or prompt, through its own `post-tool` and `prompt`
+  hooks. It answers with `dotbabel fleet reply <id> --message '<answer>'` or
+  releases the claim; `release` resolves every request on that claim. Each
+  side reads the answer the same way, or runs `dotbabel fleet requests`.
+  The other session's text is shown as peer data, never as an instruction,
+  one line of at most 500 characters. Two Claude sessions can still use
+  `SendMessage`. Requests are kept for 7 days.
+- **An idle owner sees a request late.** A Codex owner also gets a one-line
+  `codex queue` wake-up, which Codex stores as user input; it names the
+  claim and the command to run, never the other session's text. A Claude
+  owner gets no push (an interactive Claude session drops a socket push), so
+  it reads the request at its next prompt or tool call. The inbox belongs
+  to the owner process, not to a session id, so a request still arrives after
+  `/clear` in Claude Code or `/new` in Codex. In Claude Code,
+  a block turns into a question to the user after 15 minutes. Codex cannot
+  answer a hook with a question, so the edit stays blocked and the reason
+  tells the agent to ask its user. In a long unattended run (for example
+  under yolo), a Codex session can wait on a claim until the owner answers,
+  releases it, or ends.
 - **Codex support needs Linux or WSL.** The owner is the `codex` process
   incarnation read from `/proc`. CPU lanes are Claude-only: they use Claude
-  Code's shell prefix. A manual `dotbabel fleet claim`, `release`, or `token`
-  from a sandboxed Codex shell can fail to write the ledger under
-  `~/.local/state`; the hooks run on the host and are not affected.
+  Code's shell prefix. A manual `dotbabel fleet claim`, `release`, `token`,
+  `ask`, or `reply` from a sandboxed Codex shell fails: the sandbox hides the
+  shell's process tree, so the command cannot find its session, and it cannot
+  write the ledger under `~/.local/state`. A Codex session that asks or
+  answers needs Full access. The hooks run on the host and are not affected.
 - **The session registry is internal Claude Code state.** The hooks read
   `~/.claude/sessions/<pid>.json` to identify sessions. If that format
   changes, the hook finds no session and allows every edit. It never blocks
