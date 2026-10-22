@@ -55,7 +55,7 @@ function procStart(pid) {
 function cleanEnv(extra = {}) {
   const env = { ...process.env };
   for (const k of Object.keys(env)) {
-    if (k.startsWith("DOTBABEL_FLEET_") || k.startsWith("GIT_") || k.startsWith("FAKE_GH_") || k === "CLAUDE_PROJECT_DIR") {
+    if (k.startsWith("DOTBABEL_FLEET_") || k.startsWith("GIT_") || k.startsWith("FAKE_GH_") || k === "CLAUDE_PROJECT_DIR" || k === "CODEX_THREAD_ID") {
       delete env[k];
     }
   }

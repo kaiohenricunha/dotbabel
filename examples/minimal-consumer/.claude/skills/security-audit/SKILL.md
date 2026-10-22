@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:5c7ce2cf8a6a6986e48ce3aa11b0b97a7b69232e0e9cbcc7bf1df3154a037d2e source=skills/security-audit/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:82572a035354a940933192d9b18dae9370c1dfc47c274a7d51d5fc7deff70c29 source=skills/security-audit/SKILL.md — do not edit directly
 argument-hint: "[scope path | subsystem | <base>..<head>] [--profile quick|standard|deep]"
 description: |
   Whole-repository security audit with independent verification of every finding, vendored from cloudflare/security-audit-skill. Guidance by default; runs the full six-phase audit (parallel hunters, verifiers that did not hunt, coverage ledger, schema-validated findings.json) only on an explicit audit or pen-test request. Triggers on: "security audit", "audit this codebase", "pen test the code", "full security review", "end-to-end security review", "security audit report".

@@ -2,12 +2,11 @@
 # dotbabel:generated — do not edit directly. Source: .claude/skills/yolo/SKILL.md. Regenerate with `dotbabel project-sync`.
 name: yolo
 description: >
-  Start a temporary autonomy mode for this session: one approval from the owner
-  covers the current task or an explicit scope. The session asks nothing else
-  for work inside it until the scope is done, yolo off, the required --for
-  expiry, or the end of the session. It still stops for force pushes, hard
-  resets, deletions, production deploys, destroys, spec-text edits, a check it
-  cannot fix, and work outside the scope.
+  Start temporary autonomy for the current task or an explicit scope with a
+  required --for expiry. Codex permits scoped pushes, merges, deploys, and
+  releases after strict testing and validation; Full access is a separate
+  runtime setting. Claude Code uses a session permission hook with a
+  protected-action denylist.
 applyTo: "**"
 ---
 
@@ -18,22 +17,26 @@ mode. In Claude Code, type `/yolo --for <duration> [scope]`. In Codex, type
 `$yolo --for <duration> [scope]`. Only `--for` is required; scope text and
 `--merge` or `--no-merge` are optional. `off` needs no duration.
 
-Without scope text, use only the current task already agreed in this session.
-State that task before work starts. If no task exists, ask the owner for one.
-An omitted scope never grants merge permission or includes unrelated work.
-Merges require `--merge` or an explicit merge instruction in the scope.
-The invocation is the approval for that task or scope, never for unrelated work.
-
 ## Choose the runtime
 
 **Codex:** Read [references/codex.md](references/codex.md) and follow that path.
-It uses the owner's prompt and conversation context, not a Claude hook grant.
+It authorizes all necessary work in the scope, including deploys and releases,
+subject to strict verification. Check the active permissions and prompt once for
+Full access when needed, as the reference explains. The Codex instructions are
+complete; do not inherit the Claude
+standing-grant limits or stops below.
 Do not run the Claude grant steps below in Codex.
 
 **Claude Code:** Follow the hook-backed path below. A missing Claude grant never
 selects the Codex path. For any other runtime, report that it is unsupported and stop.
 
 ## Claude Code
+
+Without scope text, use only the current task already agreed in this session.
+State that task before work starts. If no task exists, ask the owner for one.
+An omitted scope never grants merge permission or includes unrelated work.
+Merges require `--merge` or an explicit merge instruction in the scope.
+The invocation is the approval for that task or scope, never for unrelated work.
 
 The `yolo.sh` hook does the mechanical part (see
 [docs/hooks.md](../../docs/hooks.md#yolosh)). When the owner types the command,

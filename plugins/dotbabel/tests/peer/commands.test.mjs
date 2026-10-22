@@ -1,8 +1,9 @@
 import fs from "node:fs";
+import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { beforeEach, afterEach, vi, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
-const ctx = vi.hoisted(() => ({ who: null, live: true, input: [], spawned: 0 }));
+const ctx = vi.hoisted(() => ({ who: null, live: true, input: [], spawned: 0, parent: null }));
 vi.mock("../../src/peer/identity.mjs", async (importOriginal) => ({
   ...(await importOriginal()),
   currentSession: () => {
@@ -10,6 +11,7 @@ vi.mock("../../src/peer/identity.mjs", async (importOriginal) => ({
     return ctx.who;
   },
   endpointAlive: (who) => Boolean(who && !who.ended && ctx.live),
+  processSession: () => ctx.parent,
 }));
 vi.mock("../../src/peer/relay.mjs", () => ({ tick: async () => false }));
 vi.mock("node:readline", () => ({
@@ -29,6 +31,7 @@ vi.mock("node:child_process", async (importOriginal) => ({
 import { runPeer, invokePeer, peerCommand } from "../../src/peer/cli.mjs";
 import { repository } from "../../src/peer/identity.mjs";
 import { PeerStore } from "../../src/peer/store.mjs";
+import { registerMain, pairAdvisor } from "../../src/peer/state.mjs";
 let repo, env, out, err, store, main, advisor;
 beforeEach(() => {
   repo = makeTempDir("peer-commands-");
@@ -49,6 +52,7 @@ beforeEach(() => {
   ctx.live = true;
   ctx.input = [];
   ctx.spawned = 0;
+  ctx.parent = null;
   out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 });
@@ -70,6 +74,29 @@ async function pair() {
   expect((await run("advisor", p.code)).code).toBe(0);
   return p;
 }
+it("returns native mirror fields with a send between Claude sessions, never storing them", async () => {
+  main.socket = "/run/user/1/cc-socks/10.sock";
+  advisor = {
+    ...advisor,
+    key: "claude:advisor",
+    harness: "claude",
+    socket: "/run/user/1/cc-socks/20.sock",
+  };
+  await pair();
+  const sent = (await run("send", "main", "race in save()", "--kind", "finding")).value;
+  expect(sent.native.to).toBe("uds:/run/user/1/cc-socks/10.sock");
+  expect(sent.native.message.startsWith(`[peer ${sent.id} seq ${sent.seq} finding]`)).toBe(true);
+  expect((await store.read()).pairs[0].messages[0].native).toBeUndefined();
+  ctx.who = main;
+  const received = (await run("receive")).value;
+  expect(received[0].id).toBe(sent.id);
+  expect(received[0].native).toBeUndefined();
+});
+it("returns no native mirror when the recipient is not a Claude session", async () => {
+  await pair();
+  ctx.who = main;
+  expect((await run("send", "advisor", "note")).value.native).toBe(null);
+});
 it("runs registration, queue management, results, history and member messages in process", async () => {
   const p = await pair();
   const a = (await run("ask", "one", "--dedupe", "one", "--forward", "explicit")).value;
@@ -101,6 +128,30 @@ it("runs registration, queue management, results, history and member messages in
   await run("resume");
   expect((await run("unpair")).code).toBe(0);
   expect((await run("history", "--pair", p.id)).code).toBe(0);
+});
+it("unpairs a session that closed an earlier pair, through the CLI and the host hook", async () => {
+  await pair();
+  expect((await run("unpair")).code).toBe(0);
+  ctx.who = main;
+  const second = await pair();
+  expect(await run("unpair")).toEqual({ code: 0, value: { id: second.id, closed: true }, err: "" });
+  ctx.who = main;
+  const third = await pair();
+  ctx.who = main;
+  const original = fs.readFileSync;
+  const input = {
+    cwd: repo,
+    session_id: main.sessionId,
+    tool_name: "Bash",
+    tool_input: { command: "dotbabel peer unpair" },
+  };
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  const hooked = (await run("hook", "PreToolUse")).value.hookSpecificOutput.updatedInput.command;
+  const output = spawnSync("bash", ["-c", hooked], { encoding: "utf8" });
+  expect(output.status).toBe(0);
+  expect(JSON.parse(output.stdout)).toEqual({ id: third.id, closed: true });
 });
 it("recovers an endpoint and explicitly retries uncertain delivery with a bound", async () => {
   const p = await pair(),
@@ -196,6 +247,101 @@ it("restores Advisor context through hooks and blocks mutation tools", async () 
   expect((await store.read()).pairs[0].advisor.ended).toBe(true);
 });
 
+it("skips unpaired sessions and keeps only the Advisor guard when a member cannot be resolved", async () => {
+  const original = fs.readFileSync,
+    gone = path.join(makeTempDir("peer-gone-"), "removed-worktree");
+  let input;
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  async function hook(event, payload) {
+    input = payload;
+    out.mockClear();
+    const code = await runPeer(["hook", event, "--json"], env);
+    const text = out.mock.calls.map((x) => x[0]).join("");
+    return { code, value: text ? JSON.parse(text) : null };
+  }
+  const silent = { code: 0, value: null };
+  const write = { tool_name: "Write", tool_input: { file_path: "a" } };
+  const state = env.DOTBABEL_PEER_STATE_DIR;
+  env.DOTBABEL_PEER_STATE_DIR = path.join(state, "not-created");
+  expect(await hook("PreToolUse", { session_id: "stranger", cwd: gone, ...write })).toEqual(silent);
+  env.DOTBABEL_PEER_STATE_DIR = state;
+  expect(await hook("Stop", { session_id: "stranger", cwd: gone })).toEqual(silent);
+  await pair();
+  fs.writeFileSync(path.join(state, "notes.txt"), "not a ledger");
+  expect(await hook("Stop", { session_id: "stranger", cwd: gone })).toEqual(silent);
+  expect(await hook("PreToolUse", { session_id: "main", cwd: gone, ...write })).toEqual(silent);
+  expect(await hook("Stop", { session_id: "advisor", cwd: gone })).toEqual(silent);
+  expect(await hook("PreToolUse", { session_id: "advisor", cwd: gone, tool_name: "Read" })).toEqual(
+    silent,
+  );
+  const denied = await hook("PreToolUse", { session_id: "advisor", cwd: gone, ...write });
+  expect(denied.value.hookSpecificOutput.permissionDecision).toBe("deny");
+  ctx.who = null;
+  const unresolved = await hook("PreToolUse", { session_id: "advisor", cwd: repo, ...write });
+  expect(unresolved.value.hookSpecificOutput.permissionDecision).toBe("deny");
+  ctx.who = main;
+  const literal = await hook("PreToolUse", {
+    session_id: "main",
+    cwd: repo,
+    tool_name: "Bash",
+    tool_input: { command: "dotbabel peer status --json" },
+  });
+  expect(literal.value.hookSpecificOutput.permissionDecision).toBe("allow");
+  expect((await hook("PreToolUse", { cwd: gone, tool_name: "Read" })).code).toBe(2);
+  const other = new PeerStore(state, "local:/other-repository");
+  await other.transaction((s) => {
+    const q = registerMain(
+      s,
+      { ...advisor, key: "codex:advisor", repo: "local:/other-repository" },
+      { alive: () => true },
+    );
+    pairAdvisor(
+      s,
+      { ...main, key: "claude:x", sessionId: "x", repo: "local:/other-repository" },
+      q.code,
+      {
+        alive: () => true,
+      },
+    );
+  });
+  const preferred = await hook("PreToolUse", { session_id: "advisor", cwd: gone, ...write });
+  expect(preferred.value.hookSpecificOutput.permissionDecision).toBe("deny");
+  fs.writeFileSync(
+    path.join(state, `${"0".repeat(64)}.json`),
+    JSON.stringify({ repo: "elsewhere" }),
+  );
+  expect((await hook("PreToolUse", { session_id: "stranger", cwd: gone, ...write })).code).toBe(2);
+});
+
+it("resolves a subagent call with its own session ID to the parent session through the process tree", async () => {
+  await pair();
+  const original = fs.readFileSync;
+  let input;
+  vi.spyOn(fs, "readFileSync").mockImplementation((file, ...args) =>
+    file === 0 ? JSON.stringify(input) : original(file, ...args),
+  );
+  async function hook(payload) {
+    input = { cwd: repo, tool_name: "Write", tool_input: { file_path: "a" }, ...payload };
+    out.mockClear();
+    const code = await runPeer(["hook", "PreToolUse", "--json"], env);
+    const text = out.mock.calls.map((x) => x[0]).join("");
+    return { code, value: text ? JSON.parse(text) : null };
+  }
+  const subagent = { session_id: "own-id", agent_id: "a1", agent_type: "Explore" };
+  const silent = { code: 0, value: null };
+  expect(await hook(subagent)).toEqual(silent);
+  ctx.parent = { sessionId: "own-id" };
+  expect(await hook(subagent)).toEqual(silent);
+  ctx.parent = { sessionId: "unpaired-parent" };
+  expect(await hook(subagent)).toEqual(silent);
+  ctx.parent = { sessionId: "advisor" };
+  ctx.who = advisor;
+  expect((await hook(subagent)).value.hookSpecificOutput.permissionDecision).toBe("deny");
+  expect(await hook({ session_id: "own-id" })).toEqual(silent);
+});
+
 it("coordinates literal peer operations in a trusted host hook with scoped results and usage failures", async () => {
   const original = fs.readFileSync;
   let input;
@@ -255,6 +401,9 @@ it("coordinates literal peer operations in a trusted host hook with scoped resul
     const result = await hook(command);
     expect(printed(result, 64).error.code, command).toBe("PEER_USAGE");
   }
+  expect((await hook("dotbabel peer unpair")).hookSpecificOutput.permissionDecision).toBe("deny");
+  expect((await store.read()).pairs[0].closed).toBe(false);
+  ctx.who = main;
   expect(printed(await hook("dotbabel peer unpair")).closed).toBe(true);
   expect(printed(await hook("dotbabel peer status"), 1).error.code).toBe("PEER_OPERATION");
   expect(await hook("pwd")).toBe(null);

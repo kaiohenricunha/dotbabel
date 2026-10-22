@@ -1,7 +1,7 @@
 /**
- * Find Claude Code sessions for `dotbabel fleet`: the session registry,
- * process liveness, and which session is running the current process. This
- * is the Claude Code host adapter's implementation of `identity` and
+ * Find Claude Code and Codex sessions for `dotbabel fleet`: the session
+ * registry, process liveness, and which session is running the current
+ * process. This is the host adapters' implementation of `identity` and
  * `liveness`; `host-adapter.mjs` declares the adapter and imports this
  * module, never the other way round.
  *
@@ -182,4 +182,63 @@ export function findSelf({ entries, sessionId, startPid, procRoot, kill }) {
     pid = parentPid(pid, opts) ?? 0;
   }
   return null;
+}
+
+/** A Codex session id is a UUID, as the hook payload and CODEX_THREAD_ID carry it. */
+const CODEX_SESSION_ID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+
+/**
+ * The nearest Codex CLI process above `startPid`: the native `codex` binary,
+ * or the node launcher that runs `codex` / `codex.js`. Codex keeps no session
+ * registry on disk, so its process incarnation is the owner.
+ *
+ * @param {number} startPid
+ * @param {{procRoot?: string}} [opts]
+ * @returns {{pid: number, procStart: string|null}|null}
+ */
+export function codexAncestor(startPid, { procRoot = "/proc" } = {}) {
+  let pid = startPid;
+  for (let hop = 0; hop < MAX_ANCESTRY_HOPS && pid > 1; hop += 1) {
+    const proc = processState(pid, { procRoot });
+    try {
+      const argv = fs.readFileSync(path.join(procRoot, String(pid), "cmdline"), "utf8").split("\0");
+      if (
+        path.basename(argv[0]) === "codex" ||
+        (path.basename(argv[0]) === "node" && /(?:^|\/)codex(?:\.js)?$/.test(argv[1] ?? ""))
+      )
+        return { pid, procStart: proc.startTime };
+    } catch {
+      /* A parent can exit during discovery. */
+    }
+    pid = proc.ppid ?? 0;
+  }
+  return null;
+}
+
+/**
+ * The Codex session this process runs in, as a registry-shaped entry. A hook
+ * passes the payload's `session_id`; the Codex tool shell exports
+ * `CODEX_THREAD_ID`. The id must be a UUID, and a live codex process must be
+ * an ancestor, which gives the owner its process incarnation.
+ *
+ * @param {{sessionId?: string, env?: NodeJS.ProcessEnv, startPid?: number, procRoot?: string}} [args]
+ * @returns {{pid: number, procStart: string, sessionId: string, name: string}|null}
+ */
+export function findCodexSelf({
+  sessionId,
+  env = process.env,
+  startPid = process.ppid,
+  procRoot,
+} = {}) {
+  const id = sessionId || env.CODEX_THREAD_ID || env.CODEX_SESSION_ID;
+  if (typeof id !== "string" || !CODEX_SESSION_ID.test(id)) return null;
+  const owner = codexAncestor(startPid, { procRoot });
+  if (!owner?.procStart) return null;
+  // The tail of the id: a UUIDv7 head is a timestamp that sessions started together share.
+  return {
+    pid: owner.pid,
+    procStart: owner.procStart,
+    sessionId: id,
+    name: `codex ${id.slice(-8)}`,
+  };
 }

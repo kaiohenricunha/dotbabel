@@ -7,6 +7,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 import {
+  codexAncestor,
+  findCodexSelf,
   findSelf,
   isOwnerAlive,
   ownerFromEntry,
@@ -33,9 +35,10 @@ function statLine(pid, comm, ppid, startTime) {
 
 function fakeProc(procs) {
   const root = makeTempDir("fleet-proc-");
-  for (const { pid, comm = "node", ppid, startTime } of procs) {
+  for (const { pid, comm = "node", ppid, startTime, argv } of procs) {
     fs.mkdirSync(path.join(root, String(pid)));
     fs.writeFileSync(path.join(root, String(pid), "stat"), statLine(pid, comm, ppid, startTime));
+    if (argv) fs.writeFileSync(path.join(root, String(pid), "cmdline"), `${argv.join("\0")}\0`);
   }
   return root;
 }
@@ -202,7 +205,7 @@ describe("host adapters", () => {
   });
 
   it("a host without an adapter reports every capability as unsupported", () => {
-    for (const id of ["codex", "gemini", "antigravity", "opencode", "copilot", "not-a-cli", ""]) {
+    for (const id of ["gemini", "antigravity", "opencode", "copilot", "not-a-cli", ""]) {
       const host = hostAdapter(id);
       expect(host.adapter).toBe(false);
       expect(Object.keys(host.capabilities).sort()).toEqual([...HOST_CAPABILITIES].sort());
@@ -213,8 +216,28 @@ describe("host adapters", () => {
       expect(host.identity).toBe(null);
       expect(host.isAlive).toBe(null);
     }
-    expect(hostAdapter("codex").label).toBe("Codex");
+    expect(hostAdapter("gemini").label).toBe("Gemini");
     expect(hostAdapter("not-a-cli").label).toBe("not-a-cli");
+  });
+
+  it("the Codex host adapter binds the hook session id to the codex process above it", () => {
+    const codex = hostAdapter("codex");
+    expect(codex.label).toBe("Codex");
+    expect(codex.adapter).toBe(true);
+    for (const name of HOST_CAPABILITIES) expect(codex.capabilities[name].support).toBe("supported");
+    expect(codex.capabilities.preEdit.evidence).toMatch(/apply_patch/);
+    const procRoot = fakeProc([
+      { pid: 40, ppid: 1, startTime: 4, argv: ["/usr/lib/node_modules/@openai/codex/vendor/bin/codex", "exec"] },
+      { pid: 41, ppid: 40, startTime: 5, argv: ["/bin/sh", "-c", "fleet-guard.sh pre-edit"] },
+    ]);
+    const self = codex.identity({ sessionId: SESSION, startPid: 41, env: {}, procRoot });
+    expect(self).toMatchObject({ pid: 40, procStart: "4", sessionId: SESSION, name: "codex f305032e" });
+    expect(ownerFromEntry(self).key).toBe("40-4");
+    expect(codex.isAlive({ pid: 40, procStart: "4" }, { procRoot })).toBe(true);
+    expect(codex.isAlive({ pid: 40, procStart: "9" }, { procRoot })).toBe(false);
+    expect(describeHostAdapter(codex)).toBe(
+      "host codex (Codex): identity supported, liveness supported, preEdit supported, preBash supported, postTool supported, sessionStart supported",
+    );
   });
 
   it("unverified never counts as supported (ARCH-4)", () => {
@@ -246,8 +269,58 @@ describe("host adapters", () => {
     expect(describeHostAdapter(hostAdapter("claude"))).toBe(
       "host claude (Claude): identity supported, liveness supported, preEdit supported, preBash supported, postTool supported, sessionStart supported",
     );
-    expect(describeHostAdapter(hostAdapter("codex"))).toBe(
-      "host codex (Codex): every capability unsupported — no host adapter yet, so the fleet is off for this host",
+    expect(describeHostAdapter(hostAdapter("gemini"))).toBe(
+      "host gemini (Gemini): every capability unsupported — no host adapter yet, so the fleet is off for this host",
     );
+  });
+});
+
+const SESSION = "01a1616d-595b-7880-b995-2e09f305032e";
+
+describe("codexAncestor", () => {
+  it("finds the native codex binary or the node launcher above a hook", () => {
+    const procRoot = fakeProc([
+      { pid: 10, ppid: 1, startTime: 1, argv: ["/usr/bin/node", "/usr/lib/node_modules/@openai/codex/bin/codex.js"] },
+      { pid: 11, ppid: 10, startTime: 2, argv: ["/opt/codex/vendor/bin/codex"] },
+      { pid: 12, ppid: 11, startTime: 3, argv: ["bash", "fleet-guard.sh"] },
+      { pid: 20, ppid: 1, startTime: 7, argv: ["/usr/bin/node", "/tmp/world/codex"] },
+      { pid: 21, ppid: 20, startTime: 8, argv: ["node", "dotbabel-fleet.mjs"] },
+    ]);
+    // The nearest match wins: the native binary, not its node launcher.
+    expect(codexAncestor(12, { procRoot })).toEqual({ pid: 11, procStart: "2" });
+    expect(codexAncestor(10, { procRoot })).toEqual({ pid: 10, procStart: "1" });
+    expect(codexAncestor(21, { procRoot })).toEqual({ pid: 20, procStart: "7" });
+  });
+
+  it("returns null when no codex process is an ancestor", () => {
+    const procRoot = fakeProc([
+      { pid: 30, ppid: 1, startTime: 1, argv: ["/usr/bin/claude"] },
+      { pid: 31, ppid: 30, startTime: 2, argv: ["/usr/bin/node", "/tmp/not-codex-at-all.mjs"] },
+      { pid: 32, ppid: 31, startTime: 3, argv: ["/usr/bin/codexx"] },
+    ]);
+    expect(codexAncestor(32, { procRoot })).toBe(null);
+    expect(codexAncestor(999, { procRoot })).toBe(null);
+  });
+});
+
+describe("findCodexSelf", () => {
+  const procRoot = fakeProc([
+    { pid: 50, ppid: 1, startTime: 6, argv: ["codex"] },
+    { pid: 51, ppid: 50, startTime: 7, argv: ["sh"] },
+  ]);
+  const other = "00000000-0000-4000-8000-0000000000aa";
+
+  it("takes the hook payload session id, then CODEX_THREAD_ID, then CODEX_SESSION_ID", () => {
+    expect(findCodexSelf({ sessionId: SESSION, env: {}, startPid: 51, procRoot })?.sessionId).toBe(SESSION);
+    expect(findCodexSelf({ env: { CODEX_THREAD_ID: other }, startPid: 51, procRoot })?.sessionId).toBe(other);
+    expect(findCodexSelf({ env: { CODEX_SESSION_ID: other }, startPid: 51, procRoot })?.name).toBe("codex 000000aa");
+  });
+
+  it("refuses an id that is not a UUID, and a process without a codex ancestor", () => {
+    for (const sessionId of ["", "sess-self", "../../etc", SESSION + "x"]) {
+      expect(findCodexSelf({ sessionId, env: {}, startPid: 51, procRoot })).toBe(null);
+    }
+    expect(findCodexSelf({ env: {}, startPid: 51, procRoot })).toBe(null);
+    expect(findCodexSelf({ sessionId: SESSION, env: {}, startPid: 1, procRoot })).toBe(null);
   });
 });

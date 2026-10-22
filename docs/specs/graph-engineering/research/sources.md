@@ -20,3 +20,4 @@
 - **DOC-12**: [A2A Protocol specification](https://a2a-protocol.org/latest/specification/), version 1.0.0 — the `TaskState` values, with four terminal and two interrupted states. Feeds: §5.
 - **DOC-13**: OpenTelemetry, [GenAI agent spans](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-agent-spans.md) — the agent operations, with status Development. Feeds: §5, §8.
 - **DOC-14**: [Host and platform capabilities](phase-2-0-hosts.md), verified 2026-10-16 — implemented fleet capabilities, upstream hook evidence, and explicit unsupported backends. Feeds: §3, §5, §6.
+- **DOC-15**: [Model adapter adoption](adoption-status.md), updated 2026-10-20 — the locked result of each judgment step's experiment, and why no step is adopted. Feeds: §6, §8.

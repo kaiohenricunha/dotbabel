@@ -4,7 +4,7 @@
 > Branch: `spec/graph-engineering`
 > Worktree: `.claude/worktrees/spec-graph-engineering/`
 > Base: `origin/main` @ `33f66a8`
-> Status: implementing since 2026-10-13 (approved the same day; unit 1a landed first)
+> Status: done on 2026-10-20 (implementing since 2026-10-13; approved the same day; unit 1a landed first)
 
 ## Status
 
@@ -18,6 +18,15 @@
 | 6   | Implementation Plan         | [x] done |
 | 7   | Non-Functional Requirements | [x] done |
 | 8   | Risks and Alternatives      | [x] done |
+
+All 12 units of §6.1 landed. Unit 3e ran each step's experiment under a locked rule: review-triage
+REJECT, dispatch REJECT, and retry INCONCLUSIVE, so no model adapter is adopted
+([adoption status](research/adoption-status.md)). The validation audit
+`docs/audits/spec-graph-engineering-validation-2026-10-20.md` found 33 constraints implemented, 1 partial,
+12 N/A, and all 14 acceptance criteria passing. The owner chose to close the spec on 2026-10-20.
+After #538 added the R-9 rejoin tests, the second audit of that day,
+`docs/audits/spec-graph-engineering-validation-2026-10-20-2.md`, found 34 constraints implemented,
+0 partial, and 12 N/A, with no CRITICAL or WARNING issue.
 
 ## Quick Start
 

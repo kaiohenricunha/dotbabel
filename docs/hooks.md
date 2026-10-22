@@ -157,6 +157,13 @@ session's systemd scope an equal CPU weight (the fair CPU share). See
 [fleet.md](./fleet.md) for the settings block, the claim rules, and the
 limits.
 
+Codex runs the same script. `dotbabel fleet setup --harness codex` registers
+it in `~/.codex/hooks.json` with `DOTBABEL_FLEET_HOST=codex`: `pre-edit` on
+`^apply_patch$`, `pre-bash` on `^Bash$`, `post-tool`, `prompt`
+(`UserPromptSubmit`), and `session-start`, plus `task-context.sh` at
+`SessionStart`. Codex does not support an `ask` answer, so for a Codex
+session the escalation stays a `deny` that tells the agent to ask its user.
+
 ---
 
 ## `task-context.sh`
@@ -231,9 +238,11 @@ These entries apply to Claude Code. The user's Claude settings may already
 register them globally; check those before adding project entries. Codex uses
 different events and transcript formats, so these four entries do not install
 a Codex permission hook. In Codex, the skill accepts a direct
-`$yolo --for <duration> [--merge|--no-merge] [scope]` as session instructions.
-It records an expiry in the conversation and preserves host permission checks;
-it does not create a hook grant or approve permission dialogs. See the
+`$yolo --for <duration> [--merge|--no-merge] [scope]` as standing approval for the
+task, including deploys and releases after strict testing and validation. It
+records an expiry in the conversation; it does not create a Claude hook grant.
+Codex needs Full access to remove shell approval prompts. The Codex reference
+includes a launcher for new sessions and setup for existing sessions. See the
 [host selection rules](../skills/yolo/SKILL.md#choose-the-runtime).
 
 It has four entries:

@@ -3,18 +3,28 @@ id: tldr
 name: tldr
 type: command
 version: 1.0.0
-domain: [devex, writing]
-platform: [none]
-task: [documentation]
+domain:
+  - devex
+  - writing
+platform:
+  - none
+task:
+  - documentation
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-09-16
-updated: 2026-09-16
-description: >
+created: 2026-09-16T00:00:00.000Z
+updated: 2026-09-16T00:00:00.000Z
+description: |
   Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.
 argument-hint: "[PR number | branch | path | URL | topic] (default: current branch vs origin/main)"
 model: haiku
-related: [pr-tldr]
+related:
+  - pr-tldr
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: mechanical
+    binding: session
 ---
 
 Explain the target in a few plain-language lines, at whatever altitude a reader unfamiliar with the internals needs.

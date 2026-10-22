@@ -60,7 +60,11 @@ it("uses the real domain lifecycle from two native integration actors", async ()
   await run(advisor, ["ack", reply.id, "--processed"]);
   await run(advisor, ["complete", request.id, "--lease", claimed.lease, "--result", "Done"]);
   expect((await run(main, ["queue"]))[0].state).toBe("completed");
+  await expect(run(advisor, ["unpair"])).rejects.toThrow(/Advisor cannot unpair/);
   expect(await run(main, ["unpair"])).toMatchObject({ closed: true });
+  const again = await run(main, ["main"]);
+  await run(advisor, ["advisor", again.code]);
+  expect(await run(main, ["unpair"])).toEqual({ id: again.id, closed: true });
 });
 it("keeps native integration tools scoped to their verified session and repository", async () => {
   const { main, advisor, env } = await fixture();

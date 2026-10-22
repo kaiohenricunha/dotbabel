@@ -3,26 +3,27 @@ id: post-pr-review
 name: post-pr-review
 type: skill
 version: 0.2.0
-domain: [devex]
-platform: [github-actions]
-task: [review]
+domain:
+  - devex
+platform:
+  - github-actions
+task:
+  - review
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-05-07
-updated: 2026-08-12
-description: >
-  Post AI-generated review findings on a GitHub PR as inline review comments
-  via the gh CLI — the bot-style review-comment workflow GitHub Copilot used
-  to provide before it got rate-limited. Idempotent (hidden marker dedup),
-  rate-limit conscious (respects GitHub's 80/min secondary limit), and
-  dry-run by default in interactive mode. Pairs with `review-pr`, which
-  consumes the comments this skill produces and applies fixes.
-  Triggers on: "post PR review", "leave inline comments on PR",
-  "AI review and comment on PR", "Copilot-style PR review".
+created: 2026-05-07T00:00:00.000Z
+updated: 2026-08-12T00:00:00.000Z
+description: |
+  Post AI-generated review findings on a GitHub PR as inline review comments via the gh CLI — the bot-style review-comment workflow GitHub Copilot used to provide before it got rate-limited. Idempotent (hidden marker dedup), rate-limit conscious (respects GitHub's 80/min secondary limit), and dry-run by default in interactive mode. Pairs with `review-pr`, which consumes the comments this skill produces and applies fixes. Triggers on: "post PR review", "leave inline comments on PR", "AI review and comment on PR", "Copilot-style PR review".
 argument-hint: "[PR#] [--dry-run] [--auto --confirm-post] [--mode review|inline] [--max-comments N] [--summary-only] [--event COMMENT|REQUEST_CHANGES|APPROVE] [--agents <csv>]"
 tools: Bash, Read, Grep, Glob, Task
 model: sonnet
 effort: medium
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: routine
+    binding: consumer
 ---
 
 Post AI review findings on a GitHub PR as inline comments. The producer side

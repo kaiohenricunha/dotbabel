@@ -5,6 +5,8 @@ import { afterEach, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 import { processState } from "../../src/fleet/registry.mjs";
 import { setupHooks } from "../../src/peer/setup.mjs";
+import { PeerStore } from "../../src/peer/store.mjs";
+import { registerMain, pairAdvisor } from "../../src/peer/state.mjs";
 const bin = new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname;
 const children = [];
 afterEach(() => {
@@ -38,9 +40,9 @@ function world() {
     DOTBABEL_PEER_STATE_DIR: path.join(root, "state"),
     DOTBABEL_PEER_NO_RELAY: "1",
   };
-  function cli(args, n = 0, input) {
+  function cli(args, n = 0, input, cwd = repo) {
     return spawnSync(process.execPath, [bin, ...args], {
-      cwd: repo,
+      cwd,
       env: { ...env, DOTBABEL_PEER_HOOK_SESSION: ids[n].sessionId },
       input,
       encoding: "utf8",
@@ -191,6 +193,184 @@ it("guards Advisor mutation tools and shell writes while allowing read-only insp
   expect(r.status).toBe(0);
   expect(r.stdout.trim()).toBe("");
 });
+it("follows Main into its current worktree after the registered worktree is removed", () => {
+  const w = world();
+  execFileSync("git", [
+    "-C",
+    w.repo,
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "fixture",
+  ]);
+  const [task, next, last] = ["es9", "check-bc", "final"].map((name) => {
+    const dir = path.join(w.root, name);
+    execFileSync("git", ["-C", w.repo, "worktree", "add", "-qb", name, dir]);
+    return fs.realpathSync(dir);
+  });
+  const p = json(w.cli(["main", "--json"], 0, undefined, task));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  execFileSync("git", ["-C", w.repo, "worktree", "remove", task]);
+  expect(json(w.cli(["status", "--json"], 1)).main_alive).toBe(false);
+  const hook = w.cli(
+    ["hook", "PreToolUse"],
+    0,
+    JSON.stringify({
+      session_id: w.ids[0].sessionId,
+      cwd: next,
+      tool_name: "Bash",
+      tool_input: { command: "npm test" },
+    }),
+  );
+  expect(hook.status, hook.stderr).toBe(0);
+  let status = json(w.cli(["status", "--json"], 1));
+  expect(status.main_alive).toBe(true);
+  expect(status.main.worktree).toBe(next);
+  execFileSync("git", ["-C", w.repo, "worktree", "remove", next]);
+  json(w.cli(["receive", "--json"], 0, undefined, last));
+  status = json(w.cli(["status", "--json"], 1));
+  expect(status.main_alive).toBe(true);
+  expect(json(w.cli(["inspect", "--json"], 1)).main_worktree).toBe(last);
+});
+it("skips hook work for a session in no pair, even when its folder is gone", () => {
+  const w = world(),
+    gone = path.join(w.root, "removed-worktree");
+  const hook = (event, payload) =>
+    w.cli(["hook", event], 0, JSON.stringify({ session_id: w.ids[0].sessionId, ...payload }));
+  for (const [event, payload] of [
+    ["PreToolUse", { cwd: gone, tool_name: "Bash", tool_input: { command: "pwd" } }],
+    ["Stop", { cwd: gone, stop_hook_active: false }],
+    ["PreToolUse", { cwd: w.repo, tool_name: "Write", tool_input: { file_path: "a" } }],
+  ]) {
+    const r = hook(event, payload);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout.trim()).toBe("");
+  }
+});
+it("keeps only the Advisor read-only guard when a paired session's folder is gone", () => {
+  const w = world(),
+    gone = path.join(w.root, "removed-worktree"),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  json(w.cli(["send", "main", "unread finding", "--json"], 1));
+  const hook = (n, event, payload = {}) =>
+    w.cli(
+      ["hook", event],
+      n,
+      JSON.stringify({ session_id: w.ids[n].sessionId, cwd: gone, ...payload }),
+    );
+  for (const [n, event, payload] of [
+    [0, "PreToolUse", { tool_name: "Write", tool_input: { file_path: "a" } }],
+    [0, "Stop", { stop_hook_active: false }],
+    [1, "PreToolUse", { tool_name: "Read", tool_input: { file_path: path.join(w.repo, "a") } }],
+    [1, "PreToolUse", { tool_name: "Bash", tool_input: { command: "git status" } }],
+    [1, "Stop", { stop_hook_active: false }],
+  ]) {
+    const r = hook(n, event, payload);
+    expect(r.status, `${n} ${event} ${r.stderr}`).toBe(0);
+    expect(r.stdout.trim(), `${n} ${event}`).toBe("");
+  }
+  for (const payload of [
+    { tool_name: "Edit", tool_input: { file_path: path.join(w.repo, "a") } },
+    { tool_name: "Bash", tool_input: { command: "rm -rf src" } },
+  ]) {
+    const r = json(hook(1, "PreToolUse", payload));
+    expect(r.hookSpecificOutput.permissionDecision).toBe("deny");
+  }
+});
+it("keeps the Advisor guard when the same session is Main in another repository ledger", async () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const other = new PeerStore(w.env.DOTBABEL_PEER_STATE_DIR, "local:/other-repository");
+  await other.transaction((s) => {
+    const q = registerMain(
+      s,
+      { key: "claude:s1", sessionId: "s1", repo: "local:/other-repository" },
+      { alive: () => true },
+    );
+    pairAdvisor(s, { key: "claude:x", sessionId: "x", repo: "local:/other-repository" }, q.code, {
+      alive: () => true,
+    });
+  });
+  const r = json(
+    w.cli(
+      ["hook", "PreToolUse"],
+      1,
+      JSON.stringify({
+        session_id: w.ids[1].sessionId,
+        cwd: path.join(w.root, "removed-worktree"),
+        tool_name: "Write",
+        tool_input: { file_path: "a" },
+      }),
+    ),
+  );
+  expect(r.hookSpecificOutput.permissionDecision).toBe("deny");
+});
+it("still fails closed on a malformed ledger instead of guessing that a session is unpaired", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const ledger = fs
+    .readdirSync(w.env.DOTBABEL_PEER_STATE_DIR)
+    .find((name) => /^[a-f0-9]{64}[.]json$/.test(name));
+  fs.writeFileSync(path.join(w.env.DOTBABEL_PEER_STATE_DIR, ledger), "not json");
+  const r = w.cli(
+    ["hook", "PreToolUse"],
+    1,
+    JSON.stringify({
+      session_id: w.ids[1].sessionId,
+      cwd: w.repo,
+      tool_name: "Edit",
+      tool_input: { file_path: "a" },
+    }),
+  );
+  expect(r.status).not.toBe(0);
+});
+it("guards an Advisor's subagent through the process tree when its calls carry their own session ID", () => {
+  const w = world();
+  fs.writeFileSync(
+    path.join(w.env.CLAUDE_CONFIG_DIR, "sessions", `${process.pid}.json`),
+    JSON.stringify({
+      pid: process.pid,
+      procStart: processState(process.pid).startTime,
+      sessionId: "parent-advisor",
+      cwd: w.repo,
+    }),
+  );
+  const as = (sessionId, args, input) =>
+    spawnSync(process.execPath, [bin, ...args], {
+      cwd: w.repo,
+      env: { ...w.env, DOTBABEL_PEER_HOOK_SESSION: sessionId },
+      input,
+      encoding: "utf8",
+    });
+  const p = json(w.cli(["main", "--json"]));
+  json(as("parent-advisor", ["advisor", p.code, "--json"]));
+  const hook = (payload) =>
+    as(
+      "unused",
+      ["hook", "PreToolUse"],
+      JSON.stringify({
+        cwd: w.repo,
+        tool_name: "Write",
+        tool_input: { file_path: "a" },
+        ...payload,
+      }),
+    );
+  const subagent = json(
+    hook({ session_id: "subagent-own-id", agent_id: "a1", agent_type: "Explore" }),
+  );
+  expect(subagent.hookSpecificOutput.permissionDecision).toBe("deny");
+  const plain = hook({ session_id: "subagent-own-id" });
+  expect(plain.status, plain.stderr).toBe(0);
+  expect(plain.stdout.trim()).toBe("");
+});
 it("routes correlated messages and requires recipient acknowledgments", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));
@@ -201,6 +381,50 @@ it("routes correlated messages and requires recipient acknowledgments", () => {
   json(w.cli(["ack", m.id, "--json"]));
   const reply = json(w.cli(["send", "advisor", "investigate", "--reply-to", m.id, "--json"]));
   expect(json(w.cli(["receive", "--json"], 1))[0].id).toBe(reply.id);
+});
+it("reminds Main about unread Advisor messages through its own hooks across processes", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const hook = (event, extra = {}) =>
+    w.cli(
+      ["hook", event],
+      0,
+      JSON.stringify({ session_id: w.ids[0].sessionId, cwd: w.repo, ...extra }),
+    );
+  expect(hook("Stop").stdout.trim()).toBe("");
+  json(w.cli(["send", "main", "B and C approved", "--kind", "finding", "--json"], 1));
+  const blocked = json(hook("Stop", { stop_hook_active: false }));
+  expect(blocked.decision).toBe("block");
+  expect(blocked.reason).toContain(p.id);
+  expect(hook("Stop").stdout.trim()).toBe("");
+  expect(
+    json(hook("UserPromptSubmit", { prompt: "status?" })).hookSpecificOutput.additionalContext,
+  ).toContain("1 unread");
+  expect(json(w.cli(["receive", "--json"]))[0].body).toBe("B and C approved");
+  expect(hook("UserPromptSubmit", { prompt: "status?" }).stdout.trim()).toBe("");
+});
+it("reminds the Advisor about unread Main messages through its own hooks across processes", () => {
+  const w = world(),
+    p = json(w.cli(["main", "--json"]));
+  json(w.cli(["advisor", p.code, "--json"], 1));
+  const hook = (event, extra = {}) =>
+    w.cli(
+      ["hook", event],
+      1,
+      JSON.stringify({ session_id: w.ids[1].sessionId, cwd: w.repo, ...extra }),
+    );
+  expect(hook("Stop").stdout.trim()).toBe("");
+  json(w.cli(["send", "advisor", "please check the migration", "--json"]));
+  const blocked = json(hook("Stop", { stop_hook_active: false }));
+  expect(blocked.decision).toBe("block");
+  expect(blocked.reason).toContain(p.id);
+  expect(hook("Stop").stdout.trim()).toBe("");
+  expect(
+    json(hook("UserPromptSubmit", { prompt: "status?" })).hookSpecificOutput.additionalContext,
+  ).toContain("1 unread");
+  expect(json(w.cli(["receive", "--json"], 1))[0].body).toBe("please check the migration");
+  expect(hook("UserPromptSubmit", { prompt: "status?" }).stdout.trim()).toBe("");
 });
 it("persists an early Main reply across processes and resumes Advisor after wait", () => {
   const w = world(),

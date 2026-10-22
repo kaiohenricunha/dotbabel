@@ -1571,6 +1571,328 @@
         "binding": "consumer",
         "rationale": "The coordinator maps user intent to a bounded context-transfer CLI and verifies its output."
       }
+    },
+    {
+      "sourcePath": "commands/changelog.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "changelog",
+        "name": "changelog",
+        "type": "command",
+        "description": "Generate a changelog entry from git history. Defaults to commits since the last tag or the last 20 commits.\n",
+        "version": "1.0.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "argument-hint": "[ref-range|count|since-deploy]",
+        "model": "haiku"
+      },
+      "bodyHash": "55fd58d9ecd0cfde0fb9a961a396e0873949785913a24a8a344f118b2345b79c",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/markdown.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "markdown",
+        "name": "markdown",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Fix markdown formatting and structure across a file or directory. Normalizes headings, tables, code blocks, link references.\n",
+        "argument-hint": "[file | dir]",
+        "model": "haiku"
+      },
+      "bodyHash": "3058932f1169a4f5092bbdfa6fc1f2bf32afe5afec65e45dc71d40e61cd30f20",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/tldr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "tldr",
+        "name": "tldr",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["documentation"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-16",
+        "updated": "2026-09-16",
+        "description": "Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.\n",
+        "argument-hint": "[PR number | branch | path | URL | topic] (default: current branch vs origin/main)",
+        "model": "haiku",
+        "related": ["pr-tldr"]
+      },
+      "bodyHash": "956457639687e55d62773ea2a71d53f56a985c5f9e206f91b31236ec458a2cba",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/pr-tldr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "pr-tldr",
+        "name": "pr-tldr",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "writing"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-13",
+        "updated": "2026-09-16",
+        "description": "Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.\n",
+        "argument-hint": "[PR number | branch] (default: current branch vs origin/main)",
+        "model": "haiku",
+        "related": ["tldr"]
+      },
+      "bodyHash": "2b41e18f7d0a2c6e92ad5ee2948050376721f14ae2e27a39c4fe0a424cb8095a",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "mechanical",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/merge-pr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "merge-pr",
+        "name": "merge-pr",
+        "type": "command",
+        "version": "2.1.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review", "testing"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-10-13",
+        "description": "Merge a pull request only after verifying that trusted evidence covers its exact head SHA.\n",
+        "argument-hint": "[PR#]",
+        "model": "sonnet"
+      },
+      "bodyHash": "3f99e6551210f94ee1813397740765fe18401e05a976dd083a788f918e77dc00",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/pre-pr.md",
+      "artifactKind": "command",
+      "category": "C",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "pre-pr",
+        "name": "pre-pr",
+        "type": "command",
+        "version": "1.1.0",
+        "domain": ["devex"],
+        "platform": ["none"],
+        "task": ["review", "testing"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-04-18",
+        "updated": "2026-08-12",
+        "description": "Pre-PR quality gate: simplify changed code, security-review the diff, run the quality profile, and surface a go/no-go summary before opening a pull request.\n",
+        "argument-hint": "[base-branch] [--conductor] — default: origin/main",
+        "model": "sonnet",
+        "headless_safe": false
+      },
+      "bodyHash": "aee56d31f6a0198d61ea3c2cedb822ba1782836e89d0ee38c853f2c79f1e38ed",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "commands/dependabot-sweep.md",
+      "artifactKind": "command",
+      "category": "D",
+      "batch": "P-19c-commands",
+      "frontmatter": {
+        "id": "dependabot-sweep",
+        "name": "dependabot-sweep",
+        "type": "command",
+        "version": "1.0.0",
+        "domain": ["devex", "security"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "validated",
+        "owner": "@kaiohenricunha",
+        "created": "2025-01-01",
+        "updated": "2026-04-17",
+        "description": "Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.\n",
+        "model": "sonnet"
+      },
+      "bodyHash": "5a5ec8fc06a5862f24790ca74dcc25d1fe0ab2580ba1f10557632de4c0a350d1",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "session"
+      }
+    },
+    {
+      "sourcePath": "skills/post-pr-review/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19e-skills",
+      "frontmatter": {
+        "id": "post-pr-review",
+        "name": "post-pr-review",
+        "type": "skill",
+        "version": "0.2.0",
+        "domain": ["devex"],
+        "platform": ["github-actions"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-05-07",
+        "updated": "2026-08-12",
+        "description": "Post AI-generated review findings on a GitHub PR as inline review comments via the gh CLI — the bot-style review-comment workflow GitHub Copilot used to provide before it got rate-limited. Idempotent (hidden marker dedup), rate-limit conscious (respects GitHub's 80/min secondary limit), and dry-run by default in interactive mode. Pairs with `review-pr`, which consumes the comments this skill produces and applies fixes. Triggers on: \"post PR review\", \"leave inline comments on PR\", \"AI review and comment on PR\", \"Copilot-style PR review\".\n",
+        "argument-hint": "[PR#] [--dry-run] [--auto --confirm-post] [--mode review|inline] [--max-comments N] [--summary-only] [--event COMMENT|REQUEST_CHANGES|APPROVE] [--agents <csv>]",
+        "tools": "Bash, Read, Grep, Glob, Task",
+        "model": "sonnet",
+        "effort": "medium"
+      },
+      "bodyHash": "82f65c52013c7604fdd660b4f28b3c16d5cb2fdbb31026dda15a9b47fc7f84be",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer"
+      }
+    },
+    {
+      "sourcePath": "skills/language-review/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19e-skills",
+      "frontmatter": {
+        "id": "language-review",
+        "name": "language-review",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["writing"],
+        "platform": ["none"],
+        "task": ["review"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-10-15",
+        "updated": "2026-10-15",
+        "description": "Read-only editorial review of text as an experienced native-language editor would read it: naturalness, idiom, word choice, syntax, register, cohesion, regional fit, and meaning preservation. Covers English (en-US, en-GB), Brazilian Portuguese, Spanish, French, German, Modern Standard Arabic, and Indonesian. Reviews original writing, or a translation against its source, in sentences, documents, Markdown, UI copy, and JSON or YAML localization strings. Never rewrites files. Triggers on: \"does this sound natural\", \"sounds translated\", \"review this translation\", \"would a native speaker say this\", \"language review\", \"check the tone of this Portuguese text\", \"is this idiomatic French\", \"natural German wording\", \"review my Spanish copy\", \"Arabic copy review\", \"Indonesian wording\".\n",
+        "argument-hint": "[text | path ...] [--lang <tag>] [--region <variant>] [--source <path|tag>] [--audience <who>] [--register <level>] [--preserve <term>] [--format md|json] [--revised]",
+        "tools": "Read, Grep, Glob",
+        "allowed-tools": "Read Grep Glob",
+        "model": "opus",
+        "effort": "medium",
+        "disable-model-invocation": false,
+        "user-invocable": true
+      },
+      "bodyHash": "572a5ba1baa826c0db962f7f14266ae3abb13f27f4e000a46ad938a14246a999",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "deep",
+        "binding": "consumer"
+      }
+    },
+    {
+      "sourcePath": "skills/smoke-test/SKILL.md",
+      "artifactKind": "skill",
+      "category": "C",
+      "batch": "P-19e-skills",
+      "frontmatter": {
+        "id": "smoke-test",
+        "name": "smoke-test",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["infra", "devex"],
+        "platform": ["vercel", "flyio", "aws"],
+        "task": ["diagnostics", "runtime-ops"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-18",
+        "updated": "2026-09-18",
+        "description": "Run the smoke checks a repository declares for its deploy targets and report whether production actually answers after a release. Use after a deploy, during release verification, and when confirming a rollback landed. Triggers on: \"smoke test\", \"run smoke checks\", \"is production healthy\", \"did the deploy work\", \"verify the release is live\".\n",
+        "argument-hint": "[--dry-run] [--json]",
+        "tools": "Bash, Read, Grep, Glob",
+        "allowed-tools": "Read Grep Glob Bash",
+        "model": "sonnet",
+        "effort": "medium",
+        "disable-model-invocation": true,
+        "user-invocable": true
+      },
+      "bodyHash": "2fab342796a72ae2638b869a1207aad33ad8fccfe158e4c07a7b82c39be46514",
+      "compute": {
+        "mode": "dynamic",
+        "requirement": "routine",
+        "binding": "consumer"
+      }
+    },
+    {
+      "sourcePath": "skills/security-audit/SKILL.md",
+      "artifactKind": "skill",
+      "category": "A",
+      "batch": "P-19e-skills",
+      "frontmatter": {
+        "id": "security-audit",
+        "name": "security-audit",
+        "type": "skill",
+        "version": "1.0.0",
+        "domain": ["devex", "security"],
+        "platform": ["none"],
+        "task": ["review", "diagnostics"],
+        "maturity": "draft",
+        "owner": "@kaiohenricunha",
+        "created": "2026-09-22",
+        "updated": "2026-09-22",
+        "description": "Whole-repository security audit with independent verification of every finding, vendored from cloudflare/security-audit-skill. Guidance by default; runs the full six-phase audit (parallel hunters, verifiers that did not hunt, coverage ledger, schema-validated findings.json) only on an explicit audit or pen-test request. Triggers on: \"security audit\", \"audit this codebase\", \"pen test the code\", \"full security review\", \"end-to-end security review\", \"security audit report\".\n",
+        "argument-hint": "[scope path | subsystem | <base>..<head>] [--profile quick|standard|deep]",
+        "model": "opus"
+      },
+      "bodyHash": "61b5d05683448fc0671e217ab5827074002534c0656eeb0268740a8b74696877",
+      "compute": {
+        "mode": "floor",
+        "requirement": "frontier",
+        "binding": "consumer"
+      }
     }
   ],
   "neutral": {
@@ -1596,5 +1918,7 @@
     "bodyHash": "2e619036b2c245fc211aafb1315be95b12d793806ca286824581d6d1ac94a1b3"
   },
   "securityOriginalCommit": "8827df12b990a3aa7cd9e61232a8003f3dcab037",
-  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be"
+  "dynamicSkillsOriginalCommit": "6303cc8831c9877bb962f273dc11a81febc239be",
+  "dynamicCommandsOriginalCommit": "b8bffed0e17b2c3cdcce482717a2e5cbab0eb627",
+  "p19eSkillsOriginalCommit": "6923047afbda8a992143f37da8767c36c0bab5eb"
 }

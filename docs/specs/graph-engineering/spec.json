@@ -1,7 +1,7 @@
 {
   "id": "graph-engineering",
   "title": "Graph engineering — a work graph, host-neutral coordination, and an opt-in decider for parallel agent sessions",
-  "status": "implementing",
+  "status": "done",
   "owners": ["dotbabel maintainers"],
   "linked_paths": [
     "plugins/dotbabel/src/task-state.mjs",
@@ -27,9 +27,9 @@
   ],
   "acceptance_commands": [
     "npx vitest run plugins/dotbabel/tests/task-state.test.mjs",
-    "npx vitest run plugins/dotbabel/tests/work-graph.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/work-graph.test.mjs plugins/dotbabel/tests/clone-registry.test.mjs",
     "npx vitest run plugins/dotbabel/tests/task-cli.test.mjs",
-    "npx vitest run plugins/dotbabel/tests/fleet-token.test.mjs plugins/dotbabel/tests/fleet-token-cli.test.mjs plugins/dotbabel/tests/fleet-platform.test.mjs plugins/dotbabel/tests/fleet-merge-queue.test.mjs plugins/dotbabel/tests/fleet-registry.test.mjs",
+    "npx vitest run plugins/dotbabel/tests/fleet-token.test.mjs plugins/dotbabel/tests/fleet-token-cli.test.mjs plugins/dotbabel/tests/fleet-platform.test.mjs plugins/dotbabel/tests/fleet-merge-queue.test.mjs plugins/dotbabel/tests/fleet-registry.test.mjs plugins/dotbabel/tests/dotbabel-doctor.test.mjs",
     "npx vitest run plugins/dotbabel/tests/decider.test.mjs plugins/dotbabel/tests/decider-cli.test.mjs plugins/dotbabel/tests/decider-config.test.mjs plugins/dotbabel/tests/decision-value.test.mjs plugins/dotbabel/tests/decider-boundary.test.mjs plugins/dotbabel/tests/jev-adapter.test.mjs plugins/dotbabel/tests/jev-transport.test.mjs plugins/dotbabel/tests/run-receipt.test.mjs plugins/dotbabel/tests/export.test.mjs plugins/dotbabel/tests/skills-decide.test.mjs plugins/dotbabel/tests/runtime-deps.test.mjs"
   ],
   "depends_on_specs": [],
