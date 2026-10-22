@@ -54,6 +54,9 @@ it("lets an Advisor under a yolo grant work without asking, and keeps the guard"
 
 it("warns that the guard does not limit where an Advisor under a grant reads", () => {
   const section = SKILL.split(/^## /m).find((s) => s.startsWith("Advisor role"));
-  expect(section).toContain("not where it reads");
-  expect(section).toContain("never send secrets or\ncredentials to Main");
+  expect(section).toContain("also limits\nwhere the Advisor reads");
+  expect(section).toContain("stays\nsearchable");
+  expect(section).toContain("`DOTBABEL_PEER_READ_ROOTS`");
+  expect(section).toContain("never send secrets or credentials to Main");
+  expect(section).toContain("recursive `grep`");
 });

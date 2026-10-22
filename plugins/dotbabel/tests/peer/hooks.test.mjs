@@ -13,8 +13,8 @@ import {
 } from "../../src/peer/state.mjs";
 function world() {
   const s = createState("r"),
-    main = { key: "m", repo: "r" },
-    advisor = { key: "a", repo: "r" };
+    main = { key: "m", repo: "r", worktree: "/repo" },
+    advisor = { key: "a", repo: "r", worktree: "/repo" };
   const p = registerMain(s, main, { alive: () => true });
   pairAdvisor(s, advisor, p.code, { alive: () => true });
   return { p, main, advisor };
@@ -258,8 +258,8 @@ it("lets the Advisor search with grep, find, and read-only git, and delegate to 
       tool_input: { command },
     })?.hookSpecificOutput?.permissionDecision ?? "allow";
   for (const command of [
-    "grep -rn 'VITE_DATA_SOURCE' src --include='*.mjs' --exclude-dir=node_modules",
-    "grep -rn 'build-full-auto\\|build:full' package.json vercel.json",
+    "rg -n 'VITE_DATA_SOURCE' src --glob '*.mjs'",
+    "grep -n 'build-full-auto\\|build:full' package.json vercel.json",
     "egrep -n 'a|b' src/a.mjs",
     "/usr/bin/grep -c x a",
     "find src -name '*.mjs' -newer package.json",
