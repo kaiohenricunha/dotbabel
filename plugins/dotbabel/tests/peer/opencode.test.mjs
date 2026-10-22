@@ -188,3 +188,18 @@ it("permits a bounded literal execute wrapper but refuses arbitrary JavaScript a
     await expect(before(code)).rejects.toThrow(/read-only/);
   }
 });
+it("checks an Advisor grep for the secret files it would read", async () => {
+  const { hooks, directory } = await fixture();
+  fs.writeFileSync(path.join(directory, "credentials.json"), "TOKEN\n");
+  execFileSync("git", ["-C", directory, "add", "credentials.json"]);
+  const grep = (sessionID, input) =>
+    hooks["tool.execute.before"]({ sessionID, tool: "grep", input });
+  await expect(grep("ses_advisor", { pattern: "TOKEN", path: directory })).rejects.toThrow(
+    /secret/,
+  );
+  fs.mkdirSync(path.join(directory, "src"));
+  await expect(
+    grep("ses_advisor", { pattern: "TOKEN", path: path.join(directory, "src") }),
+  ).resolves.toBeUndefined();
+  await expect(grep("ses_main", { pattern: "TOKEN", path: directory })).resolves.toBeUndefined();
+});

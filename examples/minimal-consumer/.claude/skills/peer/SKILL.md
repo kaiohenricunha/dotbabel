@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:64c2efac12ec728265213bcfc881eefb8be00e4a53f5828def902b1fa0f4ee12 source=skills/peer/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:a3283c461b6a8be3487e9cb351d76b661d3d826e579c9516a009f93187bf5f0a source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status | unpair
 description: |
@@ -113,9 +113,10 @@ where the Advisor reads: only the pair's worktrees, its ledger, this session's
 saved tool results, and the absolute folders that the user lists in
 `DOTBABEL_PEER_READ_ROOTS`. It never reads common secret files such as `.env`,
 keys, or credentials. For a file outside those folders, ask Main or the user.
-A secret file that git tracks, or that is neither hidden nor ignored, stays
-searchable. So never send secrets or credentials to Main, and use a grant only
-in a trusted project.
+A search that would read a secret file is refused, even when git tracks the
+file: search a narrower path. Git history can still show an old secret through
+`git log -p` or `git show`. So never send secrets or credentials to Main, and
+use a grant only in a trusted project.
 
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.
