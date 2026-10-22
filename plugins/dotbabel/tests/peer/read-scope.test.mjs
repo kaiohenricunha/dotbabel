@@ -170,3 +170,21 @@ it("refuses searches that read hidden, ignored, untracked, or linked files, and 
   }).hookSpecificOutput.permissionDecisionReason;
   expect(reason).toContain("rg");
 });
+
+it("adds the absolute folders in DOTBABEL_PEER_READ_ROOTS, still without secrets", () => {
+  const shared = path.join(root, "shared-lib");
+  fs.mkdirSync(shared);
+  const saved = process.env.DOTBABEL_PEER_READ_ROOTS;
+  try {
+    expect(decide("Read", { file_path: path.join(shared, "index.mjs") })).toBe("deny");
+    process.env.DOTBABEL_PEER_READ_ROOTS = ["relative/ignored", shared].join(path.delimiter);
+    expect(decide("Read", { file_path: path.join(shared, "index.mjs") })).toBe("allow");
+    expect(bash(`rg -n x '${shared}'`)).toBe("allow");
+    expect(decide("Read", { file_path: path.join(shared, ".env") })).toBe("deny");
+    expect(decide("Read", { file_path: path.join(root, "relative", "ignored", "a") })).toBe("deny");
+    expect(decide("Read", { file_path: "/etc/hostname" })).toBe("deny");
+  } finally {
+    if (saved === undefined) delete process.env.DOTBABEL_PEER_READ_ROOTS;
+    else process.env.DOTBABEL_PEER_READ_ROOTS = saved;
+  }
+});

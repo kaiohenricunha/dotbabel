@@ -55,9 +55,13 @@ function real(file) {
   }
 }
 
-/** The places an Advisor may read: both worktrees, the pair's ledger, and this session's saved tool results. @param {object} pair @param {object} who @param {object} input @returns {{cwd: string, dirs: string[], files: string[]}} */
+/** The places an Advisor may read: both worktrees, the absolute folders the user adds in DOTBABEL_PEER_READ_ROOTS, the pair's ledger, and this session's saved tool results. @param {object} pair @param {object} who @param {object} input @returns {{cwd: string, dirs: string[], files: string[]}} */
 function readScope(pair, who, input) {
-  const dirs = [pair.main?.worktree, who.worktree].filter(Boolean).map(real);
+  // The hook reads the session's own environment, so an Advisor tool call cannot widen it.
+  const extra = (process.env.DOTBABEL_PEER_READ_ROOTS ?? "")
+    .split(path.delimiter)
+    .filter((dir) => path.isAbsolute(dir));
+  const dirs = [pair.main?.worktree, who.worktree, ...extra].filter(Boolean).map(real);
   const files = [
     real(
       path.join(peerRoot(), `${createHash("sha256").update(String(who.repo)).digest("hex")}.json`),
@@ -214,7 +218,7 @@ function readOnlyShell(command) {
 }
 const READ_SCOPE = {
   outside:
-    "Peer Advisor reads only the pair's worktrees, its ledger, and this session's saved tool results. This path is outside them. Ask Main or the user for anything else.",
+    "Peer Advisor reads only the pair's worktrees, its ledger, this session's saved tool results, and the folders in DOTBABEL_PEER_READ_ROOTS. This path is outside them. Ask Main or the user for anything else.",
   secret:
     "Peer Advisor never reads secret files such as .env, keys, or credentials, even inside the pair's worktrees. Ask the user if a secret really matters to the review.",
   search:

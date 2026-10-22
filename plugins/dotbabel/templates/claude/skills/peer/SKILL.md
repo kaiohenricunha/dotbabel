@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:c2dd631fa93118f37ec044d4baa02f3dd9698c883e64ff416165d56f2ab6194f source=skills/peer/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:b0df454f398e5c24fcdf3d47a8c0a4dedd0d3f077b34e24d11d803af3ef24d21 source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status | unpair
 description: |
@@ -109,11 +109,13 @@ request marked `forward: never`. The grant only approves permission
 dialogs: the Advisor guard still refuses writes, so ask Main for every change.
 A grant in Main does not reach this session. To run the pair autonomously, the
 user must type `/yolo --for DURATION` in both terminals. The guard also limits
-where the Advisor reads: only the pair's worktrees, its ledger, and this
-session's saved tool results, and never common secret files such as `.env`,
-keys, or credentials. A secret file that git tracks, or that is neither hidden
-nor ignored, stays searchable. So never send secrets or credentials to Main,
-and use a grant only in a trusted project.
+where the Advisor reads: only the pair's worktrees, its ledger, this session's
+saved tool results, and the absolute folders that the user lists in
+`DOTBABEL_PEER_READ_ROOTS`. It never reads common secret files such as `.env`,
+keys, or credentials. For a file outside those folders, ask Main or the user.
+A secret file that git tracks, or that is neither hidden nor ignored, stays
+searchable. So never send secrets or credentials to Main, and use a grant only
+in a trusted project.
 
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.

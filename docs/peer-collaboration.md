@@ -358,7 +358,14 @@ reach the Advisor: type `/yolo` in both terminals for an autonomous pair.
 Under a grant, or in auto mode, an Advisor read gets no dialog, so the guard
 also limits where the Advisor reads. `Read`, `Grep`, `Glob`, and every path in a
 read-only shell command must stay inside Main's worktree, the Advisor's worktree,
-the pair's ledger file, or this session's saved tool results. Symlinks resolve
+the pair's ledger file, this session's saved tool results, or a folder that the
+user adds. The limit applies in every mode and to Codex Advisors too. To let an
+Advisor read a sibling repository or a shared library, list absolute folders,
+separated by `:`, in `DOTBABEL_PEER_READ_ROOTS` in the environment that starts
+the Advisor session, for example
+`export DOTBABEL_PEER_READ_ROOTS=/home/me/projects/shared-lib` in the shell
+profile. The hook reads that environment, so an Advisor tool call cannot widen
+the list, and relative entries are ignored. Symlinks resolve
 first, and git words resolve against `git -C`. Inside those folders, common
 secret files are refused: `.env` (but not `.env.example`, `.env.sample`, or
 `.env.template`), `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.npmrc`, `.pypirc`,
