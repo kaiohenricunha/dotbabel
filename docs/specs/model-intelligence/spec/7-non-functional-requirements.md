@@ -49,7 +49,7 @@ Decided by the owner on 2026-09-18. Reliability requirements preserve Dotbabel's
   - Official provider APIs use 6h/24h: provider catalogs can change quickly, but provider availability does not justify making every resolver call depend on live network access.
   - Broad catalog sources use 24h/7d: they are lower-frequency global knowledge rather than authoritative evidence of the current user's local invokability.
   - Override rules: a source-specific policy may shorten or lengthen these windows only when the adapter documents why, and the effective policy and provenance expose that override. No adapter represents `expired` as `fresh` simply because refresh failed.
-  - Reviewed release documentation is release-scoped. Exact-model facts that a reviewed release snapshot ships (tool support and the native effort vocabulary) stay `fresh` for the dotbabel release that contains that snapshot. Their provenance keeps the documentation source id and digest. They never establish availability: an automatic route still needs fresh runtime discovery and official provider API evidence on their own windows. A new release snapshot replaces these facts.
+  - Reviewed release documentation is release-scoped. Exact-model facts that a reviewed release snapshot ships (tool support and the native effort vocabulary) stay `fresh` for the dotbabel release that contains that snapshot. Their provenance keeps the documentation source id and digest. They never establish availability: an automatic route still needs fresh runtime discovery and official provider API evidence on their own windows. A new release snapshot replaces these facts. Reviewed `classSupport` facts follow the same release scope.
 
 The REL-4 default windows:
 
