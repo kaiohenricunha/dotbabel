@@ -38,13 +38,13 @@ it("does not probe or launch a runtime for a disabled project", async () => {
   await expect(runClaudeTerminal({ repoRoot: "/project" }, { readActivation: async () => ({ enabled: false }), runtimeVersion, startNative })).rejects.toMatchObject({ code: "routing_disabled" });
   expect(runtimeVersion).not.toHaveBeenCalled(); expect(startNative).not.toHaveBeenCalled();
 });
-it.each(["99.0.0", "2.1.303"])("does not claim support or launch native UI on unmeasured runtime %s", async version => {
+it.each(["99.0.0", "2.1.303", "2.1.306"])("does not claim support or launch native UI on unmeasured runtime %s", async version => {
   const startNative = vi.fn();
   await expect(runClaudeTerminal({ repoRoot: "/project" }, { readActivation: enabled, runtimeVersion: async () => version, startNative })).rejects.toMatchObject({ code: "routing_unverified" }); expect(startNative).not.toHaveBeenCalled();
 });
-it("launches native UI on the separately measured 2.1.304 runtime", async () => {
+it.each(["2.1.304", "2.1.307"])("launches native UI on the separately measured %s runtime", async version => {
   const startNative = vi.fn(async () => 0);
-  expect(await runClaudeTerminal({ repoRoot: "/project" }, { readActivation: enabled, runtimeVersion: async () => "2.1.304", startNative })).toBe(0); expect(startNative).toHaveBeenCalledOnce();
+  expect(await runClaudeTerminal({ repoRoot: "/project" }, { readActivation: enabled, runtimeVersion: async () => version, startNative })).toBe(0); expect(startNative).toHaveBeenCalledOnce();
 });
 it("cleans up its plugin and bridge after native startup failure", async () => {
   let plugin;

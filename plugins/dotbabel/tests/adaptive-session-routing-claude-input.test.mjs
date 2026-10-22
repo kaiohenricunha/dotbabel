@@ -76,12 +76,12 @@ describe("Claude session resolver input", () => {
     expect(f.observe).toHaveBeenCalledTimes(1); expect(f.loadPolicy).toHaveBeenCalledTimes(2);
     await expect(f.loader.load("/b")).rejects.toMatchObject({ code: "native_catalog_required" });
   });
-  it("accepts the separately measured 2.1.304 host contract", async () => {
-    const measured = "2.1.304", observe = vi.fn(async () => ({ status: "ok", provenance: { sourceId: "claude", sourceKind: "runtime", sourceVersion: measured, adapterVersion: "3" }, observedAt: clock, evidence: { axes: { model }, runtimeVersion: measured, turnExecuted: false } }));
+  it.each(["2.1.304", "2.1.307"])("accepts the separately measured %s host contract", async measured => {
+    const observe = vi.fn(async () => ({ status: "ok", provenance: { sourceId: "claude", sourceKind: "runtime", sourceVersion: measured, adapterVersion: "3" }, observedAt: clock, evidence: { axes: { model }, runtimeVersion: measured, turnExecuted: false } }));
     const f = fixture({ observe }); await expect(f.loader.load("/project", { ...native(), version: measured })).resolves.toBeDefined();
     expect(observe).toHaveBeenCalledOnce();
   });
-  it.each(["9.9.9", "2.1.303", undefined])("rejects an unmeasured native version %s", async nativeVersion => {
+  it.each(["9.9.9", "2.1.303", "2.1.306", undefined])("rejects an unmeasured native version %s", async nativeVersion => {
     const f = fixture(); await expect(f.loader.load("/project", { ...native(), version: nativeVersion })).rejects.toMatchObject({ code: "routing_unverified" });
     expect(f.observe).not.toHaveBeenCalled();
   });

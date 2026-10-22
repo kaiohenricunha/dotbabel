@@ -1,6 +1,6 @@
 # Claude MAIN native integration proof
 
-This directory verifies the production module on the installed Claude Code 2.1.302 and 2.1.304. The integration is experimental. One live MAIN execution on 2.1.304 proves the model axis; the effort axis remains unverified.
+This directory verifies the production module on the installed Claude Code 2.1.302, 2.1.304 and 2.1.307. The integration is experimental. One live MAIN execution on 2.1.304 proves the model axis; the effort axis remains unverified.
 
 ## Setup and ordinary use
 
@@ -47,6 +47,8 @@ The last command attempts one ordinary, tool-free native MAIN prompt through the
 On 2026-10-20 the same command runs on 2.1.304 after the weekly reset. The first metadata run returns `preserved` with `stale_capability_evidence`: the reviewed release documentation was more than 24 hours old. The owner approves a REL-4 amendment that keeps reviewed release documentation valid for its release. After that change the metadata run proposes `claude-haiku-5-5` with `low` effort at zero inference cost. The live run then completes one turn in 2,226 API ms for USD 0.00326. Native `modelUsage` and `turn.step` `usage.model` both report `claude-haiku-5-5`, so the model route applies. The `ClaudeRouting` record shows intended effort `low`, but `classic.Stop` reports `effort.level` `medium`. The hooks reference defines that field as the level in effect when the hook runs, so it cannot show whether the per-request `turn.step` effort applied. The record reports `medium` as the observed effort and makes no claim of `low`. Effort routing stays unverified until a discriminating measurement exists.
 
 The first metadata attempt exposes missing native effort intent annotations; the corrected shared runtime adapter resolves the same task. The inspection records both candidate causes and the failing regression. The first proof fixture used a `.git` placeholder, which made the existing native SessionEnd hook fail its git query. The fixture now runs `git init --quiet`; the final metadata proof has empty stderr and zero inference cost. The earlier live attempt, including that fixture error, remains failed evidence.
+
+On 2026-10-22 the six acceptance steps run on 2.1.307. Plugin validation and the host relay test pass. The metadata run proposes `claude-haiku-5-5` with `low` effort at zero turns, zero API time and zero cost. The live turn applies the model: intended and native `usage.model` are both `claude-haiku-5-5`. That turn costs USD 0.258, because it writes 257,723 cache-creation tokens with no cache read: the live proof loads the full user configuration, and no cache was warm. `classic.Stop` reports `effort.level` `xhigh`, which equals the user's `effortLevel` setting at that time. On 2.1.304 the setting was `medium` and the report was `medium`. The report therefore follows the session setting, which supports the second effort explanation above; it still does not show the effort that the request used, so effort routing stays unverified.
 
 ## Verify a new Claude Code release
 
