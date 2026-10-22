@@ -90,3 +90,11 @@ it("checks an existing incompatible canonical pin even without a migration decis
  const root=fixture(),a=put(root,"existing","model: haiku\ndotbabel:\n  compute:\n    requirement: frontier\n    mode: pin\n    binding: self\n    rationale: Preserve the exact native selection.\n    pin:\n      runtime: claude\n      config:\n        model: sonnet\n");const before=read(root,a);
  for(const mode of ["check","write"])await expect(migrateArtifacts({root,paths:[a],mode})).rejects.toThrow("migration_decision_conflict");expect(read(root,a)).toBe(before);
 });
+
+it("the repository's canonical artifacts pass the public migrate --check with nothing unresolved",()=>{
+ // Guards the release evidence against a declared floor that an authored native model can no longer meet.
+ const result=spawnSync(process.execPath,["plugins/dotbabel/bin/dotbabel-models.mjs","migrate","--check","--json"],{encoding:"utf8",timeout:60000});
+ expect(result.stdout).not.toContain("migration_decision_conflict");
+ const report=JSON.parse(result.stdout);
+ expect(report.unresolved).toEqual([]);expect(report.pending).toEqual([]);expect(result.status).toBe(0);
+});

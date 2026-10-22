@@ -375,15 +375,15 @@
       "runtimeContractHash": "sha256:92a477ef66d17cb47d36fdff1ca16e6d2decb039eea34cd85e64da8d40ddcbda"
     },
     "skills/agents-search/SKILL.md": {
-      "projectionId": "sha256:1927ac3df8b623e86e736381a006400780d4700439db1e8825639b8ebef0bec5",
+      "projectionId": "sha256:c0ecdb30400a6a09621978a19b5acd30e824feec593d7c588b1859dbf87287a5",
       "sourcePath": "skills/agents-search/SKILL.md",
-      "sourceHash": "sha256:66cef1eb1b50bae97fff9384402deebe96b70a0af75c061615029c56a0a06487",
-      "inputsHash": "sha256:c98a7148e3e4dba26811af94f98b16f241bba7a798474c4e674d33550a23c1f1",
-      "outputHash": "sha256:9310be4703ae2b5b33e3c62453b8b297ba89e91e8ce52b32c5d0bc269326f4a4",
+      "sourceHash": "sha256:55bf8cdff846b918182d10bac5782fd4acd756c412056babc38d34d39660f215",
+      "inputsHash": "sha256:57af130daceb7826a0c55b22ce12a2bf150229e2cd706df237373d2d396bdfe8",
+      "outputHash": "sha256:0fa528ff3ec73b2a71b712a6e3139185acbbe729bcf13ea471523ddeb010d4c4",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:317fb43d5a6c5b5d461820367c7104f7d9c09106d1c259485d10405220d0db91",
-      "resolverResultHash": "sha256:6afeed774bfa2334e9074f1767eda45c50bcf8f0a7d0971dce4e2f6078cb0511",
+      "resolverResultHash": "sha256:0699e0dc4b700a7d9fa34bca886c231b32a14348767304a2fc4fec95a0db5661",
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/audit-and-fix/SKILL.md": {
@@ -855,11 +855,11 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/validate-spec/SKILL.md": {
-      "projectionId": "sha256:bc57d60a474f3a85804649bdaa9a75381925bedf9b76426c59494da2d93dca7d",
+      "projectionId": "sha256:7d36dcd7e57d95b9dba2db986f36b7058f176f387c11d93fd89402c3dfaa5ce0",
       "sourcePath": "skills/validate-spec/SKILL.md",
-      "sourceHash": "sha256:0ccf486090a349a9a682be7458b1e5cbc9301fc62d31d370d36f31cf8ba88750",
-      "inputsHash": "sha256:221caff28fbe6c9cb54de71d4948ed882126375129da49ec0bc5266f385a1ff4",
-      "outputHash": "sha256:6ba558091e111fccdbe5a348f32e75a7d4c27caa1111e378f0136c32a53f91a8",
+      "sourceHash": "sha256:1626729e67e84c766b75e5730321c45824f2f58d83c55881a6ff0e02793c9a68",
+      "inputsHash": "sha256:1bc01a102942d12154ffa66f0f6296ff2987f75ab9aa5884ec7c2f3e19e8775d",
+      "outputHash": "sha256:7f2a5a97a613f6348ea743767fee8ec32bd9be2d0eb059f575703ed66c61c77c",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:317fb43d5a6c5b5d461820367c7104f7d9c09106d1c259485d10405220d0db91",
