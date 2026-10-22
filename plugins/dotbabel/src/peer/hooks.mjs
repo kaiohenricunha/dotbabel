@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { literalWords } from "./shell.mjs";
 import { followWorktree, nativeMessage, nextRequest, recoverRequests } from "./state.mjs";
 import { peerRoot } from "./identity.mjs";
@@ -109,6 +110,154 @@ function broadSearch(bin, words) {
   return bin === "git" && opts.some((w) => /^--(?:untracked|no-index)$/.test(w));
 }
 
+// rg options whose value is the next word when it is not attached.
+const RG_SHORT_VALUE = "efEmjgdtTABCMr";
+const RG_LONG_VALUE = new Set(
+  (
+    "regexp file pre pre-glob dfa-size-limit encoding engine max-count regex-size-limit threads " +
+    "glob iglob ignore-file max-depth max-filesize type type-not type-add type-clear after-context " +
+    "before-context color colors context context-separator field-context-separator " +
+    "field-match-separator hostname-bin hyperlink-format max-columns path-separator replace sort " +
+    "sortr generate"
+  ).split(" "),
+);
+
+/** The paths an rg command searches: the words after its pattern, or the working folder. @param {string[]} words @param {string} cwd @returns {string[]} */
+function rgPaths(words, cwd) {
+  const positional = [];
+  let patternOption = false;
+  for (let i = 1; i < words.length; i++) {
+    const w = words[i];
+    if (w === "--") {
+      positional.push(...words.slice(i + 1));
+      break;
+    }
+    if (w.startsWith("--")) {
+      const name = w.slice(2).split("=")[0];
+      if (name === "regexp" || name === "file") patternOption = true;
+      if (!w.includes("=") && RG_LONG_VALUE.has(name)) i++;
+    } else if (w.startsWith("-") && w.length > 1) {
+      const at = [...w.slice(1)].findIndex((c) => RG_SHORT_VALUE.includes(c)) + 1;
+      if (at > 0 && "ef".includes(w[at])) patternOption = true;
+      if (at === w.length - 1) i++;
+    } else positional.push(w);
+  }
+  const paths = patternOption ? positional : positional.slice(1);
+  return (paths.length ? paths : ["."]).map((p) => path.resolve(cwd, p));
+}
+
+const WALK_LIMIT = 10000;
+/** The visible files below a folder outside git, or null past WALK_LIMIT entries. Links are not followed, as rg does not. @param {string} dir @param {boolean} hidden @returns {string[]|null} */
+function walk(dir, hidden) {
+  const out = [];
+  const stack = [""];
+  while (stack.length) {
+    const rel = stack.pop();
+    let entries = [];
+    try {
+      entries = fs.readdirSync(path.join(dir, rel), { withFileTypes: true });
+    } catch {
+      // rg cannot read a folder that this walk cannot read.
+    }
+    for (const e of entries) {
+      if (!hidden && e.name.startsWith(".")) continue;
+      const child = rel ? `${rel}/${e.name}` : e.name;
+      if (out.push(child) > WALK_LIMIT) return null;
+      if (e.isDirectory()) stack.push(child);
+    }
+  }
+  return out;
+}
+
+function git(dir, args) {
+  const run = spawnSync("git", ["-C", dir, ...args], {
+    encoding: "utf8",
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  return run.status === 0 ? run.stdout : null;
+}
+const nul = (out) => out.split("\0").filter(Boolean);
+
+/** The files below a folder that rg or the Grep tool reads, relative to it, or null when they cannot be checked. rg skips hidden files and the ignored files below its folder; the Grep tool also reads hidden files. git lists a submodule or a nested repository as one entry, so its own files are listed in turn. @param {"rg"|"grep-tool"} kind @param {string} dir @returns {string[]|null} */
+function searchedFiles(kind, dir) {
+  // A folder named on the command line is searched even when it is ignored.
+  const ignored = spawnSync("git", ["-C", dir, "check-ignore", "-q", "."]).status === 0;
+  const cached = git(dir, ["ls-files", "-z", "--stage"]);
+  const others = git(dir, [
+    "ls-files",
+    "-z",
+    "--others",
+    ...(ignored ? [] : ["--exclude-standard"]),
+  ]);
+  if (cached === null || others === null)
+    return git(dir, ["rev-parse", "--git-dir"]) === null ? walk(dir, kind !== "rg") : null;
+  const entries = [
+    ...nul(cached).map((r) => ({ file: r.split("\t")[1], nested: r.startsWith("160000 ") })),
+    ...nul(others).map((r) => ({ file: r.replace(/\/$/, ""), nested: r.endsWith("/") })),
+  ];
+  const files = [];
+  for (const { file, nested } of entries) {
+    if (kind === "rg" && file.split("/").some((part) => part.startsWith("."))) continue;
+    if (!nested) {
+      files.push(file);
+      continue;
+    }
+    const inner = searchedFiles(kind, path.join(dir, file));
+    if (inner === null) return null;
+    files.push(...inner.map((f) => `${file}/${f}`));
+  }
+  return files;
+}
+
+/** The tracked files that a git grep reads, relative to its folder, or null when git cannot list them. Pathspecs after `--` give the exact list. Without them a word can still be a pathspec such as `../config` or `:/`, so every tracked file in the repository counts. @param {string[]} words @param {string} base @returns {string[]|null} */
+function grepFiles(words, base) {
+  const dash = words.indexOf("--");
+  const specs = dash >= 0 ? words.slice(dash + 1) : [":/"];
+  const recurse = words.includes("--recurse-submodules") ? ["--recurse-submodules"] : [];
+  const out = git(base, ["ls-files", "-z", "--cached", ...recurse, "--", ...specs]);
+  if (out !== null) return nul(out);
+  // Outside a repository git grep fails without reading a file.
+  return git(base, ["rev-parse", "--git-dir"]) === null ? [] : null;
+}
+
+/** A deny when a search of these folders would read a secret file, else null. @param {{kind: string, dirs: string[]}} search @param {string[]} words @returns {object|null} */
+function searchDecision({ kind, dirs }, words) {
+  for (const dir of dirs) {
+    if (!fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) continue;
+    const files = kind === "git-grep" ? grepFiles(words, dir) : searchedFiles(kind, dir);
+    if (files === null)
+      return deny(
+        `Peer Advisor checks each search for secret files and could not list the files below ${dir}: git could not list them, or there are more than ${WALK_LIMIT} outside git. Search a narrower path.`,
+      );
+    const secret = files.find((f) => SECRET.test(f));
+    if (secret)
+      return deny(
+        `Peer Advisor never reads secret files, and this search would read ${path.join(dir, secret)}. Search a narrower path that leaves it out, with rg -n PATTERN PATH.`,
+      );
+  }
+  return null;
+}
+
+/** The `-C` folder of a git command and the index of its subcommand. @param {string[]} words @param {string} cwd @returns {{base: string, at: number}} */
+function gitPrefix(words, cwd) {
+  let at = 1,
+    base = cwd;
+  if (words[at] === "--no-pager") at++;
+  if (words[at] === "-C") {
+    base = path.resolve(cwd, words[at + 1] ?? "");
+    at += 2;
+  }
+  return { base, at };
+}
+
+/** The search that a shell command runs, if any, with the folders it reads. @param {string} bin @param {string[]} words @param {string} cwd @returns {{kind: string, dirs: string[]}|null} */
+function shellSearch(bin, words, cwd) {
+  if (bin === "rg") return { kind: "rg", dirs: rgPaths(words, cwd) };
+  if (bin !== "git") return null;
+  const { base, at } = gitPrefix(words, cwd);
+  return words[at] === "grep" ? { kind: "git-grep", dirs: [base] } : null;
+}
+
 /** A deny for the first unreadable target, or null when all are readable. @param {string[]} targets @param {object} scope @returns {object|null} */
 function readDecision(targets, scope) {
   const why = targets.map((t) => unreadable(t, scope)).find(Boolean);
@@ -121,12 +270,8 @@ function shellTargets(words, cwd) {
   let base = cwd,
     i = 1;
   if (words[0].split("/").at(-1) === "git") {
-    if (words[i] === "--no-pager") i++;
-    if (words[i] === "-C") {
-      base = path.resolve(cwd, words[i + 1] ?? "");
-      out.push(base);
-      i += 2;
-    }
+    ({ base, at: i } = gitPrefix(words, cwd));
+    if (base !== cwd) out.push(base);
     i++;
   }
   for (; i < words.length; i++) {
@@ -169,9 +314,7 @@ function readOnlyShell(command) {
           /^-(?:exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls)$/.test(w)),
     );
   if (bin === "git") {
-    let i = 1;
-    if (words[i] === "--no-pager") i++;
-    if (words[i] === "-C") i += 2;
+    const i = gitPrefix(words, ".").at;
     return (
       (READ_ONLY_GIT.includes(words[i]) || (words[i] === "worktree" && words[i + 1] === "list")) &&
       !words.some((w) =>
@@ -223,6 +366,8 @@ const READ_SCOPE = {
     "Peer Advisor never reads secret files such as .env, keys, or credentials, even inside the pair's worktrees. Ask the user if a secret really matters to the review.",
   search:
     "Peer Advisor searches with rg, which skips hidden and ignored files such as .env. Recursive grep, rg --hidden, -u, --no-ignore, or --follow, and git grep --untracked or --no-index can read secret files, so they are refused. Use rg -n PATTERN PATH.",
+  rgConfig:
+    "RIPGREP_CONFIG_PATH is set, and its file can make rg read hidden or ignored files such as .env. Add --no-config to the rg command.",
 };
 function deny(reason) {
   return {
@@ -304,8 +449,13 @@ export function peerHook(pair, who, input) {
   if (event === "PreToolUse") {
     const tool = input.tool_name;
     // ToolSearch only loads tool schemas; SendMessage is a deferred tool.
-    if (["Read", "Grep", "Glob"].includes(tool))
-      return readDecision(toolTargets(input.tool_input), readScope(pair, who, input));
+    if (["Read", "Grep", "Glob"].includes(tool)) {
+      const scope = readScope(pair, who, input);
+      const read = readDecision(toolTargets(input.tool_input), scope);
+      if (read || tool !== "Grep") return read;
+      const dirs = [path.resolve(scope.cwd, input.tool_input?.path ?? ".")];
+      return searchDecision({ kind: "grep-tool", dirs }, []);
+    }
     if (["ListAgents", "WebSearch", "WebFetch", "ToolSearch"].includes(tool)) return null;
     if (tool === "Skill" && input.tool_input?.skill === "peer") return null;
     // A subagent's tool calls reach this hook with the parent session ID, so the guard
@@ -323,9 +473,17 @@ export function peerHook(pair, who, input) {
       const bin = words[0].split("/").at(-1);
       // Peer coordination words are message text, not paths.
       if (![...READ_ONLY, "git"].includes(bin)) return null;
-      const scope = readScope(pair, who, input);
+      // Codex runs a command in its workdir, so its words resolve there.
+      const workdir = input.tool_input?.workdir;
+      const base = input.cwd || who.worktree || process.cwd();
+      const at = typeof workdir === "string" && workdir ? { cwd: path.resolve(base, workdir) } : {};
+      const scope = readScope(pair, who, { ...input, ...at });
       if (broadSearch(bin, words)) return deny(READ_SCOPE.search);
-      return readDecision(shellTargets(words, scope.cwd), scope);
+      if (bin === "rg" && process.env.RIPGREP_CONFIG_PATH && !words.includes("--no-config"))
+        return deny(READ_SCOPE.rgConfig);
+      const targets = [...(at.cwd ? [scope.cwd] : []), ...shellTargets(words, scope.cwd)];
+      const search = shellSearch(bin, words, scope.cwd);
+      return readDecision(targets, scope) ?? (search && searchDecision(search, words));
     }
     return deny(
       "Peer Advisor is read-only. Run one literal read-only command per call (cat, grep, rg, find, or git status, diff, show, log, grep, blame). Put patterns and globs in single quotes; pipes, redirects, chains, $, and backslashes outside single quotes are refused. Delegate a wide search to an Explore agent. Inspect files and send findings through dotbabel peer. Main owns implementation. Only Main or the user can unpair; ask the user before changing role or permissions.",

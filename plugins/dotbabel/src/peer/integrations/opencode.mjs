@@ -31,6 +31,8 @@ function canonicalTool(tool, input) {
       return { tool_name: "NativeJavaScript", tool_input: {} };
     return canonicalTool(literal.tool, literal.input);
   }
+  // A grep reads every file below its path, so the guard checks it as a search.
+  if (tool === "grep") return { tool_name: "Grep", tool_input: input };
   if (READ_TOOLS.has(tool) || tool === PEER_TOOL.name)
     return { tool_name: "Read", tool_input: input };
   if (["shell", "bash"].includes(tool))

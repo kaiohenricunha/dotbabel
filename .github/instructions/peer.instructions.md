@@ -116,9 +116,10 @@ where the Advisor reads: only the pair's worktrees, its ledger, this session's
 saved tool results, and the absolute folders that the user lists in
 `DOTBABEL_PEER_READ_ROOTS`. It never reads common secret files such as `.env`,
 keys, or credentials. For a file outside those folders, ask Main or the user.
-A secret file that git tracks, or that is neither hidden nor ignored, stays
-searchable. So never send secrets or credentials to Main, and use a grant only
-in a trusted project.
+A search that would read a secret file is refused, even when git tracks the
+file: search a narrower path. Git history can still show an old secret through
+`git log -p` or `git show`. So never send secrets or credentials to Main, and
+use a grant only in a trusted project.
 
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.
