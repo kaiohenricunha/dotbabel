@@ -45,7 +45,7 @@ it("routes an ordinary main-session prompt before execution", () => {
     const quote = value => "'" + value.replaceAll("'", "'\\''") + "'";
     writeFileSync(join(root, "bin", "codex"), `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(fixture)} ${quote(log)} "$@"\n`, { mode: 0o700 });
     writeFileSync(join(root, ".dotbabel.json"), JSON.stringify({ model_intelligence: { enabled: true, adaptive_routing: { enabled: true } } }));
-    const prompts = ["Format the sample JSON as two-space indented text. Return only JSON: {a:1}", "Investigate this authentication race and give verification guidance. Two requests read a missing token before either writes it."];
+    const prompts = ["Format the sample JSON as two-space indented text. Return only JSON: {a:1}", "Debug why this integration test fails intermittently and verify the fix. The retry loop reads a stale cursor."];
     const result = spawnSync(process.execPath, [bin, "session", "--repo-root", root, "--model", "auto", "--effort", "auto", "--json"], { input: prompts.join("\n") + "\n", encoding: "utf8", timeout: 15000, env: { ...process.env, PATH: join(root, "bin") + ":" + process.env.PATH } });
     expect(result.status, result.stderr).toBe(0);
     const turns = result.stdout.trim().split("\n").map(JSON.parse).filter(row => row.type === "turn");

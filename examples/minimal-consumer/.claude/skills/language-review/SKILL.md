@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:cc5a8dea5af4048ee00573943091cb182731f28e47d3d0c768f71ad34a5eaf37 source=skills/language-review/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:572c67fc26b780f9839706545a544456a775a745c6f0fc5affdfaed08a71ce05 source=skills/language-review/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob
 argument-hint: "[text | path ...] [--lang <tag>] [--region <variant>] [--source <path|tag>] [--audience <who>] [--register <level>] [--preserve <term>] [--format md|json] [--revised]"
 description: |

@@ -65,7 +65,7 @@ describe("Claude session resolver input", () => {
     const candidate = input.catalog.runtimes[0].models[0];
     expect(candidate.model).toBe(model);
     expect(candidate.fields.id[0]).toMatchObject({ availability: "available", freshness: "fresh", provenance: { sourceKind: "runtime" } });
-    expect(candidate.fields.capabilities[0].value).toEqual({ tool_call: true, reasoning: true });
+    expect(candidate.fields.capabilities[0].value).toEqual({ tool_call: true, reasoning: true, class_support: [] });
     expect(candidate.fields.selectionVisibility[0].value).toBe("listed");
     expect(candidate.fields.supportedReasoningLevels[0].value).toEqual([{ effort: "high", intent: "high", order: 2 }, { effort: "low", intent: "low", order: 0 }, { effort: "medium", intent: "medium", order: 1 }]);
     expect(input.invocation.requiredModalities).toEqual(["text", "image"]);

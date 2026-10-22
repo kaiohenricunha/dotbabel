@@ -3,15 +3,15 @@
   "toolVersion": "4.2.0",
   "entries": {
     "ai-review.yml": {
-      "projectionId": "sha256:e55ad936a611c480cca613865bcf516abec21c2113593a1215a0fc363e5851f7",
+      "projectionId": "sha256:88f3f8f1d544cba3ca72253971162ebd99dd2d1abf901bbc860893d75b4ec48a",
       "sourcePath": "plugins/dotbabel/src/model-intelligence/workflows/ai-review.source.yml",
       "sourceHash": "sha256:146f5bfbb58a0f8eb29a3f5c17d1af3a1bdea68d698487d3c61df6cb80d5fb78",
-      "inputsHash": "sha256:9def2330d39567f170681ed14d37a4171f98996dde3a64a3da5f5f8971b9c7a5",
-      "outputHash": "sha256:88bfb1d7c50a40f876843edc60eae78a0f343b5ea836cf34f29292732012fc71",
+      "inputsHash": "sha256:e55dee0dcd511d19999b6a1faf701487d544fbb6866a85d5dcd4a2a834b55eac",
+      "outputHash": "sha256:076372788e16f261d874e1aa2f91542feb2aaaaf15248731debc73aae65f061c",
       "runtimeId": "claude",
       "artifactKind": "workflow",
-      "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
-      "resolverResultHash": "sha256:bf6b05268c2a44d9e584f76baba3938a36aea797ab941b4cc5faa3636a999c6f",
+      "snapshotId": "sha256:317fb43d5a6c5b5d461820367c7104f7d9c09106d1c259485d10405220d0db91",
+      "resolverResultHash": "sha256:c7329ffc6c75fc77e42100b86d16faf855fab0c809d4ad2f02787cd9f64fe48e",
       "runtimeContractHash": "sha256:19a973f07b7f9d19034b26f65bd2d2e9a2655c7ad27eb80e3ff0b4d3688d3407"
     }
   }

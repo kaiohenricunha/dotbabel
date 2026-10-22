@@ -27,7 +27,8 @@
       "satisfied_by": {
         "reasoning": "required",
         "tool_call": true,
-        "reasoning_effort_tiers": 3
+        "reasoning_effort_tiers": 3,
+        "class_support": "frontier"
       }
     },
     "exceptional": {
@@ -35,7 +36,8 @@
       "satisfied_by": {
         "reasoning": "required",
         "tool_call": true,
-        "reasoning_effort_tiers": 4
+        "reasoning_effort_tiers": 4,
+        "class_support": "exceptional"
       }
     }
   },

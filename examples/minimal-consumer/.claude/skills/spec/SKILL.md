@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:41651b23086348eb1b09b3d805d21dc772e8d373b3a9578701d4ce5e2a7ed05b source=skills/spec/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:1a0e9d4ff3b20927a71e9152b58ddcb6009ecc97071d4699761e27bbe31c725c source=skills/spec/SKILL.md — do not edit directly
 argument-hint: "[spec-name] [description] [--brownfield]"
 description: |
   Create structured engineering specs through interactive pairing. Use when the user wants to create a spec, design doc, technical specification, architecture document, RFC, or engineering plan. Triggers on "let's spec this out", "create a spec", "design doc", "write a technical plan", "plan the architecture". Works for greenfield and brownfield projects. Outputs to docs/specs/.

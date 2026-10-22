@@ -21,7 +21,7 @@ try {
   mkdirSync(join(cwd, "bin"));
   // The proof explicitly chooses native permission settings without editing any native config file.
   writeFileSync(join(cwd, "bin", "codex"), `#!/bin/sh\nif [ "$1" = app-server ]; then\nshift\nexec ${quote(native)} app-server -c 'sandbox_mode="read-only"' -c 'approval_policy="on-request"' "$@"\nfi\nexec ${quote(native)} "$@"\n`, { mode: 0o700 });
-  const prompts = ["Format the sample JSON as two-space indented text. Do not use tools. Return only JSON: {a:1}", "Investigate this authentication race and give one sentence of verification guidance without using tools. Two requests read a missing token before either writes it."];
+  const prompts = ["Format the sample JSON as two-space indented text. Do not use tools. Return only JSON: {a:1}", "Debug why this integration test fails intermittently and give one sentence of verification guidance without using tools. The retry loop reads a stale cursor."];
   const pending = promisify(execFile)(process.execPath, [join(source, "plugins/dotbabel/bin/dotbabel-models.mjs"), "session", "--repo-root", cwd, "--runtime", "codex", "--model", "auto", "--effort", "auto", "--json"], { env: { ...process.env, PATH: join(cwd, "bin") + ":" + process.env.PATH }, timeout: 230000, maxBuffer: 4 * 1024 * 1024 });
   pending.child.stdin.end(prompts.join("\n") + "\n");
   const { stdout } = await pending;
