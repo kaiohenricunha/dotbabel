@@ -639,11 +639,11 @@
       "runtimeContractHash": "sha256:7b769a2a96cc17a85472eec582d7052defcb18769786cdd4a3917654ff9af784"
     },
     "skills/peer/SKILL.md": {
-      "projectionId": "sha256:67cb8b0137a232091cc02cc8aed5e9251b3da6e747c756f3fdc896b1d8422839",
+      "projectionId": "sha256:c3fd92e82d266875d309e5b9beb69e383a58a26da741a3c64574c9ac359b3689",
       "sourcePath": "skills/peer/SKILL.md",
-      "sourceHash": "sha256:2cdf5502b487624655d4cc75472076458540e29cc2c02872a01462f3f886aba3",
-      "inputsHash": "sha256:2a76103cf019e98f31469ff9beb133e19135cce86d111f767c076def18ea7746",
-      "outputHash": "sha256:515b6d3070a9da0f4c4a2e8625fc0d1800e13b5c315aec210a6bb2aa2c23fead",
+      "sourceHash": "sha256:fecc68197c023646c1c5bfacfcf0d768320c700a43c7fc7d08ef8d963f05d96b",
+      "inputsHash": "sha256:65dd170798eae07f841d48dcded0f44edd289746cf24d89d2afc42978bd65e72",
+      "outputHash": "sha256:d206997354b1ec9c13acd748dad49eb17ea73fc0ad3890f078c9b36f93ca0b42",
       "runtimeId": "claude",
       "artifactKind": "skill",
       "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",

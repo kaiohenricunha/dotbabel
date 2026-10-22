@@ -104,6 +104,18 @@ that identifies that authorization; do not silently change the old policy.
 For `forward: actionable`, send only relevant actionable findings. Ordinary
 answers, queue operations, and acknowledgment messages need no reply to Main.
 
+While this session holds a live yolo grant (each prompt shows `YOLO active`),
+the pairing is the scope. Claim queued work with `next`, and send actionable
+findings to Main without asking the user first, also for an ordinary question
+that finds a defect. Then keep running `receive` and `next`. Never forward a
+request marked `forward: never`. The grant only approves permission
+dialogs: the Advisor guard still refuses writes, so ask Main for every change.
+A grant in Main does not reach this session. To run the pair autonomously, the
+user must type `/yolo --for DURATION` in both terminals. The guard limits what
+the Advisor does, not where it reads: under a grant, reads outside the paired
+repository get no dialog. Read only the pair's files, never send secrets or
+credentials to Main, and use a grant only in a trusted project.
+
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.
 If another request is running, do not start the new one. Keep it queued.

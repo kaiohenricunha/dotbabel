@@ -39,3 +39,21 @@ it("tells either role how to end the pairing and keep its history", () => {
   ])
     expect(section).toContain(command);
 });
+
+it("lets an Advisor under a yolo grant work without asking, and keeps the guard", () => {
+  const section = SKILL.split(/^## /m).find((s) => s.startsWith("Advisor role"));
+  for (const text of [
+    "YOLO active",
+    "without asking the user first",
+    "Never forward a\nrequest marked `forward: never`",
+    "still refuses writes",
+    "type `/yolo --for DURATION` in both terminals",
+  ])
+    expect(section, text).toContain(text);
+});
+
+it("warns that the guard does not limit where an Advisor under a grant reads", () => {
+  const section = SKILL.split(/^## /m).find((s) => s.startsWith("Advisor role"));
+  expect(section).toContain("not where it reads");
+  expect(section).toContain("never send secrets or\ncredentials to Main");
+});
