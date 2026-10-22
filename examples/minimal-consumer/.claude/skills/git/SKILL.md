@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:c40843f9f6b7c0aa99110f08c7046c3d9231d30ab0067e933873163fa1a33e59 source=skills/git/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:f35f4e83b03ff783970f796859e029afdbefb655768a03649c01ddbc4dc6f4da source=skills/git/SKILL.md — do not edit directly
 argument-hint: "[subcommand]"
 description: |
   Project-aware git workflow: conventional commits, PR creation, safe pushes, PR merges, and branch naming suggestions. Triggers on: "conventional commit", "create PR", "push changes".

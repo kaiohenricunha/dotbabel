@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:a564e9f96db6ba3cd0762251bbb42aeabd90a01c76a53756cd32b1355fdd7036 source=skills/local-attest/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:8bf051988b3a168285ee059ce7f88f228afc623a3ed2883d013175141dcb2490 source=skills/local-attest/SKILL.md — do not edit directly
 argument-hint: "[--pr <N>] [--no-push] [--dry-run] [--fail-fast] [--only <leg>] [--from <leg>] [--config <path>]"
 description: |
   Run the configured CI matrix locally and, on a clean pass, post a SHA-pinned OWNER-authored PR comment that gates downstream GitHub Actions jobs off for that exact commit. Skips the redundant remote run after a maintainer has already verified locally, saving runner minutes without weakening the gate. A new push changes the head SHA, the attestation stops matching, CI runs again. Side-effectful (posts a PR comment, applies a label, optionally pushes) and slow — minutes to tens of minutes, whatever the configured matrix costs. Diagnostic modes (--only, --from) run subsets for the fix-retry loop and can never attest; --fail-fast works in both modes. Invoke only on explicit request.

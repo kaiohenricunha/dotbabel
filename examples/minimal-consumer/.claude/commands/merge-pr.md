@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:5b5d2079a1a3181003ab26843caad45086bdfc071b44a3667bc1893f6a8ba43e source=commands/merge-pr.md — do not edit directly
+# dotbabel:generated projection=sha256:f8d752a5a56ebc462bc89c1ea1ada7e34142d25cb703e11ebfcda6f691859ac0 source=commands/merge-pr.md — do not edit directly
 argument-hint: "[PR#]"
 description: |
   Merge a pull request only after verifying that trusted evidence covers its exact head SHA.

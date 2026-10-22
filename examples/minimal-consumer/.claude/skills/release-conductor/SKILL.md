@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:a7af212fc642d853f97400a60ae8f3b5c5defba57dbffcd5babc4d723c42d8e1 source=skills/release-conductor/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:4b0aa130162898fefb89cdea2930f6021ebd38c038aa5413c908869a1ba2f4df source=skills/release-conductor/SKILL.md — do not edit directly
 allowed-tools: Read Bash Grep Glob
 argument-hint: "[verify <tag>]"
 description: |

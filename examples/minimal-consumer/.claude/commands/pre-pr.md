@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:df4a0f30fe4180b8be167cc62de8af0095d4cf9c7cf6adf9e5e27ee6127bc522 source=commands/pre-pr.md — do not edit directly
+# dotbabel:generated projection=sha256:6b35ca2565a94fa42b02e8126f8a9c22c30e318307528a3fb95d8b54eb68f471 source=commands/pre-pr.md — do not edit directly
 argument-hint: "[base-branch] [--conductor] — default: origin/main"
 description: |
   Pre-PR quality gate: simplify changed code, security-review the diff, run the quality profile, and surface a go/no-go summary before opening a pull request.

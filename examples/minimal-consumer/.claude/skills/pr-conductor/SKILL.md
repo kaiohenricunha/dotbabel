@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:725970b6bca6e52a4961e9275ae9df0c1165fb694934367c9daab7281e9d7149 source=skills/pr-conductor/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:740fb32e4d1907a4aad4cb9d92c3652c2bab26a94c5f34a50a68cf345a6a69fb source=skills/pr-conductor/SKILL.md — do not edit directly
 allowed-tools: Read Bash Grep Glob
 argument-hint: "[PR#] [--stack] [--from <phase>] [--dry-run]"
 description: |

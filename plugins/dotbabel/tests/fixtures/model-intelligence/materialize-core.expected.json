@@ -3,11 +3,11 @@
   "toolVersion": "4.2.0",
   "entries": {
     "agents/example.md": {
-      "projectionId": "sha256:e03a22ce4b82150cbb1247121d2cf5abfebe1072c43d127c9ec14c977cb44552",
+      "projectionId": "sha256:4cab9ee0b68308f512336b2c9b48029a13938a63768f08c509c3bd4f2582a211",
       "sourcePath": "agents/example.md",
       "sourceHash": "sha256:ec6f86881785f6b2001521cb99f4ec3c93c679fef4961565e6f8df93eca1ccdb",
-      "inputsHash": "sha256:d68181c4df1c81d0852a549f5d664c25de95da202ed283bf5a68f54e5bf5b347",
-      "outputHash": "sha256:d1c9bdae6617a9ec6d3f51e31205c156884ee7d6fd98ef47ab507cc045bebf7e",
+      "inputsHash": "sha256:0519a8190411ca65e61495df26a5effbb7fcfa06e4541edffc58a122b6801e62",
+      "outputHash": "sha256:7d9f92d99d173b69db517b7bca0d4d7e629b8044f1b7c7b7d7a0a7e5a490fc44",
       "runtimeId": "codex",
       "artifactKind": "agent",
       "snapshotId": null,

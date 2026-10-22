@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:6568c782658f7194f48f130021df81b2b9b79b27c68e346cd07343a97cef4f1e source=skills/yolo/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:1fa83f498876da902658b8035d503af3d0a25edb73af9ea129c46da6c2ddd197 source=skills/yolo/SKILL.md — do not edit directly
 argument-hint: "--for <duration> [--merge|--no-merge] [scope] | off"
 description: |
   Start temporary autonomy for the current task or an explicit scope with a required --for expiry. Codex permits scoped pushes, merges, deploys, and releases after strict testing and validation; Full access is a separate runtime setting. Claude Code uses a session permission hook with a protected-action denylist.

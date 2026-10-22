@@ -104,13 +104,15 @@ describe("policy layer merge", () => {
     // forbidden-token check. Constraining the keys to declared capability facts and
     // the values to the shapes those facts take rejects an unexpected token whatever
     // it is spelled, which is what ARCH-15 actually asks for.
-    const CAPABILITY_KEYS = ["reasoning", "tool_call", "reasoning_effort_tiers"];
+    const CAPABILITY_KEYS = ["reasoning", "tool_call", "reasoning_effort_tiers", "class_support"];
     for (const [name, rule] of Object.entries(SHIPPED_POLICY.classes)) {
       expect(rule.satisfied_by, name).toBeTypeOf("object");
       expect(Object.keys(rule.satisfied_by).length, name).toBeGreaterThan(0);
       for (const [key, value] of Object.entries(rule.satisfied_by)) {
         expect(CAPABILITY_KEYS, `${name}.${key}`).toContain(key);
-        if (typeof value === "string") expect(["optional", "required"], `${name}.${key}`).toContain(value);
+        // class_support names only the class itself: reviewed evidence must list it, never a model.
+        if (key === "class_support") expect(value, `${name}.${key}`).toBe(name);
+        else if (typeof value === "string") expect(["optional", "required"], `${name}.${key}`).toContain(value);
         else expect(["boolean", "number"], `${name}.${key}`).toContain(typeof value);
       }
     }

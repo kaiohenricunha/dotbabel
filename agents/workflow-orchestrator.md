@@ -21,7 +21,7 @@ model: opus
 dotbabel:
   compute:
     mode: floor
-    requirement: exceptional
+    requirement: frontier
     binding: self
 ---
 

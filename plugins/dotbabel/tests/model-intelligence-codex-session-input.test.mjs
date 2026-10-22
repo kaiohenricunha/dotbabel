@@ -49,6 +49,9 @@ it("retains a hidden manual model's capability facts so the public resolver reje
  const input=await load(repoRoot);
  const result=resolve({...input,requirement:{mode:"dynamic",requirement:"routine",binding:"self",provenance:{sourceId:"fixture",sourceKind:"artifact"}},invocation:{pin:{runtime:"codex",config:{model:"hidden"}},omitDefaultReasoning:true}});
  expect(result.status).toBe("conflict");expect(result.diagnostics.map(x=>x.code)).toContain("pin_floor_conflict");
+ // The project floor is Frontier. Codex discovery carries no reviewed class_support evidence, so an
+ // ordinary selection under that floor is unknown rather than a guessed Frontier route.
  const ordinary=resolve({...input,requirement:{mode:"dynamic",requirement:"routine",binding:"self",provenance:{sourceId:"fixture",sourceKind:"artifact"}}});
- expect(ordinary.configuration.axes.model).toBe("visible");
+ expect(ordinary.status).not.toBe("resolved");expect(ordinary.configuration).toBeUndefined();
+ expect(ordinary.diagnostics.map(x=>x.code)).toContain("insufficient_capability_evidence");
 });

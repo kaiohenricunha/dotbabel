@@ -14,7 +14,7 @@ import { descriptor } from "../src/model-intelligence/sources/runtime/claude.mjs
 const at = "2026-10-18T08:00:00.000Z";
 const provenance = { sourceId: "claude", sourceKind: "runtime", sourceVersion: "2.1.302" };
 const accepted = value => ({ value, provenance, confidence: "high" });
-const inputs = () => structuredClone({ toolVersion: "4.2.0", sources: [{ ...provenance, observedAt: at }], runtimes: { claude: { models: [{ model: "opaque-selector", fields: { id: [accepted("opaque-selector")], capabilities: [accepted({ reasoning: true, tool_call: true })], supportedReasoningLevels: [accepted(["small", "normal", "large", "largest"].map(effort => ({ effort })))], selectionVisibility: [accepted("listed")] } }], runtimeContract: descriptor, provenance } } });
+const inputs = () => structuredClone({ toolVersion: "4.2.0", sources: [{ ...provenance, observedAt: at }], runtimes: { claude: { models: [{ model: "opaque-selector", fields: { id: [accepted("opaque-selector")], capabilities: [accepted({ reasoning: true, tool_call: true, class_support: ["frontier", "exceptional"] })], supportedReasoningLevels: [accepted(["small", "normal", "large", "largest"].map(effort => ({ effort })))], selectionVisibility: [accepted("listed")] } }], runtimeContract: descriptor, provenance } } });
 const file = () => path.join(makeTempDir("mi-snapshot-"), "release-capabilities.json");
 
 describe("release snapshot accepted evidence", () => {
@@ -186,9 +186,10 @@ describe("committed release evidence", () => {
       for (const id of [mapping.selector, mapping.canonicalModel]) {
         const model = runtime.models.find(model => model.model === id);
         expect(model.fields.canonicalModel[0].value).toBe(mapping.canonicalModel);
-        expect(model.fields.capabilities[0].value).toEqual({ reasoning: proof.acceptedDocumentationFacts.reasoning, tool_call: proof.acceptedDocumentationFacts.tool_call });
-        expect(model.fields.supportedReasoningLevels[0].value).toEqual(proof.acceptedDocumentationFacts.supportedReasoningLevels.map(effort => ({ effort })));
-        expect(model.fields.defaultReasoningLevel[0].value).toBe(proof.acceptedDocumentationFacts.defaultReasoningLevel);
+        const facts = proof.acceptedDocumentationFacts;
+        expect(model.fields.capabilities[0].value).toEqual({ reasoning: facts.reasoning, tool_call: facts.tool_call, class_support: facts.classSupport[mapping.canonicalModel] });
+        expect(model.fields.supportedReasoningLevels[0].value).toEqual(facts.supportedReasoningLevels.map(effort => ({ effort })));
+        expect(model.fields.defaultReasoningLevel[0].value).toBe(facts.defaultReasoningLevel[mapping.canonicalModel]);
         expect(model.fields).not.toHaveProperty("selectionVisibility");
       }
     }

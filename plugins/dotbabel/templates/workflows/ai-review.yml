@@ -1,5 +1,5 @@
 # Generated runtime configuration.
-# dotbabel:generated projection=sha256:e55ad936a611c480cca613865bcf516abec21c2113593a1215a0fc363e5851f7 source=plugins/dotbabel/src/model-intelligence/workflows/ai-review.source.yml — do not edit directly
+# dotbabel:generated projection=sha256:88f3f8f1d544cba3ca72253971162ebd99dd2d1abf901bbc860893d75b4ec48a source=plugins/dotbabel/src/model-intelligence/workflows/ai-review.source.yml — do not edit directly
 # Always-on AI PR review via Claude-headless.
 #
 # Phase 5 of the SDD & Harness Hardening plan chose this path over Vercel Agent

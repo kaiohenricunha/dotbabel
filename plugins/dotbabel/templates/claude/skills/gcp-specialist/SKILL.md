@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:18f85d2cf8f58519f354a031bf0266a130d96b1f2875d6f58e7154749e254818 source=skills/gcp-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:c18f60e33b9d5fd95cc0902a386cbf0de920bf3943f555fceb84186c8a1eeb37 source=skills/gcp-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <project context, service, or problem description>
 description: |
