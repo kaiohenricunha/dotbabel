@@ -33,7 +33,6 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     "dotbabel peer next",
     "dotbabel peer send main 'finding; x && y'",
     `node '${new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname}' queue`,
-    "dotbabel peer unpair",
   ]) {
     expect(
       peerHook(p, advisor, {
@@ -57,6 +56,10 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     "rg --pre rm a",
     "git diff --output=x",
     "dotbabel peer setup --harness both",
+    // Unpairing would end this guard, so only Main or the user can do it.
+    "dotbabel peer unpair",
+    `node '${new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname}' unpair`,
+    `node '${new URL("../../bin/dotbabel.mjs", import.meta.url).pathname}' peer unpair`,
     'dotbabel peer send main "$(rm x)"',
     "git\nstatus",
     "cat a | tee b",
@@ -244,4 +247,66 @@ it("asks each member to handle unread messages in sequence and acknowledge each"
   const reason = peerHook(p, main, { hook_event_name: "Stop" }).reason;
   expect(reason).toContain("in seq order");
   expect(reason).toContain("dotbabel peer ack");
+});
+
+it("lets the Advisor search with grep, find, and read-only git, and delegate to Explore only", () => {
+  const { p, advisor } = world();
+  const bash = (command) =>
+    peerHook(p, advisor, {
+      hook_event_name: "PreToolUse",
+      tool_name: "Bash",
+      tool_input: { command },
+    })?.hookSpecificOutput?.permissionDecision ?? "allow";
+  for (const command of [
+    "grep -rn 'VITE_DATA_SOURCE' src --include='*.mjs' --exclude-dir=node_modules",
+    "grep -rn 'build-full-auto\\|build:full' package.json vercel.json",
+    "egrep -n 'a|b' src/a.mjs",
+    "/usr/bin/grep -c x a",
+    "find src -name '*.mjs' -newer package.json",
+    "git grep -n -e build:full HEAD",
+    "git grep -n 'VITE_DATA_SOURCE' HEAD -- ':!*.test.*'",
+    "git -C /repo worktree list --porcelain",
+    "git blame -L 1,5 a.mjs",
+    "git ls-tree -r HEAD",
+    "git cat-file -p HEAD:a.mjs",
+    "git merge-base HEAD origin/main",
+    "git rev-list --count HEAD",
+  ])
+    expect(bash(command), command).toBe("allow");
+  for (const command of [
+    "find . -delete",
+    "find . -name a -execdir touch b +",
+    "find . -exec cat {} +",
+    "find . -ok rm {} +",
+    "find . -fprint out.txt",
+    "find . -fprintf out.txt %p",
+    "find . -fls out.txt",
+    "git grep -O less x",
+    "git grep -Oless x",
+    "git grep --open-files-in-pager=vim x",
+    "git cat-file --filters HEAD:a",
+    "git worktree add ../x",
+    "git worktree remove ../x",
+    "git worktree",
+    "/untrusted/grep x a",
+    "grep x a > b",
+    'grep -rn "a\\|b" src',
+    "grep -rn x src --include=*.mjs",
+  ])
+    expect(bash(command), command).toBe("deny");
+  const reason = peerHook(p, advisor, {
+    hook_event_name: "PreToolUse",
+    tool_name: "Bash",
+    tool_input: { command: "grep -rn x src --include=*.mjs" },
+  }).hookSpecificOutput.permissionDecisionReason;
+  expect(reason).toContain("Peer Advisor is read-only");
+  expect(reason).toContain("single quotes");
+  expect(reason).toContain("Only Main or the user can unpair");
+  const agent = (tool_input) =>
+    peerHook(p, advisor, { hook_event_name: "PreToolUse", tool_name: "Agent", tool_input })
+      ?.hookSpecificOutput?.permissionDecision ?? "allow";
+  expect(agent({ subagent_type: "Explore", prompt: "find callers" })).toBe("allow");
+  expect(agent({ subagent_type: "general-purpose", prompt: "x" })).toBe("deny");
+  expect(agent({ subagent_type: "Explore", isolation: "worktree", prompt: "x" })).toBe("deny");
+  expect(agent({ prompt: "x" })).toBe("deny");
 });

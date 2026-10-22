@@ -5,25 +5,63 @@ import { fileURLToPath } from "node:url";
 const PEER_BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
 const UMBRELLA_BIN = fileURLToPath(new URL("../../bin/dotbabel.mjs", import.meta.url));
 
+// Search reaches the Advisor through the shell when a harness has no dedicated search tool.
+const READ_ONLY = [
+  "cat",
+  "head",
+  "tail",
+  "wc",
+  "ls",
+  "pwd",
+  "rg",
+  "grep",
+  "egrep",
+  "fgrep",
+  "find",
+];
+const READ_ONLY_GIT = [
+  "status",
+  "diff",
+  "show",
+  "log",
+  "ls-files",
+  "rev-parse",
+  "grep",
+  "blame",
+  "ls-tree",
+  "cat-file",
+  "merge-base",
+  "rev-list",
+];
+
 function readOnlyShell(command) {
   const words = literalWords(command);
   if (!words) return false;
   const bin = words[0]?.split("/").at(-1);
   if (
-    ["cat", "head", "tail", "wc", "ls", "pwd", "rg", "git"].includes(bin) &&
+    [...READ_ONLY, "git"].includes(bin) &&
     words[0] !== bin &&
     ![`/bin/${bin}`, `/usr/bin/${bin}`].includes(words[0])
   )
     return false;
-  if (["cat", "head", "tail", "wc", "ls", "pwd", "rg"].includes(bin))
-    return !words.some((w) => /^(?:--pre|--hostname-bin|--search-zip)(?:=|$)/.test(w));
+  if (READ_ONLY.includes(bin))
+    return !words.some(
+      (w) =>
+        /^(?:--pre|--hostname-bin|--search-zip)(?:=|$)/.test(w) ||
+        (bin === "find" &&
+          /^-(?:exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls)$/.test(w)),
+    );
   if (bin === "git") {
     let i = 1;
     if (words[i] === "--no-pager") i++;
     if (words[i] === "-C") i += 2;
     return (
-      ["status", "diff", "show", "log", "ls-files", "rev-parse"].includes(words[i]) &&
-      !words.some((w) => /^(?:--output|--ext-diff|--textconv|--exec-path)(?:=|$)/.test(w))
+      (READ_ONLY_GIT.includes(words[i]) || (words[i] === "worktree" && words[i + 1] === "list")) &&
+      !words.some((w) =>
+        /^(?:--output|--ext-diff|--textconv|--exec-path|--filters|--open-files-in-pager)(?:=|$)|^-O/.test(
+          w,
+        ),
+      )
     );
   }
   const cli =
@@ -34,6 +72,7 @@ function readOnlyShell(command) {
         : bin === "node" && words[1] === UMBRELLA_BIN
           ? words.slice(2)
           : [];
+  // unpair is absent: a closed pair has no guard, so only Main or the user may end it.
   return (
     cli[0] === "peer" &&
     [
@@ -57,7 +96,6 @@ function readOnlyShell(command) {
       "resume",
       "retry",
       "retry-delivery",
-      "unpair",
     ].includes(cli[1])
   );
 }
@@ -146,6 +184,14 @@ export function peerHook(pair, who, input) {
     )
       return null;
     if (tool === "Skill" && input.tool_input?.skill === "peer") return null;
+    // A subagent's tool calls reach this hook with the parent session ID, so the guard
+    // still covers Explore; an isolated worktree would be a write.
+    if (
+      tool === "Agent" &&
+      input.tool_input?.subagent_type === "Explore" &&
+      !input.tool_input.isolation
+    )
+      return null;
     if (tool === "SendMessage") return nativeMirror(pair, who, input.tool_input);
     if (
       ["Bash", "exec_command"].includes(tool) &&
@@ -153,7 +199,7 @@ export function peerHook(pair, who, input) {
     )
       return null;
     return deny(
-      "Peer Advisor is read-only. Inspect files and send findings through dotbabel peer. Main owns implementation. Ask the user to unpair before changing role or permissions.",
+      "Peer Advisor is read-only. Run one literal read-only command per call (cat, grep, rg, find, or git status, diff, show, log, grep, blame). Put patterns and globs in single quotes; pipes, redirects, chains, $, and backslashes outside single quotes are refused. Delegate a wide search to an Explore agent. Inspect files and send findings through dotbabel peer. Main owns implementation. Only Main or the user can unpair; ask the user before changing role or permissions.",
     );
   }
   if (["Interrupt", "StopFailure"].includes(event)) {

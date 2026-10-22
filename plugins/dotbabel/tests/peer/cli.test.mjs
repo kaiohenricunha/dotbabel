@@ -332,6 +332,45 @@ it("still fails closed on a malformed ledger instead of guessing that a session 
   );
   expect(r.status).not.toBe(0);
 });
+it("guards an Advisor's subagent through the process tree when its calls carry their own session ID", () => {
+  const w = world();
+  fs.writeFileSync(
+    path.join(w.env.CLAUDE_CONFIG_DIR, "sessions", `${process.pid}.json`),
+    JSON.stringify({
+      pid: process.pid,
+      procStart: processState(process.pid).startTime,
+      sessionId: "parent-advisor",
+      cwd: w.repo,
+    }),
+  );
+  const as = (sessionId, args, input) =>
+    spawnSync(process.execPath, [bin, ...args], {
+      cwd: w.repo,
+      env: { ...w.env, DOTBABEL_PEER_HOOK_SESSION: sessionId },
+      input,
+      encoding: "utf8",
+    });
+  const p = json(w.cli(["main", "--json"]));
+  json(as("parent-advisor", ["advisor", p.code, "--json"]));
+  const hook = (payload) =>
+    as(
+      "unused",
+      ["hook", "PreToolUse"],
+      JSON.stringify({
+        cwd: w.repo,
+        tool_name: "Write",
+        tool_input: { file_path: "a" },
+        ...payload,
+      }),
+    );
+  const subagent = json(
+    hook({ session_id: "subagent-own-id", agent_id: "a1", agent_type: "Explore" }),
+  );
+  expect(subagent.hookSpecificOutput.permissionDecision).toBe("deny");
+  const plain = hook({ session_id: "subagent-own-id" });
+  expect(plain.status, plain.stderr).toBe(0);
+  expect(plain.stdout.trim()).toBe("");
+});
 it("routes correlated messages and requires recipient acknowledgments", () => {
   const w = world(),
     p = json(w.cli(["main", "--json"]));
