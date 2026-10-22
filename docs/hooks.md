@@ -144,7 +144,9 @@ blocks by the same owner, the next attempt is an `ask`, so the user decides.
 At `SessionStart`, the hook prints the live claims of the session's
 repository. After a `gh pr merge`, the `PostToolUse` entry records the merge,
 and the `PostToolUse` and `UserPromptSubmit` entries tell every other session
-that claims files in that repository. Before a Bash call that rebases onto
+that claims files in that repository. The same entries show the session its
+inbox: a request about one of its claims (`dotbabel fleet ask`), or the
+answer or release of a request it sent. Before a Bash call that rebases onto
 the base, runs `dotbabel local-attest`, or runs `gh pr merge`, the `pre-bash`
 entry takes the repository's merge token, and denies the call while another
 live session holds it.

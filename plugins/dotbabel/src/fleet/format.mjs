@@ -61,7 +61,7 @@ export function formatDenyReason({ rel, repoKey, conflict, cli, escalateAt, now 
     `Claim: ${describeClaim(conflict.claim, now)}.`,
     "This edit is blocked so that two sessions do not change the same file.",
     "Do this:",
-    `1. Message ${owner} (SendMessage in Claude Code; from another host, ask the user to relay it). Tell it what you must change in ${rel}, and ask it to release the claim when that is safe. The owner releases with: ${cli} release ${shellArg(conflict.claim.pattern)}`,
+    `1. Ask ${owner} to release the claim when that is safe. Say what you must change in ${rel}. From any host run: ${cli} ask ${shellArg(rel)} --message '<what you must change and why>' (in Claude Code, SendMessage also works between Claude sessions). The owner releases with: ${cli} release ${shellArg(conflict.claim.pattern)}`,
     "2. Continue with other work while you wait for the answer.",
     "Do not change this file with Bash or another tool, and do not delete the claim.",
   ];
@@ -121,7 +121,7 @@ export function formatSessionContext({ repoKey, owners, cli }) {
     lines.push(`- ${who}: ${list}`);
   }
   lines.push(
-    "An edit to a path that another live session claims is blocked. To change such a path, message its owner first (SendMessage in Claude Code).",
+    `An edit to a path that another live session claims is blocked. To change such a path, ask its owner first: ${cli} ask <path> --message '<why>' from any host, or SendMessage between Claude Code sessions.`,
     `Your first edit to a file claims it for this session. Before large work, claim the scope: ${cli} claim '<glob>' --note '<intent>'. When your work lands, release your claims: ${cli} release --all`,
   );
   return lines.join("\n");

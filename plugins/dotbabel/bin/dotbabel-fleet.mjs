@@ -99,6 +99,19 @@ import { ownerFromEntry, readRegistry, sessionsDir } from "../src/fleet/registry
 import { hostAdapter } from "../src/fleet/host-adapter.mjs";
 import { patchPaths } from "../src/fleet/patch-paths.mjs";
 import { addHookCommands, shellQuote } from "../src/lib/hooks-json.mjs";
+import {
+  createRequest,
+  formatInbox,
+  formatRequests,
+  noteSession,
+  readRequests,
+  releaseRequests,
+  replyRequest,
+  takeInbox,
+  validateRequestText,
+  wakeUpText,
+} from "../src/fleet/requests.mjs";
+import { deliver } from "../src/peer/transport.mjs";
 import { platformAdapter, describePlatformAdapter } from "../src/fleet/platform-adapter.mjs";
 import {
   DEFAULT_TOKEN_IDLE_MS,
@@ -121,9 +134,16 @@ const HOST = hostAdapter(process.env.DOTBABEL_FLEET_HOST || (process.env.CODEX_T
 const findSelf = (args) => HOST.identity?.(args) ?? null;
 const isOwnerAlive = (owner, opts) => HOST.isAlive?.(owner, opts) ?? true;
 const HOST_NAME = HOST.host === "claude" ? "Claude Code" : HOST.label;
+/** Whether the process of an owner key ("<pid>-<procStart>") still runs. */
+const ownerKeyAlive = (key) => {
+  const [pid, procStart] = String(key).split("-");
+  return Number(pid) > 0 && isOwnerAlive({ pid: Number(pid), procStart: procStart && procStart !== "0" ? procStart : null });
+};
+/** This session as an owner, with the host it runs in (the request channel needs it). */
+const selfOwner = (entry) => ({ ...ownerFromEntry(entry), host: HOST.host });
 const SELF_PATH = fileURLToPath(import.meta.url);
 const LANE_SCRIPT = path.resolve(path.dirname(SELF_PATH), "../scripts/fleet-lane.sh");
-const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token", "cpu-share", "setup"]);
+const SUBCOMMANDS = new Set(["board", "claim", "release", "prune", "hook", "lane", "lanes", "events", "event", "token", "cpu-share", "setup", "ask", "requests", "reply"]);
 const TOKEN_ACTIONS = new Set(["status", "take", "release", "leave"]);
 const TOKEN_ACTION_TEXT = { rebase: "rebase onto the base", attest: "local-attest", merge: "gh pr merge" };
 const PR_FIELDS = "number,title,state,mergeCommit,baseRefName,headRefName,files,url";
@@ -144,6 +164,9 @@ const USAGE = `Usage:
   dotbabel fleet token   [status | take | release | leave] show the token and queue, take, release, or leave
   dotbabel fleet cpu-share [--status]                    give every live session's scope an equal CPU weight
   dotbabel fleet setup   --harness codex                add the fleet and task hooks to Codex's hooks.json
+  dotbabel fleet ask     <path> --message <text>        ask the session that claims <path> (any host)
+  dotbabel fleet requests [--json]                      list the requests this session received and sent
+  dotbabel fleet reply   <id> --message <text>          answer a request about your claim
 
 Patterns are relative to the repo root. A bare path also covers everything
 below it; ** and * are globs.
@@ -373,7 +396,7 @@ function guardEdit(abs, input, now) {
   const registry = readRegistry(sessionsDir());
   const selfEntry = findSelf({ entries: registry.entries, sessionId: input.session_id, startPid: process.ppid });
   if (!selfEntry) return allow;
-  const self = ownerFromEntry(selfEntry);
+  const self = selfOwner(selfEntry);
   const dir = repoDir(stateRoot(), repo.key);
   // A shared file is never claimed; it changes only outside a peer's merge token.
   if (shared) return { out: tokenDeny(dir, repo, self, `edit of ${repo.rel}`, now), claimed: null };
@@ -491,7 +514,7 @@ function preBash(input, now) {
   if (!repo?.governed || fleetOff(repo)) return null;
   const selfEntry = findSelf({ entries: readRegistry(sessionsDir()).entries, sessionId: input.session_id, startPid: process.ppid });
   if (!selfEntry) return null;
-  const self = ownerFromEntry(selfEntry);
+  const self = selfOwner(selfEntry);
   const idleMs = tokenIdleMs(repo);
   const result = takeToken(repoDir(stateRoot(), repo.key), { repoKey: repo.key, owner: self, branch: repo.branch, kind: found.kind, now, idleMs, tasks: tokenTasks(repo) });
   if (result.taken) return null;
@@ -501,11 +524,13 @@ function preBash(input, now) {
 
 /** SessionStart: the claims in the session's repo, as plain context text. */
 function sessionStart(input) {
-  const repo = resolveRepo(input.cwd || process.cwd());
-  if (!repo?.governed || fleetOff(repo)) return "";
   const registry = readRegistry(sessionsDir());
   const selfEntry = findSelf({ entries: registry.entries, sessionId: input.session_id, startPid: process.ppid });
   const selfKey = selfEntry ? ownerFromEntry(selfEntry).key : null;
+  // Every start maps its session id, /clear included, so requests reach the owner.
+  noteSession(stateRoot(), input.session_id, selfKey, { isAlive: ownerKeyAlive });
+  const repo = resolveRepo(input.cwd || process.cwd());
+  if (!repo?.governed || fleetOff(repo)) return "";
   const { owners } = loadOwners(repoDir(stateRoot(), repo.key), registry, {
     prune: selfEntry !== null,
     selfKey,
@@ -569,6 +594,83 @@ function cmdSetup(args) {
   return EXIT_CODES.OK;
 }
 
+/**
+ * Push a fixed one-line notice to an idle Codex session (`codex queue`).
+ * Codex stores it as user input, so it never carries another session's text.
+ * Claude Code sessions read their inbox through their hooks; a socket push to
+ * an interactive Claude session is accepted but never queued.
+ */
+function wakeUp(who, kind, request) {
+  if (who?.host !== "codex" || !who.sessionId) return;
+  // Best effort: a failed push leaves the notice in the inbox for the next hook call.
+  deliver({ harness: "codex", sessionId: who.sessionId }, wakeUpText(kind, request, cliCommand())).catch(() => {});
+}
+
+/** `ask <path> --message <text>`: ask the live session whose claim blocks <path>. */
+function cmdAsk(args) {
+  if (args.positional.length !== 1) throw new UsageError("ask needs one path");
+  let text;
+  try {
+    text = validateRequestText(args.flags.message);
+  } catch (err) {
+    throw new UsageError(/** @type {Error} */ (err).message);
+  }
+  const abs = path.resolve(process.cwd(), args.positional[0]);
+  const repo = resolveRepo(abs);
+  if (!repo?.rel) throw new EnvError(`not inside a git repository: ${args.positional[0]}`);
+  const registry = readRegistry(sessionsDir());
+  const self = requireSelf(registry);
+  const dir = repoDir(stateRoot(), repo.key);
+  const { owners } = loadOwners(dir, registry, { prune: false, selfKey: self.key });
+  const verdict = decideEdit({ rel: repo.rel, selfKey: self.key, owners, now: Date.now(), escalateAfterMs: 0 });
+  if (verdict.action === "allow") {
+    process.stderr.write(`${TOOL}: no other live session claims ${repo.rel} in ${repo.key}; edit it, or claim it first.\n`);
+    return EXIT_CODES.VALIDATION;
+  }
+  const owner = verdict.conflict.owner.record.owner;
+  const request = createRequest(stateRoot(), { from: self, to: owner, repo: repo.key, path: repo.rel, pattern: verdict.conflict.claim.pattern, text });
+  wakeUp(owner, "ask", request);
+  process.stdout.write(
+    `Request ${request.id} sent to "${owner.name ?? owner.key}" about ${repo.rel} (claim ${request.pattern}).\n` +
+      `The owner sees it at its next tool call or prompt. Its answer, or the release, reaches you the same way; to check now, run: ${cliCommand()} requests\n`,
+  );
+  return EXIT_CODES.OK;
+}
+
+/** `requests [--json]`: the requests this session received and sent. */
+function cmdRequests(args) {
+  if (args.positional.length > 0) throw new UsageError("requests takes no positional argument");
+  const self = requireSelf(readRegistry(sessionsDir()));
+  const all = readRequests(stateRoot());
+  // A resumed session is a new process; its session id still names what it sent and received.
+  const mine = (who) => who.key === self.key || (self.sessionId && who.sessionId === self.sessionId);
+  const incoming = all.filter((r) => mine(r.to));
+  const outgoing = all.filter((r) => mine(r.from));
+  process.stdout.write(args.json ? `${JSON.stringify({ incoming, outgoing }, null, 2)}\n` : `${formatRequests({ incoming, outgoing }, cliCommand())}\n`);
+  return EXIT_CODES.OK;
+}
+
+/** `reply <id> --message <text>`: answer a request about this session's claim. */
+function cmdReply(args) {
+  if (args.positional.length !== 1) throw new UsageError("reply needs one request id");
+  try {
+    validateRequestText(args.flags.message);
+  } catch (err) {
+    throw new UsageError(/** @type {Error} */ (err).message);
+  }
+  const self = requireSelf(readRegistry(sessionsDir()));
+  let request;
+  try {
+    request = replyRequest(stateRoot(), args.positional[0], { by: self, text: args.flags.message });
+  } catch (err) {
+    process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n`);
+    return EXIT_CODES.VALIDATION;
+  }
+  wakeUp(request.from, "reply", request);
+  process.stdout.write(`Answered request ${request.id} from "${request.from.name ?? request.from.key}".\n`);
+  return EXIT_CODES.OK;
+}
+
 function requireRepo() {
   const repo = resolveRepo(process.cwd());
   if (!repo) throw new EnvError("not inside a git repository");
@@ -579,10 +681,11 @@ function requireSelf(registry) {
   const entry = findSelf({ entries: registry.entries, startPid: process.ppid });
   if (!entry) {
     throw new EnvError(
-      `cannot find the ${HOST_NAME} session that runs this command. Run it from a ${HOST_NAME} session (its shell tool).`,
+      `cannot find the ${HOST_NAME} session that runs this command. Run it from a ${HOST_NAME} session (its shell tool).` +
+        (HOST.host === "codex" ? " A sandboxed Codex shell cannot see its process tree: run it with Full access (/permissions)." : ""),
     );
   }
-  return ownerFromEntry(entry);
+  return selfOwner(entry);
 }
 
 function cmdBoard(args) {
@@ -678,6 +781,10 @@ function cmdRelease(args) {
   }
   const { record, removed } = releaseClaims(mine, patterns);
   saveRecord(dir, { ...record, updatedAt: new Date().toISOString() });
+  if (removed.length > 0) {
+    const resolved = releaseRequests(stateRoot(), { ownerKey: self.key, repo: repo.key, patterns: removed.map((c) => c.pattern) });
+    for (const request of resolved) wakeUp(request.from, "released", request);
+  }
   process.stdout.write(
     removed.length === 0
       ? "No claim matched.\n"
@@ -740,7 +847,7 @@ function recordMergeBy(pr, self) {
 function eventHook(input, event) {
   const registry = readRegistry(sessionsDir());
   const selfEntry = findSelf({ entries: registry.entries, sessionId: input.session_id, startPid: process.ppid });
-  const self = selfEntry ? ownerFromEntry(selfEntry) : null;
+  const self = selfEntry ? selfOwner(selfEntry) : null;
   if (event === "post-tool" && input.tool_name === "Bash") {
     const merge = parseMergeCommand(input.tool_input?.command);
     const pr = merge ? ghPrView(merge.target, merge.repo, input.cwd || process.cwd()) : null;
@@ -757,9 +864,11 @@ function eventHook(input, event) {
     claimsByRepo: self ? ownClaimsByRepo(root, self.key) : {},
     startedAt: selfEntry?.startedAt ?? null,
   });
-  if (!text) return null;
+  noteSession(root, input.session_id, self?.key ?? null, { isAlive: ownerKeyAlive });
+  const news = [text, formatInbox(takeInbox(root, self?.key), cliCommand())].filter(Boolean).join("\n");
+  if (!news) return null;
   const hookEventName = event === "prompt" ? "UserPromptSubmit" : "PostToolUse";
-  return { hookSpecificOutput: { hookEventName, additionalContext: text } };
+  return { hookSpecificOutput: { hookEventName, additionalContext: news } };
 }
 
 /** `events [--all] [--json]`: the merges recorded in the last 7 days, newest first. */
@@ -796,7 +905,7 @@ function cmdEvent(args) {
   const pr = ghPrView(args.flags.pr, repo, process.cwd());
   if (!pr) throw new EnvError("gh pr view failed. Check `gh auth status` and the --pr and --repo values.");
   const selfEntry = findSelf({ entries: readRegistry(sessionsDir()).entries, startPid: process.ppid });
-  const result = recordMergeBy(pr, selfEntry ? ownerFromEntry(selfEntry) : null);
+  const result = recordMergeBy(pr, selfEntry ? selfOwner(selfEntry) : null);
   if (result.reason === "not-merged") {
     process.stderr.write(`${TOOL}: #${pr.number ?? args.flags.pr} is not merged, so there is nothing to record.\n`);
     return EXIT_CODES.VALIDATION;
@@ -1018,6 +1127,7 @@ function main(argv) {
       repo: { type: "string" },
       status: { type: "boolean" },
       harness: { type: "string" },
+      message: { type: "string" },
     });
   } catch (err) {
     process.stderr.write(`${TOOL}: ${/** @type {Error} */ (err).message}\n${USAGE}\n`);
@@ -1052,6 +1162,9 @@ function main(argv) {
     if (sub === "token") return cmdToken(subArgs);
     if (sub === "cpu-share") return cmdCpuShare(subArgs);
     if (sub === "setup") return cmdSetup(subArgs);
+    if (sub === "ask") return cmdAsk(subArgs);
+    if (sub === "requests") return cmdRequests(subArgs);
+    if (sub === "reply") return cmdReply(subArgs);
     return cmdPrune();
   } catch (err) {
     if (err instanceof UsageError) {

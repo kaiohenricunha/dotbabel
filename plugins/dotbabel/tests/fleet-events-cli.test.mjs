@@ -207,8 +207,10 @@ describe.skipIf(!HAS_PROC)("event feed: producer and consumers", () => {
   it("tells a peer about the first merge ever recorded when the hooks run through fleet-guard.sh", () => {
     const w = world({ viaGuard: true });
     w.edit("sess-peer", "docs/a.md");
-    expect(w.read("sess-peer")).toBeNull(); // no event yet, so the shell exits before node
-    expect(w.seen("sess-peer")).toBeNull();
+    // No event yet. The first call maps the session id to its owner (for fleet
+    // requests), so node runs once and marks "no event" as seen.
+    expect(w.read("sess-peer")).toBeNull();
+    expect(w.seen("sess-peer")).toBe("0");
     w.bash("sess-self", "gh pr merge 426 --squash");
     const told = w.read("sess-peer");
     expect(told.additionalContext).toContain("#426");

@@ -32,7 +32,8 @@
 
 # post-tool and prompt run on every tool call and every prompt, so bash
 # decides whether node has work: a `gh pr merge` to record (post-tool only),
-# or an event newer than this session's seen marker. Otherwise exit at once.
+# an event newer than this session's seen marker, or a notice in its inbox.
+# Otherwise exit at once.
 input=""
 case "${1:-}" in
   pre-bash)
@@ -55,6 +56,20 @@ case "${1:-}" in
       seen=""
       [ -r "$state/seen/$sid" ] && read -r seen <"$state/seen/$sid"
       [ -n "$newest" ] && [[ $newest > $seen ]] && work=1
+      # A request, answer, or release notice (fleet ask/reply/release) waits in
+      # the inbox of the session's owner, which owners/<session-id> names. An
+      # unmapped session id starts node once, and node maps it; "none" means
+      # the fleet cannot identify this session.
+      owner=""
+      [ -r "$state/owners/$sid" ] && read -r owner <"$state/owners/$sid"
+      if [ -z "$owner" ]; then
+        work=1
+      elif [ "$owner" != none ]; then
+        for f in "$state/inbox/$owner"/*.json; do
+          [ -e "$f" ] && work=1
+          break
+        done
+      fi
     fi
     [ "$work" = 1 ] || exit 0
     ;;
