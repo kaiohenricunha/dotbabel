@@ -365,7 +365,9 @@ separated by `:`, in `DOTBABEL_PEER_READ_ROOTS` in the environment that starts
 the Advisor session, for example
 `export DOTBABEL_PEER_READ_ROOTS=/home/me/projects/shared-lib` in the shell
 profile. The hook reads that environment, so an Advisor tool call cannot widen
-the list, and relative entries are ignored. Symlinks resolve
+the list, and relative entries are ignored. A running Claude or Codex process
+does not see a later export: open a new terminal so that the profile loads, then
+start the Advisor session again. Symlinks resolve
 first, and git words resolve against `git -C`. Inside those folders, common
 secret files are refused: `.env` (but not `.env.example`, `.env.sample`, or
 `.env.template`), `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.npmrc`, `.pypirc`,
