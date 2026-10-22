@@ -8,6 +8,16 @@ import { makeResolvedRuntimeConfiguration } from "../src/model-intelligence/doma
 import { fakeRunner, outcome, enoent, jsonFixture, textFixture, snapshotTree, fixedNow } from "./fixtures/model-intelligence/fake-runner.mjs";
 
 const DIR = "claude";
+it("annotates only verified Claude effort controls without assigning semantics to future values", () => {
+  const levels = ["low", "medium", "high", "xhigh", "max", "future", "constructor"].map(effort => ({ effort }));
+  const result = claude.annotateReasoningLevels(levels);
+  expect(result.slice(0, 5)).toEqual([
+    { effort: "low", intent: "low", order: 0 }, { effort: "medium", intent: "medium", order: 1 },
+    { effort: "high", intent: "high", order: 2 }, { effort: "xhigh", intent: "high", order: 3 }, { effort: "max", intent: "high", order: 4 },
+  ]);
+  expect(result.slice(5)).toEqual([{ effort: "future" }, { effort: "constructor" }]);
+  expect(levels[0]).toEqual({ effort: "low" });
+});
 const stream = (name) => textFixture(DIR, name);
 const VERSION_OUTCOME = outcome({ stdout: "2.1.278 (Claude Code)\n" });
 

@@ -11,7 +11,10 @@
     "plugins/dotbabel/tests/adaptive-session-routing-codex*.test.mjs",
     "plugins/dotbabel/tests/adaptive-session-routing.test.mjs",
     "plugins/dotbabel/tests/integration/adaptive-session-routing-*.integration.test.mjs",
-    "plugins/dotbabel/tests/integration/adaptive-session-routing-codex.integration.test.mjs"
+    "plugins/dotbabel/tests/integration/adaptive-session-routing-codex.integration.test.mjs",
+    "plugins/dotbabel/src/model-intelligence/cli/claude-session-input.mjs",
+    "experiments/adaptive-session-routing-claude/**",
+    "plugins/dotbabel/tests/fixtures/adaptive-session-routing/claude-mod/**"
   ],
   "acceptance_commands": [
     "node plugins/dotbabel/bin/dotbabel-validate-specs.mjs",
@@ -172,7 +175,7 @@
     },
     {
       "id": "AC-7",
-      "status": "planned",
+      "status": "active",
       "given": "agent independence",
       "when": "never changes a subagent configuration",
       "then": "main-session routing leaves subagent compute configuration unchanged",
@@ -222,7 +225,7 @@
     },
     {
       "id": "AC-9",
-      "status": "planned",
+      "status": "active",
       "given": "safe fallback",
       "when": "uncertain classification and failed application preserve current configuration",
       "then": "failures preserve safe configuration and expose stable diagnostic codes",
