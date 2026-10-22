@@ -13,8 +13,8 @@ import {
 } from "../../src/peer/state.mjs";
 function world() {
   const s = createState("r"),
-    main = { key: "m", repo: "r" },
-    advisor = { key: "a", repo: "r" };
+    main = { key: "m", repo: "r", worktree: "/repo" },
+    advisor = { key: "a", repo: "r", worktree: "/repo" };
   const p = registerMain(s, main, { alive: () => true });
   pairAdvisor(s, advisor, p.code, { alive: () => true });
   return { p, main, advisor };
