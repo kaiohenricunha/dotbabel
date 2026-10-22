@@ -15,6 +15,8 @@ import { hashContent } from "../src/model-intelligence/materialize/manifest.mjs"
 const sourceContent = readFileSync(new URL("../src/model-intelligence/workflows/ai-review.source.yml", import.meta.url), "utf8");
 const computeContent = readFileSync(new URL("../src/model-intelligence/workflows/ai-review.compute.yml", import.meta.url), "utf8");
 const snapshot = JSON.parse(readFileSync(new URL("../src/model-intelligence/snapshot/release-capabilities.json", import.meta.url), "utf8"));
+// The shipped workflow carries the package version, which a release bumps.
+const { version: packageVersion } = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"));
 const build = (extra = {}) => buildClaudeReviewWorkflow({ toolVersion: "4.2.0", sourceContent, computeContent, snapshot, ...extra });
 const run = doc => doc.jobs.review.steps.find(step => step.name === "Run /review-prs headless").run;
 
@@ -108,7 +110,7 @@ it("public status distinguishes an older installed copy without changing consume
   const result = spawnSync(process.execPath, [path.resolve("plugins/dotbabel/bin/dotbabel-models.mjs"), "status", "--repo-root", target, "--json"], { encoding: "utf8", env: { ...process.env, XDG_CACHE_HOME: path.join(target, "cache") } });
   expect(result.status).toBe(0);
   const report = JSON.parse(result.stdout);
-  expect(report.shippedWorkflow).toMatchObject({ status: "present", toolVersion: "4.2.0", configurationBasis: "projection", snapshotId: snapshot.snapshotId });
+  expect(report.shippedWorkflow).toMatchObject({ status: "present", toolVersion: packageVersion, configurationBasis: "projection", snapshotId: snapshot.snapshotId });
   expect(report.installedWorkflow).toMatchObject({ status: "present", toolVersion: "4.1.0", matchesShipped: false });
   expect(readFileSync(path.join(root, "ai-review.yml"), "utf8")).toBe(old.files[0].content);
 });

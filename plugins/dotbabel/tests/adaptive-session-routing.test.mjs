@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import os from "node:os";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 import { route } from "../src/adaptive-session-routing/route.mjs";
 import { prepareRoute } from "../src/adaptive-session-routing/prepare.mjs";
@@ -200,14 +201,21 @@ describe("adaptive session routing decisions", () => {
     const task = { prompt: "Implement integration tests for the payment gateway." };
     const run = () => route({ ...value, classification: classify(task) });
     for (let index = 0; index < 20; index++) run();
-    const durations = [];
+    // The budget holds for the routing work (CPU time) and for the delay a user feels (clock
+    // time). Clock time also counts the wait for a core, so an overloaded host skips only that
+    // check. Node 20 has only process CPU time.
+    const cpuUsage = (process.threadCpuUsage ?? process.cpuUsage).bind(process);
+    const overloaded = os.loadavg()[0] > os.availableParallelism();
+    const clock = [], cpu = [];
     for (let index = 0; index < 1000; index++) {
-      const start = performance.now(); const result = run(); durations.push(performance.now() - start);
+      const startCpu = cpuUsage(); const start = performance.now(); const result = run();
+      clock.push(performance.now() - start); const used = cpuUsage(startCpu); cpu.push((used.user + used.system) / 1000);
       expect(result.configuration.axes.model).toBe("warm-model-0499");
     }
-    durations.sort((a, b) => a - b);
-    console.log(JSON.stringify({ benchmark: "warm-local-route-500-models", samples: durations.length, p95Ms: durations[949] }));
-    expect(durations[949]).toBeLessThanOrEqual(25);
+    clock.sort((a, b) => a - b); cpu.sort((a, b) => a - b);
+    console.log(JSON.stringify({ benchmark: "warm-local-route-500-models", samples: cpu.length, p95Ms: clock[949], p95CpuMs: cpu[949], clockChecked: !overloaded, loadAverage: os.loadavg()[0] }));
+    expect(cpu[949]).toBeLessThanOrEqual(25);
+    if (!overloaded) expect(clock[949]).toBeLessThanOrEqual(25);
   });
   it("keeps classifier and capability confidence independent and preserves low-confidence evidence", () => {
     const value = request(); value.classification.confidence = "medium";

@@ -170,12 +170,15 @@ describe("Claude release baseline installation", () => {
   it("a real plain shell bootstrap excludes a concurrent Node projection install", async () => {
     const options = setup(); options.write(); const root = makeTempDir("mi-bootstrap-race-");
     const home = join(root, "home"); const bin = join(root, "bin"); fs.mkdirSync(bin); fs.mkdirSync(home);
-    const ready = join(root, "ready"); const release = join(root, "release");
+    const ready = join(root, "ready"); const release = join(root, "release"); const probed = join(root, "probed");
     fs.writeFileSync(join(bin, "ln"), '#!/bin/bash\nprintf ready > "$MI_READY"\nfor attempt in {1..500}; do [[ -e "$MI_RELEASE" ]] && break; sleep 0.01; done\nexec /bin/ln "$@"\n', { mode: 0o755 });
-    const env = { PATH: bin + ":" + process.env.PATH, HOME: home, MI_READY: ready, MI_RELEASE: release };
+    // Without --all, a host without copilot runs `gh copilot --version`, which downloads and
+    // unpacks the Copilot CLI into this HOME while the test runs. This stub records such a probe.
+    fs.writeFileSync(join(bin, "gh"), '#!/bin/bash\nprintf probed > "$MI_PROBED"\n', { mode: 0o755 });
+    const env = { PATH: bin + ":" + process.env.PATH, HOME: home, MI_READY: ready, MI_RELEASE: release, MI_PROBED: probed };
     const boot = new URL("../../../bootstrap.sh", import.meta.url).pathname;
     const cli = new URL("../bin/dotbabel-bootstrap.mjs", import.meta.url).pathname;
-    const child = spawn("bash", [boot, "--source", options.source, "--quiet"], { env, stdio: "ignore" });
+    const child = spawn("bash", [boot, "--source", options.source, "--all", "--quiet"], { env, stdio: "ignore" });
     const completed = new Promise((resolve, reject) => { child.once("error", reject); child.once("exit", code => resolve(code)); });
     try {
       const deadline = Date.now() + 5000;
@@ -192,6 +195,7 @@ describe("Claude release baseline installation", () => {
       try { expect(await completed).toBe(0); } finally { clearTimeout(timer); }
     }
     expect(fs.existsSync(join(home, ".claude/.dotbabel-projection.lock"))).toBe(false);
+    expect(fs.existsSync(probed)).toBe(false);
   }, 15_000);
   it("recovers an interrupted release installation using a complete new release generation", async () => {
     const options = setup(); options.write();
