@@ -86,6 +86,25 @@ function unreadable(target, scope) {
   return secret ? "secret" : "outside";
 }
 
+/** True for a search that also reads hidden, ignored, untracked, or linked files, which a path check cannot see: recursive grep, and rg or git grep with options that widen it. @param {string} bin @param {string[]} words @returns {boolean} */
+function broadSearch(bin, words) {
+  const opts = words.slice(1);
+  if (["grep", "egrep", "fgrep"].includes(bin))
+    return opts.some(
+      (w, i) =>
+        /^-[a-zA-Z]*[rR]/.test(w) ||
+        /^--(?:recursive|dereference-recursive|directories=recurse)$/.test(w) ||
+        (w === "-d" && opts[i + 1] === "recurse"),
+    );
+  if (bin === "rg")
+    return opts.some(
+      (w) =>
+        /^-[a-zA-Z.]*[u.L]/.test(w) ||
+        /^--(?:hidden|follow|unrestricted|no-ignore[a-z-]*)$/.test(w),
+    );
+  return bin === "git" && opts.some((w) => /^--(?:untracked|no-index)$/.test(w));
+}
+
 /** A deny for the first unreadable target, or null when all are readable. @param {string[]} targets @param {object} scope @returns {object|null} */
 function readDecision(targets, scope) {
   const why = targets.map((t) => unreadable(t, scope)).find(Boolean);
@@ -198,6 +217,8 @@ const READ_SCOPE = {
     "Peer Advisor reads only the pair's worktrees, its ledger, and this session's saved tool results. This path is outside them. Ask Main or the user for anything else.",
   secret:
     "Peer Advisor never reads secret files such as .env, keys, or credentials, even inside the pair's worktrees. Ask the user if a secret really matters to the review.",
+  search:
+    "Peer Advisor searches with rg, which skips hidden and ignored files such as .env. Recursive grep, rg --hidden, -u, --no-ignore, or --follow, and git grep --untracked or --no-index can read secret files, so they are refused. Use rg -n PATTERN PATH.",
 };
 function deny(reason) {
   return {
@@ -299,6 +320,7 @@ export function peerHook(pair, who, input) {
       // Peer coordination words are message text, not paths.
       if (![...READ_ONLY, "git"].includes(bin)) return null;
       const scope = readScope(pair, who, input);
+      if (broadSearch(bin, words)) return deny(READ_SCOPE.search);
       return readDecision(shellTargets(words, scope.cwd), scope);
     }
     return deny(

@@ -36,7 +36,7 @@ it("allows reads in the Advisor's and Main's worktrees, wherever Main's is", () 
   expect(decide("Read", { filePath: path.join(repo, "README.md") })).toBe("allow");
   expect(bash("ls src")).toBe("allow");
   expect(bash(`git -C '${mainTree}' diff`)).toBe("allow");
-  expect(bash("grep -rn price src --include='*.mjs'")).toBe("allow");
+  expect(bash("rg -n price src --glob '*.mjs'")).toBe("allow");
 });
 it("refuses reads outside the pair, through a .. escape, or through a symlink", () => {
   expect(decide("Read", { file_path: "/etc/hostname" })).toBe("deny");
@@ -133,4 +133,40 @@ it("says whether a read was outside the pair or a secret file", () => {
       .hookSpecificOutput.permissionDecisionReason;
   expect(reason("/etc/hostname")).toContain("This path is outside them.");
   expect(reason(path.join(repo, ".env"))).toContain("never reads secret files");
+});
+
+it("refuses searches that read hidden, ignored, untracked, or linked files, and points to rg", () => {
+  for (const command of [
+    "grep -rn TOKEN .",
+    "grep -R x src",
+    "grep --recursive x .",
+    "grep -d recurse x .",
+    "grep --directories=recurse x .",
+    "egrep -ri x .",
+    "rg --hidden x",
+    "rg -. x",
+    "rg -uu x",
+    "rg -nu x",
+    "rg --no-ignore x",
+    "rg --no-ignore-vcs x",
+    "rg -L x",
+    "rg --follow x",
+    "git grep --untracked x",
+    "git grep --no-index x",
+  ])
+    expect(bash(command), command).toBe("deny");
+  for (const command of [
+    "rg -n TOKEN src",
+    "rg --glob '*.mjs' -n x",
+    "grep -n x app.js",
+    "git grep -n x",
+    "find . -name '*.mjs'",
+  ])
+    expect(bash(command), command).toBe("allow");
+  const reason = peerHook(p, advisor, {
+    ...input,
+    tool_name: "Bash",
+    tool_input: { command: "grep -rn TOKEN ." },
+  }).hookSpecificOutput.permissionDecisionReason;
+  expect(reason).toContain("rg");
 });
