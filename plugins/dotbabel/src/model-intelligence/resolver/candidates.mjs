@@ -35,6 +35,8 @@ function satisfies(level, policy, capabilities, levels, levelsKnown) {
     if (key === "reasoning" && expected === "optional") return true;
     if (key === "reasoning" && expected === "required") return capabilities.reasoning === undefined ? undefined : capabilities.reasoning === true;
     if (key === "reasoning_effort_tiers") return !levelsKnown ? undefined : typeof expected === "number" && new Set(levels.map(e => e.effort)).size >= expected;
+    // Reviewed evidence must name the class; capability flags never imply it, and neither does a name.
+    if (key === "class_support") return Array.isArray(capabilities.class_support) ? capabilities.class_support.includes(expected) : undefined;
     return !Object.hasOwn(capabilities, key) ? undefined : capabilities[key] === expected;
   });
   return checks.includes(false) ? false : checks.includes(undefined) ? undefined : true;

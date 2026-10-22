@@ -1,33 +1,90 @@
 {
-  "nativeVersion": "2.1.302",
+  "nativeVersion": "2.1.307",
   "inferenceCalls": 0,
   "credentialBoundary": "isolated credential-free source adapter with a dead-port proxy",
   "selectors": [
     {
       "selector": "haiku",
       "canonicalModel": "claude-haiku-5-5",
-      "observedAt": "2026-10-18T08:18:51.205Z",
+      "observedAt": "2026-10-22T02:56:26.955Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "claude-haiku-5-5",
+      "canonicalModel": "claude-haiku-5-5",
+      "observedAt": "2026-10-22T02:56:28.475Z",
       "turnExecuted": false
     },
     {
       "selector": "sonnet",
       "canonicalModel": "claude-sonnet-5-5",
-      "observedAt": "2026-10-18T08:18:51.606Z",
+      "observedAt": "2026-10-22T02:56:29.990Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "claude-sonnet-5-5",
+      "canonicalModel": "claude-sonnet-5-5",
+      "observedAt": "2026-10-22T02:56:31.325Z",
       "turnExecuted": false
     },
     {
       "selector": "opus",
       "canonicalModel": "claude-opus-5-5",
-      "observedAt": "2026-10-18T08:18:52.055Z",
+      "observedAt": "2026-10-22T02:56:32.976Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "claude-opus-5-5",
+      "canonicalModel": "claude-opus-5-5",
+      "observedAt": "2026-10-22T02:56:34.308Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "fable",
+      "canonicalModel": "claude-fable-5-1",
+      "observedAt": "2026-10-22T02:56:35.393Z",
+      "turnExecuted": false
+    },
+    {
+      "selector": "claude-fable-5-1",
+      "canonicalModel": "claude-fable-5-1",
+      "observedAt": "2026-10-22T02:56:36.714Z",
       "turnExecuted": false
     }
   ],
   "acceptedDocumentationFacts": {
-    "models": ["claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5"],
+    "models": [
+      "claude-fable-5-1",
+      "claude-haiku-5-5",
+      "claude-opus-5-5",
+      "claude-sonnet-5-5"
+    ],
     "reasoning": true,
     "tool_call": true,
-    "supportedReasoningLevels": ["low", "medium", "high", "xhigh", "max"],
-    "defaultReasoningLevel": "medium",
+    "supportedReasoningLevels": [
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max"
+    ],
+    "defaultReasoningLevel": {
+      "claude-fable-5-1": "high",
+      "claude-haiku-5-5": "medium",
+      "claude-opus-5-5": "medium",
+      "claude-sonnet-5-5": "medium"
+    },
+    "classSupport": {
+      "claude-fable-5-1": [
+        "frontier",
+        "exceptional"
+      ],
+      "claude-haiku-5-5": [],
+      "claude-opus-5-5": [
+        "frontier"
+      ],
+      "claude-sonnet-5-5": []
+    },
     "sources": [
       "https://code.claude.com/docs/en/model-config",
       "https://platform.claude.com/docs/en/models/overview"

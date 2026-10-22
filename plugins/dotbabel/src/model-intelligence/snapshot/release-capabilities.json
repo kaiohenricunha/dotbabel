@@ -8,10 +8,95 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
+                },
+                "value": "claude-fable-5-1"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
+                },
+                "value": {
+                  "class_support": [
+                    "frontier",
+                    "exceptional"
+                  ],
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
+                },
+                "value": "high"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "3",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.307"
+                },
+                "value": "claude-fable-5-1"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "claude-fable-5-1"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "3",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-haiku-5-5"
               }
@@ -22,9 +107,10 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": {
+                  "class_support": [],
                   "reasoning": true,
                   "tool_call": true
                 }
@@ -48,7 +134,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": "medium"
               }
@@ -57,10 +143,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-haiku-5-5"
               }
@@ -71,7 +157,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": [
                   {
@@ -101,10 +187,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-opus-5-5"
               }
@@ -115,9 +201,12 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": {
+                  "class_support": [
+                    "frontier"
+                  ],
                   "reasoning": true,
                   "tool_call": true
                 }
@@ -141,7 +230,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": "medium"
               }
@@ -150,10 +239,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-opus-5-5"
               }
@@ -164,7 +253,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": [
                   {
@@ -194,10 +283,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-sonnet-5-5"
               }
@@ -208,9 +297,10 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": {
+                  "class_support": [],
                   "reasoning": true,
                   "tool_call": true
                 }
@@ -234,7 +324,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": "medium"
               }
@@ -243,10 +333,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-sonnet-5-5"
               }
@@ -257,7 +347,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": [
                   {
@@ -287,10 +377,95 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
+                },
+                "value": "claude-fable-5-1"
+              }
+            ],
+            "capabilities": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
+                },
+                "value": {
+                  "class_support": [
+                    "frontier",
+                    "exceptional"
+                  ],
+                  "reasoning": true,
+                  "tool_call": true
+                }
+              }
+            ],
+            "defaultReasoningLevel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
+                },
+                "value": "high"
+              }
+            ],
+            "id": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "3",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.307"
+                },
+                "value": "fable"
+              }
+            ],
+            "supportedReasoningLevels": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "sourceId": "claude-release-docs",
+                  "sourceKind": "knowledge-source",
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
+                },
+                "value": [
+                  {
+                    "effort": "low"
+                  },
+                  {
+                    "effort": "medium"
+                  },
+                  {
+                    "effort": "high"
+                  },
+                  {
+                    "effort": "xhigh"
+                  },
+                  {
+                    "effort": "max"
+                  }
+                ]
+              }
+            ]
+          },
+          "model": "fable"
+        },
+        {
+          "fields": {
+            "canonicalModel": [
+              {
+                "confidence": "high",
+                "provenance": {
+                  "adapterVersion": "3",
+                  "sourceId": "claude",
+                  "sourceKind": "runtime",
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-haiku-5-5"
               }
@@ -301,9 +476,10 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": {
+                  "class_support": [],
                   "reasoning": true,
                   "tool_call": true
                 }
@@ -327,7 +503,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": "medium"
               }
@@ -336,10 +512,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "haiku"
               }
@@ -350,7 +526,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": [
                   {
@@ -380,10 +556,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-opus-5-5"
               }
@@ -394,9 +570,12 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": {
+                  "class_support": [
+                    "frontier"
+                  ],
                   "reasoning": true,
                   "tool_call": true
                 }
@@ -420,7 +599,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": "medium"
               }
@@ -429,10 +608,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "opus"
               }
@@ -443,7 +622,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": [
                   {
@@ -473,10 +652,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "claude-sonnet-5-5"
               }
@@ -487,9 +666,10 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": {
+                  "class_support": [],
                   "reasoning": true,
                   "tool_call": true
                 }
@@ -513,7 +693,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": "medium"
               }
@@ -522,10 +702,10 @@
               {
                 "confidence": "high",
                 "provenance": {
-                  "adapterVersion": "2",
+                  "adapterVersion": "3",
                   "sourceId": "claude",
                   "sourceKind": "runtime",
-                  "sourceVersion": "2.1.302"
+                  "sourceVersion": "2.1.307"
                 },
                 "value": "sonnet"
               }
@@ -536,7 +716,7 @@
                 "provenance": {
                   "sourceId": "claude-release-docs",
                   "sourceKind": "knowledge-source",
-                  "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9"
+                  "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed"
                 },
                 "value": [
                   {
@@ -562,10 +742,10 @@
         }
       ],
       "provenance": {
-        "adapterVersion": "2",
+        "adapterVersion": "3",
         "sourceId": "claude",
         "sourceKind": "runtime",
-        "sourceVersion": "2.1.302"
+        "sourceVersion": "2.1.307"
       },
       "runtimeContract": {
         "capabilities": {
@@ -623,7 +803,7 @@
     }
   },
   "schemaVersion": 1,
-  "snapshotId": "sha256:c805856d4af90d989445cd9f0162bc90f2d662637facd829fefb0f487febe04d",
+  "snapshotId": "sha256:317fb43d5a6c5b5d461820367c7104f7d9c09106d1c259485d10405220d0db91",
   "sources": [
     {
       "adapterVersion": "1",
@@ -641,10 +821,17 @@
       "sourceVersion": "2.1.302"
     },
     {
-      "observedAt": "2026-10-18T08:22:25.895Z",
+      "adapterVersion": "3",
+      "observedAt": "2026-10-22T02:56:26.955Z",
+      "sourceId": "claude",
+      "sourceKind": "runtime",
+      "sourceVersion": "2.1.307"
+    },
+    {
+      "observedAt": "2026-10-22T02:56:36.716Z",
       "sourceId": "claude-release-docs",
       "sourceKind": "knowledge-source",
-      "sourceVersion": "sha256:974a0d16b453e9c55dab0554bb95cb80c1d53913ef90a083966da232aab045a9",
+      "sourceVersion": "sha256:b4a46b6633bb8f8ac0629cd3fe096f7a81ee60369f5c02f98b5bd262fb5bf9ed",
       "url": "https://code.claude.com/docs/en/model-config"
     }
   ],

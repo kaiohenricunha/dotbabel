@@ -142,6 +142,20 @@
                               "tool_call": {
                                 "type": "boolean"
                               },
+                              "class_support": {
+                                "description": "Workload classes that reviewed first-party evidence assigns to this exact selector. An empty list is a reviewed negative. Never inferred from a model name.",
+                                "type": "array",
+                                "uniqueItems": true,
+                                "items": {
+                                  "enum": [
+                                    "mechanical",
+                                    "routine",
+                                    "deep",
+                                    "frontier",
+                                    "exceptional"
+                                  ]
+                                }
+                              },
                               "vision": {
                                 "type": "boolean"
                               },
