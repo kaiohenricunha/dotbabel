@@ -374,9 +374,13 @@ secret files are refused: `.env` (but not `.env.example`, `.env.sample`, or
 `id_*` keys, `*.pem`, `*.key`, `*.p12`, `*.pfx`, and `credentials*`. A path check
 cannot see what a recursive search reads, so recursive `grep`, `rg --hidden`,
 `-u`, `--no-ignore`, or `--follow`, and `git grep --untracked` or `--no-index`
-are refused. `rg` skips hidden and ignored files by default. Each refusal says
-which rule applied. A secret file that git tracks, or that is neither hidden nor
-ignored, stays searchable by `rg` and `git grep`. So keep real secrets outside
+are refused. `rg` skips hidden and ignored files by default. Before an `rg`,
+Grep, or `git grep` search runs, the guard lists the files that it would read
+(with `git ls-files`, or a walk of at most 10,000 visible files outside git). If
+one of them is a secret file, even one that git tracks, the search is refused;
+search a narrower path. Each refusal says which rule applied. Git history is
+not checked: `git log -p`, `git show COMMIT`, and `git grep PATTERN COMMIT` can
+still show a secret that an older commit held. So keep real secrets outside
 the project, use an Advisor grant only in a trusted project, and remember that a
 quoted secret would reach Main, and that a Codex Main sees the text as a prompt.
 Hooks depend on installation, trust, and harness coverage; they are not a

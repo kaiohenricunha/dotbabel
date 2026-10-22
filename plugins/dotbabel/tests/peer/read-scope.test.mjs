@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { it, expect, beforeEach } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
 import { peerHook } from "../../src/peer/hooks.mjs";
@@ -183,6 +184,100 @@ it("adds the absolute folders in DOTBABEL_PEER_READ_ROOTS, still without secrets
     expect(decide("Read", { file_path: path.join(shared, ".env") })).toBe("deny");
     expect(decide("Read", { file_path: path.join(root, "relative", "ignored", "a") })).toBe("deny");
     expect(decide("Read", { file_path: "/etc/hostname" })).toBe("deny");
+  } finally {
+    if (saved === undefined) delete process.env.DOTBABEL_PEER_READ_ROOTS;
+    else process.env.DOTBABEL_PEER_READ_ROOTS = saved;
+  }
+});
+
+// A git repository with each file written, and the tracked ones added to the index.
+function gitRepo(files, ignore) {
+  execFileSync("git", ["init", "-q", repo]);
+  if (ignore) fs.writeFileSync(path.join(repo, ".gitignore"), ignore);
+  for (const [file, tracked] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(repo, file), "TOKEN\n");
+    if (tracked) execFileSync("git", ["-C", repo, "add", "-f", file]);
+  }
+}
+const reasonOf = (tool, tool_input) =>
+  peerHook(p, advisor, { ...input, tool_name: tool, tool_input })?.hookSpecificOutput
+    ?.permissionDecisionReason;
+
+it("refuses an rg, Grep, or git grep search that would read a tracked secret file", () => {
+  gitRepo({ "config/credentials.json": true, "src/a.mjs": true });
+  for (const command of ["rg -n TOKEN", "rg -n TOKEN .", "rg -n TOKEN config", "git grep -n TOKEN"])
+    expect(bash(command), command).toBe("deny");
+  expect(decide("Grep", { pattern: "TOKEN" })).toBe("deny");
+  expect(decide("Grep", { pattern: "TOKEN", path: "config" })).toBe("deny");
+  expect(bash("rg -n TOKEN src")).toBe("allow");
+  expect(decide("Grep", { pattern: "TOKEN", path: "src" })).toBe("allow");
+  const reason = reasonOf("Bash", { command: "rg -n TOKEN" });
+  expect(reason).toContain("config/credentials.json");
+  expect(reason).toContain("narrower path");
+});
+
+it("refuses an unignored untracked secret, and follows rg on ignored and hidden files", () => {
+  gitRepo({ "certs/server.key": false, "src/a.mjs": true });
+  expect(bash("rg -n TOKEN")).toBe("deny");
+  fs.writeFileSync(path.join(repo, ".gitignore"), "*.key\n");
+  expect(bash("rg -n TOKEN")).toBe("allow");
+  // rg skips hidden files below the folder it searches; the Grep tool passes --hidden.
+  fs.mkdirSync(path.join(repo, ".config"));
+  fs.writeFileSync(path.join(repo, ".config", "credentials.json"), "TOKEN\n");
+  expect(bash("rg -n TOKEN")).toBe("allow");
+  expect(decide("Grep", { pattern: "TOKEN" })).toBe("deny");
+});
+
+it("finds the folders rg searches after its pattern and value options", () => {
+  gitRepo({ "credentials.json": true, "src/a.mjs": true });
+  for (const command of ["rg src", "rg -g '*.mjs' src", "rg --max-count=3 TOKEN", "rg -n -- TOKEN"])
+    expect(bash(command), command).toBe("deny");
+  for (const command of [
+    "rg -e TOKEN src",
+    "rg --regexp=TOKEN src",
+    "rg -nA 2 TOKEN src",
+    "rg -nA2 TOKEN src",
+    "rg --max-count 3 TOKEN src",
+    "rg -g '*.mjs' TOKEN src",
+    "rg -n TOKEN -- src",
+  ])
+    expect(bash(command), command).toBe("allow");
+});
+
+it("refuses a git grep over a tracked hidden secret that rg would skip", () => {
+  gitRepo({ ".secrets/id_rsa": true, "src/a.mjs": true });
+  expect(bash("rg -n TOKEN")).toBe("allow");
+  expect(bash("git grep -n TOKEN")).toBe("deny");
+  expect(decide("Bash", { command: `git -C '${repo}' grep -n TOKEN` }, { cwd: mainTree })).toBe(
+    "deny",
+  );
+  expect(bash("git grep -n TOKEN -- src")).toBe("deny");
+});
+
+it("searches an ignored folder that rg is given by name", () => {
+  gitRepo({ "vendor/server.key": false, "src/a.mjs": true }, "vendor/\n");
+  expect(bash("rg -n TOKEN")).toBe("allow");
+  expect(bash("rg -n TOKEN vendor")).toBe("deny");
+});
+
+it("walks the visible files of a folder outside git, up to a limit", () => {
+  const shared = path.join(root, "shared-lib");
+  fs.mkdirSync(path.join(shared, ".hidden"), { recursive: true });
+  fs.writeFileSync(path.join(shared, ".hidden", "id_rsa"), "TOKEN\n");
+  const saved = process.env.DOTBABEL_PEER_READ_ROOTS;
+  process.env.DOTBABEL_PEER_READ_ROOTS = shared;
+  try {
+    expect(bash(`rg -n TOKEN '${shared}'`)).toBe("allow");
+    fs.mkdirSync(path.join(shared, "keys"));
+    fs.writeFileSync(path.join(shared, "keys", "id_rsa"), "TOKEN\n");
+    expect(bash(`rg -n TOKEN '${shared}'`)).toBe("deny");
+    fs.rmSync(path.join(shared, "keys"), { recursive: true });
+    const many = path.join(shared, "many");
+    fs.mkdirSync(many);
+    for (let i = 0; i <= 10000; i++) fs.writeFileSync(path.join(many, `f${i}.txt`), "");
+    const reason = reasonOf("Bash", { command: `rg -n TOKEN '${shared}'` });
+    expect(reason).toContain("narrower path");
   } finally {
     if (saved === undefined) delete process.env.DOTBABEL_PEER_READ_ROOTS;
     else process.env.DOTBABEL_PEER_READ_ROOTS = saved;
