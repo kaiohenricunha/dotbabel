@@ -5,3 +5,6 @@ CHANGELOG.md
 skills/security-audit/references/upstream/
 plugins/dotbabel/templates/claude/skills/security-audit/references/upstream/
 examples/minimal-consumer/.claude/skills/security-audit/references/upstream/
+# Release snapshot bytes are written by serializeSnapshot (snapshot/core.mjs) and pinned by
+# model-intelligence-snapshot.test.mjs ("serializeSnapshot(saved) === file"). Formatting breaks the pin.
+plugins/dotbabel/src/model-intelligence/snapshot/release-capabilities.json
