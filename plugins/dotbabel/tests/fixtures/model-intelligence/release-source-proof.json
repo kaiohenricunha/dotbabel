@@ -53,21 +53,10 @@
     }
   ],
   "acceptedDocumentationFacts": {
-    "models": [
-      "claude-fable-5-1",
-      "claude-haiku-5-5",
-      "claude-opus-5-5",
-      "claude-sonnet-5-5"
-    ],
+    "models": ["claude-fable-5-1", "claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5"],
     "reasoning": true,
     "tool_call": true,
-    "supportedReasoningLevels": [
-      "low",
-      "medium",
-      "high",
-      "xhigh",
-      "max"
-    ],
+    "supportedReasoningLevels": ["low", "medium", "high", "xhigh", "max"],
     "defaultReasoningLevel": {
       "claude-fable-5-1": "high",
       "claude-haiku-5-5": "medium",
@@ -75,14 +64,9 @@
       "claude-sonnet-5-5": "medium"
     },
     "classSupport": {
-      "claude-fable-5-1": [
-        "frontier",
-        "exceptional"
-      ],
+      "claude-fable-5-1": ["frontier", "exceptional"],
       "claude-haiku-5-5": [],
-      "claude-opus-5-5": [
-        "frontier"
-      ],
+      "claude-opus-5-5": ["frontier"],
       "claude-sonnet-5-5": []
     },
     "sources": [
