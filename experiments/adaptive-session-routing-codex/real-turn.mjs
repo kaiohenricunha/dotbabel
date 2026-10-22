@@ -50,7 +50,7 @@ try{
  const dependencies={loadResolverInput:async()=>{const {shipped,user,project}=loadPolicyLayers({repoRoot:cwd});return {policy:mergePolicy({shipped,user,project}),catalog:localCatalog,target:{runtimeId:"codex",artifactKind:"workflow"},runtimeContract:codex.descriptor};}};
  router=createCodexTurnRouter({threadId,repoRoot:cwd,current:{axes:proof.initial,turnExecuted:false},manual,runtimeCapability:capability,request:call,dependencies});
  let seenAxes=proof.initial;
- const prompts=["Format the sample JSON as two-space indented text. Do not use tools. Return only JSON: {a:1}","Investigate this authentication race and give one sentence of verification guidance without using tools. Two requests read a missing token before either writes it."];
+ const prompts=["Format the sample JSON as two-space indented text. Do not use tools. Return only JSON: {a:1}","Debug why this integration test fails intermittently and give one sentence of verification guidance without using tools. The retry loop reads a stale cursor."];
  for(let i=0;i<prompts.length;i++){
   const params={threadId,input:[{type:"text",text:prompts[i],text_elements:[]}],model:null,effort:null};
   const dry=await prepareRoute({repoRoot:cwd,prompt:prompts[i],current:{axes:seenAxes,turnExecuted:i===0?false:true},manual,runtimeCapability:capability},dependencies);
