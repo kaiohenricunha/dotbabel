@@ -105,8 +105,9 @@ blocks to `~/.claude/settings.json`, then restart each Claude Code session:
 
 ## Commands
 
-Run these from a Claude Code session (the Bash tool). The command finds its
-own session by its process tree.
+Run these from a Claude Code session (the Bash tool), or from a Codex session
+with `DOTBABEL_FLEET_HOST=codex` set. The command finds its own session by its
+process tree.
 
 | Command                                      | Purpose                                                   |
 | -------------------------------------------- | --------------------------------------------------------- |
@@ -116,6 +117,7 @@ own session by its process tree.
 | `dotbabel fleet release --all`               | Release every claim this session holds in the repository  |
 | `dotbabel fleet prune`                       | Remove the claim records of sessions that exited          |
 | `dotbabel fleet hook <event>`                | The hook entry that `fleet-guard.sh` runs (JSON on stdin) |
+| `dotbabel fleet setup --harness codex`       | Add the fleet and task hooks to Codex `hooks.json`        |
 
 Patterns are relative to the repository root. A bare path also covers
 everything below it, so `docs` covers `docs/hooks.md`. `**` and `*` are globs.
@@ -181,16 +183,28 @@ model.
 | `postTool`     | A hook after a tool call, where a hook result is read   |
 | `sessionStart` | A hook at session start, where the live claims are told |
 
-Claude Code is the host adapter today: its session registry gives identity
-and liveness (`plugins/dotbabel/src/fleet/registry.mjs`), and its
-`PreToolUse`, `PostToolUse`, and `SessionStart` hooks plus the shell prefix
-give the four hook points ([hooks.md](./hooks.md)). Every other CLI that
-dotbabel knows reports every capability as `unsupported` until its hooks and
-session identity are verified. A fleet feature that needs an unsupported
+Claude Code and Codex have host adapters. For Claude Code, its session
+registry gives identity and liveness (`plugins/dotbabel/src/fleet/registry.mjs`),
+and its `PreToolUse`, `PostToolUse`, and `SessionStart` hooks plus the shell
+prefix give the four hook points ([hooks.md](./hooks.md)). For Codex, the
+hook's `session_id` (or `CODEX_THREAD_ID` in its shell) is bound to the
+`codex` process above the hook, and that process incarnation is the owner.
+Codex hooks guard `apply_patch` edits (every file of the patch) and `Bash`
+calls. Owners of both hosts share one ledger, so a Claude session and a Codex
+session see each other's claims and contend for one merge token. Every other
+CLI that dotbabel knows reports every capability as `unsupported` until its
+hooks and session identity are verified. A fleet feature that needs an unsupported
 capability is off for that host, and `dotbabel doctor` prints one line per
 CLI with the state of each capability, so the gap is visible rather than a
 silent failure. The table lives in
 `plugins/dotbabel/src/fleet/host-adapter.mjs`.
+
+To guard Codex sessions, run `dotbabel fleet setup --harness codex`. It adds
+the fleet hooks (with `DOTBABEL_FLEET_HOST=codex`) and the task context hook
+to `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`), keeps every
+existing hook, and refuses a symbolic link. Then review and trust the hooks
+in Codex with `/hooks`, and restart or resume the session; Codex skips a hook
+that is not trusted. Verified with Codex CLI 0.163.0.
 
 `DOTBABEL_FLEET_HOST` selects the host adapter; it defaults to `claude` for
 existing hook installations. Selecting an unsupported host disables identity
@@ -206,8 +220,22 @@ capability states. No unverified platform backend is enabled.
 ## Limits of the claims
 
 - **Only the edit tools are guarded.** `Edit`, `Write`, `MultiEdit`, and
-  `NotebookEdit` claim and can be denied. A Bash command that writes a file
-  (`sed -i`, a redirect) is not seen.
+  `NotebookEdit` claim and can be denied, and so does a Codex `apply_patch`
+  (all of its files, or none). A Bash command that writes a file (`sed -i`, a
+  redirect) is not seen.
+- **A Claude session and a Codex session cannot message each other.** Two
+  Claude sessions settle a clash with `SendMessage`. Across hosts, the
+  blocked session's reason tells it to ask the user to relay the request. In
+  Claude Code, a block turns into a question to the user after 15 minutes.
+  Codex cannot answer a hook with a question, so the edit stays blocked and
+  the reason tells the agent to stop and ask its user. In a long unattended
+  run (for example under yolo), a Codex session can wait on a claim until the
+  owner releases it (`dotbabel fleet release`) or the owning session ends.
+- **Codex support needs Linux or WSL.** The owner is the `codex` process
+  incarnation read from `/proc`. CPU lanes are Claude-only: they use Claude
+  Code's shell prefix. A manual `dotbabel fleet claim`, `release`, or `token`
+  from a sandboxed Codex shell can fail to write the ledger under
+  `~/.local/state`; the hooks run on the host and are not affected.
 - **The session registry is internal Claude Code state.** The hooks read
   `~/.claude/sessions/<pid>.json` to identify sessions. If that format
   changes, the hook finds no session and allows every edit. It never blocks
