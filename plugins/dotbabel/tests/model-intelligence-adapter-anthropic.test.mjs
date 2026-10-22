@@ -15,6 +15,17 @@ const discover = (fetch, extra = {}) => source.discover({ providers: ["anthropic
 afterEach(() => vi.restoreAllMocks());
 
 describe("Anthropic Models API knowledge source", () => {
+  it("retains explicit image input support and leaves absent modality facts unknown", async () => {
+    const result = await discover(() => response({ data: [
+      { id: "with-image", capabilities: { image_input: { supported: true } } },
+      { id: "without-image", capabilities: { image_input: { supported: false } } },
+      { id: "unknown-image", capabilities: { image_input: { supported: "yes" } } },
+    ], has_more: false }));
+    const models = result.evidence.providers[0].discovery.models;
+    expect(models.find(model => model.id === "with-image").inputModalities).toEqual(["text", "image"]);
+    expect(models.find(model => model.id === "without-image").inputModalities).toEqual(["text"]);
+    expect(models.find(model => model.id === "unknown-image")).not.toHaveProperty("inputModalities");
+  });
   it("uses the official provider API freshness class rather than broad catalog defaults", () => {
     expect(freshnessPolicyFor(source)).toEqual({ evidenceClass: "provider-api", staleAfterMs: 6 * 60 * 60 * 1000, expireAfterMs: 24 * 60 * 60 * 1000 });
   });
@@ -86,7 +97,7 @@ describe("Anthropic Models API knowledge source", () => {
     expect(result.evidence.providers[0].id).toBe("anthropic");
     const models = result.evidence.providers[0].discovery.models;
     expect(models.map(model => model.id)).toEqual(["claude-haiku-5-5", "claude-opus-5-5", "claude-sonnet-5-5"]);
-    expect(models[0]).toEqual({ id: "claude-haiku-5-5", capabilities: { reasoning: true }, contextWindow: 1000000, supportedReasoningLevels: ["high", "low", "max", "medium", "xhigh"].map(effort => ({ effort })) });
+    expect(models[0]).toEqual({ id: "claude-haiku-5-5", capabilities: { reasoning: true }, inputModalities: ["text", "image"], contextWindow: 1000000, supportedReasoningLevels: ["high", "low", "max", "medium", "xhigh"].map(effort => ({ effort })) });
     expect(fetch).toHaveBeenCalledOnce();
     expect(fetch.mock.calls[0][0]).toBe(source.SOURCE_URL);
     expect(fetch.mock.calls[0][1]).toMatchObject({ method: "GET", redirect: "manual", credentials: "omit", headers: { accept: "application/json", "anthropic-version": "2023-06-01" } });

@@ -6,7 +6,7 @@
 
 ## Status
 
-All eight design sections are populated from the owner assignment. Implementation is incomplete. Runtime integration support remains unverified until the real-session checks pass.
+Implementation remains incomplete. The managed Codex App Server client has real-turn proof on 0.163.0. The Claude native Mods integration is experimental on 2.1.302 and 2.1.304. One ordinary MAIN turn on 2.1.304 applies the routed model; the effort axis remains unverified. See the [Claude setup and proof](../../../experiments/adaptive-session-routing-claude/README.md) and [Codex native proof](../../../experiments/adaptive-session-routing-codex/native-proof-2026-10-18.json).
 
 ## Quick Start
 

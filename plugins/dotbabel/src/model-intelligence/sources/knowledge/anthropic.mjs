@@ -7,7 +7,7 @@ import { readBoundedResponse } from "../network.mjs";
 /** Official source identity, separate from the Claude runtime adapter. */
 export const SOURCE_ID = "anthropic-models-api";
 /** Version of this adapter's normalization contract. */
-export const ADAPTER_VERSION = "1";
+export const ADAPTER_VERSION = "2";
 /** Fixed HTTPS endpoint; neither redirects nor caller-selected hosts receive the native transport. */
 export const SOURCE_URL = "https://api.anthropic.com/v1/models?limit=100";
 /** Model capability facts carry no copied document/license notice. */
@@ -26,8 +26,10 @@ function modelFact(record) {
   const effort = isPlainObject(record.capabilities?.effort) ? record.capabilities.effort : {};
   const levels = effort.supported === true ? Object.keys(effort).filter(key => /^[a-z][a-z0-9_-]{0,31}$/.test(key) && !["constructor", "prototype"].includes(key) && effort[key]?.supported === true).sort().map(effort => ({ effort })) : [];
   const thinking = record.capabilities?.thinking?.supported;
+  const image = record.capabilities?.image_input?.supported;
   const context = optionalCount(record.max_input_tokens); const name = optionalIdentifier(record.display_name);
   return makeModelFact({ id, supportedReasoningLevels: levels,
+    ...(typeof image === "boolean" ? { inputModalities: image ? ["text", "image"] : ["text"] } : {}),
     ...(typeof thinking === "boolean" ? { capabilities: { reasoning: thinking } } : {}),
     ...(context === undefined ? {} : { contextWindow: context }), ...(name === undefined ? {} : { displayName: name }),
   });

@@ -43,6 +43,23 @@ export const RUNTIME_ID = "claude";
 /** Stamped into provenance as `adapterVersion`. Bump it when the adapter's behavior or evidence shape changes. */
 export const ADAPTER_VERSION = "3";
 
+/** Exact native releases whose Mods MAIN contract passed the installed host test kit. Others stay unverified. */
+export const VERIFIED_MAIN_VERSIONS = Object.freeze(["2.1.302", "2.1.304"]);
+
+// Native control semantics documented in model-config#choose-an-effort-level, measured on 2.1.302.
+// This orders Claude effort controls, not models or another runtime's vocabulary.
+const EFFORT_SEMANTICS = Object.freeze({ low: { intent: "low", order: 0 }, medium: { intent: "medium", order: 1 }, high: { intent: "high", order: 2 }, xhigh: { intent: "high", order: 3 }, max: { intent: "high", order: 4 } });
+
+/**
+ * Annotate only advertised native Claude effort controls. Unknown future values stay opaque.
+ * The caller must independently establish support for each model and the measured runtime version.
+ * @param {object[]} levels Validated native effort facts, never a global model ranking.
+ * @returns {object[]} New facts with semantic intent and bounded native order where verified.
+ */
+export function annotateReasoningLevels(levels) {
+  return levels.map(level => ({ ...level, ...(Object.hasOwn(EFFORT_SEMANTICS, level.effort) ? EFFORT_SEMANTICS[level.effort] : {}) }));
+}
+
 /** The runtime's configuration-root variable and default directory name. */
 const ROOT = Object.freeze({ rootEnvVar: "CLAUDE_CONFIG_DIR", rootDirName: ".claude" });
 

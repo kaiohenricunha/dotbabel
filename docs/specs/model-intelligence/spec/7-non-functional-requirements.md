@@ -49,15 +49,17 @@ Decided by the owner on 2026-09-18. Reliability requirements preserve Dotbabel's
   - Official provider APIs use 6h/24h: provider catalogs can change quickly, but provider availability does not justify making every resolver call depend on live network access.
   - Broad catalog sources use 24h/7d: they are lower-frequency global knowledge rather than authoritative evidence of the current user's local invokability.
   - Override rules: a source-specific policy may shorten or lengthen these windows only when the adapter documents why, and the effective policy and provenance expose that override. No adapter represents `expired` as `fresh` simply because refresh failed.
+  - Reviewed release documentation is release-scoped. Exact-model facts that a reviewed release snapshot ships (tool support and the native effort vocabulary) stay `fresh` for the dotbabel release that contains that snapshot. Their provenance keeps the documentation source id and digest. They never establish availability: an automatic route still needs fresh runtime discovery and official provider API evidence on their own windows. A new release snapshot replaces these facts.
 
 The REL-4 default windows:
 
-| Evidence class                                          |      Fresh after | Stale until | Expired after |
-| ------------------------------------------------------- | ---------------: | ----------: | ------------: |
-| Runtime discovery / installed-model capability evidence | observation time |     6 hours |      24 hours |
-| Runtime/session observation                             | observation time |  15 minutes |        1 hour |
-| Official provider model API                             | observation time |     6 hours |      24 hours |
-| Models.dev or equivalent broad catalog                  | observation time |    24 hours |        7 days |
+| Evidence class                                          |      Fresh after |  Stale until | Expired after |
+| ------------------------------------------------------- | ---------------: | -----------: | ------------: |
+| Runtime discovery / installed-model capability evidence | observation time |      6 hours |      24 hours |
+| Runtime/session observation                             | observation time |   15 minutes |        1 hour |
+| Official provider model API                             | observation time |      6 hours |      24 hours |
+| Models.dev or equivalent broad catalog                  | observation time |     24 hours |        7 days |
+| Reviewed release documentation (release snapshot)       |     release ship | that release | next snapshot |
 
 - **REL-5**: Offline independence. With the network unavailable and the Model Intelligence cache empty, every existing Dotbabel operation that does not require Model Intelligence remains functional with its existing semantics. This is an invariant. On breach, the offline regression suite fails and the change cannot merge. This realizes ARCH-27 and ARCH-34.
   - Examples include unrelated validators, quality commands, repository tooling, and artifact operations whose behavior does not depend on model selection. Model Intelligence initialization is not a mandatory startup dependency for the package.

@@ -32,6 +32,7 @@ import {
 import { readProjectActivation, setProjectActivation } from "../src/model-intelligence/activation/index.mjs";
 import { PROVIDERS, RUNTIME_IDS, WORKLOAD_CLASSES, ARTIFACT_KINDS, checkOpaqueValue } from "../src/model-intelligence/domain/index.mjs";
 import { SOURCE_ADAPTERS } from "../src/model-intelligence/sources/index.mjs";
+import { VERIFIED_MAIN_VERSIONS } from "../src/model-intelligence/sources/runtime/claude.mjs";
 import { resolve as resolveCompute } from "../src/model-intelligence/resolver/index.mjs";
 import { makeObservedConfiguration } from "../src/model-intelligence/sources/evidence.mjs";
 import { buildRecommendation } from "../src/model-intelligence/recommend/index.mjs";
@@ -53,7 +54,7 @@ const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
   description:
-    "Model Intelligence. session [--runtime codex] [--model auto|<native-id>] [--effort auto|<native-value>] — run an explicitly enabled project's managed App Server terminal with ordinary prompts; enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; recommend [artifact | --requirement <class>] --runtime <id> — read-only advice and native invocation recipe; migrate [--check | --write] [--decisions <path>] [--batch <A-F>] — report or apply reviewed canonical migrations; class-F decisions remain untouched.",
+    "Model Intelligence. session [--runtime codex|claude] [--model auto|<native-id>] [--effort auto|<native-value>] — run an enabled project's managed Codex terminal or native Claude UI with session-only Mods; Claude effective-provider routing remains unverified; enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; recommend [artifact | --requirement <class>] --runtime <id> — read-only advice and native invocation recipe; migrate [--check | --write] [--decisions <path>] [--batch <A-F>] — report or apply reviewed canonical migrations; class-F decisions remain untouched.",
   flags: {
     model: { type: "string" },
     effort: { type: "string" },
@@ -126,7 +127,8 @@ if (verb === "migrate" && argv.flags.batch !== undefined && !["A", "B", "C", "D"
 if (verb === "snapshot" && argv.flags.check && (argv.flags.write || argv.flags["evidence-file"])) usage("snapshot --check cannot be combined with --write or --evidence-file");
 if (!["migrate", "resolve", "recommend"].includes(verb) && argv.positional.length > 1) usage(`${verb} takes no positional argument`);
 if (verb === "session") {
-  if (argv.flags.runtime !== undefined && argv.flags.runtime !== "codex") usage("session currently requires --runtime codex");
+  if (argv.flags.runtime !== undefined && !["codex", "claude"].includes(argv.flags.runtime)) usage("session requires --runtime codex or claude");
+  if (argv.flags.runtime === "claude" && argv.flags.json) usage("Claude session uses the native UI; inspect models status --json separately");
   for (const [flag, axis] of [["model", "model"], ["effort", "reasoning"]]) if (argv.flags[flag] !== undefined && !checkOpaqueValue(axis, argv.flags[flag])) usage(`invalid --${flag}`);
 }
 
@@ -142,14 +144,19 @@ try {
   else if (verb === "snapshot") await runSnapshot();
   else if (["resolve", "recommend"].includes(verb)) runResolve();
   else if (verb === "session") {
-    const { runManagedTerminal } = await import("../src/adaptive-session-routing/terminal.mjs");
-    await runManagedTerminal({ repoRoot: resolveRepoRoot(), model: argv.flags.model, effort: argv.flags.effort, json: argv.flags.json });
+    if (argv.flags.runtime === "claude") {
+      const { runClaudeTerminal } = await import("../src/adaptive-session-routing/claude-launcher.mjs");
+      process.exitCode = await runClaudeTerminal({ repoRoot: resolveRepoRoot(), model: argv.flags.model, effort: argv.flags.effort });
+    } else {
+      const { runManagedTerminal } = await import("../src/adaptive-session-routing/terminal.mjs");
+      await runManagedTerminal({ repoRoot: resolveRepoRoot(), model: argv.flags.model, effort: argv.flags.effort, json: argv.flags.json });
+    }
   }
   else if (["enable", "disable"].includes(verb)) runActivation();
   else await runMigrate();
 } catch (error) {
   const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_|migration_|projection_|recommendation_)/.test(error.code) ? error.code : undefined;
-  const code = snapshotCode ?? (["routing_disabled", "session_initialization_failed", "session_closed", "session_busy", "session_input_invalid", "native_completion_unknown", "invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
+  const code = snapshotCode ?? (["routing_disabled", "routing_unverified", "routing_unsupported", "native_runtime_unavailable", "session_axis_invalid", "session_initialization_failed", "session_closed", "session_busy", "session_input_invalid", "native_completion_unknown", "invalid_project_config", "invalid_activation_change", "project_config_locked", "project_config_unavailable"].includes(error.code) ? error.code : "models_operation_failed");
   if (argv.flags.json) process.stdout.write(`${JSON.stringify({ diagnostics: [{ code }] })}\n`);
   out.fail(code);
   process.exit(["invalid_project_config", "invalid_activation_change", "release_evidence_stale", "release_evidence_time_invalid", "release_requirement_unsatisfied", "migration_input_invalid", "migration_decision_invalid", "migration_decision_conflict", "migration_source_invalid", "projection_output_drift", "recommendation_observation_invalid"].includes(code) || code.startsWith("snapshot_") && !["snapshot_unavailable", "snapshot_locked"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);
@@ -262,8 +269,13 @@ function runStatus() {
   const localProjection = inspectClaudeProjection(resolve(resolveRepoRoot(true), ".claude"));
   const shippedWorkflow = inspectWorkflowProjection(fileURLToPath(new URL("../templates/workflows", import.meta.url)));
   const installedWorkflow = inspectWorkflowProjection(resolve(resolveRepoRoot(true), ".github/workflows"), shippedWorkflow);
-  const report = { activation, releaseSnapshot, shippedBaseline, localProjection, shippedWorkflow, installedWorkflow, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };
+  const mainSessionIntegrations = [
+    { runtimeId: "claude", mechanism: "session-only-native-mods", implementation: "experimental", verifiedHostVersions: [...VERIFIED_MAIN_VERSIONS], providerExecution: "unverified", effective: { state: "unknown" } },
+    { runtimeId: "codex", mechanism: "managed-app-server", implementation: "supported", verifiedRuntimeVersions: ["0.163.0"], effective: { state: "unknown" } },
+  ];
+  const report = { activation, mainSessionIntegrations, releaseSnapshot, shippedBaseline, localProjection, shippedWorkflow, installedWorkflow, ...catalogStatus({ sources: SOURCE_ADAPTERS.map((module) => ({ module })), root: cacheRoot(), now: new Date().toISOString() }) };
   if (argv.flags.json) process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  for (const integration of mainSessionIntegrations) out.info(`${integration.runtimeId}: ${integration.mechanism}; ${integration.implementation}; effective session configuration: unknown (inspect the running session)`);
   for (const s of report.sources) {
     const cache = s.cache === null ? "no cache" : `cache ${s.cache.freshness}, observed ${s.cache.observedAt}, ${s.cache.models} model(s)`;
     const failure = s.lastFailure ? `; last refresh failed at ${s.lastFailure.attemptedAt} (${s.lastFailure.code})` : "";
