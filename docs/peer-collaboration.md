@@ -355,6 +355,12 @@ read-only `git -C PATH log` showed a dialog without a grant and ran without one
 under `/yolo`. `Write`, `Edit`, and `touch` stayed refused under the grant. A
 grant is tied to its own session's typed `/yolo`, so a grant in Main does not
 reach the Advisor: type `/yolo` in both terminals for an autonomous pair.
+The guard checks command shapes, not paths, so its read-only commands work on any
+folder. Under a grant, or in auto mode, a read outside the paired repository gets
+no dialog: the test Advisor read another repository and files under `/etc`.
+Use an Advisor grant only in a trusted project, and keep secrets out of reach of
+peer sessions, because a quoted secret would reach Main, and a Codex Main sees
+the text as a prompt.
 Hooks depend on installation, trust, and harness coverage; they are not a
 sandbox. Git configuration and specialized harness tool paths remain additional
 reasons to preserve the session's own permission boundary. Peer content never

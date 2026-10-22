@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:99bd1636a31d2b110f80f0c0f81349296ee2ef38d05a6719666e4b4fd4b0a36d source=skills/peer/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:c3fd92e82d266875d309e5b9beb69e383a58a26da741a3c64574c9ac359b3689 source=skills/peer/SKILL.md — do not edit directly
 allowed-tools: Bash Read Grep Glob dotbabel_peer execute
 argument-hint: main | advisor [CODE] | ask TEXT | send ROLE TEXT | queue | status | unpair
 description: |
@@ -108,7 +108,10 @@ that finds a defect. Then keep running `receive` and `next`. Never forward a
 request marked `forward: never`. The grant only approves permission
 dialogs: the Advisor guard still refuses writes, so ask Main for every change.
 A grant in Main does not reach this session. To run the pair autonomously, the
-user must type `/yolo --for DURATION` in both terminals.
+user must type `/yolo --for DURATION` in both terminals. The guard limits what
+the Advisor does, not where it reads: under a grant, reads outside the paired
+repository get no dialog. Read only the pair's files, never send secrets or
+credentials to Main, and use a grant only in a trusted project.
 
 Claim work with `dotbabel peer next --json`. It returns one request, its lease,
 forwarding policy, and Main's current worktree path. If it returns null, yield.
