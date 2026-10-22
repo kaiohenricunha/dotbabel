@@ -157,6 +157,13 @@ session's systemd scope an equal CPU weight (the fair CPU share). See
 [fleet.md](./fleet.md) for the settings block, the claim rules, and the
 limits.
 
+Codex runs the same script. `dotbabel fleet setup --harness codex` registers
+it in `~/.codex/hooks.json` with `DOTBABEL_FLEET_HOST=codex`: `pre-edit` on
+`^apply_patch$`, `pre-bash` on `^Bash$`, `post-tool`, `prompt`
+(`UserPromptSubmit`), and `session-start`, plus `task-context.sh` at
+`SessionStart`. Codex does not support an `ask` answer, so for a Codex
+session the escalation stays a `deny` that tells the agent to ask its user.
+
 ---
 
 ## `task-context.sh`

@@ -5,6 +5,7 @@ import os from "node:os";
 import { execFileSync } from "node:child_process";
 import { normalizeRemote } from "../fleet/policy.mjs";
 import {
+  codexAncestor,
   findSelf,
   readRegistry,
   sessionsDir,
@@ -50,25 +51,6 @@ export function peerRoot(env = process.env) {
     env.DOTBABEL_PEER_STATE_DIR ||
     path.join(env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state"), "dotbabel", "peer")
   );
-}
-
-function codexAncestor(startPid) {
-  let pid = startPid;
-  for (let n = 0; n < 64 && pid > 1; n++) {
-    const proc = processState(pid);
-    try {
-      const argv = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0");
-      if (
-        path.basename(argv[0]) === "codex" ||
-        (path.basename(argv[0]) === "node" && /(?:^|\/)codex(?:\.js)?$/.test(argv[1] ?? ""))
-      )
-        return { pid, procStart: proc.startTime };
-    } catch {
-      /* A parent can exit during discovery. */
-    }
-    pid = proc.ppid ?? 0;
-  }
-  return null;
 }
 
 function foreignNativeAncestor(startPid) {

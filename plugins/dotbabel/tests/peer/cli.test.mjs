@@ -267,7 +267,7 @@ it("keeps only the Advisor read-only guard when a paired session's folder is gon
   for (const [n, event, payload] of [
     [0, "PreToolUse", { tool_name: "Write", tool_input: { file_path: "a" } }],
     [0, "Stop", { stop_hook_active: false }],
-    [1, "PreToolUse", { tool_name: "Read", tool_input: { file_path: "a" } }],
+    [1, "PreToolUse", { tool_name: "Read", tool_input: { file_path: path.join(w.repo, "a") } }],
     [1, "PreToolUse", { tool_name: "Bash", tool_input: { command: "git status" } }],
     [1, "Stop", { stop_hook_active: false }],
   ]) {

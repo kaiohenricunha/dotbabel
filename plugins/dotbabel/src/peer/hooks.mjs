@@ -1,6 +1,10 @@
 /** Read-only Advisor guard and recovery context for the two supported hook protocols. */
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
 import { literalWords } from "./shell.mjs";
 import { followWorktree, nativeMessage, nextRequest, recoverRequests } from "./state.mjs";
+import { peerRoot } from "./identity.mjs";
 import { fileURLToPath } from "node:url";
 const PEER_BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
 const UMBRELLA_BIN = fileURLToPath(new URL("../../bin/dotbabel.mjs", import.meta.url));
@@ -33,6 +37,119 @@ const READ_ONLY_GIT = [
   "merge-base",
   "rev-list",
 ];
+
+// A secret-looking name inside the pair's folders; examples and templates stay readable.
+const SECRET =
+  /(?:^|[/:])(?:\.env(?!\.(?:example|sample|template)$)[^/]*|\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|id_(?:rsa|dsa|ecdsa|ed25519)[^/]*|[^/]*\.(?:pem|key|p12|pfx)|credentials[^/]*)(?:\/|$)/i;
+
+/** Resolve symlinks through the nearest existing ancestor, so a link cannot leave a root. @param {string} file @returns {string} */
+function real(file) {
+  const rest = [];
+  for (let dir = file; ; dir = path.dirname(dir)) {
+    try {
+      return path.join(fs.realpathSync(dir), ...rest);
+    } catch {
+      if (path.dirname(dir) === dir) return file;
+      rest.unshift(path.basename(dir));
+    }
+  }
+}
+
+/** The places an Advisor may read: both worktrees, the absolute folders the user adds in DOTBABEL_PEER_READ_ROOTS, the pair's ledger, and this session's saved tool results. @param {object} pair @param {object} who @param {object} input @returns {{cwd: string, dirs: string[], files: string[]}} */
+function readScope(pair, who, input) {
+  // The hook reads the session's own environment, so an Advisor tool call cannot widen it.
+  const extra = (process.env.DOTBABEL_PEER_READ_ROOTS ?? "")
+    .split(path.delimiter)
+    .filter((dir) => path.isAbsolute(dir));
+  const dirs = [pair.main?.worktree, who.worktree, ...extra].filter(Boolean).map(real);
+  const files = [
+    real(
+      path.join(peerRoot(), `${createHash("sha256").update(String(who.repo)).digest("hex")}.json`),
+    ),
+  ];
+  const t = input.transcript_path,
+    sid = input.session_id;
+  if (typeof t === "string" && sid) {
+    const at = t.indexOf(`${path.sep}${sid}${path.sep}`);
+    dirs.push(real(path.join(at >= 0 ? t.slice(0, at) : path.dirname(t), sid)));
+  }
+  return { cwd: real(input.cwd || who.worktree || process.cwd()), dirs, files };
+}
+
+/** Why a target path is not readable: "outside" the read scope, a "secret" file inside it, or null when it is readable. @param {string} target @param {object} scope @returns {"outside"|"secret"|null} */
+function unreadable(target, scope) {
+  const file = real(path.resolve(scope.cwd, target));
+  if (scope.files.includes(file)) return null;
+  let secret = false;
+  for (const dir of scope.dirs) {
+    const rel = path.relative(dir, file);
+    if (rel === ".." || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) continue;
+    if (!SECRET.test(rel)) return null;
+    secret = true;
+  }
+  return secret ? "secret" : "outside";
+}
+
+/** True for a search that also reads hidden, ignored, untracked, or linked files, which a path check cannot see: recursive grep, and rg or git grep with options that widen it. @param {string} bin @param {string[]} words @returns {boolean} */
+function broadSearch(bin, words) {
+  const opts = words.slice(1);
+  if (["grep", "egrep", "fgrep"].includes(bin))
+    return opts.some(
+      (w, i) =>
+        /^-[a-zA-Z]*[rR]/.test(w) ||
+        /^--(?:recursive|dereference-recursive|directories=recurse)$/.test(w) ||
+        (w === "-d" && opts[i + 1] === "recurse"),
+    );
+  if (bin === "rg")
+    return opts.some(
+      (w) =>
+        /^-[a-zA-Z.]*[u.L]/.test(w) ||
+        /^--(?:hidden|follow|unrestricted|no-ignore[a-z-]*)$/.test(w),
+    );
+  return bin === "git" && opts.some((w) => /^--(?:untracked|no-index)$/.test(w));
+}
+
+/** A deny for the first unreadable target, or null when all are readable. @param {string[]} targets @param {object} scope @returns {object|null} */
+function readDecision(targets, scope) {
+  const why = targets.map((t) => unreadable(t, scope)).find(Boolean);
+  return why ? deny(READ_SCOPE[why]) : null;
+}
+
+/** Every word of a read-only command that can name a path, including an option value, as absolute paths. Git resolves its words against its `-C` folder and skips its subcommand. @param {string[]} words @param {string} cwd @returns {string[]} */
+function shellTargets(words, cwd) {
+  const out = [];
+  let base = cwd,
+    i = 1;
+  if (words[0].split("/").at(-1) === "git") {
+    if (words[i] === "--no-pager") i++;
+    if (words[i] === "-C") {
+      base = path.resolve(cwd, words[i + 1] ?? "");
+      out.push(base);
+      i += 2;
+    }
+    i++;
+  }
+  for (; i < words.length; i++) {
+    const w = words[i];
+    if (!w.startsWith("-")) out.push(path.resolve(base, w));
+    else {
+      // `--file=/etc/passwd` and `-C/etc` carry a path after the option name.
+      const at = w.includes("=") ? w.indexOf("=") + 1 : w.search(/[/.]/);
+      if (at > 0 && at < w.length) out.push(path.resolve(base, w.slice(at)));
+    }
+  }
+  return out;
+}
+
+/** The path of a read tool call, or of an absolute Glob pattern up to its first wildcard. @param {object} toolInput @returns {string[]} */
+function toolTargets(toolInput = {}) {
+  const target =
+    toolInput.file_path ?? toolInput.filePath ?? toolInput.notebook_path ?? toolInput.path;
+  const out = typeof target === "string" && target ? [target] : [];
+  if (typeof toolInput.pattern === "string" && path.isAbsolute(toolInput.pattern))
+    out.push(toolInput.pattern.split(/[*?[{]/)[0] || "/");
+  return out;
+}
 
 function readOnlyShell(command) {
   const words = literalWords(command);
@@ -99,6 +216,14 @@ function readOnlyShell(command) {
     ].includes(cli[1])
   );
 }
+const READ_SCOPE = {
+  outside:
+    "Peer Advisor reads only the pair's worktrees, its ledger, this session's saved tool results, and the folders in DOTBABEL_PEER_READ_ROOTS. This path is outside them. Ask Main or the user for anything else.",
+  secret:
+    "Peer Advisor never reads secret files such as .env, keys, or credentials, even inside the pair's worktrees. Ask the user if a secret really matters to the review.",
+  search:
+    "Peer Advisor searches with rg, which skips hidden and ignored files such as .env. Recursive grep, rg --hidden, -u, --no-ignore, or --follow, and git grep --untracked or --no-index can read secret files, so they are refused. Use rg -n PATTERN PATH.",
+};
 function deny(reason) {
   return {
     hookSpecificOutput: {
@@ -179,10 +304,9 @@ export function peerHook(pair, who, input) {
   if (event === "PreToolUse") {
     const tool = input.tool_name;
     // ToolSearch only loads tool schemas; SendMessage is a deferred tool.
-    if (
-      ["Read", "Grep", "Glob", "ListAgents", "WebSearch", "WebFetch", "ToolSearch"].includes(tool)
-    )
-      return null;
+    if (["Read", "Grep", "Glob"].includes(tool))
+      return readDecision(toolTargets(input.tool_input), readScope(pair, who, input));
+    if (["ListAgents", "WebSearch", "WebFetch", "ToolSearch"].includes(tool)) return null;
     if (tool === "Skill" && input.tool_input?.skill === "peer") return null;
     // A subagent's tool calls reach this hook with the parent session ID, so the guard
     // still covers Explore; an isolated worktree would be a write.
@@ -193,11 +317,16 @@ export function peerHook(pair, who, input) {
     )
       return null;
     if (tool === "SendMessage") return nativeMirror(pair, who, input.tool_input);
-    if (
-      ["Bash", "exec_command"].includes(tool) &&
-      readOnlyShell(input.tool_input?.command ?? input.tool_input?.cmd)
-    )
-      return null;
+    const command = input.tool_input?.command ?? input.tool_input?.cmd;
+    if (["Bash", "exec_command"].includes(tool) && readOnlyShell(command)) {
+      const words = literalWords(command);
+      const bin = words[0].split("/").at(-1);
+      // Peer coordination words are message text, not paths.
+      if (![...READ_ONLY, "git"].includes(bin)) return null;
+      const scope = readScope(pair, who, input);
+      if (broadSearch(bin, words)) return deny(READ_SCOPE.search);
+      return readDecision(shellTargets(words, scope.cwd), scope);
+    }
     return deny(
       "Peer Advisor is read-only. Run one literal read-only command per call (cat, grep, rg, find, or git status, diff, show, log, grep, blame). Put patterns and globs in single quotes; pipes, redirects, chains, $, and backslashes outside single quotes are refused. Delegate a wide search to an Explore agent. Inspect files and send findings through dotbabel peer. Main owns implementation. Only Main or the user can unpair; ask the user before changing role or permissions.",
     );

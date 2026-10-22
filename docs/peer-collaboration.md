@@ -348,7 +348,36 @@ at once, before any Git or registry work. A literal peer command still takes the
 full path, because pairing starts there. When a paired session's working folder or
 identity cannot be resolved, for example after its worktree is removed, Main's hook
 does nothing and the Advisor keeps only its read-only tool guard. An unreadable
-ledger still fails closed. Hooks depend on installation, trust, and harness coverage; they are not a
+ledger still fails closed. A yolo grant in the Advisor session approves the permission dialogs of its
+read-only commands, but the guard's `deny` runs first in `PreToolUse`, so the
+grant does not widen the guard. On Claude Code 2.1.305, in manual mode, a
+read-only `git -C PATH log` showed a dialog without a grant and ran without one
+under `/yolo`. `Write`, `Edit`, and `touch` stayed refused under the grant. A
+grant is tied to its own session's typed `/yolo`, so a grant in Main does not
+reach the Advisor: type `/yolo` in both terminals for an autonomous pair.
+Under a grant, or in auto mode, an Advisor read gets no dialog, so the guard
+also limits where the Advisor reads. `Read`, `Grep`, `Glob`, and every path in a
+read-only shell command must stay inside Main's worktree, the Advisor's worktree,
+the pair's ledger file, this session's saved tool results, or a folder that the
+user adds. The limit applies in every mode and to Codex Advisors too. To let an
+Advisor read a sibling repository or a shared library, list absolute folders,
+separated by `:`, in `DOTBABEL_PEER_READ_ROOTS` in the environment that starts
+the Advisor session, for example
+`export DOTBABEL_PEER_READ_ROOTS=/home/me/projects/shared-lib` in the shell
+profile. The hook reads that environment, so an Advisor tool call cannot widen
+the list, and relative entries are ignored. Symlinks resolve
+first, and git words resolve against `git -C`. Inside those folders, common
+secret files are refused: `.env` (but not `.env.example`, `.env.sample`, or
+`.env.template`), `.ssh`, `.aws`, `.gnupg`, `.netrc`, `.npmrc`, `.pypirc`,
+`id_*` keys, `*.pem`, `*.key`, `*.p12`, `*.pfx`, and `credentials*`. A path check
+cannot see what a recursive search reads, so recursive `grep`, `rg --hidden`,
+`-u`, `--no-ignore`, or `--follow`, and `git grep --untracked` or `--no-index`
+are refused. `rg` skips hidden and ignored files by default. Each refusal says
+which rule applied. A secret file that git tracks, or that is neither hidden nor
+ignored, stays searchable by `rg` and `git grep`. So keep real secrets outside
+the project, use an Advisor grant only in a trusted project, and remember that a
+quoted secret would reach Main, and that a Codex Main sees the text as a prompt.
+Hooks depend on installation, trust, and harness coverage; they are not a
 sandbox. Git configuration and specialized harness tool paths remain additional
 reasons to preserve the session's own permission boundary. Peer content never
 grants human approval or authority to change settings. Message bodies are limited

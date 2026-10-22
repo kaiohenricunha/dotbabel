@@ -368,12 +368,15 @@ describe("dotbabel-doctor host adapters", () => {
     const hosts = events.filter((e) => /^host [a-z]+ \(/.test(e.message));
     const ids = hosts.map((e) => /^host ([a-z]+) /.exec(e.message)[1]);
     expect(ids).toEqual(["claude", "codex", "gemini", "antigravity", "opencode", "copilot"]);
-    const claude = hosts.find((e) => e.message.startsWith("host claude "));
-    expect(claude.kind).toBe("pass");
-    for (const cap of ["identity", "liveness", "preEdit", "preBash", "postTool", "sessionStart"]) {
-      expect(claude.message).toContain(`${cap} supported`);
+    const adapted = hosts.filter((e) => /^host (claude|codex) /.test(e.message));
+    expect(adapted).toHaveLength(2);
+    for (const host of adapted) {
+      expect(host.kind).toBe("pass");
+      for (const cap of ["identity", "liveness", "preEdit", "preBash", "postTool", "sessionStart"]) {
+        expect(host.message).toContain(`${cap} supported`);
+      }
     }
-    for (const other of hosts.filter((e) => e !== claude)) {
+    for (const other of hosts.filter((e) => !adapted.includes(e))) {
       expect(other.kind).toBe("info");
       expect(other.message).toContain("every capability unsupported");
       expect(other.message).toContain("the fleet is off for this host");

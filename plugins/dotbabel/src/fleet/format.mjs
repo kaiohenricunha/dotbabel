@@ -57,11 +57,11 @@ function describeClaim(claim, now) {
 export function formatDenyReason({ rel, repoKey, conflict, cli, escalateAt, now }) {
   const owner = `"${conflict.owner.name}"`;
   const lines = [
-    `dotbabel fleet: the live Claude Code session ${owner} claims ${rel} in ${repoKey}.`,
+    `dotbabel fleet: the live session ${owner} claims ${rel} in ${repoKey}.`,
     `Claim: ${describeClaim(conflict.claim, now)}.`,
     "This edit is blocked so that two sessions do not change the same file.",
     "Do this:",
-    `1. SendMessage ${owner}. Tell it what you must change in ${rel}, and ask it to release the claim when that is safe. The owner releases with: ${cli} release ${shellArg(conflict.claim.pattern)}`,
+    `1. Message ${owner} (SendMessage in Claude Code; from another host, ask the user to relay it). Tell it what you must change in ${rel}, and ask it to release the claim when that is safe. The owner releases with: ${cli} release ${shellArg(conflict.claim.pattern)}`,
     "2. Continue with other work while you wait for the answer.",
     "Do not change this file with Bash or another tool, and do not delete the claim.",
   ];
@@ -83,7 +83,7 @@ export function formatDenyReason({ rel, repoKey, conflict, cli, escalateAt, now 
  */
 export function formatAskReason({ rel, conflict, since, now }) {
   return [
-    `dotbabel fleet: the live Claude Code session "${conflict.owner.name}" claims ${rel}, and it did not release the claim in the ${formatAge(now - Date.parse(since))} since this session was first blocked.`,
+    `dotbabel fleet: the live session "${conflict.owner.name}" claims ${rel}, and it did not release the claim in the ${formatAge(now - Date.parse(since))} since this session was first blocked.`,
     `Claim: ${describeClaim(conflict.claim, now)}.`,
     "Approve this edit only if you know that the two sessions will not conflict.",
   ].join("\n");
@@ -121,7 +121,7 @@ export function formatSessionContext({ repoKey, owners, cli }) {
     lines.push(`- ${who}: ${list}`);
   }
   lines.push(
-    "An edit to a path that another live session claims is blocked. To change such a path, SendMessage its owner first.",
+    "An edit to a path that another live session claims is blocked. To change such a path, message its owner first (SendMessage in Claude Code).",
     `Your first edit to a file claims it for this session. Before large work, claim the scope: ${cli} claim '<glob>' --note '<intent>'. When your work lands, release your claims: ${cli} release --all`,
   );
   return lines.join("\n");

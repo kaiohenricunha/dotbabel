@@ -1,0 +1,66 @@
+{
+  "_comment": "Hook stdin payloads recorded from a live Codex CLI 0.163.0 run on 2026-10-21 (codex exec, workspace-write). Paths scrubbed. Observed: the shell tool reports tool_name Bash; apply_patch carries the patch in tool_input.command with paths relative to cwd; CODEX_THREAD_ID is not set in the hook environment; a PreToolUse permissionDecision deny blocked the apply_patch; SessionStart additionalContext reached the model; the hook process parent is the codex binary.",
+  "codex": "0.163.0",
+  "sessionStart": {
+    "session_id": "01a1616d-595b-7880-b995-2e09f305032e",
+    "transcript_path": "/home/user/.codex/sessions/2026/10/21/rollout-2026-10-21T23-25-18-01a1616d-595b-7880-b995-2e09f305032e.jsonl",
+    "cwd": "/work/repo",
+    "hook_event_name": "SessionStart",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "source": "startup"
+  },
+  "userPromptSubmit": {
+    "session_id": "01a1616d-595b-7880-b995-2e09f305032e",
+    "turn_id": "01a1616d-620e-7002-8094-816fc1713bad",
+    "transcript_path": "/home/user/.codex/sessions/2026/10/21/rollout-2026-10-21T23-25-18-01a1616d-595b-7880-b995-2e09f305032e.jsonl",
+    "cwd": "/work/repo",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "prompt": "(probe prompt omitted)"
+  },
+  "preToolUseBash": {
+    "session_id": "01a1616d-595b-7880-b995-2e09f305032e",
+    "turn_id": "01a1616d-620e-7002-8094-816fc1713bad",
+    "transcript_path": "/home/user/.codex/sessions/2026/10/21/rollout-2026-10-21T23-25-18-01a1616d-595b-7880-b995-2e09f305032e.jsonl",
+    "cwd": "/work/repo",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "echo probe-shell-ok"
+    },
+    "tool_use_id": "exec-8a5d76c1-29bb-443b-8d6a-f557e7b23563"
+  },
+  "preToolUseApplyPatch": {
+    "session_id": "01a1616d-595b-7880-b995-2e09f305032e",
+    "turn_id": "01a1616d-620e-7002-8094-816fc1713bad",
+    "transcript_path": "/home/user/.codex/sessions/2026/10/21/rollout-2026-10-21T23-25-18-01a1616d-595b-7880-b995-2e09f305032e.jsonl",
+    "cwd": "/work/repo",
+    "hook_event_name": "PreToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "apply_patch",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Add File: blocked.txt\n+x\n*** End Patch"
+    },
+    "tool_use_id": "exec-ba4324b4-ffc9-4c49-b60a-0ee4f629cd44"
+  },
+  "postToolUseBash": {
+    "session_id": "01a1616d-595b-7880-b995-2e09f305032e",
+    "turn_id": "01a1616d-620e-7002-8094-816fc1713bad",
+    "transcript_path": "/home/user/.codex/sessions/2026/10/21/rollout-2026-10-21T23-25-18-01a1616d-595b-7880-b995-2e09f305032e.jsonl",
+    "cwd": "/work/repo",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "bypassPermissions",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "echo probe-shell-ok"
+    },
+    "tool_response": "probe-shell-ok\n",
+    "tool_use_id": "exec-8a5d76c1-29bb-443b-8d6a-f557e7b23563"
+  }
+}
