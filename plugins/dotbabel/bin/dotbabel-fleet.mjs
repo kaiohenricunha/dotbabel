@@ -603,7 +603,7 @@ function cmdSetup(args) {
 function wakeUp(who, kind, request) {
   if (who?.host !== "codex" || !who.sessionId) return;
   // Best effort: a failed push leaves the notice in the inbox for the next hook call.
-  deliver({ harness: "codex", sessionId: who.sessionId }, wakeUpText(kind, request)).catch(() => {});
+  deliver({ harness: "codex", sessionId: who.sessionId }, wakeUpText(kind, request, cliCommand())).catch(() => {});
 }
 
 /** `ask <path> --message <text>`: ask the live session whose claim blocks <path>. */
@@ -632,7 +632,7 @@ function cmdAsk(args) {
   wakeUp(owner, "ask", request);
   process.stdout.write(
     `Request ${request.id} sent to "${owner.name ?? owner.key}" about ${repo.rel} (claim ${request.pattern}).\n` +
-      "The owner sees it at its next tool call or prompt. Its answer, or the release, reaches you the same way; to check now, run: dotbabel fleet requests\n",
+      `The owner sees it at its next tool call or prompt. Its answer, or the release, reaches you the same way; to check now, run: ${cliCommand()} requests\n`,
   );
   return EXIT_CODES.OK;
 }
@@ -646,7 +646,7 @@ function cmdRequests(args) {
   const mine = (who) => who.key === self.key || (self.sessionId && who.sessionId === self.sessionId);
   const incoming = all.filter((r) => mine(r.to));
   const outgoing = all.filter((r) => mine(r.from));
-  process.stdout.write(args.json ? `${JSON.stringify({ incoming, outgoing }, null, 2)}\n` : `${formatRequests({ incoming, outgoing })}\n`);
+  process.stdout.write(args.json ? `${JSON.stringify({ incoming, outgoing }, null, 2)}\n` : `${formatRequests({ incoming, outgoing }, cliCommand())}\n`);
   return EXIT_CODES.OK;
 }
 
@@ -865,7 +865,7 @@ function eventHook(input, event) {
     startedAt: selfEntry?.startedAt ?? null,
   });
   noteSession(root, input.session_id, self?.key ?? null, { isAlive: ownerKeyAlive });
-  const news = [text, formatInbox(takeInbox(root, self?.key))].filter(Boolean).join("\n");
+  const news = [text, formatInbox(takeInbox(root, self?.key), cliCommand())].filter(Boolean).join("\n");
   if (!news) return null;
   const hookEventName = event === "prompt" ? "UserPromptSubmit" : "PostToolUse";
   return { hookSpecificOutput: { hookEventName, additionalContext: news } };

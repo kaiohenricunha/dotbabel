@@ -121,7 +121,7 @@ export function formatSessionContext({ repoKey, owners, cli }) {
     lines.push(`- ${who}: ${list}`);
   }
   lines.push(
-    "An edit to a path that another live session claims is blocked. To change such a path, ask its owner first: dotbabel fleet ask <path> --message '<why>' from any host, or SendMessage between Claude Code sessions.",
+    `An edit to a path that another live session claims is blocked. To change such a path, ask its owner first: ${cli} ask <path> --message '<why>' from any host, or SendMessage between Claude Code sessions.`,
     `Your first edit to a file claims it for this session. Before large work, claim the scope: ${cli} claim '<glob>' --note '<intent>'. When your work lands, release your claims: ${cli} release --all`,
   );
   return lines.join("\n");

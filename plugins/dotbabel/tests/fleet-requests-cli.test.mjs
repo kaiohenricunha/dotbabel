@@ -60,6 +60,8 @@ async function world() {
     env: cleanEnv(),
   });
   fs.writeFileSync(path.join(repo, ".dotbabel.json"), "{}");
+  // A dotbabel on PATH, so the fleet names its CLI "dotbabel fleet" on every machine.
+  fs.writeFileSync(path.join(stub, "dotbabel"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
   fs.writeFileSync(path.join(stub, "codex"), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${queueLog}'\n`, {
     mode: 0o755,
   });
@@ -163,7 +165,8 @@ describe.skipIf(!HAS_PROC)("fleet requests across hosts", () => {
     expect(decision(w.claude.edit("docs/a.md"))).toEqual({ action: "allow" });
     const denied = decision(await w.codex.patch("docs/a.md"));
     expect(denied.action).toBe("deny");
-    expect(denied.reason).toContain("dotbabel fleet ask docs/a.md --message");
+    // "dotbabel fleet", or the bin's own path when dotbabel is not on PATH (CI).
+    expect(denied.reason).toMatch(/ ask docs\/a\.md --message '/);
 
     const asked = await w.codex.cli(
       "ask",
