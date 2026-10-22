@@ -3,25 +3,18 @@ id: language-review
 name: language-review
 type: skill
 version: 1.0.0
-domain: [writing]
-platform: [none]
-task: [review]
+domain:
+  - writing
+platform:
+  - none
+task:
+  - review
 maturity: draft
 owner: "@kaiohenricunha"
-created: 2026-10-15
-updated: 2026-10-15
-description: >
-  Read-only editorial review of text as an experienced native-language editor
-  would read it: naturalness, idiom, word choice, syntax, register, cohesion,
-  regional fit, and meaning preservation. Covers English (en-US, en-GB),
-  Brazilian Portuguese, Spanish, French, German, Modern Standard Arabic, and
-  Indonesian. Reviews original writing, or a translation against its source,
-  in sentences, documents, Markdown, UI copy, and JSON or YAML localization
-  strings. Never rewrites files. Triggers on: "does this sound natural",
-  "sounds translated", "review this translation", "would a native speaker say
-  this", "language review", "check the tone of this Portuguese text", "is this
-  idiomatic French", "natural German wording", "review my Spanish copy",
-  "Arabic copy review", "Indonesian wording".
+created: 2026-10-15T00:00:00.000Z
+updated: 2026-10-15T00:00:00.000Z
+description: |
+  Read-only editorial review of text as an experienced native-language editor would read it: naturalness, idiom, word choice, syntax, register, cohesion, regional fit, and meaning preservation. Covers English (en-US, en-GB), Brazilian Portuguese, Spanish, French, German, Modern Standard Arabic, and Indonesian. Reviews original writing, or a translation against its source, in sentences, documents, Markdown, UI copy, and JSON or YAML localization strings. Never rewrites files. Triggers on: "does this sound natural", "sounds translated", "review this translation", "would a native speaker say this", "language review", "check the tone of this Portuguese text", "is this idiomatic French", "natural German wording", "review my Spanish copy", "Arabic copy review", "Indonesian wording".
 argument-hint: "[text | path ...] [--lang <tag>] [--region <variant>] [--source <path|tag>] [--audience <who>] [--register <level>] [--preserve <term>] [--format md|json] [--revised]"
 tools: Read, Grep, Glob
 allowed-tools: Read Grep Glob
@@ -29,6 +22,11 @@ model: opus
 effort: medium
 disable-model-invocation: false
 user-invocable: true
+dotbabel:
+  compute:
+    mode: dynamic
+    requirement: deep
+    binding: consumer
 ---
 
 # Language review
