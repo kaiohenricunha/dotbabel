@@ -288,12 +288,36 @@ describe("Heads Up notes", () => {
     expect(again.id).toBe(r.id);
     expect(p.requests).toHaveLength(1);
   });
+  it("reads a tag on its own line or before a colon", () => {
+    const oneLine = parseNote("Heads up · The cache may hide stale tokens.");
+    expect(parseNote("✦ Heads up\nThe cache may hide stale tokens.")).toMatchObject({
+      tag: "Heads up",
+      key: oneLine.key,
+    });
+    expect(parseNote("You should know: X")).toMatchObject({ tag: "You should know", note: "X" });
+    expect(parseNote("Heads up the server first").tag).toBe(null);
+  });
+  it("queues a cancelled or failed note again, and never reuses an unrelated request", () => {
+    const { p } = world();
+    const first = enqueueHeadsUp(p, NOTE, origin());
+    first.state = "cancelled";
+    const second = enqueueHeadsUp(p, NOTE, origin());
+    expect(second.id).not.toBe(first.id);
+    expect(second.dedupe).toBe(`${first.dedupe}-r1`);
+    second.state = "completed";
+    expect(enqueueHeadsUp(p, NOTE, origin()).id).toBe(second.id);
+    const other = world().p;
+    const unrelated = enqueue(other, "unrelated", { dedupe: parseNote(NOTE).key });
+    const note = enqueueHeadsUp(other, NOTE, origin());
+    expect(note.id).not.toBe(unrelated.id);
+    expect(note.body).toContain("Source: claude-you-should-know");
+  });
   it("refuses an empty or oversized note", () => {
     const { p } = world();
     expect(() => enqueueHeadsUp(p, "✦ Heads up ·  \n 1: Learn more", origin())).toThrow(
       /note text/,
     );
-    expect(() => enqueueHeadsUp(p, "x".repeat(16384), origin())).toThrow(/16384/);
+    expect(() => enqueueHeadsUp(p, "x".repeat(16000), origin())).toThrow(/note is too long.*16384/);
     expect(p.requests).toHaveLength(0);
   });
 });
