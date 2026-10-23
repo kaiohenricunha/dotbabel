@@ -38,6 +38,7 @@ export const MODELS_VERBS = Object.freeze([
     forms: [{ usage: "session [--runtime codex|claude] [--model auto|<native-id>] [--effort auto|<native-value>]", purpose: "Run an enabled project's managed Codex terminal or native Claude UI with per-prompt routing" }],
     flags: ["repo-root", "runtime", "model", "effort"],
   },
+  { name: "route", forms: [{ usage: "route < request.json", purpose: "Answer one Claude routing request read on stdin; the persistent plugin's local transport" }], flags: [] },
 ].map((verb) => Object.freeze({ ...verb, forms: Object.freeze(verb.forms.map((form) => Object.freeze(form))), flags: Object.freeze([...verb.flags]) })));
 
 /**

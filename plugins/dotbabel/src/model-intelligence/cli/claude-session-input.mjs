@@ -21,8 +21,9 @@ const safeSelector = value => typeof value === "string" && checkOpaqueValue("mod
  * exact provider IDs and reviewed documentation facts from the one existing release registry.
  * The release's availability, accepted dates, identity facts and eligibility are never copied.
  * Native/provider observations expire in six hours; documentation keeps its original date.
- * Each project has independent native membership and policy. No cache or configuration is written.
- * @param {{observe?:Function,loadPolicy?:Function,snapshot?:object,now?:Function,monotonic?:Function}} [options] Trusted source handles and clocks.
+ * Each project has independent native membership and policy. No configuration is written; an optional
+ * `store` (the persistent plugin's per-session cache) keeps the verified catalog between processes.
+ * @param {{observe?:Function,loadPolicy?:Function,snapshot?:object,now?:Function,monotonic?:Function,store?:{read:Function,write:Function,otherProjects:Function}}} [options] Trusted source handles and clocks.
  * @returns {{load:Function}} Resolver-input loader; missing live evidence requests a native catalog.
  */
 export function createClaudeSessionInputLoader(options = {}) {
@@ -80,9 +81,16 @@ export function createClaudeSessionInputLoader(options = {}) {
   return {
     async load(repoRoot, native) {
       if (native !== undefined) {
-        if (!cache.has(repoRoot) && cache.size >= 8) throw fail("session_project_limit");
+        // The store carries the per-session project limit across one-shot `models route` processes.
+        if (!cache.has(repoRoot) && (cache.size >= 8 || (await options.store?.otherProjects(repoRoot) ?? 0) >= 8)) throw fail("session_project_limit");
         const candidate = await collect(native);
         cache.set(repoRoot, candidate);
+        try { await options.store?.write(repoRoot, { ...candidate, snapshotId: snapshot.snapshotId }); }
+        catch { /* A cache that cannot be written only costs later turns new probes. */ }
+      } else if (!cache.has(repoRoot) && options.store) {
+        const stored = await options.store.read(repoRoot);
+        // A catalog built from another release snapshot carries other documentation facts.
+        if (stored && stored.snapshotId === snapshot.snapshotId) cache.set(repoRoot, { observedAt: stored.observedAt, catalog: stored.catalog });
       }
       const cached = cache.get(repoRoot);
       if (!cached || !fresh(cached.observedAt)) throw fail("native_catalog_required");
