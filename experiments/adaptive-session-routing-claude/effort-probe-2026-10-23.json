@@ -1,0 +1,142 @@
+{
+  "summary": {
+    "version": "2.1.309 (Claude Code)",
+    "prompt": "How many distinct ways can a 2x12 board be tiled with 1x2 dominoes? Think it through, then answer with the number only.",
+    "runsPerGroup": 6,
+    "totalCostUSD": 0.853
+  },
+  "rows": [
+    {
+      "effort": "low",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 130,
+      "outputTokens": 133,
+      "costUSD": 0.2740705,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "high",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 197,
+      "outputTokens": 200,
+      "costUSD": 0.265194,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "low",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 38,
+      "outputTokens": 41,
+      "costUSD": 0.0315324,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "high",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 207,
+      "outputTokens": 210,
+      "costUSD": 0.0319589,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "low",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 142,
+      "outputTokens": 145,
+      "costUSD": 0.0313204,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "high",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 159,
+      "outputTokens": 162,
+      "costUSD": 0.0313609,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "low",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 95,
+      "outputTokens": 98,
+      "costUSD": 0.031202900000000002,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "high",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 134,
+      "outputTokens": 137,
+      "costUSD": 0.031300400000000006,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "low",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 147,
+      "outputTokens": 150,
+      "costUSD": 0.031332900000000004,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "high",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 159,
+      "outputTokens": 162,
+      "costUSD": 0.031200900000000004,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "low",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 80,
+      "outputTokens": 83,
+      "costUSD": 0.0305274,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    },
+    {
+      "effort": "high",
+      "code": 0,
+      "answer": "233",
+      "model": "claude-haiku-5-5",
+      "thinkingTokens": 120,
+      "outputTokens": 123,
+      "costUSD": 0.0317394,
+      "nativeEffort": "medium",
+      "usageModel": "claude-haiku-5-5"
+    }
+  ]
+}
