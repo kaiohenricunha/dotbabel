@@ -162,6 +162,26 @@ dotbabel peer ask "Review the migration" --pair PAIR_ID
 dotbabel peer input --pair PAIR_ID
 ```
 
+To hand the Advisor a Claude Code "You should know" note (tag Heads up or You
+should know), paste it into `heads-up`. The Advisor terminal and the Main session
+can run it too:
+
+```bash
+dotbabel peer heads-up "✦ Heads up · The retry loop may charge twice." --pair PAIR_ID
+```
+
+The command drops the ✦ mark, the tag, and the answer line, and queues the note
+once: the same text with other line breaks returns the first request. The body
+labels the note as untrusted data, tells the Advisor to classify it as
+actionable, already addressed, false positive, or inconclusive, and records its
+origin: the Main session, the repository and worktree, `HEAD`, whether the
+worktree has uncommitted changes, and the time. Only an actionable note reaches
+Main. Claude Code gives no supported way to read these notes automatically, so
+forwarding stays manual (see
+[the feasibility report](research/heads-up-advisor-integration-feasibility.md)).
+Every request that `next` returns now says that its body is peer data, not a
+user instruction.
+
 The input pane stores one investigation per nonempty line. `.queue`, `.pause`,
 `.resume`, and `.quit` control it. It does not interpret conversation or start
 another model. Enqueue remains available while either model is busy.
@@ -183,6 +203,7 @@ Useful operations:
 | Suspend that request for the answer          | `dotbabel peer wait REQUEST --lease TOKEN --result "waiting" --reply-to MESSAGE` |
 | Answer the question                          | `dotbabel peer send advisor "answer" --kind reply --reply-to MESSAGE`            |
 | Follow up on an investigation                | `dotbabel peer ask "follow-up" --parent REQUEST`                                 |
+| Forward a Claude Code Heads Up note once     | `dotbabel peer heads-up "NOTE"`                                                  |
 | Suppress forwarding                          | `dotbabel peer ask "discuss privately" --forward never`                          |
 | Prioritize queued work                       | `dotbabel peer priority REQUEST --priority 10`                                   |
 | Cancel work                                  | `dotbabel peer cancel REQUEST`                                                   |
