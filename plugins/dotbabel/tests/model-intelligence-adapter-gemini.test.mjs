@@ -8,7 +8,7 @@ import { fixedNow } from "./fixtures/model-intelligence/fake-runner.mjs";
 // A context whose runner fails the test if the adapter ever starts a process.
 const spawnGuard = () => {
   const calls = [];
-  return { calls, ctx: { runCommand: async (spec) => { calls.push(spec); throw new Error("the Gemini adapter must not start a process"); }, env: { PATH: "/usr/bin", GEMINI_API_KEY: "AIzaSyB1234567890abcdefghijklmnopqrstuv" }, homeDir: "/home/nobody", now: fixedNow } };
+  return { calls, ctx: { runCommand: async (spec) => { calls.push(spec); throw new Error("the Gemini adapter must not start a process"); }, env: { PATH: "/usr/bin", GEMINI_API_KEY: "fixture-credential-never-forwarded" }, homeDir: "/home/nobody", now: fixedNow } };
 };
 const make = (runtimeId, axes) => makeResolvedRuntimeConfiguration({ runtimeId, axes, representation: { kind: "native-id", provenance: { sourceId: runtimeId, sourceKind: "runtime" } } });
 
@@ -43,7 +43,7 @@ describe("Gemini runtime source adapter (P-22a)", () => {
     for (const result of [await gemini.observe(ctx), await gemini.validate({ model: "gemini-pro" }, ctx)]) {
       expect(result.status).toBe("unsupported");
       expect(result.diagnostic.code).toBe("credential_required");
-      expect(JSON.stringify(result)).not.toMatch(/AIzaSy/);
+      expect(JSON.stringify(result)).not.toMatch(/fixture-credential-never-forwarded/);
     }
     expect(calls).toHaveLength(0);
   });
