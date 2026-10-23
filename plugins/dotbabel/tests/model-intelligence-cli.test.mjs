@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
@@ -115,11 +115,55 @@ describe("dotbabel models CLI consolidation (P-23)", () => {
     expect(snapshotTree(box.env.XDG_CONFIG_HOME)).toEqual(before);
   });
 
-  it("with no network and no cache, dotbabel subcommands outside models exit as before (REL-5)", () => {
+  it("no models verb runs a project-controlled command or adds an untrusted repository to the trust allowlist", () => {
+    // SEC-6 (AC-24, reworded 2026-10-23 to what is proven). No `models` operation takes a command from
+    // repository configuration: runtime binaries are fixed names found on the caller's PATH and start in a
+    // scratch directory (sources/runtime/process.mjs), so SEC-6's trust-required branch has no trigger
+    // today. This guards the invariant that keeps it so. Runtime binaries planted in the repository would
+    // win the PATH lookup if a spawn ever used the repository as its working directory (`.`, `bin`,
+    // `node_modules/.bin` come first). Fake runtimes on an absolute PATH entry are the positive control:
+    // they record each spawn's working directory, so the test proves spawns happen and none ran there.
+    const box = sandbox({ model_intelligence: { enabled: true, adaptive_routing: { enabled: true } } });
+    const runtimes = ["claude", "codex", "opencode", "gemini", "agy", "copilot"];
+    const fake = makeTempDir("mi-cli-fake-runtimes-"); const log = makeTempDir("mi-cli-spawn-log-");
+    const script = (file, body) => { writeFileSync(file, `#!/bin/sh\n${body}\n`); chmodSync(file, 0o755); };
+    for (const name of runtimes) script(join(fake, name), `pwd >> "${join(log, `${name}.cwd`)}"`);
+    for (const directory of ["", "bin", "node_modules/.bin"]) {
+      mkdirSync(join(box.repo, directory), { recursive: true });
+      for (const name of runtimes) script(join(box.repo, directory, name), `echo ran > "${join(box.repo, `ran-${name}`)}"`);
+    }
+    const env = { ...box.env, PATH: `.:bin:node_modules/.bin:${fake}:/usr/bin:/bin` };
+    for (const args of [["status", "--json"], ["resolve", "--requirement", "deep", "--runtime", "claude", "--json"], ["recommend", "--requirement", "deep", "--runtime", "codex"], ["migrate"], ["snapshot", "--check"], ["refresh"], ...["claude", "codex", "opencode", "copilot", "antigravity", "gemini"].map(runtime => ["refresh", "--runtime", runtime])]) {
+      const result = spawnSync(process.execPath, [standalone, ...args], { cwd: box.repo, env, encoding: "utf8", timeout: 120_000 });
+      expect(result.error, args.join(" ")).toBeUndefined();
+      expect(result.status, `${args.join(" ")} must get past argument parsing`).not.toBe(64);
+    }
+    const spawned = readdirSync(log);
+    expect(spawned.length, "the positive control: at least one runtime spawn happened").toBeGreaterThan(0);
+    for (const file of spawned) for (const cwd of readFileSync(join(log, file), "utf8").trim().split("\n")) expect(cwd.startsWith(box.repo), `${file}: ${cwd}`).toBe(false);
+    expect(readdirSync(box.repo).filter(name => name.startsWith("ran-")), "a planted runtime binary ran").toEqual([]);
+    expect(existsSync(join(box.env.XDG_CONFIG_HOME, "dotbabel", "check-on-stop-trusted")), "the trust allowlist").toBe(false);
+  }, 600_000);
+
+  it("with no network and no cache, every dotbabel subcommand outside models exits as it did before", () => {
+    // REL-5. Every umbrella subcommand other than `models` answers --help with exit 0 when the network is
+    // unreachable and no Model Intelligence cache exists. Real read-only operations exit exactly as they do
+    // with a populated cache and Model Intelligence enabled, so Model Intelligence state cannot change
+    // them. The empty-cache runs create no Model Intelligence cache.
     const box = sandbox();
-    const root = spawnSync(process.execPath, [umbrella, "--help"], { cwd: box.repo, env: box.env, encoding: "utf8" });
+    const run = (args, env = box.env) => spawnSync(process.execPath, [umbrella, ...args], { cwd: box.repo, env, encoding: "utf8", timeout: 60_000 });
+    const root = run(["--help"]);
     expect(root.status).toBe(0);
-    const version = spawnSync(process.execPath, [umbrella, "--version"], { cwd: box.repo, env: box.env, encoding: "utf8" });
-    expect(version.status).toBe(0);
-  });
+    const subcommands = [...root.stdout.matchAll(/^\s+([a-z-]+)\s+runs dotbabel-\1$/gm)].map(match => match[1]).filter(name => name !== "models");
+    expect(subcommands).toEqual(expect.arrayContaining(["doctor", "validate-specs", "handoff", "quality", "criteria", "task"]));
+    for (const args of [["--version"], ...subcommands.map(name => [name, "--help"])]) expect(run(args).status, args.join(" ")).toBe(0);
+    const operations = [["doctor"], ["task", "list"], ["detect-drift"], ["handoff", "list"], ["validate-specs"], ["list", "--type", "skill"]];
+    const empty = operations.map(args => run(args).status);
+    expect(existsSync(join(box.env.XDG_CACHE_HOME, "dotbabel", "model-intelligence")), "the Model Intelligence cache").toBe(false);
+    const full = sandbox({ model_intelligence: { enabled: true, adaptive_routing: { enabled: true } } });
+    mkdirSync(join(full.env.XDG_CACHE_HOME, "dotbabel", "model-intelligence"), { recursive: true });
+    writeFileSync(join(full.env.XDG_CACHE_HOME, "dotbabel", "model-intelligence", "codex.json"), JSON.stringify({ observedAt: new Date().toISOString(), status: "ok" }));
+    const populated = operations.map(args => spawnSync(process.execPath, [umbrella, ...args], { cwd: full.repo, env: full.env, encoding: "utf8", timeout: 60_000 }).status);
+    expect(Object.fromEntries(operations.map((args, index) => [args.join(" "), empty[index]]))).toEqual(Object.fromEntries(operations.map((args, index) => [args.join(" "), populated[index]])));
+  }, 300_000);
 });

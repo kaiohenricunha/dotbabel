@@ -112,6 +112,28 @@ describe("dotbabel.compute: one case table, both enforcement paths", () => {
   });
 });
 
+describe("dotbabel.compute unknown keys (AC-1)", () => {
+  it("rejects an unknown key inside dotbabel.compute (additionalProperties false)", async () => {
+    const validate = await compileSkillValidator();
+    const declarations = [
+      { requirement: "deep", binding: "self", mode: "dynamic", extra: 1 },
+      { requirement: "deep", binding: "self", mode: "dynamic", effort: "max" },
+      { requirement: "deep", binding: "self", mode: "pin", pin: { runtime: "claude", config: { model: "opus" }, effort: "max" } },
+    ];
+    for (const compute of declarations) {
+      const result = parse(compute);
+      // Rejected, and never an inert requirement that silently drops the key.
+      expect(result.requirement, JSON.stringify(compute)).toBeNull();
+      expect(result.errors.length, JSON.stringify(compute)).toBeGreaterThan(0);
+      for (const error of result.errors) expect(error.code).toBe(MI_COMPUTE_INVALID);
+      expect(validate(skillWith(compute)), JSON.stringify(compute)).toBe(false);
+    }
+    // The boundary: the same declaration without the unknown key is valid on both paths.
+    expect(parse({ requirement: "deep", binding: "self", mode: "dynamic" }).requirement).not.toBeNull();
+    expect(validate(skillWith({ requirement: "deep", binding: "self", mode: "dynamic" }))).toBe(true);
+  });
+});
+
 describe("dotbabel.compute parsing", () => {
   it("parses a dynamic declaration into a NormalizedComputeRequirement with artifact provenance", () => {
     const result = parse({ requirement: "deep", binding: "self", mode: "dynamic", rationale: "why" });
