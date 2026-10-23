@@ -70,9 +70,39 @@ describe("OpenCode runtime source adapter (P-22d)", () => {
     expect(JSON.stringify(call.env)).not.toMatch(/fixture-credential/);
   });
 
+  it("reports a truncated listing as unknown malformed output, and names the nonzero exit", async () => {
+    const truncated = await opencode.discover(context(() => outcome({ stdout: "opencode/a\n", truncated: true })).ctx);
+    expect(truncated).toMatchObject({ status: "unknown", diagnostic: { code: "malformed_output" } });
+    expect(truncated.diagnostic.message).toMatch(/size limit/);
+    const failed = await opencode.discover(context(() => outcome({ exitCode: 3, stderr: "ClientError: Transport\nmore\n" })).ctx);
+    expect(failed.diagnostic).toEqual({ code: "nonzero_exit", message: "ClientError: Transport" });
+    const silent = await opencode.discover(context(() => outcome({ exitCode: 3 })).ctx);
+    expect(silent.diagnostic.message).toBe("opencode models exited 3");
+  });
+
+  it("parseModels() trims rows, ignores blank lines, and counts duplicates as skipped", () => {
+    const parsed = opencode.parseModels("  opencode/a  \n\n\nopencode/a\nOpencode/caps\n");
+    expect(parsed.models.map(model => model.id)).toEqual(["opencode/a"]);
+    expect(parsed.skipped).toBe(2);
+  });
+
+  it("runs the real command name with its scratch prefix, and stamps the probed version", async () => {
+    const { runner, ctx } = context(listing("opencode/a\n"));
+    const result = await opencode.discover(ctx);
+    expect(runner.calls.map(call => call.command)).toEqual(["opencode", "opencode"]);
+    expect(runner.calls[1].args).toEqual(["--version"]);
+    expect(result.provenance.sourceVersion).toBe("2.0.5");
+  });
+
+  it("validate() accepts a reasoning-only input and refuses an input that names no axis", async () => {
+    const { ctx } = context(() => { throw new Error("must not run"); });
+    expect((await opencode.validate({ reasoning: "high" }, ctx)).status).toBe("unsupported");
+    for (const input of [{}, null, "opencode/a"]) await expect(opencode.validate(input, ctx)).rejects.toThrow(/opencode validate: input must name a model or a reasoning value/);
+  });
+
   it("observe() and validate() report unsupported without starting a process", async () => {
     const { runner, ctx } = context(() => { throw new Error("must not run"); });
-    expect((await opencode.observe(ctx)).status).toBe("unsupported");
+    expect(await opencode.observe(ctx)).toMatchObject({ status: "unsupported", diagnostic: { code: "provider_required" } });
     expect((await opencode.validate({ model: "opencode/big-pickle" }, ctx)).status).toBe("unsupported");
     expect(runner.calls).toHaveLength(0);
   });
