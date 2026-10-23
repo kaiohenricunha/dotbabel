@@ -458,9 +458,15 @@ describe("relay watcher", () => {
     };
     expect(await tick(store, id, { ...quiet, watcher: throwing })).toBe(true);
     expect((await store.read()).pairs[0].requests).toEqual([]);
+    // A failed read shows in status, and the next good tick replaces it.
+    const { watcher } = watcherFor(env);
+    await run(store, id, watcher);
+    await tick(store, id, { ...quiet, watcher: { ...watcher, prepare: throwing.prepare } });
+    expect((await store.read()).pairs[0].heads_up.diagnostic).toMatch(/failed on this tick/);
+    expect((await run(store, id, watcher)).heads_up.diagnostic).toBeUndefined();
   });
 
-  it("records a note that cannot be queued without retrying it each tick", async () => {
+  it("records a note that cannot be queued, and clears that after a later forward", async () => {
     const { env, write } = config();
     const { store, id } = await world();
     const { watcher } = watcherFor(env);
@@ -469,6 +475,82 @@ describe("relay watcher", () => {
     expect(p.requests).toEqual([]);
     expect(p.heads_up.diagnostic).toBe("a note could not be queued");
     expect(JSON.stringify(p.heads_up)).not.toContain("yyyy");
+    expect((await run(store, id, watcher)).heads_up.diagnostic).toBe("a note could not be queued");
+    write(doc([offer(MAIN, turn(2), "A short note.")]));
+    const q = await run(store, id, watcher);
+    expect(q.requests).toHaveLength(1);
+    expect(q.heads_up.diagnostic).toBeUndefined();
+  });
+
+  it("keeps the relay running when the ledger write fails, and forwards the note on the next tick", async () => {
+    const { env, write } = config();
+    const { store, id } = await world();
+    const { watcher } = watcherFor(env);
+    write(doc([offer(MAIN, turn(1), "Retried after a failed write.")]));
+    let fail = 1;
+    const flaky = {
+      read: () => store.read(),
+      transaction: (mutate) =>
+        store.transaction((s) => {
+          const result = mutate(s);
+          if (fail-- > 0 && s.pairs[0].requests.length)
+            throw new Error("peer repository capacity reached");
+          return result;
+        }),
+    };
+    expect(await tick(flaky, id, { ...quiet, watcher })).toBe(true);
+    expect((await store.read()).pairs[0].requests).toEqual([]);
+    const p = await run(store, id, watcher);
+    expect(p.requests).toHaveLength(1);
+    expect(p.heads_up.forwarded).toBe(1);
+  });
+
+  it("keeps a note forwarded in a tick that waits for a seen line's record", async () => {
+    const { env, write } = config();
+    const { store, id } = await world();
+    let origins = 0;
+    const { watcher } = watcherFor(env, { options: { origin: () => (origins++, ORIGIN) } });
+    write(doc([closed(OTHER, turn(1))], ["old"]));
+    await run(store, id, watcher);
+    // Another session's line is waiting for its record while Main's offer opens.
+    write(doc([closed(OTHER, turn(1)), offer(MAIN, turn(2), "Open now.")], ["old", "Waiting."]));
+    await run(store, id, watcher);
+    await run(store, id, watcher);
+    expect(origins).toBe(1);
+    // A line that never gets its record is dropped after a few reads, so later notes still attribute.
+    for (let n = 0; n < 5; n++) await run(store, id, watcher);
+    write(
+      doc([closed(OTHER, turn(1)), closed(MAIN, turn(3))], ["old", "Waiting.", "Closed later."]),
+    );
+    const p = await run(store, id, watcher);
+    expect(p.requests).toHaveLength(2);
+    expect(p.requests[1].body).toMatch(/\nNote:\nClosed later\.$/);
+    expect(p.heads_up.ambiguous).toBe(0);
+  });
+
+  it("retries a failed version probe after a minute, and only then", async () => {
+    const { env, write } = config();
+    const { store, id } = await world();
+    let answer = null,
+      probes = 0;
+    const watcher = createHeadsUpWatcher({
+      env,
+      version: () => (probes++, answer),
+      readMode: () => ({ mode: "enqueue" }),
+      origin: () => ORIGIN,
+    });
+    write(doc([offer(MAIN, turn(1), "x")]));
+    const at = (now) => tick(store, id, { ...quiet, watcher, now });
+    await at(1000);
+    answer = "2.1.309";
+    await at(30000);
+    expect(probes).toBe(1);
+    expect((await store.read()).pairs[0].heads_up.state).toBe("unsupported_version");
+    await at(61001);
+    expect(probes).toBe(2);
+    await at(200000);
+    expect(probes).toBe(2);
+    expect((await store.read()).pairs[0].requests).toHaveLength(1);
   });
 });
 
@@ -517,8 +599,10 @@ describe("setting reader and status", () => {
       forwarded: 2,
       ambiguous: 1,
     };
-    expect(headsUpStatus({ main: { worktree: on }, heads_up: stored })).toEqual(stored);
-    expect(headsUpStatus({ main: { worktree: on } })).toEqual({
+    const status = (dir, p = {}, alive = true) =>
+      headsUpStatus({ main: { worktree: dir }, ...p }, readHeadsUpMode(dir), alive);
+    expect(status(on, { heads_up: stored })).toEqual(stored);
+    expect(status(on)).toEqual({
       mode: "enqueue",
       state: "off",
       claudeVersion: null,
@@ -526,12 +610,14 @@ describe("setting reader and status", () => {
       ambiguous: 0,
     });
     // Removing the setting shows off at once, before the relay's next tick.
-    expect(headsUpStatus({ main: { worktree: project() }, heads_up: stored })).toEqual({
+    expect(status(project(), { heads_up: stored })).toEqual({
       ...stored,
       mode: "off",
       state: "off",
     });
-    expect(headsUpStatus({ main: { worktree: project("{") } }).diagnostic).toMatch(/invalid/);
+    // A stopped relay watches nothing, whatever it recorded last.
+    expect(status(on, { heads_up: stored }, false)).toEqual({ ...stored, state: "off" });
+    expect(status(project("{")).diagnostic).toMatch(/invalid/);
   });
 
   it("reads the Claude Code version without a shell and refuses odd output", () => {

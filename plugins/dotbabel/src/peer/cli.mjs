@@ -20,7 +20,12 @@ import { tick } from "./relay.mjs";
 import { setupHooks } from "./setup.mjs";
 import { peerHook } from "./hooks.mjs";
 import { literalWords } from "./shell.mjs";
-import { createHeadsUpWatcher, headsUpStatus, noteOrigin } from "./heads-up-store.mjs";
+import {
+  createHeadsUpWatcher,
+  headsUpStatus,
+  noteOrigin,
+  readHeadsUpMode,
+} from "./heads-up-store.mjs";
 
 const BIN = fileURLToPath(new URL("../../bin/dotbabel-peer.mjs", import.meta.url));
 const USAGE = `dotbabel peer — persistent local Main/Advisor collaboration
@@ -241,9 +246,12 @@ async function execute(store, command, args, flags, who, env = process.env) {
     const p = await selectedPair(store, flags.pair, who, true);
     return { requests: p.requests, messages: p.messages };
   }
-  // Main's git state is read before the ledger lock, so a slow worktree blocks no peer.
-  const forwardFrom = command === "heads-up" ? await selectedPair(store, flags.pair, who) : null;
-  const origin = forwardFrom && noteOrigin(forwardFrom, forwarder(forwardFrom, who));
+  // Main's git state and project setting are read before the ledger lock, so a slow worktree blocks no peer.
+  const selected = ["heads-up", "status"].includes(command)
+    ? await selectedPair(store, flags.pair, who)
+    : null;
+  const origin = command === "heads-up" ? noteOrigin(selected, forwarder(selected, who)) : null;
+  const setting = command === "status" ? readHeadsUpMode(selected.main.worktree) : null;
   return store.transaction((s) => {
     if (command === "main") return domain.registerMain(s, who, { alive });
     if (command === "advisor") return domain.pairAdvisor(s, who, args[0] ?? null, { alive });
@@ -342,7 +350,7 @@ async function execute(store, command, args, flags, who, env = process.env) {
           main_alive: alive(p.main),
           advisor_alive: alive(p.advisor),
           relay_alive: Boolean(p.relay && isOwnerAlive(p.relay)),
-          heads_up: headsUpStatus(p),
+          heads_up: headsUpStatus(p, setting, Boolean(p.relay && isOwnerAlive(p.relay))),
           protection:
             "Advisor skill is read-only; PreToolUse enforcement requires installed peer hooks",
           codex_liveness:

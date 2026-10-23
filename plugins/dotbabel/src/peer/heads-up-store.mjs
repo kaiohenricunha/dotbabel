@@ -5,15 +5,22 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
-import Ajv from "ajv/dist/2020.js";
 import { enqueueHeadsUp } from "./state.mjs";
 
 /** Claude Code releases whose store format was measured (docs/research/heads-up-advisor-integration-feasibility.md). */
 export const MEASURED_CLAUDE_VERSIONS = Object.freeze(["2.1.307", "2.1.309"]);
 
 const require = createRequire(import.meta.url);
-const schema = require("../../../../schemas/dotbabel.config.schema.json");
-const validPeer = new Ajv({ strict: false }).compile(schema.properties.peer);
+let validator;
+// Every peer command loads this module, so the validator loads only for a project that sets peer.
+function validPeer(value) {
+  if (!validator) {
+    const { default: Ajv } = require("ajv/dist/2020.js");
+    const schema = require("../../../../schemas/dotbabel.config.schema.json");
+    validator = new Ajv({ strict: false }).compile(schema.properties.peer);
+  }
+  return validator(value);
+}
 const PLUGIN = "cc-plugin-you-should-know@builtin";
 // The measured store is about 22 KB; the project config cap follows the Model Intelligence reader.
 const MAX_BYTES = 1024 * 1024;
@@ -221,9 +228,8 @@ export function noteOrigin(p, forwardedBy) {
   };
 }
 
-/** The watcher fields for peer status, with the current setting. It holds no note text. @param {object} p @param {Function} [readMode] @returns {object} */
-export function headsUpStatus(p, readMode = readHeadsUpMode) {
-  const { mode, diagnostic } = readMode(p.main.worktree);
+/** The watcher fields for peer status, with the current setting. It holds no note text. @param {object} p @param {{mode: string, diagnostic?: string}} setting from readHeadsUpMode, read before the ledger lock @param {boolean} relayAlive @returns {object} */
+export function headsUpStatus(p, { mode, diagnostic }, relayAlive) {
   return {
     state: "off",
     claudeVersion: null,
@@ -231,18 +237,26 @@ export function headsUpStatus(p, readMode = readHeadsUpMode) {
     ambiguous: 0,
     ...p.heads_up,
     mode,
-    ...(mode === "off" ? { state: "off" } : {}),
+    // A stopped relay watches nothing, whatever it recorded last.
+    ...(mode === "off" || !relayAlive ? { state: "off" } : {}),
     ...(diagnostic ? { diagnostic } : {}),
   };
 }
 
 const key = (sessionId, offeredTurn) => `${sessionId}\n${offeredTurn}`;
+// A failed version probe is retried after this long; a measured result is kept for the relay run.
+const PROBE_RETRY_MS = 60000;
+// The record follows its seen line at once; after this many reads a lone line is dropped.
+const PENDING_TICKS = 5;
+const WATCHER_ERROR = "the watcher failed on this tick and retries on the next";
 
 /**
- * One watcher per relay run. prepare reads files and Git outside the ledger lock; apply runs inside the tick transaction.
- * Its memory (the forwarded notes and the last snapshot) lives only as long as the relay.
+ * One watcher per relay run. prepare reads files and Git outside the ledger lock. apply runs inside the
+ * tick transaction and changes only the pair. commit runs after that transaction is written, so a
+ * rolled-back write leaves the watcher's memory as it was and the next tick retries.
+ * The memory (the forwarded notes and the last snapshot) lives only as long as the relay.
  * @param {{env?: NodeJS.ProcessEnv, version?: Function, readMode?: Function, origin?: Function, file?: string}} [opts]
- * @returns {{prepare: (pair: object) => object, apply: (p: object, prepared: object, now?: number) => void}}
+ * @returns {{prepare: (pair: object, now?: number) => object, apply: (p: object, prepared: object, now?: number) => void, commit: (prepared: object) => void}}
  */
 export function createHeadsUpWatcher({
   env = process.env,
@@ -252,12 +266,20 @@ export function createHeadsUpWatcher({
   file = storeFile(env),
 } = {}) {
   let installed,
+    probedAt = -Infinity,
     prev = null,
+    pending = 0,
     counts = null,
-    failure = null;
-  let handled = new Set();
+    failure = null,
+    handled = new Set();
 
-  function prepare(pair) {
+  function probe(now) {
+    if (installed || now - probedAt < PROBE_RETRY_MS) return;
+    probedAt = now;
+    installed = version();
+  }
+
+  function prepare(pair, now = Date.now()) {
     const { mode, diagnostic } = readMode(pair.main.worktree);
     const report = (state, note = diagnostic) => ({
       mode,
@@ -269,7 +291,7 @@ export function createHeadsUpWatcher({
     const pause = (state, note) => ({ reset: true, status: report(state, note) });
     if (mode !== "enqueue") return pause("off");
     if (pair.main.harness !== "claude") return pause("off", "Main is not a Claude Code session");
-    if (installed === undefined) installed = version();
+    probe(now);
     if (!MEASURED_CLAUDE_VERSIONS.includes(installed)) return pause("unsupported_version");
     if (pair.main.version && !MEASURED_CLAUDE_VERSIONS.includes(pair.main.version))
       return pause(
@@ -294,15 +316,15 @@ export function createHeadsUpWatcher({
           mark.push(key(s.id, s.offeredTurn));
     } else {
       const found = attribute(prev, next);
-      const mainRecord = next.sessions.find((s) => mine(s.id));
       const open = (k) => candidates.some((c) => key(c.sessionId, c.offeredTurn) === k);
-      if (found.kind === "pending") keep = true;
+      keep = found.kind === "pending" && pending < PENDING_TICKS;
       if (found.kind === "single" && mine(found.sessionId)) {
         const k = key(found.sessionId, found.offeredTurn);
         if (!handled.has(k) && !open(k)) candidates.push({ ...found, explanation: null });
       }
       if (found.kind === "ambiguous" && found.sessions.some(mine)) {
-        const k = key(mainRecord.id, mainRecord.offeredTurn);
+        const record = next.sessions.find((s) => mine(s.id));
+        const k = key(record.id, record.offeredTurn);
         if (!handled.has(k) && !open(k)) {
           ambiguous++;
           mark.push(k);
@@ -314,15 +336,27 @@ export function createHeadsUpWatcher({
       candidates,
       mark,
       ambiguous,
-      next: keep ? prev : next,
+      keep,
+      snapshot: next,
       origin: candidates.length ? origin(pair, FORWARDED_BY) : null,
     };
   }
 
   function apply(p, prepared, now = Date.now()) {
+    if (prepared.failed) {
+      if (p.heads_up) p.heads_up = { ...p.heads_up, diagnostic: WATCHER_ERROR };
+      return;
+    }
     if (prepared.skip) return;
-    counts ??= { forwarded: p.heads_up?.forwarded ?? 0, ambiguous: p.heads_up?.ambiguous ?? 0 };
-    if (prepared.reset) prev = null;
+    const base = counts ?? {
+      forwarded: p.heads_up?.forwarded ?? 0,
+      ambiguous: p.heads_up?.ambiguous ?? 0,
+    };
+    const staged = {
+      counts: { forwarded: base.forwarded, ambiguous: base.ambiguous + (prepared.ambiguous ?? 0) },
+      handled: [...(prepared.mark ?? [])],
+      failure,
+    };
     for (const c of prepared.candidates ?? []) {
       if (`claude:${c.sessionId}` !== p.main.key) continue;
       const before = p.sequence;
@@ -333,25 +367,39 @@ export function createHeadsUpWatcher({
           prepared.origin,
           { now },
         );
-        if (p.sequence > before) counts.forwarded++;
+        if (p.sequence > before) staged.counts.forwarded++;
+        staged.failure = null;
       } catch {
-        failure = "a note could not be queued";
+        // Each refusal is deterministic (the note's size or text), so a retry would repeat it.
+        staged.failure = "a note could not be queued";
       }
-      handled.add(key(c.sessionId, c.offeredTurn));
+      staged.handled.push(key(c.sessionId, c.offeredTurn));
     }
-    if (prepared.next) {
-      for (const k of prepared.mark) handled.add(k);
-      counts.ambiguous += prepared.ambiguous;
-      prev = prepared.next;
-      const present = new Set(prepared.next.sessions.map((s) => key(s.id, s.offeredTurn)));
-      handled = new Set([...handled].filter((k) => present.has(k)));
-    }
-    const status = { ...prepared.status, ...counts };
-    if (failure && !status.diagnostic) status.diagnostic = failure;
+    prepared.staged = staged;
+    const status = { ...prepared.status, ...staged.counts };
+    if (staged.failure && !status.diagnostic) status.diagnostic = staged.failure;
     // A project that never opted in keeps its ledger unchanged.
     if (p.heads_up === undefined && status.mode === "off") return;
     if (JSON.stringify(p.heads_up) !== JSON.stringify(status)) p.heads_up = status;
   }
 
-  return { prepare, apply };
+  function commit(prepared) {
+    const { staged } = prepared;
+    if (!staged) return;
+    counts = staged.counts;
+    failure = staged.failure;
+    if (prepared.reset) {
+      prev = null;
+      pending = 0;
+      return;
+    }
+    if (!prepared.snapshot) return;
+    pending = prepared.keep ? pending + 1 : 0;
+    if (!prepared.keep) prev = prepared.snapshot;
+    // Prune against the store as read now, so a key added on this tick stays.
+    const present = new Set(prepared.snapshot.sessions.map((s) => key(s.id, s.offeredTurn)));
+    handled = new Set([...handled, ...staged.handled].filter((k) => present.has(k)));
+  }
+
+  return { prepare, apply, commit };
 }
