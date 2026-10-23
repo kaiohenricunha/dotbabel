@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:cf649647caa6bdbb915494aacf0da456c747032fb08055ad6a016cb94f959af6 source=skills/fix-with-evidence/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:239621e2a4462f5385997693811da7694d1b00fbdcabd3ced2ea708d68215a4f source=skills/fix-with-evidence/SKILL.md — do not edit directly
 argument-hint: "[issue]"
 description: |
   Fix a bug using a strict Reproduce -> Fix -> Verify -> PR loop. Triggers on: "fix this", "apply fix", "solve issue".

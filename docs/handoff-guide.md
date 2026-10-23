@@ -1,6 +1,6 @@
 # Handoff guide — cross-CLI, cross-machine session transfer
 
-_Last updated: v4.3.0_
+_Last updated: v4.4.0_
 
 For concurrent sessions that exchange messages without transferring context, use
 [Peer collaboration](peer-collaboration.md). Handoff remains the context-transfer

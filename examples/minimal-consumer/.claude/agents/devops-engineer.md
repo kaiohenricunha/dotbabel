@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1605b3afebc6c22b86be6d85640b082251a0dd39cc40d1c9f67c5d74dbac5b4d source=agents/devops-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:f4abf1e66aac908da993857387e2db13114a101bcea69daf5665cde4f4d0fe09 source=agents/devops-engineer.md — do not edit directly
 description: |
   Use when building or improving CI/CD pipelines, release workflows, build automation, or developer tooling. Triggers on: "CI pipeline", "CD workflow", "GitHub Actions", "build automation", "artifact", "release workflow", "environment promotion", "pipeline stage", "deploy pipeline", "lint CI". Uses sonnet — CI/CD pipeline work is structured and iterative; sonnet matches the workload.
 model: sonnet
