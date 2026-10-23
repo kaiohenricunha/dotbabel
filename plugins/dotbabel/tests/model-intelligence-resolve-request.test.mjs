@@ -101,9 +101,10 @@ describe("read-only resolution file boundaries", () => {
   });
   it("reports unsupported runtime adapters without pretending that a catalog can enable them", () => {
     const { request } = fixture();
-    const value = resolveRequest({ ...request, runtimeId: "antigravity" });
+    const value = resolveRequest({ ...request, runtimeId: "copilot" });
     expect(value).toMatchObject({ exitCode: 2, result: { status: "unresolved", diagnostics: [{ code: "runtime_adapter_unavailable" }] } });
     // Gemini has an adapter, but it cannot discover models, so no catalog evidence exists for it.
+    expect(resolveRequest({ ...request, runtimeId: "antigravity" })).toMatchObject({ exitCode: 2, result: { status: "unresolved", diagnostics: [{ code: "insufficient_capability_evidence" }] } });
     expect(resolveRequest({ ...request, runtimeId: "gemini" })).toMatchObject({ exitCode: 2, result: { status: "unresolved", diagnostics: [{ code: "insufficient_capability_evidence" }] } });
   });
 });
