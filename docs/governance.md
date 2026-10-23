@@ -1,6 +1,6 @@
 # dotbabel Taxonomy Governance
 
-_Last updated: v4.2.0_
+_Last updated: v4.3.0_
 
 ## Ownership
 

@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:78ede2fda323819461664a55393f4d557242a42ba8a3748e67dd1d1058e777e6 source=skills/review-pr/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:0c1fbb2716d10c801ec6f683a3942ede3098b57c4232306ad4d8ad966dde7c60 source=skills/review-pr/SKILL.md — do not edit directly
 argument-hint: "[PR#] [--conductor]"
 description: |
   Review a pull request: fetch comments, validate, apply fixes, resolve conflicts, and close out all threads. Triggers on: "review PR", "review pull request", "check PR".

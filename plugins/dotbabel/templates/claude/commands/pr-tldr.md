@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:7a9cd1c0a9bf53a2a618b091f28aa01223aa4c4b837222f375df5ae9d7a416cc source=commands/pr-tldr.md — do not edit directly
+# dotbabel:generated projection=sha256:c137a8c6e601aa8ed00b2304e1afaee360a52d073e9efebf4db4c6c81c54f9e2 source=commands/pr-tldr.md — do not edit directly
 argument-hint: "[PR number | branch] (default: current branch vs origin/main)"
 description: |
   Explain a PR in 2-3 plain-language lines for a PO or PM: what it gives us, not how it works.

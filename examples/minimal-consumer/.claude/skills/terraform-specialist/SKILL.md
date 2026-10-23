@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:12a40d79c6a50b1775c9953740a208e43b9268bedc50ea76e00ed599fbb9af37 source=skills/terraform-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:8e970d39480c3f55606cd613a0d4e037a82d837696e93cad16b4cd7d57a3d468 source=skills/terraform-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <module path, workspace, or problem description>
 description: |
