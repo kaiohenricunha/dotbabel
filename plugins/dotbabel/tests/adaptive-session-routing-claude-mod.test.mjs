@@ -154,6 +154,23 @@ describe("Claude MAIN mod boundary", () => {
     await f.hooks.get("classic.Stop")(f.$, { agent_id: "worker", effort: { level: "low" } }, async () => ({}));
     expect(f.reports).toHaveLength(count);
   });
+  it("ignores a Stop level that differs from the effort an unrewritten request carried", async () => {
+    // The engine, not this mod, set the request effort; Stop's session level still does not describe it.
+    const f = fixture({ prepare: vi.fn(async () => ({ status: "proposed", changes: { model: "selected" }, confidence: "high", diagnostics: [] })) });
+    await f.start(); await f.step({ effort: "low" });
+    const count = f.reports.length;
+    await f.hooks.get("classic.Stop")(f.$, { effort: { level: "medium" } }, async () => ({}));
+    expect(f.reports).toHaveLength(count);
+  });
+  it("ignores Stop when a request carried no effort, or when the steps of one turn sent different efforts", async () => {
+    const onlyModel = () => vi.fn(async () => ({ status: "proposed", changes: { model: "selected" }, confidence: "high", diagnostics: [] }));
+    const none = fixture({ prepare: onlyModel() }); await none.start(); await none.step({ effort: undefined });
+    let count = none.reports.length; await none.hooks.get("classic.Stop")(none.$, { effort: { level: "medium" } }, async () => ({}));
+    expect(none.reports).toHaveLength(count);
+    const mixed = fixture({ prepare: onlyModel() }); await mixed.start(); await mixed.step({ effort: "medium" }); await mixed.step({ index: 1, effort: "high", messageCount: 8 });
+    count = mixed.reports.length; await mixed.hooks.get("classic.Stop")(mixed.$, { effort: { level: "medium" } }, async () => ({}));
+    expect(mixed.reports).toHaveLength(count);
+  });
   it("never reports the session effort from Stop as effective when the turn rewrote the effort (AC-11)", async () => {
     // #572: classic.Stop reports the session setting, not the effort of a rewritten request.
     const f = fixture(); await f.start(); await f.step();

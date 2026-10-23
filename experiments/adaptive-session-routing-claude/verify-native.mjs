@@ -6,6 +6,9 @@ import { spawn, execFileSync } from "node:child_process";
 import { runClaudeTerminal } from "../../plugins/dotbabel/src/adaptive-session-routing/claude-launcher.mjs";
 
 const live = process.argv.includes("--live");
+// --out <file> keeps concurrent runs apart; the default paths stay for the documented manual steps.
+const outIndex = process.argv.indexOf("--out");
+const out = outIndex === -1 ? undefined : process.argv[outIndex + 1];
 const root = await mkdtemp(join(tmpdir(), "dotbabel-claude-proof-"));
 const prompt = "Format the supplied JSON with two-space indentation. Return only JSON: {\"proof\":true}";
 let recording;
@@ -48,7 +51,7 @@ export function register(on) {
   const result = events.findLast(event => event.type === "result");
   const proof = { mode: live ? "native-main-ordinary-prompt-attempt" : "native-production-metadata-only", code, result, stderr: recording.stderr, observations: events.filter(event => event.type === "system" && event.subtype !== "init") };
   if (!live && (result?.duration_api_ms !== 0 || result?.total_cost_usd !== 0 || Object.keys(result?.modelUsage ?? {}).length)) throw Error("Metadata proof unexpectedly executed inference");
-  const destination = live ? "/tmp/ar-claude-main-native-live.json" : "/tmp/ar-claude-main-native-metadata.json";
+  const destination = out ?? (live ? "/tmp/ar-claude-main-native-live.json" : "/tmp/ar-claude-main-native-metadata.json");
   await writeFile(destination, JSON.stringify(proof, null, 2) + "\n");
   console.log(JSON.stringify({ mode: proof.mode, code, file: destination, numTurns: result?.num_turns, apiMs: result?.duration_api_ms, cost: result?.total_cost_usd, result: result?.result, errors: result?.errors }));
 } finally { await rm(root, { recursive: true, force: true }); }
