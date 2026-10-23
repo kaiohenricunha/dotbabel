@@ -623,7 +623,7 @@ Each batch prompt has the same structure and differs in the artifact list. Batch
    - `--help lists the seven verbs with the same descriptions as the spec`
    - `models-cli.bats: an unknown runtime id exits 64 and a resolver conflict exits 1`
    - `every diagnostic the CLI can emit has a documented code, and the recorded --json envelopes of the previous patch release still parse with the same field meanings` (OPS-3)
-   - `no verb adds a repository to the trust allowlist, and an operation that would run a project-controlled command without trust returns a structured trust-required result and runs nothing` (SEC-6)
+   - `no models verb runs a project-controlled command or adds an untrusted repository to the trust allowlist` (SEC-6; AC-24 reworded 2026-10-23, because no models operation has a trust-required trigger)
    - `human and JSON output of every verb contain no credential, token, or account identifier from the fixtures that hold them` (OPS-4)
    - `with no network and no cache, every dotbabel subcommand outside models exits as it did before` (REL-5)
    - Expected before implementation: the verbs exist with per-verb rendering; parity and help text differ.
