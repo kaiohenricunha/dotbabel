@@ -1,0 +1,44 @@
+{
+  "$comment": "Top-level --json field names recorded on 2026-10-23 from dotbabel 4.3.0 plus main at b1034f7, in an empty repository with no cache. Later releases may add fields; these must keep their names and meanings (OPS-3).",
+  "status": {
+    "args": ["status"],
+    "fields": [
+      "activation",
+      "cache",
+      "envelope",
+      "installedWorkflow",
+      "localProjection",
+      "mainSessionIntegrations",
+      "now",
+      "releaseSnapshot",
+      "shippedBaseline",
+      "shippedWorkflow",
+      "sources",
+      "version"
+    ]
+  },
+  "resolve": {
+    "args": ["resolve", "--requirement", "deep", "--runtime", "codex"],
+    "fields": ["confidence", "diagnostics", "enforcement", "explanation", "status"]
+  },
+  "recommend": {
+    "args": ["recommend", "--requirement", "deep", "--runtime", "codex"],
+    "fields": [
+      "advice",
+      "configurationBasis",
+      "diagnostics",
+      "envelope",
+      "executable",
+      "resolverResult",
+      "version"
+    ]
+  },
+  "snapshotCheck": {
+    "args": ["snapshot", "--check"],
+    "fields": ["envelope", "reason", "releaseSnapshotAgeMs", "snapshotId", "valid", "version"]
+  },
+  "migrate": {
+    "args": ["migrate"],
+    "fields": ["artifacts", "envelope", "mode", "totals", "version"]
+  }
+}
