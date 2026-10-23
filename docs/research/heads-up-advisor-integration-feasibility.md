@@ -1,7 +1,7 @@
 # Heads Up to peer Advisor: integration feasibility
 
 - **Date:** 2026-10-22
-- **Status:** research. The MANUAL FIRST scope below shipped as `dotbabel peer heads-up` in the same pull request as this file. The automatic path (E1) stays unbuilt.
+- **Status:** research. The MANUAL FIRST scope below shipped as `dotbabel peer heads-up` in the same pull request as this file. On 2026-10-23 the decision changed to CONDITIONAL GO for option C, as an opt-in store watcher in the relay (see [Decision update](#decision-update-2026-10-23)). Option D1 (E1) stays unbuilt.
 - **Claude Code under test:** 2.1.307 (native binary at `~/.local/share/claude/versions/2.1.307`)
 - **dotbabel under test:** `origin/main` at `8950fa3`
 - **Location note:** `docs/research/` did not exist. The task named this path, so the report is here. The nearest existing convention is `docs/inspections/`.
@@ -317,3 +317,21 @@ Acceptance criteria:
 - No Claude Code configuration, plugin, or internal file is read or written.
 
 An implementation prompt is not written here. Write it only after the owner approves this scope.
+
+## Decision update (2026-10-23)
+
+**Decision: CONDITIONAL GO** for option C, the store-file watcher, as an opt-in part of the existing relay. It is off by default (`peer.heads_up.mode: "enqueue"` in `.dotbabel.json`). Code: `plugins/dotbabel/src/peer/heads-up-store.mjs`; the relay calls it from `tick` (`plugins/dotbabel/src/peer/relay.mjs`). The original objections to C stay true. The watcher answers each of them with a gate that fails closed:
+
+| Objection to C (from the options table) | Gate                                                                                                                                           | Met?                                                                                                               |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| The schema is undocumented              | A strict shape check: any other key, type, tag, or view shape gives `unknown_format` and forwards nothing                                      | Yes. Unit tests cover each refusal.                                                                                |
+| Any schema change breaks it silently    | Measured versions only (2.1.307, 2.1.309), from `claude --version` and Main's registry entry. Another version gives `unsupported_version`.     | Yes, for these two versions. Each new release needs a re-measure before it joins the list.                         |
+| The format on 2.1.309                   | Re-measured on 2026-10-23 (key names and value types only): the same top-level keys, record key sets, and `view` shape as finding 3.3 and 3.4  | Yes. The open offer's line was the last `seen` entry, which matches the order seen first, then the session record. |
+| The view is overwritten in place        | Open offers are read each second. A note that closed between reads is attributed only when one session changed; two or more count as ambiguous | Yes. Unit tests and a real relay process test.                                                                     |
+| mtime changes on read                   | The watcher never uses mtime. It compares snapshots.                                                                                           | Yes                                                                                                                |
+| Notes from other sessions               | Only `claude:<sessions[].id>` equal to the pair's Main key is forwarded                                                                        | Yes. Unit tests.                                                                                                   |
+| Replay after a restart                  | A baseline at relay start, plus the content dedupe of `enqueueHeadsUp`                                                                         | Yes. Unit tests.                                                                                                   |
+| Consent per note                        | None. The project opt-in replaces it. The docs state that note text reaches the Advisor, possibly on another provider.                         | Accepted by the opt-in                                                                                             |
+| A real note forwarded end to end (live) | One real note in a real Main, queued once, with a matching line hash                                                                           | See the pull request's Proof section                                                                               |
+
+The watcher reads no transcript, writes no Claude Code file, and makes no model call. Its forwarded set and snapshot live in the relay's memory. Only its status fields go to the pair record.
