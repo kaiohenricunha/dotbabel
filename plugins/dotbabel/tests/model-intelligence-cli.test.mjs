@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
@@ -115,11 +115,42 @@ describe("dotbabel models CLI consolidation (P-23)", () => {
     expect(snapshotTree(box.env.XDG_CONFIG_HOME)).toEqual(before);
   });
 
-  it("with no network and no cache, dotbabel subcommands outside models exit as before (REL-5)", () => {
+  it("no verb adds a repository to the trust allowlist, and an operation that would run a project-controlled command without trust returns a structured trust-required result and runs nothing", () => {
+    // SEC-6. No `models` operation takes a command from repository configuration: runtime binaries are
+    // fixed names found on the caller's PATH and start in a scratch directory (sources/runtime/process.mjs),
+    // so the trust-required branch has no trigger today. This guards the invariant that makes it so: a
+    // runtime binary planted in an untrusted repository never runs, even with relative PATH entries that
+    // would resolve inside the repository, and no verb trusts the repository.
+    const box = sandbox({ model_intelligence: { enabled: true, adaptive_routing: { enabled: true } } });
+    const planted = [];
+    for (const directory of ["", "bin", "node_modules/.bin"]) {
+      mkdirSync(join(box.repo, directory), { recursive: true });
+      for (const name of ["claude", "codex", "opencode", "gemini", "agy", "copilot"]) {
+        const file = join(box.repo, directory, name);
+        writeFileSync(file, `#!/bin/sh\necho ran > "${join(box.repo, `ran-${name}`)}"\n`); chmodSync(file, 0o755); planted.push(file);
+      }
+    }
+    const env = { ...box.env, PATH: `.:bin:node_modules/.bin:${process.env.PATH}` };
+    for (const args of [["status", "--json"], ["resolve", "--requirement", "deep", "--runtime", "claude", "--json"], ["recommend", "--requirement", "deep", "--runtime", "codex"], ["migrate"], ["snapshot", "--check"], ["refresh", "--runtime", "claude"], ["refresh", "--runtime", "codex"], ["refresh", "--runtime", "opencode"]]) {
+      const result = spawnSync(process.execPath, [standalone, ...args], { cwd: box.repo, env, encoding: "utf8", timeout: 120_000 });
+      expect(result.error, args.join(" ")).toBeUndefined();
+    }
+    expect(planted).toHaveLength(18);
+    expect(readdirSync(box.repo).filter(name => name.startsWith("ran-")), "a planted runtime binary ran").toEqual([]);
+    expect(existsSync(join(box.env.XDG_CONFIG_HOME, "dotbabel", "check-on-stop-trusted")), "the trust allowlist").toBe(false);
+  }, 600_000);
+
+  it("with no network and no cache, every dotbabel subcommand outside models exits as it did before", () => {
+    // REL-5. Every umbrella subcommand other than `models` still loads and answers --help with exit 0
+    // when the network is unreachable and no Model Intelligence cache exists, and none creates that cache.
     const box = sandbox();
-    const root = spawnSync(process.execPath, [umbrella, "--help"], { cwd: box.repo, env: box.env, encoding: "utf8" });
-    expect(root.status).toBe(0);
-    const version = spawnSync(process.execPath, [umbrella, "--version"], { cwd: box.repo, env: box.env, encoding: "utf8" });
-    expect(version.status).toBe(0);
-  });
+    const source = readFileSync(umbrella, "utf8");
+    const subcommands = JSON.parse(source.slice(source.indexOf("[", source.indexOf("const SUBCOMMANDS")), source.indexOf("];", source.indexOf("const SUBCOMMANDS")) + 1).replace(/,\s*\]$/, "]")).filter(name => name !== "models");
+    expect(subcommands.length).toBeGreaterThan(20);
+    for (const args of [["--help"], ["--version"], ...subcommands.map(name => [name, "--help"])]) {
+      const result = spawnSync(process.execPath, [umbrella, ...args], { cwd: box.repo, env: box.env, encoding: "utf8", timeout: 60_000 });
+      expect(result.status, args.join(" ")).toBe(0);
+    }
+    expect(existsSync(join(box.env.XDG_CACHE_HOME, "dotbabel", "model-intelligence")), "the Model Intelligence cache").toBe(false);
+  }, 300_000);
 });

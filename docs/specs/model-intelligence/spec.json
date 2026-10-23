@@ -52,7 +52,7 @@
   "acceptance_criteria": [
     {
       "id": "AC-1",
-      "status": "planned",
+      "status": "active",
       "given": "a dotbabel.compute object with an unknown key",
       "when": "the requirement parser validates it",
       "then": "it is rejected and never becomes inert policy",
@@ -102,7 +102,7 @@
     },
     {
       "id": "AC-3",
-      "status": "planned",
+      "status": "active",
       "given": "a shipped policy file that contains a provider model name",
       "when": "policy loads",
       "then": "the policy is rejected",
@@ -127,7 +127,7 @@
     },
     {
       "id": "AC-4",
-      "status": "planned",
+      "status": "active",
       "given": "a runtime command that exits 0 with empty output",
       "when": "the adapter classifies the result",
       "then": "the result is unknown and never an empty successful catalog",
@@ -135,6 +135,10 @@
         {
           "file": "plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs",
           "name": "contract fixture: exit 0 with empty output is unknown, not ok"
+        },
+        {
+          "file": "plugins/dotbabel/tests/model-intelligence-adapter-opencode.test.mjs",
+          "name": "exit 0 with empty output is unknown, never an empty catalog (ARCH-30)"
         }
       ],
       "argv": [
@@ -142,6 +146,7 @@
         "vitest",
         "run",
         "plugins/dotbabel/tests/model-intelligence-adapter-contract.test.mjs",
+        "plugins/dotbabel/tests/model-intelligence-adapter-opencode.test.mjs",
         "--reporter=junit",
         "--outputFile=.dotbabel/criteria/AC-4.junit.xml"
       ],
@@ -627,7 +632,7 @@
     },
     {
       "id": "AC-24",
-      "status": "planned",
+      "status": "active",
       "given": "an untrusted repository",
       "when": "a models operation would run a project-controlled command",
       "then": "it returns a trust-required result, runs nothing, and adds nothing to the allowlist",
@@ -652,7 +657,7 @@
     },
     {
       "id": "AC-25",
-      "status": "planned",
+      "status": "active",
       "given": "no network and no Model Intelligence cache",
       "when": "a dotbabel subcommand outside models runs",
       "then": "it exits as it did before",
