@@ -1,6 +1,6 @@
 # Claude plugin release baselines
 
-_Last updated: v4.2.0_
+_Last updated: v4.3.0_
 
 The package build creates native Claude metadata from canonical source artifacts and one accepted release snapshot. It uses the shared resolver and pure materializer. It performs no discovery, inference or project activation. Repeating the build with the same inputs produces the same bytes.
 

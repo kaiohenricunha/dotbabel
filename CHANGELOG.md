@@ -16,6 +16,78 @@ preserved verbatim because they describe state at the time of release.
   exclude Gemini CLI, which remains supported through explicit configuration. Existing explicit
   lists, Gemini artifacts, bootstrap detection, and Model Intelligence activation remain unchanged.
 
+## [4.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.2.0...v4.3.0) (2026-10-23)
+
+
+### Added
+
+* **fleet:** add a Codex host adapter ([#555](https://github.com/kaiohenricunha/dotbabel/issues/555)) ([a435dd3](https://github.com/kaiohenricunha/dotbabel/commit/a435dd3cf638df13532a5638dac72e2f590d587b))
+* **fleet:** let blocked sessions ask claim owners across hosts ([#560](https://github.com/kaiohenricunha/dotbabel/issues/560)) ([8950fa3](https://github.com/kaiohenricunha/dotbabel/commit/8950fa3fcb6197731d382fef558e3f836fbb5490))
+* **handoff:** consume bounded shared runtime observations ([e1a97c3](https://github.com/kaiohenricunha/dotbabel/commit/e1a97c3d384448f76be6000b29d3055f36d97861))
+* **models:** add Claude projections and owned baseline bootstrap ([c4cbf77](https://github.com/kaiohenricunha/dotbabel/commit/c4cbf774f791fbc149fd1e81bd5010d6fd0794bf))
+* **models:** add deterministic pure materialization and provenance ([#504](https://github.com/kaiohenricunha/dotbabel/issues/504)) ([d6c99c9](https://github.com/kaiohenricunha/dotbabel/commit/d6c99c971c249996bded90fda1a3d3867a508ae9))
+* **models:** add deterministic release snapshots ([176f534](https://github.com/kaiohenricunha/dotbabel/commit/176f5340f272a7ddc453ba157d60c99856ad9695))
+* **models:** add official Anthropic capability source ([6e62abe](https://github.com/kaiohenricunha/dotbabel/commit/6e62abedbc4c02e9162485e85988438939765512))
+* **models:** add owned projection transactions and drift checks ([b69faa4](https://github.com/kaiohenricunha/dotbabel/commit/b69faa45fbbd43075b785eab25689143c0829b69))
+* **models:** add project opt-in and linked adaptive routing specification ([#496](https://github.com/kaiohenricunha/dotbabel/issues/496)) ([ac27cdd](https://github.com/kaiohenricunha/dotbabel/commit/ac27cdd52ed1cd5c1f6619a737ee27f085e541d5))
+* **models:** add read-only model recommendations ([#511](https://github.com/kaiohenricunha/dotbabel/issues/511)) ([0a5ba9d](https://github.com/kaiohenricunha/dotbabel/commit/0a5ba9d5bc12c1bf386bfacfa087a6611da58df4))
+* **models:** add reviewed migrations and exact artifact floors ([ad1635f](https://github.com/kaiohenricunha/dotbabel/commit/ad1635f41dfeefeb2bb9ee73d890a62db919b02f))
+* **models:** add shared compute resolution and cached diagnostics ([#499](https://github.com/kaiohenricunha/dotbabel/issues/499)) ([774d769](https://github.com/kaiohenricunha/dotbabel/commit/774d7699cee5a893e5ae666489c01ca4d85e530e))
+* **models:** add the Gemini runtime source adapter (P-22a) ([#566](https://github.com/kaiohenricunha/dotbabel/issues/566)) ([6cfe66c](https://github.com/kaiohenricunha/dotbabel/commit/6cfe66cc630f259b97cb9eb4f0f13c0c242f6af7))
+* **models:** apply approved audit-role compute floors ([8827df1](https://github.com/kaiohenricunha/dotbabel/commit/8827df12b990a3aa7cd9e61232a8003f3dcab037))
+* **models:** apply approved skill compute decisions ([cd52038](https://github.com/kaiohenricunha/dotbabel/commit/cd52038a7b37cd756472c9bd92b14c05244c005b))
+* **models:** build offline Claude plugin baselines ([bca26f2](https://github.com/kaiohenricunha/dotbabel/commit/bca26f246b25e07ea0c70c2fbef3be0f63f08007))
+* **models:** generate the Claude review workflow offline ([#510](https://github.com/kaiohenricunha/dotbabel/issues/510)) ([56a7f66](https://github.com/kaiohenricunha/dotbabel/commit/56a7f66c4d228396f753133b3b7670b8d82c3921))
+* **models:** migrate dynamic command requirements (P-19c commands) ([#534](https://github.com/kaiohenricunha/dotbabel/issues/534)) ([05af776](https://github.com/kaiohenricunha/dotbabel/commit/05af776a3c0e7f948f41957d16d3ab32017a1b3e))
+* **models:** migrate dynamic skill requirements ([#524](https://github.com/kaiohenricunha/dotbabel/issues/524)) ([b64eecb](https://github.com/kaiohenricunha/dotbabel/commit/b64eecb8a9dc3d0932850bc8ae417a24af90e369))
+* **models:** migrate P-19e skill requirements ([#553](https://github.com/kaiohenricunha/dotbabel/issues/553)) ([6a4232b](https://github.com/kaiohenricunha/dotbabel/commit/6a4232bc8774da646cfb3b5c0069b799ef837a6f))
+* **models:** migrate prerequisite skills and specialist agents ([bb5a5a1](https://github.com/kaiohenricunha/dotbabel/commit/bb5a5a1cb308f73d5d62112a441f16938ea7bcc6))
+* **models:** preserve security floors and protected pins ([#523](https://github.com/kaiohenricunha/dotbabel/issues/523)) ([6303cc8](https://github.com/kaiohenricunha/dotbabel/commit/6303cc8831c9877bb962f273dc11a81febc239be))
+* **models:** require reviewed class evidence for Frontier and Exceptional ([#557](https://github.com/kaiohenricunha/dotbabel/issues/557)) ([66b5718](https://github.com/kaiohenricunha/dotbabel/commit/66b57185bd4972e2ed2d2d4eb2bd747e18eef252))
+* **models:** route ordinary prompts through a managed Codex session ([957e685](https://github.com/kaiohenricunha/dotbabel/commit/957e685ec0823ffb1e74a917d163029451eca743))
+* **peer:** mirror ledger messages as native Claude messages ([#542](https://github.com/kaiohenricunha/dotbabel/issues/542)) ([6923047](https://github.com/kaiohenricunha/dotbabel/commit/6923047afbda8a992143f37da8767c36c0bab5eb))
+* **peer:** mirror message text into codex queue pushes ([#552](https://github.com/kaiohenricunha/dotbabel/issues/552)) ([e6874ba](https://github.com/kaiohenricunha/dotbabel/commit/e6874bab86cc5766fcf1cb5d1d9027f9abcb3b67))
+* **peer:** remind Main about unread Advisor messages in its own hooks ([#537](https://github.com/kaiohenricunha/dotbabel/issues/537)) ([763cdfa](https://github.com/kaiohenricunha/dotbabel/commit/763cdfae21efbfe4cb612fbfa319f6f82307fd92))
+* **peer:** support OpenCode, Copilot, and Antigravity ([#517](https://github.com/kaiohenricunha/dotbabel/issues/517)) ([2ac8a7b](https://github.com/kaiohenricunha/dotbabel/commit/2ac8a7b2a6c8f8b33f8895c510e40774dfc23c47))
+* **routing:** accept the measured Claude Code 2.1.307 MAIN contract ([#562](https://github.com/kaiohenricunha/dotbabel/issues/562)) ([7043748](https://github.com/kaiohenricunha/dotbabel/commit/7043748d09667576cc80759aa78b3037fcd874f8))
+* **routing:** classify bounded local engineering tasks with explicit uncertainty ([#501](https://github.com/kaiohenricunha/dotbabel/issues/501)) ([f5f9b93](https://github.com/kaiohenricunha/dotbabel/commit/f5f9b9315ee909657cef93fc78a535b03ecfc2bc))
+* **routing:** prepare project-gated main-session decisions ([#502](https://github.com/kaiohenricunha/dotbabel/issues/502)) ([6e53b38](https://github.com/kaiohenricunha/dotbabel/commit/6e53b38b74eb24dbab2f458a9387d83e69108e36))
+* **routing:** preserve native Codex turns through an exactly-once boundary ([#503](https://github.com/kaiohenricunha/dotbabel/issues/503)) ([31ec1ed](https://github.com/kaiohenricunha/dotbabel/commit/31ec1ed23278be4c29a838c027dccb5bbe3d1e38))
+* **routing:** route the native Claude MAIN session model on measured 2.1.302 and 2.1.304 ([#532](https://github.com/kaiohenricunha/dotbabel/issues/532)) ([3c244b3](https://github.com/kaiohenricunha/dotbabel/commit/3c244b3161eafca89c23453dfa652fae3146744b))
+* **runtime:** prefer Antigravity for new Google integrations ([#515](https://github.com/kaiohenricunha/dotbabel/issues/515)) ([328f93b](https://github.com/kaiohenricunha/dotbabel/commit/328f93baca11bdfb8e5d55603414632c10c46565))
+* **schema:** record owner decisions and apply metadata compatibility ([10cdb9d](https://github.com/kaiohenricunha/dotbabel/commit/10cdb9d35b5a7e5d9a54521fd33fa7f21c9b293a))
+* **yolo:** add Codex Full-access launcher and standing task approval (1.5.0) ([#543](https://github.com/kaiohenricunha/dotbabel/issues/543)) ([913a77e](https://github.com/kaiohenricunha/dotbabel/commit/913a77eb5614a9abb3f422f6afefb065d21410a6))
+
+
+### Fixed
+
+* **graph:** order only freeze, labels, and seal in the v4 retry inspector ([#530](https://github.com/kaiohenricunha/dotbabel/issues/530)) ([f88b479](https://github.com/kaiohenricunha/dotbabel/commit/f88b479eab4981fd179d81f7de69bad9de57b608))
+* **models:** pin agents-search and align validate-spec with its Frontier floor ([#565](https://github.com/kaiohenricunha/dotbabel/issues/565)) ([32dfcd7](https://github.com/kaiohenricunha/dotbabel/commit/32dfcd7b55737004fc71a910a8d742e596b45643))
+* **models:** retain command migration compatibility ([#525](https://github.com/kaiohenricunha/dotbabel/issues/525)) ([e002c91](https://github.com/kaiohenricunha/dotbabel/commit/e002c91e47e425046c5679d64bd7e38866352051))
+* **peer:** document unpair in the skill and stop a false error after it ([#549](https://github.com/kaiohenricunha/dotbabel/issues/549)) ([5b9e968](https://github.com/kaiohenricunha/dotbabel/commit/5b9e968cf56f31e492576e9106bc81fe689242cf))
+* **peer:** follow a member into its current worktree ([#536](https://github.com/kaiohenricunha/dotbabel/issues/536)) ([0479807](https://github.com/kaiohenricunha/dotbabel/commit/04798077f85e900b4b957db2a92ac2029cee6a5b))
+* **peer:** guard an Advisor's subagent through the process tree ([#548](https://github.com/kaiohenricunha/dotbabel/issues/548)) ([7da9743](https://github.com/kaiohenricunha/dotbabel/commit/7da9743dcc7dfd16f83de60cffec0982c5010dcc))
+* **peer:** let the Advisor search with read-only shell tools and Explore ([#544](https://github.com/kaiohenricunha/dotbabel/issues/544)) ([79db995](https://github.com/kaiohenricunha/dotbabel/commit/79db9954e9b8d3a9a1966af85d16c574f5602a1a))
+* **peer:** limit Advisor reads to the pair and refuse secret files ([#556](https://github.com/kaiohenricunha/dotbabel/issues/556)) ([96898aa](https://github.com/kaiohenricunha/dotbabel/commit/96898aaf3a22c8d3dcd912e49023d2dce3b6196e))
+* **peer:** one relay wake-up per unread burst, and an Advisor unread reminder ([#540](https://github.com/kaiohenricunha/dotbabel/issues/540)) ([7937136](https://github.com/kaiohenricunha/dotbabel/commit/79371362780ba565c1c43aa97ff3c55a84a52e14))
+* **peer:** refuse Advisor searches that would read a secret file ([#563](https://github.com/kaiohenricunha/dotbabel/issues/563)) ([09058df](https://github.com/kaiohenricunha/dotbabel/commit/09058df7b5b590cf831e593f9715cbb589570c69))
+* **peer:** refuse unpair from the Advisor's own tools ([#550](https://github.com/kaiohenricunha/dotbabel/issues/550)) ([2271a89](https://github.com/kaiohenricunha/dotbabel/commit/2271a890143363f294f109563ad4e859d0c1a6a5))
+* **peer:** reserve recovery capacity and archive closed history ([#526](https://github.com/kaiohenricunha/dotbabel/issues/526)) ([3bfba0f](https://github.com/kaiohenricunha/dotbabel/commit/3bfba0f8ac8ff8241ada2a978bcf9fcb91b85b58))
+* **peer:** skip the hook for unpaired sessions and survive a removed folder ([#539](https://github.com/kaiohenricunha/dotbabel/issues/539)) ([5ad5df2](https://github.com/kaiohenricunha/dotbabel/commit/5ad5df29a90a3fcf94c8173835217d5d8a2420b9))
+* **release:** regenerate the example consumer after a version bump ([#564](https://github.com/kaiohenricunha/dotbabel/issues/564)) ([c723992](https://github.com/kaiohenricunha/dotbabel/commit/c7239925c6d91f080512e7c7dedec1adeabc54aa))
+
+
+### Documentation
+
+* **graph:** record the dispatch Jev result under protocol v3 — REJECT ([#528](https://github.com/kaiohenricunha/dotbabel/issues/528)) ([620e791](https://github.com/kaiohenricunha/dotbabel/commit/620e791772ff3232ebf3ff9f820a4950f0d75cfa))
+* **graph:** record the retry result under protocol v4 — INCONCLUSIVE ([#531](https://github.com/kaiohenricunha/dotbabel/issues/531)) ([b8bffed](https://github.com/kaiohenricunha/dotbabel/commit/b8bffed0e17b2c3cdcce482717a2e5cbab0eb627))
+* **models:** activate four verified historical acceptance criteria ([5d388d2](https://github.com/kaiohenricunha/dotbabel/commit/5d388d23c02dc5debae5c5c1d851e6ab653341d0))
+* **peer:** let an Advisor under a yolo grant work without asking ([#554](https://github.com/kaiohenricunha/dotbabel/issues/554)) ([90c8238](https://github.com/kaiohenricunha/dotbabel/commit/90c823849e8b82f9558b8ee4255c682b5c0a1695))
+* **peer:** say that new Advisor read folders need a session restart ([#559](https://github.com/kaiohenricunha/dotbabel/issues/559)) ([c132593](https://github.com/kaiohenricunha/dotbabel/commit/c132593b0202e766cd1e440bd8f4ae5ffbdc7483))
+* **peer:** tell users how to end a pairing after Main has closed ([#551](https://github.com/kaiohenricunha/dotbabel/issues/551)) ([2f90cb3](https://github.com/kaiohenricunha/dotbabel/commit/2f90cb3d12427be1660940b652e174e8de54b403))
+* **spec:** close graph-engineering as done after the Unit 3e results ([#533](https://github.com/kaiohenricunha/dotbabel/issues/533)) ([8a3a6ed](https://github.com/kaiohenricunha/dotbabel/commit/8a3a6edd3e1b2c4d1b0c35915d7fd349bfc46e29))
+* **spec:** resolve the graph-engineering audit INFO items ([#541](https://github.com/kaiohenricunha/dotbabel/issues/541)) ([2627a7d](https://github.com/kaiohenricunha/dotbabel/commit/2627a7d4c7d11b3f3e477f26fcae991eb8a3db43))
+
 ## [4.2.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.1.0...v4.2.0) (2026-10-17)
 
 
