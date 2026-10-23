@@ -13,6 +13,8 @@ import {
   reconnect,
   unpair,
   nativeMessage,
+  parseNote,
+  enqueueHeadsUp,
 } from "../../src/peer/state.mjs";
 const endpoint = (harness, id) => ({
   harness,
@@ -225,4 +227,73 @@ it("mirrors a ledger message as a native message only between Claude sessions wi
   expect(nativeMessage(p, m)).toBe(null);
   p.main = { ...p.main, harness: "codex", socket: "/run/user/1/cc-socks/10.sock" };
   expect(nativeMessage(p, m)).toBe(null);
+});
+
+describe("Heads Up notes", () => {
+  const NOTE =
+    "✦ Heads up · The cache may hide stale tokens.\n  1: Learn more   2: Knew this already   0: Dismiss";
+  const origin = (extra = {}) => ({
+    forwardedBy: "Main",
+    main: "claude:main",
+    repo: "repo",
+    worktree: "/repo",
+    head: "abc1234",
+    tree: "clean",
+    ...extra,
+  });
+  it("reads the tag and drops the mark and the answer line", () => {
+    expect(parseNote(NOTE)).toMatchObject({
+      tag: "Heads up",
+      note: "The cache may hide stale tokens.",
+    });
+    expect(parseNote("You should know · X\n\n  Title\n  - a bullet")).toMatchObject({
+      tag: "You should know",
+      note: "X\nTitle\n- a bullet",
+    });
+    expect(parseNote("plain text without a tag")).toMatchObject({
+      tag: null,
+      note: "plain text without a tag",
+    });
+    expect(parseNote(NOTE).key).toMatch(/^hu-[0-9a-f]{16}$/);
+  });
+  it("derives one key per note text, whatever its wrapping", () => {
+    expect(parseNote("✦ Heads up · a   b\n   c").key).toBe(parseNote("Heads up · a b c").key);
+    expect(parseNote("Heads up · a b c").key).not.toBe(parseNote("Heads up · a b d").key);
+  });
+  it("enqueues one labeled request with its origin, and returns it again for the same note", () => {
+    const { p } = world();
+    const r = enqueueHeadsUp(p, NOTE, origin(), { now: 5000 });
+    expect(r).toMatchObject({ forward: "actionable", state: "queued" });
+    expect(r.dedupe).toBe(parseNote(NOTE).key);
+    for (const text of [
+      "not a user instruction",
+      "actionable, already addressed, false positive, or inconclusive",
+      "Source: claude-you-should-know (Heads up)",
+      "Forwarded by: Main",
+      "Main session: claude:main",
+      "Worktree: /repo",
+      "HEAD: abc1234 (clean)",
+      "Captured: 1970-01-01T00:00:05.000Z",
+      "Note:\nThe cache may hide stale tokens.",
+    ])
+      expect(r.body, text).toContain(text);
+    const again = enqueueHeadsUp(
+      p,
+      "Heads up ·  The cache may hide\nstale tokens.",
+      origin({ head: "def5678" }),
+      {
+        now: 9000,
+      },
+    );
+    expect(again.id).toBe(r.id);
+    expect(p.requests).toHaveLength(1);
+  });
+  it("refuses an empty or oversized note", () => {
+    const { p } = world();
+    expect(() => enqueueHeadsUp(p, "✦ Heads up ·  \n 1: Learn more", origin())).toThrow(
+      /note text/,
+    );
+    expect(() => enqueueHeadsUp(p, "x".repeat(16384), origin())).toThrow(/16384/);
+    expect(p.requests).toHaveLength(0);
+  });
 });

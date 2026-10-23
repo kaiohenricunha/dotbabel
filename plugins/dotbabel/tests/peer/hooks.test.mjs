@@ -32,6 +32,7 @@ it("allows read tools and bounded shell inspection, but refuses writes and shell
     "git show HEAD:a",
     "dotbabel peer next",
     "dotbabel peer send main 'finding; x && y'",
+    "dotbabel peer heads-up 'Heads up · the cache may be stale'",
     `node '${new URL("../../bin/dotbabel-peer.mjs", import.meta.url).pathname}' queue`,
   ]) {
     expect(
