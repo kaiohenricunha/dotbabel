@@ -44,7 +44,7 @@ export const RUNTIME_ID = "claude";
 export const ADAPTER_VERSION = "3";
 
 /** Exact native releases whose Mods MAIN contract passed the installed host test kit. Others stay unverified. */
-export const VERIFIED_MAIN_VERSIONS = Object.freeze(["2.1.302", "2.1.304", "2.1.307"]);
+export const VERIFIED_MAIN_VERSIONS = Object.freeze(["2.1.302", "2.1.304", "2.1.307", "2.1.309"]);
 
 // Native control semantics documented in model-config#choose-an-effort-level, measured on 2.1.302.
 // This orders Claude effort controls, not models or another runtime's vocabulary.

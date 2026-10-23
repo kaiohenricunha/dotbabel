@@ -1,6 +1,6 @@
 # Claude MAIN native integration proof
 
-This directory verifies the production module on the installed Claude Code 2.1.302, 2.1.304 and 2.1.307. The integration is experimental. One live MAIN execution on 2.1.304 proves the model axis; the effort axis remains unverified.
+This directory verifies the production module on the installed Claude Code 2.1.302, 2.1.304, 2.1.307 and 2.1.309. The integration is experimental. One live MAIN execution on 2.1.304 proves the model axis; the effort axis remains unverified.
 
 ## Setup and ordinary use
 
@@ -49,6 +49,8 @@ On 2026-10-20 the same command runs on 2.1.304 after the weekly reset. The first
 The first metadata attempt exposes missing native effort intent annotations; the corrected shared runtime adapter resolves the same task. The inspection records both candidate causes and the failing regression. The first proof fixture used a `.git` placeholder, which made the existing native SessionEnd hook fail its git query. The fixture now runs `git init --quiet`; the final metadata proof has empty stderr and zero inference cost. The earlier live attempt, including that fixture error, remains failed evidence.
 
 On 2026-10-22 the six acceptance steps run on 2.1.307. Plugin validation and the host relay test pass. The metadata run proposes `claude-haiku-5-5` with `low` effort at zero turns, zero API time and zero cost. The live turn applies the model: intended and native `usage.model` are both `claude-haiku-5-5`. That turn costs USD 0.258, because it writes 257,723 cache-creation tokens with no cache read: the live proof loads the full user configuration, and no cache was warm. `classic.Stop` reports `effort.level` `xhigh`, which equals the user's `effortLevel` setting at that time. On 2.1.304 the setting was `medium` and the report was `medium`. The report therefore follows the session setting, which supports the second effort explanation above; it still does not show the effort that the request used, so effort routing stays unverified.
+
+On 2026-10-23 the acceptance steps run on 2.1.309. The host relay test passes. Plugin validation now also reports two plugin-directory submission checks (README and LICENSE missing); they concern a public directory listing, not this session-only plugin, and validation still exits 0. The metadata run proposes `claude-haiku-5-5` / `low` at zero cost, and the live turn applies `claude-haiku-5-5` (USD 0.0036 with a warm cache). A separate measurement (`docs/experiments/adaptive-session-routing-claude-effort-2026-10-23.md`) gives moderate evidence that the `turn.step` effort override applies.
 
 ## Verify a new Claude Code release
 

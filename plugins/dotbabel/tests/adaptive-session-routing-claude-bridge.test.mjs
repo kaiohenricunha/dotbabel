@@ -59,6 +59,8 @@ it.each([
   [true, false, "2.1.302", "routing_disabled"],
   [true, true, "2.1.304", { ready: true }],
   [true, true, "2.1.307", { ready: true }],
+  [true, true, "2.1.309", { ready: true }],
+  [true, true, "2.1.308", "routing_unverified"],
   [true, true, "2.1.303", "routing_unverified"],
   [true, true, "2.1.306", "routing_unverified"],
 ])("checks each activation axis before any native discovery: %s %s %s", async (enabled, routingEnabled, runtimeVersion, expected) => {
