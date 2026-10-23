@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 import { snapshotTree } from "./fixtures/model-intelligence/fake-runner.mjs";
-import { MODELS_VERBS } from "../src/model-intelligence/cli/verbs.mjs";
+import { MODELS_VERBS, renderVerbHelp } from "../src/model-intelligence/cli/verbs.mjs";
 
 const standalone = fileURLToPath(new URL("../bin/dotbabel-models.mjs", import.meta.url));
 const umbrella = fileURLToPath(new URL("../bin/dotbabel.mjs", import.meta.url));
@@ -47,6 +47,13 @@ describe("dotbabel models CLI consolidation (P-23)", () => {
   it("one verb table drives both the help and the accepted verbs", () => {
     expect(MODELS_VERBS.map(verb => verb.name)).toEqual(["refresh", "status", "resolve", "recommend", "migrate", "snapshot", "enable", "disable", "session"]);
     for (const verb of MODELS_VERBS) { for (const form of verb.forms) expect(form.purpose.length, verb.name).toBeGreaterThan(10); expect(Array.isArray(verb.flags)).toBe(true); }
+  });
+
+  it("renderVerbHelp() prints each form on its own line with its purpose indented below", () => {
+    const lines = renderVerbHelp().split("\n");
+    const forms = MODELS_VERBS.flatMap(verb => verb.forms);
+    expect(lines).toHaveLength(forms.length * 2);
+    forms.forEach((form, index) => { expect(lines[index * 2]).toBe(`  ${form.usage}`); expect(lines[index * 2 + 1]).toBe(`      ${form.purpose}`); });
   });
 
   it("dotbabel models and dotbabel-models produce identical output for the same arguments", () => {
