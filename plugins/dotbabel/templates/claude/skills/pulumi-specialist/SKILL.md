@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:90be8cee74f119b344de006d1444687facb380aec9dcc73afe525d710802791a source=skills/pulumi-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:0e20c3d73425d5c40113404f28288bc00e0ce1b19b9dab2880ff7e5242f15f23 source=skills/pulumi-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <stack name, project path, or problem description>
 description: |

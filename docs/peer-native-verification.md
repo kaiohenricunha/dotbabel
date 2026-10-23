@@ -1,6 +1,6 @@
 # Native peer adapter verification — 2026-10-18
 
-_Last updated: v4.2.0_
+_Last updated: v4.3.0_
 
 ## Scope and result
 

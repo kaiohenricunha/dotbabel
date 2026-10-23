@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:abbc022aaad1cce97ca3aed960fc3afb407c22f6603a5ed52cee2587303e530d source=skills/deliver/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:5df4a61c15b95f76be801906281dd5d8402792cdc0d36761d8ac72be908622e6 source=skills/deliver/SKILL.md — do not edit directly
 argument-hint: <task contract as JSON or prose> [--draft]
 description: |
   Take one task contract (goal, inputs, constraints, done_when) from a prompt to a reviewable pull request in one run: test first, implement, prove the change works by running it, review the diff once, and open the pull request with the proof. CI on the head is the merge evidence. No review rounds, no local attestation, no merge. Triggers on: "deliver this", "build this and open a PR", "implement this issue and open a PR", "take this task to a PR", or a task contract whose output is a pull request.

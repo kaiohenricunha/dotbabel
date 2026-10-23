@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:8fefceb73f368e6345939bc88613178959883ca584575a7f72043e8f76088b49 source=agents/container-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:cdeb76088f88f43610f2837cd2f2e755ee33f0740d2f98fa8ede08f443a76716 source=agents/container-engineer.md — do not edit directly
 description: |
   Use when authoring, optimizing, or reviewing container images and build pipelines. Triggers on: "Dockerfile", "container image", "multi-stage build", "image size", "OCI", "Docker Compose", "container registry", "base image", "layer cache". Uses sonnet — container image optimization is structured and pattern-driven; sonnet provides the right depth without excess cost.
 model: sonnet
