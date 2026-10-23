@@ -58,7 +58,7 @@ const META = {
     "Model Intelligence (docs/specs/model-intelligence §5). Verbs:",
     renderVerbHelp(),
     "",
-    "Notes: resolve and recommend use cached evidence only. Claude session routing applies the model; its effort control stays unverified. migrate never touches class-F decisions.",
+    "Notes: resolve and recommend use cached evidence only. Claude session routing applies the model and, on moderate measured evidence, the effort; no native field reports the effort a request used. migrate never touches class-F decisions.",
   ].join("\n"),
   flags: {
     model: { type: "string" },
