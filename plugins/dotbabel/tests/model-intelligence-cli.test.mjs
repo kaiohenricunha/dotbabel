@@ -49,11 +49,15 @@ describe("dotbabel models CLI consolidation (P-23)", () => {
     for (const verb of MODELS_VERBS) { for (const form of verb.forms) expect(form.purpose.length, verb.name).toBeGreaterThan(10); expect(Array.isArray(verb.flags)).toBe(true); }
   });
 
-  it("renderVerbHelp() prints each form on its own line with its purpose indented below", () => {
-    const lines = renderVerbHelp().split("\n");
-    const forms = MODELS_VERBS.flatMap(verb => verb.forms);
-    expect(lines).toHaveLength(forms.length * 2);
-    forms.forEach((form, index) => { expect(lines[index * 2]).toBe(`  ${form.usage}`); expect(lines[index * 2 + 1]).toBe(`      ${form.purpose}`); });
+  it("renderVerbHelp() prints each form with its purpose below, then the verb's accepted flags", () => {
+    const expected = MODELS_VERBS.flatMap(verb => [...verb.forms.flatMap(form => [`  ${form.usage}`, `      ${form.purpose}`]), `      flags: ${verb.flags.map(flag => `--${flag}`).join(" ")}`]);
+    expect(renderVerbHelp().split("\n")).toEqual(expected);
+  });
+
+  it("--help names every flag each verb accepts, so no working flag is hidden", () => {
+    const help = sandbox().run("standalone", ["--help"]).stdout;
+    for (const verb of MODELS_VERBS) for (const flag of verb.flags) expect(help, `${verb.name} --${flag}`).toContain(`--${flag}`);
+    for (const flag of ["snapshot-file", "evidence-file", "artifact-kind", "decisions", "batch", "observation-file"]) expect(help).toContain(`--${flag}`);
   });
 
   it("dotbabel models and dotbabel-models produce identical output for the same arguments", () => {

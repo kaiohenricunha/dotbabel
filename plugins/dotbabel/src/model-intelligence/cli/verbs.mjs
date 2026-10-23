@@ -42,9 +42,13 @@ export const MODELS_VERBS = Object.freeze([
 
 /**
  * Render the verb section of `dotbabel models --help`: each documented form on its own line, with its
- * purpose indented below it.
+ * purpose indented below it, then the verb-specific flags the bin accepts. The flags line comes from
+ * the same `flags` list the bin enforces, so a working flag cannot be missing from its verb's help.
  * @returns {string}
  */
 export function renderVerbHelp() {
-  return MODELS_VERBS.flatMap((verb) => verb.forms.map((form) => `  ${form.usage}\n      ${form.purpose}`)).join("\n");
+  return MODELS_VERBS.flatMap((verb) => [
+    ...verb.forms.map((form) => `  ${form.usage}\n      ${form.purpose}`),
+    `      flags: ${verb.flags.map((flag) => `--${flag}`).join(" ")}`,
+  ]).join("\n");
 }
