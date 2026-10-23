@@ -50,11 +50,16 @@ import { compatibleMigrationPaths } from "../src/model-intelligence/compat/compa
 import { loadCompatibilityContext } from "../src/model-intelligence/compat/release.mjs";
 import { migrateArtifacts } from "../src/model-intelligence/compat/migrate.mjs";
 import { openProjectionTree } from "../src/model-intelligence/materialize/projection-fs.mjs";
+import { MODELS_VERBS, renderVerbHelp } from "../src/model-intelligence/cli/verbs.mjs";
 const META = {
   name: "dotbabel-models",
   synopsis: "dotbabel-models <verb> [OPTIONS]",
-  description:
-    "Model Intelligence. session [--runtime codex|claude] [--model auto|<native-id>] [--effort auto|<native-value>] — run an enabled project's managed Codex terminal or native Claude UI with session-only Mods; Claude effective-provider routing remains unverified; enable/disable [--routing] [--repo-root <path>] change project opt-ins only; resolve [artifact | --requirement <class>] --runtime <id> [--artifact-kind <kind>] — resolve and explain using cached evidence only; refresh [--source <id>] [--runtime <id>] — refresh the capability cache; status [--check] — report sources, cache freshness and release age, never refreshing; snapshot [--check | --write] [--snapshot-file <path>] [--evidence-file <path>] — validate offline or recheck native selectors and compare/write accepted release evidence; recommend [artifact | --requirement <class>] --runtime <id> — read-only advice and native invocation recipe; migrate [--check | --write] [--decisions <path>] [--batch <A-F>] — report or apply reviewed canonical migrations; class-F decisions remain untouched.",
+  description: [
+    "Model Intelligence (docs/specs/model-intelligence §5). Verbs:",
+    renderVerbHelp(),
+    "",
+    "Notes: resolve and recommend use cached evidence only. Claude session routing applies the model; its effort control stays unverified. migrate never touches class-F decisions.",
+  ].join("\n"),
   flags: {
     model: { type: "string" },
     effort: { type: "string" },
@@ -75,20 +80,10 @@ const META = {
   },
 };
 
-const VERBS = Object.freeze(["refresh", "status", "snapshot", "migrate", "resolve", "recommend", "enable", "disable", "session"]);
+const VERBS = Object.freeze(MODELS_VERBS.map((entry) => entry.name));
 
 /** The flags each verb accepts, beyond the harness-wide set. Any other is a usage error. */
-const VERB_FLAGS = Object.freeze({
-  session: ["repo-root", "runtime", "model", "effort"],
-  refresh: ["source", "runtime"],
-  status: ["check", "repo-root", "snapshot-file"],
-  snapshot: ["check", "write", "snapshot-file", "evidence-file"],
-  enable: ["routing", "repo-root"],
-  disable: ["routing", "repo-root"],
-  migrate: ["repo-root", "write", "check", "batch", "decisions"],
-  resolve: ["repo-root", "runtime", "requirement", "artifact-kind"],
-  recommend: ["repo-root", "runtime", "requirement", "artifact-kind", "observation-file"],
-});
+const VERB_FLAGS = Object.freeze(Object.fromEntries(MODELS_VERBS.map((entry) => [entry.name, entry.flags])));
 
 /**
  * Report a usage error and exit 64.
