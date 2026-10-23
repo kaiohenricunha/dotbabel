@@ -9,8 +9,9 @@
 
 import * as claude from "./runtime/claude.mjs";
 import * as codex from "./runtime/codex.mjs";
+import * as gemini from "./runtime/gemini.mjs";
 import * as modelsDev from "./knowledge/models-dev.mjs";
 import * as anthropic from "./knowledge/anthropic.mjs";
 
 /** Every shipped adapter module, runtimes first. */
-export const SOURCE_ADAPTERS = Object.freeze([claude, codex, modelsDev, anthropic]);
+export const SOURCE_ADAPTERS = Object.freeze([claude, codex, gemini, modelsDev, anthropic]);
