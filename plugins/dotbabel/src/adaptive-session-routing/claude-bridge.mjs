@@ -17,6 +17,39 @@ function valid(input) {
 }
 
 /**
+ * Answer one bounded routing request: an activation check, or a preparation that may ask for native
+ * evidence. Shared by the launcher's socket and the persistent plugin's `models route` command, so both
+ * transports apply the same gate, classification and shared resolver. Never throws.
+ * @param {unknown} input Parsed request `{action, request, native?}`.
+ * @param {{readActivation?:Function,classify?:Function,load:Function}} dependencies Trusted seams and the resolver-input loader.
+ * @returns {Promise<{code:number, body:object}>}
+ */
+export async function handleRoutingInput(input, dependencies) {
+  if (!valid(input) || ![undefined, "activation", "prepare"].includes(input.action)) return { code: 400, body: errorBody };
+  let sourceFailure;
+  try {
+    const { runtimeVersion, ...routingRequest } = input.request;
+    const support = VERIFIED_CLAUDE_MAIN_VERSIONS.includes(runtimeVersion) ? "supported" : "unverified";
+    if (input.action === "activation") {
+      const activation = await (dependencies.readActivation ?? readProjectActivation)(routingRequest.repoRoot);
+      if (activation.enabled !== true || activation.routingEnabled !== true || support !== "supported") return { code: 200, body: { decision: route({ activation, runtimeCapability: { support } }) } };
+      return { code: 200, body: { ready: true } };
+    }
+    const decision = await prepareRoute({ ...routingRequest, runtimeCapability: { support, axes: { model: support, reasoning: support } } }, {
+      readActivation: dependencies.readActivation,
+      classify: dependencies.classify,
+      loadResolverInput: async root => {
+        try { return await dependencies.load(root, input.native); }
+        catch (error) { sourceFailure = error.code; throw error; }
+      },
+    });
+    if (sourceFailure === "native_catalog_required") return { code: 200, body: { needsEvidence: true } };
+    if (["routing_unverified", "native_catalog_invalid", "native_catalog_unavailable", "session_project_limit"].includes(sourceFailure)) decision.diagnostics.push({ code: sourceFailure });
+    return { code: 200, body: { decision } };
+  } catch { return { code: 200, body: { decision: { status: "preserved", diagnostics: [{ code: "routing_preparation_failed" }] } } }; }
+}
+
+/**
  * Open an owner-only Unix socket in a newly created private directory. Accept only a bounded
  * preparation request, never a command, file path to execute, credential, native approval or turn.
  * Every request rechecks project activation before classification or capability work. Policies are
@@ -46,32 +79,9 @@ export async function openClaudeRoutingBridge(dependencies = {}) {
       try {
         if (invalid) throw Error();
         input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks)));
-        if (!valid(input) || ![undefined, "activation", "prepare"].includes(input.action)) throw Error();
       } catch { answer(response, 400, errorBody); return; }
-      let sourceFailure;
-      try {
-        const { runtimeVersion, ...routingRequest } = input.request;
-        const support = VERIFIED_CLAUDE_MAIN_VERSIONS.includes(runtimeVersion) ? "supported" : "unverified";
-        if (input.action === "activation") {
-          const activation = await (dependencies.readActivation ?? readProjectActivation)(routingRequest.repoRoot);
-          if (activation.enabled !== true || activation.routingEnabled !== true || support !== "supported") answer(response, 200, { decision: route({ activation, runtimeCapability: { support } }) });
-          else answer(response, 200, { ready: true });
-          return;
-        }
-        const decision = await prepareRoute({ ...routingRequest, runtimeCapability: { support, axes: { model: support, reasoning: support } } }, {
-          readActivation: dependencies.readActivation,
-          classify: dependencies.classify,
-          loadResolverInput: async root => {
-            try { return await load(root, input.native); }
-            catch (error) { sourceFailure = error.code; throw error; }
-          },
-        });
-        if (sourceFailure === "native_catalog_required") answer(response, 200, { needsEvidence: true });
-        else {
-          if (["routing_unverified", "native_catalog_invalid", "native_catalog_unavailable", "session_project_limit"].includes(sourceFailure)) decision.diagnostics.push({ code: sourceFailure });
-          answer(response, 200, { decision });
-        }
-      } catch { answer(response, 200, { decision: { status: "preserved", diagnostics: [{ code: "routing_preparation_failed" }] } }); }
+      const handled = await handleRoutingInput(input, { ...dependencies, load });
+      answer(response, handled.code, handled.body);
     });
   });
   server.requestTimeout = 15000;

@@ -2,11 +2,22 @@
 const validValue = value => typeof value === "string" && value.length > 0 && value.length <= 200 && !/[\p{Cc}\p{Cf}]/u.test(value);
 
 async function privatePrepare($, options, request, action, native) {
+  const body = JSON.stringify({ action, request, ...(native === undefined ? {} : { native }) });
+  if (options.transport?.kind === "process") return processPrepare($, options.transport.argv, body);
   if (typeof options.socketPath !== "string" || !options.socketPath.startsWith("/") || options.socketPath.length > 100) throw Error("native_bridge_unavailable");
   const response = await $.http.fetch("http://localhost/prepare", { method: "POST", socketPath: options.socketPath,
-    headers: { "content-type": "application/json" }, body: JSON.stringify({ action, request, ...(native === undefined ? {} : { native }) }) });
+    headers: { "content-type": "application/json" }, body });
   if (!response.ok || typeof response.text !== "string" || response.text.length > 262144) throw Error("native_bridge_unavailable");
   return JSON.parse(response.text);
+}
+
+/** Persistent-plugin transport: the request goes on stdin of an absolute local command, never in argv. */
+async function processPrepare($, argv, body) {
+  if (!Array.isArray(argv) || argv.length < 1 || argv.length > 8 || !argv.every(validValue) || !argv[0].startsWith("/")) throw Error("native_bridge_unavailable");
+  let result;
+  try { result = await $.process.run(argv, { stdin: body, timeoutMs: 20000 }); } catch { throw Error("native_bridge_unavailable"); }
+  if (result?.exitCode !== 0 || typeof result.stdout !== "string" || result.stdout.length > 262144) throw Error("native_bridge_unavailable");
+  try { return JSON.parse(result.stdout); } catch { throw Error("native_bridge_unavailable"); }
 }
 
 async function nativeManual($, request, options) {
@@ -83,13 +94,15 @@ export async function prepareClaudeRoute($, request, options) {
     const value = (request.nativeAxes ?? request.current.axes)[axis];
     if (value === undefined) delete prepared.current.axes[axis]; else prepared.current.axes[axis] = value;
   }
-  const first = await privatePrepare($, options, prepared, "prepare");
+  const keep = options.transport?.kind === "process" && options.state ? options.state : undefined;
+  const first = await privatePrepare($, options, prepared, "prepare", keep?.native);
   if (!first.needsEvidence) return { ...first.decision, manual };
   const rows = await $.config.list();
   const selectors = rows.find(row => row.key === "model")?.options;
   if (!Array.isArray(selectors) || selectors.length < 1 || selectors.length > 32 || !selectors.every(validValue)) throw Error("native_catalog_invalid");
   const pages = await providerPages($);
   const native = { version, selectors, providerPages: pages, observedAt: new Date().toISOString() };
+  if (keep) keep.native = native;
   const result = await privatePrepare($, options, prepared, "prepare", native);
   if (result.needsEvidence || !result.decision) throw Error("native_catalog_unavailable");
   return { ...result.decision, manual };

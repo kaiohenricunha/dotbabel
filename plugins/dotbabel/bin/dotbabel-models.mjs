@@ -148,6 +148,7 @@ try {
     }
   }
   else if (["enable", "disable"].includes(verb)) runActivation();
+  else if (verb === "route") await runRoute();
   else await runMigrate();
 } catch (error) {
   const snapshotCode = typeof error.code === "string" && /^(snapshot_|release_|migration_|projection_|recommendation_)/.test(error.code) ? error.code : undefined;
@@ -155,6 +156,25 @@ try {
   if (argv.flags.json) process.stdout.write(`${JSON.stringify({ diagnostics: [{ code }] })}\n`);
   out.fail(code);
   process.exit(["invalid_project_config", "invalid_activation_change", "release_evidence_stale", "release_evidence_time_invalid", "release_requirement_unsatisfied", "migration_input_invalid", "migration_decision_invalid", "migration_decision_conflict", "migration_source_invalid", "projection_output_drift", "recommendation_observation_invalid"].includes(code) || code.startsWith("snapshot_") && !["snapshot_unavailable", "snapshot_locked"].includes(code) ? EXIT_CODES.VALIDATION : EXIT_CODES.ENV);
+}
+
+/**
+ * Answer one Claude routing request read on stdin, for the persistent plugin (adaptive-session-routing
+ * §5). The request never travels in argv, so a prompt is not visible in the process list. The answer is
+ * the same one the launcher's private socket gives. Malformed or oversized input exits 64.
+ * @returns {Promise<void>}
+ */
+async function runRoute() {
+  const { handleRoutingInput } = await import("../src/adaptive-session-routing/claude-bridge.mjs");
+  const { createClaudeSessionInputLoader } = await import("../src/model-intelligence/cli/claude-session-input.mjs");
+  const invalid = () => { process.stdout.write(`${JSON.stringify({ diagnostics: [{ code: "session_input_invalid" }] })}\n`); process.exit(EXIT_CODES.USAGE); };
+  const chunks = []; let bytes = 0;
+  for await (const chunk of process.stdin) { bytes += chunk.length; if (bytes > 1048576) invalid(); chunks.push(chunk); }
+  let input;
+  try { input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))); } catch { invalid(); }
+  const handled = await handleRoutingInput(input, { load: createClaudeSessionInputLoader().load });
+  if (handled.code !== 200) invalid();
+  process.stdout.write(`${JSON.stringify(handled.body)}\n`);
 }
 
 /** Explicit project-local enable/disable operation. @returns {void} */
