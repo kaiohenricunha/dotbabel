@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:189d7fbce1f59d2496cf81b0f0c8c3355db3ff6ab7ceb4b1a1d1eef663a64fb0 source=agents/aws-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:8c903d17fabc2325093c1f1620b53a33c050d8a94f3c03c20c432f03e420d8e8 source=agents/aws-engineer.md — do not edit directly
 description: |
   Use when designing, debugging, or reviewing AWS workloads and service integrations. Triggers on: "AWS", "EC2", "ECS", "EKS", "Lambda", "S3", "IAM role", "VPC", "RDS", "DynamoDB", "CloudFront", "ALB", "Route53", "CloudFormation", "CDK", "API Gateway", "EventBridge", "SQS", "SNS". Uses opus — AWS architecture spans IAM trust, multi-service interactions, and compliance tradeoffs that benefit from deep analysis.
 model: opus

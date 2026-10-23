@@ -16,6 +16,16 @@ preserved verbatim because they describe state at the time of release.
   exclude Gemini CLI, which remains supported through explicit configuration. Existing explicit
   lists, Gemini artifacts, bootstrap detection, and Model Intelligence activation remain unchanged.
 
+## [4.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.3.0...v4.4.0) (2026-10-23)
+
+
+### Added
+
+* **models:** add the Antigravity runtime source adapter (P-22c) ([#569](https://github.com/kaiohenricunha/dotbabel/issues/569)) ([47062f6](https://github.com/kaiohenricunha/dotbabel/commit/47062f6d5e0ab857a67630bb0456e6af3f594bd7))
+* **models:** add the GitHub Copilot runtime source adapter (P-22b) ([#571](https://github.com/kaiohenricunha/dotbabel/issues/571)) ([b1034f7](https://github.com/kaiohenricunha/dotbabel/commit/b1034f783e44b979c6a3c94f2744a6a32353f2d8))
+* **models:** add the OpenCode runtime source adapter (P-22d) ([#567](https://github.com/kaiohenricunha/dotbabel/issues/567)) ([f12afcd](https://github.com/kaiohenricunha/dotbabel/commit/f12afcd2a54213770fe9a497ec704897a1f068a7))
+* **peer:** forward a Claude Code Heads Up note to the Advisor once ([#570](https://github.com/kaiohenricunha/dotbabel/issues/570)) ([fa20a49](https://github.com/kaiohenricunha/dotbabel/commit/fa20a49f3c1b5f1d62e2a91edf6e21c73f893d28))
+
 ## [4.3.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.2.0...v4.3.0) (2026-10-23)
 
 

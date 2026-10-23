@@ -350,6 +350,7 @@ function readOnlyShell(command) {
       "status",
       "ask",
       "inspect",
+      "heads-up",
       "priority",
       "cancel",
       "pause",

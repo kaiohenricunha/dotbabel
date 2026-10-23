@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:be0178d198b3b21713867eb81ce098d802703bbf822717f5afba3d450eb20794 source=agents/kubernetes-specialist.md — do not edit directly
+# dotbabel:generated projection=sha256:290cdacb3c7d9bc6ab480ce0548d09aaf9c1d39a33b6ca9dbedb48e0ef26964b source=agents/kubernetes-specialist.md — do not edit directly
 description: |
   Use when designing, debugging, or reviewing Kubernetes workloads and cluster configuration. Triggers on: "kubernetes", "k8s", "pod", "deployment", "cluster", "kubectl", "namespace", "ingress", "helm chart", "workload", "node not ready". Uses opus — Kubernetes troubleshooting spans scheduler decisions, network policy semantics, and control-plane interactions; deep reasoning prevents misdiagnosis.
 model: opus

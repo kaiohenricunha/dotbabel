@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:9ae092e5c7d782b7f7aff45fbde6edd5222ff8f3e0a4a5c04034abfecd1a7533 source=skills/rollback-prod/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:ba2c8364c15aba7e68467fd85ed8c896cf8de93c5dafc08ac473345b99f1b3d3 source=skills/rollback-prod/SKILL.md — do not edit directly
 argument-hint: "[--dry-run]"
 description: |
   Roll back the most recent production release across configured deploy targets after an explicit typed confirmation. Use only when the user directly invokes /rollback-prod during incident response or release recovery.
