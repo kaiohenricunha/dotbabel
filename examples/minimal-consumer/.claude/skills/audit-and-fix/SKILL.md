@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1d563fb0cc146487036ea6bedd894815cafec7a24c87e109f39fa44b9fd23d79 source=skills/audit-and-fix/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:a7c0ea900b0ae9bf8905211c4b2561f662329bb64d4c103fcec11afa486ba060 source=skills/audit-and-fix/SKILL.md — do not edit directly
 argument-hint: "[domain]"
 description: |
   Run an audit-then-implement pipeline: produce an audit, cluster findings into PR-sized chunks, and spawn parallel subagents to implement fixes as draft PRs. Triggers on: "audit and fix", "clean up domain", "overnight cleanup".

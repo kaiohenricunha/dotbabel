@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:b514605d266941d98b486caf7b0df3fc04839f4f1e6ee9e40daba208bbad75e4 source=agents/deployment-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:ce6de556b24a195f4fc4e92302be6129cfd66bd635d0653c631b63411e77273c source=agents/deployment-engineer.md — do not edit directly
 description: |
   Use when planning or executing deployment strategies, release coordination, traffic shifting, or rollback procedures. Triggers on: "deployment strategy", "blue/green", "canary release", "rolling update", "traffic shifting", "rollback", "release coordination", "feature flag", "progressive delivery", "deploy to production". Uses sonnet — deployment strategy execution is structured; sonnet handles the reasoning without over-provisioning cost.
 model: sonnet

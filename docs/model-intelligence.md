@@ -1,6 +1,6 @@
 # Model Intelligence
 
-_Last updated: v4.4.0_
+_Last updated: v4.5.0_
 
 Model Intelligence is an optional project capability. Installation does not enable it. The current
 activation interface stores project flags. Explicit resolution uses cached capability evidence;

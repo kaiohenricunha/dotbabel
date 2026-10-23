@@ -1,6 +1,6 @@
 # Persistent peer collaboration
 
-_Last updated: v4.4.0_
+_Last updated: v4.5.0_
 
 Peer connects one implementation session (Main) and one read-only reasoning
 session (Advisor). Each can run in Claude Code, Codex CLI, OpenCode v2, Copilot CLI,

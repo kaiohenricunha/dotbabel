@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1c23e47492273de1bd5252f7dec532e3adce70f9d8c0530cbb3360cd0ba61f25 source=agents/compliance-auditor.md — do not edit directly
+# dotbabel:generated projection=sha256:6bfc95d91e71b38269e8aa573bcc48fd16b75a675dad129c37c83bc4965b1a7b source=agents/compliance-auditor.md — do not edit directly
 description: |
   Use when auditing data quality gates, config-driven checks, or invariant enforcement. Cross-references declaration files against runtime enforcement code to find declared-not-enforced and enforced-not-declared gaps. Read-only — produces a coverage matrix, never modifies code or config. Triggers on: "gate coverage", "quality check audit", "data invariants", "declared vs enforced", "config vs code gaps", "quality gate completeness".
 model: opus

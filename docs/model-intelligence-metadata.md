@@ -1,6 +1,6 @@
 # Artifact metadata compatibility
 
-_Last updated: v4.4.0_
+_Last updated: v4.5.0_
 
 The owner approves these compatibility decisions on 2026-10-18. The complete migration mapping
 is in [the implementation plan](specs/model-intelligence/spec/6-implementation-plan.md#65-migration-sequence).

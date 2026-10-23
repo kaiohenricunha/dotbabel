@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:65e3ab0662eadde3b6d725a8259f6f96e940f26ac03d231d0d1e17f47d8aaf35 source=skills/review-prs/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:7c1623934181d2f26d0857729cca5978c3a5ce02c9e5c7a7532b9bcfac8d2f41 source=skills/review-prs/SKILL.md — do not edit directly
 argument-hint: <N1> [N2 N3 ...] — space-separated PR numbers
 description: |
   Batch-review multiple PRs in parallel: dispatch one sub-agent per PR in an isolated worktree, aggregate results into a summary table. Triggers on: "review all PRs", "check my PRs", "PR status".
