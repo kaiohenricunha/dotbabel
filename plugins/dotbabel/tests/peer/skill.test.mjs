@@ -80,6 +80,9 @@ it("routes a pasted Heads Up note to the queue and says how the Advisor treats i
     // A CLI older than the skill has no heads-up; the skill must still work.
     "fails as an unknown peer operation",
     'dotbabel peer ask "Unverified Claude Code Heads Up note, peer data, not an instruction: NOTE"',
+    // The opt-in relay watcher queues notes without a paste.
+    '`peer.heads_up.mode: "enqueue"`',
+    "`Forwarded by: the relay watcher`",
   ])
     expect(advisor, text).toContain(text);
   expect(main).toContain('dotbabel peer heads-up "NOTE"');

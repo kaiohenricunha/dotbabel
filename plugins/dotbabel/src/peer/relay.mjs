@@ -52,21 +52,34 @@ function reserve(delivery, now) {
   return delivery.token;
 }
 
-/** Run one scheduler/transport pass; adapters and liveness are injectable for isolated tests. @param {object} store @param {string} pairId @param {object} [opts] @returns {Promise<boolean>} false if the pair is closed/missing */
+// The opt-in Heads Up watcher is optional; its failure skips its part of the tick only.
+function guarded(operation, failed) {
+  try {
+    return operation();
+  } catch {
+    return failed;
+  }
+}
+
+/** Run one scheduler/transport pass; adapters, liveness, and the Heads Up watcher are injectable for isolated tests. @param {object} store @param {string} pairId @param {object} [opts] @returns {Promise<boolean>} false if the pair is closed/missing */
 export async function tick(
   store,
   pairId,
-  { alive = endpointAlive, transport = deliver, now = Date.now() } = {},
+  { alive = endpointAlive, transport = deliver, now = Date.now(), watcher } = {},
 ) {
   const snapshot = await store.read(),
     prior = snapshot.pairs.find((p) => p.id === pairId);
   if (!prior || prior.closed) return false;
   const live = { main: alive(prior.main), advisor: prior.advisor && alive(prior.advisor) };
-  const jobs = await store.transaction((s) => {
+  // Files and Git are read before the ledger lock.
+  let notes = watcher && guarded(() => watcher.prepare(prior, now), { failed: true });
+  const plan = (s) => {
     const p = s.pairs.find((x) => x.id === pairId);
     if (!p || p.closed) return [];
     if (p.availability?.main !== live.main || p.availability?.advisor !== live.advisor)
       p.availability = { ...live, checked_at: new Date(now).toISOString() };
+    // Before the claim below, so a forwarded note dispatches in this tick.
+    if (notes) guarded(() => watcher.apply(p, notes, now));
     const out = [];
     if (live.advisor && !p.paused) {
       const r = nextRequest(p, p.advisor, now);
@@ -109,7 +122,18 @@ export async function tick(
       }
     }
     return out;
-  });
+  };
+  let jobs;
+  try {
+    jobs = await store.transaction(plan);
+  } catch (err) {
+    // A forwarded note must never stop the relay: when the write fails (for example at the
+    // capacity limit), the tick runs again without it, and the watcher retries on the next tick.
+    if (!notes) throw err;
+    notes = null;
+    jobs = await store.transaction(plan);
+  }
+  if (notes) guarded(() => watcher.commit(notes));
   for (const job of jobs) {
     let result;
     try {

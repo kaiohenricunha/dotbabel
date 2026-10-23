@@ -176,11 +176,58 @@ labels the note as untrusted data, tells the Advisor to classify it as
 actionable, already addressed, false positive, or inconclusive, and records its
 origin: the Main session, the repository and worktree, `HEAD`, whether the
 worktree has uncommitted changes, and the time. Only an actionable note reaches
-Main. Claude Code gives no supported way to read these notes automatically, so
-forwarding stays manual (see
-[the feasibility report](research/heads-up-advisor-integration-feasibility.md)).
-Every request that `next` returns now says that its body is peer data, not a
+Main. Every request that `next` returns says that its body is peer data, not a
 user instruction.
+
+### Automatic forwarding (opt-in)
+
+Claude Code gives no supported interface for these notes (see
+[the feasibility report](research/heads-up-advisor-integration-feasibility.md)).
+A project can opt in to a watcher that reads the add-on's undocumented store.
+It is off by default. To turn it on, add this to `.dotbabel.json` in Main's
+worktree:
+
+```json
+{ "peer": { "heads_up": { "mode": "enqueue" } } }
+```
+
+The pair's relay then reads
+`<CLAUDE_CONFIG_DIR or ~/.claude>/plugins/store/cc-plugin-you-should-know_builtin-19776595df2c.json`
+once each second. It queues each note that the store shows as open in the
+pair's Main session, through the same path as `heads-up`. The request says
+`Forwarded by: the relay watcher`. A note that closed between two reads is
+queued only when exactly one session changed; the request then holds the line
+without its explanation. The watcher needs no new process, and it makes no
+model call.
+
+The watcher fails closed:
+
+- It runs only while the relay runs, so only for a pair with an Advisor.
+- It forwards only on measured Claude Code versions (2.1.307 and 2.1.309). It
+  checks `claude --version` once per relay start, and the version that Main's
+  session registry entry records. Another version gives `unsupported_version`.
+- A store of any other shape, a symlink, or a file over 1 MiB gives
+  `unknown_format`. A missing file gives `store_missing`. A partial read skips
+  one tick.
+- It ignores the Advisor's notes and the notes of every session outside the
+  pair. When two sessions changed at once, it queues nothing and counts the
+  change as `ambiguous`.
+- It never replays a note that closed before the relay started. The same
+  session and turn is queued once per relay run, and the same note text returns
+  the first request.
+- An invalid setting means off, and `peer status` shows a diagnostic.
+
+`peer status` shows the watcher as `heads_up`: `mode`, `state` (`off`,
+`watching`, `unsupported_version`, `unknown_format`, or `store_missing`),
+`claudeVersion`, and the `forwarded` and `ambiguous` counts. The relay records
+these fields on the pair, as it does `availability`. They never hold note text.
+
+Privacy: the watcher reads only that store file. It reads no transcript and
+writes no Claude Code file. Note text leaves Main's terminal without consent
+for each note, and it reaches the Advisor, which can run on another provider.
+The text appears only in the queued request, never in logs or status. To turn
+the watcher off, remove the setting or set `"mode": "off"`. `peer status` shows
+`off` at once, and the relay stops at its next tick.
 
 The input pane stores one investigation per nonempty line. `.queue`, `.pause`,
 `.resume`, and `.quit` control it. It does not interpret conversation or start
