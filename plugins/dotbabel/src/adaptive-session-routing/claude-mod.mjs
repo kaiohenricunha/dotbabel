@@ -116,6 +116,8 @@ export function registerClaudeRouting(on, options) {
     }
     const request = { ...e };
     for (const [axis, key] of [["model", "model"], ["reasoning", "effort"]]) if (turn.revision[axis] === revision[axis] && turn.changes[axis] !== undefined) request[key] = turn.changes[axis];
+    // classic.Stop reports the session effort setting (#572), which no longer describes a rewritten request.
+    if (request.effort !== e.effort) turn.effortRewritten = true;
     const intended = { model: request.model, ...(typeof request.effort === "string" ? { reasoning: request.effort } : {}) };
     await report($, { status: decision.status, confidence: decision.confidence, diagnostics: decision.diagnostics ?? [], intended, accepted: { state: "unknown" }, effective: { state: "unknown" } });
     const result = yield* next(request);
@@ -135,7 +137,7 @@ export function registerClaudeRouting(on, options) {
   });
 
   on("classic.Stop", async ($, e, next) => {
-    if (e.agent_id === undefined && active?.effective?.state === "observed" && opaque(e.effort?.level)) {
+    if (e.agent_id === undefined && active?.effective?.state === "observed" && !active.effortRewritten && opaque(e.effort?.level)) {
       active.effective = { ...active.effective, axes: { ...active.effective.axes, reasoning: e.effort.level }, reasoningSource: "classic.Stop:effort.level" };
       current.axes.reasoning = e.effort.level;
       await report($, { status: "observed", effective: active.effective });

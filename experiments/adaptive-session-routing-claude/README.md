@@ -52,6 +52,8 @@ On 2026-10-22 the six acceptance steps run on 2.1.307. Plugin validation and the
 
 On 2026-10-23 the acceptance steps run on 2.1.309. The host relay test passes. Plugin validation now also reports two plugin-directory submission checks (README and LICENSE missing); they concern a public directory listing, not this session-only plugin, and validation still exits 0. The metadata run proposes `claude-haiku-5-5` / `low` at zero cost, and the live turn applies `claude-haiku-5-5` (USD 0.0036 with a warm cache). A separate measurement (`docs/experiments/adaptive-session-routing-claude-effort-2026-10-23.md`) gives moderate evidence that the `turn.step` effort override applies.
 
+On 2026-10-23 a live run of the AC-11 test (`DOTBABEL_MODELS_TIER3=1 npx vitest run plugins/dotbabel/tests/integration/adaptive-session-routing-claude.integration.test.mjs`) passes on 2.1.309, with one turn costing USD 1.08. The route intends `claude-sonnet-5-5` with `low` effort, and native `usage.model` reports `claude-sonnet-5-5`. The turn rewrote the effort, so the diagnostic reports no effective effort. Before this change it reported the session level from `classic.Stop` (`medium`) as effective, which #572 showed is the session setting and not the request's effort. AC-11 stays `planned` because CI never runs live tests. Run it by hand with the command above.
+
 ## Verify a new Claude Code release
 
 Routing runs only on an exact Claude Code release listed in `VERIFIED_MAIN_VERSIONS` (`plugins/dotbabel/src/model-intelligence/sources/runtime/claude.mjs`). Each Claude Code update can change the Mods contract, so a new release stays unverified until it passes these checks.

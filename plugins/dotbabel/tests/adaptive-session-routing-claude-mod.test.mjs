@@ -144,12 +144,28 @@ describe("Claude MAIN mod boundary", () => {
     await f.start(); await f.step(); expect(f.prepare.mock.calls[0][0].current.turnExecuted).not.toBe(false);
   });
   it("uses native Stop effort evidence only for a correlated MAIN response and reports observation rather than completion", async () => {
-    const f = fixture(); await f.start(); await f.step();
-    await f.hooks.get("classic.Stop")(f.$, { effort: { level: "xhigh" } }, async () => ({}));
-    expect(f.reports.at(-1)).toMatchObject({ status: "observed", effective: { state: "observed", axes: { model: "selected", reasoning: "xhigh" }, reasoningSource: "classic.Stop:effort.level" } });
+    // The turn sent the session's own effort, so the session setting that Stop reports is what ran.
+    const f = fixture({ prepare: vi.fn(async () => ({ status: "proposed", changes: { model: "selected" }, confidence: "high", diagnostics: [] })) });
+    await f.start(); await f.step();
+    expect(f.next.mock.calls[0][0]).toMatchObject({ model: "selected", effort: "medium" });
+    await f.hooks.get("classic.Stop")(f.$, { effort: { level: "medium" } }, async () => ({}));
+    expect(f.reports.at(-1)).toMatchObject({ status: "observed", effective: { state: "observed", axes: { model: "selected", reasoning: "medium" }, reasoningSource: "classic.Stop:effort.level" } });
     const count = f.reports.length;
     await f.hooks.get("classic.Stop")(f.$, { agent_id: "worker", effort: { level: "low" } }, async () => ({}));
     expect(f.reports).toHaveLength(count);
+  });
+  it("never reports the session effort from Stop as effective when the turn rewrote the effort (AC-11)", async () => {
+    // #572: classic.Stop reports the session setting, not the effort of a rewritten request.
+    const f = fixture(); await f.start(); await f.step();
+    expect(f.next.mock.calls[0][0]).toMatchObject({ model: "selected", effort: "high" });
+    const count = f.reports.length;
+    await f.hooks.get("classic.Stop")(f.$, { effort: { level: "medium" } }, async () => ({}));
+    expect(f.reports).toHaveLength(count);
+    expect(f.reports.at(-1).effective).toEqual({ state: "observed", axes: { model: "selected" }, source: "turn.step:usage.model" });
+    // The next turn starts from the observed model only, never from the session effort.
+    await f.hooks.get("turn.complete")(f.$, { turnId: "one", reason: "answer" }, async () => ({}));
+    await f.start("two"); await f.step({ turnId: "two" });
+    expect(f.prepare.mock.calls[1][0].current.axes).toEqual({ model: "selected" });
   });
   it("does not turn the read-only effort status command into a manual override", async () => {
     const f = fixture(); const event = { command: "effort", args: "status", origin: { kind: "composer" } };
