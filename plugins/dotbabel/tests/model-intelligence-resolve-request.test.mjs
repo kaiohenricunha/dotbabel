@@ -99,11 +99,17 @@ describe("read-only resolution file boundaries", () => {
     expect(value).toMatchObject({ exitCode: 1, result: { status: "invalid", diagnostics: [{ code: "invalid_model_intelligence_policy" }] } });
     expect(value.result.configuration).toBeUndefined();
   });
-  it("reports unsupported runtime adapters without pretending that a catalog can enable them", () => {
+  it("ships an adapter for every runtime, and an adapter without discovery evidence still resolves nothing", async () => {
+    const { RUNTIME_IDS } = await import("../src/model-intelligence/domain/index.mjs");
+    const { SOURCE_ADAPTERS } = await import("../src/model-intelligence/sources/index.mjs");
+    const shipped = SOURCE_ADAPTERS.filter(module => module.descriptor.kind === "runtime").map(module => module.descriptor.id);
+    expect([...shipped].sort()).toEqual([...RUNTIME_IDS].sort());
     const { request } = fixture();
-    const value = resolveRequest({ ...request, runtimeId: "antigravity" });
-    expect(value).toMatchObject({ exitCode: 2, result: { status: "unresolved", diagnostics: [{ code: "runtime_adapter_unavailable" }] } });
-    // Gemini has an adapter, but it cannot discover models, so no catalog evidence exists for it.
-    expect(resolveRequest({ ...request, runtimeId: "gemini" })).toMatchObject({ exitCode: 2, result: { status: "unresolved", diagnostics: [{ code: "insufficient_capability_evidence" }] } });
+    // Each of these adapters exists but has no supported discovery, so no catalog evidence exists for it.
+    for (const runtimeId of ["gemini", "antigravity", "copilot", "opencode"]) {
+      const value = resolveRequest({ ...request, runtimeId });
+      expect(value, runtimeId).toMatchObject({ exitCode: 2, result: { status: "unresolved", diagnostics: [{ code: "insufficient_capability_evidence" }] } });
+      expect(value.result.diagnostics.map(entry => entry.code)).not.toContain("runtime_adapter_unavailable");
+    }
   });
 });

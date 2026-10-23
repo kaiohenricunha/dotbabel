@@ -37,14 +37,14 @@ teardown() {
   [ ! -e "$XDG_CACHE_HOME/dotbabel/model-intelligence/attempts" ]
 }
 
-@test "models resolve: missing evidence and unsupported adapters exit 2" {
+@test "models resolve: missing evidence exits 2, including adapters without supported discovery" {
   run "$REAL_NODE" "$MODELS_BIN" resolve --requirement deep --runtime codex --repo-root "$PROJECT" --json
   [ "$status" -eq 2 ]
   [[ "$output" == *'"status": "unresolved"'* ]]
   [ ! -e "$XDG_CACHE_HOME/dotbabel/model-intelligence" ]
-  run "$REAL_NODE" "$MODELS_BIN" resolve --requirement deep --runtime antigravity --repo-root "$PROJECT" --json
+  run "$REAL_NODE" "$MODELS_BIN" resolve --requirement deep --runtime copilot --repo-root "$PROJECT" --json
   [ "$status" -eq 2 ]
-  [[ "$output" == *'runtime_adapter_unavailable'* ]]
+  [[ "$output" == *'insufficient_capability_evidence'* ]]
   run "$REAL_NODE" "$MODELS_BIN" resolve --requirement deep --runtime gemini --repo-root "$PROJECT" --json
   [ "$status" -eq 2 ]
   [[ "$output" == *'insufficient_capability_evidence'* ]]

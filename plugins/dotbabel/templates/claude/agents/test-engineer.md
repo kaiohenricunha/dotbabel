@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:2a407565b8a48aec336d3abcdfe372d289c176c289885b5b04cea8466f7eb797 source=agents/test-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:b6f78be8fc45aeba0aceaf14d7eb4fa612d0c52b774f7379d686aae48b709621 source=agents/test-engineer.md — do not edit directly
 description: |
   Use when writing tests, auditing test coverage, fixing flaky tests, or setting up test infrastructure. Triggers on: "write tests", "add test coverage", "fix flaky test", "integration test", "test suite", "coverage report", "missing tests", "test CI". Uses sonnet — test design benefits from reasoning about edge cases and failure modes; sonnet balances depth and speed.
 model: sonnet

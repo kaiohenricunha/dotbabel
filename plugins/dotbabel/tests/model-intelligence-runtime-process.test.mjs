@@ -39,6 +39,15 @@ describe("isolated environment", () => {
     expect(DEAD_PROXY).toBe("http://127.0.0.1:9");
   });
 
+  it("exempts only loopback from the dead proxy when a runtime opts in, for its own private local server", () => {
+    // OpenCode's --standalone talks to a server on 127.0.0.1; with NO_PROXY empty the dead proxy swallows that.
+    const env = buildIsolatedEnv({ source: { PATH: "/usr/bin", NO_PROXY: "provider.example" }, home: "/tmp/h", loopback: true });
+    expect(env.NO_PROXY).toBe("127.0.0.1,localhost,::1");
+    for (const key of ["HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY"]) expect(env[key], key).toBe(DEAD_PROXY);
+    expect(buildIsolatedEnv({ source: { PATH: "/usr/bin" }, home: "/tmp/h" }).NO_PROXY).toBe("");
+    expect(() => buildIsolatedEnv({ source: { PATH: "/usr/bin" }, home: "/tmp/h", extra: { NO_PROXY: "provider.example" } })).toThrow(/isolation pin/);
+  });
+
   it("adds only the extra variables the caller names, and refuses one that looks like a credential", () => {
     const env = buildIsolatedEnv({ source: { PATH: "/p" }, home: "/tmp/h", extra: { CODEX_HOME: "/tmp/scratch/ch" } });
     expect(env.CODEX_HOME).toBe("/tmp/scratch/ch");

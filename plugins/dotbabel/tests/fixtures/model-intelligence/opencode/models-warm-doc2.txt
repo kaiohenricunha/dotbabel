@@ -1,0 +1,4 @@
+local-qwen/qwen3-coder-30b-a3b
+opencode/big-pickle
+opencode/ling-3.0-flash-fin-free
+opencode/union-alpha

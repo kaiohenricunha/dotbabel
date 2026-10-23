@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:f20dc5e6c0582b4ea451491cd00a4ebb5462520350bf227f509f3b80e4ebe73e source=agents/data-scientist.md — do not edit directly
+# dotbabel:generated projection=sha256:e93d9bb0d7226d2ea5bc8b2e2d2408a709d0e67855e8106398615d1be8de78c7 source=agents/data-scientist.md — do not edit directly
 description: |
   Use when validating statistical models, scoring formulas, or config-driven math. Audits formula correctness, boundary conditions, config-vs-code drift, and output scale changes. Read-only — surfaces findings, never modifies code. Triggers on: "validate scoring math", "check formula", "config drift", "boundary conditions", "statistical model audit", "rating algorithm review".
 model: sonnet

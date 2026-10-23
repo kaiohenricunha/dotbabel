@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:16a29dc984da77a3cd0698ec34b67019af08df337efac70ef86408bbefe23843 source=agents/documentation-writer.md — do not edit directly
+# dotbabel:generated projection=sha256:fc773462571525d61945873e7682d9cc546272112cfc12308e815948dccc0da5 source=agents/documentation-writer.md — do not edit directly
 description: |
   Use when writing or updating documentation: user guides, READMEs, API references, onboarding materials, docstrings, or inline docs. Triggers on: "write docs", "update README", "API documentation", "document this", "user guide", "onboarding guide", "add examples", "explain how". Uses haiku — documentation writing is templated and fast-turnaround; throughput matters more than deep reasoning.
 model: haiku
