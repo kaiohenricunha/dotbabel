@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:b7a421c7f0945c607d709ebc1c14775db93180783660cc3479e1bf6349286d2a source=skills/agents-search/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:44043e576a4fa9bd48597a15fd07f6e460d0617ac35a8df0dfa18381bc3fb7b0 source=skills/agents-search/SKILL.md — do not edit directly
 argument-hint: search <query> | list | fetch <name> | invalidate [--fetch]
 description: |
   Discover, search, and manage Claude Code agents. Use when you want to find available agents, list installed agents, or refresh the agent catalog. Triggers on: "search agents", "list agents", "find agent", "what agents", "agent catalog".

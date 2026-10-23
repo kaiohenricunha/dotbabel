@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:0b60828b70e768f98a19ca315b304bd5616781697a6357775253fa7025af8acb source=agents/iac-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:2993590714c0c229d25f54542757ef1ee99b29e0b496553633c1261ab6ef5e3f source=agents/iac-engineer.md — do not edit directly
 description: |
   Use when writing, reviewing, or refactoring infrastructure-as-code modules, managing state, or handling drift detection. Triggers on: "Terraform", "Pulumi", "OpenTofu", "infrastructure as code", "IaC module", "state file", "drift detection", "resource graph", "provider", "workspace", "remote state". Uses sonnet — IaC authoring is structured and pattern-driven; sonnet covers the depth needed without excess cost.
 model: sonnet

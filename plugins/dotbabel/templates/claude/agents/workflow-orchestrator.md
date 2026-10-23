@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:7498d2fa5f168c5cfbce003b116230d98d53526fbb65141a5987906a90b86324 source=agents/workflow-orchestrator.md — do not edit directly
+# dotbabel:generated projection=sha256:f27447b78e7c29d4872fe7e546102141d7e1d9e71ffae37cf431b39c3119dc5f source=agents/workflow-orchestrator.md — do not edit directly
 description: |
   Use when coordinating multi-step tasks that require multiple agents, managing parallel workstreams, or planning and delegating complex implementation efforts. Triggers on: "orchestrate", "coordinate agents", "parallel tasks", "multi-step plan", "delegate work", "break down", "dispatch subagents". Uses opus — orchestration quality compounds across delegated agents; poor decomposition cascades into downstream failures.
 model: opus

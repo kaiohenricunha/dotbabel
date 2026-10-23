@@ -1,6 +1,6 @@
 # Upgrade guide
 
-_Last updated: v4.3.0_
+_Last updated: v4.4.0_
 
 ## 2.x → 3.0.0 — `dotclaude` compat shims removed
 

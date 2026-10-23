@@ -1,6 +1,6 @@
 # Copilot frontmatter mapping
 
-_Last updated: v4.3.0_
+_Last updated: v4.4.0_
 
 `dotbabel project-sync` fans Claude commands and skills out to Codex, Gemini,
 and Copilot. Codex and Gemini read `.codex/skills` / `.gemini/skills` as

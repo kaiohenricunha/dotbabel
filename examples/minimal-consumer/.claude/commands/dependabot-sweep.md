@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:1ea77dae5420038500e1113ef42c17911bbe18a2b7bd8fc20fd84e76bf0e9abe source=commands/dependabot-sweep.md — do not edit directly
+# dotbabel:generated projection=sha256:7617a260773541d1934490316f635086652e0082afbcffe0fbe21ce3e44f0223 source=commands/dependabot-sweep.md — do not edit directly
 description: |
   Batch-triage all open Dependabot PRs in the current repo using parallel subagents. Produces a risk-annotated table and merges only safe bumps.
 model: sonnet

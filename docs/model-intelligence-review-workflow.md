@@ -1,6 +1,6 @@
 # AI review workflow release projection
 
-_Last updated: v4.3.0_
+_Last updated: v4.4.0_
 
 The AI review coordinator declares `deep`, `floor`, and `binding: session` in the adjacent `ai-review.compute.yml`. This applies the approved Deep coordinator requirement as a mandatory release floor. It does not change a worker's separate, stronger floor. The canonical `ai-review.source.yml` remains valid GitHub Actions YAML with no concrete model or private Dotbabel metadata.
 

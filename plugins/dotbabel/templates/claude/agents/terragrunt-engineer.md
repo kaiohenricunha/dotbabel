@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:3964a2d6a8cf22ef8b2eb82b8456a10723d45445d1f494398d65ad473baa3547 source=agents/terragrunt-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:952f0792ee626489edb2a0e8ee3e154af478b94ffc1ab38a3ae56e5e9b511c1f source=agents/terragrunt-engineer.md — do not edit directly
 description: |
   Use when working with Terragrunt configurations, DRY Terraform patterns, or multi-environment root-module hierarchies. Triggers on: "Terragrunt", "terragrunt.hcl", "run-all", "DRY Terraform", "dependency block", "env hierarchy", "root module", "terragrunt hooks", "generate block". Uses sonnet — Terragrunt DRY patterns are well-specified; sonnet handles the reasoning without over-provisioning cost.
 model: sonnet

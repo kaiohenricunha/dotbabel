@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:7866166a270a2e47df723f533ab9ee7662e5924bac08c8d579dc8f55c44f17fd source=skills/kubernetes-specialist/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:fb142e51962e06aff81c35b99b1eae2a8346efc07f919fafa1dedee1fb52dcfc source=skills/kubernetes-specialist/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: <cluster context, namespace, or problem description>
 description: |
