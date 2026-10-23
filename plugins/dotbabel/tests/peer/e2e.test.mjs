@@ -154,3 +154,122 @@ it("runs a real detached relay, three durable tasks and correlated replies with 
     await Promise.all(servers.map((s) => new Promise((r) => s.close(r))));
   }
 }, 30000);
+
+it("forwards a Main Heads Up note once through a real relay process", async () => {
+  const root = makeTempDir("peer-e2e-hu-"),
+    repo = path.join(root, "repo"),
+    config = path.join(root, "claude"),
+    registry = path.join(config, "sessions"),
+    tools = path.join(root, "bin");
+  fs.mkdirSync(repo);
+  fs.mkdirSync(registry, { recursive: true });
+  fs.mkdirSync(tools);
+  execFileSync("git", ["init", "-q", repo]);
+  fs.writeFileSync(
+    path.join(repo, ".dotbabel.json"),
+    JSON.stringify({ peer: { heads_up: { mode: "enqueue" } } }),
+  );
+  // The relay reads the version from the claude on its PATH.
+  fs.writeFileSync(path.join(tools, "claude"), "#!/bin/sh\necho '2.1.309 (Claude Code)'\n", {
+    mode: 0o755,
+  });
+  const env = {
+    ...process.env,
+    PATH: `${tools}:${process.env.PATH}`,
+    CLAUDE_CONFIG_DIR: config,
+    DOTBABEL_PEER_STATE_DIR: path.join(root, "state"),
+  };
+  delete env.DOTBABEL_PEER_NO_RELAY;
+  const ids = {
+    main: "44444444-4444-4444-8444-444444444444",
+    advisor: "55555555-5555-4555-8555-555555555555",
+  };
+  const peers = [],
+    servers = [];
+  const cli = (role, args) => {
+    const r = spawnSync(process.execPath, [bin, ...args, "--json"], {
+      cwd: repo,
+      env: { ...env, DOTBABEL_PEER_HOOK_SESSION: ids[role] },
+      encoding: "utf8",
+    });
+    if (r.status !== 0) throw new Error(r.stderr || r.stdout);
+    return JSON.parse(r.stdout);
+  };
+  for (const role of ["main", "advisor"]) {
+    const peer = spawn("sleep", ["120"], { stdio: "ignore" }),
+      socket = path.join(root, `${role}.sock`);
+    peers.push(peer);
+    fs.writeFileSync(
+      path.join(registry, `${peer.pid}.json`),
+      JSON.stringify({
+        pid: peer.pid,
+        procStart: processState(peer.pid).startTime,
+        sessionId: ids[role],
+        cwd: repo,
+        version: "2.1.309",
+        messagingSocketPath: socket,
+        peerProtocol: 1,
+      }),
+    );
+    const server = net.createServer((s) => s.resume());
+    await new Promise((r) => server.listen(socket, r));
+    fs.chmodSync(socket, 0o600);
+    servers.push(server);
+  }
+  const store = path.join(config, "plugins", "store");
+  const file = path.join(store, "cc-plugin-you-should-know_builtin-19776595df2c.json");
+  const line = "The retry loop may charge twice.";
+  const record = {
+    id: ids.main,
+    askedTurn: ids.advisor,
+    offeredTurn: ids.advisor,
+    tag: "Heads up",
+  };
+  const write = (document) => fs.writeFileSync(file, JSON.stringify(document));
+  fs.mkdirSync(store, { recursive: true });
+  // A note shown before the relay started and already closed is never replayed.
+  write({ sessions: [{ ...record, offeredTurn: ids.main }], seen: ["An old note."] });
+  let relay;
+  try {
+    const pair = cli("main", ["main"]);
+    cli("advisor", ["advisor", pair.code]);
+    await until(() => cli("main", ["status"]).heads_up.state === "watching");
+    // The add-on's two writes, in its order: the seen line, then the session record.
+    write({ sessions: [{ ...record, offeredTurn: ids.main }], seen: ["An old note.", line] });
+    await wait(1500);
+    expect(cli("main", ["queue"])).toEqual([]);
+    write({
+      sessions: [{ ...record, view: { kind: "offer", line, explanation: "Why.", shownAt: 1 } }],
+      seen: ["An old note.", line],
+    });
+    await until(() => cli("main", ["queue"]).length > 0);
+    await wait(2500);
+    const queue = cli("main", ["queue"]);
+    expect(queue).toHaveLength(1);
+    expect(queue[0].body).toContain(`Forwarded by: the relay watcher`);
+    expect(queue[0].body).toMatch(/\nNote:\nThe retry loop may charge twice\.\nWhy\.$/);
+    const status = cli("main", ["status"]);
+    relay = status.relay;
+    expect(status.heads_up).toEqual({
+      mode: "enqueue",
+      state: "watching",
+      claudeVersion: "2.1.309",
+      forwarded: 1,
+      ambiguous: 0,
+    });
+    expect(JSON.stringify(status)).not.toContain(line);
+  } finally {
+    try {
+      relay ??= cli("main", ["status"]).relay;
+      cli("main", ["unpair"]);
+    } catch {}
+    if (relay) {
+      try {
+        process.kill(relay.pid, "SIGTERM");
+        await until(() => !processState(relay.pid).exists);
+      } catch {}
+    }
+    for (const p of peers) p.kill();
+    await Promise.all(servers.map((s) => new Promise((r) => s.close(r))));
+  }
+}, 40000);

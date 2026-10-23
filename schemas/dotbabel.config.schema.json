@@ -312,6 +312,24 @@
           }
         }
       }
+    },
+    "peer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Project settings for dotbabel peer.",
+      "properties": {
+        "heads_up": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "enum": ["off", "enqueue"],
+              "default": "off",
+              "description": "Explicit project opt-in. With enqueue, the pair's relay forwards each Claude Code Heads Up or You should know note shown in the pair's Main session to the Advisor queue, once, on measured Claude Code versions only. Absent or off disables it."
+            }
+          }
+        }
+      }
     }
   },
   "$defs": {

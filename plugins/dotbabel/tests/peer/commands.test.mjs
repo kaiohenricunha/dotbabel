@@ -3,7 +3,14 @@ import path from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { beforeEach, afterEach, vi, it, expect } from "vitest";
 import { makeTempDir } from "../fixtures/temp-dir.mjs";
-const ctx = vi.hoisted(() => ({ who: null, live: true, input: [], spawned: 0, parent: null }));
+const ctx = vi.hoisted(() => ({
+  who: null,
+  live: true,
+  input: [],
+  spawned: 0,
+  parent: null,
+  tick: null,
+}));
 vi.mock("../../src/peer/identity.mjs", async (importOriginal) => ({
   ...(await importOriginal()),
   currentSession: () => {
@@ -13,7 +20,9 @@ vi.mock("../../src/peer/identity.mjs", async (importOriginal) => ({
   endpointAlive: (who) => Boolean(who && !who.ended && ctx.live),
   processSession: () => ctx.parent,
 }));
-vi.mock("../../src/peer/relay.mjs", () => ({ tick: async () => false }));
+vi.mock("../../src/peer/relay.mjs", () => ({
+  tick: async (...args) => (ctx.tick ? ctx.tick(...args) : false),
+}));
 vi.mock("node:readline", () => ({
   createInterface: () => ({
     async *[Symbol.asyncIterator]() {
@@ -53,6 +62,7 @@ beforeEach(() => {
   ctx.input = [];
   ctx.spawned = 0;
   ctx.parent = null;
+  ctx.tick = null;
   out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
 });
@@ -201,6 +211,31 @@ it("starts only a missing relay and releases foreground relay ownership", async 
   });
   await run("status");
   expect(ctx.spawned).toBe(1);
+});
+it("gives the relay one Heads Up watcher and survives lock contention", async () => {
+  const p = await pair();
+  const seen = [];
+  ctx.tick = async (_store, _id, opts) => {
+    seen.push(opts.watcher);
+    if (seen.length === 1) throw new Error("peer transaction lock busy (held); retry later");
+    return false;
+  };
+  expect((await run("relay", "--pair", p.id)).code).toBe(0);
+  expect(seen).toHaveLength(2);
+  expect(seen[1]).toBe(seen[0]);
+  expect(typeof seen[0].prepare).toBe("function");
+  ctx.tick = async () => {
+    throw new Error("disk full");
+  };
+  expect((await run("relay", "--pair", p.id)).code).toBe(1);
+  expect((await store.read()).pairs[0].relay).toBe(null);
+  expect((await run("status")).value.heads_up).toEqual({
+    state: "off",
+    claudeVersion: null,
+    forwarded: 0,
+    ambiguous: 0,
+    mode: "off",
+  });
 });
 it("supports help/version, validates usage, and returns structured errors", async () => {
   expect(await runPeer(["--version"], env)).toBe(0);

@@ -113,7 +113,7 @@ const REQUEST_CONTROL = [
   "finished_at",
   "waiting_on",
 ];
-const PAIR_CONTROL = ["closed", "paused", "relay", "availability"];
+const PAIR_CONTROL = ["closed", "paused", "relay", "availability", "heads_up"];
 function jsonBytes(value) {
   return Buffer.byteLength(JSON.stringify(value));
 }
