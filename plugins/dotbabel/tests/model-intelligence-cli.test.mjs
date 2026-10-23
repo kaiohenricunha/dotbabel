@@ -32,7 +32,7 @@ function specCommandRows() {
 describe("dotbabel models CLI consolidation (P-23)", () => {
   it("--help lists every verb with the same purpose as the spec's Commands table", () => {
     const rows = specCommandRows();
-    expect(rows.length).toBe(7);
+    expect(rows.length).toBe(8);
     const help = sandbox().run("standalone", ["--help"]);
     expect(help.status).toBe(0);
     for (const [usage, purpose] of rows) {
@@ -45,7 +45,7 @@ describe("dotbabel models CLI consolidation (P-23)", () => {
   });
 
   it("one verb table drives both the help and the accepted verbs", () => {
-    expect(MODELS_VERBS.map(verb => verb.name)).toEqual(["refresh", "status", "resolve", "recommend", "migrate", "snapshot", "enable", "disable", "session"]);
+    expect(MODELS_VERBS.map(verb => verb.name)).toEqual(["refresh", "status", "resolve", "recommend", "migrate", "snapshot", "enable", "disable", "session", "route"]);
     for (const verb of MODELS_VERBS) { for (const form of verb.forms) expect(form.purpose.length, verb.name).toBeGreaterThan(10); expect(Array.isArray(verb.flags)).toBe(true); }
   });
 

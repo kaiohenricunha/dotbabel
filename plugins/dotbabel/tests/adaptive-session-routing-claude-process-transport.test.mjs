@@ -8,7 +8,7 @@ const ran = body => ({ exitCode: 0, stdout: `${JSON.stringify(body)}\n`, stderr:
 const response = body => ({ status: 200, ok: true, text: JSON.stringify(body) });
 const argv = ["/usr/bin/node", "/opt/dotbabel/bin/dotbabel-models.mjs", "route"];
 function fixture() {
-  const $ = { session: { version: vi.fn(async () => ({ version: "2.1.309" })), authorize: vi.fn(async () => ({ handle: "opaque-native-handle" })) },
+  const $ = { session: { id: vi.fn(async () => "5f0c2a8e-1b2c-4d3e-9f00-0123456789ab"), version: vi.fn(async () => ({ version: "2.1.309" })), authorize: vi.fn(async () => ({ handle: "opaque-native-handle" })) },
     settings: { read: vi.fn(async () => ({})) }, env: { get: vi.fn(async () => undefined) }, config: { list: vi.fn(async () => [{ key: "model", options: ["haiku"] }]) },
     http: { fetch: vi.fn(async () => response({ data: [{ id: "claude-haiku-5-5" }], has_more: false })) }, process: { run: vi.fn() } };
   const options = { transport: { kind: "process", argv }, state: {}, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } };
@@ -27,17 +27,18 @@ it("sends each request on stdin to the local route command and never puts the pr
     expect(init.stdin).not.toContain("opaque-native-handle");
   }
   expect(JSON.parse(f.$.process.run.mock.calls[1][1].stdin).request.prompt).toBe(prompt);
+  for (const [, init] of f.$.process.run.mock.calls) expect(JSON.parse(init.stdin).session).toBe("5f0c2a8e-1b2c-4d3e-9f00-0123456789ab");
   expect(f.$.http.fetch.mock.calls.every(([url]) => url.startsWith("https://api.anthropic.com/"))).toBe(true);
 });
 
-it("reuses the session's native evidence so a later turn needs no second preparation", async () => {
+it("sends no native evidence on a later turn, so the route command answers from its session cache without new probes", async () => {
   const f = fixture();
   f.$.process.run.mockResolvedValueOnce(ran({ ready: true })).mockResolvedValueOnce(ran({ needsEvidence: true })).mockResolvedValueOnce(ran({ decision: { status: "preserved", diagnostics: [] } }))
     .mockResolvedValueOnce(ran({ ready: true })).mockResolvedValueOnce(ran({ decision: { status: "preserved", diagnostics: [] } }));
   await prepareClaudeRoute(f.$, ordinary(), f.options);
   await prepareClaudeRoute(f.$, ordinary(), f.options);
   expect(f.$.process.run).toHaveBeenCalledTimes(5);
-  expect(JSON.parse(f.$.process.run.mock.calls[4][1].stdin).native).toMatchObject({ version: "2.1.309", selectors: ["haiku"] });
+  expect(JSON.parse(f.$.process.run.mock.calls[4][1].stdin)).not.toHaveProperty("native");
   expect(f.$.http.fetch).toHaveBeenCalledTimes(1);
 });
 
