@@ -32,6 +32,9 @@ import { isSecretName, isVersionString, makeAdapterResult, resolveTimeoutMs, run
 /** A closed local port. A connection to it is refused at once and nothing leaves the machine. */
 export const DEAD_PROXY = "http://127.0.0.1:9";
 
+/** The only hosts a `loopback` run may reach directly: the runtime's own private local server. */
+const LOOPBACK_HOSTS = "127.0.0.1,localhost,::1";
+
 /**
  * A defensive bound on one run's total output, sized to the OPS-2 per-entry limit that P-9 will
  * enforce on the capability cache. This is not itself OPS-2: OPS-2 bounds a cache entry, not a
@@ -58,9 +61,10 @@ const ISOLATION_PINNED_NAMES = new Set(["PATH", "HOME", "TERM", "HTTPS_PROXY", "
  * @param {Record<string, string|undefined>} [input.source] The caller's environment. Read for PATH only.
  * @param {string} input.home The scratch home.
  * @param {Record<string, string>} [input.extra] Variables to add, such as a runtime's config-root variable. A credential is refused.
+ * @param {boolean} [input.loopback] Exempt only loopback from the dead proxy, for a runtime that talks to its own private local server.
  * @returns {Record<string, string>}
  */
-export function buildIsolatedEnv({ source = {}, home, extra = {} }) {
+export function buildIsolatedEnv({ source = {}, home, extra = {}, loopback = false }) {
   for (const name of Object.keys(extra)) {
     if (isSecretName(name)) throw new TypeError(`buildIsolatedEnv: "${name}" looks like a credential and is never passed to a runtime`);
     if (ISOLATION_PINNED_NAMES.has(name)) throw new TypeError(`buildIsolatedEnv: "${name}" is an isolation pin and cannot be overridden by "extra"`);
@@ -75,7 +79,7 @@ export function buildIsolatedEnv({ source = {}, home, extra = {} }) {
     https_proxy: DEAD_PROXY,
     http_proxy: DEAD_PROXY,
     all_proxy: DEAD_PROXY,
-    NO_PROXY: "",
+    NO_PROXY: loopback ? LOOPBACK_HOSTS : "",
     ...extra,
   };
 }
@@ -360,9 +364,10 @@ function budgetSpent(ctx, provenance) {
  * @param {(streams: {stdout: string, stderr: string}) => boolean} [run.stopWhen]
  * @param {(paths: {scratch: string, home: string, work: string, runtimeRoot: string}) => Promise<void>} [run.prepare] Runs before the child, to seed the scratch root.
  * @param {object} run.provenance
+ * @param {boolean} [run.loopback] Exempt only loopback from the dead proxy (see `buildIsolatedEnv`).
  * @returns {Promise<object>}
  */
-export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stopWhen, prepare, provenance }) {
+export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stopWhen, prepare, provenance, loopback = false }) {
   // Checked BEFORE anything is created: a scratch directory inside the real root would make the
   // isolation a fiction, and creating it there would already be a write.
   assertOutsideRoot(ctx.tmpDir ?? tmpdir(), ctx.realRoot);
@@ -382,7 +387,7 @@ export async function runIsolated(ctx, { prefix, command, args, rootEnvVar, stop
       // operation too, so the child is bounded by what is left after them, not before.
       const childMs = remainingMs(ctx);
       if (childMs <= 0) return budgetSpent(ctx, provenance);
-      const env = buildIsolatedEnv({ source: ctx.env, home, extra: { [rootEnvVar]: runtimeRoot } });
+      const env = buildIsolatedEnv({ source: ctx.env, home, extra: { [rootEnvVar]: runtimeRoot }, loopback });
       /** @type {Promise<unknown> | undefined} */
       let operationSettled;
       const result = await runBounded(
