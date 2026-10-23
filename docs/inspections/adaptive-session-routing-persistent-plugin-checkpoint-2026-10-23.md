@@ -2,7 +2,8 @@
 
 Status: the owner approved the design and the routing-spec paragraph on 2026-10-23 ("Approve and
 build"; no real install on the owner's machine without a separate instruction). The spec paragraph
-lands first. The implementation is **not started**.
+landed in #577. The transport slice (stdin `models route` verb, process transport, per-session catalog
+cache) is the next pull request; the plugin package, install, status and host test remain.
 
 ## Documented facts (Claude Code docs, read 2026-10-23)
 
@@ -18,27 +19,33 @@ lands first. The implementation is **not started**.
 | `allowManagedModsOnly` stops every user-installed mod; `disableAllHooks` and `allowManagedHooksOnly` also apply                                                                                            | `plugins/mods/admin.md`                            |
 | A local directory plugin loads in place; changes apply at the next session start or after `/reload-plugins`                                                                                                | `plugins/loading.md`                               |
 
-## Open questions to answer first
+## Answered questions (2026-10-23)
 
-1. **How the prompt reaches the local command.** A command-line argument would show the prompt in
-   the process list. Check whether `$.process.run` accepts standard input. The installed types are
-   the authority, but `claude plugin validate` produced no `.d.ts`, and `claude plugin init` writes
-   under `~/.claude/skills/`, which a grant forbids. A scratch `CLAUDE_CONFIG_DIR` may allow
-   `init` safely.
-2. **`$.session.root()`.** The mods reference lists it without a definition. The current module
-   (`plugins/dotbabel/src/adaptive-session-routing/claude-mod-prepare.mjs`) already calls it; confirm
-   its value in a host test.
-3. **How to detect organization policy.** Decide how `models status` detects
-   `allowManagedModsOnly` (managed settings file) to report `blocked_by_policy` truthfully.
+1. **The prompt travels on stdin.** `$.process.run(argv, init)` takes `init.stdin` ("Text written to
+   the child's standard input, then closed") in the public Mods types
+   (`anthropics/claude-code` `mods/types/claude-code.d.ts`, `ProcessRunInit`). That file is upstream
+   `main`, not pinned to 2.1.309; the host test must confirm it on an accepted release.
+2. **`$.session.id()`** returns the transcript name. The route command keys its cache with it.
+3. **Measured cost (2.1.309, scratch projects, a loaded host).** A prompt in a project with routing
+   off costs about 200-375 ms for the activation check. With routing on, the first turn of a session
+   costs about 2-2.8 s (three zero-inference `claude` probes); later turns cost about 0.4 s from the
+   owner-approved per-session catalog cache.
+
+## Still open
+
+- How `models status` detects `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`
+  to report `blocked_by_policy`.
+- Whether the routing-off check can avoid the process start (for example, a cheaper activation probe),
+  because it runs on every prompt in every project once the plugin is installed.
 
 ## Build steps
 
-1. Tests first, against a scratch `CLAUDE_CONFIG_DIR`: install, idempotent re-install, uninstall,
-   no other key changed in the settings file, refusal when the `claude` CLI is missing.
-2. A `dotbabel models` route command that takes one bounded request (activation, prompt, current
-   axes) and returns the existing `prepareRoute` decision, with no socket.
-3. A persistent module variant of `claude-mod.mjs`: no-op outside enabled projects, decision at
-   `turn.start`, application at `turn.step` for MAIN requests only.
-4. `enable|disable --routing --claude-plugin` and the `models status` integration state, including
-   `blocked_by_policy`.
-5. Host test, then a metadata proof in a scratch config; a real install only on the owner's word.
+1. Done: shared `handleRoutingInput`, the stdin `models route` verb, the mod's process transport, the
+   per-session catalog cache.
+2. A plugin package (`.claude-plugin/plugin.json`, a local marketplace, the persistent module): no-op
+   outside enabled projects, decision at `turn.start`, application at `turn.step` for MAIN requests
+   only, an absolute `node` and `dotbabel-models.mjs` path in argv.
+3. `enable|disable --routing --claude-plugin` against a scratch `CLAUDE_CONFIG_DIR`: install,
+   idempotent re-install, uninstall, no other settings key changed, refusal without the `claude` CLI.
+4. `models status`: the plugin state and `blocked_by_policy`.
+5. Host test on an accepted release, then a real install only on the owner's word.

@@ -184,3 +184,36 @@ describe("Claude session resolver input", () => {
     expect(f.observe).toHaveBeenCalledTimes(2); expect(f.observe.mock.calls.map(([args]) => args.timeoutMs)).toEqual([10000, 5000]);
   });
 });
+
+describe("Claude session resolver input with a persistent store", () => {
+  const memory = (seed = {}) => {
+    const files = new Map(Object.entries(seed));
+    return { files, read: vi.fn(async root => files.get(root)), write: vi.fn(async (root, entry) => { files.set(root, entry); }), otherProjects: vi.fn(async root => [...files.keys()].filter(key => key !== root).length) };
+  };
+  it("stores the verified catalog with its release snapshot id, and a new loader reuses it without probes", async () => {
+    const store = memory(); await fixture({ store }).loader.load("/project", native());
+    expect(store.write.mock.calls[0][1].snapshotId).toBe(readSnapshot().snapshotId);
+    const later = fixture({ store });
+    await expect(later.loader.load("/project")).resolves.toMatchObject({ target: { runtimeId: "claude" } });
+    expect(later.observe).not.toHaveBeenCalled();
+  });
+  it("ignores a stored catalog built from another release snapshot", async () => {
+    const store = memory(); await fixture({ store }).loader.load("/project", native());
+    store.files.get("/project").snapshotId = "sha256:older";
+    await expect(fixture({ store }).loader.load("/project")).rejects.toMatchObject({ code: "native_catalog_required" });
+  });
+  it("still routes when the store cannot be written", async () => {
+    const store = { ...memory(), write: vi.fn(async () => { throw Object.assign(Error("read-only"), { code: "EACCES" }); }) };
+    const f = fixture({ store });
+    await expect(f.loader.load("/project", native())).resolves.toMatchObject({ target: { runtimeId: "claude" } });
+    await expect(f.loader.load("/project")).resolves.toMatchObject({ target: { runtimeId: "claude" } });
+  });
+  it("keeps the per-session limit of eight projects across processes through the store", async () => {
+    const store = memory(Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`/p${index}`, {}])));
+    const f = fixture({ store });
+    await expect(f.loader.load("/ninth", native())).rejects.toMatchObject({ code: "session_project_limit" });
+    expect(f.observe).not.toHaveBeenCalled();
+    store.files.delete("/p7");
+    await expect(f.loader.load("/ninth", native())).resolves.toMatchObject({ target: { runtimeId: "claude" } });
+  });
+});

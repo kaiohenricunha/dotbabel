@@ -1,10 +1,9 @@
 /** `dotbabel models route`: the persistent Claude plugin's one-shot local transport. */
-import { handleRoutingInput } from "./claude-bridge.mjs";
+import { handleRoutingInput, ROUTING_INPUT_INVALID, ROUTING_INPUT_MAXIMUM } from "./claude-bridge.mjs";
 import { openClaudeSessionCache } from "./claude-session-cache.mjs";
 import { createClaudeSessionInputLoader } from "../model-intelligence/cli/claude-session-input.mjs";
 
-const maximum = 1048576;
-const invalid = { ok: false, body: { diagnostics: [{ code: "session_input_invalid" }] } };
+const invalid = { ok: false, body: ROUTING_INPUT_INVALID };
 
 /**
  * Answer one Claude routing request read from a stream (adaptive-session-routing §5). The request never
@@ -17,10 +16,13 @@ const invalid = { ok: false, body: { diagnostics: [{ code: "session_input_invali
  */
 export async function runClaudeRoute(stdin, { env = process.env, loaderOptions = {} } = {}) {
   const chunks = []; let bytes = 0;
-  for await (const chunk of stdin) { bytes += chunk.length; if (bytes > maximum) return invalid; chunks.push(chunk); }
+  for await (const chunk of stdin) { bytes += chunk.length; if (bytes > ROUTING_INPUT_MAXIMUM) return invalid; chunks.push(chunk); }
   let input;
   try { input = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))); } catch { return invalid; }
   const store = openClaudeSessionCache({ session: input?.session, claudeVersion: input?.request?.runtimeVersion, env });
-  const handled = await handleRoutingInput(input, { load: createClaudeSessionInputLoader({ ...loaderOptions, store }).load });
+  // Built on first use, so an activation check never reads the release snapshot.
+  let loader;
+  const load = (root, native) => (loader ??= createClaudeSessionInputLoader({ ...loaderOptions, store })).load(root, native);
+  const handled = await handleRoutingInput(input, { load });
   return handled.code === 200 ? { ok: true, body: handled.body } : invalid;
 }

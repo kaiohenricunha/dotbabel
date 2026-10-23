@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
 import { openClaudeSessionCache } from "../src/adaptive-session-routing/claude-session-cache.mjs";
+import { readSnapshot } from "../src/model-intelligence/snapshot/index.mjs";
 
 const bin = fileURLToPath(new URL("../bin/dotbabel-models.mjs", import.meta.url));
 function project(activation) {
@@ -44,7 +45,7 @@ describe("dotbabel models route (persistent Claude plugin transport)", () => {
   it("answers a later turn of the same session from its cached catalog without asking for evidence", async () => {
     const { repo, route, env } = project({ enabled: true, adaptive_routing: { enabled: true } });
     const session = "5f0c2a8e-1b2c-4d3e-9f00-0123456789ab"; const observedAt = new Date().toISOString();
-    await openClaudeSessionCache({ session, claudeVersion: "2.1.309", env }).write(repo, { observedAt, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [] }] } });
+    await openClaudeSessionCache({ session, claudeVersion: "2.1.309", env }).write(repo, { observedAt, snapshotId: readSnapshot().snapshotId, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [] }] } });
     const axes = { current: { axes: {} }, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } };
     const turn = extra => JSON.parse(route(JSON.stringify({ ...JSON.parse(request(repo, "prepare", axes)), ...extra })).stdout);
     expect(turn({ session })).toHaveProperty("decision");
@@ -73,7 +74,7 @@ describe("runClaudeRoute (in process)", async () => {
   it("answers a valid request and keys the cache by the session id", async () => {
     const { repo, env } = project({ enabled: true, adaptive_routing: { enabled: true } });
     const session = "5f0c2a8e-1b2c-4d3e-9f00-0123456789ab"; const observedAt = new Date().toISOString();
-    await openClaudeSessionCache({ session, claudeVersion: "2.1.309", env }).write(repo, { observedAt, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [] }] } });
+    await openClaudeSessionCache({ session, claudeVersion: "2.1.309", env }).write(repo, { observedAt, snapshotId: readSnapshot().snapshotId, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [] }] } });
     const axes = { current: { axes: {} }, manual: { model: { source: "inherited" }, reasoning: { source: "inherited" } } };
     const result = await runClaudeRoute(stream(JSON.stringify({ ...JSON.parse(request(repo, "prepare", axes)), session })), { env });
     expect(result.ok).toBe(true);

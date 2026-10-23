@@ -8,9 +8,13 @@ import { createClaudeSessionInputLoader, VERIFIED_CLAUDE_MAIN_VERSIONS } from ".
 import { readProjectActivation } from "../model-intelligence/activation/index.mjs";
 import { route } from "./route.mjs";
 
-const maximum = 1048576;
+/** Largest request body, in bytes, for the launcher socket and the persistent plugin's `models route`. */
+export const ROUTING_INPUT_MAXIMUM = 1048576;
+/** The answer both transports give to a malformed, oversized or invalid request. */
+export const ROUTING_INPUT_INVALID = Object.freeze({ diagnostics: Object.freeze([Object.freeze({ code: "session_input_invalid" })]) });
+const maximum = ROUTING_INPUT_MAXIMUM;
 const answer = (response, code, body) => { response.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" }); response.end(JSON.stringify(body)); };
-const errorBody = { diagnostics: [{ code: "session_input_invalid" }] };
+const errorBody = ROUTING_INPUT_INVALID;
 function valid(input) {
   const request = input?.request;
   return request && typeof request.repoRoot === "string" && request.repoRoot.length <= 4096 && !/[\p{Cc}\p{Cf}]/u.test(request.repoRoot) && isAbsolute(request.repoRoot) && typeof request.prompt === "string" && request.prompt.length <= 16384 && typeof request.runtimeVersion === "string";

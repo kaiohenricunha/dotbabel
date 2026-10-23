@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { openClaudeSessionCache } from "../src/adaptive-session-routing/claude-session-cache.mjs";
 import { createClaudeSessionInputLoader } from "../src/model-intelligence/cli/claude-session-input.mjs";
 import { makeTempDir } from "./fixtures/temp-dir.mjs";
+import { readSnapshot } from "../src/model-intelligence/snapshot/index.mjs";
 
 const session = "5f0c2a8e-1b2c-4d3e-9f00-0123456789ab";
-const entry = observedAt => ({ observedAt, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [{ fields: { id: [{ value: "claude-haiku-5-5", observedAt }] } }] }] } });
+const entry = (observedAt, snapshotId = readSnapshot().snapshotId) => ({ observedAt, snapshotId, catalog: { sources: [], models: [], runtimes: [{ runtimeId: "claude", models: [{ fields: { id: [{ value: "claude-haiku-5-5", observedAt }] } }] }] } });
 const box = () => { const root = makeTempDir("mi-claude-cache-"); return { root, env: { XDG_CACHE_HOME: join(root, "cache"), HOME: join(root, "home") }, dir: join(root, "cache", "dotbabel", "claude-routing") }; };
 
 describe("Claude session catalog cache (persistent plugin)", () => {
@@ -40,7 +42,11 @@ describe("Claude session catalog cache (persistent plugin)", () => {
     const b = box(); const store = openClaudeSessionCache({ session, claudeVersion: "2.1.309", env: b.env });
     await store.write("/repo", entry(new Date().toISOString()));
     const file = join(b.dir, readdirSync(b.dir)[0]);
-    for (const body of ["not json", JSON.stringify({ repoRoot: "/elsewhere", claudeVersion: "2.1.309", observedAt: "x", catalog: {} }), JSON.stringify({ repoRoot: "/repo", claudeVersion: "2.1.309", observedAt: 3, catalog: null })]) {
+    const good = { repoRoot: "/repo", claudeVersion: "2.1.309", observedAt: new Date().toISOString(), snapshotId: "sha256:x" };
+    const bodies = ["not json", JSON.stringify({ ...good, repoRoot: "/elsewhere", catalog: entry("x").catalog }), JSON.stringify({ ...good, observedAt: 3, catalog: entry("x").catalog }),
+      JSON.stringify({ ...good, snapshotId: undefined, catalog: entry("x").catalog }), JSON.stringify({ ...good, catalog: { runtimes: [] } }),
+      JSON.stringify({ ...good, catalog: { runtimes: [{ runtimeId: "claude" }] } }), JSON.stringify({ ...good, catalog: { runtimes: [{ runtimeId: "claude", models: [{ fields: { id: "x" } }] }] } })];
+    for (const body of bodies) {
       writeFileSync(file, body);
       expect(await store.read("/repo"), body).toBeUndefined();
     }
@@ -53,6 +59,25 @@ describe("Claude session catalog cache (persistent plugin)", () => {
     utimesSync(old, past, past);
     await store.write("/repo", entry(new Date().toISOString()));
     expect(readdirSync(b.dir)).toHaveLength(1);
+  });
+
+  it("counts the other projects of the same session only", async () => {
+    const b = box(); const now = new Date().toISOString();
+    const store = openClaudeSessionCache({ session, claudeVersion: "2.1.309", env: b.env });
+    expect(await store.otherProjects("/repo")).toBe(0);
+    for (const root of ["/a", "/b", "/repo"]) await store.write(root, entry(now));
+    await openClaudeSessionCache({ session: "other-session-0001", claudeVersion: "2.1.309", env: b.env }).write("/c", entry(now));
+    expect(await store.otherProjects("/repo")).toBe(2);
+  });
+
+  it("leaves no partial file when the final rename fails", async () => {
+    const b = box(); const store = openClaudeSessionCache({ session, claudeVersion: "2.1.309", env: b.env });
+    await store.write("/seed", entry(new Date().toISOString()));
+    const seeded = readdirSync(b.dir)[0];
+    const target = join(b.dir, `${seeded.split("-")[0]}-${createHash("sha256").update("/repo").digest("hex").slice(0, 32)}.json`);
+    mkdirSync(target);
+    await expect(store.write("/repo", entry(new Date().toISOString()))).rejects.toThrow();
+    expect(readdirSync(b.dir).filter(name => name.endsWith(".tmp"))).toEqual([]);
   });
 
   it("lets a new loader reuse the stored catalog without new runtime probes, and only while fresh", async () => {

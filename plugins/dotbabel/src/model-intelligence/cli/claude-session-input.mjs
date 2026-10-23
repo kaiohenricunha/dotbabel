@@ -23,7 +23,7 @@ const safeSelector = value => typeof value === "string" && checkOpaqueValue("mod
  * Native/provider observations expire in six hours; documentation keeps its original date.
  * Each project has independent native membership and policy. No configuration is written; an optional
  * `store` (the persistent plugin's per-session cache) keeps the verified catalog between processes.
- * @param {{observe?:Function,loadPolicy?:Function,snapshot?:object,now?:Function,monotonic?:Function,store?:{read:Function,write:Function}}} [options] Trusted source handles and clocks.
+ * @param {{observe?:Function,loadPolicy?:Function,snapshot?:object,now?:Function,monotonic?:Function,store?:{read:Function,write:Function,otherProjects:Function}}} [options] Trusted source handles and clocks.
  * @returns {{load:Function}} Resolver-input loader; missing live evidence requests a native catalog.
  */
 export function createClaudeSessionInputLoader(options = {}) {
@@ -81,13 +81,16 @@ export function createClaudeSessionInputLoader(options = {}) {
   return {
     async load(repoRoot, native) {
       if (native !== undefined) {
-        if (!cache.has(repoRoot) && cache.size >= 8) throw fail("session_project_limit");
+        // The store carries the per-session project limit across one-shot `models route` processes.
+        if (!cache.has(repoRoot) && (cache.size >= 8 || (await options.store?.otherProjects(repoRoot) ?? 0) >= 8)) throw fail("session_project_limit");
         const candidate = await collect(native);
         cache.set(repoRoot, candidate);
-        await options.store?.write(repoRoot, candidate);
+        try { await options.store?.write(repoRoot, { ...candidate, snapshotId: snapshot.snapshotId }); }
+        catch { /* A cache that cannot be written only costs later turns new probes. */ }
       } else if (!cache.has(repoRoot) && options.store) {
         const stored = await options.store.read(repoRoot);
-        if (stored) cache.set(repoRoot, stored);
+        // A catalog built from another release snapshot carries other documentation facts.
+        if (stored && stored.snapshotId === snapshot.snapshotId) cache.set(repoRoot, { observedAt: stored.observedAt, catalog: stored.catalog });
       }
       const cached = cache.get(repoRoot);
       if (!cached || !fresh(cached.observedAt)) throw fail("native_catalog_required");
