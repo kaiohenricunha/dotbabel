@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:7085e540f729873cc278c1c21e08c920c6834d398e231a037eb0b2f9ece7c15c source=skills/ground-first/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:f2cc020bc681fb830532954c38ec5023cd052a3e5467dc8535056bb3cacd3e5b source=skills/ground-first/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: "[subject]"
 description: |

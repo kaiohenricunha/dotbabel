@@ -16,6 +16,28 @@ preserved verbatim because they describe state at the time of release.
   exclude Gemini CLI, which remains supported through explicit configuration. Existing explicit
   lists, Gemini artifacts, bootstrap detection, and Model Intelligence activation remain unchanged.
 
+## [4.5.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.4.0...v4.5.0) (2026-10-23)
+
+
+### Added
+
+* **models:** consolidate the dotbabel models CLI (P-23) ([#573](https://github.com/kaiohenricunha/dotbabel/issues/573)) ([959e1f2](https://github.com/kaiohenricunha/dotbabel/commit/959e1f23051bd38177b5dce7d313f1733c65911a))
+* **peer:** opt-in Heads Up relay watcher ([#580](https://github.com/kaiohenricunha/dotbabel/issues/580)) ([a8bce3b](https://github.com/kaiohenricunha/dotbabel/commit/a8bce3b95ad6890cff9bdc85c4a87a9c5feda8a0))
+* **routing:** accept the measured Claude Code 2.1.309 MAIN contract ([#574](https://github.com/kaiohenricunha/dotbabel/issues/574)) ([74e87a2](https://github.com/kaiohenricunha/dotbabel/commit/74e87a242b90cfc54d0e96b9c5f7c7de232acce1))
+* **routing:** add the stdin route transport and session catalog cache for the persistent Claude plugin ([#579](https://github.com/kaiohenricunha/dotbabel/issues/579)) ([fa5ebee](https://github.com/kaiohenricunha/dotbabel/commit/fa5ebee0e0241e6da07985897e2a0713e9f91189))
+
+
+### Fixed
+
+* **models:** show each verb's accepted flags in the models help ([#581](https://github.com/kaiohenricunha/dotbabel/issues/581)) ([19dc585](https://github.com/kaiohenricunha/dotbabel/commit/19dc5850b6b61762212c713ad45a3797918c3a65))
+
+
+### Documentation
+
+* **routing:** list Claude Code 2.1.309 among the measured builds ([#578](https://github.com/kaiohenricunha/dotbabel/issues/578)) ([7d7ec4b](https://github.com/kaiohenricunha/dotbabel/commit/7d7ec4b18b5c9d1dfa62edfb455d2cf4aead8190))
+* **routing:** measure the Claude turn.step effort override; list 2.1.307 ([#572](https://github.com/kaiohenricunha/dotbabel/issues/572)) ([df0b25e](https://github.com/kaiohenricunha/dotbabel/commit/df0b25ef2c3d8de6aa2328f87d9a748b559f5521))
+* **routing:** specify the opt-in persistent Claude plugin ([#577](https://github.com/kaiohenricunha/dotbabel/issues/577)) ([5828748](https://github.com/kaiohenricunha/dotbabel/commit/5828748f1acbd511a6a0f9b8bd78cc1b85556b23))
+
 ## [4.4.0](https://github.com/kaiohenricunha/dotbabel/compare/v4.3.0...v4.4.0) (2026-10-23)
 
 

@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:c95dfdf28a7ce4e4ed61cbe999489375f6072c9baa369ff30e252ed0d4fb8e2e source=commands/tldr.md — do not edit directly
+# dotbabel:generated projection=sha256:9c53cf6608c095ccb914348025a7adeef01b6aded74d24459c62d6f6babc5cde source=commands/tldr.md — do not edit directly
 argument-hint: "[PR number | branch | path | URL | topic] (default: current branch vs origin/main)"
 description: |
   Explain anything in 2-3 plain-language lines: a PR, a file, a directory, a URL, or a concept.

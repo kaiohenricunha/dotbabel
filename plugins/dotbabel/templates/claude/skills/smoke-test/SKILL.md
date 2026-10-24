@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:591c53e174394358d68ef81c7317f081712ff692f3cff6eb585e7dda358bc898 source=skills/smoke-test/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:ec8519fe6d3dec49fc114ec7e409739494969246f1236c22130ea2292f952607 source=skills/smoke-test/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash
 argument-hint: "[--dry-run] [--json]"
 description: |

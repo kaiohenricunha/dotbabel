@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:147d78252e518177e011246e60d345eb70a9e52e4b5b3d4a3ce81b8beba7778a source=skills/reproduce-bug/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:3d3c389cb26c4a680239c8ffd5d8aa7fa5917da2d5b89e2bcae068bf65b678ae source=skills/reproduce-bug/SKILL.md — do not edit directly
 argument-hint: "[bug or symptom]"
 description: |
   Reproduce a bug in an isolated, production-mirroring sandbox and capture a failing regression test as the objective baseline to fix against. Saves a report to docs/reproductions/. Triggers on: "reproduce this bug", "can't reproduce", "make it fail reliably", "repro".

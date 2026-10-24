@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:f4623e45f7ea0f409098cb0da4d3ed90eae86cef5a201610e2c7bb740e3fa532 source=agents/azure-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:1e2ff5eaee1e7fdbcda8616586920f4cd1bfdfed55d98aad44f97b1004040799 source=agents/azure-engineer.md — do not edit directly
 description: |
   Use when designing, debugging, or reviewing Azure workloads and service integrations. Triggers on: "Azure", "AKS", "ACI", "App Service", "Azure Functions", "Blob Storage", "VNet", "App Gateway", "Front Door", "EntraID", "Managed Identity", "ARM template", "Bicep", "Azure DevOps", "ACR", "Service Bus", "Logic Apps", "Cosmos DB". Uses opus — Azure spans identity, networking, and multi-subscription governance; deep reasoning reduces costly misconfigurations.
 model: opus

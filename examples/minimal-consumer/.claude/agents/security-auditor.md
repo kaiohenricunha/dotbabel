@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:f5b0ccaf7bea65ff14d6c28d696538cffcdbf774e5edba50458b5948b5cdaed9 source=agents/security-auditor.md — do not edit directly
+# dotbabel:generated projection=sha256:7e7c1659c671cc7e31b9466fa962daaeeaa0a102a149bd388aa62c531ebeeb02 source=agents/security-auditor.md — do not edit directly
 description: |
   Use when conducting security audits, reviewing code for vulnerabilities, assessing secrets exposure, or evaluating compliance posture. Triggers on: "audit security", "find vulnerabilities", "check secrets", "OWASP review", "security scan", "CVE", "threat model". Uses opus — security analysis requires thorough reasoning; false negatives have high downstream cost.
 model: opus

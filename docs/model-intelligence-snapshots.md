@@ -1,6 +1,6 @@
 # Model Intelligence release snapshots
 
-_Last updated: v4.4.0_
+_Last updated: v4.5.0_
 
 A release snapshot is a reviewed package input. It records accepted runtime selector support and capability facts. It does not prove a user's current entitlement, quota, selected MAIN model or effective effort. Ordinary live routing refuses release-only evidence.
 

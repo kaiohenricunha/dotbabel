@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:4acf71d62231a825bc4e3b0ed8d80a0908e3591ececce6010044f7ff4e6ed9f8 source=skills/veracity-audit/SKILL.md — do not edit directly
+# dotbabel:generated projection=sha256:1e456ef274c7b86f191b2efd22ff2c51e1f041088f52c24978b3b73e0022fdc9 source=skills/veracity-audit/SKILL.md — do not edit directly
 allowed-tools: Read Grep Glob Bash Agent
 argument-hint: audit | score-check | gate-check | source-trace <label> --config <path> --quality-config <path> --pipeline-dir <path> --scoring-dir <path>
 description: |

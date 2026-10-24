@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:4f7e7301f6e2663c8b5d25530c530aa11c1421f397c1e4aa906aab65781d5138 source=agents/crossplane-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:10a6e6adc438b48be3dc21a5c535be4ea94aa2bb7843013c8b701496b61e7abe source=agents/crossplane-engineer.md — do not edit directly
 description: |
   Use when designing, debugging, or reviewing Crossplane configurations and Kubernetes-native IaC. Triggers on: "Crossplane", "XRD", "Composition", "CompositeResource", "Claim", "managed resource", "provider config", "ProviderConfig", "composite resource definition", "Crossplane package". Uses sonnet — Crossplane Composition authoring is well-specified; sonnet covers the depth needed.
 model: sonnet

@@ -1,6 +1,6 @@
 # Hooks
 
-_Last updated: v4.4.0_
+_Last updated: v4.5.0_
 
 dotbabel ships eight Claude Code hooks in `plugins/dotbabel/hooks/`. `bootstrap.sh`
 symlinks all of them into `~/.claude/hooks/`.

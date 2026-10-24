@@ -1,5 +1,5 @@
 ---
-# dotbabel:generated projection=sha256:196d730c35d05ab27a0ce61a33d26811d4d6510175920f4293eaa3c47b55449d source=agents/docker-engineer.md — do not edit directly
+# dotbabel:generated projection=sha256:69c15b4ee240972eb2087728540e0071b22dd47488e140b5d4415fdf90484ef7 source=agents/docker-engineer.md — do not edit directly
 description: |
   Use when designing, operating, or debugging Docker Compose stacks and running containers. Triggers on: "docker compose up", "docker compose exec", "docker compose ps", "docker compose down", "docker compose restart", "compose stack", "multi-service compose", "service dependencies", "docker exec", "inspect container", "container logs", "docker logs", "container networking", "docker network", "running container", "container debug", "docker stats", "docker scout". Uses sonnet — Compose design and runtime ops are structured; sonnet provides the right depth.
 model: sonnet
