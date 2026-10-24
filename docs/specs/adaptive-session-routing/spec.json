@@ -276,13 +276,13 @@
     {
       "id": "AC-11",
       "status": "planned",
-      "given": "Claude real runtime",
-      "when": "observes selected model and effort in a real Claude main-session turn",
-      "then": "real Claude evidence identifies the effective model and effort on a main turn",
+      "given": "a real Claude runtime on an accepted release, in a project with routing enabled",
+      "when": "a real Claude main-session turn runs with a routed model",
+      "then": "returned native usage identifies the selected model; effort is reported as measured only with correlated native Stop evidence and as unknown otherwise, never as applied without that evidence",
       "tests": [
         {
           "file": "plugins/dotbabel/tests/integration/adaptive-session-routing-claude.integration.test.mjs",
-          "name": "observes selected model and effort in a real Claude main-session turn"
+          "name": "proves the routed model from native usage in a real Claude main-session turn, and never reports effort applied without evidence"
         }
       ],
       "argv": [
