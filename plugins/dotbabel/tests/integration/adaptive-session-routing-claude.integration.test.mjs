@@ -28,6 +28,8 @@ it.skipIf(process.env.DOTBABEL_MODELS_TIER3 !== "1")("proves the routed model fr
   // The model is proven only by returned native usage.
   expect(Object.keys(proof.result.modelUsage ?? {})).toContain(intended.model);
   expect(routing.some(value => value.effective?.state === "observed" && value.effective.axes?.model === intended.model && value.effective.source === "turn.step:usage.model")).toBe(true);
+  // The run's record for a pull request proof: no prompt, no credential.
+  console.log(JSON.stringify({ claude: version, intended, modelUsage: Object.keys(proof.result.modelUsage), costUsd: proof.result.total_cost_usd, effective: routing.at(-1)?.effective }));
   // Effort: reported only with correlated Stop evidence, and then it is the effort the request carried.
   // The unit suite covers both Stop branches; this run cannot see the session level Stop received.
   for (const value of routing.filter(item => item.effective?.axes?.reasoning !== undefined)) {
